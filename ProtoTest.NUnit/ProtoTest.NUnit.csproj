@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+	<LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+  	<PackageId>ProtoTest.NUnit</PackageId>
+  	<Version>0.1.0-alpha</Version>
+  	<Authors>Matthias Seys</Authors>
+  	<Description>NUnit adapter for ProtoTest, bringing frictionless lifecycle management and dependency injection to your test suites.</Description>
+  	<PackageLicenseExpression>MIT</PackageLicenseExpression>
+  	<PackageTags>testing;integration-testing;nunit;dependency-injection;dotnet</PackageTags>
+  	<RepositoryUrl>https://github.com/matthiasseys/ProtoTest</RepositoryUrl>
+  	<RepositoryType>git</RepositoryType>
+  	<IncludeSymbols>true</IncludeSymbols>
+  	<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NUnit" Version="4.6.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+  </ItemGroup>
+
+</Project>

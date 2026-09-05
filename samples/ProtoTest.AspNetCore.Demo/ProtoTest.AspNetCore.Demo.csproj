@@ -24,9 +24,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\samples\ProtoTest.AspNetCore.SampleApi\ProtoTest.AspNetCore.SampleApi.csproj" />
-    <ProjectReference Include="..\src\ProtoTest.AspNetCore\ProtoTest.AspNetCore.csproj" />
-    <ProjectReference Include="..\src\ProtoTest.NUnit\ProtoTest.NUnit.csproj" />
+    <ProjectReference Include="..\ProtoTest.AspNetCore.SampleApi\ProtoTest.AspNetCore.SampleApi.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.AspNetCore\ProtoTest.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.NUnit\ProtoTest.NUnit.csproj" />
   </ItemGroup>
 
   <ItemGroup>

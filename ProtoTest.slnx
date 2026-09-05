@@ -32,7 +32,10 @@
   </Folder>
   <Folder Name="/5. Demos/" />
   <Folder Name="/5. Demos/AspNetCore/">
-    <Project Path="ProtoTest.AspNetCore.Demo/ProtoTest.AspNetCore.Demo.csproj" Id="f12a642c-7908-42d8-bae2-8d480ea8ad09" />
+    <Project Path="samples/ProtoTest.AspNetCore.Demo/ProtoTest.AspNetCore.Demo.csproj" Id="f12a642c-7908-42d8-bae2-8d480ea8ad09" />
     <Project Path="samples/ProtoTest.AspNetCore.SampleApi/ProtoTest.AspNetCore.SampleApi.csproj" Id="09473e77-99bb-4f54-8ff8-9bd6f9324279" />
+  </Folder>
+  <Folder Name="/5. Demos/Rest/">
+    <Project Path="samples/ProtoTest.Rest.Demo/ProtoTest.Rest.Demo.csproj" Id="722a7c58-ada0-4ff9-bad6-aa38c517f7f4" />
   </Folder>
 </Solution>

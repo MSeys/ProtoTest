@@ -1,24 +1,38 @@
 <Solution>
   <Folder Name="/1. Core/">
-    <Project Path="ProtoTest.Core/ProtoTest.Core.csproj" />
+    <Project Path="src/ProtoTest.Core/ProtoTest.Core.csproj" />
   </Folder>
   <Folder Name="/2. Integrations/">
-    <Project Path="ProtoTest.AspNetCore/ProtoTest.AspNetCore.csproj" Id="dafd8b60-e20d-44cc-a746-68ec3136e256" />
-    <Project Path="ProtoTest.Rest/ProtoTest.Rest.csproj" Id="0161cd20-8be1-40f2-a3c0-76335a74ccd2" />
+    <Project Path="src/ProtoTest.AspNetCore/ProtoTest.AspNetCore.csproj" Id="dafd8b60-e20d-44cc-a746-68ec3136e256" />
+    <Project Path="src/ProtoTest.GraphQL/ProtoTest.GraphQL.csproj" Id="81af1d3a-d24c-465e-b1a0-ee742ca6bf6e" />
+    <Project Path="src/ProtoTest.gRPC/ProtoTest.gRPC.csproj" Id="f13ed54f-e401-4cd6-ba89-efebd1861e89" />
+    <Project Path="src/ProtoTest.Playwright/ProtoTest.Playwright.csproj" Id="5e82a152-c648-4ec2-9b1f-0a488aeb6666" />
+    <Project Path="src/ProtoTest.Rest/ProtoTest.Rest.csproj" Id="0161cd20-8be1-40f2-a3c0-76335a74ccd2" />
   </Folder>
   <Folder Name="/3. Adapters/">
-    <Project Path="ProtoTest.MSTest/ProtoTest.MSTest.csproj" Id="f11a8aa9-96e0-42c5-9a62-c27b908d0c5e" />
-    <Project Path="ProtoTest.NUnit/ProtoTest.NUnit.csproj" Id="fa911a2a-f4f3-42a3-b31b-e16d0a0b7af2" />
-    <Project Path="ProtoTest.TUnit/ProtoTest.TUnit.csproj" Id="113b6e4d-6a02-4e5f-b733-55314788ee4e" />
-    <Project Path="ProtoTest.Xunit/ProtoTest.Xunit.csproj" Id="307d9379-9985-4f21-8b88-49d2f1bd6abb" />
-    <Project Path="ProtoTest.Xunit3/ProtoTest.Xunit3.csproj" Id="6f5a58c5-f062-46d2-88ee-d3f853fa8a5b" />
+    <Project Path="src/ProtoTest.MSTest/ProtoTest.MSTest.csproj" Id="f11a8aa9-96e0-42c5-9a62-c27b908d0c5e" />
+    <Project Path="src/ProtoTest.NUnit/ProtoTest.NUnit.csproj" Id="fa911a2a-f4f3-42a3-b31b-e16d0a0b7af2" />
+    <Project Path="src/ProtoTest.TUnit/ProtoTest.TUnit.csproj" Id="113b6e4d-6a02-4e5f-b733-55314788ee4e" />
+    <Project Path="src/ProtoTest.Xunit/ProtoTest.Xunit.csproj" Id="307d9379-9985-4f21-8b88-49d2f1bd6abb" />
+    <Project Path="src/ProtoTest.Xunit3/ProtoTest.Xunit3.csproj" Id="6f5a58c5-f062-46d2-88ee-d3f853fa8a5b" />
   </Folder>
   <Folder Name="/4. Tests/">
-    <Project Path="ProtoTest.Core.Tests/ProtoTest.Core.Tests.csproj" Id="5c324d8d-8d2d-40d2-a7ca-8c8c9defd042" />
-    <Project Path="ProtoTest.MSTest.Tests/ProtoTest.MSTest.Tests.csproj" Id="46d67240-27b6-4460-a3d1-558336e41c9f" />
-    <Project Path="ProtoTest.NUnit.Tests/ProtoTest.NUnit.Tests.csproj" Id="9ef7170a-1eed-4a16-b6d1-23f4c62f1d05" />
-    <Project Path="ProtoTest.TUnit.Tests/ProtoTest.TUnit.Tests.csproj" Id="63bb53be-7578-4f88-bcf6-b0c420dbb1e1" />
-    <Project Path="ProtoTest.Xunit.Tests/ProtoTest.Xunit.Tests.csproj" Id="e6e507aa-df6c-438c-97b1-4297bab323de" />
-    <Project Path="ProtoTest.Xunit3.Tests/ProtoTest.Xunit3.Tests.csproj" Id="733750ce-a6f6-4fb7-8936-7e58c2ad76a5" />
+    <Project Path="tests/ProtoTest.Core.Tests/ProtoTest.Core.Tests.csproj" Id="5c324d8d-8d2d-40d2-a7ca-8c8c9defd042" />
+  </Folder>
+  <Folder Name="/4. Tests/Adapters/">
+    <Project Path="tests/ProtoTest.MSTest.Tests/ProtoTest.MSTest.Tests.csproj" Id="46d67240-27b6-4460-a3d1-558336e41c9f" />
+    <Project Path="tests/ProtoTest.NUnit.Tests/ProtoTest.NUnit.Tests.csproj" Id="9ef7170a-1eed-4a16-b6d1-23f4c62f1d05" />
+    <Project Path="tests/ProtoTest.TUnit.Tests/ProtoTest.TUnit.Tests.csproj" Id="63bb53be-7578-4f88-bcf6-b0c420dbb1e1" />
+    <Project Path="tests/ProtoTest.Xunit.Tests/ProtoTest.Xunit.Tests.csproj" Id="e6e507aa-df6c-438c-97b1-4297bab323de" />
+    <Project Path="tests/ProtoTest.Xunit3.Tests/ProtoTest.Xunit3.Tests.csproj" Id="733750ce-a6f6-4fb7-8936-7e58c2ad76a5" />
+  </Folder>
+  <Folder Name="/4. Tests/Integrations/">
+    <Project Path="tests/ProtoTest.AspNetCore.Tests/ProtoTest.AspNetCore.Tests.csproj" Id="8fe93cb3-774c-4dd1-a1c0-f3ad589708fe" />
+    <Project Path="tests/ProtoTest.Rest.Tests/ProtoTest.Rest.Tests.csproj" Id="da8c0737-a839-4f92-a4c2-f9bdecd6c96b" />
+  </Folder>
+  <Folder Name="/5. Demos/" />
+  <Folder Name="/5. Demos/AspNetCore/">
+    <Project Path="ProtoTest.AspNetCore.Demo/ProtoTest.AspNetCore.Demo.csproj" Id="f12a642c-7908-42d8-bae2-8d480ea8ad09" />
+    <Project Path="samples/ProtoTest.AspNetCore.SampleApi/ProtoTest.AspNetCore.SampleApi.csproj" Id="09473e77-99bb-4f54-8ff8-9bd6f9324279" />
   </Folder>
 </Solution>

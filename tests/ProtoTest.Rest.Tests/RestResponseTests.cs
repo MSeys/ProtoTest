@@ -1,11 +1,34 @@
 ﻿namespace ProtoTest.Rest.Tests;
 
 using System.Net;
+using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
+using ProtoTest.Core;
 
 [TestFixture]
 public class RestResponseTests
 {
+    private ProtoExecutionContext _context = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        var services = new ServiceCollection();
+        _context = new ProtoExecutionContext(
+            "TestContext",
+            services.BuildServiceProvider().CreateScope(),
+            "TestRun",
+            (MethodInfo)MethodInfo.GetCurrentMethod()!
+        );
+    }
+
+    [TearDown]
+    public async Task TearDown()
+    {
+        await _context.DisposeAsync();
+    }
+
     [Test]
     public void ReadAsDynamic_Should_Parse_Complex_Json_Object()
     {
@@ -58,6 +81,37 @@ public class RestResponseTests
         var response = new RestResponse(rawResponse, "{}", TimeSpan.FromMilliseconds(10));
 
         Assert.Throws<ArgumentNullException>(() => response.ShouldMatchShape(null!));
+    }
+
+    [Test]
+    public void ShouldMatchShape_Should_Record_CoverageHit_When_Context_Is_Provided()
+    {
+        // Arrange
+        var rawResponse = new HttpResponseMessage(HttpStatusCode.OK);
+        var json = """{ "id": 42, "name": "ProtoTest" }""";
+        var expectedShape = new { id = 42 };
+
+        var response = new RestResponse(
+            rawResponse,
+            json,
+            TimeSpan.FromMilliseconds(10),
+            context: _context,
+            targetName: "MyApiTarget",
+            routeIdentifier: "GET /api/test"
+        );
+
+        // Act
+        response.ShouldMatchShape(expectedShape);
+
+        // Assert
+        var hit = _context.RecordedHits.FirstOrDefault(h => h.Data is ShapeMatchData);
+        Assert.That(hit, Is.Not.Null);
+        Assert.That(hit!.TargetName, Is.EqualTo("MyApiTarget"));
+        Assert.That(hit.Identifier, Is.EqualTo("GET /api/test"));
+
+        var shapeData = (ShapeMatchData)hit.Data!;
+        Assert.That(shapeData.RouteTemplate, Is.EqualTo("GET /api/test"));
+        Assert.That(shapeData.MatchedProperties, Contains.Item("$.id"));
     }
 
     [Test]

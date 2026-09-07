@@ -8,7 +8,7 @@ using ProtoTest.Rest.Matching;
 public class ShapeMatcherTests
 {
     [Test]
-    public void AssertMatch_Should_Pass_When_Json_Matches_Expected_Shape_Exactly()
+    public void AssertMatch_Should_Pass_And_Return_Matched_Properties_When_Shape_Matches()
     {
         var json = """
         {
@@ -32,7 +32,16 @@ public class ShapeMatcherTests
             }
         };
 
-        Assert.DoesNotThrow(() => ShapeMatcher.AssertMatch(json, expectedShape));
+        IReadOnlyList<string> matchedProperties = null!;
+        Assert.DoesNotThrow(() => matchedProperties = ShapeMatcher.AssertMatch(json, expectedShape));
+
+        Assert.That(matchedProperties, Is.Not.Null);
+        Assert.That(matchedProperties, Contains.Item("$"));
+        Assert.That(matchedProperties, Contains.Item("$.id"));
+        Assert.That(matchedProperties, Contains.Item("$.name"));
+        Assert.That(matchedProperties, Contains.Item("$.isActive"));
+        Assert.That(matchedProperties, Contains.Item("$.address"));
+        Assert.That(matchedProperties, Contains.Item("$.address.city"));
     }
 
     [Test]
@@ -47,13 +56,12 @@ public class ShapeMatcherTests
         }
         """;
 
-        // Shape expected with two mismatches and one missing property
         var expectedShape = new
         {
             id = 101,
-            name = "Matthias", // Mismatch 1
-            age = 25,          // Mismatch 2
-            department = "IT"  // Mismatch 3 (Missing property)
+            name = "Matthias",
+            age = 25,
+            department = "IT"
         };
 
         var ex = Assert.Throws<ShapeMismatchException>(() => ShapeMatcher.AssertMatch(json, expectedShape));

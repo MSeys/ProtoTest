@@ -18,7 +18,12 @@ public interface IProtoHostBuilder
     /// Registers a global execution lifecycle hook.
     /// </summary>
     /// <returns>The current <see cref="IProtoHostBuilder"/> instance.</returns>
-    IProtoHostBuilder AddHook<THook>() where THook : class, IProtoHook;
+    IProtoHostBuilder AddTestHook<THook>() where THook : class, IProtoTestHook;
+
+    /// <summary>
+    /// Registers a suite-level lifecycle hook.
+    /// </summary>
+    IProtoHostBuilder AddRunHook<TRunHook>() where TRunHook : class, IProtoRunHook;
 
     /// <summary>
     /// Configures the application configuration (appsettings.json, environment variables, etc.).

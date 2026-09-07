@@ -3,7 +3,6 @@
 using global::NUnit.Framework;
 using global::NUnit.Framework.Interfaces;
 using ProtoTest.Core;
-using System.Reflection;
 
 /// <summary>
 /// NUnit test attribute that manages the <see cref="ProtoExecutionContext"/> lifecycle for each test method.
@@ -18,12 +17,8 @@ public class ProtoTestAttribute : TestAttribute, ITestAction
         var attributes = GetProtoAttributes(test);
         var testId = ProtoTestIdGenerator.Generate(test.Method!.MethodInfo);
 
-        // 1. Synchronously bind context on NUnit's test execution frame
-        ProtoTestAssembly.Host.BeginTestContext(test.FullName, testId, test.Method!.MethodInfo);
-
-        // 2. Execute async pre-test hooks & attributes
         ProtoTestAssembly.Host
-            .ExecuteBeforeHooksAsync(attributes)
+            .StartTestAsync(test.FullName, testId, test.Method!.MethodInfo, attributes)
             .GetAwaiter()
             .GetResult();
     }
@@ -32,19 +27,11 @@ public class ProtoTestAttribute : TestAttribute, ITestAction
     {
         var attributes = GetProtoAttributes(test);
 
-        try
-        {
-            // 1. Execute async post-test hooks & attributes and dispose context scope
-            ProtoTestAssembly.Host
-                .ExecuteAfterHooksAsync(attributes)
-                .GetAwaiter()
-                .GetResult();
-        }
-        finally
-        {
-            // 2. Synchronously unbind context from NUnit's test execution frame
-            ProtoTestAssembly.Host.EndTestContext();
-        }
+        // Execute async post-test hooks, dispose the context scope, and clear ambient state.
+        ProtoTestAssembly.Host
+            .CompleteTestAsync(attributes)
+            .GetAwaiter()
+            .GetResult();
     }
 
     private static List<ProtoAttribute> GetProtoAttributes(ITest test)

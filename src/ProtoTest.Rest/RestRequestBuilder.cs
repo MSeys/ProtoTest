@@ -8,46 +8,36 @@ using ProtoTest.Core;
 using ProtoTest.Rest.Internal;
 
 public sealed class RestRequestBuilder(
-    HttpClient httpClient, 
-    ProtoExecutionContext context, 
+    HttpClient httpClient,
+    ProtoExecutionContext context,
+    string targetName,
     IRestAuthenticator? defaultAuthenticator
-    )
+)
 {
     private readonly HttpClient _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
     private readonly ProtoExecutionContext _context = context ?? throw new ArgumentNullException(nameof(context));
+    private readonly string _targetName = targetName ?? throw new ArgumentNullException(nameof(targetName));
     private readonly Dictionary<string, string> _headers = new(StringComparer.OrdinalIgnoreCase);
     private HttpContent? _content;
 
-    /// <summary>
-    /// Overrides or sets a explicit authenticator for this request.
-    /// </summary>
     public RestRequestBuilder Auth(IRestAuthenticator authenticator)
     {
         defaultAuthenticator = authenticator ?? throw new ArgumentNullException(nameof(authenticator));
         return this;
     }
 
-    /// <summary>
-    /// Instantiates and sets a custom authenticator via DI and constructor args for this request.
-    /// </summary>
     public RestRequestBuilder Auth<TAuth>(params object[] constructorArgs) where TAuth : IRestAuthenticator
     {
         defaultAuthenticator = ActivatorUtilities.CreateInstance<TAuth>(_context.Services, constructorArgs);
         return this;
     }
 
-    /// <summary>
-    /// Adds a custom header to the request.
-    /// </summary>
     public RestRequestBuilder Header(string name, string value)
     {
         _headers[name] = value;
         return this;
     }
 
-    /// <summary>
-    /// Sets a JSON body payload using system options or custom options.
-    /// </summary>
     public RestRequestBuilder Body(object payload, JsonSerializerOptions? options = null)
     {
         var json = JsonSerializer.Serialize(payload, options);
@@ -55,16 +45,11 @@ public sealed class RestRequestBuilder(
         return this;
     }
 
-    /// <summary>
-    /// Sets a raw string body with custom content type.
-    /// </summary>
     public RestRequestBuilder Body(string rawContent, string mediaType = "text/plain")
     {
         _content = new StringContent(rawContent, Encoding.UTF8, mediaType);
         return this;
     }
-
-    // --- HTTP Execution Methods ---
 
     public Task<RestResponse> GetAsync(string routeTemplate, object? routeAndQueryParams = null, CancellationToken ct = default)
         => SendAsync(HttpMethod.Get, routeTemplate, routeAndQueryParams, ct);
@@ -106,6 +91,31 @@ public sealed class RestRequestBuilder(
         stopwatch.Stop();
 
         var bodyString = await responseMessage.Content.ReadAsStringAsync(ct);
-        return new RestResponse(responseMessage, bodyString, stopwatch.Elapsed);
+
+        var headersDict = responseMessage.Headers
+            .ToDictionary(h => h.Key, h => string.Join(", ", h.Value), StringComparer.OrdinalIgnoreCase);
+
+        var routeIdentifier = $"{method.Method.ToUpperInvariant()} {routeTemplate}";
+
+        _context.RecordHit(new CoverageHit(
+            TargetName: _targetName,
+            Identifier: routeIdentifier,
+            Data: new RestHitData(
+                Method: method.Method,
+                RouteTemplate: routeTemplate,
+                StatusCode: (int)responseMessage.StatusCode,
+                ResponseBody: bodyString,
+                Headers: headersDict
+            )
+        ));
+
+        return new RestResponse(
+            responseMessage,
+            bodyString,
+            stopwatch.Elapsed,
+            _context,
+            _targetName,
+            routeIdentifier
+        );
     }
 }

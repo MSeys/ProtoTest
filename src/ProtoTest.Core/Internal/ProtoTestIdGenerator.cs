@@ -4,7 +4,7 @@ using System.Reflection;
 using System.Text;
 
 /// <summary>
-/// Generates deterministic 5-digit numeric test IDs scoped across assembly boundaries.
+/// Generates process-scoped 5-digit numeric test IDs with an assembly-derived prefix.
 /// </summary>
 public static class ProtoTestIdGenerator
 {
@@ -12,14 +12,16 @@ public static class ProtoTestIdGenerator
 
     public static string Generate(MethodInfo method)
     {
-        var assemblyName = method.DeclaringType?.Assembly.GetName().Name ?? "DefaultAssembly";
-        int assemblyPrefix = GetAssemblyPrefix(assemblyName);
+        ArgumentNullException.ThrowIfNull(method);
 
-        // Increments safely across threads, wraps within 0-999
+        var assemblyName = method.DeclaringType?.Assembly.GetName().Name ?? "DefaultAssembly";
+        var assemblyPrefix = GetAssemblyPrefix(assemblyName);
+
+        // Increments safely across threads and wraps within the three-digit suffix.
         long testIndex = Interlocked.Increment(ref _testCounter) % 1000;
 
-        int finalTestId = (assemblyPrefix * 1000) + (int)testIndex;
-        return finalTestId.ToString();
+        var finalTestId = (assemblyPrefix * 1000) + (int)testIndex;
+        return finalTestId.ToString("D5");
     }
 
     private static int GetAssemblyPrefix(string assemblyName)

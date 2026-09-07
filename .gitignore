@@ -480,3 +480,5 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+!*ProtoTest.Coverage

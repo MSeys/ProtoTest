@@ -1,12 +1,20 @@
 ﻿namespace ProtoTest.Rest;
 
+using ProtoTest.Core;
 using ProtoTest.Rest.Matching;
 using System.Dynamic;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
-public sealed class RestResponse(HttpResponseMessage rawResponse, string content, TimeSpan elapsedTime)
+public sealed class RestResponse(
+    HttpResponseMessage rawResponse,
+    string content,
+    TimeSpan elapsedTime,
+    ProtoExecutionContext? context = null,
+    string? targetName = null,
+    string? routeIdentifier = null
+)
 {
     private static readonly JsonSerializerOptions DefaultJsonOptions = new()
     {
@@ -20,9 +28,6 @@ public sealed class RestResponse(HttpResponseMessage rawResponse, string content
     public TimeSpan ElapsedTime { get; } = elapsedTime;
     public string Content { get; } = content ?? string.Empty;
 
-    /// <summary>
-    /// Deserializes the JSON body into a strongly-typed object.
-    /// </summary>
     public T? ReadAsJson<T>(JsonSerializerOptions? options = null)
     {
         if (string.IsNullOrWhiteSpace(Content))
@@ -31,18 +36,11 @@ public sealed class RestResponse(HttpResponseMessage rawResponse, string content
         return JsonSerializer.Deserialize<T>(Content, options ?? DefaultJsonOptions);
     }
 
-    /// <summary>
-    /// Deserializes the JSON body using the shape of an anonymous object.
-    /// Usage: response.ReadAsAnonymous(new { id = 0, name = "" })
-    /// </summary>
     public T? ReadAsAnonymous<T>(T anonymousTypeDefinition, JsonSerializerOptions? options = null)
     {
         return ReadAsJson<T>(options);
     }
 
-    /// <summary>
-    /// Deserializes the JSON body as a dynamic JsonElement/ExpandoObject structure.
-    /// </summary>
     public dynamic? ReadAsDynamic()
     {
         if (string.IsNullOrWhiteSpace(Content))
@@ -52,9 +50,6 @@ public sealed class RestResponse(HttpResponseMessage rawResponse, string content
         return ConvertJsonElement(doc.RootElement.Clone());
     }
 
-    /// <summary>
-    /// Asserts that the response HTTP status code matches the expected status code.
-    /// </summary>
     public RestResponse ShouldHaveStatus(HttpStatusCode expectedStatusCode)
     {
         if (StatusCode != expectedStatusCode)
@@ -66,15 +61,27 @@ public sealed class RestResponse(HttpResponseMessage rawResponse, string content
         return this;
     }
 
-    // <summary>
-    /// Asserts that the JSON response structure and values match the provided shape specification.
-    /// Partial matching is supported: properties not specified in expectedShape are ignored.
-    /// </summary>
     public RestResponse ShouldMatchShape(object expectedShape)
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
-        ShapeMatcher.AssertMatch(Content, expectedShape);
-        return this; // Returns itself for chaining!
+
+        var matchedProps = ShapeMatcher.AssertMatch(Content, expectedShape);
+
+        // 🎯 Record ShapeMatch Hit if context is available
+        if (context != null && !string.IsNullOrEmpty(targetName) && !string.IsNullOrEmpty(routeIdentifier))
+        {
+            context.RecordHit(new CoverageHit(
+                TargetName: targetName,
+                Identifier: routeIdentifier,
+                Data: new ShapeMatchData(
+                    RouteTemplate: routeIdentifier,
+                    MatchedProperties: matchedProps,
+                    TargetType: expectedShape.GetType()
+                )
+            ));
+        }
+
+        return this;
     }
 
     private static object? ConvertJsonElement(JsonElement element)

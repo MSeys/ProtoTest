@@ -1,19 +1,11 @@
 ﻿namespace ProtoTest.Rest;
 
-using ProtoTest.Core;
 using ProtoTest.Rest.Authenticators;
-using ProtoTest.Rest.Internal;
 
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
 public abstract class RestAuthAttribute : Attribute
 {
     public abstract IRestAuthenticator CreateAuthenticator();
-
-    public void ApplyToContext(ProtoExecutionContext context, string? clientName)
-    {
-        var authenticator = CreateAuthenticator();
-        context.SetContext(new RestContextState { Authenticator = authenticator, ClientName = clientName ?? "Default" });
-    }
 }
 
 /// <summary>

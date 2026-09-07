@@ -5,7 +5,7 @@ using ProtoTest.Core;
 
 /// <summary>
 /// Base class for global assembly setup in NUnit.
-/// Initializes and disposes the root <see cref="ProtoHost"/>.
+/// Initializes, starts, and disposes the root <see cref="ProtoHost"/>.
 /// </summary>
 [SetUpFixture]
 public abstract class ProtoTestAssembly
@@ -19,11 +19,15 @@ public abstract class ProtoTestAssembly
         ?? throw new InvalidOperationException("ProtoHost is not initialized. Ensure your setup class inherits from ProtoTestAssembly.");
 
     [OneTimeSetUp]
-    public void GlobalSetUp()
+    public async Task GlobalSetUp()
     {
         var builder = new ProtoHostBuilder();
         Configure(builder);
+
         _host = builder.Build();
+
+        // Trigger suite-level before run hooks (e.g. downloading OpenAPI specs, starting test environments)
+        await _host.StartAsync();
     }
 
     [OneTimeTearDown]
@@ -31,12 +35,20 @@ public abstract class ProtoTestAssembly
     {
         if (_host != null)
         {
-            await _host.DisposeAsync();
+            try
+            {
+                // Trigger suite-level after run hooks (e.g. generating coverage reports)
+                await _host.StopAsync();
+            }
+            finally
+            {
+                await _host.DisposeAsync();
+            }
         }
     }
 
     /// <summary>
-    /// Configures the <see cref="IProtoHostBuilder"/> with custom services and hooks.
+    /// Configures the <see cref="IProtoHostBuilder"/> with custom services, collectors, and hooks.
     /// </summary>
     protected abstract void Configure(IProtoHostBuilder builder);
 }

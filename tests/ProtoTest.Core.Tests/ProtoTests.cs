@@ -16,7 +16,7 @@ public class ProtoTests
         services.AddScoped<ITestService, TestService>();
         var rootProvider = services.BuildServiceProvider();
 
-        _host = new ProtoHost(rootProvider, Array.Empty<IProtoHook>());
+        _host = new ProtoHost(rootProvider);
     }
 
     [TearDown]
@@ -29,8 +29,7 @@ public class ProtoTests
     public async Task Service_ShouldResolveRegisteredService()
     {
         // Arrange
-        _host.BeginTestContext("HelperTest", "id-789", (MethodInfo)MethodInfo.GetCurrentMethod()!);
-        await _host.ExecuteBeforeHooksAsync();
+        await _host.StartTestAsync("HelperTest", "id-789", (MethodInfo)MethodInfo.GetCurrentMethod()!);
 
         try
         {
@@ -43,8 +42,7 @@ public class ProtoTests
         }
         finally
         {
-            await _host.ExecuteAfterHooksAsync();
-            _host.EndTestContext();
+            await _host.CompleteTestAsync();
         }
     }
 
@@ -52,8 +50,7 @@ public class ProtoTests
     public async Task TryService_ShouldReturnNull_WhenServiceIsNotRegistered()
     {
         // Arrange
-        _host.BeginTestContext("HelperTest", "id-789", (MethodInfo)MethodInfo.GetCurrentMethod()!);
-        await _host.ExecuteBeforeHooksAsync();
+        await _host.StartTestAsync("HelperTest", "id-789", (MethodInfo)MethodInfo.GetCurrentMethod()!);
 
         try
         {
@@ -65,8 +62,7 @@ public class ProtoTests
         }
         finally
         {
-            await _host.ExecuteAfterHooksAsync();
-            _host.EndTestContext();
+            await _host.CompleteTestAsync();
         }
     }
 
@@ -74,8 +70,7 @@ public class ProtoTests
     public async Task ContextAndSetContext_ShouldManageTestState()
     {
         // Arrange
-        _host.BeginTestContext("HelperTest", "id-789", (MethodInfo)MethodInfo.GetCurrentMethod()!);
-        await _host.ExecuteBeforeHooksAsync();
+        await _host.StartTestAsync("HelperTest", "id-789", (MethodInfo)MethodInfo.GetCurrentMethod()!);
 
         try
         {
@@ -90,8 +85,7 @@ public class ProtoTests
         }
         finally
         {
-            await _host.ExecuteAfterHooksAsync();
-            _host.EndTestContext();
+            await _host.CompleteTestAsync();
         }
     }
 

@@ -1,8 +1,8 @@
 ﻿namespace ProtoTest.Core;
 /// <summary>
-/// Defines a global lifecycle hook executed before and after each test.
+/// Defines a lifecycle hook executed before and after each test.
 /// </summary>
-public interface IProtoHook
+public interface IProtoTestHook
 {
     /// <summary>
     /// Order of execution for the hook. Lower values are executed earlier in the lifecycle.

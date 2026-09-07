@@ -32,7 +32,7 @@ public sealed record ProtoExecutionContext(string TestName, IServiceScope Scope,
 
     #region Contextual State Management
 
-    private readonly Dictionary<Type, IProtoContext> _contexts = [];
+    private readonly ConcurrentDictionary<Type, IProtoContext> _contexts = new();
 
     /// <summary>
     /// Registers or overrides a contextual state instance for the current test execution.
@@ -49,7 +49,7 @@ public sealed record ProtoExecutionContext(string TestName, IServiceScope Scope,
     /// <returns>The registered instance, or <c>null</c> if not found.</returns>
     public T? TryContext<T>() where T : class, IProtoContext
     {
-        return _contexts.TryGetValue(typeof(T), out var ctx) ? (T)ctx : null;
+        return _contexts.TryGetValue(typeof(T), out var context) ? (T)context : null;
     }
 
     /// <summary>
@@ -67,16 +67,32 @@ public sealed record ProtoExecutionContext(string TestName, IServiceScope Scope,
 
     #region Named Client Registry
 
-    private readonly ConcurrentDictionary<string, object> _clients = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _clientGate = new();
+    private readonly Dictionary<string, object> _clients = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<string> _clientOrder = [];
+    private int _disposeStarted;
 
     /// <summary>
-    /// Registers a named client or connection instance (e.g., HttpClient, GrpcChannel, etc.) for the current test context.
+    /// Registers a named client or connection instance for the current test context.
+    /// The context owns registered clients and disposes them when the test completes.
+    /// Registering the same client type and name more than once is not allowed.
     /// </summary>
     public void RegisterClient<TClient>(TClient client, string name = "Default") where TClient : class
     {
         ArgumentNullException.ThrowIfNull(client);
         var key = BuildClientKey<TClient>(name);
-        _clients[key] = client;
+
+        lock (_clientGate)
+        {
+            if (_clients.ContainsKey(key))
+            {
+                throw new InvalidOperationException(
+                    $"A client of type '{typeof(TClient).Name}' is already registered with name '{name}'.");
+            }
+
+            _clientOrder.Add(key);
+            _clients[key] = client;
+        }
     }
 
     /// <summary>
@@ -85,9 +101,12 @@ public sealed record ProtoExecutionContext(string TestName, IServiceScope Scope,
     public TClient Client<TClient>(string name = "Default") where TClient : class
     {
         var key = BuildClientKey<TClient>(name);
-        if (_clients.TryGetValue(key, out var client) && client is TClient typedClient)
+        lock (_clientGate)
         {
-            return typedClient;
+            if (_clients.TryGetValue(key, out var client) && client is TClient typedClient)
+            {
+                return typedClient;
+            }
         }
 
         throw new InvalidOperationException(
@@ -100,42 +119,138 @@ public sealed record ProtoExecutionContext(string TestName, IServiceScope Scope,
     public TClient? TryClient<TClient>(string name = "Default") where TClient : class
     {
         var key = BuildClientKey<TClient>(name);
-        return _clients.TryGetValue(key, out var client) && client is TClient typedClient
-            ? typedClient
-            : null;
+
+        lock (_clientGate)
+        {
+            return _clients.TryGetValue(key, out var client) && client is TClient typedClient
+                ? typedClient
+                : null;
+        }
     }
 
-    private static string BuildClientKey<TClient>(string name) => $"{typeof(TClient).FullName}:{name}";
+    private static string BuildClientKey<TClient>(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return $"{typeof(TClient).FullName}:{name}";
+    }
+
+    #endregion
+
+    #region Coverage Dispatcher
+
+    private readonly ConcurrentBag<CoverageHit> _recordedHits = [];
+
+    /// <summary>
+    /// Gets a materialized snapshot of the coverage hits recorded for this test.
+    /// </summary>
+    public IReadOnlyCollection<CoverageHit> RecordedHits => _recordedHits.ToArray();
+
+    /// <summary>
+    /// Dispatches a coverage hit to all registered collectors matching the target name.
+    /// </summary>
+    public void RecordHit(CoverageHit hit)
+    {
+        ArgumentNullException.ThrowIfNull(hit);
+
+        _recordedHits.Add(hit);
+
+        var collectors = Services.GetServices<IProtoCollector>();
+
+        foreach (var collector in collectors)
+        {
+            if (string.Equals(collector.TargetName, hit.TargetName, StringComparison.OrdinalIgnoreCase))
+            {
+                collector.RecordHit(hit);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Convenience overload to record a coverage hit directly.
+    /// </summary>
+    public void RecordHit(
+        string targetName,
+        string identifier,
+        object? data = null,
+        IReadOnlyDictionary<string, object>? metadata = null)
+    {
+        RecordHit(new CoverageHit(targetName, identifier, data, metadata));
+    }
 
     #endregion
 
     /// <summary>
-    /// Disposes the underlying service scope asynchronously.
+    /// Disposes registered clients in reverse registration order and then the underlying service scope.
+    /// Disposal is safe to call more than once. All registered clients are attempted even when one fails.
     /// </summary>
     public async ValueTask DisposeAsync()
     {
-        // 1. Clean up registered clients in reverse order
-        foreach (var client in _clients.Values)
+        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
         {
-            if (client is IAsyncDisposable asyncDisposable)
-            {
-                await asyncDisposable.DisposeAsync();
-            }
-            else if (client is IDisposable disposable)
-            {
-                disposable.Dispose();
-            }
+            return;
         }
-        _clients.Clear();
 
-        // 2. Dispose DI scope
-        if (Scope is IAsyncDisposable scopeAsyncDisposable)
+        List<object> clients;
+
+        lock (_clientGate)
         {
-            await scopeAsyncDisposable.DisposeAsync();
+            clients = [.. _clientOrder
+                .AsEnumerable()
+                .Reverse()
+                .Select(key => _clients[key])];
+
+            _clients.Clear();
+            _clientOrder.Clear();
         }
-        else
+
+        List<Exception>? disposalExceptions = null;
+        Exception? scopeException = null;
+
+        foreach (var client in clients)
         {
-            Scope.Dispose();
+            try
+            {
+                if (client is IAsyncDisposable asyncDisposable)
+                {
+                    await asyncDisposable.DisposeAsync();
+                }
+                else if (client is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
+            catch (Exception exception)
+            {
+                disposalExceptions ??= [];
+                disposalExceptions.Add(exception);
+            }
+        }
+
+        try
+        {
+            if (_scope is IAsyncDisposable scopeAsyncDisposable)
+            {
+                await scopeAsyncDisposable.DisposeAsync();
+            }
+            else
+            {
+                _scope.Dispose();
+            }
+        }
+        catch (Exception exception)
+        {
+            scopeException = exception;
+        }
+
+        if (disposalExceptions is not null || scopeException is not null)
+        {
+            var exceptions = disposalExceptions ?? [];
+            if (scopeException is not null)
+            {
+                exceptions.Add(scopeException);
+            }
+
+            throw new AggregateException("One or more execution context resources failed to dispose.", exceptions);
         }
     }
 }

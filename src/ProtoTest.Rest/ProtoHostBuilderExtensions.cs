@@ -1,37 +1,43 @@
-﻿namespace ProtoTest.Rest.Extensions;
+﻿namespace ProtoTest.Rest;
 
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Rest.Internal;
 
+public sealed class ProtoRestTargetBuilder(string targetName, IServiceCollection services) : IProtoTargetBuilder
+{
+    public string TargetName { get; } = targetName;
+    public IServiceCollection Services { get; } = services;
+}
+
 public static class ProtoHostBuilderExtensions
 {
-    /// <summary>
-    /// Registers usage of ProtoTest.Reset.
-    /// </summary>
-    public static IProtoHostBuilder AddRest(this IProtoHostBuilder builder)
+    public static IProtoHostBuilder AddRest(this IProtoHostBuilder builder, Action<ProtoRestBuilder>? configure = null)
     {
-        builder.AddHook<RestLifecycleHook>();
+        builder.AddTestHook<RestLifecycleHook>();
+
+        if (configure != null)
+        {
+            builder.ConfigureServices(services =>
+            {
+                var restBuilder = new ProtoRestBuilder(services);
+                configure(restBuilder);
+            });
+        }
+
         return builder;
     }
+}
 
-    /// <summary>
-    /// Registers a REST client initializer
-    /// </summary>
-    public static IProtoHostBuilder AddRestClient(
-        this IProtoHostBuilder builder,
-        string name = "Default",
-        string? baseUrl = null)
+public sealed class ProtoRestBuilder(IServiceCollection services)
+{
+    public IServiceCollection Services { get; } = services;
+
+    public IProtoTargetBuilder AddClient(string name = "Default", string? baseUrl = null)
     {
-        builder.AddHook<RestLifecycleHook>();
-        return builder.ConfigureServices(services =>
-        {
-            services.AddSingleton<IProtoClientInitializer>(sp =>
-            {
-                var configuration = sp.GetRequiredService<IConfiguration>();
-                return new GenericRestClientInitializer(name, baseUrl);
-            });
-        });
+        Services.AddSingleton<IProtoClientInitializer>(sp =>
+            new GenericRestClientInitializer(name, baseUrl));
+
+        return new ProtoRestTargetBuilder(name, Services);
     }
 }

@@ -10,45 +10,38 @@ using ProtoTest.Core;
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
 public class ProtoTestAttribute : BeforeAfterTestAttribute
 {
+    /// <inheritdoc />
     public override void Before(MethodInfo methodUnderTest)
     {
         var attributes = GetProtoAttributes(methodUnderTest);
         var testId = ProtoTestIdGenerator.Generate(methodUnderTest);
 
-        // 1. Synchronously bind context on xUnit's test execution frame
-        ProtoTestAssembly.Host.BeginTestContext(methodUnderTest.Name, testId, methodUnderTest);
-
-        // 2. Execute async pre-test hooks & attributes
         ProtoTestAssembly.Host
-            .ExecuteBeforeHooksAsync(attributes)
+            .StartTestAsync(methodUnderTest.Name, testId, methodUnderTest, attributes)
             .GetAwaiter()
             .GetResult();
     }
 
+    /// <inheritdoc />
     public override void After(MethodInfo methodUnderTest)
     {
         var attributes = GetProtoAttributes(methodUnderTest);
 
-        try
-        {
-            // 1. Execute async post-test hooks & attributes and dispose context scope
-            ProtoTestAssembly.Host
-                .ExecuteAfterHooksAsync(attributes)
-                .GetAwaiter()
-                .GetResult();
-        }
-        finally
-        {
-            // 2. Synchronously unbind context from xUnit's test execution frame
-            ProtoTestAssembly.Host.EndTestContext();
-        }
+        ProtoTestAssembly.Host
+            .CompleteTestAsync(attributes)
+            .GetAwaiter()
+            .GetResult();
     }
 
+    /// <summary>
+    /// Retrieves all <see cref="ProtoAttribute"/> instances declared on the test method and its declaring class.
+    /// </summary>
+    /// <param name="methodUnderTest">Reflection metadata for the test method.</param>
+    /// <returns>A list of discovered <see cref="ProtoAttribute"/> instances.</returns>
     private static List<ProtoAttribute> GetProtoAttributes(MethodInfo methodUnderTest)
     {
         var attributes = new List<ProtoAttribute>();
 
-        // 1. Resolve class-level attributes
         if (methodUnderTest.DeclaringType != null)
         {
             attributes.AddRange(
@@ -58,7 +51,6 @@ public class ProtoTestAttribute : BeforeAfterTestAttribute
             );
         }
 
-        // 2. Resolve method-level attributes
         attributes.AddRange(
             methodUnderTest
                 .GetCustomAttributes(true)

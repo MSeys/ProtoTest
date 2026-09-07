@@ -15,13 +15,10 @@ public class IntegrationTests
             .AddAspNetCoreServer<SampleApi.Program>("Default")
             .Build();
 
-        var context = host.BeginTestContext("InMemory_Test", "test-1", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = await host.StartTestAsync("InMemory_Test", "test-1", (MethodInfo)MethodInfo.GetCurrentMethod()!);
 
         try
         {
-            // Execute pre-test hooks to initialize clients
-            await host.ExecuteBeforeHooksAsync();
-
             // 2. Act: Call in-memory endpoint via Proto.Context
             var client = Proto.Context.Client<HttpClient>("Default");
             var response = await client.GetAsync("/ping");
@@ -35,8 +32,7 @@ public class IntegrationTests
         }
         finally
         {
-            await host.ExecuteAfterHooksAsync();
-            host.EndTestContext();
+            await host.CompleteTestAsync();
             await host.DisposeAsync();
         }
     }
@@ -55,12 +51,10 @@ public class IntegrationTests
             .AddAspNetCoreServer<SampleApi.Program>("ExternalApi")
             .Build();
 
-        var context = host.BeginTestContext("ExternalUrl_Test", "test-2", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = await host.StartTestAsync("ExternalUrl_Test", "test-2", (MethodInfo)MethodInfo.GetCurrentMethod()!);
 
         try
         {
-            await host.ExecuteBeforeHooksAsync();
-
             // 2. Act
             var client = Proto.Context.Client<HttpClient>("ExternalApi");
 
@@ -69,8 +63,34 @@ public class IntegrationTests
         }
         finally
         {
-            await host.ExecuteAfterHooksAsync();
-            host.EndTestContext();
+            await host.CompleteTestAsync();
+            await host.DisposeAsync();
+        }
+    }
+
+    [Test]
+    public async Task AddAspNetCoreServer_Should_Invoke_FactoryConfigurationCallback()
+    {
+        // Arrange
+        var callbackInvoked = false;
+        var host = new ProtoHostBuilder()
+            .AddAspNetCoreServer<SampleApi.Program>(
+                "ConfiguredApi",
+                factory => callbackInvoked = true)
+            .Build();
+
+        await host.StartTestAsync("FactoryConfiguration", "test-3", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+
+        try
+        {
+            // Act
+            // Assert
+            Assert.That(callbackInvoked, Is.True);
+            Assert.That(Proto.Context.Client<HttpClient>("ConfiguredApi"), Is.Not.Null);
+        }
+        finally
+        {
+            await host.CompleteTestAsync();
             await host.DisposeAsync();
         }
     }

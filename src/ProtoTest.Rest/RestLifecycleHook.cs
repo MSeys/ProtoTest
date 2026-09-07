@@ -1,10 +1,10 @@
 ﻿namespace ProtoTest.Rest;
 
 using ProtoTest.Core;
+using ProtoTest.Rest.Internal;
 using System.Reflection;
-using System.Xml;
 
-internal class RestLifecycleHook : IProtoHook
+internal class RestLifecycleHook : IProtoTestHook
 {
     public int Order => 100;
 
@@ -24,7 +24,7 @@ internal class RestLifecycleHook : IProtoHook
         var authAttr = methodInfo?.GetCustomAttribute<RestAuthAttribute>()
                     ?? classType?.GetCustomAttribute<RestAuthAttribute>();
 
-        authAttr?.ApplyToContext(context, clientName);
+        context.SetContext(new RestContextState { Authenticator = authAttr?.CreateAuthenticator(), ClientName = clientName ?? "Default" });
 
         return Task.CompletedTask;
     }

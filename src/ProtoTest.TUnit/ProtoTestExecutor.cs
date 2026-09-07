@@ -6,49 +6,38 @@ using global::TUnit.Core.Interfaces;
 using ProtoTest.Core;
 
 /// <summary>
-/// TUnit test executor that intercepts test execution to manage the <see cref="ProtoTest"/> lifecycle.
-/// Automatically sets up execution context and invokes registered lifecycle hooks.
+/// Intercepts test execution in TUnit to manage the <see cref="ProtoExecutionContext"/> and execute registered lifecycle hooks.
 /// </summary>
 public class ProtoTestExecutor : ITestExecutor
 {
     /// <summary>
-    /// Intercepts the test execution pipeline to manage ProtoTest context and hooks around the test action.
+    /// Executes the test action within an isolated <see cref="ProtoExecutionContext"/>.
     /// </summary>
-    /// <param name="context">The TUnit execution context for the current test.</param>
-    /// <param name="action">The delegate representing the actual test method execution.</param>
-    /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
+    /// <param name="context">The execution context provided by TUnit.</param>
+    /// <param name="action">The delegate representing the test method execution.</param>
+    /// <returns>A <see cref="ValueTask"/> representing the execution flow.</returns>
     public async ValueTask ExecuteTest(TestContext context, Func<ValueTask> action)
     {
         var methodInfo = context.Metadata.TestDetails.MethodMetadata.GetReflectionInfo();
         var attributes = GetProtoAttributes(methodInfo);
         var testId = ProtoTestIdGenerator.Generate(methodInfo);
 
-        // 1. Initialize the ProtoTest context for the current async execution flow
-        ProtoTestAssembly.Host.BeginTestContext(methodInfo.Name, testId, methodInfo);
-
         try
         {
-            // 2. Execute all registered ProtoTest before-hooks
-            await ProtoTestAssembly.Host.ExecuteBeforeHooksAsync(attributes);
-
-            // 3. Execute the actual test method within the active ProtoTest context
+            await ProtoTestAssembly.Host.StartTestAsync(methodInfo.Name, testId, methodInfo, attributes);
             await action();
-
-            // 4. Execute all registered ProtoTest after-hooks
-            await ProtoTestAssembly.Host.ExecuteAfterHooksAsync(attributes);
         }
         finally
         {
-            // 5. Clean up the test context upon completion
-            ProtoTestAssembly.Host.EndTestContext();
+            await ProtoTestAssembly.Host.CompleteTestAsync(attributes);
         }
     }
 
     /// <summary>
-    /// Collects all <see cref="ProtoAttribute"/> instances declared on the test method and its target class.
+    /// Retrieves all <see cref="ProtoAttribute"/> instances declared on the test method and its declaring class.
     /// </summary>
     /// <param name="methodInfo">Reflection metadata for the test method.</param>
-    /// <returns>A list of <see cref="ProtoAttribute"/> instances discovered in the hierarchy.</returns>
+    /// <returns>A list of discovered <see cref="ProtoAttribute"/> instances.</returns>
     private static List<ProtoAttribute> GetProtoAttributes(MethodInfo methodInfo)
     {
         var attributes = new List<ProtoAttribute>();

@@ -1,6 +1,5 @@
 ﻿namespace ProtoTest.Xunit3;
 
-using ProtoTest.Core;
 using System.Reflection;
 using Xunit;
 using Xunit.v3;
@@ -11,55 +10,15 @@ using Xunit.v3;
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
 public class ProtoTestTheoryAttribute : TheoryAttribute, IBeforeAfterTestAttribute
 {
+    /// <inheritdoc />
     public void Before(MethodInfo methodUnderTest, IXunitTest test)
     {
-        var attributes = GetProtoAttributes(methodUnderTest);
-        var testId = ProtoTestIdGenerator.Generate(methodUnderTest);
-
-        ProtoTestAssembly.Host.BeginTestContext(methodUnderTest.Name, testId, methodUnderTest);
-
-        ProtoTestAssembly.Host
-            .ExecuteBeforeHooksAsync(attributes)
-            .GetAwaiter()
-            .GetResult();
+        ProtoTestLifecycleHandler.Before(methodUnderTest, test);
     }
 
+    /// <inheritdoc />
     public void After(MethodInfo methodUnderTest, IXunitTest test)
     {
-        var attributes = GetProtoAttributes(methodUnderTest);
-
-        try
-        {
-            ProtoTestAssembly.Host
-                .ExecuteAfterHooksAsync(attributes)
-                .GetAwaiter()
-                .GetResult();
-        }
-        finally
-        {
-            ProtoTestAssembly.Host.EndTestContext();
-        }
-    }
-
-    private static List<ProtoAttribute> GetProtoAttributes(MethodInfo methodUnderTest)
-    {
-        var attributes = new List<ProtoAttribute>();
-
-        if (methodUnderTest.DeclaringType != null)
-        {
-            attributes.AddRange(
-                methodUnderTest.DeclaringType
-                    .GetCustomAttributes(true)
-                    .OfType<ProtoAttribute>()
-            );
-        }
-
-        attributes.AddRange(
-            methodUnderTest
-                .GetCustomAttributes(true)
-                .OfType<ProtoAttribute>()
-        );
-
-        return attributes;
+        ProtoTestLifecycleHandler.After(methodUnderTest, test);
     }
 }

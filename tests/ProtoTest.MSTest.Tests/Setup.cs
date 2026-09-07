@@ -8,11 +8,11 @@ using ProtoTest.Core;
 public class Setup : ProtoTestAssembly
 {
     [AssemblyInitialize]
-    public static void AssemblyInit(TestContext context)
+    public static async Task AssemblyInitAsync(TestContext context)
     {
-        Initialize(builder =>
+        await InitializeAsync(builder =>
         {
-            builder.AddHook<TrackingHook>();
+            builder.AddTestHook<TrackingHook>();
             builder.ConfigureServices(services =>
             {
                 services.AddScoped<ITestService, TestService>();
@@ -41,7 +41,7 @@ public class ExecutionLogState : IProtoContext
     public List<string> Log { get; } = [];
 }
 
-public class TrackingHook : IProtoHook
+public class TrackingHook : IProtoTestHook
 {
     public int Order => 1;
 

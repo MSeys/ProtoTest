@@ -10,7 +10,7 @@ public class Setup : ProtoTestAssembly
 {
     protected override void Configure(IProtoHostBuilder builder)
     {
-        builder.AddHook<TrackingHook>();
+        builder.AddTestHook<TrackingHook>();
         builder.ConfigureServices(services =>
         {
             services.AddScoped<ITestService, TestService>();
@@ -33,7 +33,7 @@ public class ExecutionLogState : IProtoContext
     public List<string> Log { get; } = [];
 }
 
-public class TrackingHook : IProtoHook
+public class TrackingHook : IProtoTestHook
 {
     public int Order => 1;
 

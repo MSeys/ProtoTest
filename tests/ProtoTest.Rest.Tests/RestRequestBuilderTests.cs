@@ -41,7 +41,7 @@ public class RestRequestBuilderTests
             Content = new StringContent("""{"status":"ok"}""")
         };
 
-        var builder = new RestRequestBuilder(_httpClient, _context, null)
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null)
             .Header("X-Custom-Header", "TestValue")
             .Header("User-Agent", "ProtoTest-Runner");
 
@@ -64,7 +64,34 @@ public class RestRequestBuilderTests
     }
 
     [Test]
-    public async Task Body_Object_Should_Serialize_As_Json_Content()
+    public async Task SendAsync_Should_Emit_CoverageHit_With_RestHitData()
+    {
+        // Arrange
+        _handler.ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"id": 1}""")
+        };
+
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null);
+
+        // Act
+        await builder.GetAsync("/users/{id}", new { id = 1 });
+
+        // Assert - Context Recorded Hits
+        var hit = _context.RecordedHits.FirstOrDefault(h => h.Data is RestHitData);
+        Assert.That(hit, Is.Not.Null);
+        Assert.That(hit!.TargetName, Is.EqualTo("TestTarget"));
+        Assert.That(hit.Identifier, Is.EqualTo("GET /users/{id}"));
+
+        var data = (RestHitData)hit.Data!;
+        Assert.That(data.Method, Is.EqualTo("GET"));
+        Assert.That(data.RouteTemplate, Is.EqualTo("/users/{id}"));
+        Assert.That(data.StatusCode, Is.EqualTo(200));
+        Assert.That(data.ResponseBody, Is.EqualTo("""{"id": 1}"""));
+    }
+
+    [Test]
+    public async Task Body_Object_Should_Serialize_As_Json_Content_And_Emit_ShapeMatchData()
     {
         // Arrange
         _handler.ResponseToReturn = new HttpResponseMessage(HttpStatusCode.Created)
@@ -72,7 +99,7 @@ public class RestRequestBuilderTests
             Content = new StringContent("""{"id": 1, "created": true}""")
         };
 
-        var builder = new RestRequestBuilder(_httpClient, _context, null)
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null)
             .Body(new { name = "Matthias", role = "Admin" });
 
         // Act
@@ -85,10 +112,17 @@ public class RestRequestBuilderTests
         Assert.That(_handler.LastRequestBody, Is.Not.Null);
         Assert.That(_handler.LastRequestBody, Contains.Substring("Matthias"));
 
-        // Assert - Response Verification via Fluent Chaining
+        // Assert - Response Verification & Shape Hit Recording
         response
             .ShouldHaveStatus(HttpStatusCode.Created)
             .ShouldMatchShape(new { id = 1, created = true });
+
+        var shapeHit = _context.RecordedHits.FirstOrDefault(h => h.Data is ShapeMatchData);
+        Assert.That(shapeHit, Is.Not.Null);
+
+        var shapeData = (ShapeMatchData)shapeHit!.Data!;
+        Assert.That(shapeData.MatchedProperties, Contains.Item("$.id"));
+        Assert.That(shapeData.MatchedProperties, Contains.Item("$.created"));
     }
 
     [Test]
@@ -100,7 +134,7 @@ public class RestRequestBuilderTests
             Content = new StringContent("<response>ok</response>", System.Text.Encoding.UTF8, "application/xml")
         };
 
-        var builder = new RestRequestBuilder(_httpClient, _context, null)
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null)
             .Body("<xml><user>Matthias</user></xml>", "application/xml");
 
         // Act
@@ -121,7 +155,7 @@ public class RestRequestBuilderTests
         _handler.ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"auth": true}""") };
         var authenticator = new TestDummyAuthenticator("Bearer custom-token-123");
 
-        var builder = new RestRequestBuilder(_httpClient, _context, null)
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null)
             .Auth(authenticator);
 
         // Act
@@ -140,7 +174,7 @@ public class RestRequestBuilderTests
         // Arrange
         _handler.ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"auth": true}""") };
 
-        var builder = new RestRequestBuilder(_httpClient, _context, null)
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null)
             .Auth<TestDummyAuthenticator>("Bearer di-token-456");
 
         // Act

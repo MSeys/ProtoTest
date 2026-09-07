@@ -10,6 +10,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
 {
     private readonly IServiceCollection _services = new ServiceCollection();
     private readonly ConfigurationBuilder _configurationBuilder = new();
+    private bool _built;
 
     /// <inheritdoc />
     public IProtoHostBuilder ConfigureServices(Action<IServiceCollection> configure)
@@ -27,25 +28,37 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     }
 
     /// <inheritdoc />
-    public IProtoHostBuilder AddHook<THook>() where THook : class, IProtoHook
+    public IProtoHostBuilder AddTestHook<THook>() where THook : class, IProtoTestHook
     {
-        _services.AddSingleton<IProtoHook, THook>();
+        _services.AddSingleton<IProtoTestHook, THook>();
+        return this;
+    }
+
+    /// <inheritdoc />
+    public IProtoHostBuilder AddRunHook<TRunHook>() where TRunHook : class, IProtoRunHook
+    {
+        _services.AddSingleton<IProtoRunHook, TRunHook>();
         return this;
     }
 
     /// <inheritdoc />
     public ProtoHost Build()
     {
+        if (_built)
+        {
+            throw new InvalidOperationException("A ProtoHostBuilder can only build one ProtoHost.");
+        }
+
+        _built = true;
+
         // Build and register IConfiguration
         IConfiguration configuration = _configurationBuilder.Build();
         _services.AddSingleton(configuration);
 
         // Internal hooks
-        _services.AddSingleton<IProtoHook, ProtoClientInitializerHook>();
+        _services.AddSingleton<IProtoTestHook, ProtoClientInitializerHook>();
 
         var rootProvider = _services.BuildServiceProvider();
-        var hooks = rootProvider.GetServices<IProtoHook>();
-
-        return new ProtoHost(rootProvider, hooks);
+        return new ProtoHost(rootProvider);
     }
 }

@@ -6,7 +6,7 @@ using ProtoTest.Rest.Exceptions;
 
 public static class ShapeMatcher
 {
-    public static void AssertMatch(string jsonContent, object expectedShape)
+    public static IReadOnlyList<string> AssertMatch(string jsonContent, object expectedShape)
     {
         if (string.IsNullOrWhiteSpace(jsonContent))
         {
@@ -15,18 +15,28 @@ public static class ShapeMatcher
 
         using var doc = JsonDocument.Parse(jsonContent);
         var mismatches = new List<ShapeMismatch>();
+        var matchedProperties = new List<string>();
 
-        MatchElement(doc.RootElement, expectedShape, "$", mismatches);
+        MatchElement(doc.RootElement, expectedShape, "$", mismatches, matchedProperties);
 
         if (mismatches.Count > 0)
         {
             throw new ShapeMismatchException(mismatches);
         }
+
+        return matchedProperties;
     }
 
-    private static void MatchElement(JsonElement actual, object? expected, string path, List<ShapeMismatch> mismatches)
+    private static void MatchElement(
+        JsonElement actual,
+        object? expected,
+        string path,
+        List<ShapeMismatch> mismatches,
+        List<string> matchedProperties)
     {
-        // Case 1: Expected is an IValueMatcher constraint (Is.NotNull, Is.GreaterThan, etc.)
+        matchedProperties.Add(path);
+
+        // Case 1: Expected is an IValueMatcher constraint
         if (expected is IValueMatcher matcher)
         {
             var rawValue = ExtractRawValue(actual);
@@ -64,7 +74,7 @@ public static class ShapeMatcher
 
                 if (TryGetJsonProperty(actual, prop.Name, out var actualProp))
                 {
-                    MatchElement(actualProp, expectedVal, propPath, mismatches);
+                    MatchElement(actualProp, expectedVal, propPath, mismatches, matchedProperties);
                 }
                 else
                 {
@@ -74,7 +84,7 @@ public static class ShapeMatcher
             return;
         }
 
-        // Case 4: Expected is a Primitive Exact Value (string, int, bool, etc.)
+        // Case 4: Expected is a Primitive Exact Value
         var actualRaw = ExtractRawValue(actual);
         if (!EqualsPrimitive(actualRaw, expected))
         {

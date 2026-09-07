@@ -17,26 +17,19 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
         var attributes = GetProtoAttributes(methodInfo);
         var testId = ProtoTestIdGenerator.Generate(methodInfo);
 
-        // 1. Initialize context for the current test
-        ProtoTestAssembly.Host.BeginTestContext(methodInfo.Name, testId, methodInfo);
-
         try
         {
-            // 2. Execute async pre-test hooks & attributes
-            await ProtoTestAssembly.Host.ExecuteBeforeHooksAsync(attributes);
+            await ProtoTestAssembly.Host.StartTestAsync(methodInfo.Name, testId, methodInfo, attributes);
 
             // 3. Run the actual MSTest execution pipeline
             var results = await base.ExecuteAsync(testMethod);
-
-            // 4. Execute async post-test hooks & attributes
-            await ProtoTestAssembly.Host.ExecuteAfterHooksAsync(attributes);
 
             return results;
         }
         finally
         {
-            // 5. Clean up context
-            ProtoTestAssembly.Host.EndTestContext();
+            // Complete the lifecycle even when setup or test execution fails.
+            await ProtoTestAssembly.Host.CompleteTestAsync(attributes);
         }
     }
 

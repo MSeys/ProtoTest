@@ -6,7 +6,12 @@
 public static class Proto
 {
     /// <summary>
+    /// Gets the active ProtoTest host.
+    /// </summary>
+    public static ProtoHost Host => ProtoHost.CurrentHost;
+
+    /// <summary>
     /// Gets the current active test execution context.
     /// </summary>
-    public static ProtoExecutionContext Context => ProtoHost.Current;
+    public static ProtoExecutionContext Context => ProtoHost.CurrentContext;
 }

@@ -15,24 +15,19 @@ public class ProtoHostTests
         var globalHook = new TrackingHook(executionLog);
         var testAttribute = new TrackingAttribute(executionLog);
 
-        var services = new ServiceCollection().BuildServiceProvider();
-        await using var host = new ProtoHost(services, [globalHook]);
+        var serviceCollection = new ServiceCollection();
+        serviceCollection.AddSingleton<IProtoTestHook>(globalHook);
+        await using var host = new ProtoHost(serviceCollection.BuildServiceProvider());
 
         // Act
-        // 1. Synchronously bind context to caller frame
-        host.BeginTestContext("TestSequence", "id-123", (MethodInfo)MethodInfo.GetCurrentMethod()!);
-
-        // 2. Asynchronously execute pre-test hooks & attributes
-        await host.ExecuteBeforeHooksAsync([testAttribute]);
+        // 1. Create the test execution scope
+        await host.StartTestAsync("TestSequence", "id-123", (MethodInfo)MethodInfo.GetCurrentMethod()!, [testAttribute]);
 
         // 3. Test execution body
         executionLog.Add("TestBody");
 
-        // 4. Asynchronously execute post-test hooks & dispose scope
-        await host.ExecuteAfterHooksAsync([testAttribute]);
-
-        // 5. Synchronously unbind context from caller frame
-        host.EndTestContext();
+        // 4. Complete the test lifecycle and dispose its scope
+        await host.CompleteTestAsync([testAttribute]);
 
         // Assert
         var expectedSequence = new[]
@@ -51,34 +46,59 @@ public class ProtoHostTests
     public void Current_ShouldThrowInvalidOperationException_WhenAccessedOutsideOfTestScope()
     {
         // Act & Assert
-        Assert.Throws<InvalidOperationException>(() => _ = ProtoHost.Current);
+        Assert.Throws<InvalidOperationException>(() => _ = ProtoHost.CurrentContext);
     }
 
     [Test]
-    public async Task EndTestContext_ShouldDisposeScopeAndClearCurrentContext()
+    public async Task Builder_ShouldExposeTheSameHostToDiServices()
+    {
+        // Arrange
+        var builder = new ProtoHostBuilder();
+
+        // Act
+        await using var host = builder.Build();
+
+        // Assert
+        Assert.That(ProtoHost.CurrentHost, Is.SameAs(host));
+        Assert.That(Proto.Host, Is.SameAs(host));
+        Assert.Throws<InvalidOperationException>(() => _ = Proto.Context);
+    }
+
+    [Test]
+    public async Task Builder_ShouldRejectSecondBuild()
+    {
+        // Arrange
+        var builder = new ProtoHostBuilder();
+        await using var host = builder.Build();
+
+        // Act & Assert
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+    }
+
+    [Test]
+    public async Task CompleteTest_ShouldDisposeScopeAndClearCurrentContext()
     {
         // Arrange
         var serviceCollection = new ServiceCollection();
         serviceCollection.AddScoped<DisposableDependency>();
         var rootProvider = serviceCollection.BuildServiceProvider();
 
-        await using var host = new ProtoHost(rootProvider, []);
+        await using var host = new ProtoHost(rootProvider);
 
         // Act
-        host.BeginTestContext("TestDisposal", "id-456", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("TestDisposal", "id-456", (MethodInfo)MethodInfo.GetCurrentMethod()!);
 
         // Resolve dependency while context is active on the current thread
-        var dependency = ProtoHost.Current.Services.GetRequiredService<DisposableDependency>();
+        var dependency = ProtoHost.CurrentContext.Services.GetRequiredService<DisposableDependency>();
 
-        await host.ExecuteAfterHooksAsync();
-        host.EndTestContext();
+        await host.CompleteTestAsync();
 
         // Assert
         Assert.That(dependency.IsDisposed, Is.True);
-        Assert.Throws<InvalidOperationException>(() => _ = ProtoHost.Current);
+        Assert.Throws<InvalidOperationException>(() => _ = ProtoHost.CurrentContext);
     }
 
-    private sealed class TrackingHook(List<string> log) : IProtoHook
+    private sealed class TrackingHook(List<string> log) : IProtoTestHook
     {
         public Task BeforeTestAsync(ProtoExecutionContext context)
         {
@@ -113,4 +133,5 @@ public class ProtoHostTests
         public bool IsDisposed { get; private set; }
         public void Dispose() => IsDisposed = true;
     }
+
 }

@@ -4,7 +4,7 @@
 /// Global lifecycle hook responsible for executing all registered <see cref="IProtoClientInitializer"/> instances
 /// prior to test execution.
 /// </summary>
-internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitializer> initializers) : IProtoHook
+internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitializer> initializers) : IProtoTestHook
 {
     /// <summary>
     /// Set to <see cref="int.MinValue"/> to ensure clients are initialized before all other hooks.

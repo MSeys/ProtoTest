@@ -1,6 +1,7 @@
 ﻿namespace ProtoTest.Rest;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 using ProtoTest.Rest.Internal;
 
@@ -39,5 +40,20 @@ public sealed class ProtoRestBuilder(IServiceCollection services)
             new GenericRestClientInitializer(name, baseUrl));
 
         return new ProtoRestTargetBuilder(name, Services);
+    }
+
+    /// <summary>
+    /// Enables automatic request, response, and expected-shape test attachments.
+    /// </summary>
+    public ProtoRestBuilder CaptureAttachments(Action<RestAttachmentOptions>? configure = null)
+    {
+        Services.AddSingleton(serviceProvider =>
+        {
+            var options = new RestAttachmentOptions();
+            configure?.Invoke(options);
+            options.Bind(serviceProvider.GetRequiredService<IConfiguration>());
+            return options;
+        });
+        return this;
     }
 }

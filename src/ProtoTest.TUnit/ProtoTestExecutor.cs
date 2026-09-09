@@ -21,7 +21,8 @@ public class ProtoTestExecutor : ITestExecutor
         var attributes = ProtoAttributeResolver.Resolve(methodInfo);
         try
         {
-            await ProtoTestAssembly.Host.StartTestAsync(methodInfo.Name, methodInfo, attributes);
+            await ProtoTestAssembly.Host.StartTestAsync(
+                methodInfo.Name, methodInfo, attributes, new TUnitAttachmentPublisher(context));
             await action();
         }
         finally

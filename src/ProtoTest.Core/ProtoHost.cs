@@ -59,10 +59,12 @@ public sealed class ProtoHost : IAsyncDisposable
         string testName,
         string testId,
         MethodInfo testMethod,
-        IEnumerable<ProtoAttribute>? attributes = null)
+        IEnumerable<ProtoAttribute>? attributes = null,
+        IProtoTestAttachmentPublisher? attachmentPublisher = null)
     {
         _runLifecycle.EnsureTestCanStart();
-        return _testLifecycle.StartAsync(testName, ProtoTestId.Parse(testId), testMethod, attributes);
+        return _testLifecycle.StartAsync(
+            testName, ProtoTestId.Parse(testId), testMethod, attributes, attachmentPublisher);
     }
 
     /// <summary>
@@ -71,10 +73,11 @@ public sealed class ProtoHost : IAsyncDisposable
     public Task<ProtoExecutionContext> StartTestAsync(
         string testName,
         MethodInfo testMethod,
-        IEnumerable<ProtoAttribute>? attributes = null)
+        IEnumerable<ProtoAttribute>? attributes = null,
+        IProtoTestAttachmentPublisher? attachmentPublisher = null)
     {
         _runLifecycle.EnsureTestCanStart();
-        return _testLifecycle.StartAsync(testName, testMethod, attributes);
+        return _testLifecycle.StartAsync(testName, testMethod, attributes, attachmentPublisher);
     }
 
     /// <summary>

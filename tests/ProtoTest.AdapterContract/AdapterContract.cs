@@ -38,6 +38,11 @@ public static class AdapterContract
         Ensure(context.TestNumber == long.Parse(context.TestId),
             "The numeric and string test ID representations differ.");
 
+        context.AddAttachment(
+            "adapter-contract",
+            "ProtoTest adapter attachment publishing succeeded.",
+            description: "Shared adapter contract artifact");
+
         state.Events.Add("Test");
     }
 

@@ -10,6 +10,7 @@ Choose an extension point by the behavior you need to add:
 | Declare behavior on a class or method | `ProtoAttribute` | Attribute usage |
 | Create a named test-scoped resource | `IProtoClientInitializer` | Dependency injection |
 | Share typed state in one test | `IProtoContext` | `Proto.Context.SetContext` |
+| Publish test artifacts | `IProtoTestAttachmentPublisher` | Adapter lifecycle or a custom host integration |
 | Receive execution events | `IProtoCollector` | `IProtoTargetBuilder.WithCoverage<T>()` or DI |
 | Aggregate standard coverage items | `ProtoCollector` | Derive a collector |
 | Export coverage items | `IProtoSink` | Sink/reporting integration |
@@ -42,3 +43,7 @@ Implement `IProtoClientInitializer` when an extension needs to create and regist
 Implement `IProtoCollector` when an extension consumes `CoverageHit` values and produces `CoverageItem` values. Derive from `ProtoCollector` when its standard aggregation is suitable. Implement `IProtoSink` when coverage items need to be exported.
 
 See [coverage extensions](../extending/coverage.md).
+
+## Test attachments
+
+Tests and integrations register artifacts through `ProtoExecutionContext`. Framework adapters implement `IProtoTestAttachmentPublisher` to transfer those artifacts during teardown. See [test attachments](test-attachments.md).

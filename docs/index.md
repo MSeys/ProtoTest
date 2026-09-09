@@ -121,6 +121,7 @@ The REST demo is the best complete example: it uses WireMock.Net as an external-
 
 - [Lifecycle](reference/lifecycle.md)
 - [Execution context](reference/execution-context.md)
+- [Test attachments](reference/test-attachments.md)
 - [Extension points](reference/extension-points.md)
 - [Extension guide](extending/index.md)
 - [Test framework adapters](integrations/nunit.md)

@@ -14,19 +14,35 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
     {
         var methodInfo = testMethod.MethodInfo;
         var attributes = ProtoAttributeResolver.Resolve(methodInfo);
+        var attachmentPublisher = new MSTestAttachmentPublisher();
+        TestResult[]? results = null;
         try
         {
-            await ProtoTestAssembly.Host.StartTestAsync(methodInfo.Name, methodInfo, attributes);
+            await ProtoTestAssembly.Host.StartTestAsync(
+                methodInfo.Name, methodInfo, attributes, attachmentPublisher);
 
             // 3. Run the actual MSTest execution pipeline
-            var results = await base.ExecuteAsync(testMethod);
+            results = await base.ExecuteAsync(testMethod);
 
             return results;
         }
         finally
         {
-            // Complete the lifecycle even when setup or test execution fails.
-            await ProtoTestAssembly.Host.CompleteTestAsync();
+            try
+            {
+                // Complete the lifecycle even when setup or test execution fails.
+                await ProtoTestAssembly.Host.CompleteTestAsync();
+            }
+            finally
+            {
+                if (results is not null && attachmentPublisher.Files.Count > 0)
+                {
+                    foreach (var result in results)
+                    {
+                        result.ResultFiles = [.. result.ResultFiles ?? [], .. attachmentPublisher.Files];
+                    }
+                }
+            }
         }
     }
 

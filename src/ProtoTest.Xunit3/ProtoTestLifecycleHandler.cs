@@ -16,7 +16,7 @@ internal static class ProtoTestLifecycleHandler
     {
         var attributes = ProtoAttributeResolver.Resolve(methodUnderTest);
         ProtoTestAssembly.Host
-            .StartTestAsync(methodUnderTest.Name, methodUnderTest, attributes)
+            .StartTestAsync(methodUnderTest.Name, methodUnderTest, attributes, Xunit3AttachmentPublisher.Instance)
             .GetAwaiter()
             .GetResult();
     }

@@ -15,7 +15,7 @@ public class ProtoTestAttribute : BeforeAfterTestAttribute
     {
         var attributes = ProtoAttributeResolver.Resolve(methodUnderTest);
         ProtoTestAssembly.Host
-            .StartTestAsync(methodUnderTest.Name, methodUnderTest, attributes)
+            .StartTestAsync(methodUnderTest.Name, methodUnderTest, attributes, Xunit2AttachmentPublisher.Instance)
             .GetAwaiter()
             .GetResult();
     }

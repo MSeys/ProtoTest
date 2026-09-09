@@ -70,10 +70,26 @@ public sealed class RestRequestBuilder(
     {
         var finalUrl = RouteAndQueryParser.BuildUrl(routeTemplate, routeAndQueryParams);
         using var request = new HttpRequestMessage(method, finalUrl);
+        var attachmentOptions = _context.TryService<RestAttachmentOptions>();
+        var attachmentNumber = attachmentOptions is null
+            ? (int?)null
+            : attachmentOptions.NextAttachmentNumber();
+        var attachmentPrefix = attachmentNumber is null ? null : $"rest-{attachmentNumber:00}";
+        var attachmentDescription = $"{method.Method.ToUpperInvariant()} {routeTemplate}";
 
         if (_content != null)
         {
             request.Content = _content;
+
+            if (attachmentOptions?.CaptureRequestBodies == true)
+            {
+                var requestBody = await _content.ReadAsStringAsync(ct);
+                _context.AddAttachment(
+                    $"{attachmentPrefix}-request",
+                    requestBody,
+                    _content.Headers.ContentType?.MediaType ?? "text/plain",
+                    attachmentDescription);
+            }
         }
 
         foreach (var (key, value) in _headers)
@@ -91,6 +107,15 @@ public sealed class RestRequestBuilder(
         stopwatch.Stop();
 
         var bodyString = await responseMessage.Content.ReadAsStringAsync(ct);
+
+        if (attachmentOptions?.CaptureResponses == true)
+        {
+            _context.AddAttachment(
+                $"{attachmentPrefix}-response",
+                bodyString,
+                responseMessage.Content.Headers.ContentType?.MediaType ?? "text/plain",
+                $"{attachmentDescription} returned {(int)responseMessage.StatusCode} ({responseMessage.StatusCode})");
+        }
 
         var headersDict = responseMessage.Headers
             .ToDictionary(h => h.Key, h => string.Join(", ", h.Value), StringComparer.OrdinalIgnoreCase);
@@ -115,7 +140,9 @@ public sealed class RestRequestBuilder(
             stopwatch.Elapsed,
             _context,
             _targetName,
-            routeIdentifier
+            routeIdentifier,
+            attachmentOptions,
+            attachmentPrefix
         );
     }
 }

@@ -5,6 +5,7 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
+using ProtoTest.Rest.Matching;
 
 [TestFixture]
 public class RestRequestBuilderTests
@@ -21,6 +22,7 @@ public class RestRequestBuilderTests
 
         var services = new ServiceCollection();
         services.AddTransient<TestDummyAuthenticator>();
+        services.AddSingleton(new RestAttachmentOptions());
         _context = new ProtoExecutionContext("", services.BuildServiceProvider().CreateScope(), "00000", (MethodInfo)MethodInfo.GetCurrentMethod()!);
     }
 
@@ -115,7 +117,7 @@ public class RestRequestBuilderTests
         // Assert - Response Verification & Shape Hit Recording
         response
             .ShouldHaveStatus(HttpStatusCode.Created)
-            .ShouldMatchShape(new { id = 1, created = true });
+            .ShouldMatchShape(new { id = IsRest.GreaterThan(0), created = true });
 
         var shapeHit = _context.RecordedHits.FirstOrDefault(h => h.Data is ShapeMatchData);
         Assert.That(shapeHit, Is.Not.Null);
@@ -123,6 +125,19 @@ public class RestRequestBuilderTests
         var shapeData = (ShapeMatchData)shapeHit!.Data!;
         Assert.That(shapeData.MatchedProperties, Contains.Item("$.id"));
         Assert.That(shapeData.MatchedProperties, Contains.Item("$.created"));
+        Assert.That(_context.Attachments.Select(attachment => attachment.Name), Is.EqualTo(new[]
+        {
+            "00000-rest-01-request",
+            "00000-rest-01-response",
+            "00000-rest-01-expected-shape"
+        }));
+        Assert.That(_context.Attachments[1].MediaType, Is.EqualTo("text/plain"));
+        Assert.That(
+            System.Text.Encoding.UTF8.GetString(await _context.Attachments[1].ReadAllBytesAsync()),
+            Is.EqualTo("""{"id": 1, "created": true}"""));
+        Assert.That(
+            System.Text.Encoding.UTF8.GetString(await _context.Attachments[2].ReadAllBytesAsync()),
+            Does.Contain("constraint: greater than 0"));
     }
 
     [Test]

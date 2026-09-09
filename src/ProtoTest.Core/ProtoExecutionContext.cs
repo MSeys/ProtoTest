@@ -46,6 +46,72 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     public T Service<T>() where T : notnull => Services.GetRequiredService<T>();
     public T? TryService<T>() => Services.GetService<T>();
 
+    #region Test Attachments
+
+    private readonly object _attachmentGate = new();
+    private readonly List<ProtoTestAttachment> _attachments = [];
+
+    /// <summary>
+    /// Gets a snapshot of the artifacts registered for this test.
+    /// </summary>
+    public IReadOnlyList<ProtoTestAttachment> Attachments
+    {
+        get
+        {
+            lock (_attachmentGate)
+            {
+                return _attachments.ToArray();
+            }
+        }
+    }
+
+    public ProtoTestAttachment AddAttachment(
+        string name,
+        string content,
+        string mediaType = "text/plain",
+        string? description = null)
+        => AddAttachment(ProtoTestAttachment.FromText(name, content, mediaType, description));
+
+    public ProtoTestAttachment AddAttachment(
+        string name,
+        ReadOnlyMemory<byte> content,
+        string mediaType = "application/octet-stream",
+        string? description = null)
+        => AddAttachment(ProtoTestAttachment.FromBytes(name, content, mediaType, description));
+
+    public ProtoTestAttachment AddAttachmentFile(
+        string filePath,
+        string? name = null,
+        string mediaType = "application/octet-stream",
+        string? description = null)
+        => AddAttachment(ProtoTestAttachment.FromFile(filePath, name, mediaType, description));
+
+    public ProtoTestAttachment AddAttachment(ProtoTestAttachment attachment)
+    {
+        ArgumentNullException.ThrowIfNull(attachment);
+        var testIdPrefix = $"{TestId}-";
+        if (!attachment.Name.StartsWith(testIdPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            attachment = attachment.WithName($"{testIdPrefix}{attachment.Name}");
+        }
+
+        lock (_attachmentGate)
+        {
+            if (_attachments.Any(existing =>
+                    string.Equals(existing.Name, attachment.Name, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidOperationException(
+                    $"An attachment named '{attachment.Name}' is already registered for this test.");
+            }
+
+            _attachments.Add(attachment);
+        }
+
+        return attachment;
+    }
+
+    #endregion
+
     #region Contextual State Management
 
     private readonly ConcurrentDictionary<Type, IProtoContext> _contexts = new();

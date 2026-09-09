@@ -89,6 +89,42 @@ public class RestConfigurationAndAuthenticationTests
     }
 
     [Test]
+    public async Task CaptureAttachments_ShouldLetKnownConfigurationSectionOverrideCodeDefaults()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureAppConfiguration(configuration => configuration.Add(
+            new StaticConfigurationSource(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Rest:Attachments:CaptureRequestBodies"] = "false",
+                ["ProtoTest:Rest:Attachments:CaptureResponses"] = "true",
+                ["ProtoTest:Rest:Attachments:CaptureExpectedShapes"] = "false"
+            })));
+        builder.AddRest(rest => rest.CaptureAttachments(options =>
+        {
+            options.CaptureResponses = false;
+            options.CaptureExpectedShapes = true;
+        }));
+        await using var host = builder.Build();
+        await host.StartTestAsync(
+            "AttachmentConfiguration",
+            "00004",
+            (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!);
+
+        try
+        {
+            var options = Proto.Context.Service<RestAttachmentOptions>();
+
+            Assert.That(options.CaptureRequestBodies, Is.False);
+            Assert.That(options.CaptureResponses, Is.True);
+            Assert.That(options.CaptureExpectedShapes, Is.False);
+        }
+        finally
+        {
+            await host.CompleteTestAsync();
+        }
+    }
+
+    [Test]
     public async Task BearerTokenAuthenticator_ShouldSetAuthorizationHeader()
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://example.test");

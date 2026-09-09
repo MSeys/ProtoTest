@@ -4,6 +4,7 @@ This page is retained as a familiar entry point for existing links. For the focu
 
 - [Lifecycle](../reference/lifecycle.md) — suite/test ordering, hooks, attributes, and disposal.
 - [Execution context](../reference/execution-context.md) — services, named clients, typed state, metadata, and coverage hits.
+- [Test attachments](../reference/test-attachments.md) — attach text, binary data, files, and integration artifacts to test results.
 - [Extension points](../reference/extension-points.md) — which API to use when extending ProtoTest.
 
 For practical usage, start with [writing tests](../guides/writing-tests.md), [context and state](../guides/context-and-state.md), or [hooks](../extending/hooks.md).

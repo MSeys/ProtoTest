@@ -3,6 +3,7 @@
 using ProtoTest.Core;
 using ProtoTest.Rest.Matching;
 using System.Dynamic;
+using System.Collections;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -13,7 +14,9 @@ public sealed class RestResponse(
     TimeSpan elapsedTime,
     ProtoExecutionContext? context = null,
     string? targetName = null,
-    string? routeIdentifier = null
+    string? routeIdentifier = null,
+    RestAttachmentOptions? attachmentOptions = null,
+    string? attachmentPrefix = null
 )
 {
     private static readonly JsonSerializerOptions DefaultJsonOptions = new()
@@ -65,6 +68,17 @@ public sealed class RestResponse(
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
 
+        if (context is not null && attachmentOptions?.CaptureExpectedShapes == true)
+        {
+            context.AddAttachment(
+                $"{attachmentPrefix}-expected-shape",
+                JsonSerializer.Serialize(
+                    DescribeExpectedValue(expectedShape),
+                    new JsonSerializerOptions { WriteIndented = true }),
+                "application/json",
+                routeIdentifier);
+        }
+
         var matchedProps = ShapeMatcher.AssertMatch(Content, expectedShape);
 
         // 🎯 Record ShapeMatch Hit if context is available
@@ -82,6 +96,36 @@ public sealed class RestResponse(
         }
 
         return this;
+    }
+
+    private static object? DescribeExpectedValue(object? expected)
+    {
+        if (expected is null)
+        {
+            return null;
+        }
+
+        if (expected is IValueMatcher matcher)
+        {
+            return $"constraint: {matcher.Description}";
+        }
+
+        var type = expected.GetType();
+        if (type.IsPrimitive || type.IsEnum || expected is string or decimal or DateTime or DateTimeOffset or Guid)
+        {
+            return expected;
+        }
+
+        if (expected is IEnumerable values)
+        {
+            return values.Cast<object?>().Select(DescribeExpectedValue).ToArray();
+        }
+
+        return type.GetProperties()
+            .Where(property => property.GetIndexParameters().Length == 0)
+            .ToDictionary(
+                property => property.Name,
+                property => DescribeExpectedValue(property.GetValue(expected)));
     }
 
     private static object? ConvertJsonElement(JsonElement element)

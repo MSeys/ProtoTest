@@ -31,17 +31,19 @@ internal sealed class ProtoTestLifecycle
     public Task<ProtoExecutionContext> StartAsync(
         string testName,
         MethodInfo testMethod,
-        IEnumerable<ProtoAttribute>? attributes)
+        IEnumerable<ProtoAttribute>? attributes,
+        IProtoTestAttachmentPublisher? attachmentPublisher)
     {
         ArgumentNullException.ThrowIfNull(testMethod);
-        return StartAsync(testName, _testIdGenerator.Next(testMethod), testMethod, attributes);
+        return StartAsync(testName, _testIdGenerator.Next(testMethod), testMethod, attributes, attachmentPublisher);
     }
 
     public Task<ProtoExecutionContext> StartAsync(
         string testName,
         ProtoTestId testId,
         MethodInfo testMethod,
-        IEnumerable<ProtoAttribute>? attributes)
+        IEnumerable<ProtoAttribute>? attributes,
+        IProtoTestAttachmentPublisher? attachmentPublisher)
     {
         if (Current.Value?.Context is not null)
         {
@@ -54,7 +56,11 @@ internal sealed class ProtoTestLifecycle
 
         var scope = _rootServiceProvider.CreateScope();
         var context = new ProtoExecutionContext(testName, scope, testId, testMethod);
-        var state = new ContextState(_host, context, attributes?.OrderBy(attribute => attribute.Order).ToArray() ?? []);
+        var state = new ContextState(
+            _host,
+            context,
+            attributes?.OrderBy(attribute => attribute.Order).ToArray() ?? [],
+            attachmentPublisher);
         Current.Value = state;
 
         return ExecuteBeforeAsync(state);
@@ -122,6 +128,15 @@ internal sealed class ProtoTestLifecycle
                 () => hook.AfterTestAsync(context), exceptions);
         }
 
+        if (state.AttachmentPublisher is not null)
+        {
+            foreach (var attachment in context.Attachments)
+            {
+                await LifecycleExceptionHelper.CaptureAsync(
+                    async () => await state.AttachmentPublisher.PublishAsync(attachment), exceptions);
+            }
+        }
+
         await LifecycleExceptionHelper.CaptureAsync(
             async () => await context.DisposeAsync(), exceptions);
 
@@ -135,11 +150,13 @@ internal sealed class ProtoTestLifecycle
     private sealed class ContextState(
         ProtoHost host,
         ProtoExecutionContext context,
-        IReadOnlyList<ProtoAttribute> attributes)
+        IReadOnlyList<ProtoAttribute> attributes,
+        IProtoTestAttachmentPublisher? attachmentPublisher)
     {
         public ProtoHost Host { get; } = host;
         public ProtoExecutionContext? Context { get; set; } = context;
         public IReadOnlyList<ProtoAttribute> Attributes { get; } = attributes;
+        public IProtoTestAttachmentPublisher? AttachmentPublisher { get; } = attachmentPublisher;
         public List<IProtoTestHook> CompletedHooks { get; } = [];
         public List<ProtoAttribute> CompletedAttributes { get; } = [];
     }

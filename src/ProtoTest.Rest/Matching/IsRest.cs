@@ -27,6 +27,8 @@ public static class IsRest
 
     private sealed class NotNullMatcher : IValueMatcher
     {
+        public string Description => "not null";
+
         public bool Matches(object? actual, out string? errorMessage)
         {
             if (actual is null)
@@ -41,6 +43,8 @@ public static class IsRest
 
     private sealed class NullMatcher : IValueMatcher
     {
+        public string Description => "null";
+
         public bool Matches(object? actual, out string? errorMessage)
         {
             if (actual is not null)
@@ -55,6 +59,8 @@ public static class IsRest
 
     private sealed class AnyMatcher : IValueMatcher
     {
+        public string Description => "any value";
+
         public bool Matches(object? actual, out string? errorMessage)
         {
             errorMessage = null;
@@ -65,6 +71,8 @@ public static class IsRest
     private sealed class ComparableMatcher<T>(T threshold, Func<int, bool> condition, string operatorName) : IValueMatcher
         where T : IComparable
     {
+        public string Description => $"{operatorName} {threshold}";
+
         public bool Matches(object? actual, out string? errorMessage)
         {
             if (actual is null)
@@ -98,6 +106,7 @@ public static class IsRest
     private sealed class RegexMatcher(string pattern, RegexOptions options) : IValueMatcher
     {
         private readonly Regex _regex = new(pattern, options);
+        public string Description => $"matches /{pattern}/ ({options})";
 
         public bool Matches(object? actual, out string? errorMessage)
         {
@@ -114,6 +123,8 @@ public static class IsRest
 
     private sealed class CustomPredicateMatcher<T>(Predicate<T?> predicate, string description) : IValueMatcher
     {
+        public string Description => description;
+
         public bool Matches(object? actual, out string? errorMessage)
         {
             T? typedVal = actual is T val ? val : default;

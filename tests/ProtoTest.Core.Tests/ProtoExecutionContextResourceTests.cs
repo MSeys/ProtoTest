@@ -35,6 +35,16 @@ public sealed class ProtoExecutionContextResourceTests
     }
 
     [Test]
+    public async Task RegisterClient_ShouldRejectRegistrationAfterDisposalStarts()
+    {
+        using var rootProvider = new ServiceCollection().BuildServiceProvider();
+        var context = CreateContext(rootProvider);
+        await context.DisposeAsync();
+
+        Assert.Throws<ObjectDisposedException>(() => context.RegisterClient(new DisposableClient()));
+    }
+
+    [Test]
     public void DisposeAsync_ShouldAttemptAllClients_WhenOneFails()
     {
         using var rootProvider = new ServiceCollection().BuildServiceProvider();

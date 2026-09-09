@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.AdapterContract\ProtoTest.AdapterContract.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.MSTest\ProtoTest.MSTest.csproj" />
   </ItemGroup>
 

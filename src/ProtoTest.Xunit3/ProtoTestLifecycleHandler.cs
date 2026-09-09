@@ -14,11 +14,9 @@ internal static class ProtoTestLifecycleHandler
     /// </summary>
     public static void Before(MethodInfo methodUnderTest, IXunitTest test)
     {
-        var attributes = GetProtoAttributes(methodUnderTest);
-        var testId = ProtoTestIdGenerator.Generate(methodUnderTest);
-
+        var attributes = ProtoAttributeResolver.Resolve(methodUnderTest);
         ProtoTestAssembly.Host
-            .StartTestAsync(methodUnderTest.Name, testId, methodUnderTest, attributes)
+            .StartTestAsync(methodUnderTest.Name, methodUnderTest, attributes)
             .GetAwaiter()
             .GetResult();
     }
@@ -28,36 +26,10 @@ internal static class ProtoTestLifecycleHandler
     /// </summary>
     public static void After(MethodInfo methodUnderTest, IXunitTest test)
     {
-        var attributes = GetProtoAttributes(methodUnderTest);
-
         ProtoTestAssembly.Host
-            .CompleteTestAsync(attributes)
+            .CompleteTestAsync()
             .GetAwaiter()
             .GetResult();
     }
 
-    /// <summary>
-    /// Retrieves all <see cref="ProtoAttribute"/> instances declared on the test method and its declaring class.
-    /// </summary>
-    private static List<ProtoAttribute> GetProtoAttributes(MethodInfo methodUnderTest)
-    {
-        var attributes = new List<ProtoAttribute>();
-
-        if (methodUnderTest.DeclaringType != null)
-        {
-            attributes.AddRange(
-                methodUnderTest.DeclaringType
-                    .GetCustomAttributes(true)
-                    .OfType<ProtoAttribute>()
-            );
-        }
-
-        attributes.AddRange(
-            methodUnderTest
-                .GetCustomAttributes(true)
-                .OfType<ProtoAttribute>()
-        );
-
-        return attributes;
-    }
 }

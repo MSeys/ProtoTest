@@ -13,6 +13,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\ProtoTest.AdapterContract\ProtoTest.AdapterContract.csproj" />
 		<ProjectReference Include="..\..\src\ProtoTest.TUnit\ProtoTest.TUnit.csproj" />
 	</ItemGroup>
 </Project>

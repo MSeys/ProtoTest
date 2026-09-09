@@ -62,8 +62,21 @@ The context also exposes metadata for the active test:
 ```csharp
 var name = Proto.Context.TestName;
 var id = Proto.Context.TestId;
+var number = Proto.Context.TestNumber;
 var method = Proto.Context.TestMethod;
 var configuration = Proto.Context.Configuration;
 ```
 
 Use metadata when hooks, clients, or collectors need to identify the current test or resolve configuration.
+
+`TestId` contains only decimal digits and is convenient for composing unique test data. `TestNumber` exposes the same value as a `long`; `Id` exposes the complete `ProtoTestId` value. IDs are guaranteed unique within one host. Configure a run or CI-worker prefix when data must also remain unique across hosts or processes:
+
+```csharp
+builder.ConfigureTestIds(options =>
+{
+	options.RunPrefix = 482731; // For example, a numeric CI build ID
+	options.SequenceDigits = 6;
+});
+```
+
+Without an explicit prefix, each host uses a random six-digit run prefix.

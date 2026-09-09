@@ -2,6 +2,7 @@
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 /// <summary>
 /// Implements the builder pattern for configuring and constructing a <see cref="ProtoHost"/> instance.
@@ -10,6 +11,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
 {
     private readonly IServiceCollection _services = new ServiceCollection();
     private readonly ConfigurationBuilder _configurationBuilder = new();
+    private readonly ProtoTestIdOptions _testIdOptions = new();
     private bool _built;
 
     /// <inheritdoc />
@@ -24,6 +26,14 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     {
         ArgumentNullException.ThrowIfNull(configure);
         configure(_configurationBuilder);
+        return this;
+    }
+
+    /// <inheritdoc />
+    public IProtoHostBuilder ConfigureTestIds(Action<ProtoTestIdOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        configure(_testIdOptions);
         return this;
     }
 
@@ -54,11 +64,21 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
         // Build and register IConfiguration
         IConfiguration configuration = _configurationBuilder.Build();
         _services.AddSingleton(configuration);
+        _services.TryAddSingleton<IProtoTestIdGenerator>(
+            _ => new NumericProtoTestIdGenerator(_testIdOptions));
 
         // Internal hooks
         _services.AddSingleton<IProtoTestHook, ProtoClientInitializerHook>();
 
         var rootProvider = _services.BuildServiceProvider();
-        return new ProtoHost(rootProvider);
+        try
+        {
+            return new ProtoHost(rootProvider);
+        }
+        catch
+        {
+            rootProvider.Dispose();
+            throw;
+        }
     }
 }

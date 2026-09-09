@@ -27,7 +27,7 @@ public class ProtoExecutionContextTests
     public void SetAndGet_ShouldStoreAndRetrieveTypedContext()
     {
         // Arrange
-        var context = new ProtoExecutionContext("TestMethod", _scope, "test-id-1", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = new ProtoExecutionContext("TestMethod", _scope, "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
         var customState = new SampleContext("InitialData");
 
         // Act
@@ -42,7 +42,7 @@ public class ProtoExecutionContextTests
     public void GetRequired_ShouldReturnInstance_WhenContextExists()
     {
         // Arrange
-        var context = new ProtoExecutionContext("TestMethod", _scope, "test-id-1", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = new ProtoExecutionContext("TestMethod", _scope, "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
         var customState = new SampleContext("Active");
         context.SetContext(customState);
 
@@ -57,7 +57,7 @@ public class ProtoExecutionContextTests
     public void GetRequired_ShouldThrowInvalidOperationException_WhenContextIsMissing()
     {
         // Arrange
-        var context = new ProtoExecutionContext("TestMethod", _scope, "test-id-1", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = new ProtoExecutionContext("TestMethod", _scope, "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
 
         // Act & Assert
         var exception = Assert.Throws<InvalidOperationException>(() => context.Context<SampleContext>());

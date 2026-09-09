@@ -29,7 +29,7 @@ public class ProtoTests
     public async Task Service_ShouldResolveRegisteredService()
     {
         // Arrange
-        await _host.StartTestAsync("HelperTest", "id-789", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await _host.StartTestAsync("HelperTest", "00789", (MethodInfo)MethodInfo.GetCurrentMethod()!);
 
         try
         {
@@ -50,7 +50,7 @@ public class ProtoTests
     public async Task TryService_ShouldReturnNull_WhenServiceIsNotRegistered()
     {
         // Arrange
-        await _host.StartTestAsync("HelperTest", "id-789", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await _host.StartTestAsync("HelperTest", "00789", (MethodInfo)MethodInfo.GetCurrentMethod()!);
 
         try
         {
@@ -70,7 +70,7 @@ public class ProtoTests
     public async Task ContextAndSetContext_ShouldManageTestState()
     {
         // Arrange
-        await _host.StartTestAsync("HelperTest", "id-789", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await _host.StartTestAsync("HelperTest", "00789", (MethodInfo)MethodInfo.GetCurrentMethod()!);
 
         try
         {

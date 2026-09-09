@@ -21,7 +21,7 @@ public class RestRequestBuilderTests
 
         var services = new ServiceCollection();
         services.AddTransient<TestDummyAuthenticator>();
-        _context = new ProtoExecutionContext("", services.BuildServiceProvider().CreateScope(), "", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        _context = new ProtoExecutionContext("", services.BuildServiceProvider().CreateScope(), "00000", (MethodInfo)MethodInfo.GetCurrentMethod()!);
     }
 
     [TearDown]

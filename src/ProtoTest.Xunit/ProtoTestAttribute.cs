@@ -13,11 +13,9 @@ public class ProtoTestAttribute : BeforeAfterTestAttribute
     /// <inheritdoc />
     public override void Before(MethodInfo methodUnderTest)
     {
-        var attributes = GetProtoAttributes(methodUnderTest);
-        var testId = ProtoTestIdGenerator.Generate(methodUnderTest);
-
+        var attributes = ProtoAttributeResolver.Resolve(methodUnderTest);
         ProtoTestAssembly.Host
-            .StartTestAsync(methodUnderTest.Name, testId, methodUnderTest, attributes)
+            .StartTestAsync(methodUnderTest.Name, methodUnderTest, attributes)
             .GetAwaiter()
             .GetResult();
     }
@@ -25,38 +23,10 @@ public class ProtoTestAttribute : BeforeAfterTestAttribute
     /// <inheritdoc />
     public override void After(MethodInfo methodUnderTest)
     {
-        var attributes = GetProtoAttributes(methodUnderTest);
-
         ProtoTestAssembly.Host
-            .CompleteTestAsync(attributes)
+            .CompleteTestAsync()
             .GetAwaiter()
             .GetResult();
     }
 
-    /// <summary>
-    /// Retrieves all <see cref="ProtoAttribute"/> instances declared on the test method and its declaring class.
-    /// </summary>
-    /// <param name="methodUnderTest">Reflection metadata for the test method.</param>
-    /// <returns>A list of discovered <see cref="ProtoAttribute"/> instances.</returns>
-    private static List<ProtoAttribute> GetProtoAttributes(MethodInfo methodUnderTest)
-    {
-        var attributes = new List<ProtoAttribute>();
-
-        if (methodUnderTest.DeclaringType != null)
-        {
-            attributes.AddRange(
-                methodUnderTest.DeclaringType
-                    .GetCustomAttributes(true)
-                    .OfType<ProtoAttribute>()
-            );
-        }
-
-        attributes.AddRange(
-            methodUnderTest
-                .GetCustomAttributes(true)
-                .OfType<ProtoAttribute>()
-        );
-
-        return attributes;
-    }
 }

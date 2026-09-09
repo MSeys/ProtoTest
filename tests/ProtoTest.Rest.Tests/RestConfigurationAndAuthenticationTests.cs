@@ -80,7 +80,7 @@ public class RestConfigurationAndAuthenticationTests
             var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
                 await host.StartTestAsync("MissingClient", "00003", (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!));
             Assert.That(exception!.Message, Does.Contain("Orders"));
-            Assert.That(exception.Message, Does.Contain("BaseUrl"));
+            Assert.That(exception.Message, Does.Contain(nameof(HttpClient)));
         }
         finally
         {

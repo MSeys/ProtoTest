@@ -19,6 +19,7 @@
     <Project Path="src/ProtoTest.Xunit3/ProtoTest.Xunit3.csproj" Id="6f5a58c5-f062-46d2-88ee-d3f853fa8a5b" />
   </Folder>
   <Folder Name="/4. Tests/">
+    <Project Path="tests/ProtoTest.AdapterContract/ProtoTest.AdapterContract.csproj" />
     <Project Path="tests/ProtoTest.Core.Tests/ProtoTest.Core.Tests.csproj" Id="5c324d8d-8d2d-40d2-a7ca-8c8c9defd042" />
   </Folder>
   <Folder Name="/4. Tests/Adapters/">

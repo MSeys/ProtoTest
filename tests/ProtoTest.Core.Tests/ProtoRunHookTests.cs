@@ -53,6 +53,23 @@ public class ProtoRunHookTests
         Assert.Throws<InvalidOperationException>(() => _ = ProtoHost.CurrentContext);
     }
 
+    [Test]
+    public async Task Stop_ShouldAttemptAllRunHooks_WhenMultipleHooksFail()
+    {
+        var events = new List<string>();
+        var services = new ServiceCollection();
+        services.AddSingleton<IProtoRunHook>(new FailingAfterRunHook("First", 10, events));
+        services.AddSingleton<IProtoRunHook>(new FailingAfterRunHook("Second", 20, events));
+        await using var host = new ProtoHost(services.BuildServiceProvider());
+        await host.StartAsync();
+        events.Clear();
+
+        var exception = Assert.ThrowsAsync<AggregateException>(async () => await host.StopAsync());
+
+        Assert.That(exception!.InnerExceptions, Has.Count.EqualTo(2));
+        Assert.That(events, Is.EqualTo(new[] { "Second:After", "First:After" }));
+    }
+
     private sealed class TrackingRunHook(
         string name,
         int order,
@@ -85,6 +102,19 @@ public class ProtoRunHookTests
 
         public Task AfterTestAsync(ProtoExecutionContext context)
             => Task.FromException(new InvalidOperationException("after hook failed"));
+    }
+
+    private sealed class FailingAfterRunHook(string name, int order, List<string> events) : IProtoRunHook
+    {
+        public int Order => order;
+
+        public Task BeforeRunAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task AfterRunAsync(CancellationToken cancellationToken = default)
+        {
+            events.Add($"{name}:After");
+            return Task.FromException(new InvalidOperationException($"{name} failed"));
+        }
     }
 
     private sealed class DisposableDependency : IDisposable

@@ -54,20 +54,23 @@ An `IProtoClientInitializer` creates a client for each test context and register
 
 ```csharp
 public sealed class OrdersClientInitializer(IConfiguration configuration)
-	: IProtoClientInitializer
+	: IProtoClientInitializer<OrdersClient>
 {
 	public string Name => "OrdersSdk";
 
-	public Task InitializeAsync(
+	public Task<bool> TryInitializeAsync(
 		ProtoExecutionContext context,
 		CancellationToken cancellationToken = default)
 	{
-		var baseUrl = configuration["Orders:BaseUrl"]
-			?? throw new InvalidOperationException("Orders:BaseUrl is required.");
+		var baseUrl = configuration["Orders:BaseUrl"];
+		if (string.IsNullOrWhiteSpace(baseUrl))
+		{
+			return Task.FromResult(false);
+		}
 
 		var client = new OrdersClient(new Uri(baseUrl));
 		context.RegisterClient(client, Name);
-		return Task.CompletedTask;
+		return Task.FromResult(true);
 	}
 }
 ```
@@ -95,6 +98,8 @@ public async Task GetsAnOrderWithTheSdk()
 ```
 
 The current test context owns registered clients. Disposable clients are disposed in reverse registration order when the test completes. Do not register the same client type and name twice.
+
+Multiple initializers may target the same client type and name. ProtoTest tries them in dependency-injection registration order and stops after the first initializer that returns `true`. An initializer must return `false` without changing the execution context when it cannot provide its client. If every initializer for a client returns `false`, test setup fails.
 
 ## Initializer versus hook
 

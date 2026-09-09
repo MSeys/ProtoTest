@@ -6,6 +6,7 @@ using TUnit.Core.Executors;
 namespace ProtoTest.TUnit.Tests;
 
 using Microsoft.Extensions.DependencyInjection;
+using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 
 public class Setup : ProtoTestAssembly
@@ -16,6 +17,7 @@ public class Setup : ProtoTestAssembly
         await InitializeAsync(builder =>
         {
             builder.AddTestHook<TrackingHook>();
+            builder.AddTestHook<AdapterContractHook>();
             builder.ConfigureServices(services =>
             {
                 services.AddScoped<ITestService, TestService>();

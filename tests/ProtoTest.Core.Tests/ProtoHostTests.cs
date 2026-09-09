@@ -21,13 +21,13 @@ public class ProtoHostTests
 
         // Act
         // 1. Create the test execution scope
-        await host.StartTestAsync("TestSequence", "id-123", (MethodInfo)MethodInfo.GetCurrentMethod()!, [testAttribute]);
+        await host.StartTestAsync("TestSequence", "00123", (MethodInfo)MethodInfo.GetCurrentMethod()!, [testAttribute]);
 
         // 3. Test execution body
         executionLog.Add("TestBody");
 
         // 4. Complete the test lifecycle and dispose its scope
-        await host.CompleteTestAsync([testAttribute]);
+        await host.CompleteTestAsync();
 
         // Assert
         var expectedSequence = new[]
@@ -76,6 +76,19 @@ public class ProtoHostTests
     }
 
     [Test]
+    public async Task MultipleHosts_ShouldResolveTheHostOwningTheCurrentContext()
+    {
+        await using var first = new ProtoHost(new ServiceCollection().BuildServiceProvider());
+        await using var second = new ProtoHost(new ServiceCollection().BuildServiceProvider());
+
+        Assert.Throws<InvalidOperationException>(() => _ = Proto.Host);
+
+        await first.StartTestAsync("First", "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        Assert.That(Proto.Host, Is.SameAs(first));
+        await first.CompleteTestAsync();
+    }
+
+    [Test]
     public async Task CompleteTest_ShouldDisposeScopeAndClearCurrentContext()
     {
         // Arrange
@@ -86,7 +99,7 @@ public class ProtoHostTests
         await using var host = new ProtoHost(rootProvider);
 
         // Act
-        await host.StartTestAsync("TestDisposal", "id-456", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("TestDisposal", "00456", (MethodInfo)MethodInfo.GetCurrentMethod()!);
 
         // Resolve dependency while context is active on the current thread
         var dependency = ProtoHost.CurrentContext.Services.GetRequiredService<DisposableDependency>();

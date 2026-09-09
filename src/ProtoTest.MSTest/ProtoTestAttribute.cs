@@ -1,6 +1,5 @@
 ﻿namespace ProtoTest.MSTest;
 
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using ProtoTest.Core;
@@ -14,12 +13,10 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
     public override async Task<TestResult[]> ExecuteAsync(ITestMethod testMethod)
     {
         var methodInfo = testMethod.MethodInfo;
-        var attributes = GetProtoAttributes(methodInfo);
-        var testId = ProtoTestIdGenerator.Generate(methodInfo);
-
+        var attributes = ProtoAttributeResolver.Resolve(methodInfo);
         try
         {
-            await ProtoTestAssembly.Host.StartTestAsync(methodInfo.Name, testId, methodInfo, attributes);
+            await ProtoTestAssembly.Host.StartTestAsync(methodInfo.Name, methodInfo, attributes);
 
             // 3. Run the actual MSTest execution pipeline
             var results = await base.ExecuteAsync(testMethod);
@@ -29,29 +26,8 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
         finally
         {
             // Complete the lifecycle even when setup or test execution fails.
-            await ProtoTestAssembly.Host.CompleteTestAsync(attributes);
+            await ProtoTestAssembly.Host.CompleteTestAsync();
         }
     }
 
-    private static List<ProtoAttribute> GetProtoAttributes(MethodInfo methodInfo)
-    {
-        var attributes = new List<ProtoAttribute>();
-
-        if (methodInfo.DeclaringType != null)
-        {
-            attributes.AddRange(
-                methodInfo.DeclaringType
-                    .GetCustomAttributes(true)
-                    .OfType<ProtoAttribute>()
-            );
-        }
-
-        attributes.AddRange(
-            methodInfo
-                .GetCustomAttributes(true)
-                .OfType<ProtoAttribute>()
-        );
-
-        return attributes;
-    }
 }

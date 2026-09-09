@@ -1,139 +1,59 @@
-﻿namespace ProtoTest.Core;
+namespace ProtoTest.Core;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 
+/// <summary>
+/// Owns the ProtoTest service provider and exposes the public run and test lifecycle API.
+/// Lifecycle execution is delegated to focused internal components.
+/// </summary>
 public sealed class ProtoHost : IAsyncDisposable
 {
-    private static readonly AsyncLocal<ContextState?> _currentContext = new();
-    private static ProtoHost? _currentHost;
-    private readonly object _lifecycleGate = new();
     private readonly IServiceProvider _rootServiceProvider;
-    private readonly IEnumerable<IProtoTestHook> _hooks;
-    private readonly IEnumerable<IProtoRunHook> _runHooks;
-    private HostState _state;
+    private readonly ProtoRunLifecycle _runLifecycle;
+    private readonly ProtoTestLifecycle _testLifecycle;
 
     public ProtoHost(IServiceProvider rootServiceProvider)
     {
         _rootServiceProvider = rootServiceProvider ?? throw new ArgumentNullException(nameof(rootServiceProvider));
 
-        if (Interlocked.CompareExchange(ref _currentHost, this, null) is not null)
-        {
-            throw new InvalidOperationException(
-                "Only one ProtoHost can be active in a process. Dispose the existing host before creating another one.");
-        }
+        var testHooks = _rootServiceProvider.GetServices<IProtoTestHook>().ToArray();
+        var runHooks = _rootServiceProvider.GetServices<IProtoRunHook>().ToArray();
+        var testIdGenerator = _rootServiceProvider.GetService<IProtoTestIdGenerator>()
+            ?? new NumericProtoTestIdGenerator();
 
-        _hooks = _rootServiceProvider.GetServices<IProtoTestHook>();
-        _runHooks = _rootServiceProvider.GetServices<IProtoRunHook>();
+        _runLifecycle = new ProtoRunLifecycle(runHooks);
+        _testLifecycle = new ProtoTestLifecycle(this, _rootServiceProvider, testHooks, testIdGenerator);
+        ProtoHostRegistry.Register(this);
     }
 
     /// <summary>
     /// Gets the current test execution context for this asynchronous control flow.
     /// </summary>
-    public static ProtoExecutionContext CurrentContext => _currentContext.Value?.Context
-        ?? throw new InvalidOperationException("No active ProtoExecutionContext available on this thread.");
+    public static ProtoExecutionContext CurrentContext => ProtoTestLifecycle.CurrentContext;
 
     /// <summary>
-    /// Gets the active host instance.
+    /// Gets the host owning the current test, or the sole active host outside a test.
     /// </summary>
-    public static ProtoHost CurrentHost => _currentHost
-        ?? throw new InvalidOperationException("No active ProtoHost is available.");
+    public static ProtoHost CurrentHost => ProtoHostRegistry.GetCurrent(ProtoTestLifecycle.CurrentHost);
 
     public IConfiguration Configuration => _rootServiceProvider.GetRequiredService<IConfiguration>();
 
     /// <summary>
     /// Executes all suite-level BeforeRun hooks in ascending order.
     /// </summary>
-    public async Task StartAsync(CancellationToken cancellationToken = default)
-    {
-        lock (_lifecycleGate)
-        {
-            switch (_state)
-            {
-                case HostState.Started:
-                    return;
-                case HostState.Starting:
-                    throw new InvalidOperationException("ProtoHost startup is already in progress.");
-                case HostState.Stopped:
-                case HostState.Disposed:
-                    throw new InvalidOperationException("A ProtoHost cannot be started after it has stopped.");
-                default:
-                    _state = HostState.Starting;
-                    break;
-            }
-        }
-
-        try
-        {
-            foreach (var hook in _runHooks.OrderBy(h => h.Order))
-            {
-                await hook.BeforeRunAsync(cancellationToken);
-            }
-
-            lock (_lifecycleGate)
-            {
-                _state = HostState.Started;
-            }
-        }
-        catch
-        {
-            lock (_lifecycleGate)
-            {
-                _state = HostState.Created;
-            }
-
-            throw;
-        }
-    }
+    public Task StartAsync(CancellationToken cancellationToken = default)
+        => _runLifecycle.StartAsync(cancellationToken);
 
     /// <summary>
     /// Executes all suite-level AfterRun hooks in descending order.
     /// </summary>
-    public async Task StopAsync(CancellationToken cancellationToken = default)
-    {
-        lock (_lifecycleGate)
-        {
-            switch (_state)
-            {
-                case HostState.Stopped:
-                case HostState.Disposed:
-                    return;
-                case HostState.Created:
-                    throw new InvalidOperationException("A ProtoHost must be started before it can be stopped.");
-                case HostState.Stopping:
-                    throw new InvalidOperationException("ProtoHost shutdown is already in progress.");
-                default:
-                    _state = HostState.Stopping;
-                    break;
-            }
-        }
-
-        try
-        {
-            foreach (var hook in _runHooks.OrderByDescending(h => h.Order))
-            {
-                await hook.AfterRunAsync(cancellationToken);
-            }
-
-            lock (_lifecycleGate)
-            {
-                _state = HostState.Stopped;
-            }
-        }
-        catch
-        {
-            lock (_lifecycleGate)
-            {
-                _state = HostState.Started;
-            }
-
-            throw;
-        }
-    }
+    public Task StopAsync(CancellationToken cancellationToken = default)
+        => _runLifecycle.StopAsync(cancellationToken);
 
     /// <summary>
-    /// Starts a test lifecycle, creates its scoped execution context, and executes all before hooks.
+    /// Starts a test lifecycle with an explicit numeric ID.
     /// </summary>
     public Task<ProtoExecutionContext> StartTestAsync(
         string testName,
@@ -141,115 +61,32 @@ public sealed class ProtoHost : IAsyncDisposable
         MethodInfo testMethod,
         IEnumerable<ProtoAttribute>? attributes = null)
     {
-        if (_currentContext.Value?.Context is not null)
-        {
-            throw new InvalidOperationException(
-                "A ProtoExecutionContext is already active on this async flow. Complete the active test before starting another one.");
-        }
-
-        var scope = _rootServiceProvider.CreateScope();
-        var context = new ProtoExecutionContext(testName, scope, testId, testMethod);
-        _currentContext.Value = new ContextState(context);
-
-        return ExecuteBeforeHooksAsync(context, attributes);
-    }
-
-    private async Task<ProtoExecutionContext> ExecuteBeforeHooksAsync(
-        ProtoExecutionContext context,
-        IEnumerable<ProtoAttribute>? attributes)
-    {
-        try
-        {
-            foreach (var hook in _hooks.OrderBy(x => x.Order))
-            {
-                await hook.BeforeTestAsync(context);
-            }
-
-            if (attributes != null)
-            {
-                foreach (var attribute in attributes.OrderBy(x => x.Order))
-                {
-                    await attribute.BeforeTestAsync(context);
-                }
-            }
-
-            return context;
-        }
-        catch
-        {
-            try
-            {
-                await context.DisposeAsync();
-            }
-            finally
-            {
-                ClearCurrentContext();
-            }
-
-            throw;
-        }
+        _runLifecycle.EnsureTestCanStart();
+        return _testLifecycle.StartAsync(testName, ProtoTestId.Parse(testId), testMethod, attributes);
     }
 
     /// <summary>
-    /// Completes the active test lifecycle, executes after hooks, disposes its scope, and clears ambient state.
+    /// Starts a test lifecycle with an ID generated by this host.
     /// </summary>
-    public async Task CompleteTestAsync(IEnumerable<ProtoAttribute>? attributes = null)
+    public Task<ProtoExecutionContext> StartTestAsync(
+        string testName,
+        MethodInfo testMethod,
+        IEnumerable<ProtoAttribute>? attributes = null)
     {
-        var context = _currentContext.Value?.Context;
-        if (context == null) return;
-
-        try
-        {
-            if (attributes != null)
-            {
-                foreach (var attribute in attributes.OrderByDescending(x => x.Order))
-                {
-                    await attribute.AfterTestAsync(context);
-                }
-            }
-
-            foreach (var hook in _hooks.OrderByDescending(x => x.Order))
-            {
-                await hook.AfterTestAsync(context);
-            }
-        }
-        finally
-        {
-            try
-            {
-                await context.DisposeAsync();
-            }
-            finally
-            {
-                ClearCurrentContext();
-            }
-        }
+        _runLifecycle.EnsureTestCanStart();
+        return _testLifecycle.StartAsync(testName, testMethod, attributes);
     }
 
-    private void ClearCurrentContext()
-    {
-        if (_currentContext.Value is not null)
-        {
-            _currentContext.Value.Context = null;
-            _currentContext.Value = null;
-        }
-    }
-
-    private sealed class ContextState(ProtoExecutionContext context)
-    {
-        public ProtoExecutionContext? Context { get; set; } = context;
-    }
+    /// <summary>
+    /// Completes the active test using the exact lifecycle components that completed setup.
+    /// </summary>
+    public Task CompleteTestAsync() => _testLifecycle.CompleteAsync();
 
     public async ValueTask DisposeAsync()
     {
-        lock (_lifecycleGate)
+        if (!_runLifecycle.TryMarkDisposed())
         {
-            if (_state == HostState.Disposed)
-            {
-                return;
-            }
-
-            _state = HostState.Disposed;
+            return;
         }
 
         try
@@ -265,17 +102,7 @@ public sealed class ProtoHost : IAsyncDisposable
         }
         finally
         {
-            Interlocked.CompareExchange(ref _currentHost, null, this);
+            ProtoHostRegistry.Unregister(this);
         }
-    }
-
-    private enum HostState
-    {
-        Created,
-        Starting,
-        Started,
-        Stopping,
-        Stopped,
-        Disposed
     }
 }

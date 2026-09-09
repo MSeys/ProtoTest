@@ -22,6 +22,7 @@ Choose an extension point by the behavior you need to add:
 builder
 	.ConfigureServices(services => { })
 	.ConfigureAppConfiguration(configuration => { })
+	.ConfigureTestIds(options => { })
 	.AddRunHook<RunHook>()
 	.AddTestHook<TestHook>();
 ```

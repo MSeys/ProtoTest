@@ -2,6 +2,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 
 [TestClass]
@@ -13,6 +14,7 @@ public class Setup : ProtoTestAssembly
         await InitializeAsync(builder =>
         {
             builder.AddTestHook<TrackingHook>();
+            builder.AddTestHook<AdapterContractHook>();
             builder.ConfigureServices(services =>
             {
                 services.AddScoped<ITestService, TestService>();

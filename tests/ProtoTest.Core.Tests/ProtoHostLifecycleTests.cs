@@ -13,9 +13,9 @@ public sealed class ProtoHostLifecycleTests
         await using var host = CreateHost();
         var method = (MethodInfo)MethodInfo.GetCurrentMethod()!;
 
-        await host.StartTestAsync("First", "first", method);
+        await host.StartTestAsync("First", "00001", method);
 
-        Assert.Throws<InvalidOperationException>(() => host.StartTestAsync("Second", "second", method));
+        Assert.Throws<InvalidOperationException>(() => host.StartTestAsync("Second", "00002", method));
 
         await host.CompleteTestAsync();
     }
@@ -36,6 +36,22 @@ public sealed class ProtoHostLifecycleTests
         Assert.That(hook.BeforeRunAttempts, Is.EqualTo(2));
     }
 
+    [Test]
+    public async Task CompleteTest_ShouldReuseAttributesProvidedAtStart()
+    {
+        await using var host = CreateHost();
+        var attribute = new StatefulAttribute();
+
+        await host.StartTestAsync(
+            "StatefulAttribute",
+            "00001",
+            (MethodInfo)MethodInfo.GetCurrentMethod()!,
+            [attribute]);
+        await host.CompleteTestAsync();
+
+        Assert.That(attribute.AfterObservedBeforeState, Is.True);
+    }
+
     private static ProtoHost CreateHost()
         => new(new ServiceCollection().BuildServiceProvider());
 
@@ -51,6 +67,25 @@ public sealed class ProtoHostLifecycleTests
                 throw new InvalidOperationException("Expected test failure.");
             }
 
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class StatefulAttribute : ProtoAttribute
+    {
+        private bool _beforeRan;
+
+        public bool AfterObservedBeforeState { get; private set; }
+
+        public override Task BeforeTestAsync(ProtoExecutionContext context)
+        {
+            _beforeRan = true;
+            return Task.CompletedTask;
+        }
+
+        public override Task AfterTestAsync(ProtoExecutionContext context)
+        {
+            AfterObservedBeforeState = _beforeRan;
             return Task.CompletedTask;
         }
     }

@@ -15,6 +15,21 @@ protected override void Configure(IProtoHostBuilder builder)
 
 The optional factory callback can customize the underlying `WebApplicationFactory<TProgram>`.
 
+## Combine local and external clients
+
+Register REST before ASP.NET Core to use a configured external endpoint when available and fall through to the in-process application otherwise:
+
+```csharp
+protected override void Configure(IProtoHostBuilder builder)
+{
+	builder
+		.AddRest(rest => rest.AddClient("OrderApi"))
+		.AddAspNetCoreServer<Program>("OrderApi");
+}
+```
+
+When `ProtoTest:Clients:OrderApi:BaseUrl` has a value, the REST initializer creates the named `HttpClient`. Without a value, it declines and the ASP.NET Core initializer creates the client through `WebApplicationFactory<Program>`. Initializers are tried in registration order, so reversing the two builder calls makes the in-process client take precedence.
+
 ## Use the application client
 
 ```csharp

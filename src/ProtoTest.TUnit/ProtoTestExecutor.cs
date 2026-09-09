@@ -1,6 +1,5 @@
 ﻿namespace ProtoTest.TUnit;
 
-using System.Reflection;
 using global::TUnit.Core.Extensions;
 using global::TUnit.Core.Interfaces;
 using ProtoTest.Core;
@@ -19,44 +18,16 @@ public class ProtoTestExecutor : ITestExecutor
     public async ValueTask ExecuteTest(TestContext context, Func<ValueTask> action)
     {
         var methodInfo = context.Metadata.TestDetails.MethodMetadata.GetReflectionInfo();
-        var attributes = GetProtoAttributes(methodInfo);
-        var testId = ProtoTestIdGenerator.Generate(methodInfo);
-
+        var attributes = ProtoAttributeResolver.Resolve(methodInfo);
         try
         {
-            await ProtoTestAssembly.Host.StartTestAsync(methodInfo.Name, testId, methodInfo, attributes);
+            await ProtoTestAssembly.Host.StartTestAsync(methodInfo.Name, methodInfo, attributes);
             await action();
         }
         finally
         {
-            await ProtoTestAssembly.Host.CompleteTestAsync(attributes);
+            await ProtoTestAssembly.Host.CompleteTestAsync();
         }
     }
 
-    /// <summary>
-    /// Retrieves all <see cref="ProtoAttribute"/> instances declared on the test method and its declaring class.
-    /// </summary>
-    /// <param name="methodInfo">Reflection metadata for the test method.</param>
-    /// <returns>A list of discovered <see cref="ProtoAttribute"/> instances.</returns>
-    private static List<ProtoAttribute> GetProtoAttributes(MethodInfo methodInfo)
-    {
-        var attributes = new List<ProtoAttribute>();
-
-        if (methodInfo.DeclaringType != null)
-        {
-            attributes.AddRange(
-                methodInfo.DeclaringType
-                    .GetCustomAttributes(true)
-                    .OfType<ProtoAttribute>()
-            );
-        }
-
-        attributes.AddRange(
-            methodInfo
-                .GetCustomAttributes(true)
-                .OfType<ProtoAttribute>()
-        );
-
-        return attributes;
-    }
 }

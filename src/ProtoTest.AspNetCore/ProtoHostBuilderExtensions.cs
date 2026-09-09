@@ -1,7 +1,6 @@
 ﻿namespace ProtoTest.AspNetCore;
 
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 
@@ -27,11 +26,8 @@ public static class ProtoHostBuilderExtensions
 
         return builder.ConfigureServices(services =>
         {
-            services.AddSingleton<IProtoClientInitializer>(sp =>
-            {
-                var configuration = sp.GetRequiredService<IConfiguration>();
-                return new AspNetCoreClientInitializer<TProgram>(name, configuration, configureFactory);
-            });
+            services.AddSingleton<IProtoClientInitializer>(
+                new AspNetCoreClientInitializer<TProgram>(name, configureFactory));
         });
     }
 }

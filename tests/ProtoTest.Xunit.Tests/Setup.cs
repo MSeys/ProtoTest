@@ -2,6 +2,7 @@
 
 using global::Xunit;
 using Microsoft.Extensions.DependencyInjection;
+using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 
 public class ProtoTestFixture : ProtoTestAssembly
@@ -9,6 +10,7 @@ public class ProtoTestFixture : ProtoTestAssembly
     protected override void Configure(IProtoHostBuilder builder)
     {
         builder.AddTestHook<TrackingHook>();
+        builder.AddTestHook<AdapterContractHook>();
         builder.ConfigureServices(services =>
         {
             services.AddScoped<ITestService, TestService>();

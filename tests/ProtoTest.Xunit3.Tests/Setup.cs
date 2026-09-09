@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 using ProtoTest.Xunit3.Tests;
 
@@ -11,6 +12,7 @@ public class Setup : ProtoTestAssembly
     protected override void Configure(IProtoHostBuilder builder)
     {
         builder.AddTestHook<TrackingHook>();
+        builder.AddTestHook<AdapterContractHook>();
         builder.ConfigureServices(services =>
         {
             services.AddScoped<ITestService, TestService>();

@@ -111,11 +111,14 @@ Read [hooks](extending/hooks.md) for lifecycle extensions or [custom attributes 
 
 ## Runnable examples
 
+- [Shared SaaS sample application](examples/sample-app.md)
 - [REST demo](examples/rest-demo.md)
 - [ASP.NET Core demo](examples/aspnetcore-demo.md)
 - [REST comparison](comparisons/with-and-without-prototest.md)
 
-The REST demo is the best complete example: it uses WireMock.Net as an external-style API, named clients, class-level authentication, fluent authentication, response matching, and coverage.
+The shared SaaS sample is the best place to see ProtoTest used as a reusable test platform.
+The focused REST demo complements it with a WireMock.Net-based external API, multiple
+named clients, different authentication styles, response matching, and coverage.
 
 ## Reference
 

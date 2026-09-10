@@ -49,6 +49,7 @@ Read the [ProtoTest documentation](docs/index.md), or start directly with:
 
 ## Samples
 
+- [Shared SaaS sample application and REST showcase](samples/ProtoTest.SampleApp.RestDemo)
 - [REST demo](samples/ProtoTest.Rest.Demo)
 - [ASP.NET Core demo](samples/ProtoTest.AspNetCore.Demo)
 

@@ -34,7 +34,8 @@ $vstestProjects = @(
     "tests/ProtoTest.OpenApi.Tests/ProtoTest.OpenApi.Tests.csproj",
     "tests/ProtoTest.Reporting.Tests/ProtoTest.Reporting.Tests.csproj",
     "samples/ProtoTest.Rest.Demo/ProtoTest.Rest.Demo.csproj",
-    "samples/ProtoTest.AspNetCore.Demo/ProtoTest.AspNetCore.Demo.csproj"
+    "samples/ProtoTest.AspNetCore.Demo/ProtoTest.AspNetCore.Demo.csproj",
+    "samples/ProtoTest.SampleApp.RestDemo/ProtoTest.SampleApp.RestDemo.csproj"
 )
 
 foreach ($project in $vstestProjects) {

@@ -43,4 +43,10 @@
   <Folder Name="/5. Demos/Rest/">
     <Project Path="samples/ProtoTest.Rest.Demo/ProtoTest.Rest.Demo.csproj" Id="722a7c58-ada0-4ff9-bad6-aa38c517f7f4" />
   </Folder>
+  <Folder Name="/5. Demos/SampleApp/">
+    <Project Path="samples/ProtoTest.SampleApp.Contracts/ProtoTest.SampleApp.Contracts.csproj" />
+    <Project Path="samples/ProtoTest.SampleApp.Testing/ProtoTest.SampleApp.Testing.csproj" />
+    <Project Path="samples/ProtoTest.SampleApp/ProtoTest.SampleApp.csproj" />
+    <Project Path="samples/ProtoTest.SampleApp.RestDemo/ProtoTest.SampleApp.RestDemo.csproj" />
+  </Folder>
 </Solution>

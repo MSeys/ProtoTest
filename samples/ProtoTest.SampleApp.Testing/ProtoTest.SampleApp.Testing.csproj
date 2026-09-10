@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.SampleApp.Contracts\ProtoTest.SampleApp.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Rest\ProtoTest.Rest.csproj" />
+  </ItemGroup>
+
+</Project>

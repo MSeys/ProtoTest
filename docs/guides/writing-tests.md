@@ -34,7 +34,7 @@ using ProtoTest.Rest;
 [RestClient("Orders")]
 public async Task GetOrder_ReturnsExpectedOrder()
 {
-	var response = await Proto.Context.Rest()
+	using var response = await Proto.Context.Rest()
 		.GetAsync("/orders/{id}", new { id = 42 });
 
 	response
@@ -60,7 +60,7 @@ public async Task GetOrder_ReturnsExpectedOrder()
 | `Context<T>()` | Get required custom state. |
 | `TryContext<T>()` | Get optional custom state. |
 | `SetContext(value)` | Register or replace custom state. |
-| `RecordHit(...)` | Send a coverage hit to matching collectors. |
+| `RecordObservation(...)` | Send integration or test information to matching collectors. |
 
 ## Keep test intent in the method
 
@@ -71,7 +71,7 @@ Use suite configuration and hooks for repeated infrastructure. Keep the test met
 [RestClient("Orders")]
 public async Task CreateOrder_ReturnsCreatedOrder()
 {
-	var response = await Proto.Context.Rest()
+	using var response = await Proto.Context.Rest()
 		.Body(new { product = "notebook", quantity = 2 })
 		.PostAsync("/orders");
 

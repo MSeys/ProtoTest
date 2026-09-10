@@ -6,7 +6,7 @@ using ProtoTest.Core;
 using ProtoTest.OpenApi.Internal;
 using ProtoTest.Rest;
 
-public class OpenApiCoverageCollector : ProtoCollector
+public class OpenApiCoverageCollector : ProtoCoverageCollector
 {
     private readonly OpenApiDocument _document;
     private readonly Dictionary<(string Method, string Route), int> _endpointHits = new();
@@ -49,23 +49,23 @@ public class OpenApiCoverageCollector : ProtoCollector
         _document = document ?? throw new ArgumentNullException(nameof(document));
     }
 
-    public override void RecordHit(CoverageHit hit)
+    public override void Collect(ProtoObservation observation)
     {
-        ArgumentNullException.ThrowIfNull(hit);
+        ArgumentNullException.ThrowIfNull(observation);
 
         lock (Lock)
         {
-            if (hit.Data is RestHitData restHit)
+            if (observation.Data is RestHitData restHit)
             {
                 RecordRestHit(restHit);
             }
-            else if (hit.Data is ShapeMatchData shapeHit)
+            else if (observation.Data is ShapeMatchData shapeHit)
             {
                 RecordShapeMatchHit(shapeHit);
             }
-
-            base.RecordHit(hit);
         }
+
+        base.Collect(observation);
     }
 
     private void RecordRestHit(RestHitData hit)
@@ -102,11 +102,11 @@ public class OpenApiCoverageCollector : ProtoCollector
     /// Generates hierarchical coverage items based on the loaded OpenAPI spec contract.
     /// Maps endpoints, response status codes, and schema properties to coverage nodes.
     /// </summary>
-    public override IEnumerable<CoverageItem> GetReportItems()
+    public override IEnumerable<ProtoReportItem> GetReportItems()
     {
         lock (Lock)
         {
-            var reportItems = new List<CoverageItem>();
+            var reportItems = new List<ProtoReportItem>();
 
             foreach (var (pathKey, pathItem) in _document.Paths)
             {
@@ -116,7 +116,7 @@ public class OpenApiCoverageCollector : ProtoCollector
                     var endpointIdentifier = $"{method} {pathKey}";
                     var totalEndpointHits = _endpointHits.GetValueOrDefault((method, pathKey), 0);
 
-                    var childItems = new List<CoverageItem>();
+                    var childItems = new List<ProtoReportItem>();
 
                     // 1. Status Codes Baseline
                     foreach (var (statusCodeKey, _) in operation.Responses)
@@ -124,12 +124,14 @@ public class OpenApiCoverageCollector : ProtoCollector
                         if (int.TryParse(statusCodeKey, out var statusCode))
                         {
                             var statusHits = _statusCodeHits.GetValueOrDefault((method, pathKey, statusCode), 0);
-                            childItems.Add(new CoverageItem(
+                            childItems.Add(new ProtoReportItem(
                                 TargetName: TargetName,
                                 Category: "OpenAPI StatusCode",
                                 Identifier: $"{endpointIdentifier} -> {statusCode}",
-                                IsVisited: statusHits > 0,
-                                HitCount: statusHits
+                                Kind: ProtoReportItemKind.Coverage,
+                                Status: statusHits > 0 ? ProtoReportStatus.Success : ProtoReportStatus.Neutral,
+                                Count: statusHits,
+                                IsCovered: statusHits > 0
                             ));
                         }
                     }
@@ -141,12 +143,14 @@ public class OpenApiCoverageCollector : ProtoCollector
                     {
                         var propHits = _propertyHits.GetValueOrDefault((method, pathKey, propPath), 0);
 
-                        childItems.Add(new CoverageItem(
+                        childItems.Add(new ProtoReportItem(
                             TargetName: TargetName,
                             Category: "OpenAPI Property",
                             Identifier: $"{endpointIdentifier} -> {propPath}",
-                            IsVisited: propHits > 0,
-                            HitCount: propHits
+                            Kind: ProtoReportItemKind.Coverage,
+                            Status: propHits > 0 ? ProtoReportStatus.Success : ProtoReportStatus.Neutral,
+                            Count: propHits,
+                            IsCovered: propHits > 0
                         ));
                     }
 
@@ -154,16 +158,18 @@ public class OpenApiCoverageCollector : ProtoCollector
                     var metadata = new Dictionary<string, object>
                     {
                         ["Method"] = method,
-                        ["Route"] = pathKey,
-                        ["Children"] = childItems
+                        ["Route"] = pathKey
                     };
 
-                    reportItems.Add(new CoverageItem(
+                    reportItems.Add(new ProtoReportItem(
                         TargetName: TargetName,
                         Category: Category,
                         Identifier: endpointIdentifier,
-                        IsVisited: totalEndpointHits > 0,
-                        HitCount: totalEndpointHits,
+                        Kind: ProtoReportItemKind.Coverage,
+                        Status: totalEndpointHits > 0 ? ProtoReportStatus.Success : ProtoReportStatus.Neutral,
+                        Count: totalEndpointHits,
+                        IsCovered: totalEndpointHits > 0,
+                        Children: childItems,
                         Metadata: metadata
                     ));
                 }

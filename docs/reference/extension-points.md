@@ -11,9 +11,10 @@ Choose an extension point by the behavior you need to add:
 | Create a named test-scoped resource | `IProtoClientInitializer` | Dependency injection |
 | Share typed state in one test | `IProtoContext` | `Proto.Context.SetContext` |
 | Publish test artifacts | `IProtoTestAttachmentPublisher` | Adapter lifecycle or a custom host integration |
-| Receive execution events | `IProtoCollector` | `IProtoTargetBuilder.WithCoverage<T>()` or DI |
-| Aggregate standard coverage items | `ProtoCollector` | Derive a collector |
-| Export coverage items | `IProtoSink` | Sink/reporting integration |
+| Receive observations | `IProtoCollector` | `IProtoTargetBuilder.WithCollector<T>()` or DI |
+| Aggregate standard coverage items | `ProtoCoverageCollector` | Derive a collector |
+| Produce normalized report items | `IProtoReportSource` | Dependency injection or a collector |
+| Export report items | `IProtoSink` | `AddSink<T>()` |
 
 ## Host builder
 
@@ -40,7 +41,7 @@ Implement `IProtoClientInitializer` when an extension needs to create and regist
 
 ## Collectors and sinks
 
-Implement `IProtoCollector` when an extension consumes `CoverageHit` values and produces `CoverageItem` values. Derive from `ProtoCollector` when its standard aggregation is suitable. Implement `IProtoSink` when coverage items need to be exported.
+Implement `IProtoCollector` when an extension consumes `ProtoObservation` values. Reporting is optional: implement `IProtoReportSource` to produce `ProtoReportItem` values, or derive from `ProtoCoverageCollector` for standard coverage aggregation. Implement `IProtoSink` to export normalized report items.
 
 See [coverage extensions](../extending/coverage.md).
 

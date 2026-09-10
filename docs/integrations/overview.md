@@ -10,7 +10,7 @@ The user guides explain how to write and extend tests. Integration pages explain
 
 | Integration | Package | Purpose | Example |
 | --- | --- | --- | --- |
-| Core | `ProtoTest.Core` | Lifecycle, hooks, context, clients, and coverage dispatch | [Core lifecycle](../concepts/core-lifecycle.md) |
+| Core | `ProtoTest.Core` | Lifecycle, hooks, context, clients, observations, and reporting contracts | [Core lifecycle](../concepts/core-lifecycle.md) |
 | NUnit | `ProtoTest.NUnit` | NUnit test lifecycle integration | [Adapter guide](nunit.md) |
 | xUnit | `ProtoTest.Xunit` | xUnit v2 lifecycle integration | [Adapter guide](nunit.md#other-frameworks) |
 | xUnit v3 | `ProtoTest.Xunit3` | xUnit v3 lifecycle integration | [Adapter guide](nunit.md#other-frameworks) |
@@ -19,6 +19,7 @@ The user guides explain how to write and extend tests. Integration pages explain
 | REST | `ProtoTest.Rest` | Named HTTP clients, authentication, matching, and REST coverage | [REST guide](rest.md) |
 | ASP.NET Core | `ProtoTest.AspNetCore` | In-memory application hosting and service access | [ASP.NET Core guide](aspnetcore.md) |
 | OpenAPI | `ProtoTest.OpenApi` | Specification-driven REST coverage | [OpenAPI guide](openapi.md) |
+| Reporting | `ProtoTest.Reporting` | End-of-run JSON and self-contained HTML reports | [Reporting and coverage](../extending/coverage.md) |
 
 The framework adapter guides are intentionally short because the lifecycle is shared. The REST, ASP.NET Core, and OpenAPI guides contain the domain-specific setup and examples.
 
@@ -31,7 +32,6 @@ The following projects exist as planned extension points but are not currently i
 | `ProtoTest.GraphQL` | GraphQL client and coverage integration |
 | `ProtoTest.gRPC` | gRPC client and coverage integration |
 | `ProtoTest.Playwright` | Browser automation integration |
-| `ProtoTest.Coverage` | Standalone coverage/reporting features |
 
 ## Common flow
 

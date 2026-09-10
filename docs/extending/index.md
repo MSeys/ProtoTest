@@ -11,8 +11,9 @@ Most projects can use ProtoTest without writing extensions. When your suite need
 | Apply behavior to selected classes or methods | `ProtoAttribute` | [Custom attributes and clients](custom-attributes-and-clients.md) |
 | Create a named client for each test context | `IProtoClientInitializer` | [Custom attributes and clients](custom-attributes-and-clients.md) |
 | Share typed scenario data | `IProtoContext` | [Context and state](../guides/context-and-state.md) |
-| Aggregate execution events | `IProtoCollector` or `ProtoCollector` | [Coverage](coverage.md) |
-| Export coverage items | `IProtoSink` | [Coverage](coverage.md) |
+| Consume execution observations | `IProtoCollector` | [Reporting and coverage](coverage.md) |
+| Produce normalized report data | `IProtoReportSource` or `ProtoCoverageCollector` | [Reporting and coverage](coverage.md) |
+| Export report items | `IProtoSink` | [Reporting and coverage](coverage.md) |
 | Add services or configuration | `IProtoHostBuilder` | [Lifecycle reference](../reference/extension-points.md) |
 
 ## The usual extension sequence

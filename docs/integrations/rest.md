@@ -1,6 +1,6 @@
 # REST integration
 
-`ProtoTest.Rest` provides named `HttpClient` instances, route templates, authentication, JSON request bodies, response assertions, and REST coverage hits.
+`ProtoTest.Rest` provides named `HttpClient` instances, route templates, authentication, JSON request bodies, response assertions, and REST observations.
 
 ## Configure a named client
 
@@ -9,7 +9,7 @@ protected override void Configure(IProtoHostBuilder builder)
 {
 	builder.AddRest(rest => rest
 		.AddClient("Orders")
-		.WithCoverage<RestCoverageCollector>());
+		.WithCollector<RestCoverageCollector>());
 }
 ```
 
@@ -50,7 +50,7 @@ public sealed class OrderApiTests
 	[ProtoTest]
 	public async Task GetOrder_ReturnsExpectedOrder()
 	{
-		var response = await Proto.Context.Rest()
+		using var response = await Proto.Context.Rest()
 			.GetAsync("/orders/{id}", new { id = 42 });
 
 		response.ShouldHaveStatus(HttpStatusCode.OK);
@@ -59,7 +59,7 @@ public sealed class OrderApiTests
 	[ProtoTest]
 	public async Task CreateOrder_ReturnsCreatedOrder()
 	{
-		var response = await Proto.Context.Rest()
+		using var response = await Proto.Context.Rest()
 			.Body(new { product = "notebook", quantity = 2 })
 			.PostAsync("/orders");
 
@@ -67,6 +67,8 @@ public sealed class OrderApiTests
 	}
 }
 ```
+
+`RestResponse` owns its underlying `HttpResponseMessage`. Dispose the response with `using var` after assertions and any direct `RawResponse` access are complete.
 
 Method-level attributes can be used when one test needs different configuration. A method-level setting takes precedence over the corresponding inherited class-level setting:
 
@@ -109,7 +111,7 @@ using ProtoTest.Rest;
 [BearerToken("orders-token")]
 public async Task GetOrder_ReturnsExpectedOrder()
 {
-	var response = await Proto.Context.Rest()
+	using var response = await Proto.Context.Rest()
 		.GetAsync("/orders/{id}", new { id = 42 });
 
 	response
@@ -128,7 +130,7 @@ This class-level pattern is especially useful for a suite of tests targeting one
 The same authentication can be selected fluently for one request:
 
 ```csharp
-var response = await Proto.Context.Rest("Inventory")
+using var response = await Proto.Context.Rest("Inventory")
 	.Auth<BearerTokenAuthenticator>("inventory-token")
 	.GetAsync("/inventory/{sku}", new { sku = "notebook" });
 ```
@@ -136,7 +138,7 @@ var response = await Proto.Context.Rest("Inventory")
 You can also pass an authenticator instance:
 
 ```csharp
-var response = await Proto.Context.Rest("Inventory")
+using var response = await Proto.Context.Rest("Inventory")
 	.Auth(new BearerTokenAuthenticator("inventory-token"))
 	.GetAsync("/inventory/{sku}", new { sku = "notebook" });
 ```
@@ -144,7 +146,7 @@ var response = await Proto.Context.Rest("Inventory")
 ## Request bodies and assertions
 
 ```csharp
-var response = await Proto.Context.Rest("Orders")
+using var response = await Proto.Context.Rest("Orders")
 	.Body(new { product = "notebook", quantity = 2 })
 	.PostAsync("/orders");
 
@@ -160,13 +162,15 @@ response
 
 `ShouldMatchShape` checks only the properties described by the expected object. `IsRest` matchers express values that are intentionally not exact, such as a regular expression or a range.
 
+Assertion failures use runner-independent ProtoTest exceptions. `RestStatusAssertionException` exposes the expected status, actual status, and response body, while `ShapeMismatchException` exposes every structured shape mismatch. Test runners can display their messages directly, and reporting integrations can inspect the structured details without parsing text.
+
 ## Coverage
 
 Each REST request records a route and status hit. `RestCoverageCollector` can be composed through the target builder's common coverage extension:
 
 ```csharp
 .AddClient("Orders")
-.WithCoverage<RestCoverageCollector>()
+.WithCollector<RestCoverageCollector>()
 ```
 
 When `ProtoTest.OpenApi` is also configured, use `OpenApiCoverageCollector` to map REST hits to endpoints, status codes, and response properties from the contract.

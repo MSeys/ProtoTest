@@ -36,7 +36,7 @@ Compose the collector with the named REST target:
 ```csharp
 builder.AddRest(rest => rest
 	.AddClient("Orders")
-	.WithCoverage<OpenApiCoverageCollector>());
+	.WithCollector<OpenApiCoverageCollector>());
 ```
 
 `OpenApiCoverageCollector` reads the named client's OpenAPI configuration through dependency injection. It also supports direct construction when a test host needs to supply a specification programmatically.
@@ -64,7 +64,7 @@ using ProtoTest.Rest;
 [RestClient("Orders")]
 public async Task GetOrder_ExercisesDocumentedEndpoint()
 {
-	var response = await Proto.Context.Rest()
+	using var response = await Proto.Context.Rest()
 		.GetAsync("/orders/{id}", new { id = 42 });
 
 	response

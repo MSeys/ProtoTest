@@ -12,7 +12,7 @@ public sealed class InventoryApiTests
     [ProtoTest]
     public async Task GetInventoryItem_UsesFluentAuthentication()
     {
-        var response = await Proto.Context.Rest()
+        using var response = await Proto.Context.Rest()
             .Auth<BearerTokenAuthenticator>("inventory-token")
             .GetAsync("/inventory/{sku}", new { sku = "notebook" });
 
@@ -28,7 +28,7 @@ public sealed class InventoryApiTests
     [ProtoTest]
     public async Task GetInventoryItem_RejectsWrongFluentToken()
     {
-        var response = await Proto.Context.Rest()
+        using var response = await Proto.Context.Rest()
             .Auth(new BearerTokenAuthenticator("wrong-token"))
             .GetAsync("/inventory/{sku}", new { sku = "notebook" });
 

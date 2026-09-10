@@ -38,10 +38,10 @@ public sealed class Setup : ProtoTestAssembly
             })
             .AddRest(rest => rest
                 .AddClient("Orders")
-                .WithCoverage<RestCoverageCollector>())
+                .WithCollector<RestCoverageCollector>())
             .AddRest(rest => rest
                 .AddClient("Inventory")
-                .WithCoverage<RestCoverageCollector>());
+                .WithCollector<RestCoverageCollector>());
     }
 
     private static void ConfigureApi()

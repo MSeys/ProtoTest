@@ -65,7 +65,7 @@ public sealed class OrderTests
 	[ProtoTest]
 	public async Task GetOrder_ReturnsExpectedOrder()
 	{
-		var response = await Proto.Context.Rest()
+		using var response = await Proto.Context.Rest()
 			.GetAsync("/orders/{id}", new { id = 42 });
 
 		response
@@ -80,7 +80,7 @@ public sealed class OrderTests
 	[ProtoTest]
 	public async Task GetAnotherOrder_UsesTheSameClientAndAuthentication()
 	{
-		var response = await Proto.Context.Rest()
+		using var response = await Proto.Context.Rest()
 			.GetAsync("/orders/{id}", new { id = 43 });
 
 		response.ShouldHaveStatus(HttpStatusCode.OK);

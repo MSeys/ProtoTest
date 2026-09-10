@@ -8,7 +8,7 @@ using System.Text;
 public sealed class ProtoTestAttachment
 {
     private readonly byte[]? _content;
-    private readonly object _materializationGate = new();
+    private readonly ProtoLock _materializationGate = new();
     private Task<string>? _materialization;
 
     private ProtoTestAttachment(
@@ -113,7 +113,7 @@ public sealed class ProtoTestAttachment
     private static string SanitizeFileName(string name)
     {
         var invalidCharacters = Path.GetInvalidFileNameChars();
-        var sanitized = new string(name.Select(character => invalidCharacters.Contains(character) ? '_' : character).ToArray());
+        var sanitized = new string([.. name.Select(character => invalidCharacters.Contains(character) ? '_' : character)]);
         return string.IsNullOrWhiteSpace(sanitized) ? "attachment" : sanitized;
     }
 

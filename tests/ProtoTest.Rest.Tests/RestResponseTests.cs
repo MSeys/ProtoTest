@@ -5,6 +5,7 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
+using ProtoTest.Rest.Exceptions;
 
 [TestFixture]
 public class RestResponseTests
@@ -68,10 +69,17 @@ public class RestResponseTests
         var rawResponse = new HttpResponseMessage(HttpStatusCode.NotFound);
         var response = new RestResponse(rawResponse, "Not Found Error", TimeSpan.FromMilliseconds(100));
 
-        var ex = Assert.Throws<InvalidOperationException>(() => response.ShouldHaveStatus(HttpStatusCode.OK));
+        var ex = Assert.Throws<RestStatusAssertionException>(() => response.ShouldHaveStatus(HttpStatusCode.OK));
 
-        Assert.That(ex!.Message, Contains.Substring("Expected HTTP Status 200 (OK), but received 404 (NotFound)"));
-        Assert.That(ex.Message, Contains.Substring("Not Found Error"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(ex, Is.InstanceOf<ProtoAssertionException>());
+            Assert.That(ex!.ExpectedStatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(ex.ActualStatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+            Assert.That(ex.ResponseBody, Is.EqualTo("Not Found Error"));
+            Assert.That(ex.Message, Contains.Substring("Expected HTTP status 200 (OK), but received 404 (NotFound)"));
+            Assert.That(ex.Message, Contains.Substring("Not Found Error"));
+        }
     }
 
     [Test]
@@ -84,7 +92,7 @@ public class RestResponseTests
     }
 
     [Test]
-    public void ShouldMatchShape_Should_Record_CoverageHit_When_Context_Is_Provided()
+    public void ShouldMatchShape_Should_Record_Observation_When_Context_Is_Provided()
     {
         // Arrange
         var rawResponse = new HttpResponseMessage(HttpStatusCode.OK);
@@ -104,7 +112,7 @@ public class RestResponseTests
         response.ShouldMatchShape(expectedShape);
 
         // Assert
-        var hit = _context.RecordedHits.FirstOrDefault(h => h.Data is ShapeMatchData);
+        var hit = _context.RecordedObservations.FirstOrDefault(h => h.Data is ShapeMatchData);
         Assert.That(hit, Is.Not.Null);
         Assert.That(hit!.TargetName, Is.EqualTo("MyApiTarget"));
         Assert.That(hit.Identifier, Is.EqualTo("GET /api/test"));

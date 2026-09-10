@@ -2,7 +2,7 @@ namespace ProtoTest.Core;
 
 internal static class ProtoHostRegistry
 {
-    private static readonly object Gate = new();
+    private static readonly ProtoLock Gate = new();
     private static readonly HashSet<ProtoHost> ActiveHosts = [];
 
     public static void Register(ProtoHost host)

@@ -19,7 +19,7 @@ internal sealed class ProtoTestLifecycle
     {
         _host = host;
         _rootServiceProvider = rootServiceProvider;
-        _hooks = hooks.OrderBy(hook => hook.Order).ToArray();
+        _hooks = [.. hooks.OrderBy(hook => hook.Order)];
         _testIdGenerator = testIdGenerator;
     }
 

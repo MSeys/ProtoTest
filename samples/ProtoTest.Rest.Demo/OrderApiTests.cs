@@ -13,7 +13,7 @@ public sealed class OrderApiTests
     [RestClient("Orders")]
     public async Task GetOrder_ReturnsExpectedOrder()
     {
-        var response = await Proto.Context.Rest()
+        using var response = await Proto.Context.Rest()
             .GetAsync("/orders/{id}", new { id = 42 });
 
         response
@@ -30,7 +30,7 @@ public sealed class OrderApiTests
     [RestClient("Orders")]
     public async Task CreateOrder_SendsJsonBodyAndReturnsCreatedOrder()
     {
-        var response = await Proto.Context.Rest()
+        using var response = await Proto.Context.Rest()
             .Body(new { product = "notebook", quantity = 2 })
             .PostAsync("/orders");
 
@@ -47,7 +47,7 @@ public sealed class OrderApiTests
     [ProtoTest]
     public async Task GetOrder_ReturnsNotFoundForUnknownOrder()
     {
-        var response = await Proto.Context.Rest("Orders")
+        using var response = await Proto.Context.Rest("Orders")
             .GetAsync("/orders/{id}", new { id = 999 });
 
         response

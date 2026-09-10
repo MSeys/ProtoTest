@@ -1,16 +1,20 @@
-﻿namespace ProtoTest.Core;
+namespace ProtoTest.Core;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using System.Collections.Concurrent;
 using System.Reflection;
 
 /// <summary>
-/// Encapsulates the execution context and service scope for an individual test.
+/// Provides the public per-test façade for metadata, services, state, clients, attachments, and observations.
 /// </summary>
 public sealed class ProtoExecutionContext : IAsyncDisposable
 {
     private readonly IServiceScope _scope;
+    private readonly ProtoAttachmentCollection _attachments;
+    private readonly ProtoContextStateStore _state = new();
+    private readonly ProtoClientRegistry _clients = new();
+    private readonly ProtoObservationDispatcher _observations;
+    private int _disposeStarted;
 
     public ProtoExecutionContext(string testName, IServiceScope scope, string testId, MethodInfo testMethod)
         : this(testName, scope, ProtoTestId.Parse(testId), testMethod)
@@ -23,6 +27,8 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         _scope = scope ?? throw new ArgumentNullException(nameof(scope));
         Id = id;
         TestMethod = testMethod ?? throw new ArgumentNullException(nameof(testMethod));
+        _attachments = new ProtoAttachmentCollection(TestId);
+        _observations = new ProtoObservationDispatcher(_scope.ServiceProvider);
     }
 
     public string TestName { get; }
@@ -35,35 +41,15 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     public string TestId => Id.Value;
     public long TestNumber => Id.Number;
 
-    /// <summary>
-    /// Retrieves the global <see cref="IConfiguration"/> registered in the ProtoHost.
-    /// </summary>
+    /// <summary>Retrieves the global configuration registered in the ProtoHost.</summary>
     public IConfiguration Configuration => Service<IConfiguration>();
 
     public IServiceProvider Services => _scope.ServiceProvider;
-
-
     public T Service<T>() where T : notnull => Services.GetRequiredService<T>();
     public T? TryService<T>() => Services.GetService<T>();
 
-    #region Test Attachments
-
-    private readonly object _attachmentGate = new();
-    private readonly List<ProtoTestAttachment> _attachments = [];
-
-    /// <summary>
-    /// Gets a snapshot of the artifacts registered for this test.
-    /// </summary>
-    public IReadOnlyList<ProtoTestAttachment> Attachments
-    {
-        get
-        {
-            lock (_attachmentGate)
-            {
-                return _attachments.ToArray();
-            }
-        }
-    }
+    /// <summary>Gets a snapshot of the artifacts registered for this test.</summary>
+    public IReadOnlyList<ProtoTestAttachment> Attachments => _attachments.Snapshot();
 
     public ProtoTestAttachment AddAttachment(
         string name,
@@ -87,199 +73,48 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         => AddAttachment(ProtoTestAttachment.FromFile(filePath, name, mediaType, description));
 
     public ProtoTestAttachment AddAttachment(ProtoTestAttachment attachment)
-    {
-        ArgumentNullException.ThrowIfNull(attachment);
-        var testIdPrefix = $"{TestId}-";
-        if (!attachment.Name.StartsWith(testIdPrefix, StringComparison.OrdinalIgnoreCase))
-        {
-            attachment = attachment.WithName($"{testIdPrefix}{attachment.Name}");
-        }
+        => _attachments.Add(attachment);
 
-        lock (_attachmentGate)
-        {
-            if (_attachments.Any(existing =>
-                    string.Equals(existing.Name, attachment.Name, StringComparison.OrdinalIgnoreCase)))
-            {
-                throw new InvalidOperationException(
-                    $"An attachment named '{attachment.Name}' is already registered for this test.");
-            }
+    /// <summary>Registers or replaces contextual state for this test.</summary>
+    public void SetContext<T>(T context) where T : class, IProtoContext => _state.Set(context);
 
-            _attachments.Add(attachment);
-        }
+    /// <summary>Retrieves contextual state when it is present.</summary>
+    public T? TryContext<T>() where T : class, IProtoContext => _state.TryGet<T>();
 
-        return attachment;
-    }
-
-    #endregion
-
-    #region Contextual State Management
-
-    private readonly ConcurrentDictionary<Type, IProtoContext> _contexts = new();
+    /// <summary>Retrieves required contextual state.</summary>
+    public T Context<T>() where T : class, IProtoContext => _state.Get<T>();
 
     /// <summary>
-    /// Registers or overrides a contextual state instance for the current test execution.
-    /// </summary>
-    public void SetContext<T>(T context) where T : class, IProtoContext
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        _contexts[typeof(T)] = context;
-    }
-
-    /// <summary>
-    /// Retrieves a registered context instance if present.
-    /// </summary>
-    /// <returns>The registered instance, or <c>null</c> if not found.</returns>
-    public T? TryContext<T>() where T : class, IProtoContext
-    {
-        return _contexts.TryGetValue(typeof(T), out var context) ? (T)context : null;
-    }
-
-    /// <summary>
-    /// Retrieves a required context instance, throwing an exception if it has not been registered.
-    /// </summary>
-    /// <returns>The registered context instance.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when the requested context type is missing.</exception>
-    public T Context<T>() where T : class, IProtoContext
-    {
-        return TryContext<T>()
-            ?? throw new InvalidOperationException($"No context of type '{typeof(T).Name}' registered.");
-    }
-
-    #endregion
-
-    #region Named Client Registry
-
-    private readonly object _clientGate = new();
-    private readonly Dictionary<ClientKey, object> _clients = new(ClientKeyComparer.Instance);
-    private readonly List<ClientKey> _clientOrder = [];
-    private int _disposeStarted;
-
-    /// <summary>
-    /// Registers a named client or connection instance for the current test context.
-    /// The context owns registered clients and disposes them when the test completes.
-    /// Registering the same client type and name more than once is not allowed.
+    /// Registers a named client owned by this test. Clients are disposed in reverse registration order.
     /// </summary>
     public void RegisterClient<TClient>(TClient client, string name = "Default") where TClient : class
-    {
-        ArgumentNullException.ThrowIfNull(client);
-        var key = BuildClientKey<TClient>(name);
+        => _clients.Register(client, name);
 
-        lock (_clientGate)
-        {
-            ObjectDisposedException.ThrowIf(_disposeStarted != 0, this);
-
-            if (_clients.ContainsKey(key))
-            {
-                throw new InvalidOperationException(
-                    $"A client of type '{typeof(TClient).Name}' is already registered with name '{name}'.");
-            }
-
-            _clientOrder.Add(key);
-            _clients[key] = client;
-        }
-    }
-
-    /// <summary>
-    /// Retrieves a registered named client or connection instance.
-    /// </summary>
+    /// <summary>Retrieves a required named client.</summary>
     public TClient Client<TClient>(string name = "Default") where TClient : class
-    {
-        var key = BuildClientKey<TClient>(name);
-        lock (_clientGate)
-        {
-            if (_clients.TryGetValue(key, out var client) && client is TClient typedClient)
-            {
-                return typedClient;
-            }
-        }
+        => _clients.Get<TClient>(name);
 
-        throw new InvalidOperationException(
-            $"No client of type '{typeof(TClient).Name}' registered with name '{name}' in current ProtoExecutionContext.");
-    }
-
-    /// <summary>
-    /// Attempts to retrieve a registered named client.
-    /// </summary>
+    /// <summary>Retrieves a named client when it is present.</summary>
     public TClient? TryClient<TClient>(string name = "Default") where TClient : class
-    {
-        var key = BuildClientKey<TClient>(name);
+        => _clients.TryGet<TClient>(name);
 
-        lock (_clientGate)
-        {
-            return _clients.TryGetValue(key, out var client) && client is TClient typedClient
-                ? typedClient
-                : null;
-        }
-    }
+    /// <summary>Gets a snapshot of observations recorded for this test.</summary>
+    public IReadOnlyCollection<ProtoObservation> RecordedObservations => _observations.Snapshot();
 
-    private static ClientKey BuildClientKey<TClient>(string name)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        return new ClientKey(typeof(TClient), name);
-    }
+    /// <summary>Stores and dispatches an observation to every collector that accepts it.</summary>
+    public void RecordObservation(ProtoObservation observation) => _observations.Record(observation);
 
-    private readonly record struct ClientKey(Type ClientType, string Name);
-
-    private sealed class ClientKeyComparer : IEqualityComparer<ClientKey>
-    {
-        public static ClientKeyComparer Instance { get; } = new();
-
-        public bool Equals(ClientKey x, ClientKey y)
-            => x.ClientType == y.ClientType
-               && StringComparer.OrdinalIgnoreCase.Equals(x.Name, y.Name);
-
-        public int GetHashCode(ClientKey obj)
-            => HashCode.Combine(obj.ClientType, StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Name));
-    }
-
-    #endregion
-
-    #region Coverage Dispatcher
-
-    private readonly ConcurrentBag<CoverageHit> _recordedHits = [];
-
-    /// <summary>
-    /// Gets a materialized snapshot of the coverage hits recorded for this test.
-    /// </summary>
-    public IReadOnlyCollection<CoverageHit> RecordedHits => _recordedHits.ToArray();
-
-    /// <summary>
-    /// Dispatches a coverage hit to all registered collectors matching the target name.
-    /// </summary>
-    public void RecordHit(CoverageHit hit)
-    {
-        ArgumentNullException.ThrowIfNull(hit);
-
-        _recordedHits.Add(hit);
-
-        var collectors = Services.GetServices<IProtoCollector>();
-
-        foreach (var collector in collectors)
-        {
-            if (string.Equals(collector.TargetName, hit.TargetName, StringComparison.OrdinalIgnoreCase))
-            {
-                collector.RecordHit(hit);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Convenience overload to record a coverage hit directly.
-    /// </summary>
-    public void RecordHit(
+    /// <summary>Convenience overload for recording an observation.</summary>
+    public void RecordObservation(
         string targetName,
+        string kind,
         string identifier,
         object? data = null,
         IReadOnlyDictionary<string, object>? metadata = null)
-    {
-        RecordHit(new CoverageHit(targetName, identifier, data, metadata));
-    }
-
-    #endregion
+        => RecordObservation(new ProtoObservation(targetName, kind, identifier, data, metadata));
 
     /// <summary>
-    /// Disposes registered clients in reverse registration order and then the underlying service scope.
-    /// Disposal is safe to call more than once. All registered clients are attempted even when one fails.
+    /// Disposes owned clients and the service scope. Disposal is idempotent and attempts every resource.
     /// </summary>
     public async ValueTask DisposeAsync()
     {
@@ -288,47 +123,12 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
             return;
         }
 
-        List<object> clients;
-
-        lock (_clientGate)
-        {
-            clients = [.. _clientOrder
-                .AsEnumerable()
-                .Reverse()
-                .Select(key => _clients[key])];
-
-            _clients.Clear();
-            _clientOrder.Clear();
-        }
-
-        List<Exception>? disposalExceptions = null;
-        Exception? scopeException = null;
-
-        foreach (var client in clients)
-        {
-            try
-            {
-                if (client is IAsyncDisposable asyncDisposable)
-                {
-                    await asyncDisposable.DisposeAsync();
-                }
-                else if (client is IDisposable disposable)
-                {
-                    disposable.Dispose();
-                }
-            }
-            catch (Exception exception)
-            {
-                disposalExceptions ??= [];
-                disposalExceptions.Add(exception);
-            }
-        }
-
+        var exceptions = (await _clients.DisposeClientsAsync()).ToList();
         try
         {
-            if (_scope is IAsyncDisposable scopeAsyncDisposable)
+            if (_scope is IAsyncDisposable asyncDisposable)
             {
-                await scopeAsyncDisposable.DisposeAsync();
+                await asyncDisposable.DisposeAsync();
             }
             else
             {
@@ -337,17 +137,11 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         }
         catch (Exception exception)
         {
-            scopeException = exception;
+            exceptions.Add(exception);
         }
 
-        if (disposalExceptions is not null || scopeException is not null)
+        if (exceptions.Count > 0)
         {
-            var exceptions = disposalExceptions ?? [];
-            if (scopeException is not null)
-            {
-                exceptions.Add(scopeException);
-            }
-
             throw new AggregateException("One or more execution context resources failed to dispose.", exceptions);
         }
     }

@@ -63,7 +63,7 @@ public sealed class OrderApiTests
 	[ProtoTest]
 	public async Task GetOrder_ReturnsExpectedOrder()
 	{
-		var response = await Proto.Context.Rest()
+		using var response = await Proto.Context.Rest()
 			.GetAsync("/orders/{id}", new { id = 42 });
 
 		response
@@ -79,7 +79,7 @@ public sealed class OrderApiTests
 	[ProtoTest]
 	public async Task CreateOrder_ReturnsCreatedOrder()
 	{
-		var response = await Proto.Context.Rest()
+		using var response = await Proto.Context.Rest()
 			.Body(new { product = "notebook", quantity = 2 })
 			.PostAsync("/orders");
 
@@ -122,7 +122,7 @@ using ProtoTest.Rest;
 [BearerToken("orders-token")]
 public async Task GetOneOrder_WithMethodConfiguration()
 {
-	var response = await Proto.Context.Rest()
+	using var response = await Proto.Context.Rest()
 		.GetAsync("/orders/{id}", new { id = 42 });
 
 	response.ShouldHaveStatus(HttpStatusCode.OK);
@@ -143,7 +143,7 @@ protected override void Configure(IProtoHostBuilder builder)
 		})
 		.AddRest(rest => rest
 			.AddClient("Orders")
-			.WithCoverage<RestCoverageCollector>());
+			.WithCollector<RestCoverageCollector>());
 }
 ```
 
@@ -156,7 +156,7 @@ protected override void Configure(IProtoHostBuilder builder)
 | Authentication | Header configured manually | `[BearerToken]` or fluent `.Auth(...)` |
 | Route parameters | URL assembled manually | Route template plus anonymous parameters |
 | JSON verification | Deserialize into a DTO or inspect JSON | `ShouldMatchShape` verifies the described shape |
-| Coverage | Requires separate instrumentation | REST requests record hits; collectors are composed with `.WithCoverage<T>()` |
+| Coverage | Requires separate instrumentation | REST requests record observations; collectors are composed with `.WithCollector<T>()` |
 | Cleanup | Test author owns `HttpClient` and fixture state | Context disposes clients in reverse registration order and completes teardown |
 | Reuse | Custom fixture conventions | Shared hooks, attributes, named clients, and configuration |
 

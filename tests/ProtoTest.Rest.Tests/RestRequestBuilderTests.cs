@@ -66,7 +66,7 @@ public class RestRequestBuilderTests
     }
 
     [Test]
-    public async Task SendAsync_Should_Emit_CoverageHit_With_RestHitData()
+    public async Task SendAsync_Should_Emit_Observation_With_RestHitData()
     {
         // Arrange
         _handler.ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK)
@@ -80,7 +80,7 @@ public class RestRequestBuilderTests
         await builder.GetAsync("/users/{id}", new { id = 1 });
 
         // Assert - Context Recorded Hits
-        var hit = _context.RecordedHits.FirstOrDefault(h => h.Data is RestHitData);
+        var hit = _context.RecordedObservations.FirstOrDefault(h => h.Data is RestHitData);
         Assert.That(hit, Is.Not.Null);
         Assert.That(hit!.TargetName, Is.EqualTo("TestTarget"));
         Assert.That(hit.Identifier, Is.EqualTo("GET /users/{id}"));
@@ -90,6 +90,22 @@ public class RestRequestBuilderTests
         Assert.That(data.RouteTemplate, Is.EqualTo("/users/{id}"));
         Assert.That(data.StatusCode, Is.EqualTo(200));
         Assert.That(data.ResponseBody, Is.EqualTo("""{"id": 1}"""));
+    }
+
+    [Test]
+    public async Task SendAsync_ShouldKeepRawResponseAliveUntilRestResponseIsDisposed()
+    {
+        var content = new TrackingContent("raw response");
+        _handler.ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null);
+
+        var response = await builder.GetAsync("/raw");
+
+        Assert.That(content.IsDisposed, Is.False);
+        Assert.That(await response.RawResponse.Content.ReadAsStringAsync(), Is.EqualTo("raw response"));
+
+        response.Dispose();
+        Assert.That(content.IsDisposed, Is.True);
     }
 
     [Test]
@@ -119,7 +135,7 @@ public class RestRequestBuilderTests
             .ShouldHaveStatus(HttpStatusCode.Created)
             .ShouldMatchShape(new { id = IsRest.GreaterThan(0), created = true });
 
-        var shapeHit = _context.RecordedHits.FirstOrDefault(h => h.Data is ShapeMatchData);
+        var shapeHit = _context.RecordedObservations.FirstOrDefault(h => h.Data is ShapeMatchData);
         Assert.That(shapeHit, Is.Not.Null);
 
         var shapeData = (ShapeMatchData)shapeHit!.Data!;
@@ -230,5 +246,17 @@ public class TestDummyAuthenticator(string token = "Bearer default") : IRestAuth
     {
         request.Headers.TryAddWithoutValidation("Authorization", token);
         return ValueTask.CompletedTask;
+    }
+}
+
+public sealed class TrackingContent(string content)
+    : ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(content))
+{
+    public bool IsDisposed { get; private set; }
+
+    protected override void Dispose(bool disposing)
+    {
+        IsDisposed = true;
+        base.Dispose(disposing);
     }
 }

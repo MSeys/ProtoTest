@@ -76,7 +76,7 @@ public async Task GetOrder_RecordsScenarioData()
 	var scenario = Proto.Context.Context<OrderScenario>();
 	scenario.Events.Add("request-started");
 
-	var response = await Proto.Context.Rest("Orders")
+	using var response = await Proto.Context.Rest("Orders")
 		.GetAsync("/orders/{id}", new { id = 42 });
 
 	response.ShouldHaveStatus(HttpStatusCode.OK);
@@ -109,7 +109,7 @@ public Task AfterTestAsync(ProtoExecutionContext context)
 }
 ```
 
-Collectors receive `CoverageHit` values, not the context directly. If a collector needs scenario metadata, include it in the hit's data or have the integration record a typed value before dispatching the hit. A collector can also resolve scoped services from its constructor when the collector is registered through dependency injection.
+Collectors receive `ProtoObservation` values, not the context directly. If a collector needs scenario metadata, include it in the observation's data or metadata, or have the integration record a typed value before dispatching it. A collector can also resolve services from its constructor when it is registered through dependency injection.
 
 The important boundary is that state belongs to the active test context. Do not use static mutable state to move scenario data between tests.
 
@@ -122,7 +122,7 @@ Use a service when the object is application or infrastructure behavior register
 | Resolve application behavior | `Proto.Context.Service<T>()` |
 | Access an initialized endpoint client | `Proto.Context.Client<T>(name)` |
 | Share current test scenario data | `Proto.Context.Context<T>()` |
-| Record protocol or contract execution | `Proto.Context.RecordHit(...)` |
+| Record protocol or contract execution | `Proto.Context.RecordObservation(...)` |
 
 ## Next steps
 

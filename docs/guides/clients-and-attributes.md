@@ -39,7 +39,7 @@ using ProtoTest.Rest;
 [RestClient("Orders")]
 public async Task GetsAnOrder()
 {
-	var response = await Proto.Context.Rest()
+	using var response = await Proto.Context.Rest()
 		.GetAsync("/orders/{id}", new { id = 42 });
 
 	response.ShouldHaveStatus(HttpStatusCode.OK);
@@ -49,7 +49,7 @@ public async Task GetsAnOrder()
 If the attribute is omitted, use the client name explicitly:
 
 ```csharp
-var response = await Proto.Context.Rest("Orders")
+using var response = await Proto.Context.Rest("Orders")
 	.GetAsync("/orders/{id}", new { id = 42 });
 ```
 
@@ -106,7 +106,7 @@ public sealed class OrderTests
 Or selected for a single request:
 
 ```csharp
-var response = await Proto.Context.Rest("Inventory")
+using var response = await Proto.Context.Rest("Inventory")
 	.Auth<BearerTokenAuthenticator>("inventory-token")
 	.GetAsync("/inventory/{sku}", new { sku = "notebook" });
 ```

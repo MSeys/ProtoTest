@@ -13,7 +13,7 @@ public sealed record ShapeMismatch(string PropertyPath, string Reason, object? E
     };
 }
 
-public class ShapeMismatchException : Exception
+public class ShapeMismatchException : ProtoTest.Core.ProtoAssertionException
 {
     public IReadOnlyList<ShapeMismatch> Mismatches { get; }
 

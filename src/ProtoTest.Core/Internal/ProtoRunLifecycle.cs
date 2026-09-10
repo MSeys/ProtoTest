@@ -2,8 +2,8 @@ namespace ProtoTest.Core;
 
 internal sealed class ProtoRunLifecycle(IEnumerable<IProtoRunHook> hooks)
 {
-    private readonly object _gate = new();
-    private readonly IReadOnlyList<IProtoRunHook> _hooks = hooks.OrderBy(hook => hook.Order).ToArray();
+    private readonly ProtoLock _gate = new();
+    private readonly IReadOnlyList<IProtoRunHook> _hooks = [.. hooks.OrderBy(hook => hook.Order)];
     private IReadOnlyList<IProtoRunHook> _startedHooks = [];
     private State _state;
 

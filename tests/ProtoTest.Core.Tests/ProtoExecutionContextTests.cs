@@ -64,5 +64,43 @@ public class ProtoExecutionContextTests
         Assert.That(exception!.Message, Does.Contain(nameof(SampleContext)));
     }
 
+    [Test]
+    public void RecordObservation_ShouldStoreAndDispatchToEveryMatchingCollector()
+    {
+        var first = new RecordingCollector("Orders");
+        var second = new RecordingCollector("orders");
+        var ignored = new RecordingCollector("Customers");
+        using var provider = new ServiceCollection()
+            .AddSingleton<IProtoCollector>(first)
+            .AddSingleton<IProtoCollector>(second)
+            .AddSingleton<IProtoCollector>(ignored)
+            .BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var context = new ProtoExecutionContext(
+            "TestMethod",
+            scope,
+            "00001",
+            (MethodInfo)MethodInfo.GetCurrentMethod()!);
+
+        context.RecordObservation("Orders", "http.response", "GET /orders", data: 200);
+
+        Assert.That(context.RecordedObservations, Has.Count.EqualTo(1));
+        Assert.That(first.Observations, Has.Count.EqualTo(1));
+        Assert.That(second.Observations, Has.Count.EqualTo(1));
+        Assert.That(ignored.Observations, Is.Empty);
+        Assert.That(first.Observations.Single().Kind, Is.EqualTo("http.response"));
+        Assert.That(first.Observations.Single().Data, Is.EqualTo(200));
+    }
+
     private sealed record SampleContext(string Value) : IProtoContext;
+
+    private sealed class RecordingCollector(string targetName) : IProtoCollector
+    {
+        public List<ProtoObservation> Observations { get; } = [];
+
+        public bool CanCollect(ProtoObservation observation)
+            => string.Equals(observation.TargetName, targetName, StringComparison.OrdinalIgnoreCase);
+
+        public void Collect(ProtoObservation observation) => Observations.Add(observation);
+    }
 }

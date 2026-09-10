@@ -1,6 +1,7 @@
 ﻿namespace ProtoTest.Rest;
 
 using ProtoTest.Core;
+using ProtoTest.Rest.Exceptions;
 using ProtoTest.Rest.Matching;
 using System.Dynamic;
 using System.Collections;
@@ -17,7 +18,7 @@ public sealed class RestResponse(
     string? routeIdentifier = null,
     RestAttachmentOptions? attachmentOptions = null,
     string? attachmentPrefix = null
-)
+) : IDisposable
 {
     private static readonly JsonSerializerOptions DefaultJsonOptions = new()
     {
@@ -30,6 +31,12 @@ public sealed class RestResponse(
     public HttpResponseHeaders Headers => RawResponse.Headers;
     public TimeSpan ElapsedTime { get; } = elapsedTime;
     public string Content { get; } = content ?? string.Empty;
+
+    /// <summary>
+    /// Releases the underlying HTTP response. Callers own a returned <see cref="RestResponse"/>
+    /// and should dispose it when access to <see cref="RawResponse"/> is no longer required.
+    /// </summary>
+    public void Dispose() => RawResponse.Dispose();
 
     public T? ReadAsJson<T>(JsonSerializerOptions? options = null)
     {
@@ -57,9 +64,7 @@ public sealed class RestResponse(
     {
         if (StatusCode != expectedStatusCode)
         {
-            throw new InvalidOperationException(
-                $"Expected HTTP Status {(int)expectedStatusCode} ({expectedStatusCode}), " +
-                $"but received {(int)StatusCode} ({StatusCode}). Response Body:\n{Content}");
+            throw new RestStatusAssertionException(expectedStatusCode, StatusCode, Content);
         }
         return this;
     }
@@ -81,11 +86,12 @@ public sealed class RestResponse(
 
         var matchedProps = ShapeMatcher.AssertMatch(Content, expectedShape);
 
-        // 🎯 Record ShapeMatch Hit if context is available
+        // Record the shape-match observation when an execution context is available.
         if (context != null && !string.IsNullOrEmpty(targetName) && !string.IsNullOrEmpty(routeIdentifier))
         {
-            context.RecordHit(new CoverageHit(
+            context.RecordObservation(new ProtoObservation(
                 TargetName: targetName,
+                Kind: "http.contract.shape",
                 Identifier: routeIdentifier,
                 Data: new ShapeMatchData(
                     RouteTemplate: routeIdentifier,

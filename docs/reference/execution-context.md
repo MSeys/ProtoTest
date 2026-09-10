@@ -1,6 +1,6 @@
 # Execution context reference
 
-`ProtoExecutionContext` is the per-test container for services, named clients, typed scenario state, and recorded coverage hits. The ambient gateway is `Proto.Context`.
+`ProtoExecutionContext` is the per-test container for services, named clients, typed scenario state, and recorded observations. The ambient gateway is `Proto.Context`.
 
 ## Services
 
@@ -42,18 +42,19 @@ var optionalState = context.TryContext<ScenarioState>();
 
 See [context and state](../guides/context-and-state.md) for the complete usage pattern.
 
-## Coverage hits
+## Observations
 
 ```csharp
-Proto.Context.RecordHit(
+Proto.Context.RecordObservation(
 	targetName: "Orders",
+	kind: "http.response",
 	identifier: "GET /orders/{id}",
 	data: responseData);
 
-var hits = Proto.Context.RecordedHits;
+var observations = Proto.Context.RecordedObservations;
 ```
 
-Matching collectors receive recorded hits. Most integration code records hits automatically.
+Matching collectors receive recorded observations. Most integration code records observations automatically.
 
 ## Test metadata
 

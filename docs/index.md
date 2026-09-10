@@ -104,7 +104,7 @@ See the [integration overview](integrations/overview.md) for package names and s
 | Declare behavior on a class or method | `ProtoAttribute` |
 | Create a named test-scoped resource | `IProtoClientInitializer` |
 | Share typed scenario data | `IProtoContext` and `Proto.Context.Context<T>()` |
-| Aggregate execution data | `IProtoCollector` or `ProtoCollector` |
+| Consume or report execution data | `IProtoCollector`, `IProtoReportSource`, or `ProtoCoverageCollector` |
 | Export coverage items | `IProtoSink` |
 
 Read [hooks](extending/hooks.md) for lifecycle extensions or [custom attributes and clients](extending/custom-attributes-and-clients.md) for new test behavior and resources.

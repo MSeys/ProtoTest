@@ -1,6 +1,7 @@
 namespace ProtoTest.Rest.Tests;
 
 using NUnit.Framework;
+using ProtoTest.Core;
 using ProtoTest.Rest.Exceptions;
 using ProtoTest.Rest.Matching;
 
@@ -69,6 +70,7 @@ public class ShapeMatcherTests
         Assert.That(ex, Is.Not.Null);
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(ex, Is.InstanceOf<ProtoAssertionException>());
             Assert.That(ex!.Mismatches, Has.Count.EqualTo(3));
 
             Assert.That(ex.Mismatches[0].PropertyPath, Is.EqualTo("$.name"));

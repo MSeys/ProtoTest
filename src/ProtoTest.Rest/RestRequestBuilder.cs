@@ -103,46 +103,55 @@ public sealed class RestRequestBuilder(
         }
 
         var stopwatch = Stopwatch.StartNew();
-        using var responseMessage = await _httpClient.SendAsync(request, ct);
+        var responseMessage = await _httpClient.SendAsync(request, ct);
         stopwatch.Stop();
 
-        var bodyString = await responseMessage.Content.ReadAsStringAsync(ct);
-
-        if (attachmentOptions?.CaptureResponses == true)
+        try
         {
-            _context.AddAttachment(
-                $"{attachmentPrefix}-response",
+            var bodyString = await responseMessage.Content.ReadAsStringAsync(ct);
+
+            if (attachmentOptions?.CaptureResponses == true)
+            {
+                _context.AddAttachment(
+                    $"{attachmentPrefix}-response",
+                    bodyString,
+                    responseMessage.Content.Headers.ContentType?.MediaType ?? "text/plain",
+                    $"{attachmentDescription} returned {(int)responseMessage.StatusCode} ({responseMessage.StatusCode})");
+            }
+
+            var headersDict = responseMessage.Headers
+                .ToDictionary(h => h.Key, h => string.Join(", ", h.Value), StringComparer.OrdinalIgnoreCase);
+
+            var routeIdentifier = $"{method.Method.ToUpperInvariant()} {routeTemplate}";
+
+            _context.RecordObservation(new ProtoObservation(
+                TargetName: _targetName,
+                Kind: "http.response",
+                Identifier: routeIdentifier,
+                Data: new RestHitData(
+                    Method: method.Method,
+                    RouteTemplate: routeTemplate,
+                    StatusCode: (int)responseMessage.StatusCode,
+                    ResponseBody: bodyString,
+                    Headers: headersDict
+                )
+            ));
+
+            return new RestResponse(
+                responseMessage,
                 bodyString,
-                responseMessage.Content.Headers.ContentType?.MediaType ?? "text/plain",
-                $"{attachmentDescription} returned {(int)responseMessage.StatusCode} ({responseMessage.StatusCode})");
+                stopwatch.Elapsed,
+                _context,
+                _targetName,
+                routeIdentifier,
+                attachmentOptions,
+                attachmentPrefix
+            );
         }
-
-        var headersDict = responseMessage.Headers
-            .ToDictionary(h => h.Key, h => string.Join(", ", h.Value), StringComparer.OrdinalIgnoreCase);
-
-        var routeIdentifier = $"{method.Method.ToUpperInvariant()} {routeTemplate}";
-
-        _context.RecordHit(new CoverageHit(
-            TargetName: _targetName,
-            Identifier: routeIdentifier,
-            Data: new RestHitData(
-                Method: method.Method,
-                RouteTemplate: routeTemplate,
-                StatusCode: (int)responseMessage.StatusCode,
-                ResponseBody: bodyString,
-                Headers: headersDict
-            )
-        ));
-
-        return new RestResponse(
-            responseMessage,
-            bodyString,
-            stopwatch.Elapsed,
-            _context,
-            _targetName,
-            routeIdentifier,
-            attachmentOptions,
-            attachmentPrefix
-        );
+        catch
+        {
+            responseMessage.Dispose();
+            throw;
+        }
     }
 }

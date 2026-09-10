@@ -55,11 +55,11 @@ public class OpenApiCoverageCollector : ProtoCoverageCollector
 
         lock (Lock)
         {
-            if (observation.Data is RestHitData restHit)
+            if (observation.Data is RestResponseData restHit)
             {
                 RecordRestHit(restHit);
             }
-            else if (observation.Data is ShapeMatchData shapeHit)
+            else if (observation.Data is RestShapeMatchData shapeHit)
             {
                 RecordShapeMatchHit(shapeHit);
             }
@@ -68,7 +68,7 @@ public class OpenApiCoverageCollector : ProtoCoverageCollector
         base.Collect(observation);
     }
 
-    private void RecordRestHit(RestHitData hit)
+    private void RecordRestHit(RestResponseData hit)
     {
         var matchedRoute = FindMatchingOpenApiRoute(hit.RouteTemplate);
         if (matchedRoute == null) return;
@@ -82,9 +82,9 @@ public class OpenApiCoverageCollector : ProtoCoverageCollector
         _statusCodeHits[statusKey] = _statusCodeHits.GetValueOrDefault(statusKey, 0) + 1;
     }
 
-    private void RecordShapeMatchHit(ShapeMatchData hit)
+    private void RecordShapeMatchHit(RestShapeMatchData hit)
     {
-        var parts = hit.RouteTemplate.Split(' ', 2);
+        var parts = hit.RequestIdentifier.Split(' ', 2);
         if (parts.Length < 2) return;
 
         var method = parts[0].ToUpperInvariant();

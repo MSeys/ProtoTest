@@ -1,20 +1,27 @@
 ﻿namespace ProtoTest.Rest.Authenticators;
 
-public class ApiKeyAuthenticator(string keyName, string keyValue, ApiKeyLocation location = ApiKeyLocation.Header) : IRestAuthenticator
+public sealed class ApiKeyAuthenticator(string keyName, string keyValue, ApiKeyLocation location = ApiKeyLocation.Header) : IRestAuthenticator
 {
-    public ValueTask AuthenticateAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
+    public ValueTask AuthenticateAsync(RestAuthenticationContext context, CancellationToken cancellationToken = default)
     {
+        var request = context.Request;
         if (location == ApiKeyLocation.Header)
         {
-            request.Headers.TryAddWithoutValidation(keyName, keyValue);
+            if (!request.Headers.TryAddWithoutValidation(keyName, keyValue))
+            {
+                throw new InvalidOperationException($"API key header '{keyName}' could not be added to the request.");
+            }
         }
-        else if (request.RequestUri != null)
+        else if (request.RequestUri is not null)
         {
-            var uriBuilder = new UriBuilder(request.RequestUri);
-            var query = System.Web.HttpUtility.ParseQueryString(uriBuilder.Query);
-            query[keyName] = keyValue;
-            uriBuilder.Query = query.ToString();
-            request.RequestUri = uriBuilder.Uri;
+            var uri = request.RequestUri;
+            var updated = Internal.RestUriBuilder.SetQueryParameter(
+                uri.OriginalString,
+                keyName,
+                keyValue);
+            request.RequestUri = new Uri(
+                updated,
+                uri.IsAbsoluteUri ? UriKind.Absolute : UriKind.Relative);
         }
 
         return ValueTask.CompletedTask;

@@ -2,7 +2,7 @@ namespace ProtoTest.TUnit;
 
 using ProtoTest.Core;
 
-internal sealed class TUnitAttachmentPublisher(global::TUnit.Core.TestContext context)
+internal sealed class TUnitAttachmentPublisher(TestContext context)
     : IProtoTestAttachmentPublisher
 {
     public async ValueTask PublishAsync(

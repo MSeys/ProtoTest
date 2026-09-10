@@ -2,5 +2,10 @@
 
 public interface IRestAuthenticator
 {
-    ValueTask AuthenticateAsync(HttpRequestMessage request, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Authenticates a request with access to the owning test context and selected client.
+    /// </summary>
+    ValueTask AuthenticateAsync(
+        RestAuthenticationContext context,
+        CancellationToken cancellationToken = default);
 }

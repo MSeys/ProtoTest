@@ -53,7 +53,7 @@ public class RestRequestBuilderTests
         // Assert - Request Verification
         Assert.That(_handler.LastRequest, Is.Not.Null);
         Assert.That(_handler.LastRequest!.Method, Is.EqualTo(HttpMethod.Get));
-        Assert.That(_handler.LastRequest.RequestUri?.ToString(), Is.EqualTo("https://api.prototest.dev/users/42?active=True"));
+        Assert.That(_handler.LastRequest.RequestUri?.ToString(), Is.EqualTo("https://api.prototest.dev/users/42?active=true"));
         Assert.That(_handler.LastRequest.Headers.GetValues("X-Custom-Header").Single(), Is.EqualTo("TestValue"));
         Assert.That(_handler.LastRequest.Headers.GetValues("User-Agent").Single(), Is.EqualTo("ProtoTest-Runner"));
 
@@ -66,7 +66,7 @@ public class RestRequestBuilderTests
     }
 
     [Test]
-    public async Task SendAsync_Should_Emit_Observation_With_RestHitData()
+    public async Task SendAsync_ShouldEmitRestResponseObservation()
     {
         // Arrange
         _handler.ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK)
@@ -80,12 +80,12 @@ public class RestRequestBuilderTests
         await builder.GetAsync("/users/{id}", new { id = 1 });
 
         // Assert - Context Recorded Hits
-        var hit = _context.RecordedObservations.FirstOrDefault(h => h.Data is RestHitData);
+        var hit = _context.RecordedObservations.FirstOrDefault(h => h.Data is RestResponseData);
         Assert.That(hit, Is.Not.Null);
         Assert.That(hit!.TargetName, Is.EqualTo("TestTarget"));
         Assert.That(hit.Identifier, Is.EqualTo("GET /users/{id}"));
 
-        var data = (RestHitData)hit.Data!;
+        var data = (RestResponseData)hit.Data!;
         Assert.That(data.Method, Is.EqualTo("GET"));
         Assert.That(data.RouteTemplate, Is.EqualTo("/users/{id}"));
         Assert.That(data.StatusCode, Is.EqualTo(200));
@@ -101,15 +101,16 @@ public class RestRequestBuilderTests
 
         var response = await builder.GetAsync("/raw");
 
-        Assert.That(content.IsDisposed, Is.False);
+        Assert.That(content.IsDisposed, Is.True, "The network content is replaced by a bounded in-memory copy.");
         Assert.That(await response.RawResponse.Content.ReadAsStringAsync(), Is.EqualTo("raw response"));
 
         response.Dispose();
-        Assert.That(content.IsDisposed, Is.True);
+        Assert.ThrowsAsync<ObjectDisposedException>(async () =>
+            await response.RawResponse.Content.ReadAsStringAsync());
     }
 
     [Test]
-    public async Task Body_Object_Should_Serialize_As_Json_Content_And_Emit_ShapeMatchData()
+    public async Task Body_Object_ShouldSerializeJsonAndEmitShapeMatchObservation()
     {
         // Arrange
         _handler.ResponseToReturn = new HttpResponseMessage(HttpStatusCode.Created)
@@ -133,12 +134,12 @@ public class RestRequestBuilderTests
         // Assert - Response Verification & Shape Hit Recording
         response
             .ShouldHaveStatus(HttpStatusCode.Created)
-            .ShouldMatchShape(new { id = IsRest.GreaterThan(0), created = true });
+            .ShouldMatchShape(new { id = JsonValue.GreaterThan(0), created = true });
 
-        var shapeHit = _context.RecordedObservations.FirstOrDefault(h => h.Data is ShapeMatchData);
+        var shapeHit = _context.RecordedObservations.FirstOrDefault(h => h.Data is RestShapeMatchData);
         Assert.That(shapeHit, Is.Not.Null);
 
-        var shapeData = (ShapeMatchData)shapeHit!.Data!;
+        var shapeData = (RestShapeMatchData)shapeHit!.Data!;
         Assert.That(shapeData.MatchedProperties, Contains.Item("$.id"));
         Assert.That(shapeData.MatchedProperties, Contains.Item("$.created"));
         Assert.That(_context.Attachments.Select(attachment => attachment.Name), Is.EqualTo(new[]
@@ -217,6 +218,36 @@ public class RestRequestBuilderTests
         response.ShouldHaveStatus(HttpStatusCode.OK);
         Assert.That(response.IsSuccessStatusCode, Is.True);
     }
+
+    [Test]
+    public async Task Builder_ShouldCreateFreshContentForEverySend()
+    {
+        _handler.ResponseFactory = () => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("ok")
+        };
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null)
+            .Body(new { value = 42 });
+
+        using var first = await builder.PostAsync("/first");
+        using var second = await builder.PostAsync("/second");
+
+        Assert.That(_handler.RequestBodies, Is.EqualTo(new[] { "{\"value\":42}", "{\"value\":42}" }));
+    }
+
+    [Test]
+    public void RequestFailure_ShouldEmitFailureObservation()
+    {
+        _handler.ExceptionToThrow = new HttpRequestException("Connection failed");
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null);
+
+        Assert.ThrowsAsync<HttpRequestException>(async () => await builder.GetAsync("/unavailable"));
+
+        var observation = _context.RecordedObservations.Single(item => item.Kind == "http.failure");
+        var failure = (RestFailureData)observation.Data!;
+        Assert.That(failure.RouteTemplate, Is.EqualTo("/unavailable"));
+        Assert.That(failure.Message, Is.EqualTo("Connection failed"));
+    }
 }
 
 // --- Test Helpers ---
@@ -225,26 +256,35 @@ public class TestHttpMessageHandler : HttpMessageHandler
 {
     public HttpRequestMessage? LastRequest { get; private set; }
     public string? LastRequestBody { get; private set; }
+    public List<string> RequestBodies { get; } = [];
     public HttpResponseMessage ResponseToReturn { get; set; } = new(HttpStatusCode.OK);
+    public Func<HttpResponseMessage>? ResponseFactory { get; set; }
+    public Exception? ExceptionToThrow { get; set; }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         LastRequest = request;
 
+        if (ExceptionToThrow is not null)
+        {
+            throw ExceptionToThrow;
+        }
+
         if (request.Content != null)
         {
             LastRequestBody = await request.Content.ReadAsStringAsync(cancellationToken);
+            RequestBodies.Add(LastRequestBody);
         }
 
-        return ResponseToReturn;
+        return ResponseFactory?.Invoke() ?? ResponseToReturn;
     }
 }
 
 public class TestDummyAuthenticator(string token = "Bearer default") : IRestAuthenticator
 {
-    public ValueTask AuthenticateAsync(HttpRequestMessage request, CancellationToken ct = default)
+    public ValueTask AuthenticateAsync(RestAuthenticationContext context, CancellationToken ct = default)
     {
-        request.Headers.TryAddWithoutValidation("Authorization", token);
+        context.Request.Headers.TryAddWithoutValidation("Authorization", token);
         return ValueTask.CompletedTask;
     }
 }

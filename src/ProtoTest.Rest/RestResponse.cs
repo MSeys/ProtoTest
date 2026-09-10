@@ -2,6 +2,7 @@
 
 using ProtoTest.Core;
 using ProtoTest.Rest.Exceptions;
+using ProtoTest.Rest.Internal;
 using ProtoTest.Rest.Matching;
 using System.Dynamic;
 using System.Collections;
@@ -9,28 +10,50 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
-public sealed class RestResponse(
-    HttpResponseMessage rawResponse,
-    string content,
-    TimeSpan elapsedTime,
-    ProtoExecutionContext? context = null,
-    string? targetName = null,
-    string? routeIdentifier = null,
-    RestAttachmentOptions? attachmentOptions = null,
-    string? attachmentPrefix = null
-) : IDisposable
+public sealed class RestResponse : IDisposable
 {
+    private readonly ProtoExecutionContext? _context;
+    private readonly string? _targetName;
+    private readonly string? _routeIdentifier;
+    private readonly RestAttachmentOptions? _attachmentOptions;
+    private readonly string? _attachmentPrefix;
+    private int _shapeAssertionSequence;
+
     private static readonly JsonSerializerOptions DefaultJsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    public HttpResponseMessage RawResponse { get; } = rawResponse ?? throw new ArgumentNullException(nameof(rawResponse));
+    internal RestResponse(
+        HttpResponseMessage rawResponse,
+        string content,
+        TimeSpan elapsedTime,
+        ProtoExecutionContext? context = null,
+        string? targetName = null,
+        string? routeIdentifier = null,
+        RestAttachmentOptions? attachmentOptions = null,
+        string? attachmentPrefix = null,
+        ReadOnlyMemory<byte>? contentBytes = null)
+    {
+        RawResponse = rawResponse ?? throw new ArgumentNullException(nameof(rawResponse));
+        Content = content ?? string.Empty;
+        ElapsedTime = elapsedTime;
+        ContentBytes = contentBytes ?? System.Text.Encoding.UTF8.GetBytes(Content);
+        _context = context;
+        _targetName = targetName;
+        _routeIdentifier = routeIdentifier;
+        _attachmentOptions = attachmentOptions;
+        _attachmentPrefix = attachmentPrefix;
+    }
+
+    public HttpResponseMessage RawResponse { get; }
     public HttpStatusCode StatusCode => RawResponse.StatusCode;
     public bool IsSuccessStatusCode => RawResponse.IsSuccessStatusCode;
     public HttpResponseHeaders Headers => RawResponse.Headers;
-    public TimeSpan ElapsedTime { get; } = elapsedTime;
-    public string Content { get; } = content ?? string.Empty;
+    public HttpContentHeaders ContentHeaders => RawResponse.Content.Headers;
+    public TimeSpan ElapsedTime { get; }
+    public string Content { get; }
+    public ReadOnlyMemory<byte> ContentBytes { get; }
 
     /// <summary>
     /// Releases the underlying HTTP response. Callers own a returned <see cref="RestResponse"/>
@@ -64,37 +87,47 @@ public sealed class RestResponse(
     {
         if (StatusCode != expectedStatusCode)
         {
-            throw new RestStatusAssertionException(expectedStatusCode, StatusCode, Content);
+            var diagnosticBody = RestDiagnosticSanitizer.SanitizeBody(
+                Content,
+                RawResponse.Content.Headers.ContentType?.MediaType,
+                _attachmentOptions);
+            throw new RestStatusAssertionException(expectedStatusCode, StatusCode, diagnosticBody);
         }
         return this;
     }
 
-    public RestResponse ShouldMatchShape(object expectedShape)
+    public RestResponse ShouldMatchShape(object expectedShape, JsonSerializerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
 
-        if (context is not null && attachmentOptions?.CaptureExpectedShapes == true)
+        if (_context is not null && _attachmentOptions?.CaptureExpectedShapes == true)
         {
-            context.AddAttachment(
-                $"{attachmentPrefix}-expected-shape",
-                JsonSerializer.Serialize(
-                    DescribeExpectedValue(expectedShape),
-                    new JsonSerializerOptions { WriteIndented = true }),
+            var assertionNumber = Interlocked.Increment(ref _shapeAssertionSequence);
+            var assertionSuffix = assertionNumber == 1 ? string.Empty : $"-{assertionNumber:00}";
+            var expectedShapeJson = JsonSerializer.Serialize(
+                DescribeExpectedValue(expectedShape),
+                new JsonSerializerOptions { WriteIndented = true });
+            _context.AddAttachment(
+                $"{_attachmentPrefix}-expected-shape{assertionSuffix}",
+                RestDiagnosticSanitizer.SanitizeBody(
+                    expectedShapeJson,
+                    "application/json",
+                    _attachmentOptions),
                 "application/json",
-                routeIdentifier);
+                _routeIdentifier);
         }
 
-        var matchedProps = ShapeMatcher.AssertMatch(Content, expectedShape);
+        var matchedProps = ShapeMatcher.AssertMatch(Content, expectedShape, options);
 
         // Record the shape-match observation when an execution context is available.
-        if (context != null && !string.IsNullOrEmpty(targetName) && !string.IsNullOrEmpty(routeIdentifier))
+        if (_context != null && !string.IsNullOrEmpty(_targetName) && !string.IsNullOrEmpty(_routeIdentifier))
         {
-            context.RecordObservation(new ProtoObservation(
-                TargetName: targetName,
+            _context.RecordObservation(new ProtoObservation(
+                TargetName: _targetName,
                 Kind: "http.contract.shape",
-                Identifier: routeIdentifier,
-                Data: new ShapeMatchData(
-                    RouteTemplate: routeIdentifier,
+                Identifier: _routeIdentifier,
+                Data: new RestShapeMatchData(
+                    RequestIdentifier: _routeIdentifier,
                     MatchedProperties: matchedProps,
                     TargetType: expectedShape.GetType()
                 )
@@ -104,6 +137,8 @@ public sealed class RestResponse(
         return this;
     }
 
+    public byte[] ReadAsBytes() => ContentBytes.ToArray();
+
     private static object? DescribeExpectedValue(object? expected)
     {
         if (expected is null)
@@ -111,7 +146,7 @@ public sealed class RestResponse(
             return null;
         }
 
-        if (expected is IValueMatcher matcher)
+        if (expected is IJsonValueMatcher matcher)
         {
             return $"constraint: {matcher.Description}";
         }

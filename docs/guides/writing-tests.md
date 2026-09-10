@@ -80,7 +80,7 @@ public async Task CreateOrder_ReturnsCreatedOrder()
 		.ShouldMatchShape(new
 		{
 			id = 43,
-			status = IsRest.Regex("^(confirmed|pending)$")
+			status = JsonValue.Regex("^(confirmed|pending)$")
 		});
 }
 ```
@@ -93,7 +93,7 @@ If all methods in a class use the same client or authentication, put the attribu
 
 ```csharp
 [RestClient("Orders")]
-[BearerToken("orders-token")]
+[Auth<BearerTokenAuthenticator>("orders-token")]
 public sealed class OrderTests
 {
 	[ProtoTest]

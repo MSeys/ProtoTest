@@ -1,6 +1,6 @@
 ﻿namespace ProtoTest.Xunit3;
 
-using global::Xunit;
+using Xunit;
 using ProtoTest.Core;
 
 /// <summary>

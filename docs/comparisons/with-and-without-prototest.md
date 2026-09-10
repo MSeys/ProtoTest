@@ -57,7 +57,7 @@ using ProtoTest.NUnit;
 using ProtoTest.Rest;
 
 [RestClient("Orders")]
-[BearerToken("orders-token")]
+[Auth<BearerTokenAuthenticator>("orders-token")]
 public sealed class OrderApiTests
 {
 	[ProtoTest]
@@ -88,7 +88,7 @@ public sealed class OrderApiTests
 }
 ```
 
-The class-level `[RestClient]` and `[BearerToken]` apply to both methods. A method can still override either attribute when it targets another client or requires different credentials:
+The class-level `[RestClient]` and `[Auth<T>]` apply to both methods. A method can still override either attribute when it targets another client or requires different credentials:
 
 ```csharp
 using ProtoTest.Core;
@@ -96,12 +96,12 @@ using ProtoTest.NUnit;
 using ProtoTest.Rest;
 
 [RestClient("Orders")]
-[BearerToken("orders-token")]
+[Auth<BearerTokenAuthenticator>("orders-token")]
 public sealed class MixedApiTests
 {
 	[ProtoTest]
 	[RestClient("Inventory")]
-	[BearerToken("inventory-token")]
+	[Auth<BearerTokenAuthenticator>("inventory-token")]
 	public Task InventoryTest_OverridesClassDefaults()
 	{
 		return Task.CompletedTask;
@@ -119,7 +119,7 @@ using ProtoTest.Rest;
 
 [ProtoTest]
 [RestClient("Orders")]
-[BearerToken("orders-token")]
+[Auth<BearerTokenAuthenticator>("orders-token")]
 public async Task GetOneOrder_WithMethodConfiguration()
 {
 	using var response = await Proto.Context.Rest()
@@ -153,7 +153,7 @@ protected override void Configure(IProtoHostBuilder builder)
 | --- | --- | --- |
 | Test framework | NUnit owns setup and teardown | `ProtoTest.NUnit` translates callbacks to the common lifecycle |
 | Client setup | Test or fixture creates `HttpClient` | `AddRest` registers a named client |
-| Authentication | Header configured manually | `[BearerToken]` or fluent `.Auth(...)` |
+| Authentication | Header configured manually | `[Auth<T>]` or fluent `.Auth(...)` |
 | Route parameters | URL assembled manually | Route template plus anonymous parameters |
 | JSON verification | Deserialize into a DTO or inspect JSON | `ShouldMatchShape` verifies the described shape |
 | Coverage | Requires separate instrumentation | REST requests record observations; collectors are composed with `.WithCollector<T>()` |

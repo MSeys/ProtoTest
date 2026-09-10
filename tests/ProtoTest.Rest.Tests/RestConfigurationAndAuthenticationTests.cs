@@ -1,10 +1,12 @@
 namespace ProtoTest.Rest.Tests;
 
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Rest.Authenticators;
 using System.Net.Http.Headers;
+using System.Reflection;
 
 [TestFixture]
 public class RestConfigurationAndAuthenticationTests
@@ -125,11 +127,22 @@ public class RestConfigurationAndAuthenticationTests
     }
 
     [Test]
+    public void AddClient_ShouldRejectNonHttpBaseUrl()
+    {
+        var builder = new ProtoHostBuilder();
+
+        var exception = Assert.Throws<ArgumentException>(() =>
+            builder.AddRest(rest => rest.AddClient("Files", "file:///temporary/api")));
+
+        Assert.That(exception!.Message, Does.Contain("HTTP or HTTPS"));
+    }
+
+    [Test]
     public async Task BearerTokenAuthenticator_ShouldSetAuthorizationHeader()
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://example.test");
 
-        await new BearerTokenAuthenticator("token").AuthenticateAsync(request);
+        await AuthenticateAsync(new BearerTokenAuthenticator("token"), request);
 
         Assert.That(request.Headers.Authorization, Is.EqualTo(new AuthenticationHeaderValue("Bearer", "token")));
     }
@@ -139,7 +152,7 @@ public class RestConfigurationAndAuthenticationTests
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://example.test");
 
-        await new BasicAuthAuthenticator("user", "password").AuthenticateAsync(request);
+        await AuthenticateAsync(new BasicAuthAuthenticator("user", "password"), request);
 
         Assert.That(request.Headers.Authorization, Is.EqualTo(
             new AuthenticationHeaderValue("Basic", Convert.ToBase64String("user:password"u8.ToArray()))));
@@ -151,12 +164,38 @@ public class RestConfigurationAndAuthenticationTests
         using var headerRequest = new HttpRequestMessage(HttpMethod.Get, "https://example.test");
         using var queryRequest = new HttpRequestMessage(HttpMethod.Get, "https://example.test/items?existing=value");
 
-        await new ApiKeyAuthenticator("X-Api-Key", "secret").AuthenticateAsync(headerRequest);
-        await new ApiKeyAuthenticator("api_key", "secret", ApiKeyLocation.Query).AuthenticateAsync(queryRequest);
+        await AuthenticateAsync(new ApiKeyAuthenticator("X-Api-Key", "secret"), headerRequest);
+        await AuthenticateAsync(new ApiKeyAuthenticator("api_key", "secret", ApiKeyLocation.Query), queryRequest);
 
         Assert.That(headerRequest.Headers.GetValues("X-Api-Key").Single(), Is.EqualTo("secret"));
         Assert.That(queryRequest.RequestUri!.Query, Does.Contain("api_key=secret"));
         Assert.That(queryRequest.RequestUri.Query, Does.Contain("existing=value"));
+    }
+
+    [Test]
+    public async Task ApiKeyAuthenticator_ShouldSupportRelativeUrisAndReplaceExistingValues()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/items?api_key=old#results");
+
+        await AuthenticateAsync(
+            new ApiKeyAuthenticator("api_key", "new secret", ApiKeyLocation.Query),
+            request);
+
+        Assert.That(request.RequestUri!.OriginalString, Is.EqualTo("/items?api_key=new%20secret#results"));
+    }
+
+    private static async Task AuthenticateAsync(
+        IRestAuthenticator authenticator,
+        HttpRequestMessage request)
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        await using var context = new ProtoExecutionContext(
+            "Authenticator unit test",
+            services.CreateScope(),
+            "00000",
+            (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await authenticator.AuthenticateAsync(
+            new RestAuthenticationContext(request, context, "Default"));
     }
 
     private sealed class StaticConfigurationSource(IReadOnlyDictionary<string, string?> values) : IConfigurationSource

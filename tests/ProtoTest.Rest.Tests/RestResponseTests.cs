@@ -112,14 +112,37 @@ public class RestResponseTests
         response.ShouldMatchShape(expectedShape);
 
         // Assert
-        var hit = _context.RecordedObservations.FirstOrDefault(h => h.Data is ShapeMatchData);
+        var hit = _context.RecordedObservations.FirstOrDefault(h => h.Data is RestShapeMatchData);
         Assert.That(hit, Is.Not.Null);
         Assert.That(hit!.TargetName, Is.EqualTo("MyApiTarget"));
         Assert.That(hit.Identifier, Is.EqualTo("GET /api/test"));
 
-        var shapeData = (ShapeMatchData)hit.Data!;
-        Assert.That(shapeData.RouteTemplate, Is.EqualTo("GET /api/test"));
+        var shapeData = (RestShapeMatchData)hit.Data!;
+        Assert.That(shapeData.RequestIdentifier, Is.EqualTo("GET /api/test"));
         Assert.That(shapeData.MatchedProperties, Contains.Item("$.id"));
+    }
+
+    [Test]
+    public void ShouldMatchShape_ShouldUseUniqueAttachmentNamesForRepeatedAssertions()
+    {
+        var response = new RestResponse(
+            new HttpResponseMessage(HttpStatusCode.OK),
+            """{"id":42,"name":"ProtoTest"}""",
+            TimeSpan.Zero,
+            _context,
+            "Orders",
+            "GET /orders/42",
+            new RestAttachmentOptions(),
+            "rest-01");
+
+        response.ShouldMatchShape(new { id = 42 });
+        response.ShouldMatchShape(new { name = "ProtoTest" });
+
+        Assert.That(_context.Attachments.Select(item => item.Name), Is.EqualTo(new[]
+        {
+            "00001-rest-01-expected-shape",
+            "00001-rest-01-expected-shape-02"
+        }));
     }
 
     [Test]

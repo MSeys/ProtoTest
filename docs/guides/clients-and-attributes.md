@@ -59,7 +59,7 @@ Attributes can target both classes and methods. Put common configuration on the 
 
 ```csharp
 [RestClient("Orders")]
-[BearerToken("orders-token")]
+[Auth<BearerTokenAuthenticator>("orders-token")]
 public sealed class OrderTests
 {
 	[ProtoTest]
@@ -78,12 +78,12 @@ A method-level attribute overrides the corresponding class-level attribute:
 
 ```csharp
 [RestClient("Orders")]
-[BearerToken("orders-token")]
+[Auth<BearerTokenAuthenticator>("orders-token")]
 public sealed class MixedApiTests
 {
 	[ProtoTest]
 	[RestClient("Inventory")]
-	[BearerToken("inventory-token")]
+	[Auth<BearerTokenAuthenticator>("inventory-token")]
 	public Task GetsInventory() => Task.CompletedTask;
 }
 ```
@@ -95,7 +95,7 @@ Use method-level configuration for an exception, not as the default location for
 REST authentication can be declared as an attribute:
 
 ```csharp
-[BearerToken("orders-token")]
+[Auth<BearerTokenAuthenticator>("orders-token")]
 public sealed class OrderTests
 {
 	[ProtoTest]

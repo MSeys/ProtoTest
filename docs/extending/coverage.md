@@ -23,7 +23,7 @@ Proto.Context.RecordObservation(
     targetName: "Orders",
     kind: "http.response",
     identifier: "GET /orders/{id}",
-    data: new RestHitData(
+    data: new RestResponseData(
         Method: "GET",
         RouteTemplate: "/orders/{id}",
         StatusCode: 200,

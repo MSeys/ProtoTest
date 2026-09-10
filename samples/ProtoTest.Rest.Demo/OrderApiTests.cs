@@ -4,9 +4,10 @@ using System.Net;
 using ProtoTest.Core;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
+using ProtoTest.Rest.Authenticators;
 using ProtoTest.Rest.Matching;
 
-[BearerToken("orders-token")]
+[Auth<BearerTokenAuthenticator>("orders-token")]
 public sealed class OrderApiTests
 {
     [ProtoTest]
@@ -39,7 +40,7 @@ public sealed class OrderApiTests
             .ShouldMatchShape(new
             {
                 id = 43,
-                status = IsRest.Regex("^(confirmed|pending)$"),
+                status = JsonValue.Regex("^(confirmed|pending)$"),
                 total = 75m
             });
     }

@@ -6,6 +6,7 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
+using ProtoTest.Rest.Authenticators;
 
 [TestFixture]
 public sealed class RestAttributeIntegrationTests
@@ -150,7 +151,7 @@ public sealed class RestAttributeIntegrationTests
         => ProtoAttributeResolver.Resolve(method);
 
     [RestClient("Orders")]
-    [BearerToken("class-token")]
+    [Auth<BearerTokenAuthenticator>("class-token")]
     [RestStateTracking("Class", Order = 20)]
     private sealed class RestAttributeCases
     {
@@ -159,15 +160,15 @@ public sealed class RestAttributeIntegrationTests
         [RestClient("Inventory")]
         public void MethodClientOverride() { }
 
-        [BearerToken("method-token")]
+        [Auth<BearerTokenAuthenticator>("method-token")]
         public void MethodAuthOverride() { }
 
-        [BearerToken("method-token")]
+        [Auth<BearerTokenAuthenticator>("method-token")]
         [RestClient("Inventory")]
         public void MethodClientAndAuthOverride() { }
 
         [RestStateTracking("Method", Order = 10)]
-        [BearerToken("method-token")]
+        [Auth<BearerTokenAuthenticator>("method-token")]
         [RestClient("Inventory")]
         public void WithOrderedProtoAttributes() { }
     }
@@ -178,7 +179,7 @@ public sealed class RestAttributeIntegrationTests
     }
 
     [RestClient("Orders")]
-    [BearerToken("base-token")]
+    [Auth<BearerTokenAuthenticator>("base-token")]
     private abstract class RestAttributeBase
     {
     }

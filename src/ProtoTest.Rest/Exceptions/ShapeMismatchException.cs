@@ -13,18 +13,19 @@ public sealed record ShapeMismatch(string PropertyPath, string Reason, object? E
     };
 }
 
-public class ShapeMismatchException : ProtoTest.Core.ProtoAssertionException
+public sealed class ShapeMismatchException : Core.ProtoAssertionException
 {
     public IReadOnlyList<ShapeMismatch> Mismatches { get; }
 
     public ShapeMismatchException(IReadOnlyList<ShapeMismatch> mismatches)
         : base(BuildErrorMessage(mismatches))
     {
-        Mismatches = mismatches;
+        Mismatches = [.. mismatches];
     }
 
     private static string BuildErrorMessage(IReadOnlyList<ShapeMismatch> mismatches)
     {
+        ArgumentNullException.ThrowIfNull(mismatches);
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"Shape mismatch failed with {mismatches.Count} error(s):");
         foreach (var mismatch in mismatches)

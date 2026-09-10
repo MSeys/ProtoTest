@@ -3,6 +3,7 @@
 using ProtoTest.Core;
 using ProtoTest.Rest.Internal;
 using System.Net.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 public static class ProtoExecutionContextExtensions
 {
@@ -17,8 +18,16 @@ public static class ProtoExecutionContextExtensions
         var targetClientName = clientName ?? restState?.ClientName ?? "Default";
 
         var httpClient = context.Client<HttpClient>(targetClientName);
-        var authenticator = restState?.Authenticator;
+        var authenticatorFactory = restState?.AuthenticatorFactory;
+        var baseAddressRegistration = context.Services
+            .GetServices<RestBaseAddressRegistration>()
+            .LastOrDefault(registration => string.Equals(
+                registration.ClientName,
+                targetClientName,
+                StringComparison.OrdinalIgnoreCase));
 
-        return new RestRequestBuilder(httpClient, context, targetClientName, authenticator);
+        return new RestRequestBuilder(httpClient, context, targetClientName, defaultAuthenticator: null)
+            .UseAuthenticatorFactory(authenticatorFactory)
+            .UseBaseAddressResolver(baseAddressRegistration?.ResolveAsync);
     }
 }

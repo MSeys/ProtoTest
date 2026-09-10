@@ -11,7 +11,7 @@ internal sealed class Xunit3AttachmentPublisher : IProtoTestAttachmentPublisher
         CancellationToken cancellationToken = default)
     {
         var content = await attachment.ReadAllBytesAsync(cancellationToken);
-        global::Xunit.TestContext.Current.AddAttachment(
+        Xunit.TestContext.Current.AddAttachment(
             attachment.Name,
             content,
             replaceExistingValue: false,

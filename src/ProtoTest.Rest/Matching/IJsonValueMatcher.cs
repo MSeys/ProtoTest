@@ -1,6 +1,6 @@
 ﻿namespace ProtoTest.Rest.Matching;
 
-public interface IValueMatcher
+public interface IJsonValueMatcher
 {
     /// <summary>
     /// Human-readable constraint included in diagnostics and test attachments.

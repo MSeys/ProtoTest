@@ -4,6 +4,10 @@ namespace ProtoTest.Rest.Internal;
 
 internal sealed class RestContextState : IProtoContext
 {
+    private int _requestSequence;
+
     public string ClientName { get; set; } = "Default";
-    public IRestAuthenticator? Authenticator { get; set; }
+    public Func<ProtoExecutionContext, IRestAuthenticator>? AuthenticatorFactory { get; set; }
+
+    public int NextRequestNumber() => Interlocked.Increment(ref _requestSequence);
 }

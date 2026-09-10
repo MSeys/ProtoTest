@@ -91,7 +91,7 @@ public class ShapeMatcherTests
     }
 
     [Test]
-    public void AssertMatch_Should_Support_IValueMatcher_Constraints()
+    public void AssertMatch_ShouldSupportJsonValueConstraints()
     {
         var json = """
         {
@@ -102,8 +102,8 @@ public class ShapeMatcherTests
 
         var expectedShape = new
         {
-            status = IsRest.NotNull(),
-            score = IsRest.GreaterThan(90)
+            status = JsonValue.NotNull(),
+            score = JsonValue.GreaterThan(90)
         };
 
         Assert.DoesNotThrow(() => ShapeMatcher.AssertMatch(json, expectedShape));
@@ -120,7 +120,7 @@ public class ShapeMatcherTests
 
         var expectedShape = new
         {
-            score = IsRest.GreaterThan(50)
+            score = JsonValue.GreaterThan(50)
         };
 
         var ex = Assert.Throws<ShapeMismatchException>(() => ShapeMatcher.AssertMatch(json, expectedShape));
@@ -143,11 +143,59 @@ public class ShapeMatcherTests
     }
 
     [Test]
-    public void AssertMatch_Should_Throw_ArgumentException_On_Empty_Json()
+    public void AssertMatch_Should_Throw_AssertionException_On_Empty_Json()
     {
         var expectedShape = new { name = "Matthias" };
 
-        Assert.Throws<ArgumentException>(() => ShapeMatcher.AssertMatch("", expectedShape));
-        Assert.Throws<ArgumentException>(() => ShapeMatcher.AssertMatch("   ", expectedShape));
+        Assert.Throws<RestJsonAssertionException>(() => ShapeMatcher.AssertMatch("", expectedShape));
+        Assert.Throws<RestJsonAssertionException>(() => ShapeMatcher.AssertMatch("   ", expectedShape));
+    }
+
+    [Test]
+    public void AssertMatch_ShouldSupportArraysAndDictionaries()
+    {
+        var expected = new Dictionary<string, object?>
+        {
+            ["items"] = new object[]
+            {
+                new Dictionary<string, object?> { ["id"] = 1 },
+                new Dictionary<string, object?> { ["id"] = 2 }
+            }
+        };
+
+        var matched = ShapeMatcher.AssertMatch("""{"items":[{"id":1,"extra":true},{"id":2}]}""", expected);
+
+        Assert.That(matched, Contains.Item("$.items[1].id"));
+    }
+
+    [Test]
+    public void AssertMatch_ShouldRespectJsonPropertyNamesAndNamingPolicies()
+    {
+        var options = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = false
+        };
+
+        Assert.DoesNotThrow(() => ShapeMatcher.AssertMatch(
+            """{"display_name":"ProtoTest","itemCount":2}""",
+            new NamedShape { DisplayName = "ProtoTest", ItemCount = 2 },
+            options));
+    }
+
+    [Test]
+    public void AssertMatch_ShouldWrapInvalidJsonAsAssertionFailure()
+    {
+        var exception = Assert.Throws<RestJsonAssertionException>(() =>
+            ShapeMatcher.AssertMatch("not-json", new { id = 1 }));
+
+        Assert.That(exception!.InnerException, Is.InstanceOf<System.Text.Json.JsonException>());
+    }
+
+    private sealed class NamedShape
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("display_name")]
+        public string DisplayName { get; init; } = string.Empty;
+        public int ItemCount { get; init; }
     }
 }

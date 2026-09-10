@@ -59,7 +59,7 @@ using ProtoTest.NUnit;
 using ProtoTest.Rest;
 
 [RestClient("Orders")]
-[BearerToken("orders-token")]
+[Auth<BearerTokenAuthenticator>("orders-token")]
 public sealed class OrderTests
 {
 	[ProtoTest]

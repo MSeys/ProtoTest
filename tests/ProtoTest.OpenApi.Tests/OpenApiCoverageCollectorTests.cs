@@ -47,24 +47,24 @@ public class OpenApiCoverageCollectorTests
             TargetName: "TestApi",
             Kind: "http.response",
             Identifier: "GET /users/{id}",
-            Data: new RestHitData("GET", "/users/{id}", 200, "{}", emptyHeaders)
+            Data: new RestResponseData("GET", "/users/{id}", 200, "{}", emptyHeaders)
         ));
 
         collector.Collect(new ProtoObservation(
             TargetName: "TestApi",
             Kind: "http.response",
             Identifier: "GET /users/{id}",
-            Data: new RestHitData("GET", "/users/{id}", 200, "{}", emptyHeaders)
+            Data: new RestResponseData("GET", "/users/{id}", 200, "{}", emptyHeaders)
         ));
 
         // Act - 2. Record ShapeMatch Hit (verstuurd via RestResponse.ShouldMatchShape)
-        // RouteTemplate is de volledige routeIdentifier ("GET /users/{id}")
+        // RequestIdentifier is the full request identifier ("GET /users/{id}").
         collector.Collect(new ProtoObservation(
             TargetName: "TestApi",
             Kind: "http.contract.shape",
             Identifier: "GET /users/{id}",
-            Data: new ShapeMatchData(
-                RouteTemplate: "GET /users/{id}",
+            Data: new RestShapeMatchData(
+                RequestIdentifier: "GET /users/{id}",
                 MatchedProperties: new[] { "$.id", "$.name" },
                 TargetType: typeof(DummyPayload)
             )
@@ -108,7 +108,7 @@ public class OpenApiCoverageCollectorTests
 
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
-        IProtoTargetBuilder targetBuilder = new ProtoRestTargetBuilder("TestApi", services);
+        IProtoTargetBuilder targetBuilder = new TestTargetBuilder("TestApi", services);
 
         // Act
         targetBuilder.WithCollector<OpenApiCoverageCollector>();
@@ -124,6 +124,13 @@ public class OpenApiCoverageCollectorTests
     {
         public IConfigurationProvider Build(IConfigurationBuilder builder)
             => new StaticConfigurationProvider(values);
+    }
+
+    private sealed class TestTargetBuilder(string targetName, IServiceCollection services)
+        : IProtoTargetBuilder
+    {
+        public string TargetName { get; } = targetName;
+        public IServiceCollection Services { get; } = services;
     }
 
     private sealed class StaticConfigurationProvider(IReadOnlyDictionary<string, string?> values)

@@ -5,7 +5,7 @@
   <Folder Name="/2. Integrations/">
     <Project Path="src/ProtoTest.AspNetCore/ProtoTest.AspNetCore.csproj" Id="dafd8b60-e20d-44cc-a746-68ec3136e256" />
     <Project Path="src/ProtoTest.GraphQL/ProtoTest.GraphQL.csproj" Id="81af1d3a-d24c-465e-b1a0-ee742ca6bf6e" />
-    <Project Path="src/ProtoTest.gRPC/ProtoTest.gRPC.csproj" Id="f13ed54f-e401-4cd6-ba89-efebd1861e89" />
+    <Project Path="src/ProtoTest.Grpc/ProtoTest.Grpc.csproj" Id="f13ed54f-e401-4cd6-ba89-efebd1861e89" />
     <Project Path="src/ProtoTest.OpenApi/ProtoTest.OpenApi.csproj" Id="23cb63d4-b36b-4e43-a2c9-c53533307d85" />
     <Project Path="src/ProtoTest.Playwright/ProtoTest.Playwright.csproj" Id="5e82a152-c648-4ec2-9b1f-0a488aeb6666" />
     <Project Path="src/ProtoTest.Rest/ProtoTest.Rest.csproj" Id="0161cd20-8be1-40f2-a3c0-76335a74ccd2" />

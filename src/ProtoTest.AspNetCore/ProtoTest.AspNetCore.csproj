@@ -5,6 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 	<LangVersion>latest</LangVersion>
+	<IsPackable>true</IsPackable>
+	<Description>In-process ASP.NET Core application testing for ProtoTest.</Description>
+	<PackageTags>testing;integration-testing;aspnetcore;webapplicationfactory;dotnet</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

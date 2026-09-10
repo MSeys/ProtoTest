@@ -50,6 +50,8 @@ REST requests are matched to OpenAPI operations and can produce coverage items f
 - response properties, including nested properties;
 - properties observed by `ShouldMatchShape`.
 
+Exact response codes, ranges such as `2XX`, and `default` responses are tracked separately. Property coverage belongs to the response that was actually asserted. Referenced and composed schemas (`allOf`, `oneOf`, and `anyOf`) are traversed, and array paths use `[]` in report identifiers. Request matching accepts route templates, concrete paths, absolute URLs, and URLs containing query strings.
+
 The request test remains a normal REST test. Coverage is collected as a side effect of the existing request and assertion APIs.
 
 ## Example test
@@ -74,3 +76,5 @@ public async Task GetOrder_ExercisesDocumentedEndpoint()
 ```
 
 The OpenAPI tests in [`tests/ProtoTest.OpenApi.Tests`](../../tests/ProtoTest.OpenApi.Tests) cover loading, route matching, status coverage, and nested response properties.
+
+The runnable [REST demo](../examples/rest-demo.md) combines `OpenApiCoverageCollector` with both JSON and HTML reporting.

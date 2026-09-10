@@ -1,0 +1,28 @@
+# ProtoTest.Rest
+
+Runner-independent HTTP/REST testing for ProtoTest, with named `HttpClient` instances, route and query expansion, contextual authentication, JSON shape assertions, safe diagnostics, attachments, and REST observations.
+
+```bash
+dotnet add package ProtoTest.Rest --prerelease
+```
+
+```csharp
+builder.AddRest(rest => rest.AddClient("Orders", "https://api.example.test"));
+
+[RestClient("Orders")]
+[Auth<BearerTokenAuthenticator>("token")]
+public sealed class OrderTests
+{
+    [ProtoTest]
+    public async Task GetOrder()
+    {
+        using var response = await Proto.Context.Rest()
+            .GetAsync("/orders/{id}", new { id = 42 });
+
+        response.ShouldHaveStatus(HttpStatusCode.OK)
+            .ShouldMatchShape(new { id = 42, status = JsonValue.NotNull() });
+    }
+}
+```
+
+Per-test base addresses and custom `IRestAuthenticator` implementations can use typed state from `Proto.Context`. See the [REST guide](https://github.com/matthiasseys/ProtoTest/blob/main/docs/integrations/rest.md).

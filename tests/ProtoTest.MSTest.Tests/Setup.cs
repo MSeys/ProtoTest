@@ -25,6 +25,7 @@ public class Setup : ProtoTestAssembly
     [AssemblyCleanup]
     public static async Task AssemblyCleanupAsync()
     {
+        await CleanupAsync();
     }
 }
 

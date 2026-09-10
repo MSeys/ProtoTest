@@ -5,6 +5,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 	<LangVersion>latest</LangVersion>
+	<IsPackable>false</IsPackable>
+	<PackageId>ProtoTest.Grpc</PackageId>
+	<AssemblyName>ProtoTest.Grpc</AssemblyName>
+	<RootNamespace>ProtoTest.Grpc</RootNamespace>
+	<Description>Planned gRPC integration for ProtoTest. This package is not yet published.</Description>
+	<PackageTags>testing;integration-testing;grpc;dotnet</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

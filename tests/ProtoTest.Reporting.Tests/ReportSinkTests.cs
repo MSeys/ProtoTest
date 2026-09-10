@@ -43,6 +43,54 @@ public sealed class ReportSinkTests
             Assert.That(html, Does.Contain("status-warning"));
             Assert.That(html, Does.Contain("uncovered"));
             Assert.That(html, Does.Contain("Needs &lt;attention&gt;"));
+            Assert.That(html, Does.Contain("id=\"reportSearch\""));
+            Assert.That(html, Does.Contain("data-filter=\"uncovered\""));
+            Assert.That(html, Does.Contain("data-filter=\"partial\""));
+            Assert.That(html, Does.Contain("id=\"themeToggle\""));
+            Assert.That(html, Does.Contain("class=\"coverage-ring\""));
+            Assert.That(html, Does.Contain("data-search=\"get /orders"));
+            Assert.That(html, Does.Contain("localStorage.getItem('prototest-report-theme')"));
+            Assert.That(html, Does.Contain("class=\"report-item partial status-warning root\""));
+            Assert.That(html, Does.Contain(">Partial</span>"));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public async Task HtmlSink_ShouldRenderLeavesWithoutDisclosureAndSimplifyOpenApiLabels()
+    {
+        var directory = CreateTempDirectory();
+        var path = Path.Combine(directory, "report.html");
+        try
+        {
+            var items = new[]
+            {
+                new ProtoReportItem(
+                    "Orders", "OpenAPI", "GET /orders/{id}",
+                    ProtoReportItemKind.Coverage, ProtoReportStatus.Success, 1, true,
+                    Children:
+                    [
+                        new ProtoReportItem(
+                            "Orders", "OpenAPI Response", "200",
+                            ProtoReportItemKind.Coverage, ProtoReportStatus.Success, 1, true,
+                            Children:
+                            [
+                                new ProtoReportItem(
+                                    "Orders", "OpenAPI Property", "$.address.city",
+                                    ProtoReportItemKind.Coverage, ProtoReportStatus.Success, 1, true)
+                            ])
+                    ])
+            };
+            var sink = new HtmlReportSink(new HtmlReportSinkOptions { OutputPath = path });
+
+            await sink.ExportAsync(items);
+
+            var html = await File.ReadAllTextAsync(path);
+            Assert.That(html, Does.Contain(">200 response</strong>"));
+            Assert.That(html, Does.Contain(">address › city</strong>"));
+            Assert.That(html, Does.Contain("title=\"$.address.city\""));
+            Assert.That(html, Does.Contain("<article class=\"report-item covered status-success child\""));
+            Assert.That(html, Does.Not.Contain("GET /orders/{id} -&gt; 200"));
         }
         finally { Directory.Delete(directory, recursive: true); }
     }

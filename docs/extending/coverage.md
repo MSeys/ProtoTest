@@ -2,6 +2,8 @@
 
 ProtoTest Core records generic `ProtoObservation` values. Collectors consume those observations; collectors that also implement `IProtoReportSource` can expose normalized `ProtoReportItem` values to sinks. Coverage is one useful projection, not a restriction of the collection model.
 
+For a complete runnable configuration, see the [REST demo](../examples/rest-demo.md). It registers REST and OpenAPI collectors and writes both report formats at suite teardown.
+
 ## Use an existing coverage collector
 
 Integrations expose their collectors through the shared target builder:
@@ -98,6 +100,12 @@ The fixed `ProtoTest:Reporting:Json` and `ProtoTest:Reporting:Html` configuratio
 ```
 
 Without configured paths, filenames include the process ID so parallel test assemblies do not overwrite each other.
+
+The HTML sink produces a self-contained, responsive report. It offers hierarchical
+details, light and dark themes, text search, and filters for covered, partial,
+uncovered, warning, and error groups. Parent rows are marked partial whenever their
+coverage subtree contains both covered and uncovered entries. Press `/` to focus the
+search field and `Escape` to clear it.
 
 ## Semantic report data
 

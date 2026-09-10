@@ -28,5 +28,6 @@ public sealed record RestFailureData(
 public sealed record RestShapeMatchData(
     string RequestIdentifier,
     IReadOnlyList<string> MatchedProperties,
-    Type TargetType
+    Type TargetType,
+    int? StatusCode = null
 );

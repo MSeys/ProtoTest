@@ -30,9 +30,11 @@ public class OpenApiCoverageCollectorTests
         Assert.That(root.Count, Is.Zero);
 
         var children = root.Children!;
-        Assert.That(children.Any(c => c.Identifier == "GET /users/{id} -> 200" && c.IsCovered is false), Is.True);
-        Assert.That(children.Any(c => c.Identifier == "GET /users/{id} -> 404" && c.IsCovered is false), Is.True);
-        Assert.That(children.Any(c => c.Identifier == "GET /users/{id} -> $.id" && c.IsCovered is false), Is.True);
+        var response200 = children.Single(c => c.Identifier == "200");
+        Assert.That(response200.IsCovered, Is.False);
+        Assert.That(children.Any(c => c.Identifier == "404" && c.IsCovered is false), Is.True);
+        Assert.That(response200.Children!.Any(c => c.Identifier == "$.id" && c.IsCovered is false), Is.True);
+        Assert.That(root.Metadata, Is.Null);
     }
 
     [Test]
@@ -66,7 +68,8 @@ public class OpenApiCoverageCollectorTests
             Data: new RestShapeMatchData(
                 RequestIdentifier: "GET /users/{id}",
                 MatchedProperties: new[] { "$.id", "$.name" },
-                TargetType: typeof(DummyPayload)
+                TargetType: typeof(DummyPayload),
+                StatusCode: 200
             )
         ));
 
@@ -80,19 +83,94 @@ public class OpenApiCoverageCollectorTests
         var children = root.Children!;
 
         // Assert - Status Code Child
-        var status200 = children.Single(c => c.Identifier == "GET /users/{id} -> 200");
+        var status200 = children.Single(c => c.Identifier == "200");
         Assert.That(status200.IsCovered, Is.True);
         Assert.That(status200.Count, Is.EqualTo(2));
 
         // Assert - Matched Shape Property Child
-        var propId = children.Single(c => c.Identifier == "GET /users/{id} -> $.id");
+        var propId = status200.Children!.Single(c => c.Identifier == "$.id");
         Assert.That(propId.IsCovered, Is.True);
         Assert.That(propId.Count, Is.EqualTo(1));
 
         // Assert - Unmatched Shape Property Child (from OpenAPI spec baseline)
-        var propCity = children.Single(c => c.Identifier == "GET /users/{id} -> $.address.city");
+        var propCity = status200.Children!.Single(c => c.Identifier == "$.address.city");
         Assert.That(propCity.IsCovered, Is.False);
         Assert.That(propCity.Count, Is.Zero);
+    }
+
+    [Test]
+    public void Collect_ShouldMatchAbsoluteConcreteRoutesAndIgnoreQueryStrings()
+    {
+        var collector = new OpenApiCoverageCollector("TestApi", OpenApiTestHelper.SampleJsonSpec);
+
+        collector.Collect(new ProtoObservation(
+            "TestApi",
+            "http.response",
+            "GET https://api.example.test/users/42?expand=address",
+            new RestResponseData(
+                "GET",
+                "https://api.example.test/users/42?expand=address",
+                200,
+                "{}",
+                new Dictionary<string, string>())));
+
+        var endpoint = collector.GetReportItems().Single();
+        Assert.That(endpoint.IsCovered, Is.True);
+        Assert.That(endpoint.Children!.Single(child => child.Identifier == "200").IsCovered, Is.True);
+    }
+
+    [Test]
+    public void Collect_ShouldKeepPropertiesScopedToTheObservedResponse()
+    {
+        var collector = new OpenApiCoverageCollector("TestApi", OpenApiTestHelper.SampleJsonSpec);
+
+        collector.Collect(new ProtoObservation(
+            "TestApi",
+            "http.contract.shape",
+            "GET /users/{id}",
+            new RestShapeMatchData(
+                "GET /users/{id}",
+                ["$.id"],
+                typeof(DummyPayload),
+                StatusCode: 404)));
+
+        var successResponse = collector.GetReportItems().Single().Children!
+            .Single(child => child.Identifier == "200");
+        Assert.That(successResponse.Children!.Single(child => child.Identifier == "$.id").IsCovered, Is.False);
+    }
+
+    [Test]
+    public void Collect_ShouldMapWildcardAndDefaultResponses()
+    {
+        const string specification = """
+        {
+          "openapi": "3.0.1",
+          "info": { "title": "Responses", "version": "1" },
+          "paths": {
+            "/jobs": {
+              "post": {
+                "responses": {
+                  "2XX": { "description": "accepted" },
+                  "default": { "description": "other" }
+                }
+              }
+            }
+          }
+        }
+        """;
+        var collector = new OpenApiCoverageCollector("Jobs", specification);
+        var headers = new Dictionary<string, string>();
+
+        collector.Collect(new ProtoObservation(
+            "Jobs", "http.response", "POST /jobs",
+            new RestResponseData("POST", "/jobs", 202, "", headers)));
+        collector.Collect(new ProtoObservation(
+            "Jobs", "http.response", "POST /jobs",
+            new RestResponseData("POST", "/jobs", 503, "", headers)));
+
+        var responses = collector.GetReportItems().Single().Children!;
+        Assert.That(responses.Single(item => item.Identifier == "2XX").Count, Is.EqualTo(1));
+        Assert.That(responses.Single(item => item.Identifier == "default").Count, Is.EqualTo(1));
     }
 
     [Test]

@@ -3,7 +3,11 @@ namespace ProtoTest.AspNetCore.Tests;
 using System.Net;
 using System.Reflection;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
 using ProtoTest.Rest;
 
@@ -136,7 +140,11 @@ public class IntegrationTests
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>(
                 "ConfiguredApi",
-                factory => callbackInvoked = true)
+                webHost =>
+                {
+                    callbackInvoked = true;
+                    webHost.UseSetting("ProtoTest:Configured", "true");
+                })
             .Build();
 
         await host.StartTestAsync("FactoryConfiguration", "00003", (MethodInfo)MethodInfo.GetCurrentMethod()!);
@@ -153,5 +161,45 @@ public class IntegrationTests
             await host.CompleteTestAsync();
             await host.DisposeAsync();
         }
+    }
+
+    [Test]
+    public async Task AddAspNetCoreServer_ShouldApplyWebHostServiceOverridesAndClientOptions()
+    {
+        var host = new ProtoHostBuilder()
+            .AddAspNetCoreServer<SampleApi.Program>(
+                "ConfiguredApi",
+                webHost => webHost.ConfigureTestServices(services =>
+                {
+                    services.RemoveAll<SampleApi.ITestMessageService>();
+                    services.AddSingleton<SampleApi.ITestMessageService, ReplacementMessageService>();
+                }),
+                client => client.BaseAddress = new Uri("https://configured.example.test"))
+            .Build();
+
+        await host.StartTestAsync(
+            "ConfiguredServices",
+            "00006",
+            (MethodInfo)MethodInfo.GetCurrentMethod()!);
+
+        try
+        {
+            var client = Proto.Context.Client<HttpClient>("ConfiguredApi");
+            using var response = await client.GetAsync("/message");
+            var body = await response.Content.ReadAsStringAsync();
+
+            Assert.That(client.BaseAddress, Is.EqualTo(new Uri("https://configured.example.test")));
+            Assert.That(body, Does.Contain("replacement"));
+        }
+        finally
+        {
+            await host.CompleteTestAsync();
+            await host.DisposeAsync();
+        }
+    }
+
+    private sealed class ReplacementMessageService : SampleApi.ITestMessageService
+    {
+        public string GetMessage() => "replacement";
     }
 }

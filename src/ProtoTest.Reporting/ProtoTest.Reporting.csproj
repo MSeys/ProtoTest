@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <PackageId>ProtoTest.Reporting</PackageId>
+    <IsPackable>true</IsPackable>
+    <Description>JSON and self-contained HTML reporting for ProtoTest observations and coverage.</Description>
+    <PackageTags>testing;integration-testing;reporting;coverage;html;json;dotnet</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

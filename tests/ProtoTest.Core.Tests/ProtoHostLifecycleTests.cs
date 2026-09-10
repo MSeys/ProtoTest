@@ -52,6 +52,42 @@ public sealed class ProtoHostLifecycleTests
         Assert.That(attribute.AfterObservedBeforeState, Is.True);
     }
 
+    [Test]
+    public async Task ParallelTests_ShouldKeepAmbientContextsIsolated()
+    {
+        await using var host = CreateHost();
+        var method = (MethodInfo)MethodInfo.GetCurrentMethod()!;
+        var bothStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var startedCount = 0;
+
+        async Task RunTestAsync(string name, string id)
+        {
+            await host.StartTestAsync(name, id, method);
+            try
+            {
+                if (Interlocked.Increment(ref startedCount) == 2)
+                {
+                    bothStarted.SetResult();
+                }
+
+                await bothStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                await Task.Yield();
+
+                Assert.That(Proto.Context.TestName, Is.EqualTo(name));
+                Assert.That(Proto.Context.TestId, Is.EqualTo(id));
+                Assert.That(ProtoHost.CurrentHost, Is.SameAs(host));
+            }
+            finally
+            {
+                await host.CompleteTestAsync();
+            }
+        }
+
+        await Task.WhenAll(
+            Task.Run(() => RunTestAsync("First", "00001")),
+            Task.Run(() => RunTestAsync("Second", "00002")));
+    }
+
     private static ProtoHost CreateHost()
         => new(new ServiceCollection().BuildServiceProvider());
 

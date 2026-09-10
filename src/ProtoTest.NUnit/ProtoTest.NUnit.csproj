@@ -5,19 +5,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 	<LangVersion>latest</LangVersion>
+	<IsPackable>true</IsPackable>
   </PropertyGroup>
 
   <PropertyGroup>
   	<PackageId>ProtoTest.NUnit</PackageId>
-  	<Version>0.1.0-alpha</Version>
-  	<Authors>Matthias Seys</Authors>
-  	<Description>NUnit adapter for ProtoTest, bringing frictionless lifecycle management and dependency injection to your test suites.</Description>
-  	<PackageLicenseExpression>MIT</PackageLicenseExpression>
-  	<PackageTags>testing;integration-testing;nunit;dependency-injection;dotnet</PackageTags>
-  	<RepositoryUrl>https://github.com/matthiasseys/ProtoTest</RepositoryUrl>
-  	<RepositoryType>git</RepositoryType>
-  	<IncludeSymbols>true</IncludeSymbols>
-  	<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+	<Description>NUnit adapter for ProtoTest, bringing frictionless lifecycle management and dependency injection to your test suites.</Description>
+	<PackageTags>testing;integration-testing;nunit;dependency-injection;dotnet</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

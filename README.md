@@ -52,6 +52,22 @@ Read the [ProtoTest documentation](docs/index.md), or start directly with:
 - [REST demo](samples/ProtoTest.Rest.Demo)
 - [ASP.NET Core demo](samples/ProtoTest.AspNetCore.Demo)
 
+## Build and test
+
+The repository contains VSTest projects as well as Microsoft Testing Platform projects. Run the checked-in entrypoint so every adapter and demo is included:
+
+```powershell
+./eng/test.ps1
+```
+
+CI uses the same command and validates every packable NuGet project afterwards.
+
+To produce the complete package set locally:
+
+```powershell
+./eng/pack.ps1
+```
+
 ## Status
 
 | Area | Status |
@@ -61,6 +77,6 @@ Read the [ProtoTest documentation](docs/index.md), or start directly with:
 | REST | Available |
 | ASP.NET Core | Available |
 | OpenAPI | Available |
-| GraphQL, gRPC, Playwright, standalone Coverage | Planned |
+| GraphQL, gRPC (`ProtoTest.Grpc`), Playwright, standalone Coverage | Planned |
 
 See the [integration overview](docs/integrations/overview.md) for package names and capabilities.

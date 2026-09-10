@@ -19,15 +19,20 @@ public class ProtoTestExecutor : ITestExecutor
     {
         var methodInfo = context.Metadata.TestDetails.MethodMetadata.GetReflectionInfo();
         var attributes = ProtoAttributeResolver.Resolve(methodInfo);
+        var lifecycleStarted = false;
         try
         {
             await ProtoTestAssembly.Host.StartTestAsync(
                 methodInfo.Name, methodInfo, attributes, new TUnitAttachmentPublisher(context));
+            lifecycleStarted = true;
             await action();
         }
         finally
         {
-            await ProtoTestAssembly.Host.CompleteTestAsync();
+            if (lifecycleStarted)
+            {
+                await ProtoTestAssembly.Host.CompleteTestAsync();
+            }
         }
     }
 

@@ -5,6 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 	<LangVersion>latest</LangVersion>
+	<IsPackable>true</IsPackable>
+	<Description>xUnit.net v3 lifecycle and attachment integration for ProtoTest.</Description>
+	<PackageTags>testing;integration-testing;xunit;dependency-injection;dotnet</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

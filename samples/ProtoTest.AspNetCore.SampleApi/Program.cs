@@ -18,22 +18,49 @@ public class TestMessageService : ITestMessageService
     public string GetMessage() => "Hello from AspNetCore DI!";
 }
 
+public interface IScenarioIdProvider
+{
+    Guid Id { get; }
+}
+
+public sealed class ScenarioIdProvider : IScenarioIdProvider
+{
+    public Guid Id { get; } = Guid.NewGuid();
+}
+
+public sealed record CreateOrderRequest(string Product, int Quantity);
+
 public class Program
 {
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // Service Registraties
         builder.Services.AddSingleton<ITestMessageService, TestMessageService>();
+        builder.Services.AddScoped<IScenarioIdProvider, ScenarioIdProvider>();
 
         var app = builder.Build();
 
-        // Endpoints
         app.MapGet("/ping", () => Results.Ok(new { Message = "pong" }));
 
         app.MapGet("/message", (ITestMessageService service) =>
             Results.Ok(new { Message = service.GetMessage() }));
+
+        app.MapPost("/orders", (CreateOrderRequest request) =>
+        {
+            if (request.Quantity <= 0)
+            {
+                return Results.BadRequest(new { Error = "quantity-must-be-positive" });
+            }
+
+            return Results.Created("/orders/101", new
+            {
+                Id = 101,
+                request.Product,
+                request.Quantity,
+                Status = "pending"
+            });
+        });
 
         app.Run();
     }

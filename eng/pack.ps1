@@ -1,0 +1,33 @@
+[CmdletBinding()]
+param(
+    [ValidateSet("Debug", "Release")]
+    [string]$Configuration = "Release",
+    [string]$OutputPath = "artifacts/packages",
+    [switch]$NoBuild,
+    [switch]$NoRestore
+)
+
+$ErrorActionPreference = "Stop"
+$packages = @(
+    "src/ProtoTest.Core/ProtoTest.Core.csproj",
+    "src/ProtoTest.NUnit/ProtoTest.NUnit.csproj",
+    "src/ProtoTest.MSTest/ProtoTest.MSTest.csproj",
+    "src/ProtoTest.TUnit/ProtoTest.TUnit.csproj",
+    "src/ProtoTest.Xunit/ProtoTest.Xunit.csproj",
+    "src/ProtoTest.Xunit3/ProtoTest.Xunit3.csproj",
+    "src/ProtoTest.Rest/ProtoTest.Rest.csproj",
+    "src/ProtoTest.AspNetCore/ProtoTest.AspNetCore.csproj",
+    "src/ProtoTest.OpenApi/ProtoTest.OpenApi.csproj",
+    "src/ProtoTest.Reporting/ProtoTest.Reporting.csproj"
+)
+
+$packArguments = @("--configuration", $Configuration, "--output", $OutputPath)
+if ($NoBuild) { $packArguments += "--no-build" }
+if ($NoRestore) { $packArguments += "--no-restore" }
+
+foreach ($project in $packages) {
+    & dotnet pack $project @packArguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Packing '$project' failed with exit code $LASTEXITCODE."
+    }
+}

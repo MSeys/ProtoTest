@@ -129,7 +129,8 @@ public sealed class RestResponse : IDisposable
                 Data: new RestShapeMatchData(
                     RequestIdentifier: _routeIdentifier,
                     MatchedProperties: matchedProps,
-                    TargetType: expectedShape.GetType()
+                    TargetType: expectedShape.GetType(),
+                    StatusCode: (int)StatusCode
                 )
             ));
         }

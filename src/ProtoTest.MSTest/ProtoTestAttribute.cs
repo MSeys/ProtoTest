@@ -16,12 +16,13 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
         var attributes = ProtoAttributeResolver.Resolve(methodInfo);
         var attachmentPublisher = new MSTestAttachmentPublisher();
         TestResult[]? results = null;
+        var lifecycleStarted = false;
         try
         {
             await ProtoTestAssembly.Host.StartTestAsync(
                 methodInfo.Name, methodInfo, attributes, attachmentPublisher);
+            lifecycleStarted = true;
 
-            // 3. Run the actual MSTest execution pipeline
             results = await base.ExecuteAsync(testMethod);
 
             return results;
@@ -30,8 +31,10 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
         {
             try
             {
-                // Complete the lifecycle even when setup or test execution fails.
-                await ProtoTestAssembly.Host.CompleteTestAsync();
+                if (lifecycleStarted)
+                {
+                    await ProtoTestAssembly.Host.CompleteTestAsync();
+                }
             }
             finally
             {

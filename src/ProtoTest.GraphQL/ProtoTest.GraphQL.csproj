@@ -5,6 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 	<LangVersion>latest</LangVersion>
+	<IsPackable>false</IsPackable>
+	<Description>Planned GraphQL integration for ProtoTest. This package is not yet published.</Description>
+	<PackageTags>testing;integration-testing;graphql;dotnet</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

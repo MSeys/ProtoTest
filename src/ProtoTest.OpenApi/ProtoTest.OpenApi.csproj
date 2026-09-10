@@ -5,6 +5,9 @@
 	<ImplicitUsings>enable</ImplicitUsings>
 	<Nullable>enable</Nullable>
 	<LangVersion>latest</LangVersion>
+	<IsPackable>true</IsPackable>
+	<Description>OpenAPI contract coverage for ProtoTest REST tests.</Description>
+	<PackageTags>testing;integration-testing;openapi;contract-testing;coverage;dotnet</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

@@ -13,7 +13,18 @@ protected override void Configure(IProtoHostBuilder builder)
 }
 ```
 
-The optional factory callback can customize the underlying `WebApplicationFactory<TProgram>`.
+The optional web-host callback supports the normal `WebApplicationFactory<TProgram>` customization model, including service replacement through `ConfigureTestServices`. A separate client callback configures redirects, cookies, and the generated client's base address.
+
+```csharp
+builder.AddAspNetCoreServer<Program>(
+	"OrderApi",
+	webHost => webHost.ConfigureTestServices(services =>
+	{
+		services.RemoveAll<IEmailSender>();
+		services.AddSingleton<IEmailSender, RecordingEmailSender>();
+	}),
+	client => client.AllowAutoRedirect = false);
+```
 
 ## Combine local and external clients
 
@@ -69,6 +80,13 @@ public void ResolveService_ReturnsRegisteredDependency()
 
 The server factory and its clients are owned by the test context and are disposed during `CompleteTestAsync`.
 
+`ServerService` resolves from the application's root provider and should therefore only be used for singleton services. For scoped services, create and dispose an explicit application scope:
+
+```csharp
+using var scope = Proto.Context.CreateServerScope<Program>("OrderApi");
+var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+```
+
 ## Runnable example
 
-See the [ASP.NET Core demo](../examples/aspnetcore-demo.md) for a minimal application and tests covering both HTTP requests and application DI.
+See the [ASP.NET Core demo](../examples/aspnetcore-demo.md) for a runnable application covering service replacement, REST assertions, success and error responses, and scoped application DI.

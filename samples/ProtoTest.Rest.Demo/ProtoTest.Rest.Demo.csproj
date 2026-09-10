@@ -31,6 +31,8 @@
     <ProjectReference Include="..\..\src\ProtoTest.Core\ProtoTest.Core.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Rest\ProtoTest.Rest.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.NUnit\ProtoTest.NUnit.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.OpenApi\ProtoTest.OpenApi.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Reporting\ProtoTest.Reporting.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -40,6 +42,9 @@
 
   <ItemGroup>
     <None Update="appsettings*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="*.openapi.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

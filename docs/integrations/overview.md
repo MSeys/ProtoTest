@@ -30,7 +30,7 @@ The following projects exist as planned extension points but are not currently i
 | Project | Planned purpose |
 | --- | --- |
 | `ProtoTest.GraphQL` | GraphQL client and coverage integration |
-| `ProtoTest.gRPC` | gRPC client and coverage integration |
+| `ProtoTest.Grpc` | gRPC client and coverage integration |
 | `ProtoTest.Playwright` | Browser automation integration |
 
 ## Common flow

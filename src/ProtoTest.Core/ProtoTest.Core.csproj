@@ -5,19 +5,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 	<LangVersion>latest</LangVersion>
+	<IsPackable>true</IsPackable>
   </PropertyGroup>
 
   <PropertyGroup>
   	<PackageId>ProtoTest.Core</PackageId>
-  	<Version>0.1.0-alpha</Version>
-  	<Authors>Matthias Seys</Authors>
-  	<Description>Bringing back the simplicity and readability of prototyping to .NET integration testing.</Description>
-  	<PackageLicenseExpression>MIT</PackageLicenseExpression>
-  	<PackageTags>testing;integration-testing;dependency-injection;dotnet</PackageTags>
-  	<RepositoryUrl>https://github.com/matthiasseys/ProtoTest</RepositoryUrl>
-  	<RepositoryType>git</RepositoryType>
-  	<IncludeSymbols>true</IncludeSymbols>
-  	<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+	<Description>Bringing back the simplicity and readability of prototyping to .NET integration testing.</Description>
+	<PackageTags>testing;integration-testing;dependency-injection;dotnet</PackageTags>
   </PropertyGroup>
 
   <!-- Conditional Version Mapping -->

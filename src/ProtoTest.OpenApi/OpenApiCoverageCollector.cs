@@ -5,6 +5,7 @@ using Microsoft.OpenApi.Models;
 using ProtoTest.Core;
 using ProtoTest.OpenApi.Internal;
 using ProtoTest.Rest;
+using ProtoTest.Http;
 
 public class OpenApiCoverageCollector : ProtoCoverageCollector
 {
@@ -244,8 +245,8 @@ public class OpenApiCoverageCollector : ProtoCoverageCollector
 
     private static string NormalizeRoute(string route)
     {
-        var path = Uri.TryCreate(route, UriKind.Absolute, out var absoluteUri)
-            ? absoluteUri.AbsolutePath
+        var path = ProtoHttpUri.TryCreateAbsoluteHttpUri(route, out var absoluteUri)
+            ? absoluteUri!.AbsolutePath
             : route.Split('#', 2)[0].Split('?', 2)[0];
         path = path.Trim();
         if (!path.StartsWith('/')) path = $"/{path}";

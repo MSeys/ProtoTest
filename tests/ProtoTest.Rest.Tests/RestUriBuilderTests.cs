@@ -2,10 +2,19 @@
 
 using NUnit.Framework;
 using ProtoTest.Rest.Internal;
+using ProtoTest.Http;
 
 [TestFixture]
 public class RestUriBuilderTests
 {
+    [TestCase("/resource", false)]
+    [TestCase("resource", false)]
+    [TestCase("https://example.test/resource", true)]
+    [TestCase("file:///temporary/resource", true)]
+    [TestCase("custom+http://example.test", true)]
+    public void ExplicitSchemeDetection_ShouldBePlatformIndependent(string target, bool expected)
+        => Assert.That(ProtoHttpUri.HasExplicitScheme(target), Is.EqualTo(expected));
+
     [Test]
     public void BuildUrl_Should_Return_Original_Template_When_Params_Are_Null()
     {

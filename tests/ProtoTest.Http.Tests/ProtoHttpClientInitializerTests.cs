@@ -11,13 +11,13 @@ public sealed class ProtoHttpClientInitializerTests
     [TestCase("http://example.test")]
     [TestCase("https://example.test/path")]
     public void TryCreateAbsoluteHttpUri_ShouldAcceptHttpEndpoints(string value)
-        => Assert.That(ProtoHttpClientInitializer.TryCreateAbsoluteHttpUri(value, out _), Is.True);
+        => Assert.That(ProtoHttpUri.TryCreateAbsoluteHttpUri(value, out _), Is.True);
 
     [TestCase("/graphql")]
     [TestCase("ftp://example.test")]
     [TestCase("")]
     public void TryCreateAbsoluteHttpUri_ShouldRejectUnsupportedEndpoints(string value)
-        => Assert.That(ProtoHttpClientInitializer.TryCreateAbsoluteHttpUri(value, out _), Is.False);
+        => Assert.That(ProtoHttpUri.TryCreateAbsoluteHttpUri(value, out _), Is.False);
 
     [Test]
     public async Task Initializer_ShouldPreferExplicitBaseUrlOverConfiguration()

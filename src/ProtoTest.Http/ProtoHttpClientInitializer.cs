@@ -15,12 +15,6 @@ public sealed class ProtoHttpClientInitializer(
     public static string GetFactoryName(string protocolName, string clientName)
         => $"ProtoTest.{protocolName}:{clientName}";
 
-    public static bool TryCreateAbsoluteHttpUri(string value, out Uri? uri)
-    {
-        var created = Uri.TryCreate(value, UriKind.Absolute, out uri);
-        return created && uri!.Scheme is "http" or "https";
-    }
-
     public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
     {
         var baseUrl = explicitBaseUrl ?? context.Configuration[$"ProtoTest:Clients:{Name}:BaseUrl"];
@@ -31,7 +25,7 @@ public sealed class ProtoHttpClientInitializer(
             return Task.FromResult(true);
         }
 
-        if (!TryCreateAbsoluteHttpUri(baseUrl, out var baseAddress))
+        if (!ProtoHttpUri.TryCreateAbsoluteHttpUri(baseUrl, out var baseAddress))
             throw new InvalidOperationException(
                 $"The base URL configured for {protocolName} client '{Name}' must be an absolute HTTP or HTTPS URI.");
 

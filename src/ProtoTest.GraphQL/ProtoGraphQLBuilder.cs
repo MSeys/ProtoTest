@@ -17,7 +17,7 @@ public sealed class ProtoGraphQLBuilder(IServiceCollection services)
         Action<IHttpClientBuilder>? configure = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (baseUrl is not null && !ProtoHttpClientInitializer.TryCreateAbsoluteHttpUri(baseUrl, out _))
+        if (baseUrl is not null && !ProtoHttpUri.TryCreateAbsoluteHttpUri(baseUrl, out _))
         {
             throw new ArgumentException("A GraphQL client base URL must be an absolute HTTP or HTTPS URI.", nameof(baseUrl));
         }

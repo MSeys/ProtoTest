@@ -8,6 +8,7 @@ using System.Collections;
 using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using ProtoTest.Http;
 
 internal static partial class RestUriBuilder
 {
@@ -23,8 +24,13 @@ internal static partial class RestUriBuilder
         CancellationToken cancellationToken)
     {
         var target = BuildTarget(template, routeAndQueryParams);
-        if (Uri.TryCreate(target, UriKind.Absolute, out var absoluteUri))
+        // On Unix, System.Uri interprets a root-relative path such as "/orders" as an
+        // absolute file URI. A REST route is absolute only when the caller supplied an
+        // explicit URI scheme; root-relative routes must still resolve against BaseAddress.
+        if (ProtoHttpUri.HasExplicitScheme(target))
         {
+            if (!Uri.TryCreate(target, UriKind.Absolute, out var absoluteUri))
+                throw new InvalidOperationException($"REST request URI '{target}' is not a valid absolute URI.");
             if (!IsHttpUri(absoluteUri))
             {
                 throw new InvalidOperationException(

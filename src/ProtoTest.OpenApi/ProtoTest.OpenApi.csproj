@@ -11,6 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Http\ProtoTest.Http.csproj" />
     <PackageReference Include="Microsoft.OpenApi.Readers" Version="1.6.31" />
   </ItemGroup>
 

@@ -5,7 +5,7 @@ using System.Net.Http.Headers;
 using ProtoTest.Core;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
-using ProtoTest.Rest.Matching;
+using ProtoTest.Json;
 
 [RestClient("SaaS")]
 [DemoEnvironment(Order = -200)]

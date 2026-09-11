@@ -12,7 +12,9 @@ ProtoTest provides:
 
 - one lifecycle across NUnit, xUnit, xUnit v3, MSTest, and TUnit;
 - per-test services, clients, typed state, and coverage hits;
-- REST and ASP.NET Core integrations;
+- REST, GraphQL, and ASP.NET Core integrations;
+- shared JSON shape matching through `ProtoTest.Json`;
+- shared HTTP integration foundations through `ProtoTest.Http`;
 - OpenAPI-driven REST coverage;
 - extension points for hooks, attributes, clients, and collectors.
 
@@ -41,6 +43,7 @@ Read the [ProtoTest documentation](docs/index.md), or start directly with:
 
 - [First test](docs/getting-started/first-test.md)
 - [REST integration](docs/integrations/rest.md)
+- [GraphQL integration](docs/integrations/graphql.md)
 - [ASP.NET Core integration](docs/integrations/aspnetcore.md)
 - [Hooks and lifecycle extensions](docs/extending/hooks.md)
 - [Context and state](docs/guides/context-and-state.md)
@@ -50,6 +53,8 @@ Read the [ProtoTest documentation](docs/index.md), or start directly with:
 ## Samples
 
 - [Shared SaaS sample application and REST showcase](samples/ProtoTest.SampleApp.RestDemo)
+- [Shared SaaS sample application and GraphQL showcase](samples/ProtoTest.SampleApp.GraphQLDemo)
+- [Focused GraphQL demo](samples/ProtoTest.GraphQL.Demo)
 - [REST demo](samples/ProtoTest.Rest.Demo)
 - [ASP.NET Core demo](samples/ProtoTest.AspNetCore.Demo)
 
@@ -78,6 +83,7 @@ To produce the complete package set locally:
 | REST | Available |
 | ASP.NET Core | Available |
 | OpenAPI | Available |
-| GraphQL, gRPC (`ProtoTest.Grpc`), Playwright, standalone Coverage | Planned |
+| GraphQL | Preview |
+| gRPC (`ProtoTest.Grpc`), Playwright, standalone Coverage | Planned |
 
 See the [integration overview](docs/integrations/overview.md) for package names and capabilities.

@@ -11,7 +11,7 @@ public class OpenApiSchemaExtractorTests
     public void ExtractResponseProperties_ShouldExtractNestedJsonPaths()
     {
         // Arrange
-        var doc = OpenApiSpecLoader.LoadFromPath(OpenApiTestHelper.SampleJsonSpec);
+        var doc = OpenApiSpecLoader.Load(OpenApiTestHelper.SampleJsonSpec);
         var operation = doc.Paths["/users/{id}"].Operations[OperationType.Get];
         var response = operation.Responses["200"];
 

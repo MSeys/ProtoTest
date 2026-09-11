@@ -7,7 +7,7 @@ using ProtoTest.AspNetCore.SampleApi;
 using ProtoTest.Core;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
-using ProtoTest.Rest.Matching;
+using ProtoTest.Json;
 
 [RestClient("OrderApi")]
 public class OrderApiTests

@@ -6,6 +6,7 @@ namespace ProtoTest.OpenApi.Internal;
 
 using Microsoft.OpenApi.Models;
 using Microsoft.OpenApi.Readers;
+using ProtoTest.Core;
 
 internal static class OpenApiSpecLoader
 {
@@ -16,52 +17,7 @@ internal static class OpenApiSpecLoader
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
 
-        if (File.Exists(source))
-        {
-            using var stream = File.OpenRead(source);
-            var readResult = new OpenApiStreamReader().Read(stream, out var diagnostic);
-
-            ValidateDiagnostics(diagnostic);
-            return readResult;
-        }
-
-        if (TryResolveHttpUri(source, baseUrl, out var uri))
-        {
-            return LoadFromUrl(uri, httpClient);
-        }
-
-        return LoadFromContent(source);
-    }
-
-    /// <summary>
-    /// Compatibility alias for loading a local path or raw document content.
-    /// </summary>
-    public static OpenApiDocument LoadFromPath(string pathOrContent)
-        => Load(pathOrContent);
-
-    private static OpenApiDocument LoadFromUrl(Uri uri, HttpClient? httpClient)
-    {
-        var ownsClient = httpClient is null;
-        httpClient ??= new HttpClient();
-
-        try
-        {
-            var content = httpClient.GetStringAsync(uri).GetAwaiter().GetResult();
-            return LoadFromContent(content);
-        }
-        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
-        {
-            throw new InvalidOperationException(
-                $"Failed to retrieve OpenAPI specification from '{uri}'.",
-                exception);
-        }
-        finally
-        {
-            if (ownsClient)
-            {
-                httpClient.Dispose();
-            }
-        }
+        return LoadFromContent(ProtoDocumentSource.LoadText(source, baseUrl, httpClient));
     }
 
     private static OpenApiDocument LoadFromContent(string content)
@@ -72,30 +28,6 @@ internal static class OpenApiSpecLoader
         ValidateDiagnostics(stringDiagnostic);
         return result;
     }
-
-    private static bool TryResolveHttpUri(string source, string? baseUrl, out Uri uri)
-    {
-        if (Uri.TryCreate(source, UriKind.Absolute, out uri!) && IsHttpUri(uri))
-        {
-            return true;
-        }
-
-        if (!string.IsNullOrWhiteSpace(baseUrl) &&
-            Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri) &&
-            IsHttpUri(baseUri) &&
-            Uri.TryCreate(baseUri, source, out uri!) &&
-            IsHttpUri(uri))
-        {
-            return true;
-        }
-
-        uri = null!;
-        return false;
-    }
-
-    private static bool IsHttpUri(Uri uri)
-        => string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
 
     private static void ValidateDiagnostics(OpenApiDiagnostic diagnostic)
     {

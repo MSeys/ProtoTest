@@ -5,7 +5,7 @@ using ProtoTest.Core;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.Rest.Authenticators;
-using ProtoTest.Rest.Matching;
+using ProtoTest.Json;
 
 [Auth<BearerTokenAuthenticator>("orders-token")]
 public sealed class OrderApiTests

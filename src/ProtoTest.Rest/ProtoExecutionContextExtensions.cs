@@ -1,6 +1,7 @@
 ﻿namespace ProtoTest.Rest;
 
 using ProtoTest.Core;
+using ProtoTest.Http;
 using ProtoTest.Rest.Internal;
 using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,8 +21,11 @@ public static class ProtoExecutionContextExtensions
         var httpClient = context.Client<HttpClient>(targetClientName);
         var authenticatorFactory = restState?.AuthenticatorFactory;
         var baseAddressRegistration = context.Services
-            .GetServices<RestBaseAddressRegistration>()
+            .GetServices<ProtoHttpBaseAddressRegistration>()
             .LastOrDefault(registration => string.Equals(
+                registration.ProtocolName,
+                "Rest",
+                StringComparison.OrdinalIgnoreCase) && string.Equals(
                 registration.ClientName,
                 targetClientName,
                 StringComparison.OrdinalIgnoreCase));

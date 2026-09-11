@@ -4,7 +4,7 @@ using System.Net;
 using ProtoTest.Core;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
-using ProtoTest.Rest.Matching;
+using ProtoTest.Json;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Testing;
 

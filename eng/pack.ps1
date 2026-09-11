@@ -10,12 +10,15 @@ param(
 $ErrorActionPreference = "Stop"
 $packages = @(
     "src/ProtoTest.Core/ProtoTest.Core.csproj",
+    "src/ProtoTest.Http/ProtoTest.Http.csproj",
+    "src/ProtoTest.Json/ProtoTest.Json.csproj",
     "src/ProtoTest.NUnit/ProtoTest.NUnit.csproj",
     "src/ProtoTest.MSTest/ProtoTest.MSTest.csproj",
     "src/ProtoTest.TUnit/ProtoTest.TUnit.csproj",
     "src/ProtoTest.Xunit/ProtoTest.Xunit.csproj",
     "src/ProtoTest.Xunit3/ProtoTest.Xunit3.csproj",
     "src/ProtoTest.Rest/ProtoTest.Rest.csproj",
+    "src/ProtoTest.GraphQL/ProtoTest.GraphQL.csproj",
     "src/ProtoTest.AspNetCore/ProtoTest.AspNetCore.csproj",
     "src/ProtoTest.OpenApi/ProtoTest.OpenApi.csproj",
     "src/ProtoTest.Reporting/ProtoTest.Reporting.csproj"

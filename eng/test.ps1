@@ -26,16 +26,21 @@ Invoke-DotNet build ProtoTest.slnx --configuration $Configuration --no-restore
 
 $vstestProjects = @(
     "tests/ProtoTest.Core.Tests/ProtoTest.Core.Tests.csproj",
+    "tests/ProtoTest.Http.Tests/ProtoTest.Http.Tests.csproj",
+    "tests/ProtoTest.Json.Tests/ProtoTest.Json.Tests.csproj",
     "tests/ProtoTest.NUnit.Tests/ProtoTest.NUnit.Tests.csproj",
     "tests/ProtoTest.MSTest.Tests/ProtoTest.MSTest.Tests.csproj",
     "tests/ProtoTest.Xunit.Tests/ProtoTest.Xunit.Tests.csproj",
     "tests/ProtoTest.Rest.Tests/ProtoTest.Rest.Tests.csproj",
+    "tests/ProtoTest.GraphQL.Tests/ProtoTest.GraphQL.Tests.csproj",
     "tests/ProtoTest.AspNetCore.Tests/ProtoTest.AspNetCore.Tests.csproj",
     "tests/ProtoTest.OpenApi.Tests/ProtoTest.OpenApi.Tests.csproj",
     "tests/ProtoTest.Reporting.Tests/ProtoTest.Reporting.Tests.csproj",
     "samples/ProtoTest.Rest.Demo/ProtoTest.Rest.Demo.csproj",
+    "samples/ProtoTest.GraphQL.Demo/ProtoTest.GraphQL.Demo.csproj",
     "samples/ProtoTest.AspNetCore.Demo/ProtoTest.AspNetCore.Demo.csproj",
-    "samples/ProtoTest.SampleApp.RestDemo/ProtoTest.SampleApp.RestDemo.csproj"
+    "samples/ProtoTest.SampleApp.RestDemo/ProtoTest.SampleApp.RestDemo.csproj",
+    "samples/ProtoTest.SampleApp.GraphQLDemo/ProtoTest.SampleApp.GraphQLDemo.csproj"
 )
 
 foreach ($project in $vstestProjects) {

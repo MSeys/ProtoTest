@@ -53,12 +53,6 @@ internal static partial class RestUriBuilder
         return new Uri(baseAddress, target);
     }
 
-    public static bool TryCreateAbsoluteHttpUri(string value, out Uri? uri)
-    {
-        var created = Uri.TryCreate(value, UriKind.Absolute, out uri);
-        return created && IsHttpUri(uri!);
-    }
-
     public static string BuildTarget(string template, object? routeAndQueryParams)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(template);

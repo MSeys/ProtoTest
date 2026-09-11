@@ -72,6 +72,9 @@ public sealed class SampleSaasStore
             ? state.Orders.GetValueOrDefault(id)
             : null;
 
+    public IReadOnlyCollection<OrderResponse>? GetOrders(string tenant)
+        => _tenants.TryGetValue(tenant, out var state) ? state.Orders.Values.ToArray() : null;
+
     public IReadOnlyCollection<InvoiceResponse>? GetInvoices(string tenant, string? state)
         => _tenants.TryGetValue(tenant, out var tenantState)
             ? tenantState.Invoices

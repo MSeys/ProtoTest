@@ -249,7 +249,7 @@ The convenience API buffers response bodies so JSON, shape assertions and attach
 rest.ConfigureResponses(options => options.MaxResponseBodyBytes = 50 * 1024 * 1024);
 ```
 
-Binary content is available through `response.ReadAsBytes()`. Responses exceeding the limit throw `RestResponseTooLargeException` and emit an `http.failure` observation.
+Binary content is available through `response.ReadAsBytes()`. Responses exceeding the limit throw `ProtoResponseTooLargeException` and emit an `http.failure` observation.
 
 ## Coverage
 

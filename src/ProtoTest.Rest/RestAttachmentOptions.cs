@@ -1,23 +1,18 @@
 namespace ProtoTest.Rest;
 
 using Microsoft.Extensions.Configuration;
+using ProtoTest.Json;
 
 /// <summary>
 /// Controls which REST artifacts are automatically attached to a test result.
 /// </summary>
-public sealed class RestAttachmentOptions
+public sealed class RestAttachmentOptions : JsonDiagnosticOptions
 {
     public const string ConfigurationSectionName = "ProtoTest:Rest:Attachments";
 
     public bool CaptureRequestBodies { get; set; } = true;
     public bool CaptureResponses { get; set; } = true;
     public bool CaptureExpectedShapes { get; set; } = true;
-
-    /// <summary>Maximum number of characters retained in diagnostic bodies.</summary>
-    public int MaxDiagnosticBodyLength { get; set; } = 64 * 1024;
-
-    /// <summary>Whether known sensitive headers and JSON properties are replaced in diagnostics.</summary>
-    public bool RedactSensitiveData { get; set; } = true;
 
     public List<string> SensitiveHeaders { get; set; } =
     [
@@ -26,17 +21,6 @@ public sealed class RestAttachmentOptions
         "Cookie",
         "Set-Cookie",
         "X-Api-Key"
-    ];
-
-    public List<string> SensitiveJsonProperties { get; set; } =
-    [
-        "password",
-        "token",
-        "access_token",
-        "refresh_token",
-        "secret",
-        "apiKey",
-        "api_key"
     ];
 
     public List<string> SensitiveQueryParameters { get; set; } =

@@ -4,11 +4,13 @@ using System.Net;
 using System.Net.Http.Headers;
 using ProtoTest.Core;
 using ProtoTest.Rest;
+using ProtoTest.GraphQL;
 using ProtoTest.SampleApp.Contracts;
 
 public static class SampleAppTargets
 {
     public const string Api = "SampleApp";
+    public const string GraphQL = "SampleAppGraphQL";
 }
 
 public sealed record SampleEnvironmentContext(
@@ -98,6 +100,20 @@ public sealed class SampleUserAuthenticator : IRestAuthenticator
 {
     public ValueTask AuthenticateAsync(
         RestAuthenticationContext context,
+        CancellationToken cancellationToken = default)
+    {
+        var environment = context.Test.Context<SampleEnvironmentContext>();
+        var user = context.Test.Context<SampleUserContext>();
+        context.Request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", user.AccessToken);
+        context.Request.Headers.Add("X-Tenant", environment.Tenant);
+        return ValueTask.CompletedTask;
+    }
+}
+
+public sealed class SampleGraphQLAuthenticator : IGraphQLAuthenticator
+{
+    public ValueTask AuthenticateAsync(
+        GraphQLAuthenticationContext context,
         CancellationToken cancellationToken = default)
     {
         var environment = context.Test.Context<SampleEnvironmentContext>();

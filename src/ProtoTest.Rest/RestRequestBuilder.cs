@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
+using ProtoTest.Http;
 using ProtoTest.Rest.Internal;
 
 public sealed class RestRequestBuilder
@@ -229,7 +230,7 @@ public sealed class RestRequestBuilder
                 HttpCompletionOption.ResponseHeadersRead,
                 ct);
             var responseOptions = _context.TryService<RestResponseOptions>() ?? new RestResponseOptions();
-            var bodyBytes = await BufferResponseContentAsync(
+            var bodyBytes = await ProtoHttpResponseBuffer.BufferAsync(
                 responseMessage,
                 responseOptions.MaxResponseBodyBytes,
                 ct);
@@ -297,58 +298,6 @@ public sealed class RestRequestBuilder
                 attachmentOptions);
             throw;
         }
-    }
-
-    private static async Task<byte[]> BufferResponseContentAsync(
-        HttpResponseMessage response,
-        int maximumBytes,
-        CancellationToken cancellationToken)
-    {
-        if (maximumBytes < 0)
-        {
-            throw new InvalidOperationException("MaxResponseBodyBytes cannot be negative.");
-        }
-
-        var originalContent = response.Content;
-        if (originalContent.Headers.ContentLength is > 0
-            && originalContent.Headers.ContentLength > maximumBytes)
-        {
-            throw new Exceptions.RestResponseTooLargeException(
-                maximumBytes,
-                originalContent.Headers.ContentLength.Value);
-        }
-
-        await using var source = await originalContent.ReadAsStreamAsync(cancellationToken);
-        using var destination = new MemoryStream(Math.Min(maximumBytes, 64 * 1024));
-        var buffer = new byte[16 * 1024];
-        long total = 0;
-        while (true)
-        {
-            var read = await source.ReadAsync(buffer, cancellationToken);
-            if (read == 0)
-            {
-                break;
-            }
-
-            total += read;
-            if (total > maximumBytes)
-            {
-                throw new Exceptions.RestResponseTooLargeException(maximumBytes, total);
-            }
-
-            await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-        }
-
-        var bytes = destination.ToArray();
-        var bufferedContent = new ByteArrayContent(bytes);
-        foreach (var header in originalContent.Headers)
-        {
-            bufferedContent.Headers.TryAddWithoutValidation(header.Key, header.Value);
-        }
-
-        response.Content = bufferedContent;
-        originalContent.Dispose();
-        return bytes;
     }
 
     private void TryRecordFailure(

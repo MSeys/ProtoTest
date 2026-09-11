@@ -1,0 +1,23 @@
+scalar Decimal
+
+type Query {
+  apiInfo: ApiInfo!
+  me: UserResponse!
+  orders(first: Int, after: String, last: Int, before: String, where: OrderFilterInput, order: [OrderSortInput!]): OrderConnection!
+}
+
+type Mutation {
+  createOrder(input: CreateOrderInput!): OrderResponse!
+}
+
+type ApiInfo { name: String! version: String! }
+type UserResponse { id: String! tenant: String! email: String! role: String! accessToken: String! }
+type OrderResponse { id: Int! tenant: String! product: String! quantity: Int! total: Decimal! status: String! }
+type OrderConnection { nodes: [OrderResponse!]! pageInfo: PageInfo! totalCount: Int! }
+type PageInfo { hasNextPage: Boolean! hasPreviousPage: Boolean! startCursor: String endCursor: String }
+input CreateOrderInput { product: String! quantity: Int! unitPrice: Decimal! }
+input OrderFilterInput { product: StringFilterInput total: DecimalFilterInput }
+input StringFilterInput { contains: String }
+input DecimalFilterInput { gt: Decimal }
+input OrderSortInput { total: SortDirection }
+enum SortDirection { ASC DESC }

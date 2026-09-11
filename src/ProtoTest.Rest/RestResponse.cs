@@ -1,6 +1,7 @@
 ﻿namespace ProtoTest.Rest;
 
 using ProtoTest.Core;
+using ProtoTest.Json;
 using ProtoTest.Rest.Exceptions;
 using ProtoTest.Rest.Internal;
 using ProtoTest.Rest.Matching;

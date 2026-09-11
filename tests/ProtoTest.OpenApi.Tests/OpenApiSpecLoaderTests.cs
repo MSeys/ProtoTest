@@ -8,10 +8,10 @@ using System.Net;
 public class OpenApiSpecLoaderTests
 {
     [Test]
-    public void LoadFromPath_ShouldParseValidJsonContent()
+    public void Load_ShouldParseValidJsonContent()
     {
         // Act
-        var doc = OpenApiSpecLoader.LoadFromPath(OpenApiTestHelper.SampleJsonSpec);
+        var doc = OpenApiSpecLoader.Load(OpenApiTestHelper.SampleJsonSpec);
 
         // Assert
         Assert.That(doc, Is.Not.Null);
@@ -19,13 +19,13 @@ public class OpenApiSpecLoaderTests
     }
 
     [Test]
-    public void LoadFromPath_ShouldThrow_WhenContentIsInvalid()
+    public void Load_ShouldThrow_WhenContentIsInvalid()
     {
         // Arrange
         var invalidJson = "{ \"openapi\": \"3.0.0\" }";
 
         // Act & Assert
-        var ex = Assert.Throws<InvalidOperationException>(() => OpenApiSpecLoader.LoadFromPath(invalidJson));
+        var ex = Assert.Throws<InvalidOperationException>(() => OpenApiSpecLoader.Load(invalidJson));
         Assert.That(ex.Message, Does.Contain("Failed to parse OpenAPI specification"));
     }
 

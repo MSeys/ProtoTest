@@ -21,17 +21,13 @@ public class OpenApiCoverageCollector : ProtoCoverageCollector
         ArgumentNullException.ThrowIfNull(configuration);
 
         var clientConfiguration = configuration.GetSection($"ProtoTest:Clients:{targetName}");
-        var source = clientConfiguration["OpenApi:Url"]
-            ?? clientConfiguration["OpenApi:Path"]
-            ?? clientConfiguration["OpenApi:Specification"];
+        var source = clientConfiguration["OpenApi:Specification"];
 
         if (string.IsNullOrWhiteSpace(source))
         {
             throw new InvalidOperationException(
                 $"No OpenAPI specification configured for target '{targetName}'. " +
-                $"Set 'ProtoTest:Clients:{targetName}:OpenApi:Url', " +
-                $"'ProtoTest:Clients:{targetName}:OpenApi:Path', or " +
-                $"'ProtoTest:Clients:{targetName}:OpenApi:Specification'.");
+                $"Set 'ProtoTest:Clients:{targetName}:OpenApi:Specification'.");
         }
 
         _document = OpenApiSpecLoader.Load(source, clientConfiguration["BaseUrl"]);

@@ -19,7 +19,7 @@ public sealed class Setup : ProtoTestAssembly
             .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
-                    [$"ProtoTest:Clients:{SampleAppTargets.Api}:OpenApi:Path"] = Path.Combine(
+                    [$"ProtoTest:Clients:{SampleAppTargets.Api}:OpenApi:Specification"] = Path.Combine(
                         AppContext.BaseDirectory,
                         "sampleapp.openapi.json")
                 }))

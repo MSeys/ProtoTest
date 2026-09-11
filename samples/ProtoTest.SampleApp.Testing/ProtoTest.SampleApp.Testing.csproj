@@ -9,6 +9,7 @@
     <ProjectReference Include="..\ProtoTest.SampleApp.Contracts\ProtoTest.SampleApp.Contracts.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Core\ProtoTest.Core.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Rest\ProtoTest.Rest.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.GraphQL\ProtoTest.GraphQL.csproj" />
   </ItemGroup>
 
 </Project>

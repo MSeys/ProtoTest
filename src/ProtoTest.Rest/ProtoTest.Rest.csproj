@@ -16,6 +16,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <ProjectReference Include="..\ProtoTest.Http\ProtoTest.Http.csproj" />
+    <ProjectReference Include="..\ProtoTest.Json\ProtoTest.Json.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">

@@ -6,6 +6,7 @@ using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
+using ProtoTest.Http;
 using ProtoTest.Rest.Authenticators;
 using ProtoTest.Rest.Exceptions;
 
@@ -296,7 +297,7 @@ public sealed class RestDiagnosticsAndExtensibilityTests
         };
         using var client = new HttpClient(handler) { BaseAddress = new Uri("https://example.test") };
 
-        var exception = Assert.ThrowsAsync<RestResponseTooLargeException>(async () =>
+        var exception = Assert.ThrowsAsync<ProtoResponseTooLargeException>(async () =>
             await new RestRequestBuilder(client, context, "Orders", null).GetAsync("/large"));
 
         Assert.That(exception!.MaximumBytes, Is.EqualTo(4));

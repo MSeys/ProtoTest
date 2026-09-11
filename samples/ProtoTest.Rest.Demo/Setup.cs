@@ -35,7 +35,7 @@ public sealed class Setup : ProtoTestAssembly
                     .AddInMemoryCollection(new Dictionary<string, string?>
                     {
                         ["ProtoTest:Clients:Orders:BaseUrl"] = Server.Url,
-                        ["ProtoTest:Clients:Orders:OpenApi:Path"] = Path.Combine(
+                        ["ProtoTest:Clients:Orders:OpenApi:Specification"] = Path.Combine(
                             AppContext.BaseDirectory,
                             "orders.openapi.json"),
                         ["ProtoTest:Clients:Inventory:BaseUrl"] = Server.Url

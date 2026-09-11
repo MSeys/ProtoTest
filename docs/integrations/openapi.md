@@ -13,7 +13,7 @@ OpenAPI configuration is associated with a named client:
 	  "Orders": {
 		"BaseUrl": "https://localhost:5001",
 		"OpenApi": {
-		  "Path": "contracts/orders.json"
+		  "Specification": "contracts/orders.json"
 		}
 	  }
 	}
@@ -21,13 +21,9 @@ OpenAPI configuration is associated with a named client:
 }
 ```
 
-The supported keys are:
-
-- `ProtoTest:Clients:{name}:OpenApi:Url`
-- `ProtoTest:Clients:{name}:OpenApi:Path`
-- `ProtoTest:Clients:{name}:OpenApi:Specification`
-
-A URL can be relative to the configured client base URL. A path can point to a JSON or YAML file.
+`ProtoTest:Clients:{name}:OpenApi:Specification` is the single canonical setting. Its
+value can be inline JSON/YAML, a local file, an absolute URL, or a URL relative to the
+configured client `BaseUrl`.
 
 ## Register the collector
 

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="NUnit" Version="4.6.1" />
+    <PackageReference Include="NUnit3TestAdapter" Version="6.3.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.SampleApp\ProtoTest.SampleApp.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.AspNetCore\ProtoTest.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.GraphQL\ProtoTest.GraphQL.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.NUnit\ProtoTest.NUnit.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Reporting\ProtoTest.Reporting.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\ProtoTest.SampleApp.GraphQLDemo\sampleapp.graphql" Link="sampleapp.graphql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+</Project>

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
+using ProtoTest.Http;
 using ProtoTest.Rest.Internal;
 
 public sealed class ProtoRestBuilder
@@ -21,17 +22,17 @@ public sealed class ProtoRestBuilder
         Action<IHttpClientBuilder>? configure = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (baseUrl is not null && !RestUriBuilder.TryCreateAbsoluteHttpUri(baseUrl, out _))
+        if (baseUrl is not null && !ProtoHttpClientInitializer.TryCreateAbsoluteHttpUri(baseUrl, out _))
         {
             throw new ArgumentException(
                 "A REST client base URL must be an absolute HTTP or HTTPS URI.",
                 nameof(baseUrl));
         }
 
-        var httpClientBuilder = Services.AddHttpClient(RestHttpClientInitializer.GetFactoryName(name));
+        var httpClientBuilder = Services.AddHttpClient(ProtoHttpClientInitializer.GetFactoryName("Rest", name));
         configure?.Invoke(httpClientBuilder);
         Services.AddSingleton<IProtoClientInitializer>(
-            _ => new RestHttpClientInitializer(name, baseUrl));
+            _ => new ProtoHttpClientInitializer("Rest", name, baseUrl));
 
         return new ProtoRestTargetBuilder(name, Services);
     }
@@ -45,11 +46,11 @@ public sealed class ProtoRestBuilder
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(baseAddressResolver);
 
-        var httpClientBuilder = Services.AddHttpClient(RestHttpClientInitializer.GetFactoryName(name));
+        var httpClientBuilder = Services.AddHttpClient(ProtoHttpClientInitializer.GetFactoryName("Rest", name));
         configure?.Invoke(httpClientBuilder);
         Services.AddSingleton<IProtoClientInitializer>(
-            _ => new RestHttpClientInitializer(name, allowMissingBaseUrl: true));
-        Services.AddSingleton(new RestBaseAddressRegistration(name, baseAddressResolver));
+            _ => new ProtoHttpClientInitializer("Rest", name, allowMissingBaseUrl: true));
+        Services.AddSingleton(new ProtoHttpBaseAddressRegistration("Rest", name, baseAddressResolver));
         return new ProtoRestTargetBuilder(name, Services);
     }
 

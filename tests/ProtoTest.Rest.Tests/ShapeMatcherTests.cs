@@ -2,6 +2,7 @@ namespace ProtoTest.Rest.Tests;
 
 using NUnit.Framework;
 using ProtoTest.Core;
+using ProtoTest.Json;
 using ProtoTest.Rest.Exceptions;
 using ProtoTest.Rest.Matching;
 

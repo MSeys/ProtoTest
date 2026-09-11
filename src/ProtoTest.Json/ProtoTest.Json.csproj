@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>true</IsPackable>
+    <PackageId>ProtoTest.Json</PackageId>
+    <Description>Shared JSON shape matching and value constraints for ProtoTest integrations.</Description>
+    <PackageTags>testing;json;shape-matching;contract-testing;dotnet</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+  </ItemGroup>
+</Project>

@@ -23,6 +23,7 @@ If this is your first ProtoTest project:
 | --- | --- |
 | Write my first test | [Getting started](getting-started/first-test.md) |
 | Write REST tests | [REST integration](integrations/rest.md) |
+| Write GraphQL tests | [GraphQL integration](integrations/graphql.md) |
 | Test an ASP.NET Core application | [ASP.NET Core integration](integrations/aspnetcore.md) |
 | Measure REST endpoints against OpenAPI | [OpenAPI integration](integrations/openapi.md) |
 | Reuse setup and teardown | [Hooks](extending/hooks.md) |
@@ -90,6 +91,7 @@ You do not need to implement this lifecycle yourself. Select the adapter for you
 ### Implemented integrations
 
 - REST clients, authentication, JSON bodies, response matching, and REST coverage
+- GraphQL fluent operations, protocol assertions, and SDL field coverage
 - ASP.NET Core `WebApplicationFactory` clients and application-service access
 - OpenAPI endpoint, status-code, and response-property coverage
 

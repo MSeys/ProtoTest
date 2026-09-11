@@ -9,10 +9,15 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
         builder.Services.AddSingleton<SampleSaasStore>();
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddGraphQLServer()
+            .AddQueryType<SampleQuery>()
+            .AddMutationType<SampleMutation>();
 
         var app = builder.Build();
 
         app.MapGet("/health", () => Results.Ok(new { Status = "healthy" }));
+        app.MapGraphQL("/graphql");
 
         app.MapPost("/test-support/environments", (
             CreateEnvironmentRequest request,

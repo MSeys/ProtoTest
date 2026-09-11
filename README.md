@@ -1,4 +1,4 @@
-<img width="1266" height="619" alt="ProtoTest-Logo" src="https://github.com/user-attachments/assets/30232720-f77a-4a04-9c46-cd59c0845dcf" />
+<img width="1600" height="600" alt="ProtoTest blueprint logo banner" src="assets/brand/prototest-banner.svg" />
 
 > Integration testing made as simple, readable, and frictionless as prototyping.
 

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 700" role="img" aria-labelledby="title description">
+  <title id="title">ProtoTest transparent mark</title>
+  <desc id="description">A blue hatched P with shared T geometry and a completed check on a transparent background.</desc>
+  <defs>
+    <pattern id="glyph-hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(28)">
+      <path d="M0 0V9" stroke="#1677A6" stroke-width="2.2"/>
+    </pattern>
+    <marker id="dimension-arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse">
+      <path d="M0 4 8 0 6 4 8 8Z" fill="#79B5CF"/>
+    </marker>
+    <mask id="glyph-breaks">
+      <rect width="700" height="700" fill="white"/>
+      <rect x="174" y="345" width="78" height="9" fill="black"/>
+      <rect x="174" y="430" width="78" height="9" fill="black"/>
+    </mask>
+  </defs>
+  <g mask="url(#glyph-breaks)">
+    <path d="M174 112H333c112 0 181 61 181 158s-69 158-181 158h-81v151h-78V112Zm78 72v172h72c70 0 108-29 108-86s-38-86-108-86h-72Z" fill="url(#glyph-hatch)" fill-rule="evenodd" stroke="#1677A6" stroke-width="4"/>
+    <rect x="92" y="356" width="160" height="72" fill="white" fill-opacity="0"/>
+    <rect x="92" y="356" width="160" height="72" fill="url(#glyph-hatch)"/>
+    <path d="M252 356H92V428H252" fill="none" stroke="#1677A6" stroke-width="4"/>
+  </g>
+  <g fill="none" stroke="#79B5CF" stroke-width="2" opacity=".62">
+    <path d="M150 86V602M536 86V452M68 270H548M68 356H548M68 428H548" stroke-dasharray="6 6"/>
+    <circle cx="252" cy="270" r="86"/>
+    <path d="M174 78H514M550 112V428M92 458H252" marker-start="url(#dimension-arrow)" marker-end="url(#dimension-arrow)"/>
+    <path d="M174 66V90M514 66V90M538 112H562M538 428H562M92 446V470M252 446V470"/>
+    <path d="M252 270 313 209" marker-end="url(#dimension-arrow)"/>
+  </g>
+  <path d="m314 470 62 63 166-184" fill="none" stroke="#0B5278" stroke-linecap="square" stroke-linejoin="miter" stroke-width="48"/>
+</svg>

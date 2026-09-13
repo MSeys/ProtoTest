@@ -70,7 +70,10 @@ assertion separate when errors or extensions are the subject of the test:
 
 ```csharp
 using var response = await Proto.Context.GraphQL()
-    .Mutation("createOrder", new { input = command })
+    .Mutation("createOrder", new
+    {
+        input = Gql.Variable("CreateOrderInput!", command)
+    })
     .Select(new { id = Gql.Field, status = Gql.Field })
     .ExecuteAsync();
 
@@ -92,6 +95,45 @@ using var response = await Proto.Context.GraphQL()
 var product = response.ReadDataAs<ProductResult>();
 ```
 
+## Variables and uploads
+
+`Gql.Variable` keeps complex values out of the generated document while retaining an
+explicit GraphQL type. The value can be an anonymous object or a test-owned contract:
+
+```csharp
+using var response = await Proto.Context.GraphQL()
+    .Mutation("createOrder", new
+    {
+        input = Gql.Variable("CreateOrderInput!", new
+        {
+            product = "notebook",
+            quantity = 2,
+            unitPrice = 12.50m
+        })
+    })
+    .ExpectAsync(new { id = JsonValue.NotNull(), status = "pending" });
+```
+
+A direct upload is even shorter. ProtoTest generates the `Upload!` variable, multipart
+map, and GraphQL preflight header automatically:
+
+```csharp
+using var response = await Proto.Context.GraphQL()
+    .Mutation("uploadDocument", new
+    {
+        file = Gql.Upload(bytes, "example.txt", "text/plain")
+    })
+    .ExpectAsync(new
+    {
+        fileName = "example.txt",
+        length = JsonValue.GreaterThan(0)
+    });
+```
+
+Use the `Func<Stream>` overload for large or lazily opened files. Uploads nested inside
+input objects or lists remain possible by wrapping that complete value in
+`Gql.Variable(...)`. Raw documents can use `.Variables(...)` with `Gql.Upload(...)` too.
+
 ## Advanced operations
 
 The detailed fluent builder remains available for aliases, multiple root fields,
@@ -110,6 +152,53 @@ Proto.Context.GraphQL()
 `Connection`, `Where`, `OrderBy`, `Nodes`, and `PageInfo` follow common Hot Chocolate
 and Relay conventions. `Request` accepts a raw GraphQL document as the final escape
 hatch.
+
+## Subscriptions
+
+Subscriptions use the modern `graphql-transport-ws` WebSocket protocol by default.
+Opening the stream is deliberately separate from reading its results:
+
+```csharp
+var expected = new
+{
+    id = JsonValue.GreaterThan(0),
+    status = "pending"
+};
+
+await using var subscription = await Proto.Context.GraphQL()
+    .Subscription("orderCreated")
+    .Select(expected)
+    .SubscribeAsync();
+
+// Trigger the event through the system under test.
+
+using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+using var message = await subscription.ExpectNextAsync(expected, timeout.Token);
+message.ShouldHaveNoErrors();
+```
+
+Use `NextAsync` when each event has different expectations, or consume the subscription
+with `await foreach` for a continuous stream. Disposal closes the transport stream, and every
+received result participates independently in assertions, attachments, observations,
+and SDL coverage. Authentication, headers, variables, raw documents, and the detailed
+selection builder work the same way as for queries and mutations.
+
+Select SSE explicitly when the server or test host exposes subscriptions over HTTP:
+
+```csharp
+graphQL.AddClient("Catalog", "https://localhost:5001/graphql")
+    .WithSubscriptionTransport(GraphQLSubscriptionTransport.Sse);
+```
+
+The same choice is available through the canonical configuration key
+`ProtoTest:Clients:Catalog:GraphQL:SubscriptionTransport`, with `WebSocket` and `Sse` as
+the only accepted values. `IGraphQLWebSocketFactory` is the extension point for custom
+hosts such as ASP.NET Core `TestServer`; normal network clients use `ClientWebSocket`.
+Use `ConnectionPayload(...)` when a server expects authentication or other metadata in
+the `connection_init` payload instead of handshake headers.
+
+HTTP batching, persisted operations, and incremental `@defer`/`@stream` responses
+remain separate future features.
 
 ## Assert the response
 

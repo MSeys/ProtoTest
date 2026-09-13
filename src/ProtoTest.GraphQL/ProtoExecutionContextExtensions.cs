@@ -4,6 +4,7 @@ using ProtoTest.Core;
 using ProtoTest.Http;
 using ProtoTest.GraphQL.Internal;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 
 public static class ProtoExecutionContextExtensions
 {
@@ -19,6 +20,12 @@ public static class ProtoExecutionContextExtensions
                 && string.Equals(item.ClientName, selectedName, StringComparison.OrdinalIgnoreCase));
         var client = context.Client<HttpClient>(alias?.SourceClientName ?? selectedName);
         var authenticatorFactory = context.TryContext<GraphQLContextState>()?.AuthenticatorFactory;
+        var transportRegistration = context.Services.GetServices<GraphQLSubscriptionTransportRegistration>()
+            .LastOrDefault(item => string.Equals(item.TargetName, selectedName, StringComparison.OrdinalIgnoreCase));
+        var configuredTransport = context.Services.GetService<IConfiguration>()?
+            [$"ProtoTest:Clients:{selectedName}:GraphQL:SubscriptionTransport"];
+        var subscriptionTransport = transportRegistration?.Transport
+            ?? ParseSubscriptionTransport(configuredTransport, selectedName);
         context.Trace.WriteEvent(
             "graphql.builder.create",
             $"GraphQL builder · {selectedName}",
@@ -33,6 +40,17 @@ public static class ProtoExecutionContextExtensions
             });
         return new GraphQLRequestBuilder(client, context, selectedName)
             .UseAuthenticatorFactory(authenticatorFactory)
-            .UseBaseAddressResolver(alias?.ResolveEndpointAsync ?? registration?.ResolveAsync);
+            .UseBaseAddressResolver(alias?.ResolveEndpointAsync ?? registration?.ResolveAsync)
+            .UseSubscriptionTransport(subscriptionTransport);
+    }
+
+    private static GraphQLSubscriptionTransport ParseSubscriptionTransport(string? value, string clientName)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return GraphQLSubscriptionTransport.WebSocket;
+        if (Enum.TryParse<GraphQLSubscriptionTransport>(value, ignoreCase: true, out var transport)
+            && Enum.IsDefined(transport))
+            return transport;
+        throw new InvalidOperationException(
+            $"GraphQL subscription transport '{value}' for client '{clientName}' is invalid. Use 'WebSocket' or 'Sse'.");
     }
 }

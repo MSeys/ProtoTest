@@ -12,10 +12,14 @@ public class Program
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddGraphQLServer()
             .AddQueryType<SampleQuery>()
-            .AddMutationType<SampleMutation>();
+            .AddMutationType<SampleMutation>()
+            .AddSubscriptionType<SampleSubscription>()
+            .AddInMemorySubscriptions()
+            .AddUploadType();
 
         var app = builder.Build();
 
+        app.UseWebSockets();
         app.MapGet("/health", () => Results.Ok(new { Status = "healthy" }));
         app.MapGraphQL("/graphql");
 

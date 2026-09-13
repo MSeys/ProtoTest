@@ -26,7 +26,11 @@ public sealed class Setup : ProtoTestAssembly
                     [$"ProtoTest:Clients:{SampleAppTargets.Api}:OpenApi:Specification"] = Path.Combine(
                         AppContext.BaseDirectory, "control-plane.openapi.json")
                 }))
-            .ConfigureServices(services => services.AddSingleton<IProtoClientInitializer, ScenarioProbeInitializer>())
+            .ConfigureServices(services =>
+            {
+                services.AddSingleton<IProtoClientInitializer, ScenarioProbeInitializer>();
+                services.AddSingleton<IGraphQLWebSocketFactory, SampleAppGraphQLWebSocketFactory>();
+            })
             .AddTestHook<SaasScenarioHook>()
             .AddRest(rest => rest
                 .AddClient(SampleAppTargets.Api)
@@ -34,7 +38,9 @@ public sealed class Setup : ProtoTestAssembly
                 .WithCollector<OpenApiCoverageCollector>())
             .AddAspNetCoreServer<Program>(SampleAppTargets.Api)
             .AddGraphQL(graphQL => graphQL
+                .CaptureAttachments()
                 .AddClientFrom(SampleAppTargets.GraphQL, SampleAppTargets.Api)
+                .WithSubscriptionTransport(GraphQLSubscriptionTransport.WebSocket)
                 .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "control-plane.graphql")))
             .AddSink<JsonReportSink>(sink => sink.OutputPath = Path.Combine(
                 "TestResults", "ProtoTest.Demo", "report.json"))

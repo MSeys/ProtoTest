@@ -16,6 +16,7 @@ public static class ProtoHostBuilderExtensions
         builder.ConfigureServices(services =>
         {
             services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, GraphQLLifecycleHook>());
+            services.TryAddSingleton<IGraphQLWebSocketFactory, ClientGraphQLWebSocketFactory>();
             services.TryAddSingleton(sp =>
             {
                 var options = new GraphQLResponseOptions();

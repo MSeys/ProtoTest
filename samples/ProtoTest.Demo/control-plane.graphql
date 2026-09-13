@@ -1,4 +1,5 @@
 scalar Decimal
+scalar Upload
 
 type Query {
   apiInfo: ApiInfo!
@@ -8,10 +9,15 @@ type Query {
   controlPlane: ControlPlaneResponse!
 }
 
-type Mutation { createOrder(input: CreateOrderInput!): OrderResponse! }
+type Mutation {
+  createOrder(input: CreateOrderInput!): OrderResponse!
+  uploadDocument(file: Upload!): UploadReceipt!
+}
+type Subscription { orderCreated: OrderResponse! }
 type ApiInfo { name: String! version: String! }
 type UserResponse { id: String! tenant: String! email: String! role: String! accessToken: String! }
 type OrderResponse { id: Int! tenant: String! product: String! quantity: Int! total: Decimal! status: String! }
+type UploadReceipt { fileName: String! contentType: String! length: Long! }
 type WorkspaceResponse { id: String! tenant: String! name: String! region: String! plan: String! }
 type ControlPlaneResponse { tenant: String! userCount: Int! workspaceCount: Int! releaseCount: Int! openInvoiceCount: Int! monthlyRecurringRevenue: Decimal! }
 type OrderConnection { nodes: [OrderResponse!]! pageInfo: PageInfo! totalCount: Int! }

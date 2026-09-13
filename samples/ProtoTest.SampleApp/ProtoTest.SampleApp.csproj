@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <PackageReference Include="HotChocolate.AspNetCore" Version="16.6.3" />
+    <PackageReference Include="HotChocolate.Subscriptions.InMemory" Version="16.6.3" />
     <ProjectReference Include="..\ProtoTest.SampleApp.Contracts\ProtoTest.SampleApp.Contracts.csproj" />
   </ItemGroup>
 

@@ -1,6 +1,7 @@
 namespace ProtoTest.GraphQL.Tests;
 
 using System.Net;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -74,8 +75,10 @@ public sealed class GraphQLShapeDrivenApiTests
     public async Task Mutation_ShouldAcceptAnonymousInputAndInferExpectedSelection()
     {
         string? document = null;
+        string? requestBody = null;
         await using var host = CreateHost(request =>
         {
+            requestBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
             document = Document(request);
             return Json("""{"data":{"createOrder":{"id":7,"product":"notebook"}}}""");
         });
@@ -83,11 +86,97 @@ public sealed class GraphQLShapeDrivenApiTests
         try
         {
             using var response = await Proto.Context.GraphQL()
-                .Mutation("createOrder", new { input = new RenamedInput("notebook", 2) })
+                .Mutation("createOrder", new
+                {
+                    input = Gql.Variable("CreateOrderInput!", new RenamedInput("notebook", 2))
+                })
                 .ExpectAsync(new { id = JsonValue.GreaterThan(0), product = "notebook" });
 
-            Assert.That(document, Does.Contain("mutation CreateOrder {"));
-            Assert.That(document, Does.Contain("createOrder(input: {product: \"notebook\", quantity: 2})"));
+            Assert.That(document, Does.Contain("mutation CreateOrder($input: CreateOrderInput!)"));
+            Assert.That(document, Does.Contain("createOrder(input: $input)"));
+            using var envelope = JsonDocument.Parse(requestBody!);
+            Assert.That(envelope.RootElement.GetProperty("variables").GetProperty("input")
+                .GetProperty("product").GetString(), Is.EqualTo("notebook"));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task Upload_ShouldUseMultipartVariablesAndAddHotChocolatePreflightHeader()
+    {
+        string? body = null;
+        MediaTypeHeaderValue? contentType = null;
+        bool hasPreflight = false;
+        await using var host = CreateHost(request =>
+        {
+            contentType = request.Content!.Headers.ContentType;
+            hasPreflight = request.Headers.TryGetValues("GraphQL-preflight", out var values)
+                && values.Single() == "1";
+            body = request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            return Json("""{"data":{"uploadDocument":{"fileName":"example.txt"}}}""");
+        });
+        await host.StartTestAsync("upload", "4", Method());
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Mutation("uploadDocument", new
+                {
+                    file = Gql.Upload("contents"u8.ToArray(), "example.txt", "text/plain")
+                })
+                .ExpectAsync(new { fileName = "example.txt" });
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(contentType?.MediaType, Is.EqualTo("multipart/form-data"));
+                Assert.That(hasPreflight, Is.True);
+                Assert.That(body, Does.Contain("$file: Upload!"));
+                Assert.That(body, Does.Contain("variables.file"));
+                Assert.That(body, Does.Contain("example.txt"));
+                Assert.That(body, Does.Contain("contents"));
+            });
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task Upload_ShouldMapFilesNestedInsideExplicitVariables()
+    {
+        string? body = null;
+        await using var host = CreateHost(request =>
+        {
+            body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return Json("""{"data":{"importDocuments":2}}""");
+        });
+        await host.StartTestAsync("nested-upload", "5", Method());
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Request("""
+                    mutation ImportDocuments($input: DocumentImportInput!) {
+                      importDocuments(input: $input)
+                    }
+                    """)
+                .Variables(new
+                {
+                    input = new
+                    {
+                        files = new[]
+                        {
+                            Gql.Upload("one"u8.ToArray(), "one.txt", "text/plain"),
+                            Gql.Upload("two"u8.ToArray(), "two.txt", "text/plain")
+                        }
+                    }
+                })
+                .ExecuteAsync();
+
+            response.ShouldHaveNoErrors();
+            Assert.Multiple(() =>
+            {
+                Assert.That(body, Does.Contain("variables.input.files.0"));
+                Assert.That(body, Does.Contain("variables.input.files.1"));
+                Assert.That(body, Does.Contain("one.txt"));
+                Assert.That(body, Does.Contain("two.txt"));
+            });
         }
         finally { await host.CompleteTestAsync(); }
     }
@@ -101,7 +190,7 @@ public sealed class GraphQLShapeDrivenApiTests
             document = Document(request);
             return Json("""{"data":{"orders":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}""");
         });
-        await host.StartTestAsync("typed", "4", Method());
+        await host.StartTestAsync("typed", "6", Method());
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -134,7 +223,7 @@ public sealed class GraphQLShapeDrivenApiTests
             document = Document(request);
             return Json("""{"data":{"viewer":{"displayName":"Ada"}}}""");
         });
-        await host.StartTestAsync("markers", "5", Method());
+        await host.StartTestAsync("markers", "7", Method());
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -157,7 +246,7 @@ public sealed class GraphQLShapeDrivenApiTests
     public async Task Select_ShouldExplainWhenNoShapeDrivenOperationWasStarted()
     {
         await using var host = CreateHost(_ => Json("""{"data":{"id":1}}"""));
-        await host.StartTestAsync("invalid-shape", "6", Method());
+        await host.StartTestAsync("invalid-shape", "8", Method());
         try
         {
             Assert.That(() => Proto.Context.GraphQL().Select(new { id = Gql.Field }),

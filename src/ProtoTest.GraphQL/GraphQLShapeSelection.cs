@@ -10,11 +10,32 @@ internal static class GraphQLShapeSelection
 {
     private static readonly JsonSerializerOptions Naming = new(JsonSerializerDefaults.Web);
 
-    public static void AddArguments(GraphQLFieldBuilder field, object? arguments)
+    public static void AddArguments(
+        GraphQLOperationBuilder operation,
+        GraphQLFieldBuilder field,
+        object? arguments,
+        IDictionary<string, object?> variables)
     {
         if (arguments is null) return;
         foreach (var (name, value, _) in Properties(arguments, arguments.GetType()))
-            field.Argument(name, value);
+        {
+            if (value is GraphQLVariableValue variable)
+            {
+                operation.Variable(name, variable.Type);
+                field.Argument(name, Gql.Var(name));
+                variables[name] = variable.Value;
+            }
+            else if (value is GraphQLUpload upload)
+            {
+                operation.Variable(name, GqlType.Upload.NonNull());
+                field.Argument(name, Gql.Var(name));
+                variables[name] = upload;
+            }
+            else
+            {
+                field.Argument(name, value);
+            }
+        }
     }
 
     public static void Apply(GraphQLFieldBuilder field, object? shape, Type declaredType)

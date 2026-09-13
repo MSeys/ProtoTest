@@ -59,9 +59,44 @@ public async Task FindsProducts()
 ```
 
 Anonymous objects or test-owned contract types drive the selection, while arguments
-remain ordinary objects. Use the detailed `Field`, `Argument`, connection and variable
-builders for advanced operations. `Request` accepts a raw GraphQL document as the final
-escape hatch.
+remain ordinary objects. Use `Gql.Variable("InputType!", value)` for safe typed variables.
+Direct file uploads stay compact:
+
+```csharp
+using var response = await Proto.Context.GraphQL()
+    .Mutation("uploadDocument", new
+    {
+        file = Gql.Upload(bytes, "example.txt", "text/plain")
+    })
+    .ExpectAsync(new { fileName = "example.txt", length = JsonValue.GreaterThan(0) });
+```
+
+ProtoTest creates the multipart map and preflight header automatically. Uploads also
+work inside explicitly typed variables and with raw documents. Use the detailed
+`Field`, `Argument`, connection and variable builders for advanced operations.
+`Request` accepts a raw GraphQL document as the final escape hatch.
+
+Subscriptions use `graphql-transport-ws` by default and return a separately owned stream:
+
+```csharp
+await using var subscription = await Proto.Context.GraphQL()
+    .Subscription("orderCreated")
+    .Select(new { id = Gql.Field, status = Gql.Field })
+    .SubscribeAsync();
+
+using var message = await subscription.ExpectNextAsync(expected, cancellationToken);
+message.ShouldHaveNoErrors();
+```
+
+`GraphQLSubscription` also supports `ExpectNextAsync` and `await foreach`. Each event is
+a normal `GraphQLResponse` and contributes its own observations, shape assertions,
+attachments, and schema coverage. Select
+`GraphQLSubscriptionTransport.Sse` with `WithSubscriptionTransport(...)` for HTTP-based
+streams. The appsettings equivalent is
+`ProtoTest:Clients:{name}:GraphQL:SubscriptionTransport`. Custom in-process hosts can
+provide `IGraphQLWebSocketFactory`, and `ConnectionPayload(...)` configures optional
+`connection_init` metadata. Batching, persisted operations, and incremental responses
+remain separate future features.
 
 Schema coverage parses SDL and reports every object/interface field, including fields
 that were not selected. Aliases are resolved to their schema field, and fragments and

@@ -1,6 +1,9 @@
 namespace ProtoTest.SampleApp;
 
 using HotChocolate;
+using HotChocolate.Execution;
+using HotChocolate.Subscriptions;
+using HotChocolate.Types;
 using ProtoTest.SampleApp.Contracts;
 
 public sealed class SampleQuery
@@ -31,17 +34,19 @@ public sealed class SampleQuery
             orders = sort.Total == SortDirection.Desc ? orders.OrderByDescending(item => item.Total)
                 : sort.Total == SortDirection.Asc ? orders.OrderBy(item => item.Total) : orders;
 
-        var materialized = orders.ToArray();
-        var offset = DecodeCursor(after) + 1;
-        if (before is not null) materialized = materialized.Take(Math.Max(0, DecodeCursor(before))).ToArray();
-        if (offset > 0) materialized = materialized.Skip(offset).ToArray();
-        if (first is not null) materialized = materialized.Take(first.Value).ToArray();
-        if (last is not null) materialized = materialized.TakeLast(last.Value).ToArray();
+        var filtered = orders.ToArray();
+        var start = Math.Clamp(DecodeCursor(after) + 1, 0, filtered.Length);
+        var end = before is null
+            ? filtered.Length
+            : Math.Clamp(DecodeCursor(before), start, filtered.Length);
+        if (first is not null) end = Math.Min(end, start + Math.Max(0, first.Value));
+        if (last is not null) start = Math.Max(start, end - Math.Max(0, last.Value));
+        var materialized = filtered[start..end];
         return new OrderConnection(
             materialized,
-            new PageInfo(false, offset > 0, materialized.Length == 0 ? null : EncodeCursor(offset),
-                materialized.Length == 0 ? null : EncodeCursor(offset + materialized.Length - 1)),
-            store.GetOrders(user.Tenant)?.Count ?? 0);
+            new PageInfo(end < filtered.Length, start > 0, materialized.Length == 0 ? null : EncodeCursor(start),
+                materialized.Length == 0 ? null : EncodeCursor(end - 1)),
+            filtered.Length);
     }
 
     public IReadOnlyCollection<WorkspaceResponse> Workspaces(
@@ -67,20 +72,55 @@ public sealed class SampleQuery
 
 public sealed class SampleMutation
 {
-    public OrderResponse CreateOrder(
+    public async Task<OrderResponse> CreateOrder(
         CreateOrderInput input,
         [Service] IHttpContextAccessor accessor,
-        [Service] SampleSaasStore store)
+        [Service] SampleSaasStore store,
+        [Service] ITopicEventSender eventSender,
+        CancellationToken cancellationToken)
     {
         var user = SampleGraphQLSecurity.RequireTenantUser(accessor.HttpContext, store);
         if (input.Quantity <= 0 || input.UnitPrice <= 0 || string.IsNullOrWhiteSpace(input.Product))
             throw SampleGraphQLSecurity.Error("The order is invalid.", "INVALID_ORDER");
-        return store.CreateOrder(user.Tenant, input.Product, input.Quantity, input.UnitPrice)!;
+        var order = store.CreateOrder(user.Tenant, input.Product, input.Quantity, input.UnitPrice)!;
+        await eventSender.SendAsync($"OrderCreated:{user.Tenant}", order, cancellationToken);
+        return order;
+    }
+
+    public async Task<UploadReceipt> UploadDocument(
+        IFile file,
+        [Service] IHttpContextAccessor accessor,
+        [Service] SampleSaasStore store,
+        CancellationToken cancellationToken)
+    {
+        _ = SampleGraphQLSecurity.RequireTenantUser(accessor.HttpContext, store);
+        await using var content = new MemoryStream();
+        await file.CopyToAsync(content, cancellationToken);
+        return new UploadReceipt(file.Name, file.ContentType ?? "application/octet-stream", content.Length);
+    }
+}
+
+public sealed class SampleSubscription
+{
+    [Subscribe(With = nameof(SubscribeToOrderCreated))]
+    public OrderResponse OrderCreated([EventMessage] OrderResponse order) => order;
+
+    public async ValueTask<ISourceStream<OrderResponse>> SubscribeToOrderCreated(
+        [Service] IHttpContextAccessor accessor,
+        [Service] SampleSaasStore store,
+        [Service] ITopicEventReceiver eventReceiver,
+        CancellationToken cancellationToken)
+    {
+        var user = SampleGraphQLSecurity.RequireTenantUser(accessor.HttpContext, store);
+        return await eventReceiver.SubscribeAsync<OrderResponse>(
+            $"OrderCreated:{user.Tenant}",
+            cancellationToken);
     }
 }
 
 public sealed record ApiInfo(string Name, string Version);
 public sealed record CreateOrderInput(string Product, int Quantity, decimal UnitPrice);
+public sealed record UploadReceipt(string FileName, string ContentType, long Length);
 public sealed record OrderConnection(IReadOnlyList<OrderResponse> Nodes, PageInfo PageInfo, int TotalCount);
 public sealed record PageInfo(bool HasNextPage, bool HasPreviousPage, string? StartCursor, string? EndCursor);
 public sealed record OrderFilterInput(StringFilterInput? Product, DecimalFilterInput? Total);

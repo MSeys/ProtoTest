@@ -109,6 +109,15 @@ internal sealed class ProtoGraphQLTargetBuilder(string targetName, IServiceColle
 
 public static class ProtoGraphQLTargetBuilderExtensions
 {
+    public static IProtoTargetBuilder WithSubscriptionTransport(
+        this IProtoTargetBuilder target,
+        GraphQLSubscriptionTransport transport)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        target.Services.AddSingleton(new GraphQLSubscriptionTransportRegistration(target.TargetName, transport));
+        return target;
+    }
+
     public static IProtoTargetBuilder WithSchemaCoverage(this IProtoTargetBuilder target)
     {
         ArgumentNullException.ThrowIfNull(target);

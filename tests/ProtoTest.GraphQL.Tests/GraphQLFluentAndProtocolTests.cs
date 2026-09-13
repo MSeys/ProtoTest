@@ -163,11 +163,107 @@ public sealed class GraphQLFluentAndProtocolTests
         finally { await host.CompleteTestAsync(); }
     }
 
+    [Test]
+    public async Task Subscription_ShouldReadSseEventsAndReuseShapeAssertionsAndCoverageObservations()
+    {
+        string? accept = null;
+        string? document = null;
+        await using var host = CreateHost(request =>
+        {
+            accept = request.Headers.Accept.Single().MediaType;
+            document = ReadDocument(request);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """
+                    event: next
+                    data: {"data":{"orderCreated":{"id":42,"status":"pending"}}}
+
+                    event: complete
+                    data:
+
+                    """,
+                    System.Text.Encoding.UTF8,
+                    "text/event-stream")
+            };
+        });
+        await host.StartTestAsync("subscription", "7", Method());
+        try
+        {
+            await using var subscription = await Proto.Context.GraphQL()
+                .Subscription("orderCreated")
+                .Select(new { id = Gql.Field, status = Gql.Field })
+                .SubscribeAsync();
+
+            using var message = await subscription.NextAsync();
+            message!.ShouldHaveNoErrors().ShouldMatchData(new { id = 42, status = "pending" });
+            Assert.That(await subscription.NextAsync(), Is.Null);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(accept, Is.EqualTo("text/event-stream"));
+                Assert.That(document, Does.Contain("subscription OrderCreated"));
+                Assert.That(subscription.IsCompleted, Is.True);
+                Assert.That(Proto.Context.RecordedObservations
+                    .Where(item => item.Kind == "graphql.response")
+                    .Select(item => ((GraphQLResponseData)item.Data!).OperationType),
+                    Does.Contain("subscription"));
+            });
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task ExecuteAsync_ShouldDirectSubscriptionsToStreamingApi()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"value":1}}"""));
+        await host.StartTestAsync("subscription-api", "8", Method());
+        try
+        {
+            var exception = Assert.ThrowsAsync<InvalidOperationException>(() => Proto.Context.GraphQL()
+                .Subscription("value")
+                .Select(new { id = Gql.Field })
+                .ExecuteAsync());
+            Assert.That(exception!.Message, Does.Contain("SubscribeAsync"));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task Subscription_ShouldExposeProtocolErrorEventsAsGraphQLResponses()
+    {
+        await using var host = CreateHost(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                """
+                event: error
+                data: [{"message":"Subscription denied","extensions":{"code":"FORBIDDEN"}}]
+
+                """,
+                System.Text.Encoding.UTF8,
+                "text/event-stream")
+        });
+        await host.StartTestAsync("subscription-error", "9", Method());
+        try
+        {
+            await using var subscription = await Proto.Context.GraphQL()
+                .Subscription("restricted")
+                .Select(new { id = Gql.Field })
+                .SubscribeAsync();
+            using var message = await subscription.NextAsync();
+
+            message!.ShouldHaveErrors().ShouldHaveError("FORBIDDEN");
+            Assert.That(subscription.IsCompleted, Is.True);
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
     private static ProtoHost CreateHost(Func<HttpRequestMessage, HttpResponseMessage> response)
     {
         var builder = new ProtoHostBuilder();
         builder.AddGraphQL(graphQL => graphQL.AddClient("Default", "https://example.test/graphql", http =>
-            http.ConfigurePrimaryHttpMessageHandler(() => new StubHandler(response))));
+            http.ConfigurePrimaryHttpMessageHandler(() => new StubHandler(response)))
+            .WithSubscriptionTransport(GraphQLSubscriptionTransport.Sse));
         return builder.Build();
     }
 

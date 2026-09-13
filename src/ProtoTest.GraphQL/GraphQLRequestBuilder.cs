@@ -2,8 +2,9 @@ namespace ProtoTest.GraphQL;
 
 using System.Diagnostics;
 using System.Net.Http.Headers;
-using System.Text;
+using System.Net.WebSockets;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Http;
 using ProtoTest.GraphQL.Internal;
@@ -12,7 +13,6 @@ using ProtoTest.Json;
 public sealed class GraphQLRequestBuilder
 {
     private static readonly MediaTypeWithQualityHeaderValue GraphQLMediaType = new("application/graphql-response+json");
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _client;
     private readonly ProtoExecutionContext _context;
     private readonly string _targetName;
@@ -26,6 +26,8 @@ public sealed class GraphQLRequestBuilder
     private string? _simpleRootField;
     private object? _simpleArguments;
     private string? _simpleOperationName;
+    private GraphQLSubscriptionTransport _subscriptionTransport = GraphQLSubscriptionTransport.WebSocket;
+    private object? _connectionPayload;
 
     internal GraphQLRequestBuilder(HttpClient client, ProtoExecutionContext context, string targetName)
     {
@@ -40,6 +42,9 @@ public sealed class GraphQLRequestBuilder
     public GraphQLRequestBuilder Mutation(string? name, Action<GraphQLOperationBuilder> configure)
         => Operation("mutation", name, configure);
 
+    public GraphQLRequestBuilder Subscription(string? name, Action<GraphQLOperationBuilder> configure)
+        => Operation("subscription", name, configure);
+
     /// <summary>Starts a shape-driven query for one root field.</summary>
     public GraphQLRequestBuilder Query(string rootField, object? arguments = null, string? operationName = null)
         => SimpleOperation("query", rootField, arguments, operationName);
@@ -47,6 +52,10 @@ public sealed class GraphQLRequestBuilder
     /// <summary>Starts a shape-driven mutation for one root field.</summary>
     public GraphQLRequestBuilder Mutation(string rootField, object? arguments = null, string? operationName = null)
         => SimpleOperation("mutation", rootField, arguments, operationName);
+
+    /// <summary>Starts a shape-driven subscription for one root field.</summary>
+    public GraphQLRequestBuilder Subscription(string rootField, object? arguments = null, string? operationName = null)
+        => SimpleOperation("subscription", rootField, arguments, operationName);
 
     /// <summary>Derives the GraphQL selection set from an anonymous object or test-owned contract.</summary>
     public GraphQLRequestBuilder Select<TShape>(TShape selectionShape)
@@ -127,6 +136,17 @@ public sealed class GraphQLRequestBuilder
         return this;
     }
 
+    /// <summary>Sets the optional graphql-transport-ws connection_init payload.</summary>
+    public GraphQLRequestBuilder ConnectionPayload(object payload)
+    {
+        _connectionPayload = payload ?? throw new ArgumentNullException(nameof(payload));
+        TraceConfiguration(
+            "graphql.subscription.connection_payload.configure",
+            "GraphQL subscription connection payload configured",
+            new Dictionary<string, string?> { ["payload.type"] = payload.GetType().FullName });
+        return this;
+    }
+
     public GraphQLRequestBuilder Auth(IGraphQLAuthenticator authenticator)
     {
         _authenticator = authenticator ?? throw new ArgumentNullException(nameof(authenticator));
@@ -174,9 +194,17 @@ public sealed class GraphQLRequestBuilder
         return this;
     }
 
+    internal GraphQLRequestBuilder UseSubscriptionTransport(GraphQLSubscriptionTransport transport)
+    {
+        _subscriptionTransport = transport;
+        return this;
+    }
+
     public async Task<GraphQLResponse> ExecuteAsync(CancellationToken cancellationToken = default)
     {
         var operation = _operation ?? throw new InvalidOperationException("Configure a query, mutation, or request before executing it.");
+        if (operation.Type == "subscription")
+            throw new InvalidOperationException("Subscriptions return a stream. Use SubscribeAsync instead of ExecuteAsync.");
         var identifier = $"{operation.Type} {operation.Name ?? "<anonymous>"}";
         using var traceOperation = _context.Trace.StartOperation(
             "graphql.operation",
@@ -217,14 +245,12 @@ public sealed class GraphQLRequestBuilder
         request.Headers.Accept.Add(GraphQLMediaType);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json", 0.9));
         foreach (var header in _headers) request.Headers.TryAddWithoutValidation(header.Key, header.Value);
-        var requestEnvelope = JsonSerializer.Serialize(
-            new { query = operation.DocumentText, operationName = operation.Name, variables = _variables },
-            SerializerOptions);
-        var variablesJson = _variables is null ? null : JsonSerializer.Serialize(_variables, SerializerOptions);
-        request.Content = new StringContent(
-            requestEnvelope,
-            Encoding.UTF8,
-            "application/json");
+        var requestContent = GraphQLRequestContent.Create(operation.DocumentText, operation.Name, _variables);
+        var requestEnvelope = requestContent.DiagnosticJson;
+        var variablesJson = requestContent.VariablesJson;
+        request.Content = requestContent.Content;
+        if (requestContent.RequiresPreflight)
+            request.Headers.TryAddWithoutValidation("GraphQL-preflight", "1");
 
         var attachmentOptions = _context.TryService<GraphQLAttachmentOptions>();
         var requestNumber = attachmentOptions is null
@@ -326,6 +352,218 @@ public sealed class GraphQLRequestBuilder
         }
     }
 
+    public async Task<GraphQLSubscription> SubscribeAsync(CancellationToken cancellationToken = default)
+    {
+        var operation = _operation
+            ?? throw new InvalidOperationException("Configure a subscription before subscribing.");
+        if (operation.Type != "subscription")
+            throw new InvalidOperationException("SubscribeAsync requires a subscription operation.");
+
+        var identifier = $"subscription {operation.Name ?? "<anonymous>"}";
+        var stopwatch = Stopwatch.StartNew();
+        var endpoint = _baseAddressResolver is not null
+            ? await _baseAddressResolver(_context, cancellationToken)
+            : _client.BaseAddress ?? throw new InvalidOperationException($"GraphQL client '{_targetName}' has no endpoint.");
+        if (!endpoint.IsAbsoluteUri || endpoint.Scheme is not ("http" or "https"))
+            throw new InvalidOperationException("A per-test GraphQL endpoint must be an absolute HTTP or HTTPS URI.");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+        HttpResponseMessage? rawResponse = null;
+        WebSocket? rawSocket = null;
+        try
+        {
+            if (_subscriptionTransport == GraphQLSubscriptionTransport.Sse)
+                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+            foreach (var header in _headers) request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            var requestContent = GraphQLRequestContent.Create(operation.DocumentText, operation.Name, _variables);
+            request.Content = requestContent.Content;
+            if (requestContent.RequiresPreflight)
+                request.Headers.TryAddWithoutValidation("GraphQL-preflight", "1");
+
+            if (_authenticatorFactory is not null)
+            {
+                using var authOperation = _context.Trace.StartOperation(
+                    "auth.apply",
+                    "Apply GraphQL authentication",
+                    "ProtoTest.GraphQL",
+                    attributes: new Dictionary<string, string?> { ["client.name"] = _targetName });
+                try
+                {
+                    _authenticator ??= _authenticatorFactory(_context)
+                        ?? throw new InvalidOperationException("The GraphQL authenticator factory returned null.");
+                    authOperation.SetAttribute("auth.type", _authenticator.GetType().FullName);
+                    await _authenticator.AuthenticateAsync(
+                        new GraphQLAuthenticationContext(request, _context, _targetName), cancellationToken);
+                    authOperation.Succeed();
+                }
+                catch (Exception exception)
+                {
+                    authOperation.Fail(exception);
+                    throw;
+                }
+            }
+            else
+            {
+                _context.Trace.WriteEvent(
+                    "auth.skip",
+                    "Authentication · None",
+                    "ProtoTest.GraphQL",
+                    outcome: ProtoTraceOutcome.Succeeded,
+                    attributes: new Dictionary<string, string?> { ["client.name"] = _targetName });
+            }
+
+            var attachmentOptions = _context.TryService<GraphQLAttachmentOptions>();
+            var requestNumber = attachmentOptions is null
+                ? (int?)null
+                : (_context.TryContext<GraphQLContextState>()
+                    ?? throw new InvalidOperationException("GraphQL context state was not initialized.")).NextRequestNumber();
+            var attachmentPrefix = requestNumber is null ? null : $"graphql-{requestNumber:00}";
+            if (attachmentOptions?.CaptureRequestBodies == true)
+                _context.AddAttachment(
+                    $"{attachmentPrefix}-request",
+                    JsonDiagnosticSanitizer.Sanitize(requestContent.DiagnosticJson, attachmentOptions),
+                    "application/json",
+                    identifier);
+
+            var variablesJson = requestContent.VariablesJson is null
+                ? null
+                : JsonDiagnosticSanitizer.Sanitize(
+                    requestContent.VariablesJson,
+                    attachmentOptions,
+                    truncate: false);
+
+            if (_subscriptionTransport == GraphQLSubscriptionTransport.WebSocket)
+            {
+                var webSocketEndpoint = ToWebSocketUri(endpoint);
+                var headers = request.Headers.ToDictionary(
+                    header => header.Key,
+                    header => string.Join(", ", header.Value),
+                    StringComparer.OrdinalIgnoreCase);
+                rawSocket = await _context.Services.GetRequiredService<IGraphQLWebSocketFactory>()
+                    .ConnectAsync(webSocketEndpoint, headers, cancellationToken);
+                await GraphQLWebSocketProtocol.SendAsync(
+                    rawSocket,
+                    new { type = "connection_init", payload = _connectionPayload },
+                    cancellationToken);
+                await AwaitConnectionAcknowledgementAsync(rawSocket, cancellationToken);
+                using var envelope = JsonDocument.Parse(requestContent.DiagnosticJson);
+                await GraphQLWebSocketProtocol.SendAsync(
+                    rawSocket,
+                    new
+                    {
+                        id = "1",
+                        type = "subscribe",
+                        payload = envelope.RootElement.Clone()
+                    },
+                    cancellationToken);
+                request.Dispose();
+                TraceSubscriptionStarted(operation, "websocket", null);
+                var webSocketSubscription = new GraphQLSubscription(
+                    rawSocket,
+                    _context.TryService<GraphQLResponseOptions>()?.MaxResponseBodyBytes ?? 10 * 1024 * 1024,
+                    stopwatch,
+                    _context,
+                    _targetName,
+                    identifier,
+                    operation,
+                    attachmentOptions,
+                    attachmentPrefix,
+                    variablesJson,
+                    _simpleRootField);
+                rawSocket = null;
+                return webSocketSubscription;
+            }
+
+            rawResponse = await _client.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+            var stream = await rawResponse.Content.ReadAsStreamAsync(cancellationToken);
+            request.Dispose();
+            TraceSubscriptionStarted(operation, "sse", (int)rawResponse.StatusCode);
+            var subscription = new GraphQLSubscription(
+                rawResponse,
+                stream,
+                stopwatch,
+                _context,
+                _targetName,
+                identifier,
+                operation,
+                attachmentOptions,
+                attachmentPrefix,
+                variablesJson,
+                _simpleRootField);
+            rawResponse = null;
+            return subscription;
+        }
+        catch (Exception exception)
+        {
+            stopwatch.Stop();
+            request.Dispose();
+            rawResponse?.Dispose();
+            rawSocket?.Dispose();
+            TryRecordFailure(operation, identifier, stopwatch.Elapsed, exception);
+            throw;
+        }
+    }
+
+    private async Task AwaitConnectionAcknowledgementAsync(
+        WebSocket socket,
+        CancellationToken cancellationToken)
+    {
+        var maxBytes = _context.TryService<GraphQLResponseOptions>()?.MaxResponseBodyBytes ?? 10 * 1024 * 1024;
+        while (true)
+        {
+            var message = await GraphQLWebSocketProtocol.ReceiveAsync(socket, maxBytes, cancellationToken)
+                ?? throw new GraphQLProtocolException(
+                    "The GraphQL WebSocket closed before acknowledging the connection.",
+                    string.Empty);
+            using var document = JsonDocument.Parse(message);
+            var root = document.RootElement;
+            var type = root.TryGetProperty("type", out var typeNode) ? typeNode.GetString() : null;
+            if (type == "connection_ack") return;
+            if (type == "ping")
+            {
+                await GraphQLWebSocketProtocol.SendAsync(socket, new { type = "pong" }, cancellationToken);
+                continue;
+            }
+            if (type is "connection_error" or "error")
+                throw new GraphQLProtocolException(
+                    "The GraphQL WebSocket rejected the connection.",
+                    JsonDiagnosticSanitizer.Sanitize(message, _context.TryService<GraphQLAttachmentOptions>()));
+            throw new GraphQLProtocolException(
+                $"Expected a GraphQL WebSocket 'connection_ack' message, but received '{type ?? "<missing>"}'.",
+                JsonDiagnosticSanitizer.Sanitize(message, _context.TryService<GraphQLAttachmentOptions>()));
+        }
+    }
+
+    private void TraceSubscriptionStarted(GraphQLBuiltOperation operation, string transport, int? statusCode)
+    {
+        var attributes = new Dictionary<string, string?>
+        {
+            ["client.name"] = _targetName,
+            ["graphql.operation.name"] = operation.Name,
+            ["graphql.transport"] = transport
+        };
+        if (statusCode is not null) attributes["http.response.status_code"] = statusCode.Value.ToString();
+        _context.Trace.WriteEvent(
+            "graphql.subscription.start",
+            $"GraphQL subscription · {operation.Name ?? "<anonymous>"}",
+            "ProtoTest.GraphQL",
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: attributes);
+    }
+
+    private static Uri ToWebSocketUri(Uri endpoint)
+    {
+        var builder = new UriBuilder(endpoint)
+        {
+            Scheme = endpoint.Scheme == Uri.UriSchemeHttps ? "wss" : "ws"
+        };
+        if (endpoint.IsDefaultPort) builder.Port = -1;
+        return builder.Uri;
+    }
+
     private GraphQLRequestBuilder Operation(string type, string? name, Action<GraphQLOperationBuilder> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
@@ -362,12 +600,14 @@ public sealed class GraphQLRequestBuilder
             ?? throw new InvalidOperationException("Select is available after a shape-driven Query or Mutation.");
         var rootField = _simpleRootField!;
         var operation = new GraphQLOperationBuilder(type, _simpleOperationName);
+        var variables = new Dictionary<string, object?>(StringComparer.Ordinal);
         operation.Field(rootField, field =>
         {
-            GraphQLShapeSelection.AddArguments(field, _simpleArguments);
+            GraphQLShapeSelection.AddArguments(operation, field, _simpleArguments, variables);
             GraphQLShapeSelection.Apply(field, shape, shapeType);
         });
         _operation = operation.Build();
+        _variables = variables.Count == 0 ? null : variables;
         TraceConfiguration("graphql.operation.configure", $"Configure · {type} {_simpleOperationName ?? "<anonymous>"}",
             new Dictionary<string, string?>
             {

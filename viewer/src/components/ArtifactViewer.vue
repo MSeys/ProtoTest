@@ -72,7 +72,8 @@ onBeforeUnmount(releaseArtifactUrl);
     <img v-else-if="artifactUrl && artifact.mediaType.startsWith('image/')" :src="artifactUrl" :alt="artifact.name" class="artifact-image">
     <video v-else-if="artifactUrl && artifact.mediaType.startsWith('video/')" :src="artifactUrl" class="artifact-media" controls />
     <audio v-else-if="artifactUrl && artifact.mediaType.startsWith('audio/')" :src="artifactUrl" class="artifact-audio" controls />
-    <iframe v-else-if="artifactUrl && (artifact.mediaType === 'application/pdf' || artifact.mediaType === 'text/html')" :src="artifactUrl" :title="artifact.name" class="artifact-frame" sandbox="" />
+    <iframe v-else-if="artifactUrl && artifact.mediaType === 'application/pdf'" :src="artifactUrl" :title="artifact.name" class="artifact-frame" sandbox="" />
+    <iframe v-else-if="artifactUrl && artifact.mediaType === 'text/html'" :src="artifactUrl" :title="artifact.name" class="artifact-frame" sandbox="allow-scripts" />
     <pre v-else-if="formattedJson" class="artifact-text artifact-json"><code>{{ formattedJson }}</code></pre>
     <pre v-else-if="artifactText" class="artifact-text">{{ artifactText }}</pre>
     <div v-else class="inspector-empty">Preview is not available for {{ artifact.mediaType }}. Download the bundled file to inspect it.</div>

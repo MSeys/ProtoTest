@@ -73,7 +73,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--blueprint);
   border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(14px);
 }
 .brand, .top-actions { display: flex; align-items: center; gap: 10px; }
-.brand img { width: 36px; height: 36px; object-fit: contain; }
+.brand img { width: 36px; height: 36px; display: block; object-fit: contain; }
 .brand > span { display: flex; flex-direction: column; line-height: 1.15; }
 .brand strong { font-size: 14px; letter-spacing: .02em; }
 .brand small, .eyebrow, .drawing-label { color: var(--dim); font-size: 9px; letter-spacing: .13em; text-transform: uppercase; }

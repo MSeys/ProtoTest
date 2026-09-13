@@ -89,4 +89,4 @@ var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
 ## Runnable example
 
-See the [ASP.NET Core demo](../examples/aspnetcore-demo.md) for a runnable application covering service replacement, REST assertions, success and error responses, and scoped application DI.
+See the [unified control-plane demo](../examples/sample-app.md) for a runnable ASP.NET Core application exercised concurrently through REST and GraphQL.

@@ -11,7 +11,25 @@ internal sealed class CompositeRestAuthenticator(IEnumerable<IRestAuthenticator>
     {
         foreach (var authenticator in _authenticators)
         {
-            await authenticator.AuthenticateAsync(context, cancellationToken);
+            using var operation = context.Test.Trace.StartOperation(
+                "auth.handler.apply",
+                $"Apply · {authenticator.GetType().Name}",
+                "ProtoTest.Rest",
+                attributes: new Dictionary<string, string?>
+                {
+                    ["auth.type"] = authenticator.GetType().FullName,
+                    ["client.name"] = context.ClientName
+                });
+            try
+            {
+                await authenticator.AuthenticateAsync(context, cancellationToken);
+                operation.Succeed();
+            }
+            catch (Exception exception)
+            {
+                operation.Fail(exception);
+                throw;
+            }
         }
     }
 }

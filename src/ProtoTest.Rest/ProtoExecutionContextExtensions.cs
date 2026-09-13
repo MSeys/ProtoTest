@@ -30,6 +30,18 @@ public static class ProtoExecutionContextExtensions
                 targetClientName,
                 StringComparison.OrdinalIgnoreCase));
 
+        context.Trace.WriteEvent(
+            "rest.builder.create",
+            $"REST builder · {targetClientName}",
+            "ProtoTest.Rest",
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: new Dictionary<string, string?>
+            {
+                ["client.name"] = targetClientName,
+                ["auth.configured"] = (authenticatorFactory is not null).ToString().ToLowerInvariant(),
+                ["endpoint.resolver"] = baseAddressRegistration is null ? "client" : "per-test"
+            });
+
         return new RestRequestBuilder(httpClient, context, targetClientName, defaultAuthenticator: null)
             .UseAuthenticatorFactory(authenticatorFactory)
             .UseBaseAddressResolver(baseAddressRegistration?.ResolveAsync);

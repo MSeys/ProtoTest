@@ -19,25 +19,62 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
 
         foreach (var group in groups)
         {
+            using var clientOperation = context.Trace.StartOperation(
+                "client.initialize",
+                $"Initialize · {group.Key.Name} ({group.Key.ClientType.Name})",
+                "ProtoTest.Core",
+                ProtoTracePhase.Setup,
+                attributes: new Dictionary<string, string?>
+                {
+                    ["client.name"] = group.Key.Name,
+                    ["client.type"] = group.Key.ClientType.FullName,
+                    ["initializer.count"] = group.Count().ToString()
+                });
             var initialized = false;
 
             // IEnumerable<T> service resolution preserves registration order, which lets
             // Configure determine provider precedence without integration-specific coupling.
             foreach (var initializer in group)
             {
-                if (await initializer.TryInitializeAsync(context))
+                using var attempt = context.Trace.StartOperation(
+                    "client.initializer.attempt",
+                    $"Try · {initializer.GetType().Name}",
+                    "ProtoTest.Core",
+                    ProtoTracePhase.Setup,
+                    new Dictionary<string, string?>
+                    {
+                        ["initializer.type"] = initializer.GetType().FullName
+                    });
+                try
                 {
-                    initialized = true;
-                    break;
+                    if (await initializer.TryInitializeAsync(context))
+                    {
+                        attempt.SetAttribute("selected", "true");
+                        attempt.Succeed();
+                        initialized = true;
+                        break;
+                    }
+                    attempt.SetAttribute("selected", "false");
+                    attempt.Succeed();
+                }
+                catch (Exception exception)
+                {
+                    attempt.Fail(exception);
+                    clientOperation.Fail(exception);
+                    throw;
                 }
             }
 
             if (!initialized)
             {
-                throw new InvalidOperationException(
+                var exception = new InvalidOperationException(
                     $"No registered initializer could create a client of type " +
                     $"'{group.Key.ClientType.Name}' with name '{group.Key.Name}'.");
+                clientOperation.Fail(exception);
+                throw exception;
             }
+
+            clientOperation.Succeed();
         }
     }
 

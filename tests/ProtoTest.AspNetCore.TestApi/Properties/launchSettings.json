@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "ProtoTest.AspNetCore.TestApi": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:52610;http://localhost:52611"
+    }
+  }
+}

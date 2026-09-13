@@ -481,4 +481,4 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
-!*ProtoTest.Coverage
+/assets/internal

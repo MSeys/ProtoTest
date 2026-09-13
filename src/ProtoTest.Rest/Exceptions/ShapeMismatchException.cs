@@ -16,11 +16,13 @@ public sealed record ShapeMismatch(string PropertyPath, string Reason, object? E
 public sealed class ShapeMismatchException : Core.ProtoAssertionException
 {
     public IReadOnlyList<ShapeMismatch> Mismatches { get; }
+    public IReadOnlyList<string> MatchedProperties { get; }
 
-    public ShapeMismatchException(IReadOnlyList<ShapeMismatch> mismatches)
+    public ShapeMismatchException(IReadOnlyList<ShapeMismatch> mismatches, IReadOnlyList<string>? matchedProperties = null)
         : base(BuildErrorMessage(mismatches))
     {
         Mismatches = [.. mismatches];
+        MatchedProperties = [.. matchedProperties ?? []];
     }
 
     private static string BuildErrorMessage(IReadOnlyList<ShapeMismatch> mismatches)

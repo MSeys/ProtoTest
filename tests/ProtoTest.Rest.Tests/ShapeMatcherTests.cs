@@ -73,6 +73,7 @@ public class ShapeMatcherTests
         {
             Assert.That(ex, Is.InstanceOf<ProtoAssertionException>());
             Assert.That(ex!.Mismatches, Has.Count.EqualTo(3));
+            Assert.That(ex.MatchedProperties, Does.Contain("$.id"));
 
             Assert.That(ex.Mismatches[0].PropertyPath, Is.EqualTo("$.name"));
             Assert.That(ex.Mismatches[0].Expected, Is.EqualTo("Matthias"));

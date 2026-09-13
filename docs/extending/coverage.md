@@ -2,7 +2,7 @@
 
 ProtoTest Core records generic `ProtoObservation` values. Collectors consume those observations; collectors that also implement `IProtoReportSource` can expose normalized `ProtoReportItem` values to sinks. Coverage is one useful projection, not a restriction of the collection model.
 
-For a complete runnable configuration, see the [REST demo](../examples/rest-demo.md). It registers REST and OpenAPI collectors and writes both report formats at suite teardown.
+For a complete runnable configuration, see the [unified control-plane demo](../examples/sample-app.md). It registers REST, OpenAPI, and GraphQL collectors and writes both report formats at suite teardown.
 
 ## Use an existing coverage collector
 

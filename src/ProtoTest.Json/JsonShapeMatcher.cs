@@ -9,10 +9,13 @@ using ProtoTest.Core;
 
 public sealed record JsonShapeMismatch(string PropertyPath, string Reason, object? Expected, object? Actual);
 
-public sealed class JsonShapeMismatchException(IReadOnlyList<JsonShapeMismatch> mismatches)
+public sealed class JsonShapeMismatchException(
+    IReadOnlyList<JsonShapeMismatch> mismatches,
+    IReadOnlyList<string>? matchedProperties = null)
     : ProtoAssertionException(BuildMessage(mismatches))
 {
     public IReadOnlyList<JsonShapeMismatch> Mismatches { get; } = [.. mismatches];
+    public IReadOnlyList<string> MatchedProperties { get; } = [.. matchedProperties ?? []];
     private static string BuildMessage(IReadOnlyList<JsonShapeMismatch> mismatches)
         => $"Shape mismatch failed with {mismatches.Count} error(s):{Environment.NewLine}" +
            string.Join(Environment.NewLine, mismatches.Select(m => $"  • [{m.PropertyPath}]: {m.Reason}"));
@@ -49,23 +52,25 @@ public static class JsonShapeMatcher
         var mismatches = new List<JsonShapeMismatch>();
         var matched = new List<string>();
         Match(actual, expected, "$", mismatches, matched, options);
-        if (mismatches.Count > 0) throw new JsonShapeMismatchException(mismatches);
+        if (mismatches.Count > 0) throw new JsonShapeMismatchException(mismatches, matched);
         return matched;
     }
 
     private static void Match(JsonElement actual, object? expected, string path,
         List<JsonShapeMismatch> mismatches, List<string> matched, JsonSerializerOptions? options)
     {
-        matched.Add(path);
+        var mismatchCount = mismatches.Count;
         if (expected is IJsonValueMatcher matcher)
         {
             var raw = Raw(actual);
             if (!matcher.Matches(raw, out var error)) mismatches.Add(new(path, error ?? "Value constraint failed.", matcher.Description, raw));
+            if (mismatches.Count == mismatchCount) matched.Add(path);
             return;
         }
         if (expected is null)
         {
             if (actual.ValueKind != JsonValueKind.Null) mismatches.Add(new(path, "Expected null.", null, Raw(actual)));
+            if (mismatches.Count == mismatchCount) matched.Add(path);
             return;
         }
         if (expected is IEnumerable sequence and not string and not IDictionary)
@@ -76,6 +81,7 @@ public static class JsonShapeMatcher
             if (expectedItems.Length != actualItems.Length) mismatches.Add(new(path, "Array lengths did not match.", expectedItems.Length, actualItems.Length));
             for (var index = 0; index < Math.Min(expectedItems.Length, actualItems.Length); index++)
                 Match(actualItems[index], expectedItems[index], $"{path}[{index}]", mismatches, matched, options);
+            if (mismatches.Count == mismatchCount) matched.Add(path);
             return;
         }
         if (TryProperties(expected, options, out var properties))
@@ -87,10 +93,13 @@ public static class JsonShapeMatcher
                 if (!found) mismatches.Add(new($"{path}.{name}", "Property was missing from the JSON response.", value, null));
                 else Match(property, value, $"{path}.{name}", mismatches, matched, options);
             }
+            if (mismatches.Count == mismatchCount) matched.Add(path);
             return;
         }
         if (!ScalarEquals(actual, expected, out var actualValue))
             mismatches.Add(new(path, "Values did not match.", expected, actualValue));
+        else
+            matched.Add(path);
     }
 
     private static bool TryProperties(object value, JsonSerializerOptions? options, out IReadOnlyList<KeyValuePair<string, object?>> properties)

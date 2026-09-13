@@ -33,8 +33,26 @@ internal sealed class GraphQLLifecycleHook : IProtoTestHook
                 return authenticators.Length == 1 ? authenticators[0] : new CompositeGraphQLAuthenticator(authenticators);
             }
         });
+        context.Trace.WriteEvent(
+            "graphql.context.configure",
+            $"GraphQL context · {attribute?.ClientName ?? "Default"}",
+            "ProtoTest.GraphQL",
+            ProtoTracePhase.Setup,
+            ProtoTraceOutcome.Succeeded,
+            new Dictionary<string, string?>
+            {
+                ["client.name"] = attribute?.ClientName ?? "Default",
+                ["auth.source"] = methodAuth.Length > 0 ? "method" : auth.Length > 0 ? "class" : "none",
+                ["auth.count"] = auth.Length.ToString(),
+                ["auth.types"] = string.Join(", ", auth.Select(AuthTypeName))
+            });
         return Task.CompletedTask;
     }
 
     public Task AfterTestAsync(ProtoExecutionContext context) => Task.CompletedTask;
+
+    private static string AuthTypeName(IGraphQLAuthMetadata metadata)
+        => metadata.GetType().GenericTypeArguments.FirstOrDefault()?.FullName
+           ?? metadata.GetType().FullName
+           ?? metadata.GetType().Name;
 }

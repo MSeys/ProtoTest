@@ -146,7 +146,7 @@ public async Task GetOrder_ReturnsExpectedOrder()
 }
 ```
 
-This class-level pattern is especially useful for a suite of tests targeting one named client with the same default authentication. The demo uses this pattern in [`OrderApiTests.cs`](../../samples/ProtoTest.Rest.Demo/OrderApiTests.cs).
+This class-level pattern is especially useful for a suite targeting one named client with the same default authentication. The demo uses it throughout [`ProtoTest.Demo`](../../samples/ProtoTest.Demo).
 
 The same authentication can be selected fluently for one request:
 
@@ -264,14 +264,14 @@ When `ProtoTest.OpenApi` is also configured, use `OpenApiCoverageCollector` to m
 
 ## Runnable example
 
-The [REST demo](../examples/rest-demo.md) is a complete WireMock-backed example. Its source includes:
+The [unified control-plane demo](../examples/sample-app.md) is a complete in-process example. Its source includes:
 
-- suite-level external API configuration in `Setup.cs`;
-- attribute-based authentication and response matching in `OrderApiTests.cs`;
-- fluent authentication in `InventoryApiTests.cs`.
+- suite-level ASP.NET Core, REST, GraphQL, coverage, reporting, and tracing configuration in `Setup.cs`;
+- attribute-based authentication and response matching across business journeys;
+- custom provisioning attributes, hooks, clients, observations, and artifacts.
 
 Run it with:
 
 ```bash
-dotnet test samples/ProtoTest.Rest.Demo/ProtoTest.Rest.Demo.csproj
+dotnet test samples/ProtoTest.Demo/ProtoTest.Demo.csproj
 ```

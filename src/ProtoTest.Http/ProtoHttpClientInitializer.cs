@@ -22,6 +22,7 @@ public sealed class ProtoHttpClientInitializer(
         {
             if (!allowMissingBaseUrl) return Task.FromResult(false);
             Register(context, baseAddress: null);
+            TraceConfiguration(context, null, "deferred");
             return Task.FromResult(true);
         }
 
@@ -30,6 +31,7 @@ public sealed class ProtoHttpClientInitializer(
                 $"The base URL configured for {protocolName} client '{Name}' must be an absolute HTTP or HTTPS URI.");
 
         Register(context, baseAddress);
+        TraceConfiguration(context, baseAddress, explicitBaseUrl is null ? "configuration" : "registration");
         return Task.FromResult(true);
     }
 
@@ -39,4 +41,19 @@ public sealed class ProtoHttpClientInitializer(
         client.BaseAddress = baseAddress;
         context.RegisterClient(client, Name);
     }
+
+    private void TraceConfiguration(ProtoExecutionContext context, Uri? baseAddress, string source)
+        => context.Trace.WriteEvent(
+            "http.client.configure",
+            $"HTTP client · {Name}",
+            "ProtoTest.Http",
+            ProtoTracePhase.Setup,
+            ProtoTraceOutcome.Succeeded,
+            new Dictionary<string, string?>
+            {
+                ["client.name"] = Name,
+                ["protocol.name"] = protocolName,
+                ["endpoint.source"] = source,
+                ["server.address"] = baseAddress?.GetLeftPart(UriPartial.Authority)
+            });
 }

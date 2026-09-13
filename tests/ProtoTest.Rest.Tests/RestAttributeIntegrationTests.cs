@@ -28,7 +28,8 @@ public sealed class RestAttributeIntegrationTests
 
         try
         {
-            await Proto.Context.Rest().GetAsync("/resource");
+            using var response = await Proto.Context.Rest().GetAsync("/resource");
+            response.ShouldHaveStatus(HttpStatusCode.OK);
 
             Assert.That(requests, Has.Count.EqualTo(1));
             Assert.Multiple(() =>
@@ -36,6 +37,14 @@ public sealed class RestAttributeIntegrationTests
                 Assert.That(requests[0].ClientName, Is.EqualTo(expectedClient));
                 Assert.That(requests[0].Authorization,
                     Is.EqualTo(new AuthenticationHeaderValue("Bearer", expectedToken)));
+                var entries = host.Trace.Snapshot().Tests.Single().Entries;
+                var request = entries.Single(entry => entry.Kind == "http.request");
+                Assert.That(entries, Has.Some.Matches<ProtoTraceEntry>(entry =>
+                    entry.Kind == "auth.apply" && entry.ParentId == request.Id));
+                Assert.That(entries, Has.Some.Matches<ProtoTraceEntry>(entry =>
+                    entry.Kind == "assert.http.status" && entry.ParentId == request.Id));
+                Assert.That(entries.SelectMany(entry => entry.Attributes.Values),
+                    Has.None.EqualTo(expectedToken));
             });
         }
         finally

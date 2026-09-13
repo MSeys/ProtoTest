@@ -31,6 +31,19 @@ internal sealed class AspNetCoreClientInitializer<TProgram>(
         var clientOptions = new WebApplicationFactoryClientOptions();
         configureClient?.Invoke(clientOptions);
         context.RegisterClient(factory.CreateClient(clientOptions), Name);
+        context.Trace.WriteEvent(
+            "aspnetcore.server.initialize",
+            $"ASP.NET Core server · {Name}",
+            "ProtoTest.AspNetCore",
+            ProtoTracePhase.Setup,
+            ProtoTraceOutcome.Succeeded,
+            new Dictionary<string, string?>
+            {
+                ["client.name"] = Name,
+                ["application.type"] = typeof(TProgram).FullName,
+                ["web_host.customized"] = (configureWebHost is not null).ToString().ToLowerInvariant(),
+                ["client.customized"] = (configureClient is not null).ToString().ToLowerInvariant()
+            });
         return Task.FromResult(true);
     }
 }

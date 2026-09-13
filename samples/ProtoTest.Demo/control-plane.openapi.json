@@ -1,0 +1,22 @@
+{
+  "openapi": "3.0.1",
+  "info": { "title": "Northstar Control Plane", "version": "1.0" },
+  "paths": {
+    "/api/orders": { "post": { "responses": { "201": { "description": "Order created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Order" } } } }, "400": { "description": "Invalid order" } } } },
+    "/api/billing/invoices": { "get": { "responses": { "200": { "description": "Invoices" }, "403": { "description": "Insufficient permissions" } } } },
+    "/api/workspaces": {
+      "get": { "responses": { "200": { "description": "Tenant workspaces", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Workspace" } } } } } } },
+      "post": { "responses": { "201": { "description": "Workspace created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Workspace" } } } }, "400": { "description": "Invalid workspace" } } }
+    },
+    "/api/workspaces/{workspaceId}/releases": { "post": { "responses": { "201": { "description": "Release deployed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Release" } } } }, "403": { "description": "Insufficient permissions" }, "404": { "description": "Workspace not found" } } } },
+    "/api/control-plane": { "get": { "responses": { "200": { "description": "Control plane summary", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ControlPlane" } } } }, "403": { "description": "Tenant boundary rejected" } } } },
+    "/api/audit": { "get": { "responses": { "200": { "description": "Tenant audit trail", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AuditEvent" } } } } } } } }
+  },
+  "components": { "schemas": {
+    "Order": { "type": "object", "properties": { "id": { "type": "integer" }, "tenant": { "type": "string" }, "product": { "type": "string" }, "quantity": { "type": "integer" }, "total": { "type": "number" }, "status": { "type": "string" } } },
+    "Workspace": { "type": "object", "properties": { "id": { "type": "string" }, "tenant": { "type": "string" }, "name": { "type": "string" }, "region": { "type": "string" }, "plan": { "type": "string" } } },
+    "Release": { "type": "object", "properties": { "id": { "type": "string" }, "tenant": { "type": "string" }, "workspaceId": { "type": "string" }, "version": { "type": "string" }, "commitSha": { "type": "string" }, "status": { "type": "string" } } },
+    "ControlPlane": { "type": "object", "properties": { "tenant": { "type": "string" }, "userCount": { "type": "integer" }, "workspaceCount": { "type": "integer" }, "releaseCount": { "type": "integer" }, "openInvoiceCount": { "type": "integer" }, "monthlyRecurringRevenue": { "type": "number" } } },
+    "AuditEvent": { "type": "object", "properties": { "sequence": { "type": "integer" }, "tenant": { "type": "string" }, "action": { "type": "string" }, "resource": { "type": "string" }, "timestampUtc": { "type": "string", "format": "date-time" } } }
+  } }
+}

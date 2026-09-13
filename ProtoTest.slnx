@@ -9,6 +9,7 @@
     <Project Path="src/ProtoTest.GraphQL/ProtoTest.GraphQL.csproj" Id="81af1d3a-d24c-465e-b1a0-ee742ca6bf6e" />
     <Project Path="src/ProtoTest.Grpc/ProtoTest.Grpc.csproj" Id="f13ed54f-e401-4cd6-ba89-efebd1861e89" />
     <Project Path="src/ProtoTest.OpenApi/ProtoTest.OpenApi.csproj" Id="23cb63d4-b36b-4e43-a2c9-c53533307d85" />
+    <Project Path="src/ProtoTest.OpenTelemetry/ProtoTest.OpenTelemetry.csproj" />
     <Project Path="src/ProtoTest.Playwright/ProtoTest.Playwright.csproj" Id="5e82a152-c648-4ec2-9b1f-0a488aeb6666" />
     <Project Path="src/ProtoTest.Rest/ProtoTest.Rest.csproj" Id="0161cd20-8be1-40f2-a3c0-76335a74ccd2" />
     <Project Path="src/ProtoTest.Reporting/ProtoTest.Reporting.csproj" Id="1ad73a64-19cd-4807-a0d4-283da87581f6" />
@@ -34,28 +35,19 @@
     <Project Path="tests/ProtoTest.Xunit3.Tests/ProtoTest.Xunit3.Tests.csproj" Id="733750ce-a6f6-4fb7-8936-7e58c2ad76a5" />
   </Folder>
   <Folder Name="/4. Tests/Integrations/">
+    <Project Path="tests/ProtoTest.AspNetCore.TestApi/ProtoTest.AspNetCore.TestApi.csproj" />
     <Project Path="tests/ProtoTest.AspNetCore.Tests/ProtoTest.AspNetCore.Tests.csproj" Id="8fe93cb3-774c-4dd1-a1c0-f3ad589708fe" />
     <Project Path="tests/ProtoTest.GraphQL.Tests/ProtoTest.GraphQL.Tests.csproj" />
     <Project Path="tests/ProtoTest.OpenApi.Tests/ProtoTest.OpenApi.Tests.csproj" Id="4d4c7e56-9c4e-4193-b73e-64b067c9268b" />
     <Project Path="tests/ProtoTest.Rest.Tests/ProtoTest.Rest.Tests.csproj" Id="da8c0737-a839-4f92-a4c2-f9bdecd6c96b" />
     <Project Path="tests/ProtoTest.Reporting.Tests/ProtoTest.Reporting.Tests.csproj" />
   </Folder>
-  <Folder Name="/5. Demos/" />
-  <Folder Name="/5. Demos/GraphQL/">
-    <Project Path="samples/ProtoTest.GraphQL.Demo/ProtoTest.GraphQL.Demo.csproj" />
+  <Folder Name="/5. Demo/">
+    <Project Path="samples/ProtoTest.Demo/ProtoTest.Demo.csproj" />
   </Folder>
-  <Folder Name="/5. Demos/AspNetCore/">
-    <Project Path="samples/ProtoTest.AspNetCore.Demo/ProtoTest.AspNetCore.Demo.csproj" Id="f12a642c-7908-42d8-bae2-8d480ea8ad09" />
-    <Project Path="samples/ProtoTest.AspNetCore.SampleApi/ProtoTest.AspNetCore.SampleApi.csproj" Id="09473e77-99bb-4f54-8ff8-9bd6f9324279" />
-  </Folder>
-  <Folder Name="/5. Demos/Rest/">
-    <Project Path="samples/ProtoTest.Rest.Demo/ProtoTest.Rest.Demo.csproj" Id="722a7c58-ada0-4ff9-bad6-aa38c517f7f4" />
-  </Folder>
-  <Folder Name="/5. Demos/SampleApp/">
+  <Folder Name="/5. Demo/Supporting projects/">
     <Project Path="samples/ProtoTest.SampleApp.Contracts/ProtoTest.SampleApp.Contracts.csproj" />
     <Project Path="samples/ProtoTest.SampleApp.Testing/ProtoTest.SampleApp.Testing.csproj" />
     <Project Path="samples/ProtoTest.SampleApp/ProtoTest.SampleApp.csproj" />
-    <Project Path="samples/ProtoTest.SampleApp.RestDemo/ProtoTest.SampleApp.RestDemo.csproj" />
-    <Project Path="samples/ProtoTest.SampleApp.GraphQLDemo/ProtoTest.SampleApp.GraphQLDemo.csproj" />
   </Folder>
 </Solution>

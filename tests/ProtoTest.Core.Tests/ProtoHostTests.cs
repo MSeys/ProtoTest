@@ -5,6 +5,7 @@ using NUnit.Framework;
 using System.Reflection;
 
 [TestFixture]
+[NonParallelizable]
 public class ProtoHostTests
 {
     [Test]

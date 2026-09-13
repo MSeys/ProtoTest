@@ -12,6 +12,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     private readonly IServiceCollection _services = new ServiceCollection();
     private readonly ConfigurationBuilder _configurationBuilder = new();
     private readonly ProtoTestIdOptions _testIdOptions = new();
+    private readonly ProtoTraceOptions _traceOptions = new();
     private bool _built;
 
     /// <inheritdoc />
@@ -34,6 +35,14 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     {
         ArgumentNullException.ThrowIfNull(configure);
         configure(_testIdOptions);
+        return this;
+    }
+
+    /// <inheritdoc />
+    public IProtoHostBuilder ConfigureTracing(Action<ProtoTraceOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        configure(_traceOptions);
         return this;
     }
 
@@ -66,9 +75,13 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
         _services.AddSingleton(configuration);
         _services.TryAddSingleton<IProtoTestIdGenerator>(
             _ => new NumericProtoTestIdGenerator(_testIdOptions));
+        _services.TryAddSingleton(_traceOptions);
+        _services.TryAddSingleton<ProtoTraceSession>();
+        _services.TryAddSingleton<IProtoTraceSource>(services => services.GetRequiredService<ProtoTraceSession>());
 
         // Internal hooks
         _services.AddSingleton<IProtoTestHook, ProtoClientInitializerHook>();
+        _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoRunHook, ProtoTraceExportHook>());
 
         var rootProvider = _services.BuildServiceProvider();
         try

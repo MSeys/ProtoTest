@@ -50,6 +50,11 @@ public sealed class ReportSinkTests
             Assert.That(html, Does.Contain("class=\"coverage-ring\""));
             Assert.That(html, Does.Contain("data-search=\"get /orders"));
             Assert.That(html, Does.Contain("localStorage.getItem('prototest-report-theme')"));
+            Assert.That(html, Does.Contain("REPORTING BLUEPRINT"));
+            Assert.That(html, Does.Contain("--blueprint:#4eb7ee"));
+            Assert.That(html, Does.Contain("background-size:28px 28px"));
+            Assert.That(html, Does.Contain("scrollbar-color:var(--border-strong) transparent"));
+            Assert.That(html, Does.Contain("*::-webkit-scrollbar-thumb:hover{background-color:var(--blueprint)}"));
             Assert.That(html, Does.Contain("class=\"report-item partial status-warning root\""));
             Assert.That(html, Does.Contain(">Partial</span>"));
         }
@@ -100,9 +105,11 @@ public sealed class ReportSinkTests
     {
         var directory = CreateTempDirectory();
         var path = Path.Combine(directory, "end-of-run.json");
+        var tracePath = Path.Combine(directory, "run.prototrace");
         try
         {
             var builder = new ProtoHostBuilder();
+            builder.ConfigureTracing(options => options.OutputPath = tracePath);
             builder.ConfigureServices(services =>
                 services.AddSingleton<IProtoReportSource>(new StubReportSource(SampleItems())));
             builder.AddSink<JsonReportSink>(sink => sink.OutputPath = path);
@@ -112,6 +119,15 @@ public sealed class ReportSinkTests
             Assert.That(File.Exists(path), Is.False);
             await host.StopAsync();
             Assert.That(File.Exists(path), Is.True);
+            var artifact = host.Trace.Snapshot().Artifacts!.Single();
+            Assert.Multiple(() =>
+            {
+                Assert.That(artifact.Name, Is.EqualTo("end-of-run.json"));
+                Assert.That(artifact.MediaType, Is.EqualTo("application/json"));
+                Assert.That(File.Exists(tracePath), Is.True);
+            });
+            using var archive = System.IO.Compression.ZipFile.OpenRead(tracePath);
+            Assert.That(archive.GetEntry(artifact.ArchivePath), Is.Not.Null);
         }
         finally { Directory.Delete(directory, recursive: true); }
     }

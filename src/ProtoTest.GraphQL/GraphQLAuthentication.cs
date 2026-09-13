@@ -44,6 +44,26 @@ internal sealed class CompositeGraphQLAuthenticator(IReadOnlyList<IGraphQLAuthen
     public async ValueTask AuthenticateAsync(GraphQLAuthenticationContext context, CancellationToken cancellationToken = default)
     {
         foreach (var authenticator in authenticators)
-            await authenticator.AuthenticateAsync(context, cancellationToken);
+        {
+            using var operation = context.Test.Trace.StartOperation(
+                "auth.handler.apply",
+                $"Apply · {authenticator.GetType().Name}",
+                "ProtoTest.GraphQL",
+                attributes: new Dictionary<string, string?>
+                {
+                    ["auth.type"] = authenticator.GetType().FullName,
+                    ["client.name"] = context.ClientName
+                });
+            try
+            {
+                await authenticator.AuthenticateAsync(context, cancellationToken);
+                operation.Succeed();
+            }
+            catch (Exception exception)
+            {
+                operation.Fail(exception);
+                throw;
+            }
+        }
     }
 }

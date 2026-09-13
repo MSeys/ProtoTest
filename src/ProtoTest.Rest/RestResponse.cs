@@ -18,6 +18,7 @@ public sealed class RestResponse : IDisposable
     private readonly string? _routeIdentifier;
     private readonly RestAttachmentOptions? _attachmentOptions;
     private readonly string? _attachmentPrefix;
+    private readonly string? _requestTraceId;
     private int _shapeAssertionSequence;
 
     private static readonly JsonSerializerOptions DefaultJsonOptions = new()
@@ -34,7 +35,8 @@ public sealed class RestResponse : IDisposable
         string? routeIdentifier = null,
         RestAttachmentOptions? attachmentOptions = null,
         string? attachmentPrefix = null,
-        ReadOnlyMemory<byte>? contentBytes = null)
+        ReadOnlyMemory<byte>? contentBytes = null,
+        string? requestTraceId = null)
     {
         RawResponse = rawResponse ?? throw new ArgumentNullException(nameof(rawResponse));
         Content = content ?? string.Empty;
@@ -45,6 +47,7 @@ public sealed class RestResponse : IDisposable
         _routeIdentifier = routeIdentifier;
         _attachmentOptions = attachmentOptions;
         _attachmentPrefix = attachmentPrefix;
+        _requestTraceId = requestTraceId;
     }
 
     public HttpResponseMessage RawResponse { get; }
@@ -64,10 +67,29 @@ public sealed class RestResponse : IDisposable
 
     public T? ReadAsJson<T>(JsonSerializerOptions? options = null)
     {
-        if (string.IsNullOrWhiteSpace(Content))
-            return default;
-
-        return JsonSerializer.Deserialize<T>(Content, options ?? DefaultJsonOptions);
+        using var operation = _context?.Trace.StartOperation(
+            "http.response.deserialize",
+            $"Deserialize response · {typeof(T).Name}",
+            "ProtoTest.Rest",
+            attributes: new Dictionary<string, string?>
+            {
+                ["target.type"] = typeof(T).FullName,
+                ["content.length"] = ContentBytes.Length.ToString()
+            },
+            parentId: _requestTraceId);
+        try
+        {
+            var result = string.IsNullOrWhiteSpace(Content)
+                ? default
+                : JsonSerializer.Deserialize<T>(Content, options ?? DefaultJsonOptions);
+            operation?.Succeed();
+            return result;
+        }
+        catch (Exception exception)
+        {
+            operation?.Fail(exception);
+            throw;
+        }
     }
 
     public T? ReadAsAnonymous<T>(T anonymousTypeDefinition, JsonSerializerOptions? options = null)
@@ -86,28 +108,66 @@ public sealed class RestResponse : IDisposable
 
     public RestResponse ShouldHaveStatus(HttpStatusCode expectedStatusCode)
     {
-        if (StatusCode != expectedStatusCode)
+        using var operation = _context?.Trace.StartOperation(
+            "assert.http.status",
+            $"Assert status · {(int)expectedStatusCode} {expectedStatusCode}",
+            "ProtoTest.Rest",
+            attributes: new Dictionary<string, string?>
+            {
+                ["expected.status_code"] = ((int)expectedStatusCode).ToString(),
+                ["actual.status_code"] = ((int)StatusCode).ToString(),
+                ["request.identifier"] = _routeIdentifier
+            },
+            parentId: _requestTraceId);
+        try
         {
-            var diagnosticBody = RestDiagnosticSanitizer.SanitizeBody(
-                Content,
-                RawResponse.Content.Headers.ContentType?.MediaType,
-                _attachmentOptions);
-            throw new RestStatusAssertionException(expectedStatusCode, StatusCode, diagnosticBody);
+            if (StatusCode != expectedStatusCode)
+            {
+                var diagnosticBody = RestDiagnosticSanitizer.SanitizeBody(
+                    Content,
+                    RawResponse.Content.Headers.ContentType?.MediaType,
+                    _attachmentOptions);
+                throw new RestStatusAssertionException(expectedStatusCode, StatusCode, diagnosticBody);
+            }
+            operation?.Succeed();
+            return this;
         }
-        return this;
+        catch (Exception exception)
+        {
+            operation?.Fail(exception);
+            throw;
+        }
     }
 
     public RestResponse ShouldMatchShape(object expectedShape, JsonSerializerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
+        var expectedShapeJson = JsonDiagnosticSanitizer.Serialize(DescribeExpectedValue(expectedShape), _attachmentOptions);
+        var actualShapeJson = RestDiagnosticSanitizer.SanitizeBody(
+            Content,
+            RawResponse.Content.Headers.ContentType?.MediaType,
+            _attachmentOptions);
+        using var operation = _context?.Trace.StartOperation(
+            "assert.json.shape",
+            "Assert response shape",
+            "ProtoTest.Rest",
+            attributes: new Dictionary<string, string?>
+            {
+                ["expected.type"] = expectedShape.GetType().FullName,
+                ["shape.expected"] = expectedShapeJson,
+                ["shape.actual"] = actualShapeJson,
+                ["actual.media_type"] = RawResponse.Content.Headers.ContentType?.MediaType,
+                ["request.identifier"] = _routeIdentifier
+            },
+            parentId: _requestTraceId);
+
+        try
+        {
 
         if (_context is not null && _attachmentOptions?.CaptureExpectedShapes == true)
         {
             var assertionNumber = Interlocked.Increment(ref _shapeAssertionSequence);
             var assertionSuffix = assertionNumber == 1 ? string.Empty : $"-{assertionNumber:00}";
-            var expectedShapeJson = JsonSerializer.Serialize(
-                DescribeExpectedValue(expectedShape),
-                new JsonSerializerOptions { WriteIndented = true });
             _context.AddAttachment(
                 $"{_attachmentPrefix}-expected-shape{assertionSuffix}",
                 RestDiagnosticSanitizer.SanitizeBody(
@@ -118,25 +178,45 @@ public sealed class RestResponse : IDisposable
                 _routeIdentifier);
         }
 
-        var matchedProps = ShapeMatcher.AssertMatch(Content, expectedShape, options);
+            var matchedProps = ShapeMatcher.AssertMatch(Content, expectedShape, options);
+            operation?.SetAttribute("matched.property_count", matchedProps.Count.ToString());
+            operation?.SetAttribute("matched.properties", string.Join(", ", matchedProps));
+            operation?.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(matchedProps, _attachmentOptions));
+            operation?.SetAttribute("shape.result", "matched");
 
         // Record the shape-match observation when an execution context is available.
-        if (_context != null && !string.IsNullOrEmpty(_targetName) && !string.IsNullOrEmpty(_routeIdentifier))
-        {
-            _context.RecordObservation(new ProtoObservation(
-                TargetName: _targetName,
-                Kind: "http.contract.shape",
-                Identifier: _routeIdentifier,
-                Data: new RestShapeMatchData(
-                    RequestIdentifier: _routeIdentifier,
-                    MatchedProperties: matchedProps,
-                    TargetType: expectedShape.GetType(),
-                    StatusCode: (int)StatusCode
-                )
-            ));
-        }
+            if (_context != null && !string.IsNullOrEmpty(_targetName) && !string.IsNullOrEmpty(_routeIdentifier))
+            {
+                _context.RecordObservation(new ProtoObservation(
+                    TargetName: _targetName,
+                    Kind: "http.contract.shape",
+                    Identifier: _routeIdentifier,
+                    Data: new RestShapeMatchData(
+                        RequestIdentifier: _routeIdentifier,
+                        MatchedProperties: matchedProps,
+                        TargetType: expectedShape.GetType(),
+                        StatusCode: (int)StatusCode
+                    )
+                ));
+            }
 
-        return this;
+            operation?.Succeed();
+            return this;
+        }
+        catch (ShapeMismatchException exception)
+        {
+            operation?.SetAttribute("shape.result", "mismatched");
+            operation?.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(exception.MatchedProperties, _attachmentOptions));
+            operation?.SetAttribute("shape.mismatches", JsonDiagnosticSanitizer.Serialize(exception.Mismatches, _attachmentOptions));
+            operation?.SetAttribute("shape.mismatch_count", exception.Mismatches.Count.ToString());
+            operation?.Fail(exception);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            operation?.Fail(exception);
+            throw;
+        }
     }
 
     public byte[] ReadAsBytes() => ContentBytes.ToArray();

@@ -42,24 +42,35 @@ internal sealed class ProtoClientRegistry
         }
     }
 
-    public async ValueTask<IReadOnlyList<Exception>> DisposeClientsAsync()
+    public async ValueTask<IReadOnlyList<Exception>> DisposeClientsAsync(IProtoTraceWriter trace)
     {
         if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
         {
             return [];
         }
 
-        List<object> clients;
+        List<(ClientKey Key, object Client)> clients;
         lock (_gate)
         {
-            clients = [.. _registrationOrder.AsEnumerable().Reverse().Select(key => _clients[key])];
+            clients = [.. _registrationOrder.AsEnumerable().Reverse().Select(key => (key, _clients[key]))];
             _clients.Clear();
             _registrationOrder.Clear();
         }
 
         var exceptions = new List<Exception>();
-        foreach (var client in clients)
+        foreach (var (key, client) in clients)
         {
+            using var operation = trace.StartOperation(
+                "client.dispose",
+                $"Dispose · {key.Name} ({key.ClientType.Name})",
+                "ProtoTest.Core",
+                ProtoTracePhase.Teardown,
+                new Dictionary<string, string?>
+                {
+                    ["client.name"] = key.Name,
+                    ["client.type"] = key.ClientType.FullName,
+                    ["instance.type"] = client.GetType().FullName
+                });
             try
             {
                 if (client is IAsyncDisposable asyncDisposable)
@@ -70,9 +81,11 @@ internal sealed class ProtoClientRegistry
                 {
                     disposable.Dispose();
                 }
+                operation.Succeed();
             }
             catch (Exception exception)
             {
+                operation.Fail(exception);
                 exceptions.Add(exception);
             }
         }

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>true</IsPackable>
+    <PackageId>ProtoTest.OpenTelemetry</PackageId>
+    <Description>OpenTelemetry registration helpers for ProtoTest execution traces.</Description>
+    <PackageTags>testing;integration-testing;opentelemetry;tracing;observability</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <PackageReference Include="OpenTelemetry" Version="1.18.0" />
+  </ItemGroup>
+</Project>

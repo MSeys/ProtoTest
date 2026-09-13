@@ -37,7 +37,7 @@ public sealed class OrderTests
 }
 ```
 
-The REST demo uses NUnit and is a runnable reference: [`samples/ProtoTest.Rest.Demo`](../../samples/ProtoTest.Rest.Demo).
+The unified demo uses NUnit with eight parallel workers and is a runnable reference: [`samples/ProtoTest.Demo`](../../samples/ProtoTest.Demo).
 
 The adapter choice changes the test framework annotations, not the ProtoTest model. After choosing an adapter, continue with [writing tests](../guides/writing-tests.md), [hooks](../extending/hooks.md), and [context and state](../guides/context-and-state.md).
 

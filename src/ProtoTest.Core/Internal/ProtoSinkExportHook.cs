@@ -5,10 +5,11 @@ using System.Runtime.ExceptionServices;
 internal sealed class ProtoSinkExportHook(
     IEnumerable<IProtoCollector> collectors,
     IEnumerable<IProtoReportSource> reportSources,
-    IEnumerable<IProtoSink> sinks) : IProtoRunHook
+    IEnumerable<IProtoSink> sinks,
+    ProtoTraceSession traceSession) : IProtoRunHook
 {
-    // AfterRun executes in descending order. A low order exports after other hooks finalize their data.
-    public int Order => int.MinValue;
+    // AfterRun executes in descending order. Reports are generated immediately before the trace archive.
+    public int Order => int.MinValue + 1;
 
     public async Task AfterRunAsync(CancellationToken cancellationToken = default)
     {
@@ -27,6 +28,13 @@ internal sealed class ProtoSinkExportHook(
             try
             {
                 await sink.ExportAsync(items, cancellationToken);
+                if (sink is IProtoSinkArtifactSource artifactSource)
+                {
+                    await traceSession.CaptureRunArtifactsAsync(
+                        artifactSource.GetArtifacts(),
+                        sink.GetType().Name,
+                        cancellationToken);
+                }
             }
             catch (Exception exception)
             {

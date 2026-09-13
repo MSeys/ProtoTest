@@ -98,7 +98,7 @@ Use method-level attributes when one test needs a different client or authentica
 dotnet test
 ```
 
-For a complete external-style REST example using WireMock.Net, see [`samples/ProtoTest.Rest.Demo`](../../samples/ProtoTest.Rest.Demo).
+For a complete end-to-end SaaS example, see [`samples/ProtoTest.Demo`](../../samples/ProtoTest.Demo).
 
 ## What can you use in a test?
 

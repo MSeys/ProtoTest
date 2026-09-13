@@ -22,6 +22,16 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     }
 
     public ProtoExecutionContext(string testName, IServiceScope scope, ProtoTestId id, MethodInfo testMethod)
+        : this(testName, scope, id, testMethod, new ProtoTestTraceRecorder(id.Value, testName, testMethod))
+    {
+    }
+
+    internal ProtoExecutionContext(
+        string testName,
+        IServiceScope scope,
+        ProtoTestId id,
+        MethodInfo testMethod,
+        ProtoTestTraceRecorder trace)
     {
         TestName = testName ?? throw new ArgumentNullException(nameof(testName));
         _scope = scope ?? throw new ArgumentNullException(nameof(scope));
@@ -29,6 +39,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         TestMethod = testMethod ?? throw new ArgumentNullException(nameof(testMethod));
         _attachments = new ProtoAttachmentCollection(TestId);
         _observations = new ProtoObservationDispatcher(_scope.ServiceProvider);
+        Trace = trace;
     }
 
     public string TestName { get; }
@@ -40,6 +51,9 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     public ProtoTestId Id { get; }
     public string TestId => Id.Value;
     public long TestNumber => Id.Number;
+
+    /// <summary>Records automatic execution diagnostics for ProtoTest integrations.</summary>
+    public IProtoTraceWriter Trace { get; }
 
     /// <summary>Retrieves the global configuration registered in the ProtoHost.</summary>
     public IConfiguration Configuration => Service<IConfiguration>();
@@ -73,36 +87,177 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         => AddAttachment(ProtoTestAttachment.FromFile(filePath, name, mediaType, description));
 
     public ProtoTestAttachment AddAttachment(ProtoTestAttachment attachment)
-        => _attachments.Add(attachment);
+    {
+        var registered = _attachments.Add(attachment);
+        Trace.WriteEvent(
+            "attachment.register",
+            $"Attachment · {registered.Name}",
+            "ProtoTest.Core",
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: new Dictionary<string, string?>
+            {
+                ["attachment.name"] = registered.Name,
+                ["attachment.media_type"] = registered.MediaType,
+                ["attachment.description"] = registered.Description,
+                ["attachment.source"] = registered.IsFile ? "file" : "memory"
+            });
+        return registered;
+    }
 
     /// <summary>Registers or replaces contextual state for this test.</summary>
-    public void SetContext<T>(T context) where T : class, IProtoContext => _state.Set(context);
+    public void SetContext<T>(T context) where T : class, IProtoContext
+    {
+        _state.Set(context);
+        Trace.WriteEvent(
+            "context.set",
+            $"Context · {typeof(T).Name}",
+            "ProtoTest.Core",
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: new Dictionary<string, string?>
+            {
+                ["context.type"] = typeof(T).FullName,
+                ["context.value"] = ProtoTraceValueFormatter.Serialize(context)
+            });
+    }
 
     /// <summary>Retrieves contextual state when it is present.</summary>
-    public T? TryContext<T>() where T : class, IProtoContext => _state.TryGet<T>();
+    public T? TryContext<T>() where T : class, IProtoContext
+    {
+        var context = _state.TryGet<T>();
+        Trace.WriteEvent(
+            "context.try_resolve",
+            $"Try context · {typeof(T).Name}",
+            "ProtoTest.Core",
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: new Dictionary<string, string?>
+            {
+                ["context.type"] = typeof(T).FullName,
+                ["context.found"] = (context is not null).ToString().ToLowerInvariant()
+            });
+        return context;
+    }
 
     /// <summary>Retrieves required contextual state.</summary>
-    public T Context<T>() where T : class, IProtoContext => _state.Get<T>();
+    public T Context<T>() where T : class, IProtoContext
+    {
+        try
+        {
+            var context = _state.Get<T>();
+            Trace.WriteEvent(
+                "context.resolve",
+                $"Resolve context · {typeof(T).Name}",
+                "ProtoTest.Core",
+                outcome: ProtoTraceOutcome.Succeeded,
+                attributes: new Dictionary<string, string?>
+                {
+                    ["context.type"] = typeof(T).FullName
+                });
+            return context;
+        }
+        catch (Exception exception)
+        {
+            Trace.WriteEvent(
+                "context.resolve",
+                $"Resolve context · {typeof(T).Name}",
+                "ProtoTest.Core",
+                outcome: ProtoTraceOutcome.Failed,
+                attributes: new Dictionary<string, string?> { ["context.type"] = typeof(T).FullName },
+                exception: exception);
+            throw;
+        }
+    }
 
     /// <summary>
     /// Registers a named client owned by this test. Clients are disposed in reverse registration order.
     /// </summary>
     public void RegisterClient<TClient>(TClient client, string name = "Default") where TClient : class
-        => _clients.Register(client, name);
+    {
+        _clients.Register(client, name);
+        Trace.WriteEvent(
+            "client.register",
+            $"Register · {name} ({typeof(TClient).Name})",
+            "ProtoTest.Core",
+            phase: ProtoTracePhase.Setup,
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: new Dictionary<string, string?>
+            {
+                ["client.name"] = name,
+                ["client.type"] = typeof(TClient).FullName,
+                ["instance.type"] = client.GetType().FullName
+            });
+    }
 
     /// <summary>Retrieves a required named client.</summary>
     public TClient Client<TClient>(string name = "Default") where TClient : class
-        => _clients.Get<TClient>(name);
+    {
+        var attributes = new Dictionary<string, string?>
+        {
+            ["client.name"] = name,
+            ["client.type"] = typeof(TClient).FullName
+        };
+        try
+        {
+            var client = _clients.Get<TClient>(name);
+            Trace.WriteEvent(
+                "client.resolve",
+                $"Resolve · {name} ({typeof(TClient).Name})",
+                "ProtoTest.Core",
+                outcome: ProtoTraceOutcome.Succeeded,
+                attributes: attributes);
+            return client;
+        }
+        catch (Exception exception)
+        {
+            Trace.WriteEvent(
+                "client.resolve",
+                $"Resolve · {name} ({typeof(TClient).Name})",
+                "ProtoTest.Core",
+                outcome: ProtoTraceOutcome.Failed,
+                attributes: attributes,
+                exception: exception);
+            throw;
+        }
+    }
 
     /// <summary>Retrieves a named client when it is present.</summary>
     public TClient? TryClient<TClient>(string name = "Default") where TClient : class
-        => _clients.TryGet<TClient>(name);
+    {
+        var client = _clients.TryGet<TClient>(name);
+        Trace.WriteEvent(
+            "client.try_resolve",
+            $"Try resolve · {name} ({typeof(TClient).Name})",
+            "ProtoTest.Core",
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: new Dictionary<string, string?>
+            {
+                ["client.name"] = name,
+                ["client.type"] = typeof(TClient).FullName,
+                ["client.found"] = (client is not null).ToString().ToLowerInvariant()
+            });
+        return client;
+    }
 
     /// <summary>Gets a snapshot of observations recorded for this test.</summary>
     public IReadOnlyCollection<ProtoObservation> RecordedObservations => _observations.Snapshot();
 
     /// <summary>Stores and dispatches an observation to every collector that accepts it.</summary>
-    public void RecordObservation(ProtoObservation observation) => _observations.Record(observation);
+    public void RecordObservation(ProtoObservation observation)
+    {
+        _observations.Record(observation);
+        Trace.WriteEvent(
+            "observation.record",
+            $"Observation · {observation.Kind}",
+            "ProtoTest.Core",
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: new Dictionary<string, string?>
+            {
+                ["observation.target"] = observation.TargetName,
+                ["observation.kind"] = observation.Kind,
+                ["observation.identifier"] = observation.Identifier,
+                ["observation.data"] = ProtoTraceValueFormatter.Serialize(observation.Data),
+                ["observation.metadata"] = ProtoTraceValueFormatter.Serialize(observation.Metadata)
+            });
+    }
 
     /// <summary>Convenience overload for recording an observation.</summary>
     public void RecordObservation(
@@ -123,7 +278,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
             return;
         }
 
-        var exceptions = (await _clients.DisposeClientsAsync()).ToList();
+        var exceptions = (await _clients.DisposeClientsAsync(Trace)).ToList();
         try
         {
             if (_scope is IAsyncDisposable asyncDisposable)

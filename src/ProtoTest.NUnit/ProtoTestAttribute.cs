@@ -23,9 +23,23 @@ public class ProtoTestAttribute : TestAttribute, ITestAction
 
     public void AfterTest(ITest test)
     {
+        var nunitResult = TestContext.CurrentContext.Result;
+        var result = nunitResult.Outcome.Status switch
+        {
+            TestStatus.Passed => ProtoTestResult.Passed,
+            TestStatus.Failed => ProtoTestResult.Failed(new ProtoTraceError(
+                $"NUnit.{nunitResult.Outcome.Label ?? TestStatus.Failed.ToString()}",
+                string.IsNullOrWhiteSpace(nunitResult.Message)
+                    ? "NUnit reported a failed test without a failure message."
+                    : nunitResult.Message,
+                nunitResult.StackTrace)),
+            TestStatus.Skipped => ProtoTestResult.Skipped,
+            _ => ProtoTestResult.Unknown
+        };
+
         // Execute async post-test hooks, dispose the context scope, and clear ambient state.
         ProtoTestAssembly.Host
-            .CompleteTestAsync()
+            .CompleteTestAsync(result)
             .GetAwaiter()
             .GetResult();
     }

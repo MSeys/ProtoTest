@@ -18,8 +18,21 @@ public static class ProtoExecutionContextExtensions
             .LastOrDefault(item => string.Equals(item.ProtocolName, "GraphQL", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(item.ClientName, selectedName, StringComparison.OrdinalIgnoreCase));
         var client = context.Client<HttpClient>(alias?.SourceClientName ?? selectedName);
+        var authenticatorFactory = context.TryContext<GraphQLContextState>()?.AuthenticatorFactory;
+        context.Trace.WriteEvent(
+            "graphql.builder.create",
+            $"GraphQL builder · {selectedName}",
+            "ProtoTest.GraphQL",
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: new Dictionary<string, string?>
+            {
+                ["client.name"] = selectedName,
+                ["client.source_name"] = alias?.SourceClientName ?? selectedName,
+                ["auth.configured"] = (authenticatorFactory is not null).ToString().ToLowerInvariant(),
+                ["endpoint.resolver"] = alias is not null ? "alias" : registration is not null ? "per-test" : "client"
+            });
         return new GraphQLRequestBuilder(client, context, selectedName)
-            .UseAuthenticatorFactory(context.TryContext<GraphQLContextState>()?.AuthenticatorFactory)
+            .UseAuthenticatorFactory(authenticatorFactory)
             .UseBaseAddressResolver(alias?.ResolveEndpointAsync ?? registration?.ResolveAsync);
     }
 }

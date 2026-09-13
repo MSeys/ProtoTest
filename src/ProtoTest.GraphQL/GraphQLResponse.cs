@@ -15,6 +15,7 @@ public sealed class GraphQLResponse : IDisposable
     private readonly string _identifier;
     private readonly GraphQLAttachmentOptions? _attachmentOptions;
     private readonly string? _attachmentPrefix;
+    private readonly string? _requestTraceId;
 
     internal GraphQLResponse(
         HttpResponseMessage rawResponse,
@@ -25,7 +26,8 @@ public sealed class GraphQLResponse : IDisposable
         string identifier,
         GraphQLBuiltOperation operation,
         GraphQLAttachmentOptions? attachmentOptions,
-        string? attachmentPrefix)
+        string? attachmentPrefix,
+        string? requestTraceId = null)
     {
         RawResponse = rawResponse;
         Content = content;
@@ -35,6 +37,7 @@ public sealed class GraphQLResponse : IDisposable
         _identifier = identifier;
         _attachmentOptions = attachmentOptions;
         _attachmentPrefix = attachmentPrefix;
+        _requestTraceId = requestTraceId;
         try
         {
             _document = JsonDocument.Parse(content);
@@ -70,58 +73,165 @@ public sealed class GraphQLResponse : IDisposable
     public JsonElement? Extensions => _document.RootElement.TryGetProperty("extensions", out var extensions) ? extensions.Clone() : null;
 
     public GraphQLResponse ShouldHaveHttpStatus(HttpStatusCode expected)
-    {
-        if (HttpStatusCode != expected)
-            throw new GraphQLAssertionException($"Expected GraphQL HTTP status {(int)expected} ({expected}), but received {(int)HttpStatusCode} ({HttpStatusCode}).");
-        return this;
-    }
+        => Assert(
+            "assert.graphql.http_status",
+            $"Assert HTTP status · {(int)expected} {expected}",
+            new Dictionary<string, string?>
+            {
+                ["expected.status_code"] = ((int)expected).ToString(),
+                ["actual.status_code"] = ((int)HttpStatusCode).ToString()
+            },
+            () =>
+            {
+                if (HttpStatusCode != expected)
+                    throw new GraphQLAssertionException($"Expected GraphQL HTTP status {(int)expected} ({expected}), but received {(int)HttpStatusCode} ({HttpStatusCode}).");
+            });
 
     public GraphQLResponse ShouldHaveNoErrors()
-    {
-        if (HasErrors)
-            throw new GraphQLAssertionException($"Expected no GraphQL errors, but received {Errors.Count}: {string.Join("; ", Errors.Select(e => e.Message))}");
-        return this;
-    }
+        => Assert(
+            "assert.graphql.no_errors",
+            "Assert no GraphQL errors",
+            new Dictionary<string, string?> { ["actual.error_count"] = Errors.Count.ToString() },
+            () =>
+            {
+                if (HasErrors)
+                    throw new GraphQLAssertionException($"Expected no GraphQL errors, but received {Errors.Count}: {string.Join("; ", Errors.Select(e => e.Message))}");
+            });
 
     public GraphQLResponse ShouldHaveErrors()
-    {
-        if (!HasErrors) throw new GraphQLAssertionException("Expected at least one GraphQL error, but the response contained none.");
-        return this;
-    }
+        => Assert(
+            "assert.graphql.has_errors",
+            "Assert GraphQL has errors",
+            new Dictionary<string, string?> { ["actual.error_count"] = Errors.Count.ToString() },
+            () =>
+            {
+                if (!HasErrors) throw new GraphQLAssertionException("Expected at least one GraphQL error, but the response contained none.");
+            });
 
     public GraphQLResponse ShouldHaveError(string code)
-    {
-        if (!Errors.Any(error => string.Equals(error.Code, code, StringComparison.OrdinalIgnoreCase)))
-            throw new GraphQLAssertionException($"Expected a GraphQL error with code '{code}', but found: {string.Join(", ", Errors.Select(e => e.Code ?? "<none>"))}.");
-        return this;
-    }
+        => Assert(
+            "assert.graphql.error_code",
+            $"Assert GraphQL error · {code}",
+            new Dictionary<string, string?>
+            {
+                ["expected.error_code"] = code,
+                ["actual.error_codes"] = string.Join(", ", Errors.Select(error => error.Code ?? "<none>"))
+            },
+            () =>
+            {
+                if (!Errors.Any(error => string.Equals(error.Code, code, StringComparison.OrdinalIgnoreCase)))
+                    throw new GraphQLAssertionException($"Expected a GraphQL error with code '{code}', but found: {string.Join(", ", Errors.Select(e => e.Code ?? "<none>"))}.");
+            });
 
     public GraphQLResponse ShouldMatchData(object expectedShape, JsonSerializerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
-        if (!Data.HasValue) throw new GraphQLAssertionException("Expected GraphQL data, but the response did not contain data.");
-        if (_attachmentOptions?.CaptureExpectedShapes == true)
-            _context.AddAttachment(
-                $"{_attachmentPrefix}-expected-shape",
-                JsonDiagnosticSanitizer.Sanitize(JsonSerializer.Serialize(expectedShape), _attachmentOptions),
-                "application/json",
-                _identifier);
-        var matched = GraphQLShapeMatcher.AssertMatch(Data.Value, expectedShape, options);
-        _context.RecordObservation(new ProtoObservation(
-            _targetName,
-            "graphql.contract.shape",
-            _identifier,
-            new GraphQLShapeMatchData(_identifier, matched)));
-        return this;
+        var expectedShapeJson = JsonDiagnosticSanitizer.Serialize(expectedShape, _attachmentOptions);
+        var actualShapeJson = Data.HasValue
+            ? JsonDiagnosticSanitizer.Sanitize(Data.Value.GetRawText(), _attachmentOptions)
+            : null;
+        using var operation = _context.Trace.StartOperation(
+            "assert.graphql.data_shape",
+            "Assert GraphQL data shape",
+            "ProtoTest.GraphQL",
+            attributes: new Dictionary<string, string?>
+            {
+                ["expected.type"] = expectedShape.GetType().FullName,
+                ["shape.expected"] = expectedShapeJson,
+                ["shape.actual"] = actualShapeJson,
+                ["graphql.operation"] = _identifier
+            },
+            parentId: _requestTraceId);
+        try
+        {
+            if (!Data.HasValue) throw new GraphQLAssertionException("Expected GraphQL data, but the response did not contain data.");
+            if (_attachmentOptions?.CaptureExpectedShapes == true)
+                _context.AddAttachment(
+                    $"{_attachmentPrefix}-expected-shape",
+                    JsonDiagnosticSanitizer.Sanitize(JsonSerializer.Serialize(expectedShape), _attachmentOptions),
+                    "application/json",
+                    _identifier);
+            var matched = GraphQLShapeMatcher.AssertMatch(Data.Value, expectedShape, options);
+            operation.SetAttribute("matched.property_count", matched.Count.ToString());
+            operation.SetAttribute("matched.properties", string.Join(", ", matched));
+            operation.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(matched, _attachmentOptions));
+            operation.SetAttribute("shape.result", "matched");
+            _context.RecordObservation(new ProtoObservation(
+                _targetName,
+                "graphql.contract.shape",
+                _identifier,
+                new GraphQLShapeMatchData(_identifier, matched)));
+            operation.Succeed();
+            return this;
+        }
+        catch (GraphQLShapeMismatchException exception)
+        {
+            operation.SetAttribute("shape.result", "mismatched");
+            operation.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(exception.MatchedProperties, _attachmentOptions));
+            operation.SetAttribute("shape.mismatches", JsonDiagnosticSanitizer.Serialize(exception.Mismatches, _attachmentOptions));
+            operation.SetAttribute("shape.mismatch_count", exception.Mismatches.Count.ToString());
+            operation.Fail(exception);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            operation.Fail(exception);
+            throw;
+        }
     }
 
     public T? ReadDataAs<T>(JsonSerializerOptions? options = null)
-        => Data.HasValue ? Data.Value.Deserialize<T>(options ?? new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) : default;
+    {
+        using var operation = _context.Trace.StartOperation(
+            "graphql.response.deserialize",
+            $"Deserialize GraphQL data · {typeof(T).Name}",
+            "ProtoTest.GraphQL",
+            attributes: new Dictionary<string, string?> { ["target.type"] = typeof(T).FullName },
+            parentId: _requestTraceId);
+        try
+        {
+            var result = Data.HasValue
+                ? Data.Value.Deserialize<T>(options ?? new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                : default;
+            operation.Succeed();
+            return result;
+        }
+        catch (Exception exception)
+        {
+            operation.Fail(exception);
+            throw;
+        }
+    }
 
     public void Dispose()
     {
         _document.Dispose();
         RawResponse.Dispose();
+    }
+
+    private GraphQLResponse Assert(
+        string kind,
+        string name,
+        IReadOnlyDictionary<string, string?> attributes,
+        Action assertion)
+    {
+        using var operation = _context.Trace.StartOperation(
+            kind,
+            name,
+            "ProtoTest.GraphQL",
+            attributes: attributes,
+            parentId: _requestTraceId);
+        try
+        {
+            assertion();
+            operation.Succeed();
+            return this;
+        }
+        catch (Exception exception)
+        {
+            operation.Fail(exception);
+            throw;
+        }
     }
 
     private static IReadOnlyList<GraphQLError> ReadErrors(JsonElement root)

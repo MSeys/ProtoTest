@@ -13,6 +13,7 @@ public sealed class ProtoHost : IAsyncDisposable
     private readonly IServiceProvider _rootServiceProvider;
     private readonly ProtoRunLifecycle _runLifecycle;
     private readonly ProtoTestLifecycle _testLifecycle;
+    private readonly ProtoTraceSession _trace;
 
     public ProtoHost(IServiceProvider rootServiceProvider)
     {
@@ -22,9 +23,10 @@ public sealed class ProtoHost : IAsyncDisposable
         var runHooks = _rootServiceProvider.GetServices<IProtoRunHook>().ToArray();
         var testIdGenerator = _rootServiceProvider.GetService<IProtoTestIdGenerator>()
             ?? new NumericProtoTestIdGenerator();
+        _trace = _rootServiceProvider.GetService<ProtoTraceSession>() ?? new ProtoTraceSession();
 
         _runLifecycle = new ProtoRunLifecycle(runHooks);
-        _testLifecycle = new ProtoTestLifecycle(this, _rootServiceProvider, testHooks, testIdGenerator);
+        _testLifecycle = new ProtoTestLifecycle(this, _rootServiceProvider, testHooks, testIdGenerator, _trace);
         ProtoHostRegistry.Register(this);
     }
 
@@ -40,6 +42,9 @@ public sealed class ProtoHost : IAsyncDisposable
 
     public IConfiguration Configuration => _rootServiceProvider.GetRequiredService<IConfiguration>();
 
+    /// <summary>Gets immutable snapshots of the current run trace.</summary>
+    public IProtoTraceSource Trace => _trace;
+
     /// <summary>
     /// Executes all suite-level BeforeRun hooks in ascending order.
     /// </summary>
@@ -49,8 +54,17 @@ public sealed class ProtoHost : IAsyncDisposable
     /// <summary>
     /// Executes all suite-level AfterRun hooks in descending order.
     /// </summary>
-    public Task StopAsync(CancellationToken cancellationToken = default)
-        => _runLifecycle.StopAsync(cancellationToken);
+    public async Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _runLifecycle.StopAsync(cancellationToken);
+        }
+        finally
+        {
+            _trace.CompleteRun();
+        }
+    }
 
     /// <summary>
     /// Starts a test lifecycle with an explicit numeric ID.
@@ -83,7 +97,11 @@ public sealed class ProtoHost : IAsyncDisposable
     /// <summary>
     /// Completes the active test using the exact lifecycle components that completed setup.
     /// </summary>
-    public Task CompleteTestAsync() => _testLifecycle.CompleteAsync();
+    public Task CompleteTestAsync() => _testLifecycle.CompleteAsync(ProtoTestResult.Unknown);
+
+    /// <summary>Completes the active test and records the result reported by its framework adapter.</summary>
+    public Task CompleteTestAsync(ProtoTestResult result)
+        => _testLifecycle.CompleteAsync(result ?? throw new ArgumentNullException(nameof(result)));
 
     public async ValueTask DisposeAsync()
     {

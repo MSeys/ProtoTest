@@ -35,10 +35,29 @@ internal sealed class RestLifecycleHook : IProtoTestHook
             ClientName = clientAttribute?.ClientName ?? "Default"
         });
 
+        context.Trace.WriteEvent(
+            "rest.context.configure",
+            $"REST context · {clientAttribute?.ClientName ?? "Default"}",
+            "ProtoTest.Rest",
+            ProtoTracePhase.Setup,
+            ProtoTraceOutcome.Succeeded,
+            new Dictionary<string, string?>
+            {
+                ["client.name"] = clientAttribute?.ClientName ?? "Default",
+                ["auth.source"] = methodAuthAttributes.Length > 0 ? "method" : authAttributes.Length > 0 ? "class" : "none",
+                ["auth.count"] = orderedAuthAttributes.Length.ToString(),
+                ["auth.types"] = string.Join(", ", orderedAuthAttributes.Select(AuthTypeName))
+            });
+
         return Task.CompletedTask;
     }
 
     public Task AfterTestAsync(ProtoExecutionContext context) => Task.CompletedTask;
+
+    private static string AuthTypeName(IRestAuthMetadata metadata)
+        => metadata.GetType().GenericTypeArguments.FirstOrDefault()?.FullName
+           ?? metadata.GetType().FullName
+           ?? metadata.GetType().Name;
 
     private static IRestAuthenticator CreateAuthenticator(
         IReadOnlyList<IRestAuthMetadata> attributes,

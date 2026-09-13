@@ -16,7 +16,9 @@ ProtoTest provides:
 - shared JSON shape matching through `ProtoTest.Json`;
 - shared HTTP integration foundations through `ProtoTest.Http`;
 - OpenAPI-driven REST coverage;
-- extension points for hooks, attributes, clients, and collectors.
+- extension points for hooks, attributes, clients, and collectors;
+- automatic portable execution traces for lifecycle and integration operations.
+- optional OpenTelemetry export through `ProtoTest.OpenTelemetry`, compatible with Sentry's official OpenTelemetry bridge.
 
 ## Example
 
@@ -48,15 +50,12 @@ Read the [ProtoTest documentation](docs/index.md), or start directly with:
 - [Hooks and lifecycle extensions](docs/extending/hooks.md)
 - [Context and state](docs/guides/context-and-state.md)
 - [Extension points](docs/reference/extension-points.md)
+- [Execution tracing](docs/reference/tracing.md)
 - [Extension guide](docs/extending/index.md)
 
-## Samples
+## Demo
 
-- [Shared SaaS sample application and REST showcase](samples/ProtoTest.SampleApp.RestDemo)
-- [Shared SaaS sample application and GraphQL showcase](samples/ProtoTest.SampleApp.GraphQLDemo)
-- [Focused GraphQL demo](samples/ProtoTest.GraphQL.Demo)
-- [REST demo](samples/ProtoTest.Rest.Demo)
-- [ASP.NET Core demo](samples/ProtoTest.AspNetCore.Demo)
+[ProtoTest.Demo](samples/ProtoTest.Demo) is the single end-to-end showcase. It tests a multi-tenant control-plane SaaS through REST and GraphQL with parallel tenant provisioning, authentication, workspaces, releases, commerce, billing, audit, OpenAPI/GraphQL coverage, custom hooks, clients, contexts, observations, attachments, reports, and a complete ProtoTrace.
 
 ## Build and test
 

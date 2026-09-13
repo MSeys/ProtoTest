@@ -33,6 +33,7 @@ If this is your first ProtoTest project:
 | Add a coverage collector | [Coverage extensions](extending/coverage.md) |
 | Choose an extension point | [Extension guide](extending/index.md) |
 | Understand ordering and disposal | [Lifecycle reference](reference/lifecycle.md) |
+| Inspect what happened during a test | [Execution tracing](reference/tracing.md) |
 | Compare ProtoTest with plain tests | [With and without ProtoTest](comparisons/with-and-without-prototest.md) |
 
 ## The ProtoTest mental model
@@ -53,6 +54,7 @@ ProtoHost
 	  +-- ProtoAttribute         class/method behavior
 	  +-- IProtoClientInitializer
 	  +-- IProtoCollector
+	  +-- automatic execution trace
 	  |
 	  v
 Proto.Context (current test)
@@ -94,6 +96,7 @@ You do not need to implement this lifecycle yourself. Select the adapter for you
 - GraphQL fluent operations, protocol assertions, and SDL field coverage
 - ASP.NET Core `WebApplicationFactory` clients and application-service access
 - OpenAPI endpoint, status-code, and response-property coverage
+- OpenTelemetry export for ProtoTest execution spans
 
 See the [integration overview](integrations/overview.md) for package names and status.
 
@@ -113,19 +116,16 @@ Read [hooks](extending/hooks.md) for lifecycle extensions or [custom attributes 
 
 ## Runnable examples
 
-- [Shared SaaS sample application](examples/sample-app.md)
-- [REST demo](examples/rest-demo.md)
-- [ASP.NET Core demo](examples/aspnetcore-demo.md)
+- [Unified control-plane SaaS demo](examples/sample-app.md)
 - [REST comparison](comparisons/with-and-without-prototest.md)
 
-The shared SaaS sample is the best place to see ProtoTest used as a reusable test platform.
-The focused REST demo complements it with a WireMock.Net-based external API, multiple
-named clients, different authentication styles, response matching, and coverage.
+The unified control-plane SaaS demo is the best place to see ProtoTest used as a reusable test platform across integrations and extension points.
 
 ## Reference
 
 - [Lifecycle](reference/lifecycle.md)
 - [Execution context](reference/execution-context.md)
+- [Execution tracing](reference/tracing.md)
 - [Test attachments](reference/test-attachments.md)
 - [Extension points](reference/extension-points.md)
 - [Extension guide](extending/index.md)

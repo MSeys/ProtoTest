@@ -25,7 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\samples\ProtoTest.AspNetCore.SampleApi\ProtoTest.AspNetCore.SampleApi.csproj" />
+    <ProjectReference Include="..\ProtoTest.AspNetCore.TestApi\ProtoTest.AspNetCore.TestApi.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.AspNetCore\ProtoTest.AspNetCore.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Rest\ProtoTest.Rest.csproj" />
   </ItemGroup>

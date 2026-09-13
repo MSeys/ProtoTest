@@ -1,52 +1,43 @@
-# Shared SaaS sample application
+# Unified control-plane SaaS demo
 
-`ProtoTest.SampleApp` is the common application under test for the growing integration
-showcase. Unlike the focused WireMock REST demo, it is a real runnable multi-tenant
-ASP.NET Core application with environments, users, roles, authentication, tenant
-isolation, orders, and billing.
+`ProtoTest.Demo` is the single runnable showcase. It exercises a real ASP.NET Core multi-tenant control-plane SaaS through REST and GraphQL while OpenAPI and GraphQL collectors produce coverage reports and ProtoTrace records the complete parallel execution.
 
-The sample is split by responsibility:
+The supporting projects are layers of this one demo:
 
-- `ProtoTest.SampleApp.Contracts` contains shared transport-neutral contracts;
-- `ProtoTest.SampleApp` owns the application and domain behavior;
-- `ProtoTest.SampleApp.Testing` owns reusable scenario attributes, typed contexts,
-  authentication, provisioning, and cleanup;
-- `ProtoTest.SampleApp.RestDemo` is the first integration-specific test suite.
+- `ProtoTest.SampleApp.Contracts` contains transport-neutral contracts;
+- `ProtoTest.SampleApp` owns organizations, users, roles, workspaces, releases, orders, billing, audit, and GraphQL;
+- `ProtoTest.SampleApp.Testing` owns reusable provisioning attributes, typed contexts, REST/GraphQL authenticators, a lifecycle hook, a named custom client initializer, observations, attachments, and cleanup;
+- `ProtoTest.Demo` contains the cross-integration journeys.
 
 ## Scenario model
 
-Tests declare the scenario they need:
+Tests declare only the scenario capabilities they need:
 
 ```csharp
 [RestClient(SampleAppTargets.Api)]
 [SampleEnvironment]
 [Auth<SampleUserAuthenticator>]
-public sealed class BillingTests
+public sealed class PlatformLifecycleTests
 {
     [ProtoTest]
-    [SampleUser(SampleRoles.BillingAdministrator)]
-    public async Task BillingAdministrator_CanSeeOpenInvoices()
+    [SampleUser(SampleRoles.TenantAdministrator)]
+    public async Task AdministratorCanDeployRelease()
     {
-        using var response = await Proto.Context.Rest()
-            .GetAsync("/api/billing/invoices", new { state = "open" });
-
-        response.ShouldHaveStatus(HttpStatusCode.OK);
+        // Exercise the real application through its public API.
     }
 }
 ```
 
-`SampleEnvironmentAttribute` provisions an isolated tenant and removes it during
-teardown. `SampleUserAttribute` provisions a user inside that tenant.
-`SampleUserAuthenticator` reads both typed contexts and applies the bearer token and
-tenant header. Their internal ordering is defined once in the shared testing project.
+`SampleEnvironmentAttribute` provisions an isolated organization and removes it during teardown. `SampleUserAttribute` provisions a role-specific user. Authentication reads those typed contexts. `SaasScenarioHook` adds correlation, observations, and a JSON summary artifact, while `ScenarioProbeInitializer` demonstrates a custom named test-scoped client.
+
+## Parallel execution
+
+The NUnit assembly uses `ParallelScope.All`, eight workers, and one fixture instance per testcase. Independent tenant journeys overlap safely and appear as overlapping spans in the ProtoTrace run timeline.
 
 ## Run it
 
 ```powershell
-dotnet test samples/ProtoTest.SampleApp.RestDemo
+dotnet test samples/ProtoTest.Demo
 ```
 
-The first suite covers successful and invalid orders, tenant isolation, billing roles,
-administrative access, OpenAPI coverage, and HTML/JSON reporting. Future GraphQL,
-gRPC, Playwright, and spreadsheet demos should remain separate test projects while
-reusing this application and scenario infrastructure.
+Reports and `control-plane.prototrace` are written below `TestResults/ProtoTest.Demo` in the output directory.

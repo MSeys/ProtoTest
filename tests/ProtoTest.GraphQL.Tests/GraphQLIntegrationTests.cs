@@ -58,6 +58,20 @@ public sealed class GraphQLIntegrationTests
                 Assert.That(queryText, Does.Contain("first: 10"));
                 Assert.That(Proto.Context.RecordedObservations.Select(o => o.Kind),
                     Is.EquivalentTo(new[] { "graphql.response", "graphql.contract.shape" }));
+                var entries = host.Trace.Snapshot().Tests.Single().Entries;
+                var request = entries.Single(entry => entry.Kind == "graphql.operation");
+                Assert.That(entries, Has.Some.Matches<ProtoTraceEntry>(entry =>
+                    entry.Kind == "graphql.builder.create"));
+                Assert.That(entries, Has.Some.Matches<ProtoTraceEntry>(entry =>
+                    entry.Kind == "auth.skip" && entry.ParentId == request.Id));
+                Assert.That(entries, Has.Some.Matches<ProtoTraceEntry>(entry =>
+                    entry.Kind == "assert.graphql.no_errors" && entry.ParentId == request.Id));
+                var shape = entries.Single(entry => entry.Kind == "assert.graphql.data_shape");
+                Assert.That(shape.ParentId, Is.EqualTo(request.Id));
+                Assert.That(shape.Attributes["shape.result"], Is.EqualTo("matched"));
+                Assert.That(shape.Attributes["shape.matches"], Does.Contain("$.products"));
+                Assert.That(shape.Attributes["shape.expected"], Is.Not.Empty);
+                Assert.That(shape.Attributes["shape.actual"], Is.Not.Empty);
             });
         }
         finally { await host.CompleteTestAsync(); }

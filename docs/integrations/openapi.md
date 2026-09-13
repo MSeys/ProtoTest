@@ -73,4 +73,4 @@ public async Task GetOrder_ExercisesDocumentedEndpoint()
 
 The OpenAPI tests in [`tests/ProtoTest.OpenApi.Tests`](../../tests/ProtoTest.OpenApi.Tests) cover loading, route matching, status coverage, and nested response properties.
 
-The runnable [REST demo](../examples/rest-demo.md) combines `OpenApiCoverageCollector` with both JSON and HTML reporting.
+The runnable [unified control-plane demo](../examples/sample-app.md) combines `OpenApiCoverageCollector` with JSON/HTML reporting and ProtoTrace.

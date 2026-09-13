@@ -124,6 +124,48 @@ public class Program
             return Results.Ok(new { user.Tenant, Users = store.GetUsers(user.Tenant) });
         });
 
+        app.MapPost("/api/workspaces", (
+            CreateWorkspaceRequest request,
+            HttpRequest httpRequest,
+            SampleSaasStore store) =>
+        {
+            if (!TryGetTenantUser(httpRequest, store, out var user, out var failure)) return failure!;
+            if (string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.Region))
+                return Results.BadRequest(new ErrorResponse("invalid-workspace"));
+            var workspace = store.CreateWorkspace(user!.Tenant, request.Name, request.Region, request.Plan)!;
+            return Results.Created($"/api/workspaces/{workspace.Id}", workspace);
+        });
+
+        app.MapGet("/api/workspaces", (HttpRequest request, SampleSaasStore store) =>
+            TryGetTenantUser(request, store, out var user, out var failure)
+                ? Results.Ok(store.GetWorkspaces(user!.Tenant))
+                : failure!);
+
+        app.MapPost("/api/workspaces/{workspaceId}/releases", (
+            string workspaceId,
+            CreateReleaseRequest request,
+            HttpRequest httpRequest,
+            SampleSaasStore store) =>
+        {
+            if (!TryGetTenantUser(httpRequest, store, out var user, out var failure)) return failure!;
+            if (user!.Role != SampleRoles.TenantAdministrator)
+                return Results.Json(new ErrorResponse("insufficient-permissions"), statusCode: StatusCodes.Status403Forbidden);
+            var release = store.CreateRelease(user.Tenant, workspaceId, request.Version, request.CommitSha);
+            return release is null
+                ? Results.NotFound(new ErrorResponse("workspace-not-found"))
+                : Results.Created($"/api/workspaces/{workspaceId}/releases/{release.Id}", release);
+        });
+
+        app.MapGet("/api/control-plane", (HttpRequest request, SampleSaasStore store) =>
+            TryGetTenantUser(request, store, out var user, out var failure)
+                ? Results.Ok(store.GetControlPlane(user!.Tenant))
+                : failure!);
+
+        app.MapGet("/api/audit", (HttpRequest request, SampleSaasStore store) =>
+            TryGetTenantUser(request, store, out var user, out var failure)
+                ? Results.Ok(store.GetAuditEvents(user!.Tenant))
+                : failure!);
+
         app.Run();
     }
 

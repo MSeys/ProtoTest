@@ -44,6 +44,22 @@ public sealed class SampleQuery
             store.GetOrders(user.Tenant)?.Count ?? 0);
     }
 
+    public IReadOnlyCollection<WorkspaceResponse> Workspaces(
+        [Service] IHttpContextAccessor accessor,
+        [Service] SampleSaasStore store)
+    {
+        var user = SampleGraphQLSecurity.RequireTenantUser(accessor.HttpContext, store);
+        return store.GetWorkspaces(user.Tenant) ?? [];
+    }
+
+    public ControlPlaneResponse ControlPlane(
+        [Service] IHttpContextAccessor accessor,
+        [Service] SampleSaasStore store)
+    {
+        var user = SampleGraphQLSecurity.RequireTenantUser(accessor.HttpContext, store);
+        return store.GetControlPlane(user.Tenant)!;
+    }
+
     private static int DecodeCursor(string? cursor)
         => cursor is null ? -1 : int.TryParse(cursor, out var value) ? value : -1;
     private static string EncodeCursor(int value) => value.ToString();

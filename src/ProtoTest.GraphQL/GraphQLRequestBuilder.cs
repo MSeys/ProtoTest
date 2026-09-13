@@ -48,18 +48,36 @@ public sealed class GraphQLRequestBuilder
             parsed,
             operation.Operation.ToString().ToLowerInvariant(),
             operation.Name?.Value);
+        TraceConfiguration(
+            "graphql.operation.configure",
+            $"Configure · {_operation.Type} {_operation.Name ?? "<anonymous>"}",
+            new Dictionary<string, string?>
+            {
+                ["graphql.operation.type"] = _operation.Type,
+                ["graphql.operation.name"] = _operation.Name,
+                ["graphql.document.source"] = "raw"
+            });
         return this;
     }
 
     public GraphQLRequestBuilder Header(string name, string value)
     {
         _headers[name] = value;
+        TraceConfiguration("http.header.configure", $"Header · {name}", new Dictionary<string, string?>()
+        {
+            ["http.header.name"] = name,
+            ["http.header.value_recorded"] = "false"
+        });
         return this;
     }
 
     public GraphQLRequestBuilder Variables(object variables)
     {
         _variables = variables ?? throw new ArgumentNullException(nameof(variables));
+        TraceConfiguration("graphql.variables.configure", "GraphQL variables configured", new Dictionary<string, string?>()
+        {
+            ["variables.type"] = variables.GetType().FullName
+        });
         return this;
     }
 
@@ -67,6 +85,11 @@ public sealed class GraphQLRequestBuilder
     {
         _authenticator = authenticator ?? throw new ArgumentNullException(nameof(authenticator));
         _authenticatorFactory = _ => authenticator;
+        TraceConfiguration("auth.select", $"Authentication · {authenticator.GetType().Name}", new Dictionary<string, string?>()
+        {
+            ["auth.source"] = "request",
+            ["auth.type"] = authenticator.GetType().FullName
+        });
         return this;
     }
 
@@ -76,6 +99,11 @@ public sealed class GraphQLRequestBuilder
         _authenticator = null;
         _authenticatorFactory = context => Microsoft.Extensions.DependencyInjection.ActivatorUtilities
             .CreateInstance<TAuthenticator>(context.Services, constructorArgs);
+        TraceConfiguration("auth.select", $"Authentication · {typeof(TAuthenticator).Name}", new Dictionary<string, string?>()
+        {
+            ["auth.source"] = "request",
+            ["auth.type"] = typeof(TAuthenticator).FullName
+        });
         return this;
     }
 
@@ -83,6 +111,7 @@ public sealed class GraphQLRequestBuilder
     {
         _authenticator = null;
         _authenticatorFactory = null;
+        TraceConfiguration("auth.disable", "Authentication · Disabled", new Dictionary<string, string?> { ["auth.source"] = "request" });
         return this;
     }
 
@@ -103,12 +132,41 @@ public sealed class GraphQLRequestBuilder
     {
         var operation = _operation ?? throw new InvalidOperationException("Configure a query, mutation, or request before executing it.");
         var identifier = $"{operation.Type} {operation.Name ?? "<anonymous>"}";
+        using var traceOperation = _context.Trace.StartOperation(
+            "graphql.operation",
+            $"GraphQL · {identifier}",
+            "ProtoTest.GraphQL",
+            attributes: new Dictionary<string, string?>
+            {
+                ["client.name"] = _targetName,
+                ["graphql.operation.type"] = operation.Type,
+                ["graphql.operation.name"] = operation.Name
+            });
         var stopwatch = Stopwatch.StartNew();
-        var endpoint = _baseAddressResolver is not null
-            ? await _baseAddressResolver(_context, cancellationToken)
-            : _client.BaseAddress ?? throw new InvalidOperationException($"GraphQL client '{_targetName}' has no endpoint.");
-        if (!endpoint.IsAbsoluteUri || endpoint.Scheme is not ("http" or "https"))
-            throw new InvalidOperationException("A per-test GraphQL endpoint must be an absolute HTTP or HTTPS URI.");
+        Uri endpoint;
+        using var resolveOperation = _context.Trace.StartOperation(
+            "graphql.endpoint.resolve",
+            $"Resolve endpoint · {_targetName}",
+            "ProtoTest.GraphQL",
+            attributes: new Dictionary<string, string?> { ["client.name"] = _targetName });
+        try
+        {
+            endpoint = _baseAddressResolver is not null
+                ? await _baseAddressResolver(_context, cancellationToken)
+                : _client.BaseAddress ?? throw new InvalidOperationException($"GraphQL client '{_targetName}' has no endpoint.");
+            if (!endpoint.IsAbsoluteUri || endpoint.Scheme is not ("http" or "https"))
+                throw new InvalidOperationException("A per-test GraphQL endpoint must be an absolute HTTP or HTTPS URI.");
+            resolveOperation.SetAttribute("server.address", endpoint.GetLeftPart(UriPartial.Authority));
+            resolveOperation.Succeed();
+        }
+        catch (Exception exception)
+        {
+            stopwatch.Stop();
+            resolveOperation.Fail(exception);
+            traceOperation.Fail(exception);
+            TryRecordFailure(operation, identifier, stopwatch.Elapsed, exception);
+            throw;
+        }
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
         request.Headers.Accept.Add(GraphQLMediaType);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json", 0.9));
@@ -138,10 +196,34 @@ public sealed class GraphQLRequestBuilder
         {
             if (_authenticatorFactory is not null)
             {
-                _authenticator ??= _authenticatorFactory(_context)
-                    ?? throw new InvalidOperationException("The GraphQL authenticator factory returned null.");
-                await _authenticator.AuthenticateAsync(
-                    new GraphQLAuthenticationContext(request, _context, _targetName), cancellationToken);
+                using var authOperation = _context.Trace.StartOperation(
+                    "auth.apply",
+                    "Apply GraphQL authentication",
+                    "ProtoTest.GraphQL",
+                    attributes: new Dictionary<string, string?> { ["client.name"] = _targetName });
+                try
+                {
+                    _authenticator ??= _authenticatorFactory(_context)
+                        ?? throw new InvalidOperationException("The GraphQL authenticator factory returned null.");
+                    authOperation.SetAttribute("auth.type", _authenticator.GetType().FullName);
+                    await _authenticator.AuthenticateAsync(
+                        new GraphQLAuthenticationContext(request, _context, _targetName), cancellationToken);
+                    authOperation.Succeed();
+                }
+                catch (Exception exception)
+                {
+                    authOperation.Fail(exception);
+                    throw;
+                }
+            }
+            else
+            {
+                _context.Trace.WriteEvent(
+                    "auth.skip",
+                    "Authentication · None",
+                    "ProtoTest.GraphQL",
+                    outcome: ProtoTraceOutcome.Succeeded,
+                    attributes: new Dictionary<string, string?> { ["client.name"] = _targetName });
             }
 
             HttpResponseMessage? rawResponse = null;
@@ -155,7 +237,7 @@ public sealed class GraphQLRequestBuilder
                 var content = await rawResponse.Content.ReadAsStringAsync(cancellationToken);
                 stopwatch.Stop();
                 var response = new GraphQLResponse(rawResponse, content, stopwatch.Elapsed, _context, _targetName, identifier, operation,
-                    attachmentOptions, attachmentPrefix);
+                    attachmentOptions, attachmentPrefix, traceOperation.Id);
 
                 if (attachmentOptions?.CaptureResponses == true)
                     _context.AddAttachment(
@@ -177,6 +259,10 @@ public sealed class GraphQLRequestBuilder
                         response.Errors.Select(error => error.Code).Where(code => code is not null).Cast<string>().ToArray(),
                         stopwatch.Elapsed,
                         variablesJson is null ? null : JsonDiagnosticSanitizer.Sanitize(variablesJson, attachmentOptions, truncate: false))));
+                traceOperation
+                    .SetAttribute("http.response.status_code", ((int)rawResponse.StatusCode).ToString())
+                    .SetAttribute("graphql.error.count", response.Errors.Count.ToString());
+                traceOperation.Succeed();
                 rawResponse = null; // GraphQLResponse owns the response from here on.
                 return response;
             }
@@ -188,12 +274,8 @@ public sealed class GraphQLRequestBuilder
         catch (Exception exception)
         {
             stopwatch.Stop();
-            _context.RecordObservation(new ProtoObservation(
-                _targetName,
-                "graphql.failure",
-                identifier,
-                new GraphQLFailureData(operation.Type, operation.Name, stopwatch.Elapsed,
-                    exception.GetType().FullName ?? exception.GetType().Name, exception.Message)));
+            traceOperation.Fail(exception);
+            TryRecordFailure(operation, identifier, stopwatch.Elapsed, exception);
             throw;
         }
     }
@@ -204,7 +286,45 @@ public sealed class GraphQLRequestBuilder
         var builder = new GraphQLOperationBuilder(type, name);
         configure(builder);
         _operation = builder.Build();
+        TraceConfiguration("graphql.operation.configure", $"Configure · {type} {name ?? "<anonymous>"}", new Dictionary<string, string?>()
+        {
+            ["graphql.operation.type"] = type,
+            ["graphql.operation.name"] = name
+        });
         return this;
+    }
+
+    private void TraceConfiguration(string kind, string name, IReadOnlyDictionary<string, string?> attributes)
+        => _context.Trace.WriteEvent(
+            kind,
+            name,
+            "ProtoTest.GraphQL",
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: attributes);
+
+    private void TryRecordFailure(
+        GraphQLBuiltOperation operation,
+        string identifier,
+        TimeSpan duration,
+        Exception exception)
+    {
+        try
+        {
+            _context.RecordObservation(new ProtoObservation(
+                _targetName,
+                "graphql.failure",
+                identifier,
+                new GraphQLFailureData(
+                    operation.Type,
+                    operation.Name,
+                    duration,
+                    exception.GetType().FullName ?? exception.GetType().Name,
+                    exception.Message)));
+        }
+        catch
+        {
+            // Diagnostics must never replace the original GraphQL failure.
+        }
     }
 }
 

@@ -26,8 +26,19 @@ internal static class ProtoTestLifecycleHandler
     /// </summary>
     public static void After(MethodInfo methodUnderTest, IXunitTest test)
     {
+        var state = global::Xunit.TestContext.Current.TestState;
+        var result = state?.Result switch
+        {
+            global::Xunit.TestResult.Passed => ProtoTestResult.Passed,
+            global::Xunit.TestResult.Skipped or global::Xunit.TestResult.NotRun => ProtoTestResult.Skipped,
+            global::Xunit.TestResult.Failed => ProtoTestResult.Failed(new ProtoTraceError(
+                state.ExceptionTypes?.FirstOrDefault() ?? "xUnit.TestFailure",
+                state.ExceptionMessages?.FirstOrDefault() ?? "The xUnit test failed.",
+                state.ExceptionStackTraces?.FirstOrDefault())),
+            _ => ProtoTestResult.Unknown
+        };
         ProtoTestAssembly.Host
-            .CompleteTestAsync()
+            .CompleteTestAsync(result)
             .GetAwaiter()
             .GetResult();
     }

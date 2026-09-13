@@ -13,6 +13,26 @@ public class JsonDiagnosticOptions
 
 public static class JsonDiagnosticSanitizer
 {
+    public static string Serialize(object? value, JsonDiagnosticOptions? configured = null)
+    {
+        try
+        {
+            return Sanitize(JsonSerializer.Serialize(value, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            }), configured);
+        }
+        catch (Exception exception)
+        {
+            return JsonSerializer.Serialize(new
+            {
+                unavailable = true,
+                type = value?.GetType().FullName,
+                reason = exception.GetType().Name
+            });
+        }
+    }
+
     public static string Sanitize(string content, JsonDiagnosticOptions? configured = null, bool truncate = true)
     {
         var options = configured ?? new JsonDiagnosticOptions();

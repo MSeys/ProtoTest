@@ -168,14 +168,13 @@ Use ProtoTest when multiple tests share clients or environments, when several in
 
 ## See the runnable version
 
-The comparison snippets are intentionally focused on the test boundary. The complete ProtoTest implementation uses a WireMock.Net server so it behaves like an external API. See the [REST demo](../examples/rest-demo.md) for the runnable example and source links:
+The comparison snippets are intentionally focused on the test boundary. See the [unified control-plane demo](../examples/sample-app.md) for the runnable implementation:
 
-- `Setup.cs` starts WireMock and registers named clients and coverage.
-- `OrderApiTests.cs` shows attribute-based authentication and shape matching.
-- `InventoryApiTests.cs` shows fluent authentication.
+- `Setup.cs` registers the in-process application, named REST/GraphQL clients, coverage, reports, tracing, and custom extensions.
+- The business journey fixtures show authentication, shape matching, tenant isolation, billing, releases, and audit.
 
 Run the complete implementation with:
 
 ```bash
-dotnet test samples/ProtoTest.Rest.Demo/ProtoTest.Rest.Demo.csproj
+dotnet test samples/ProtoTest.Demo/ProtoTest.Demo.csproj
 ```

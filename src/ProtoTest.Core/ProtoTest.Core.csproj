@@ -35,11 +35,5 @@
   	<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.*" />
   	<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.*" />
   </ItemGroup>
-  
-  <ItemGroup>
-    <Compile Remove="NewFolder\**" />
-    <EmbeddedResource Remove="NewFolder\**" />
-    <None Remove="NewFolder\**" />
-  </ItemGroup>
 
 </Project>

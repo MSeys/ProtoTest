@@ -28,7 +28,7 @@ internal static class ShapeMatcher
                     mismatch.Reason,
                     mismatch.Expected,
                     mismatch.Actual))
-                .ToArray());
+                .ToArray(), exception.MatchedProperties);
         }
     }
 }

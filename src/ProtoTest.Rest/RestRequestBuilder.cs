@@ -36,6 +36,11 @@ public sealed class RestRequestBuilder
     {
         _resolvedAuthenticator = authenticator ?? throw new ArgumentNullException(nameof(authenticator));
         _authenticatorFactory = _ => authenticator;
+        TraceConfiguration("auth.select", $"Authentication · {authenticator.GetType().Name}", new Dictionary<string, string?>()
+        {
+            ["auth.source"] = "request",
+            ["auth.type"] = authenticator.GetType().FullName
+        });
         return this;
     }
 
@@ -43,6 +48,11 @@ public sealed class RestRequestBuilder
     {
         _resolvedAuthenticator = null;
         _authenticatorFactory = context => RestAuthenticatorFactory.Create<TAuth>(context, constructorArgs);
+        TraceConfiguration("auth.select", $"Authentication · {typeof(TAuth).Name}", new Dictionary<string, string?>()
+        {
+            ["auth.source"] = "request",
+            ["auth.type"] = typeof(TAuth).FullName
+        });
         return this;
     }
 
@@ -51,6 +61,7 @@ public sealed class RestRequestBuilder
     {
         _resolvedAuthenticator = null;
         _authenticatorFactory = null;
+        TraceConfiguration("auth.disable", "Authentication · Disabled", new Dictionary<string, string?> { ["auth.source"] = "request" });
         return this;
     }
 
@@ -72,6 +83,11 @@ public sealed class RestRequestBuilder
     public RestRequestBuilder Header(string name, string value)
     {
         _headers[name] = value;
+        TraceConfiguration("http.header.configure", $"Header · {name}", new Dictionary<string, string?>()
+        {
+            ["http.header.name"] = name,
+            ["http.header.value_recorded"] = "false"
+        });
         return this;
     }
 
@@ -87,6 +103,11 @@ public sealed class RestRequestBuilder
         ArgumentNullException.ThrowIfNull(rawContent);
         ArgumentException.ThrowIfNullOrWhiteSpace(mediaType);
         _contentFactory = () => new StringContent(rawContent, Encoding.UTF8, mediaType);
+        TraceConfiguration("http.body.configure", $"Body · {mediaType}", new Dictionary<string, string?>()
+        {
+            ["http.request.body.media_type"] = mediaType,
+            ["http.request.body.length"] = Encoding.UTF8.GetByteCount(rawContent).ToString()
+        });
         return this;
     }
 
@@ -94,6 +115,11 @@ public sealed class RestRequestBuilder
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(mediaType);
         var bytes = content.ToArray();
+        TraceConfiguration("http.body.configure", $"Body · {mediaType}", new Dictionary<string, string?>()
+        {
+            ["http.request.body.media_type"] = mediaType,
+            ["http.request.body.length"] = bytes.Length.ToString()
+        });
         _contentFactory = () =>
         {
             var byteContent = new ByteArrayContent(bytes);
@@ -107,6 +133,10 @@ public sealed class RestRequestBuilder
     public RestRequestBuilder Body(Func<HttpContent> contentFactory)
     {
         _contentFactory = contentFactory ?? throw new ArgumentNullException(nameof(contentFactory));
+        TraceConfiguration("http.body.configure", "Body · Content factory", new Dictionary<string, string?>()
+        {
+            ["http.request.body.source"] = "factory"
+        });
         return this;
     }
 
@@ -139,8 +169,23 @@ public sealed class RestRequestBuilder
     {
         ArgumentNullException.ThrowIfNull(method);
         var attachmentOptions = _context.TryService<RestAttachmentOptions>();
+        using var traceOperation = _context.Trace.StartOperation(
+            "http.request",
+            $"REST · {method.Method.ToUpperInvariant()} {routeTemplate}",
+            "ProtoTest.Rest",
+            attributes: new Dictionary<string, string?>
+            {
+                ["client.name"] = _targetName,
+                ["http.request.method"] = method.Method.ToUpperInvariant(),
+                ["http.route"] = routeTemplate
+            });
         var stopwatch = Stopwatch.StartNew();
         Uri requestUri;
+        using var resolveOperation = _context.Trace.StartOperation(
+            "http.route.resolve",
+            $"Resolve route · {routeTemplate}",
+            "ProtoTest.Rest",
+            attributes: new Dictionary<string, string?> { ["http.route"] = routeTemplate });
         try
         {
             requestUri = await RestUriBuilder.BuildRequestUriAsync(
@@ -150,10 +195,14 @@ public sealed class RestRequestBuilder
                 _baseAddressResolver,
                 _context,
                 ct);
+            resolveOperation.SetAttribute("server.address", RestDiagnosticSanitizer.SanitizeUri(requestUri, attachmentOptions));
+            resolveOperation.Succeed();
         }
         catch (Exception exception)
         {
             stopwatch.Stop();
+            resolveOperation.Fail(exception);
+            traceOperation.Fail(exception);
             TryRecordFailure(method, routeTemplate, null, stopwatch.Elapsed, exception, ct, attachmentOptions);
             throw;
         }
@@ -201,16 +250,41 @@ public sealed class RestRequestBuilder
 
             if (_authenticatorFactory is not null)
             {
-                _resolvedAuthenticator ??= _authenticatorFactory(_context)
-                    ?? throw new InvalidOperationException("The REST authenticator factory returned null.");
-                await _resolvedAuthenticator.AuthenticateAsync(
-                    new RestAuthenticationContext(request, _context, _targetName),
-                    ct);
+                using var authOperation = _context.Trace.StartOperation(
+                    "auth.apply",
+                    "Apply REST authentication",
+                    "ProtoTest.Rest",
+                    attributes: new Dictionary<string, string?> { ["client.name"] = _targetName });
+                try
+                {
+                    _resolvedAuthenticator ??= _authenticatorFactory(_context)
+                        ?? throw new InvalidOperationException("The REST authenticator factory returned null.");
+                    authOperation.SetAttribute("auth.type", _resolvedAuthenticator.GetType().FullName);
+                    await _resolvedAuthenticator.AuthenticateAsync(
+                        new RestAuthenticationContext(request, _context, _targetName),
+                        ct);
+                    authOperation.Succeed();
+                }
+                catch (Exception exception)
+                {
+                    authOperation.Fail(exception);
+                    throw;
+                }
+            }
+            else
+            {
+                _context.Trace.WriteEvent(
+                    "auth.skip",
+                    "Authentication · None",
+                    "ProtoTest.Rest",
+                    outcome: ProtoTraceOutcome.Succeeded,
+                    attributes: new Dictionary<string, string?> { ["client.name"] = _targetName });
             }
         }
         catch (Exception exception)
         {
             stopwatch.Stop();
+            traceOperation.Fail(exception);
             TryRecordFailure(
                 method,
                 routeTemplate,
@@ -272,6 +346,11 @@ public sealed class RestRequestBuilder
                 )
             ));
 
+            traceOperation
+                .SetAttribute("http.response.status_code", ((int)responseMessage.StatusCode).ToString())
+                .SetAttribute("server.address", RestDiagnosticSanitizer.SanitizeUri(request.RequestUri, attachmentOptions));
+            traceOperation.Succeed();
+
             return new RestResponse(
                 responseMessage,
                 bodyString,
@@ -281,12 +360,14 @@ public sealed class RestRequestBuilder
                 routeIdentifier,
                 attachmentOptions,
                 attachmentPrefix,
-                bodyBytes
+                bodyBytes,
+                traceOperation.Id
             );
         }
         catch (Exception exception)
         {
             stopwatch.Stop();
+            traceOperation.Fail(exception);
             responseMessage?.Dispose();
             TryRecordFailure(
                 method,
@@ -299,6 +380,14 @@ public sealed class RestRequestBuilder
             throw;
         }
     }
+
+    private void TraceConfiguration(string kind, string name, IReadOnlyDictionary<string, string?> attributes)
+        => _context.Trace.WriteEvent(
+            kind,
+            name,
+            "ProtoTest.Rest",
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: attributes);
 
     private void TryRecordFailure(
         HttpMethod method,

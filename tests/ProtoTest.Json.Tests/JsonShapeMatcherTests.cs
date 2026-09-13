@@ -59,4 +59,17 @@ public sealed class JsonShapeMatcherTests
                 Is.EqualTo("""{"id": 1}"""));
         });
     }
+
+    [Test]
+    public void DiagnosticSerializer_ShouldUseCamelCaseAndRedactSensitiveValues()
+    {
+        var result = JsonDiagnosticSanitizer.Serialize(new { PropertyPath = "$.user", Token = "secret" });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Does.Contain("\"propertyPath\":\"$.user\""));
+            Assert.That(result, Does.Contain("\"token\":\"[REDACTED]\""));
+            Assert.That(result, Does.Not.Contain("secret"));
+        });
+    }
 }

@@ -6,6 +6,7 @@ using ProtoTest.Core;
 using ProtoTest.Rest;
 using ProtoTest.GraphQL;
 using ProtoTest.SampleApp.Contracts;
+using System.Text.Json;
 
 public static class SampleAppTargets
 {
@@ -24,6 +25,96 @@ public sealed record SampleUserContext(
     string Email,
     string Role,
     string AccessToken) : IProtoContext;
+
+public sealed record ScenarioCorrelationContext(
+    string CorrelationId,
+    DateTimeOffset StartedAtUtc,
+    string TestName) : IProtoContext;
+
+public sealed class ScenarioProbe
+{
+    private readonly List<string> _milestones = [];
+    public IReadOnlyList<string> Milestones => _milestones;
+    public void Mark(string milestone) => _milestones.Add(milestone);
+}
+
+public sealed class ScenarioProbeInitializer : IProtoClientInitializer<ScenarioProbe>
+{
+    public string Name => "ScenarioProbe";
+
+    public Task<bool> TryInitializeAsync(
+        ProtoExecutionContext context,
+        CancellationToken cancellationToken = default)
+    {
+        context.RegisterClient(new ScenarioProbe(), Name);
+        return Task.FromResult(true);
+    }
+}
+
+public sealed class SaasScenarioHook : IProtoTestHook
+{
+    public int Order => -1_000;
+
+    public Task BeforeTestAsync(ProtoExecutionContext context)
+    {
+        var correlation = new ScenarioCorrelationContext(
+            $"scenario-{context.TestId}-{Guid.NewGuid():N}",
+            DateTimeOffset.UtcNow,
+            context.TestName);
+        context.SetContext(correlation);
+        context.Client<ScenarioProbe>("ScenarioProbe").Mark("scenario-started");
+        context.RecordObservation(
+            "ControlPlane",
+            "scenario.started",
+            correlation.CorrelationId,
+            new { context.TestId, context.TestName });
+        context.Trace.WriteEvent(
+            "saas.correlation.begin",
+            "Begin correlated SaaS scenario",
+            "ProtoTest.SampleApp.Testing",
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: new Dictionary<string, string?>
+            {
+                ["saas.correlation_id"] = correlation.CorrelationId
+            });
+        return Task.CompletedTask;
+    }
+
+    public Task AfterTestAsync(ProtoExecutionContext context)
+    {
+        var correlation = context.Context<ScenarioCorrelationContext>();
+        var probe = context.Client<ScenarioProbe>("ScenarioProbe");
+        probe.Mark("scenario-completed");
+        var duration = DateTimeOffset.UtcNow - correlation.StartedAtUtc;
+        context.RecordObservation(
+            "ControlPlane",
+            "scenario.completed",
+            correlation.CorrelationId,
+            new { duration.TotalMilliseconds, probe.Milestones });
+        context.AddAttachment(
+            "scenario-summary.json",
+            JsonSerializer.Serialize(new
+            {
+                correlation.CorrelationId,
+                correlation.TestName,
+                DurationMs = duration.TotalMilliseconds,
+                probe.Milestones
+            }),
+            "application/json",
+            "Correlation and custom-client milestones for this SaaS scenario.");
+        context.Trace.WriteEvent(
+            "saas.correlation.end",
+            "Complete correlated SaaS scenario",
+            "ProtoTest.SampleApp.Testing",
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: new Dictionary<string, string?>
+            {
+                ["saas.correlation_id"] = correlation.CorrelationId,
+                ["saas.duration_ms"] = duration.TotalMilliseconds.ToString("F1")
+            });
+        return Task.CompletedTask;
+    }
+}
 
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, Inherited = true)]
 public sealed class SampleEnvironmentAttribute : ProtoAttribute

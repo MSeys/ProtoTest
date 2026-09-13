@@ -5,10 +5,13 @@ using ProtoTest.Json;
 
 public sealed record GraphQLShapeMismatch(string Path, string Reason, object? Expected, object? Actual);
 
-public sealed class GraphQLShapeMismatchException(IReadOnlyList<GraphQLShapeMismatch> mismatches)
+public sealed class GraphQLShapeMismatchException(
+    IReadOnlyList<GraphQLShapeMismatch> mismatches,
+    IReadOnlyList<string>? matchedProperties = null)
     : ProtoTest.Core.ProtoAssertionException(BuildMessage(mismatches))
 {
     public IReadOnlyList<GraphQLShapeMismatch> Mismatches { get; } = [.. mismatches];
+    public IReadOnlyList<string> MatchedProperties { get; } = [.. matchedProperties ?? []];
 
     private static string BuildMessage(IReadOnlyList<GraphQLShapeMismatch> mismatches)
         => $"GraphQL data shape mismatch with {mismatches.Count} error(s):{Environment.NewLine}" +
@@ -31,7 +34,7 @@ internal static class GraphQLShapeMatcher
                     mismatch.Reason,
                     mismatch.Expected,
                     mismatch.Actual))
-                .ToArray());
+                .ToArray(), exception.MatchedProperties);
         }
     }
 }

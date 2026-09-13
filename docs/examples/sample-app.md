@@ -40,4 +40,4 @@ The NUnit assembly uses `ParallelScope.All`, eight workers, and one fixture inst
 dotnet test samples/ProtoTest.Demo
 ```
 
-Reports and `control-plane.prototrace` are written below `TestResults/ProtoTest.Demo` in the output directory.
+Reports and `prototest-demo.prototrace` are written below `TestResults/ProtoTest.Demo` in the output directory.

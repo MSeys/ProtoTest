@@ -125,7 +125,11 @@ public class Program
                 return Results.Json(new ErrorResponse("insufficient-permissions"), statusCode: StatusCodes.Status403Forbidden);
             }
 
-            return Results.Ok(new { user.Tenant, Users = store.GetUsers(user.Tenant) });
+            return Results.Ok(new
+            {
+                user.Tenant,
+                Users = store.GetUsers(user.Tenant)!.OrderBy(item => item.Id, StringComparer.Ordinal).ToArray()
+            });
         });
 
         app.MapPost("/api/workspaces", (

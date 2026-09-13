@@ -7,9 +7,9 @@ param(
 $ErrorActionPreference = "Stop"
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $repositoryRoot "samples/ProtoTest.Demo/ProtoTest.Demo.csproj"
-$trace = Join-Path $repositoryRoot "samples/ProtoTest.Demo/bin/$Configuration/net8.0/TestResults/ProtoTest.Demo/control-plane.prototrace"
+$trace = Join-Path $repositoryRoot "samples/ProtoTest.Demo/bin/$Configuration/net8.0/TestResults/ProtoTest.Demo/prototest-demo.prototrace"
 $destinationDirectory = Join-Path $repositoryRoot "viewer/public/demos"
-$destination = Join-Path $destinationDirectory "shape-mismatch.prototrace"
+$destination = Join-Path $destinationDirectory "prototest-demo.prototrace"
 $previousFailureMode = [Environment]::GetEnvironmentVariable("PROTOTEST_DEMO_INCLUDE_FAILURE", "Process")
 $runStartedAtUtc = [DateTime]::UtcNow
 
@@ -47,9 +47,9 @@ try {
     $failedTests = @($tests | Where-Object outcome -eq "Failed")
     $succeededTests = @($tests | Where-Object outcome -eq "Succeeded")
     $partialTests = @($tests | Where-Object outcome -eq "Partial")
-    if ($tests.Count -ne 12 -or $succeededTests.Count -ne 9 -or $partialTests.Count -ne 2 -or $failedTests.Count -ne 1 -or
+    if ($tests.Count -ne 18 -or $succeededTests.Count -ne 15 -or $partialTests.Count -ne 2 -or $failedTests.Count -ne 1 -or
         $failedTests[0].methodName -ne "IntentionalFailureShowsFailedTestShapeMismatchAndTeardown") {
-        throw "Expected 9 successful tests, 2 partial diagnostic tests and only the intentional shape-mismatch failure in the viewer trace."
+        throw "Expected 15 successful tests, 2 partial diagnostic tests and only the intentional shape-mismatch failure in the viewer trace."
     }
 
     New-Item -ItemType Directory -Path $destinationDirectory -Force | Out-Null

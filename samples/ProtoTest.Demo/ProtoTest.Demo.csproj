@@ -18,6 +18,7 @@
     <ProjectReference Include="..\ProtoTest.SampleApp.Contracts\ProtoTest.SampleApp.Contracts.csproj" />
     <ProjectReference Include="..\ProtoTest.SampleApp.Testing\ProtoTest.SampleApp.Testing.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.AspNetCore\ProtoTest.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Data\ProtoTest.Data.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.GraphQL\ProtoTest.GraphQL.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.NUnit\ProtoTest.NUnit.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.OpenApi\ProtoTest.OpenApi.csproj" />

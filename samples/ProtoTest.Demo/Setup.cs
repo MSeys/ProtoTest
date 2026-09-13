@@ -4,12 +4,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.AspNetCore;
 using ProtoTest.Core;
+using ProtoTest.Data;
 using ProtoTest.GraphQL;
 using ProtoTest.NUnit;
 using ProtoTest.OpenApi;
 using ProtoTest.Reporting;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp;
+using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Testing;
 
 [SetUpFixture]
@@ -19,7 +21,7 @@ public sealed class Setup : ProtoTestAssembly
     {
         builder
             .ConfigureTracing(trace => trace.OutputPath = Path.Combine(
-                "TestResults", "ProtoTest.Demo", "control-plane.prototrace"))
+                "TestResults", "ProtoTest.Demo", "prototest-demo.prototrace"))
             .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
@@ -32,6 +34,8 @@ public sealed class Setup : ProtoTestAssembly
                 services.AddSingleton<IGraphQLWebSocketFactory, SampleAppGraphQLWebSocketFactory>();
             })
             .AddTestHook<SaasScenarioHook>()
+            .AddData(data => data.AddDefaults<SampleAppDataDefaults>())
+            .AddDataProvisioner<CreateUserRequest, UserResponse, SampleUserProvisioner>()
             .AddRest(rest => rest
                 .AddClient(SampleAppTargets.Api)
                 .WithCollector<RestCoverageCollector>()

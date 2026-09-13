@@ -52,9 +52,9 @@ async function loadFile(file: File) {
 async function loadDemo() {
   try {
     error.value = "";
-    const response = await fetch(`${import.meta.env.BASE_URL}demos/shape-mismatch.prototrace`);
+    const response = await fetch(`${import.meta.env.BASE_URL}demos/prototest-demo.prototrace`);
     if (!response.ok) throw new Error(`The demo trace could not be loaded (${response.status}).`);
-    await loadBuffer(await response.arrayBuffer(), "Built-in shape mismatch demo");
+    await loadBuffer(await response.arrayBuffer(), "ProtoTest demo trace");
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : "The demo trace could not be opened.";
   }

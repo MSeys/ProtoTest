@@ -8,7 +8,7 @@ The testing layer also demonstrates custom ProtoTest extension points: provision
 dotnet test samples/ProtoTest.Demo
 ```
 
-The assembly runs testcases and fixtures concurrently with eight NUnit workers. Its HTML/JSON reports and `control-plane.prototrace` are written under `TestResults/ProtoTest.Demo`.
+The assembly runs testcases and fixtures concurrently with eight NUnit workers. Its HTML/JSON reports and `prototest-demo.prototrace` are written under `TestResults/ProtoTest.Demo`.
 
 The normal run contains deliberately failed child operations whose exceptions are inspected by the test, so failure diagnostics remain visible without making CI red. Its top-level failure showcase is skipped unless `PROTOTEST_DEMO_INCLUDE_FAILURE=1` is set.
 

@@ -2,6 +2,7 @@ namespace ProtoTest.Demo;
 
 using System.Net;
 using ProtoTest.Core;
+using ProtoTest.Data;
 using ProtoTest.Json;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
@@ -13,6 +14,29 @@ using ProtoTest.SampleApp.Testing;
 [Auth<SampleUserAuthenticator>]
 public sealed class CommerceAndSecurityTests
 {
+    [ProtoTest]
+    [SampleUser(SampleRoles.TenantAdministrator)]
+    public async Task AdministratorCanProvisionAndListSevenAdditionalUsers()
+    {
+        var createdUsers = await Proto.Context.Data()
+            .For<CreateUserRequest>()
+            .With(request => request.Role, SampleRoles.Member)
+            .CreateManyAsync<UserResponse>(7);
+        var administrator = Proto.Context.Context<SampleUserContext>();
+        var expectedUsers = createdUsers
+            .Select(user => new { user.Id, user.Email, user.Role })
+            .Append(new { administrator.Id, administrator.Email, administrator.Role })
+            .OrderBy(user => user.Id, StringComparer.Ordinal)
+            .ToArray();
+
+        using var response = await Proto.Context.Rest().GetAsync("/api/admin/users");
+        response.ShouldHaveStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        {
+            tenant = administrator.Tenant,
+            users = expectedUsers
+        });
+    }
+
     [ProtoTest]
     [SampleUser(SampleRoles.BillingAdministrator)]
     public async Task BillingAdministratorCanCreateOrderAndReconcileOpenInvoices()
@@ -47,4 +71,5 @@ public sealed class CommerceAndSecurityTests
         response.ShouldHaveStatus(HttpStatusCode.Forbidden)
             .ShouldMatchShape(new { error = "tenant-access-denied" });
     }
+
 }

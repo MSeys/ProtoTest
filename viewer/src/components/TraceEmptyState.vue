@@ -18,10 +18,10 @@ function drop(event: DragEvent) {
       <img class="empty-mark" :src="logoUrl" alt="">
       <span class="drawing-label">Trace input / local</span>
       <h1>Open a ProtoTest execution</h1>
-      <p>Inspect your own <code>.prototrace</code>, or explore a real failed SaaS test first.</p>
+      <p>Inspect your own <code>.prototrace</code>, or explore the bundled SaaS demo.</p>
       <div class="empty-actions">
         <button class="primary" type="button" @click.stop="$emit('open')">Choose trace file</button>
-        <button class="secondary" type="button" @click.stop="$emit('demo')">Open failure demo</button>
+        <button class="secondary" type="button" @click.stop="$emit('demo')">Open demo trace</button>
       </div>
       <small>Your files are processed locally. Nothing is uploaded.</small>
     </div>

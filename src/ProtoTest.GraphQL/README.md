@@ -34,40 +34,34 @@ builder
 public async Task FindsProducts()
 {
     using var response = await Proto.Context.GraphQL()
-        .Query("FindProducts", query => query
-            .Connection("products", products => products
-                .Where(filter => filter
-                    .Contains("name", "note")
-                    .LessThan("price", 100m))
-                .OrderBy(order => order.Ascending("name"))
-                .First(10)
-                .Nodes("id", "name", "price")
-                .PageInfo("hasNextPage", "endCursor")))
-        .ExecuteAsync();
-
-    response
-        .ShouldHaveNoErrors()
-        .ShouldMatchData(new
+        .Query("products", new
         {
-            products = new
+            first = 10,
+            where = new { name = new { contains = "note" } },
+            order = new[] { new { name = Gql.Enum("ASC") } }
+        })
+        .ExpectAsync(new
+        {
+            nodes = new[]
             {
-                nodes = new[]
+                new
                 {
-                    new
-                    {
-                        id = JsonValue.NotNull(),
-                        name = JsonValue.StringContaining("note"),
-                        price = JsonValue.LessThan(100m)
-                    }
+                    id = JsonValue.NotNull(),
+                    name = JsonValue.StringContaining("note"),
+                    price = JsonValue.LessThan(100m)
                 }
-            }
+            },
+            pageInfo = new { hasNextPage = false }
         });
+
+    response.ShouldHaveNoErrors();
 }
 ```
 
-The connection, filtering, and ordering helpers follow Hot Chocolate conventions.
-Use `Field`, `Argument`, and `Select` for arbitrary GraphQL schemas. `Request` accepts
-a raw GraphQL document as an escape hatch.
+Anonymous objects or test-owned contract types drive the selection, while arguments
+remain ordinary objects. Use the detailed `Field`, `Argument`, connection and variable
+builders for advanced operations. `Request` accepts a raw GraphQL document as the final
+escape hatch.
 
 Schema coverage parses SDL and reports every object/interface field, including fields
 that were not selected. Aliases are resolved to their schema field, and fragments and

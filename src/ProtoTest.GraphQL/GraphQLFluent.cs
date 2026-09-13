@@ -2,7 +2,10 @@ namespace ProtoTest.GraphQL;
 
 using System.Collections;
 using System.Globalization;
+using System.Reflection;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using HotChocolate.Language;
 
 public sealed class GraphQLOperationBuilder
@@ -274,8 +277,15 @@ public sealed class GraphQLOrderBuilder
 
 public static class Gql
 {
+    /// <summary>Marks a scalar field in an anonymous selection shape.</summary>
+    public static GraphQLFieldSelection Field { get; } = new();
     public static GraphQLEnum Enum(string value) => new(value);
     public static GraphQLVariableReference Var(string name) => new(name);
+}
+
+public sealed class GraphQLFieldSelection
+{
+    internal GraphQLFieldSelection() { }
 }
 
 public sealed record GraphQLEnum(string Value);
@@ -348,11 +358,13 @@ internal static class GraphQLLiteral
                 {
                     text.Append('{');
                     first = true;
-                    foreach (var property in type.GetProperties().Where(p => p.GetIndexParameters().Length == 0))
+                    foreach (var property in type.GetProperties().Where(p => p.GetIndexParameters().Length == 0
+                                 && p.GetCustomAttribute<JsonIgnoreAttribute>() is null))
                     {
                         if (!first) text.Append(", ");
                         first = false;
-                        var name = char.ToLowerInvariant(property.Name[0]) + property.Name[1..];
+                        var name = property.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name
+                            ?? JsonNamingPolicy.CamelCase.ConvertName(property.Name);
                         text.Append(name).Append(": ");
                         Write(text, property.GetValue(value));
                     }

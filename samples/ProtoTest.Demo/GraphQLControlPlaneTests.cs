@@ -25,17 +25,24 @@ public sealed class GraphQLControlPlaneTests
             .PostAsync("/api/workspaces");
         provisioned.ShouldHaveStatus(HttpStatusCode.Created);
 
-        using var response = await Proto.Context.GraphQL()
-            .Query("ControlPlane", query => query
-                .Field("workspaces", workspaces => workspaces.Fields("id", "name", "region", "plan"))
-                .Field("controlPlane", dashboard => dashboard.Fields(
-                    "tenant", "userCount", "workspaceCount", "releaseCount", "openInvoiceCount", "monthlyRecurringRevenue")))
-            .ExecuteAsync();
-        response.ShouldHaveNoErrors().ShouldMatchData(new
-        {
-            workspaces = new[] { new { name = "analytics", region = "eu-central", plan = "growth" } },
-            controlPlane = new { userCount = 1, workspaceCount = 1, releaseCount = 0, monthlyRecurringRevenue = 199m }
-        });
+        using var workspaces = await Proto.Context.GraphQL()
+            .Query("workspaces")
+            .ExpectAsync(new[]
+            {
+                new { name = "analytics", region = "eu-central", plan = "growth" }
+            });
+        workspaces.ShouldHaveNoErrors();
+
+        using var controlPlane = await Proto.Context.GraphQL()
+            .Query("controlPlane")
+            .ExpectAsync(new
+            {
+                userCount = 1,
+                workspaceCount = 1,
+                releaseCount = 0,
+                monthlyRecurringRevenue = 199m
+            });
+        controlPlane.ShouldHaveNoErrors();
     }
 
     [ProtoTest]
@@ -44,7 +51,8 @@ public sealed class GraphQLControlPlaneTests
     {
         using var response = await Proto.Context.GraphQL()
             .WithoutAuth()
-            .Query("Me", query => query.Field("me", me => me.Fields("id")))
+            .Query("me")
+            .Select(new { id = Gql.Field })
             .ExecuteAsync();
         response.ShouldHaveErrors().ShouldHaveError("UNAUTHORIZED");
     }

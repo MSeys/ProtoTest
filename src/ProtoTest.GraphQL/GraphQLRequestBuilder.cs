@@ -22,6 +22,10 @@ public sealed class GraphQLRequestBuilder
     private IGraphQLAuthenticator? _authenticator;
     private object? _variables;
     private Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>>? _baseAddressResolver;
+    private string? _simpleOperationType;
+    private string? _simpleRootField;
+    private object? _simpleArguments;
+    private string? _simpleOperationName;
 
     internal GraphQLRequestBuilder(HttpClient client, ProtoExecutionContext context, string targetName)
     {
@@ -36,6 +40,47 @@ public sealed class GraphQLRequestBuilder
     public GraphQLRequestBuilder Mutation(string? name, Action<GraphQLOperationBuilder> configure)
         => Operation("mutation", name, configure);
 
+    /// <summary>Starts a shape-driven query for one root field.</summary>
+    public GraphQLRequestBuilder Query(string rootField, object? arguments = null, string? operationName = null)
+        => SimpleOperation("query", rootField, arguments, operationName);
+
+    /// <summary>Starts a shape-driven mutation for one root field.</summary>
+    public GraphQLRequestBuilder Mutation(string rootField, object? arguments = null, string? operationName = null)
+        => SimpleOperation("mutation", rootField, arguments, operationName);
+
+    /// <summary>Derives the GraphQL selection set from an anonymous object or test-owned contract.</summary>
+    public GraphQLRequestBuilder Select<TShape>(TShape selectionShape)
+    {
+        ArgumentNullException.ThrowIfNull(selectionShape);
+        return BuildSimpleSelection(selectionShape, selectionShape.GetType());
+    }
+
+    /// <summary>Derives the GraphQL selection set from a test-owned contract type.</summary>
+    public GraphQLRequestBuilder Select<TShape>()
+        => BuildSimpleSelection(null, typeof(TShape));
+
+    /// <summary>Selects, executes, and matches one root field using the same response shape.</summary>
+    public async Task<GraphQLResponse> ExpectAsync<TShape>(
+        TShape expectedShape,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(expectedShape);
+        _ = _simpleRootField
+            ?? throw new InvalidOperationException("ExpectAsync is available after a shape-driven Query or Mutation.");
+        Select(expectedShape);
+        var response = await ExecuteAsync(cancellationToken);
+        try
+        {
+            response.ShouldMatchData(expectedShape);
+            return response;
+        }
+        catch
+        {
+            response.Dispose();
+            throw;
+        }
+    }
+
     public GraphQLRequestBuilder Request(string document, string? operationName = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(document);
@@ -43,6 +88,7 @@ public sealed class GraphQLRequestBuilder
         var operation = parsed.Definitions.OfType<HotChocolate.Language.OperationDefinitionNode>()
             .FirstOrDefault(definition => operationName is null || definition.Name?.Value == operationName)
             ?? throw new ArgumentException("The GraphQL document does not contain the requested operation.", nameof(document));
+        ClearSimpleOperation();
         _operation = new GraphQLBuiltOperation(
             document,
             parsed,
@@ -237,7 +283,7 @@ public sealed class GraphQLRequestBuilder
                 var content = await rawResponse.Content.ReadAsStringAsync(cancellationToken);
                 stopwatch.Stop();
                 var response = new GraphQLResponse(rawResponse, content, stopwatch.Elapsed, _context, _targetName, identifier, operation,
-                    attachmentOptions, attachmentPrefix, traceOperation.Id);
+                    attachmentOptions, attachmentPrefix, traceOperation.Id, _simpleRootField);
 
                 if (attachmentOptions?.CaptureResponses == true)
                     _context.AddAttachment(
@@ -283,6 +329,7 @@ public sealed class GraphQLRequestBuilder
     private GraphQLRequestBuilder Operation(string type, string? name, Action<GraphQLOperationBuilder> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
+        ClearSimpleOperation();
         var builder = new GraphQLOperationBuilder(type, name);
         configure(builder);
         _operation = builder.Build();
@@ -292,6 +339,52 @@ public sealed class GraphQLRequestBuilder
             ["graphql.operation.name"] = name
         });
         return this;
+    }
+
+    private GraphQLRequestBuilder SimpleOperation(
+        string type,
+        string rootField,
+        object? arguments,
+        string? operationName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rootField);
+        _operation = null;
+        _simpleOperationType = type;
+        _simpleRootField = rootField;
+        _simpleArguments = arguments;
+        _simpleOperationName = operationName ?? char.ToUpperInvariant(rootField[0]) + rootField[1..];
+        return this;
+    }
+
+    private GraphQLRequestBuilder BuildSimpleSelection(object? shape, Type shapeType)
+    {
+        var type = _simpleOperationType
+            ?? throw new InvalidOperationException("Select is available after a shape-driven Query or Mutation.");
+        var rootField = _simpleRootField!;
+        var operation = new GraphQLOperationBuilder(type, _simpleOperationName);
+        operation.Field(rootField, field =>
+        {
+            GraphQLShapeSelection.AddArguments(field, _simpleArguments);
+            GraphQLShapeSelection.Apply(field, shape, shapeType);
+        });
+        _operation = operation.Build();
+        TraceConfiguration("graphql.operation.configure", $"Configure · {type} {_simpleOperationName ?? "<anonymous>"}",
+            new Dictionary<string, string?>
+            {
+                ["graphql.operation.type"] = type,
+                ["graphql.operation.name"] = _simpleOperationName,
+                ["graphql.root.field"] = rootField,
+                ["graphql.document.source"] = "shape"
+            });
+        return this;
+    }
+
+    private void ClearSimpleOperation()
+    {
+        _simpleOperationType = null;
+        _simpleRootField = null;
+        _simpleArguments = null;
+        _simpleOperationName = null;
     }
 
     private void TraceConfiguration(string kind, string name, IReadOnlyDictionary<string, string?> attributes)

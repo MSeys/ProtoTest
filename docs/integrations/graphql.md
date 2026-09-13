@@ -35,29 +35,67 @@ Schema coverage can use inline SDL, a local file, or an absolute URL through
 the single canonical key `ProtoTest:Clients:Catalog:GraphQL:Schema`. A configured schema
 URL may be relative to the client `BaseUrl`.
 
-## Build an operation
+## Shape-first operations
+
+For most tests, provide the root field, its arguments, and the expected result. ProtoTest
+derives the GraphQL selection set from the expected anonymous shape:
 
 ```csharp
 using var response = await Proto.Context.GraphQL()
-    .Query("FindProducts", query => query
-        .Connection("products", products => products
-            .Where(filter => filter
-                .Contains("name", "note")
-                .GreaterThanOrEqual("price", 10m)
-                .LessThan("price", 100m))
-            .OrderBy(order => order.Ascending("name"))
-            .First(10)
-            .Nodes("id", "name", "price")
-            .PageInfo()))
-    .ExecuteAsync();
+    .Query("products", new
+    {
+        first = 10,
+        where = new { name = new { contains = "note" } },
+        order = new[] { new { name = Gql.Enum("ASC") } }
+    })
+    .ExpectAsync(new
+    {
+        nodes = new[]
+        {
+            new
+            {
+                id = JsonValue.NotNull(),
+                name = JsonValue.StringContaining("note"),
+                price = JsonValue.Between(10m, 100m)
+            }
+        },
+        pageInfo = new { hasNextPage = false }
+    });
+
+response.ShouldHaveNoErrors();
 ```
 
-`Connection`, `Where`, `OrderBy`, `Nodes`, and `PageInfo` follow the common Hot
-Chocolate and Relay conventions. For another schema, use the underlying generic
-`Field`, `Argument`, and `Select` methods. `Request` accepts a raw GraphQL document as
-an escape hatch, but fluent operations are the primary API.
+`ExpectAsync` combines selection, execution, and shape matching. Keep execution and
+assertion separate when errors or extensions are the subject of the test:
 
-Variables stay fluent as well:
+```csharp
+using var response = await Proto.Context.GraphQL()
+    .Mutation("createOrder", new { input = command })
+    .Select(new { id = Gql.Field, status = Gql.Field })
+    .ExecuteAsync();
+
+response.ShouldHaveErrors().ShouldHaveError("INVALID_ORDER");
+```
+
+`Select<TContract>()` derives the same selection from a test-owned contract type, so
+tests do not need to reference application DTOs. `ReadDataAs<T>()` deserializes the
+selected root-field value for shape-driven operations.
+
+```csharp
+private sealed record ProductResult(string Id, string Name, decimal Price);
+
+using var response = await Proto.Context.GraphQL()
+    .Query("product", new { id = "product-42" })
+    .Select<ProductResult>()
+    .ExecuteAsync();
+
+var product = response.ReadDataAs<ProductResult>();
+```
+
+## Advanced operations
+
+The detailed fluent builder remains available for aliases, multiple root fields,
+explicit variables, fragments, and other advanced documents:
 
 ```csharp
 Proto.Context.GraphQL()
@@ -68,6 +106,10 @@ Proto.Context.GraphQL()
             .Fields("id", "name")))
     .Variables(new { id = "product-42" });
 ```
+
+`Connection`, `Where`, `OrderBy`, `Nodes`, and `PageInfo` follow common Hot Chocolate
+and Relay conventions. `Request` accepts a raw GraphQL document as the final escape
+hatch.
 
 ## Assert the response
 
@@ -97,8 +139,9 @@ GraphQL execution errors remain inspectable even when the HTTP status is success
 response.ShouldHaveErrors().ShouldHaveError("PRODUCT_NOT_FOUND");
 ```
 
-Use `ReadDataAs<T>()` for typed deserialization. The raw `HttpResponseMessage`, data,
-errors, extensions, content, status, and elapsed time remain available.
+Use `ReadDataAs<T>()` for typed deserialization. The raw `HttpResponseMessage`, full
+`Data`, shape-driven `SelectedData`, errors, extensions, content, status, and elapsed
+time remain available.
 
 The shape engine and `JsonValue` constraints live in `ProtoTest.Json` and are shared
 directly with REST.

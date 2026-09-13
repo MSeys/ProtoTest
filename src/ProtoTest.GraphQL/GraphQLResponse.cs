@@ -16,6 +16,7 @@ public sealed class GraphQLResponse : IDisposable
     private readonly GraphQLAttachmentOptions? _attachmentOptions;
     private readonly string? _attachmentPrefix;
     private readonly string? _requestTraceId;
+    private readonly string? _selectedRootField;
 
     internal GraphQLResponse(
         HttpResponseMessage rawResponse,
@@ -27,7 +28,8 @@ public sealed class GraphQLResponse : IDisposable
         GraphQLBuiltOperation operation,
         GraphQLAttachmentOptions? attachmentOptions,
         string? attachmentPrefix,
-        string? requestTraceId = null)
+        string? requestTraceId = null,
+        string? selectedRootField = null)
     {
         RawResponse = rawResponse;
         Content = content;
@@ -38,6 +40,7 @@ public sealed class GraphQLResponse : IDisposable
         _attachmentOptions = attachmentOptions;
         _attachmentPrefix = attachmentPrefix;
         _requestTraceId = requestTraceId;
+        _selectedRootField = selectedRootField;
         try
         {
             _document = JsonDocument.Parse(content);
@@ -70,6 +73,19 @@ public sealed class GraphQLResponse : IDisposable
     public bool HasErrors => Errors.Count > 0;
     public bool HasData => _document.RootElement.TryGetProperty("data", out var data) && data.ValueKind != JsonValueKind.Null;
     public JsonElement? Data => _document.RootElement.TryGetProperty("data", out var data) ? data.Clone() : null;
+    /// <summary>The selected root-field value for shape-driven operations; otherwise the complete data object.</summary>
+    public JsonElement? SelectedData
+    {
+        get
+        {
+            if (!Data.HasValue) return null;
+            var data = Data.Value;
+            return _selectedRootField is not null && data.ValueKind == JsonValueKind.Object
+                && data.TryGetProperty(_selectedRootField, out var selected)
+                    ? selected.Clone()
+                    : data;
+        }
+    }
     public JsonElement? Extensions => _document.RootElement.TryGetProperty("extensions", out var extensions) ? extensions.Clone() : null;
 
     public GraphQLResponse ShouldHaveHttpStatus(HttpStatusCode expected)
@@ -127,8 +143,8 @@ public sealed class GraphQLResponse : IDisposable
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
         var expectedShapeJson = JsonDiagnosticSanitizer.Serialize(expectedShape, _attachmentOptions);
-        var actualShapeJson = Data.HasValue
-            ? JsonDiagnosticSanitizer.Sanitize(Data.Value.GetRawText(), _attachmentOptions)
+        var actualShapeJson = SelectedData.HasValue
+            ? JsonDiagnosticSanitizer.Sanitize(SelectedData.Value.GetRawText(), _attachmentOptions)
             : null;
         using var operation = _context.Trace.StartOperation(
             "assert.graphql.data_shape",
@@ -144,14 +160,14 @@ public sealed class GraphQLResponse : IDisposable
             parentId: _requestTraceId);
         try
         {
-            if (!Data.HasValue) throw new GraphQLAssertionException("Expected GraphQL data, but the response did not contain data.");
+            if (!SelectedData.HasValue) throw new GraphQLAssertionException("Expected GraphQL data, but the response did not contain data.");
             if (_attachmentOptions?.CaptureExpectedShapes == true)
                 _context.AddAttachment(
                     $"{_attachmentPrefix}-expected-shape",
                     JsonDiagnosticSanitizer.Sanitize(JsonSerializer.Serialize(expectedShape), _attachmentOptions),
                     "application/json",
                     _identifier);
-            var matched = GraphQLShapeMatcher.AssertMatch(Data.Value, expectedShape, options);
+            var matched = GraphQLShapeMatcher.AssertMatch(SelectedData.Value, expectedShape, options);
             operation.SetAttribute("matched.property_count", matched.Count.ToString());
             operation.SetAttribute("matched.properties", string.Join(", ", matched));
             operation.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(matched, _attachmentOptions));
@@ -190,8 +206,8 @@ public sealed class GraphQLResponse : IDisposable
             parentId: _requestTraceId);
         try
         {
-            var result = Data.HasValue
-                ? Data.Value.Deserialize<T>(options ?? new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            var result = SelectedData.HasValue
+                ? SelectedData.Value.Deserialize<T>(options ?? new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                 : default;
             operation.Succeed();
             return result;

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>true</IsPackable>
+    <PackageId>ProtoTest.Web</PackageId>
+    <Description>Backend-neutral, component-based web testing for ProtoTest.</Description>
+    <PackageTags>testing;integration-testing;web;browser;dotnet</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+  </ItemGroup>
+
+</Project>

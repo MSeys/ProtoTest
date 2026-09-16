@@ -24,6 +24,7 @@ If this is your first ProtoTest project:
 | Write my first test | [Getting started](getting-started/first-test.md) |
 | Write REST tests | [REST integration](integrations/rest.md) |
 | Write GraphQL tests | [GraphQL integration](integrations/graphql.md) |
+| Write browser tests | [Web integration](integrations/web.md) |
 | Test an ASP.NET Core application | [ASP.NET Core integration](integrations/aspnetcore.md) |
 | Measure REST endpoints against OpenAPI | [OpenAPI integration](integrations/openapi.md) |
 | Reuse setup and teardown | [Hooks](extending/hooks.md) |

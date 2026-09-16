@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>true</IsPackable>
+    <PackageId>ProtoTest.Web.Selenium</PackageId>
+    <Description>Selenium execution backend for ProtoTest.Web.</Description>
+    <PackageTags>testing;integration-testing;web;selenium;browser;dotnet</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Web\ProtoTest.Web.csproj" />
+    <PackageReference Include="Selenium.WebDriver" Version="4.49.0" />
+  </ItemGroup>
+
+</Project>

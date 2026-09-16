@@ -36,6 +36,7 @@ $vstestProjects = @(
     "tests/ProtoTest.AspNetCore.Tests/ProtoTest.AspNetCore.Tests.csproj",
     "tests/ProtoTest.OpenApi.Tests/ProtoTest.OpenApi.Tests.csproj",
     "tests/ProtoTest.Reporting.Tests/ProtoTest.Reporting.Tests.csproj",
+    "tests/ProtoTest.Web.Tests/ProtoTest.Web.Tests.csproj",
     "samples/ProtoTest.Demo/ProtoTest.Demo.csproj"
 )
 

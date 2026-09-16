@@ -21,7 +21,10 @@ $packages = @(
     "src/ProtoTest.GraphQL/ProtoTest.GraphQL.csproj",
     "src/ProtoTest.AspNetCore/ProtoTest.AspNetCore.csproj",
     "src/ProtoTest.OpenApi/ProtoTest.OpenApi.csproj",
-    "src/ProtoTest.Reporting/ProtoTest.Reporting.csproj"
+    "src/ProtoTest.Reporting/ProtoTest.Reporting.csproj",
+    "src/ProtoTest.Web/ProtoTest.Web.csproj",
+    "src/ProtoTest.Web.Playwright/ProtoTest.Web.Playwright.csproj",
+    "src/ProtoTest.Web.Selenium/ProtoTest.Web.Selenium.csproj"
 )
 
 $packArguments = @("--configuration", $Configuration, "--output", $OutputPath)

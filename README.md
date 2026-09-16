@@ -12,7 +12,7 @@ ProtoTest provides:
 
 - one lifecycle across NUnit, xUnit, xUnit v3, MSTest, and TUnit;
 - per-test services, clients, typed state, and coverage hits;
-- REST, GraphQL, and ASP.NET Core integrations;
+- REST, GraphQL, ASP.NET Core, and component-based Web integrations;
 - shared JSON shape matching through `ProtoTest.Json`;
 - shared HTTP integration foundations through `ProtoTest.Http`;
 - OpenAPI-driven REST coverage;
@@ -46,6 +46,7 @@ Read the [ProtoTest documentation](docs/index.md), or start directly with:
 - [First test](docs/getting-started/first-test.md)
 - [REST integration](docs/integrations/rest.md)
 - [GraphQL integration](docs/integrations/graphql.md)
+- [Web integration](docs/integrations/web.md)
 - [ASP.NET Core integration](docs/integrations/aspnetcore.md)
 - [Hooks and lifecycle extensions](docs/extending/hooks.md)
 - [Context and state](docs/guides/context-and-state.md)
@@ -83,6 +84,7 @@ To produce the complete package set locally:
 | ASP.NET Core | Available |
 | OpenAPI | Available |
 | GraphQL | Preview |
-| gRPC (`ProtoTest.Grpc`), Playwright, standalone Coverage | Planned |
+| Web with Playwright and Selenium backends | Preview |
+| gRPC (`ProtoTest.Grpc`), standalone Coverage | Planned |
 
 See the [integration overview](docs/integrations/overview.md) for package names and capabilities.

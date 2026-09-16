@@ -23,6 +23,9 @@ The user guides explain how to write and extend tests. Integration pages explain
 | ASP.NET Core | `ProtoTest.AspNetCore` | In-memory application hosting and service access | [ASP.NET Core guide](aspnetcore.md) |
 | OpenAPI | `ProtoTest.OpenApi` | Specification-driven REST coverage | [OpenAPI guide](openapi.md) |
 | Reporting | `ProtoTest.Reporting` | End-of-run JSON and self-contained HTML reports | [Reporting and coverage](../extending/coverage.md) |
+| Web | `ProtoTest.Web` | Backend-neutral components, semantic locators, and traced web operations | [Web guide](web.md) |
+| Playwright Web | `ProtoTest.Web.Playwright` | Playwright backend and native trace artifacts | [Web guide](web.md) |
+| Selenium Web | `ProtoTest.Web.Selenium` | Selenium backend with explicit actionability waits | [Web guide](web.md) |
 
 The framework adapter guides are intentionally short because the lifecycle is shared. The REST, ASP.NET Core, and OpenAPI guides contain the domain-specific setup and examples.
 
@@ -33,7 +36,6 @@ The following projects exist as planned extension points but are not currently i
 | Project | Planned purpose |
 | --- | --- |
 | `ProtoTest.Grpc` | gRPC client and coverage integration |
-| `ProtoTest.Playwright` | Browser automation integration |
 
 ## Common flow
 

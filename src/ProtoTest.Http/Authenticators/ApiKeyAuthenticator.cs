@@ -1,8 +1,13 @@
-﻿namespace ProtoTest.Rest.Authenticators;
+namespace ProtoTest.Http.Authenticators;
 
-public sealed class ApiKeyAuthenticator(string keyName, string keyValue, ApiKeyLocation location = ApiKeyLocation.Header) : IRestAuthenticator
+using ProtoTest.Http.Internal;
+
+public sealed class ApiKeyAuthenticator(string keyName, string keyValue, ApiKeyLocation location = ApiKeyLocation.Header)
+    : IProtoHttpAuthenticator
 {
-    public ValueTask AuthenticateAsync(RestAuthenticationContext context, CancellationToken cancellationToken = default)
+    public ValueTask AuthenticateAsync(
+        ProtoHttpAuthenticationContext context,
+        CancellationToken cancellationToken = default)
     {
         var request = context.Request;
         if (location == ApiKeyLocation.Header)
@@ -15,7 +20,7 @@ public sealed class ApiKeyAuthenticator(string keyName, string keyValue, ApiKeyL
         else if (request.RequestUri is not null)
         {
             var uri = request.RequestUri;
-            var updated = Internal.RestUriBuilder.SetQueryParameter(
+            var updated = ProtoQueryString.SetParameter(
                 uri.OriginalString,
                 keyName,
                 keyValue);

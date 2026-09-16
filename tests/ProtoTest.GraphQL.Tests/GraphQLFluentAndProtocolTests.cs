@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
+using ProtoTest.Http.Authenticators;
 
 [TestFixture]
 public sealed class GraphQLFluentAndProtocolTests
@@ -144,11 +145,11 @@ public sealed class GraphQLFluentAndProtocolTests
         try
         {
             using var authenticated = await Proto.Context.GraphQL()
-                .Auth(new GraphQLBearerTokenAuthenticator("secret"))
+                .Auth(new BearerTokenAuthenticator("secret"))
                 .Query(null, query => query.Field("value"))
                 .ExecuteAsync();
             using var anonymous = await Proto.Context.GraphQL()
-                .Auth(new GraphQLBearerTokenAuthenticator("secret"))
+                .Auth(new BearerTokenAuthenticator("secret"))
                 .WithoutAuth()
                 .Query(null, query => query.Field("value"))
                 .ExecuteAsync();

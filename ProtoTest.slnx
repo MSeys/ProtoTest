@@ -1,21 +1,21 @@
 <Solution>
   <Folder Name="/1. Core/">
     <Project Path="src/ProtoTest.Core/ProtoTest.Core.csproj" />
-    <Project Path="src/ProtoTest.Data/ProtoTest.Data.csproj" />
     <Project Path="src/ProtoTest.Http/ProtoTest.Http.csproj" />
     <Project Path="src/ProtoTest.Json/ProtoTest.Json.csproj" />
   </Folder>
   <Folder Name="/2. Integrations/">
     <Project Path="src/ProtoTest.AspNetCore/ProtoTest.AspNetCore.csproj" Id="dafd8b60-e20d-44cc-a746-68ec3136e256" />
+    <Project Path="src/ProtoTest.Data/ProtoTest.Data.csproj" />
     <Project Path="src/ProtoTest.GraphQL/ProtoTest.GraphQL.csproj" Id="81af1d3a-d24c-465e-b1a0-ee742ca6bf6e" />
     <Project Path="src/ProtoTest.Grpc/ProtoTest.Grpc.csproj" Id="f13ed54f-e401-4cd6-ba89-efebd1861e89" />
     <Project Path="src/ProtoTest.OpenApi/ProtoTest.OpenApi.csproj" Id="23cb63d4-b36b-4e43-a2c9-c53533307d85" />
     <Project Path="src/ProtoTest.OpenTelemetry/ProtoTest.OpenTelemetry.csproj" />
+    <Project Path="src/ProtoTest.Reporting/ProtoTest.Reporting.csproj" Id="1ad73a64-19cd-4807-a0d4-283da87581f6" />
+    <Project Path="src/ProtoTest.Rest/ProtoTest.Rest.csproj" Id="0161cd20-8be1-40f2-a3c0-76335a74ccd2" />
     <Project Path="src/ProtoTest.Web/ProtoTest.Web.csproj" />
     <Project Path="src/ProtoTest.Web.Playwright/ProtoTest.Web.Playwright.csproj" />
     <Project Path="src/ProtoTest.Web.Selenium/ProtoTest.Web.Selenium.csproj" />
-    <Project Path="src/ProtoTest.Rest/ProtoTest.Rest.csproj" Id="0161cd20-8be1-40f2-a3c0-76335a74ccd2" />
-    <Project Path="src/ProtoTest.Reporting/ProtoTest.Reporting.csproj" Id="1ad73a64-19cd-4807-a0d4-283da87581f6" />
   </Folder>
   <Folder Name="/3. Adapters/">
     <Project Path="src/ProtoTest.MSTest/ProtoTest.MSTest.csproj" Id="f11a8aa9-96e0-42c5-9a62-c27b908d0c5e" />
@@ -27,7 +27,6 @@
   <Folder Name="/4. Tests/">
     <Project Path="tests/ProtoTest.AdapterContract/ProtoTest.AdapterContract.csproj" />
     <Project Path="tests/ProtoTest.Core.Tests/ProtoTest.Core.Tests.csproj" Id="5c324d8d-8d2d-40d2-a7ca-8c8c9defd042" />
-    <Project Path="tests/ProtoTest.Data.Tests/ProtoTest.Data.Tests.csproj" />
     <Project Path="tests/ProtoTest.Http.Tests/ProtoTest.Http.Tests.csproj" />
     <Project Path="tests/ProtoTest.Json.Tests/ProtoTest.Json.Tests.csproj" />
   </Folder>
@@ -41,11 +40,12 @@
   <Folder Name="/4. Tests/Integrations/">
     <Project Path="tests/ProtoTest.AspNetCore.TestApi/ProtoTest.AspNetCore.TestApi.csproj" />
     <Project Path="tests/ProtoTest.AspNetCore.Tests/ProtoTest.AspNetCore.Tests.csproj" Id="8fe93cb3-774c-4dd1-a1c0-f3ad589708fe" />
+    <Project Path="tests/ProtoTest.Data.Tests/ProtoTest.Data.Tests.csproj" />
     <Project Path="tests/ProtoTest.GraphQL.Tests/ProtoTest.GraphQL.Tests.csproj" />
     <Project Path="tests/ProtoTest.OpenApi.Tests/ProtoTest.OpenApi.Tests.csproj" Id="4d4c7e56-9c4e-4193-b73e-64b067c9268b" />
+    <Project Path="tests/ProtoTest.Reporting.Tests/ProtoTest.Reporting.Tests.csproj" />
     <Project Path="tests/ProtoTest.Rest.Tests/ProtoTest.Rest.Tests.csproj" Id="da8c0737-a839-4f92-a4c2-f9bdecd6c96b" />
     <Project Path="tests/ProtoTest.Web.Tests/ProtoTest.Web.Tests.csproj" />
-    <Project Path="tests/ProtoTest.Reporting.Tests/ProtoTest.Reporting.Tests.csproj" />
   </Folder>
   <Folder Name="/5. Demo/">
     <Project Path="samples/ProtoTest.Demo/ProtoTest.Demo.csproj" />

@@ -5,7 +5,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
 using ProtoTest.Http;
-using ProtoTest.GraphQL.Internal;
 
 public sealed class ProtoGraphQLBuilder(IServiceCollection services)
 {
@@ -15,32 +14,13 @@ public sealed class ProtoGraphQLBuilder(IServiceCollection services)
         string name = "Default",
         string? baseUrl = null,
         Action<IHttpClientBuilder>? configure = null)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (baseUrl is not null && !ProtoHttpUri.TryCreateAbsoluteHttpUri(baseUrl, out _))
-        {
-            throw new ArgumentException("A GraphQL client base URL must be an absolute HTTP or HTTPS URI.", nameof(baseUrl));
-        }
-
-        var http = Services.AddHttpClient(ProtoHttpClientInitializer.GetFactoryName("GraphQL", name));
-        configure?.Invoke(http);
-        Services.AddSingleton<IProtoClientInitializer>(_ => new ProtoHttpClientInitializer("GraphQL", name, baseUrl));
-        return new ProtoGraphQLTargetBuilder(name, Services);
-    }
+        => ProtoHttpClientRegistration.AddClient(Services, "GraphQL", "GraphQL", name, baseUrl, configure);
 
     public IProtoTargetBuilder AddClient(
         string name,
         Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> baseAddressResolver,
         Action<IHttpClientBuilder>? configure = null)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(baseAddressResolver);
-        var http = Services.AddHttpClient(ProtoHttpClientInitializer.GetFactoryName("GraphQL", name));
-        configure?.Invoke(http);
-        Services.AddSingleton<IProtoClientInitializer>(_ => new ProtoHttpClientInitializer("GraphQL", name, allowMissingBaseUrl: true));
-        Services.AddSingleton(new ProtoHttpBaseAddressRegistration("GraphQL", name, baseAddressResolver));
-        return new ProtoGraphQLTargetBuilder(name, Services);
-    }
+        => ProtoHttpClientRegistration.AddClient(Services, "GraphQL", name, baseAddressResolver, configure);
 
     public IProtoTargetBuilder AddClient(
         string name,
@@ -69,7 +49,7 @@ public sealed class ProtoGraphQLBuilder(IServiceCollection services)
                     ?? throw new InvalidOperationException($"HTTP client '{sourceClientName}' has no base address.");
                 return ValueTask.FromResult(new Uri(baseAddress, endpointPath));
             }));
-        return new ProtoGraphQLTargetBuilder(name, Services);
+        return new ProtoHttpTargetBuilder(name, Services);
     }
 
     public ProtoGraphQLBuilder CaptureAttachments(Action<GraphQLAttachmentOptions>? configure = null)
@@ -79,7 +59,7 @@ public sealed class ProtoGraphQLBuilder(IServiceCollection services)
         {
             var options = new GraphQLAttachmentOptions();
             configure?.Invoke(options);
-            options.Bind(sp.GetRequiredService<IConfiguration>());
+            options.BindFromConfiguration(sp.GetRequiredService<IConfiguration>());
             return options;
         });
         return this;
@@ -93,18 +73,11 @@ public sealed class ProtoGraphQLBuilder(IServiceCollection services)
         {
             var options = new GraphQLResponseOptions();
             configure(options);
-            options.Bind(sp.GetRequiredService<IConfiguration>());
+            options.BindFromConfiguration(sp.GetRequiredService<IConfiguration>());
             return options;
         });
         return this;
     }
-}
-
-internal sealed class ProtoGraphQLTargetBuilder(string targetName, IServiceCollection services)
-    : IProtoTargetBuilder
-{
-    public string TargetName { get; } = targetName;
-    public IServiceCollection Services { get; } = services;
 }
 
 public static class ProtoGraphQLTargetBuilderExtensions
@@ -121,17 +94,13 @@ public static class ProtoGraphQLTargetBuilderExtensions
     public static IProtoTargetBuilder WithSchemaCoverage(this IProtoTargetBuilder target)
     {
         ArgumentNullException.ThrowIfNull(target);
-        target.Services.AddSingleton<IProtoCollector>(services =>
-            ActivatorUtilities.CreateInstance<GraphQLSchemaCoverageCollector>(services, target.TargetName));
-        return target;
+        return target.WithCollector<GraphQLSchemaCoverageCollector>();
     }
 
     public static IProtoTargetBuilder WithSchemaCoverage(this IProtoTargetBuilder target, string schemaSource)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentException.ThrowIfNullOrWhiteSpace(schemaSource);
-        target.Services.AddSingleton<IProtoCollector>(_ =>
-            new GraphQLSchemaCoverageCollector(target.TargetName, schemaSource));
-        return target;
+        return target.WithCollector<GraphQLSchemaCoverageCollector>(schemaSource);
     }
 }

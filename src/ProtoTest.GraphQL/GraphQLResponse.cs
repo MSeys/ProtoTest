@@ -167,7 +167,7 @@ public sealed class GraphQLResponse : IDisposable
                     JsonDiagnosticSanitizer.Sanitize(JsonSerializer.Serialize(expectedShape), _attachmentOptions),
                     "application/json",
                     _identifier);
-            var matched = GraphQLShapeMatcher.AssertMatch(SelectedData.Value, expectedShape, options);
+            var matched = JsonShapeMatcher.AssertMatch(SelectedData.Value, expectedShape, options);
             operation.SetAttribute("matched.property_count", matched.Count.ToString());
             operation.SetAttribute("matched.properties", string.Join(", ", matched));
             operation.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(matched, _attachmentOptions));
@@ -180,7 +180,7 @@ public sealed class GraphQLResponse : IDisposable
             operation.Succeed();
             return this;
         }
-        catch (GraphQLShapeMismatchException exception)
+        catch (JsonShapeMismatchException exception)
         {
             operation.SetAttribute("shape.result", "mismatched");
             operation.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(exception.MatchedProperties, _attachmentOptions));

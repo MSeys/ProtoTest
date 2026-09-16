@@ -20,7 +20,7 @@ public static class ProtoHostBuilderExtensions
             services.TryAddSingleton(sp =>
             {
                 var options = new GraphQLResponseOptions();
-                options.Bind(sp.GetRequiredService<IConfiguration>());
+                options.BindFromConfiguration(sp.GetRequiredService<IConfiguration>());
                 return options;
             });
         });

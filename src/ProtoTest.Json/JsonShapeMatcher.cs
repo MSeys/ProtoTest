@@ -7,7 +7,18 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ProtoTest.Core;
 
-public sealed record JsonShapeMismatch(string PropertyPath, string Reason, object? Expected, object? Actual);
+public sealed record JsonShapeMismatch(string PropertyPath, string Reason, object? Expected, object? Actual)
+{
+    public override string ToString()
+        => $"  • [{PropertyPath}]: {Reason} (Expected: {Format(Expected)}, Actual: {Format(Actual)})";
+
+    private static string Format(object? value) => value switch
+    {
+        null => "null",
+        string text => $"\"{text}\"",
+        _ => $"'{value}'"
+    };
+}
 
 public sealed class JsonShapeMismatchException(
     IReadOnlyList<JsonShapeMismatch> mismatches,
@@ -18,7 +29,7 @@ public sealed class JsonShapeMismatchException(
     public IReadOnlyList<string> MatchedProperties { get; } = [.. matchedProperties ?? []];
     private static string BuildMessage(IReadOnlyList<JsonShapeMismatch> mismatches)
         => $"Shape mismatch failed with {mismatches.Count} error(s):{Environment.NewLine}" +
-           string.Join(Environment.NewLine, mismatches.Select(m => $"  • [{m.PropertyPath}]: {m.Reason}"));
+           string.Join(Environment.NewLine, mismatches.Select(m => m.ToString()));
 }
 
 public sealed class JsonDocumentAssertionException : ProtoAssertionException

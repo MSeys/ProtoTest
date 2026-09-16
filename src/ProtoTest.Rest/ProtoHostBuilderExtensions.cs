@@ -17,7 +17,7 @@ public static class ProtoHostBuilderExtensions
             services.TryAddSingleton(serviceProvider =>
             {
                 var options = new RestResponseOptions();
-                options.Bind(serviceProvider.GetRequiredService<IConfiguration>());
+                options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
                 return options;
             });
         });

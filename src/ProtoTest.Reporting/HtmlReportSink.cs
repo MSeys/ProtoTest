@@ -1,19 +1,17 @@
 namespace ProtoTest.Reporting;
 
-using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
 
-public sealed class HtmlReportSink : IProtoSink, IProtoSinkArtifactSource
+public sealed class HtmlReportSink : IProtoSink, IProtoSinkArtifactSource, IProtoConfigurableOptions
 {
     private static readonly string BrandMark = ReadEmbeddedText("ProtoTest.Reporting.BrandMark.svg");
     private static readonly string Favicon = "data:image/svg+xml;base64," + Convert.ToBase64String(
         Encoding.UTF8.GetBytes(ReadEmbeddedText("ProtoTest.Reporting.BlueprintMark.svg")));
     private readonly HtmlReportSinkOptions _options;
-    private readonly IConfiguration? _configuration;
     private string? _lastOutputPath;
 
     public HtmlReportSink() : this(new HtmlReportSinkOptions()) { }
@@ -23,10 +21,7 @@ public sealed class HtmlReportSink : IProtoSink, IProtoSinkArtifactSource
         _options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
-    public HtmlReportSink(IConfiguration configuration) : this()
-    {
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-    }
+    string IProtoConfigurableOptions.ConfigurationSectionName => HtmlReportSinkOptions.ConfigurationSectionName;
 
     public string OutputPath
     {
@@ -44,7 +39,6 @@ public sealed class HtmlReportSink : IProtoSink, IProtoSinkArtifactSource
         IEnumerable<ProtoReportItem> items,
         CancellationToken cancellationToken = default)
     {
-        _configuration?.GetSection(HtmlReportSinkOptions.ConfigurationSectionName).Bind(_options);
         var outputPath = Path.GetFullPath(_options.OutputPath);
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
         await File.WriteAllTextAsync(

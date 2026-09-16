@@ -13,7 +13,7 @@ using ProtoTest.SampleApp.Testing;
 [GraphQLClient(SampleAppTargets.GraphQL)]
 [SampleEnvironment]
 [Auth<SampleUserAuthenticator>]
-[GraphQLAuth<SampleGraphQLAuthenticator>]
+[GraphQLAuth<SampleUserAuthenticator>]
 public sealed class GraphQLControlPlaneTests
 {
     [ProtoTest]

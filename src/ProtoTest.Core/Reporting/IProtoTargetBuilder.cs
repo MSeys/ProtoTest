@@ -13,13 +13,14 @@ public interface IProtoTargetBuilder
 
     /// <summary>
     /// Registers an observation collector. The collector must expose a constructor accepting the
-    /// target name, optionally followed by services resolvable from DI.
+    /// target name, any <paramref name="additionalArguments"/>, and optionally services resolvable
+    /// from DI.
     /// </summary>
-    public IProtoTargetBuilder WithCollector<TCollector>()
+    public IProtoTargetBuilder WithCollector<TCollector>(params object[] additionalArguments)
         where TCollector : class, IProtoCollector
     {
         Services.AddSingleton<IProtoCollector>(sp =>
-            ActivatorUtilities.CreateInstance<TCollector>(sp, TargetName));
+            ActivatorUtilities.CreateInstance<TCollector>(sp, [TargetName, .. additionalArguments]));
         return this;
     }
 }

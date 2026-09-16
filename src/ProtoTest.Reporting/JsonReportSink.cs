@@ -1,14 +1,12 @@
 namespace ProtoTest.Reporting;
 
-using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-public sealed class JsonReportSink : IProtoSink, IProtoSinkArtifactSource
+public sealed class JsonReportSink : IProtoSink, IProtoSinkArtifactSource, IProtoConfigurableOptions
 {
     private readonly JsonReportSinkOptions _options;
-    private readonly IConfiguration? _configuration;
     private string? _lastOutputPath;
 
     public JsonReportSink() : this(new JsonReportSinkOptions()) { }
@@ -18,10 +16,7 @@ public sealed class JsonReportSink : IProtoSink, IProtoSinkArtifactSource
         _options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
-    public JsonReportSink(IConfiguration configuration) : this()
-    {
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-    }
+    string IProtoConfigurableOptions.ConfigurationSectionName => JsonReportSinkOptions.ConfigurationSectionName;
 
     public string OutputPath
     {
@@ -39,7 +34,6 @@ public sealed class JsonReportSink : IProtoSink, IProtoSinkArtifactSource
         IEnumerable<ProtoReportItem> items,
         CancellationToken cancellationToken = default)
     {
-        _configuration?.GetSection(JsonReportSinkOptions.ConfigurationSectionName).Bind(_options);
         var report = ProtoReport.Create(items);
         var outputPath = Path.GetFullPath(_options.OutputPath);
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);

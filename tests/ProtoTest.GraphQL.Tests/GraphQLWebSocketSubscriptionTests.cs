@@ -7,6 +7,7 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
+using ProtoTest.Http.Authenticators;
 
 [TestFixture]
 public sealed class GraphQLWebSocketSubscriptionTests
@@ -28,7 +29,7 @@ public sealed class GraphQLWebSocketSubscriptionTests
         try
         {
             await using var subscription = await Proto.Context.GraphQL()
-                .Auth(new GraphQLBearerTokenAuthenticator("secret"))
+                .Auth(new BearerTokenAuthenticator("secret"))
                 .ConnectionPayload(new { token = "init-secret" })
                 .Subscription("orderCreated")
                 .Select(new { id = Gql.Field, status = Gql.Field })

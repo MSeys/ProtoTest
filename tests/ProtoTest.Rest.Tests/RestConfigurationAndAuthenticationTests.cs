@@ -4,7 +4,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
-using ProtoTest.Rest.Authenticators;
+using ProtoTest.Http;
+using ProtoTest.Http.Authenticators;
 using System.Net.Http.Headers;
 using System.Reflection;
 
@@ -185,7 +186,7 @@ public class RestConfigurationAndAuthenticationTests
     }
 
     private static async Task AuthenticateAsync(
-        IRestAuthenticator authenticator,
+        IProtoHttpAuthenticator authenticator,
         HttpRequestMessage request)
     {
         using var services = new ServiceCollection().BuildServiceProvider();
@@ -195,7 +196,7 @@ public class RestConfigurationAndAuthenticationTests
             "00000",
             (MethodInfo)MethodInfo.GetCurrentMethod()!);
         await authenticator.AuthenticateAsync(
-            new RestAuthenticationContext(request, context, "Default"));
+            new ProtoHttpAuthenticationContext(request, context, "Default"));
     }
 
     private sealed class StaticConfigurationSource(IReadOnlyDictionary<string, string?> values) : IConfigurationSource

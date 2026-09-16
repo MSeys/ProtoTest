@@ -49,6 +49,111 @@ public sealed class JsonShapeMatcherTests
     }
 
     [Test]
+    public void AssertMatch_ShouldRespectExplicitJsonPropertyNamesAlongsideNamingPolicy()
+    {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = false
+        };
+
+        Assert.DoesNotThrow(() => JsonShapeMatcher.AssertMatch(
+            """{"display_name":"ProtoTest","itemCount":2}""",
+            new NamedShape { DisplayName = "ProtoTest", ItemCount = 2 },
+            options));
+    }
+
+    [Test]
+    public void AssertMatch_ShouldCollectMultipleMismatchesInOneException()
+    {
+        var json = """
+        {
+            "id": 101,
+            "name": "Sven",
+            "age": 16,
+            "role": "User"
+        }
+        """;
+
+        var expectedShape = new
+        {
+            id = 101,
+            name = "Matthias",
+            age = 25,
+            department = "IT"
+        };
+
+        var exception = Assert.Throws<JsonShapeMismatchException>(
+            () => JsonShapeMatcher.AssertMatch(json, expectedShape));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Mismatches, Has.Count.EqualTo(3));
+            Assert.That(exception.MatchedProperties, Does.Contain("$.id"));
+
+            Assert.That(exception.Mismatches[0].PropertyPath, Is.EqualTo("$.name"));
+            Assert.That(exception.Mismatches[0].Expected, Is.EqualTo("Matthias"));
+            Assert.That(exception.Mismatches[0].Actual, Is.EqualTo("Sven"));
+
+            Assert.That(exception.Mismatches[1].PropertyPath, Is.EqualTo("$.age"));
+            Assert.That(exception.Mismatches[1].Expected, Is.EqualTo(25));
+            Assert.That(exception.Mismatches[1].Actual, Is.EqualTo(16L));
+
+            Assert.That(exception.Mismatches[2].PropertyPath, Is.EqualTo("$.department"));
+            Assert.That(exception.Mismatches[2].Reason, Contains.Substring("Property was missing"));
+
+            Assert.That(exception.Message, Contains.Substring("$.name"));
+            Assert.That(exception.Message, Contains.Substring("$.age"));
+            Assert.That(exception.Message, Contains.Substring("$.department"));
+        });
+    }
+
+    [Test]
+    public void AssertMatch_ShouldSupportArraysAndDictionaries()
+    {
+        var expected = new Dictionary<string, object?>
+        {
+            ["items"] = new object[]
+            {
+                new Dictionary<string, object?> { ["id"] = 1 },
+                new Dictionary<string, object?> { ["id"] = 2 }
+            }
+        };
+
+        var matched = JsonShapeMatcher.AssertMatch("""{"items":[{"id":1,"extra":true},{"id":2}]}""", expected);
+
+        Assert.That(matched, Contains.Item("$.items[1].id"));
+    }
+
+    [Test]
+    public void AssertMatch_ShouldHandleCaseInsensitivePropertyNames()
+    {
+        Assert.DoesNotThrow(() => JsonShapeMatcher.AssertMatch(
+            """{ "firstName": "Matthias" }""",
+            new { FirstName = "Matthias" }));
+    }
+
+    [Test]
+    public void AssertMatch_ShouldWrapEmptyOrInvalidJsonAsAssertionFailure()
+    {
+        var expectedShape = new { name = "Matthias" };
+
+        Assert.Throws<JsonDocumentAssertionException>(() => JsonShapeMatcher.AssertMatch("", expectedShape));
+        Assert.Throws<JsonDocumentAssertionException>(() => JsonShapeMatcher.AssertMatch("   ", expectedShape));
+
+        var exception = Assert.Throws<JsonDocumentAssertionException>(
+            () => JsonShapeMatcher.AssertMatch("not-json", expectedShape));
+        Assert.That(exception!.InnerException, Is.InstanceOf<JsonException>());
+    }
+
+    private sealed class NamedShape
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("display_name")]
+        public string DisplayName { get; init; } = string.Empty;
+        public int ItemCount { get; init; }
+    }
+
+    [Test]
     public void DiagnosticSanitizer_ShouldRedactNestedPropertiesAndPreserveUnchangedJson()
     {
         Assert.Multiple(() =>

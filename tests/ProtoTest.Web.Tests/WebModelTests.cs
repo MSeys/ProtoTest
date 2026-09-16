@@ -289,6 +289,57 @@ public sealed class WebModelTests
         });
     }
 
+    [Test]
+    public async Task LoginAs_ShouldConstructTheStrategyAndPassPersonaAndSession()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+
+        await host.StartTestAsync(
+            "web login",
+            TestMethod(),
+            [new LoginAsAttribute<RecordingLoginStrategy>("Administrator")]);
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
+    public async Task LoginAs_ShouldLetTheStrategyRequestProtoExecutionContextDirectly()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+
+        await host.StartTestAsync(
+            "web login",
+            TestMethod(),
+            [new LoginAsAttribute<ContextAwareLoginStrategy>("Administrator")]);
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    private sealed class RecordingLoginStrategy : IWebLoginStrategy
+    {
+        public ValueTask LoginAsync(WebLoginContext context, CancellationToken cancellationToken = default)
+        {
+            Assert.That(context.Persona, Is.EqualTo("Administrator"));
+            Assert.That(context.Web.Name, Is.EqualTo("Default"));
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class ContextAwareLoginStrategy(ProtoExecutionContext constructedWith) : IWebLoginStrategy
+    {
+        public ValueTask LoginAsync(WebLoginContext context, CancellationToken cancellationToken = default)
+        {
+            Assert.That(context.Execution, Is.SameAs(constructedWith));
+            return ValueTask.CompletedTask;
+        }
+    }
+
     private static ProtoHost CreateHost(
         FakeBackendFactory factory,
         Action<IProtoHostBuilder>? configure = null)

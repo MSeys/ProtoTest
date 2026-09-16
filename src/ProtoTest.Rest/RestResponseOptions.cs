@@ -1,13 +1,12 @@
 namespace ProtoTest.Rest;
 
-using Microsoft.Extensions.Configuration;
+using ProtoTest.Core;
 using ProtoTest.Http;
 
 /// <summary>Controls how REST response bodies are buffered.</summary>
-public sealed class RestResponseOptions : ProtoHttpResponseOptions
+public sealed class RestResponseOptions : ProtoHttpResponseOptions, IProtoConfigurableOptions
 {
     public const string ConfigurationSectionName = "ProtoTest:Rest:Responses";
 
-    internal void Bind(IConfiguration configuration)
-        => configuration.GetSection(ConfigurationSectionName).Bind(this);
+    string IProtoConfigurableOptions.ConfigurationSectionName => ConfigurationSectionName;
 }

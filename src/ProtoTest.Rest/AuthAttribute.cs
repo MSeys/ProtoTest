@@ -1,23 +1,14 @@
-﻿namespace ProtoTest.Rest;
+namespace ProtoTest.Rest;
 
-using ProtoTest.Core;
+using ProtoTest.Http;
 
-internal interface IRestAuthMetadata
-{
-    int Order { get; }
-    IRestAuthenticator CreateAuthenticator(ProtoExecutionContext context);
-}
+internal interface IRestAuthMetadata : IProtoHttpAuthMetadata;
 
 /// <summary>
-/// Generic attribute to apply an IRestAuthenticator directly to a test method or class.
+/// Generic attribute to apply an IProtoHttpAuthenticator directly to a test method or class.
 /// Usage: [Auth&lt;MyAuthenticator&gt;] or [Auth&lt;BearerTokenAuthenticator&gt;("secret-token")]
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true, Inherited = true)]
-public sealed class AuthAttribute<TAuth>(params object[] constructorArgs) : Attribute, IRestAuthMetadata
-    where TAuth : IRestAuthenticator
-{
-    public int Order { get; init; }
-
-    IRestAuthenticator IRestAuthMetadata.CreateAuthenticator(ProtoExecutionContext context)
-        => Internal.RestAuthenticatorFactory.Create<TAuth>(context, constructorArgs);
-}
+public sealed class AuthAttribute<TAuthenticator>(params object[] constructorArgs)
+    : ProtoHttpAuthAttribute<TAuthenticator>(constructorArgs), IRestAuthMetadata
+    where TAuthenticator : class, IProtoHttpAuthenticator;

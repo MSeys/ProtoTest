@@ -5,8 +5,8 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
+using ProtoTest.Http;
 using ProtoTest.Json;
-using ProtoTest.Rest.Matching;
 
 [TestFixture]
 public class RestRequestBuilderTests
@@ -281,9 +281,9 @@ public class TestHttpMessageHandler : HttpMessageHandler
     }
 }
 
-public class TestDummyAuthenticator(string token = "Bearer default") : IRestAuthenticator
+public class TestDummyAuthenticator(string token = "Bearer default") : IProtoHttpAuthenticator
 {
-    public ValueTask AuthenticateAsync(RestAuthenticationContext context, CancellationToken ct = default)
+    public ValueTask AuthenticateAsync(ProtoHttpAuthenticationContext context, CancellationToken ct = default)
     {
         context.Request.Headers.TryAddWithoutValidation("Authorization", token);
         return ValueTask.CompletedTask;

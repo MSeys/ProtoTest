@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Http;
-using ProtoTest.Rest.Authenticators;
+using ProtoTest.Http.Authenticators;
 using ProtoTest.Rest.Exceptions;
 
 [TestFixture]
@@ -335,9 +335,9 @@ public sealed class RestDiagnosticsAndExtensibilityTests
         public string Token => "resolved-from-di";
     }
 
-    private sealed class DependencyAuthenticator(AuthTokenProvider tokenProvider) : IRestAuthenticator
+    private sealed class DependencyAuthenticator(AuthTokenProvider tokenProvider) : IProtoHttpAuthenticator
     {
-        public ValueTask AuthenticateAsync(RestAuthenticationContext context, CancellationToken cancellationToken = default)
+        public ValueTask AuthenticateAsync(ProtoHttpAuthenticationContext context, CancellationToken cancellationToken = default)
         {
             context.Request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {tokenProvider.Token}");
             return ValueTask.CompletedTask;
@@ -371,10 +371,10 @@ public sealed class RestDiagnosticsAndExtensibilityTests
         }
     }
 
-    private sealed class UserContextAuthenticator(ProtoExecutionContext constructedWith) : IRestAuthenticator
+    private sealed class UserContextAuthenticator(ProtoExecutionContext constructedWith) : IProtoHttpAuthenticator
     {
         public ValueTask AuthenticateAsync(
-            RestAuthenticationContext context,
+            ProtoHttpAuthenticationContext context,
             CancellationToken cancellationToken = default)
         {
             Assert.That(context.Test, Is.SameAs(constructedWith));

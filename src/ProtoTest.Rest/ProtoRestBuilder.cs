@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
 using ProtoTest.Http;
-using ProtoTest.Rest.Internal;
 
 public sealed class ProtoRestBuilder
 {
@@ -20,39 +19,14 @@ public sealed class ProtoRestBuilder
         string name = "Default",
         string? baseUrl = null,
         Action<IHttpClientBuilder>? configure = null)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (baseUrl is not null && !ProtoHttpUri.TryCreateAbsoluteHttpUri(baseUrl, out _))
-        {
-            throw new ArgumentException(
-                "A REST client base URL must be an absolute HTTP or HTTPS URI.",
-                nameof(baseUrl));
-        }
-
-        var httpClientBuilder = Services.AddHttpClient(ProtoHttpClientInitializer.GetFactoryName("Rest", name));
-        configure?.Invoke(httpClientBuilder);
-        Services.AddSingleton<IProtoClientInitializer>(
-            _ => new ProtoHttpClientInitializer("Rest", name, baseUrl));
-
-        return new ProtoRestTargetBuilder(name, Services);
-    }
+        => ProtoHttpClientRegistration.AddClient(Services, "Rest", "REST", name, baseUrl, configure);
 
     /// <summary>Adds a client whose absolute base address is resolved from per-test context.</summary>
     public IProtoTargetBuilder AddClient(
         string name,
         Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> baseAddressResolver,
         Action<IHttpClientBuilder>? configure = null)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(baseAddressResolver);
-
-        var httpClientBuilder = Services.AddHttpClient(ProtoHttpClientInitializer.GetFactoryName("Rest", name));
-        configure?.Invoke(httpClientBuilder);
-        Services.AddSingleton<IProtoClientInitializer>(
-            _ => new ProtoHttpClientInitializer("Rest", name, allowMissingBaseUrl: true));
-        Services.AddSingleton(new ProtoHttpBaseAddressRegistration("Rest", name, baseAddressResolver));
-        return new ProtoRestTargetBuilder(name, Services);
-    }
+        => ProtoHttpClientRegistration.AddClient(Services, "Rest", name, baseAddressResolver, configure);
 
     /// <summary>Adds a client whose absolute base address is read from per-test context.</summary>
     public IProtoTargetBuilder AddClient(
@@ -74,7 +48,7 @@ public sealed class ProtoRestBuilder
         {
             var options = new RestAttachmentOptions();
             configure?.Invoke(options);
-            options.Bind(serviceProvider.GetRequiredService<IConfiguration>());
+            options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
             return options;
         });
         return this;
@@ -88,7 +62,7 @@ public sealed class ProtoRestBuilder
         {
             var options = new RestResponseOptions();
             configure(options);
-            options.Bind(serviceProvider.GetRequiredService<IConfiguration>());
+            options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
             return options;
         });
         return this;

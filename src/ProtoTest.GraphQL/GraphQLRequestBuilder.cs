@@ -18,8 +18,8 @@ public sealed class GraphQLRequestBuilder
     private readonly string _targetName;
     private readonly Dictionary<string, string> _headers = new(StringComparer.OrdinalIgnoreCase);
     private GraphQLBuiltOperation? _operation;
-    private Func<ProtoExecutionContext, IGraphQLAuthenticator>? _authenticatorFactory;
-    private IGraphQLAuthenticator? _authenticator;
+    private Func<ProtoExecutionContext, IProtoHttpAuthenticator>? _authenticatorFactory;
+    private IProtoHttpAuthenticator? _authenticator;
     private object? _variables;
     private Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>>? _baseAddressResolver;
     private string? _simpleOperationType;
@@ -147,7 +147,7 @@ public sealed class GraphQLRequestBuilder
         return this;
     }
 
-    public GraphQLRequestBuilder Auth(IGraphQLAuthenticator authenticator)
+    public GraphQLRequestBuilder Auth(IProtoHttpAuthenticator authenticator)
     {
         _authenticator = authenticator ?? throw new ArgumentNullException(nameof(authenticator));
         _authenticatorFactory = _ => authenticator;
@@ -160,11 +160,10 @@ public sealed class GraphQLRequestBuilder
     }
 
     public GraphQLRequestBuilder Auth<TAuthenticator>(params object[] constructorArgs)
-        where TAuthenticator : class, IGraphQLAuthenticator
+        where TAuthenticator : class, IProtoHttpAuthenticator
     {
         _authenticator = null;
-        _authenticatorFactory = context => Microsoft.Extensions.DependencyInjection.ActivatorUtilities
-            .CreateInstance<TAuthenticator>(context.Services, constructorArgs);
+        _authenticatorFactory = context => ProtoAuthenticatorFactory.Create<TAuthenticator>(context, constructorArgs);
         TraceConfiguration("auth.select", $"Authentication · {typeof(TAuthenticator).Name}", new Dictionary<string, string?>()
         {
             ["auth.source"] = "request",
@@ -181,7 +180,7 @@ public sealed class GraphQLRequestBuilder
         return this;
     }
 
-    internal GraphQLRequestBuilder UseAuthenticatorFactory(Func<ProtoExecutionContext, IGraphQLAuthenticator>? factory)
+    internal GraphQLRequestBuilder UseAuthenticatorFactory(Func<ProtoExecutionContext, IProtoHttpAuthenticator>? factory)
     {
         _authenticatorFactory = factory;
         return this;
@@ -266,37 +265,15 @@ public sealed class GraphQLRequestBuilder
 
         try
         {
-            if (_authenticatorFactory is not null)
-            {
-                using var authOperation = _context.Trace.StartOperation(
-                    "auth.apply",
-                    "Apply GraphQL authentication",
-                    "ProtoTest.GraphQL",
-                    attributes: new Dictionary<string, string?> { ["client.name"] = _targetName });
-                try
-                {
-                    _authenticator ??= _authenticatorFactory(_context)
-                        ?? throw new InvalidOperationException("The GraphQL authenticator factory returned null.");
-                    authOperation.SetAttribute("auth.type", _authenticator.GetType().FullName);
-                    await _authenticator.AuthenticateAsync(
-                        new GraphQLAuthenticationContext(request, _context, _targetName), cancellationToken);
-                    authOperation.Succeed();
-                }
-                catch (Exception exception)
-                {
-                    authOperation.Fail(exception);
-                    throw;
-                }
-            }
-            else
-            {
-                _context.Trace.WriteEvent(
-                    "auth.skip",
-                    "Authentication · None",
-                    "ProtoTest.GraphQL",
-                    outcome: ProtoTraceOutcome.Succeeded,
-                    attributes: new Dictionary<string, string?> { ["client.name"] = _targetName });
-            }
+            _authenticator = await ProtoHttpAuthenticationApplier.ApplyAsync(
+                _authenticatorFactory,
+                _authenticator,
+                request,
+                _context,
+                _targetName,
+                "GraphQL",
+                "ProtoTest.GraphQL",
+                cancellationToken);
 
             HttpResponseMessage? rawResponse = null;
             try
@@ -380,37 +357,15 @@ public sealed class GraphQLRequestBuilder
             if (requestContent.RequiresPreflight)
                 request.Headers.TryAddWithoutValidation("GraphQL-preflight", "1");
 
-            if (_authenticatorFactory is not null)
-            {
-                using var authOperation = _context.Trace.StartOperation(
-                    "auth.apply",
-                    "Apply GraphQL authentication",
-                    "ProtoTest.GraphQL",
-                    attributes: new Dictionary<string, string?> { ["client.name"] = _targetName });
-                try
-                {
-                    _authenticator ??= _authenticatorFactory(_context)
-                        ?? throw new InvalidOperationException("The GraphQL authenticator factory returned null.");
-                    authOperation.SetAttribute("auth.type", _authenticator.GetType().FullName);
-                    await _authenticator.AuthenticateAsync(
-                        new GraphQLAuthenticationContext(request, _context, _targetName), cancellationToken);
-                    authOperation.Succeed();
-                }
-                catch (Exception exception)
-                {
-                    authOperation.Fail(exception);
-                    throw;
-                }
-            }
-            else
-            {
-                _context.Trace.WriteEvent(
-                    "auth.skip",
-                    "Authentication · None",
-                    "ProtoTest.GraphQL",
-                    outcome: ProtoTraceOutcome.Succeeded,
-                    attributes: new Dictionary<string, string?> { ["client.name"] = _targetName });
-            }
+            _authenticator = await ProtoHttpAuthenticationApplier.ApplyAsync(
+                _authenticatorFactory,
+                _authenticator,
+                request,
+                _context,
+                _targetName,
+                "GraphQL",
+                "ProtoTest.GraphQL",
+                cancellationToken);
 
             var attachmentOptions = _context.TryService<GraphQLAttachmentOptions>();
             var requestNumber = attachmentOptions is null

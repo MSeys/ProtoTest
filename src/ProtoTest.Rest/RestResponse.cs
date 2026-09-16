@@ -4,7 +4,6 @@ using ProtoTest.Core;
 using ProtoTest.Json;
 using ProtoTest.Rest.Exceptions;
 using ProtoTest.Rest.Internal;
-using ProtoTest.Rest.Matching;
 using System.Dynamic;
 using System.Collections;
 using System.Net;
@@ -178,7 +177,7 @@ public sealed class RestResponse : IDisposable
                 _routeIdentifier);
         }
 
-            var matchedProps = ShapeMatcher.AssertMatch(Content, expectedShape, options);
+            var matchedProps = JsonShapeMatcher.AssertMatch(Content, expectedShape, options);
             operation?.SetAttribute("matched.property_count", matchedProps.Count.ToString());
             operation?.SetAttribute("matched.properties", string.Join(", ", matchedProps));
             operation?.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(matchedProps, _attachmentOptions));
@@ -203,7 +202,7 @@ public sealed class RestResponse : IDisposable
             operation?.Succeed();
             return this;
         }
-        catch (ShapeMismatchException exception)
+        catch (JsonShapeMismatchException exception)
         {
             operation?.SetAttribute("shape.result", "mismatched");
             operation?.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(exception.MatchedProperties, _attachmentOptions));

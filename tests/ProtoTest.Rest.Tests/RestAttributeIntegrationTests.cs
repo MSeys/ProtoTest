@@ -6,7 +6,7 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
-using ProtoTest.Rest.Authenticators;
+using ProtoTest.Http.Authenticators;
 
 [TestFixture]
 public sealed class RestAttributeIntegrationTests

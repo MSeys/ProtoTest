@@ -15,15 +15,15 @@ public sealed class RestRequestBuilder
     private readonly string _targetName;
     private readonly Dictionary<string, string> _headers = new(StringComparer.OrdinalIgnoreCase);
     private Func<HttpContent>? _contentFactory;
-    private Func<ProtoExecutionContext, IRestAuthenticator>? _authenticatorFactory;
-    private IRestAuthenticator? _resolvedAuthenticator;
+    private Func<ProtoExecutionContext, IProtoHttpAuthenticator>? _authenticatorFactory;
+    private IProtoHttpAuthenticator? _resolvedAuthenticator;
     private Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>>? _baseAddressResolver;
 
     internal RestRequestBuilder(
         HttpClient httpClient,
         ProtoExecutionContext context,
         string targetName,
-        IRestAuthenticator? defaultAuthenticator)
+        IProtoHttpAuthenticator? defaultAuthenticator)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -32,7 +32,7 @@ public sealed class RestRequestBuilder
         _authenticatorFactory = defaultAuthenticator is null ? null : _ => defaultAuthenticator;
     }
 
-    public RestRequestBuilder Auth(IRestAuthenticator authenticator)
+    public RestRequestBuilder Auth(IProtoHttpAuthenticator authenticator)
     {
         _resolvedAuthenticator = authenticator ?? throw new ArgumentNullException(nameof(authenticator));
         _authenticatorFactory = _ => authenticator;
@@ -44,10 +44,10 @@ public sealed class RestRequestBuilder
         return this;
     }
 
-    public RestRequestBuilder Auth<TAuth>(params object[] constructorArgs) where TAuth : IRestAuthenticator
+    public RestRequestBuilder Auth<TAuth>(params object[] constructorArgs) where TAuth : class, IProtoHttpAuthenticator
     {
         _resolvedAuthenticator = null;
-        _authenticatorFactory = context => RestAuthenticatorFactory.Create<TAuth>(context, constructorArgs);
+        _authenticatorFactory = context => ProtoAuthenticatorFactory.Create<TAuth>(context, constructorArgs);
         TraceConfiguration("auth.select", $"Authentication · {typeof(TAuth).Name}", new Dictionary<string, string?>()
         {
             ["auth.source"] = "request",
@@ -66,7 +66,7 @@ public sealed class RestRequestBuilder
     }
 
     internal RestRequestBuilder UseAuthenticatorFactory(
-        Func<ProtoExecutionContext, IRestAuthenticator>? authenticatorFactory)
+        Func<ProtoExecutionContext, IProtoHttpAuthenticator>? authenticatorFactory)
     {
         _resolvedAuthenticator = null;
         _authenticatorFactory = authenticatorFactory;
@@ -248,38 +248,15 @@ public sealed class RestRequestBuilder
                 }
             }
 
-            if (_authenticatorFactory is not null)
-            {
-                using var authOperation = _context.Trace.StartOperation(
-                    "auth.apply",
-                    "Apply REST authentication",
-                    "ProtoTest.Rest",
-                    attributes: new Dictionary<string, string?> { ["client.name"] = _targetName });
-                try
-                {
-                    _resolvedAuthenticator ??= _authenticatorFactory(_context)
-                        ?? throw new InvalidOperationException("The REST authenticator factory returned null.");
-                    authOperation.SetAttribute("auth.type", _resolvedAuthenticator.GetType().FullName);
-                    await _resolvedAuthenticator.AuthenticateAsync(
-                        new RestAuthenticationContext(request, _context, _targetName),
-                        ct);
-                    authOperation.Succeed();
-                }
-                catch (Exception exception)
-                {
-                    authOperation.Fail(exception);
-                    throw;
-                }
-            }
-            else
-            {
-                _context.Trace.WriteEvent(
-                    "auth.skip",
-                    "Authentication · None",
-                    "ProtoTest.Rest",
-                    outcome: ProtoTraceOutcome.Succeeded,
-                    attributes: new Dictionary<string, string?> { ["client.name"] = _targetName });
-            }
+            _resolvedAuthenticator = await ProtoHttpAuthenticationApplier.ApplyAsync(
+                _authenticatorFactory,
+                _resolvedAuthenticator,
+                request,
+                _context,
+                _targetName,
+                "REST",
+                "ProtoTest.Rest",
+                ct);
         }
         catch (Exception exception)
         {

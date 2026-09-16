@@ -3,8 +3,8 @@ namespace ProtoTest.SampleApp.Testing;
 using System.Net;
 using System.Net.Http.Headers;
 using ProtoTest.Core;
+using ProtoTest.Http;
 using ProtoTest.Rest;
-using ProtoTest.GraphQL;
 using ProtoTest.SampleApp.Contracts;
 using System.Text.Json;
 
@@ -187,24 +187,11 @@ public sealed class SampleUserAttribute : ProtoAttribute
 
 }
 
-public sealed class SampleUserAuthenticator : IRestAuthenticator
+/// <summary>Shared by both the REST and GraphQL clients via [Auth&lt;&gt;] and [GraphQLAuth&lt;&gt;].</summary>
+public sealed class SampleUserAuthenticator : IProtoHttpAuthenticator
 {
     public ValueTask AuthenticateAsync(
-        RestAuthenticationContext context,
-        CancellationToken cancellationToken = default)
-    {
-        var environment = context.Test.Context<SampleEnvironmentContext>();
-        var user = context.Test.Context<SampleUserContext>();
-        context.Request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", user.AccessToken);
-        context.Request.Headers.Add("X-Tenant", environment.Tenant);
-        return ValueTask.CompletedTask;
-    }
-}
-
-public sealed class SampleGraphQLAuthenticator : IGraphQLAuthenticator
-{
-    public ValueTask AuthenticateAsync(
-        GraphQLAuthenticationContext context,
+        ProtoHttpAuthenticationContext context,
         CancellationToken cancellationToken = default)
     {
         var environment = context.Test.Context<SampleEnvironmentContext>();

@@ -1,14 +1,16 @@
-namespace ProtoTest.Rest.Internal;
+namespace ProtoTest.Core;
 
 using Microsoft.Extensions.DependencyInjection;
-using ProtoTest.Core;
 
-internal static class RestAuthenticatorFactory
+/// <summary>
+/// Constructs a protocol authenticator so its constructor can request <see cref="ProtoExecutionContext"/>
+/// directly, in addition to any services resolvable from DI and explicit constructor arguments.
+/// </summary>
+public static class ProtoAuthenticatorFactory
 {
     public static TAuthenticator Create<TAuthenticator>(
         ProtoExecutionContext context,
         object[] constructorArguments)
-        where TAuthenticator : IRestAuthenticator
         => ActivatorUtilities.CreateInstance<TAuthenticator>(
             new ContextServiceProvider(context),
             constructorArguments);

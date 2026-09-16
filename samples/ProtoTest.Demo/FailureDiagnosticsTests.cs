@@ -2,9 +2,9 @@ namespace ProtoTest.Demo;
 
 using System.Net;
 using ProtoTest.Core;
+using ProtoTest.Json;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
-using ProtoTest.Rest.Exceptions;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Testing;
 
@@ -30,7 +30,7 @@ public sealed class FailureDiagnosticsTests
             });
             Assert.Fail("The diagnostic mismatch was expected.");
         }
-        catch (ShapeMismatchException exception)
+        catch (JsonShapeMismatchException exception)
         {
             Proto.Context.RecordObservation(
                 "TraceViewer",

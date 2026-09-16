@@ -1,6 +1,6 @@
 namespace ProtoTest.GraphQL;
 
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, Inherited = true)]
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
 public sealed class GraphQLClientAttribute(string clientName) : Attribute
 {
     public string ClientName { get; } = string.IsNullOrWhiteSpace(clientName)

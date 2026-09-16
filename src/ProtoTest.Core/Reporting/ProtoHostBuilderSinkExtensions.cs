@@ -1,5 +1,6 @@
 namespace ProtoTest.Core;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -20,6 +21,8 @@ public static class ProtoHostBuilderSinkExtensions
             {
                 var sink = ActivatorUtilities.CreateInstance<TSink>(serviceProvider);
                 configure?.Invoke(sink);
+                if (sink is IProtoConfigurableOptions configurable)
+                    configurable.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
                 return sink;
             });
         });

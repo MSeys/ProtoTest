@@ -1,12 +1,12 @@
 namespace ProtoTest.Rest;
 
-using Microsoft.Extensions.Configuration;
+using ProtoTest.Core;
 using ProtoTest.Json;
 
 /// <summary>
 /// Controls which REST artifacts are automatically attached to a test result.
 /// </summary>
-public sealed class RestAttachmentOptions : JsonDiagnosticOptions
+public sealed class RestAttachmentOptions : JsonDiagnosticOptions, IProtoConfigurableOptions
 {
     public const string ConfigurationSectionName = "ProtoTest:Rest:Attachments";
 
@@ -33,6 +33,5 @@ public sealed class RestAttachmentOptions : JsonDiagnosticOptions
         "key"
     ];
 
-    internal void Bind(IConfiguration configuration)
-        => configuration.GetSection(ConfigurationSectionName).Bind(this);
+    string IProtoConfigurableOptions.ConfigurationSectionName => ConfigurationSectionName;
 }

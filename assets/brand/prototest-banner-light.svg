@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300">
+  <defs>
+    <pattern id="pt-banner-grid-light" width="18" height="18" patternUnits="userSpaceOnUse">
+      <path d="M18 0H0V18" fill="none" stroke="rgba(31,117,169,.06)" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="pt-banner-glow-light" cx="72%" cy="46%" r="55%">
+      <stop offset="0%" stop-color="#1f75a9" stop-opacity=".10"/>
+      <stop offset="100%" stop-color="#1f75a9" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="300" fill="#f7f5ee"/>
+  <rect width="1200" height="300" fill="url(#pt-banner-grid-light)"/>
+  <rect width="1200" height="300" fill="url(#pt-banner-glow-light)"/>
+
+  <path d="M20 190H160V130H310V170H470V90H630V140H790V95H960V155H1180" fill="none" stroke="rgba(31,117,169,.20)" stroke-width="2"/>
+  <path d="M160 190V225H360V200H630" fill="none" stroke="rgba(31,117,169,.12)" stroke-width="2" stroke-dasharray="7 7"/>
+  <circle cx="470" cy="90" r="5" fill="none" stroke="rgba(31,117,169,.31)"/>
+  <circle cx="960" cy="155" r="6" fill="rgba(22,136,191,.60)"/>
+
+  <g transform="translate(-37.24,-3.1) scale(0.4138)">
+    <path fill="#123b58" d="M301 263V300H383A21 21 0 0 1 404 321A21 21 0 0 1 383 342H333V312H301V342H267V376H301V440H333V376H383A56 56 0 0 0 439 320A56 56 0 0 0 383 264H301Z"/>
+    <path fill="#1688bf" d="M349 400L366 383L392 407L453 346L470 363L392 441Z"/>
+  </g>
+
+  <text x="200" y="140" font-family="'Space Grotesk','Segoe UI',sans-serif" font-weight="700" font-size="46" fill="#123b58" letter-spacing="-2">ProtoTest</text>
+  <text x="200" y="164" font-family="'JetBrains Mono','Consolas',monospace" font-weight="500" font-size="11" letter-spacing="1.4" fill="#748c9d">COMPOSABLE INTEGRATION TESTING FOUNDATION FOR .NET</text>
+
+  <text x="1140" y="110" text-anchor="end" font-family="'Space Grotesk','Segoe UI',sans-serif" font-weight="700" font-size="22" fill="#123b58">Infrastructure should be composable.</text>
+  <text x="1140" y="136" text-anchor="end" font-family="'JetBrains Mono','Consolas',monospace" font-weight="500" font-size="11" letter-spacing=".4" fill="rgba(18,59,88,.68)">Behavior should be explicit.</text>
+</svg>

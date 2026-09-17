@@ -1,0 +1,40 @@
+.pre {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  font-size: 0.8rem;
+  line-height: 1.62;
+  overflow-x: auto;
+  background: transparent !important;
+  tab-size: 4;
+}
+
+@media (max-width: 600px) {
+  .pre {
+    font-size: 0.7rem;
+    padding: 0.85rem 0.9rem;
+  }
+}
+
+.line {
+  display: flex;
+  gap: 0.9rem;
+  transition: opacity 160ms ease;
+}
+
+.lineNo {
+  flex: 0 0 auto;
+  width: 1.6em;
+  text-align: right;
+  opacity: 0.32;
+  user-select: none;
+}
+
+.lineContent {
+  flex: 1 1 auto;
+  white-space: pre;
+}
+
+/* Infrastructure lines: present, but visibly not the point. */
+.dim {
+  opacity: 0.3;
+}

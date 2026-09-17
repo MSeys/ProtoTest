@@ -1,0 +1,8 @@
+{
+  "label": "Test Runners",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "description": "ProtoTest plugs into the runner you already use."
+  }
+}

@@ -1,0 +1,204 @@
+.frame {
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--pt-code);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 60px rgba(3, 15, 24, 0.28);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tabs {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.tab {
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.75rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.tab:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tabActive {
+  color: #05222c;
+  background: var(--pt-cyan);
+  font-weight: 700;
+}
+
+.tabActive:hover {
+  color: #05222c;
+  background: var(--pt-cyan);
+}
+
+.suiteTotal {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+@media (max-width: 720px) {
+  .suiteTotal {
+    display: none;
+  }
+}
+
+.files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.6rem 0.75rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.file {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.7rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.file:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.fileActive {
+  color: #fff;
+  border-color: var(--pt-cyan);
+  background: rgba(25, 168, 181, 0.12);
+}
+
+.scope {
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+}
+
+.scopeTest {
+  background: rgba(216, 106, 106, 0.18);
+  color: #e89a9a;
+}
+
+.scopeSuite {
+  background: rgba(53, 185, 133, 0.16);
+  color: var(--pt-green);
+}
+
+.note {
+  padding: 0.65rem 1.1rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.62);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.35rem;
+  padding: 0.7rem 1.1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.stats strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+.statTotal strong {
+  font-size: 0.95rem;
+}
+
+.statSplit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.swatchBehaviour,
+.swatchInfra {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.swatchBehaviour {
+  background: var(--pt-cyan);
+}
+
+.swatchInfra {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.codeArea {
+  position: relative;
+  max-height: 460px;
+  overflow: hidden;
+}
+
+.codeAreaExpanded {
+  max-height: none;
+}
+
+.fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 120px;
+  background: linear-gradient(to bottom, rgba(11, 33, 50, 0), var(--pt-code));
+  pointer-events: none;
+}
+
+.expand {
+  display: block;
+  width: 100%;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.72);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.72rem;
+  padding: 0.7rem;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.expand:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+}

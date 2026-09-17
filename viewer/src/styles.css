@@ -9,42 +9,46 @@
   --text: #102a3b;
   --muted: #587080;
   --dim: #8aa0ad;
-  --blueprint: #087fc4;
-  --blueprint-soft: #087fc414;
-  --cyan: #00a7a0;
-  --success: #16835a;
-  --success-soft: #16835a14;
-  --warning: #a66b08;
-  --warning-soft: #a66b0817;
-  --danger: #d74355;
-  --danger-soft: #d7435514;
+  --blueprint: #1F75A9;
+  --blueprint-soft: #1F75A914;
+  --cyan: #19A8B5;
+  --success: #35B985;
+  --success-soft: #35B98514;
+  --warning: #D7A84B;
+  --warning-soft: #D7A84B17;
+  --danger: #D86A6A;
+  --danger-soft: #D86A6A14;
   --purple: #7459a8;
   --shadow: #13394d12;
-  font: 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --pt-navy: #123B58;
+  --pt-navy-deep: #08283D;
+  font: 14px/1.5 Manrope, Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0b1115;
-  --surface: #111a20;
-  --surface-2: #17232b;
-  --hover: #1b2b34;
+  --bg: #071823;
+  --surface: #0d2234;
+  --surface-2: #132d3e;
+  --hover: #1a3548;
   --border: #263943;
   --border-strong: #385461;
   --text: #ecf4f7;
   --muted: #a2b4bd;
   --dim: #718892;
-  --blueprint: #4eb7ee;
-  --blueprint-soft: #4eb7ee18;
-  --cyan: #45cdc5;
-  --success: #5cdb95;
-  --success-soft: #5cdb9517;
-  --warning: #f0bd55;
-  --warning-soft: #f0bd5519;
-  --danger: #fb7185;
-  --danger-soft: #fb718519;
+  --blueprint: #1688BF;
+  --blueprint-soft: #1688BF18;
+  --cyan: #19A8B5;
+  --success: #35B985;
+  --success-soft: #35B98517;
+  --warning: #D7A84B;
+  --warning-soft: #D7A84B19;
+  --danger: #D86A6A;
+  --danger-soft: #D86A6A19;
   --purple: #b29ae1;
   --shadow: #00000035;
+  --pt-navy: #123B58;
+  --pt-navy-deep: #08283D;
 }
 
 * { box-sizing: border-box; }
@@ -58,7 +62,7 @@ html, body, #app { min-height: 100%; margin: 0; }
 body {
   color: var(--text);
   background-color: var(--bg);
-  background-image: linear-gradient(#168ac108 1px, transparent 1px), linear-gradient(90deg, #168ac108 1px, transparent 1px);
+  background-image: linear-gradient(#1F75A908 1px, transparent 1px), linear-gradient(90deg, #1F75A908 1px, transparent 1px);
   background-size: 28px 28px;
   -webkit-font-smoothing: antialiased;
 }

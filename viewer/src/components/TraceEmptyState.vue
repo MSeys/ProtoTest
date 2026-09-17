@@ -1,8 +1,25 @@
 <script setup lang="ts">
-import logoUrl from "../../../assets/brand/prototest-mark-transparent.svg?url";
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import logoLight from "../../../assets/brand/prototest-mark.svg?url";
+import logoDark from "../../../assets/brand/prototest-mark-white.svg?url";
 
 defineProps<{ error?: string }>();
 const emit = defineEmits<{ open: []; demo: []; file: [file: File] }>();
+
+type Theme = "light" | "dark";
+const theme = ref<Theme>(
+  (document.documentElement.dataset.theme as Theme)
+  ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+);
+const logoUrl = computed(() => theme.value === "dark" ? logoDark : logoLight);
+
+// Keep in sync when AppHeader toggles the theme
+const observer = new MutationObserver(() => {
+  const t = document.documentElement.dataset.theme as Theme | undefined;
+  if (t) theme.value = t;
+});
+onMounted(() => observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] }));
+onUnmounted(() => observer.disconnect());
 
 function drop(event: DragEvent) {
   const file = event.dataTransfer?.files[0];

@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import logoUrl from "../../../assets/brand/prototest-mark-transparent.svg?url";
+import { ref, computed } from "vue";
+import logoLight from "../../../assets/brand/prototest-mark.svg?url";
+import logoDark from "../../../assets/brand/prototest-mark-white.svg?url";
 
 defineEmits<{ open: [] }>();
 type Theme = "light" | "dark";
 let savedTheme: Theme | null = null;
 try { savedTheme = localStorage.getItem("prototest-trace-theme") as Theme | null; } catch { /* Storage may be disabled. */ }
 const theme = ref<Theme>(savedTheme ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+const logoUrl = computed(() => theme.value === "dark" ? logoDark : logoLight);
 document.documentElement.dataset.theme = theme.value;
 function toggleTheme() {
   theme.value = theme.value === "dark" ? "light" : "dark";

@@ -1,0 +1,91 @@
+/**
+ * ProtoTest brand theme.
+ * Tokens sourced from assets/internal/prototest-complete-design-handoff-v6.html
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --pt-blue: #1f75a9;
+  --pt-blue-bright: #1688bf;
+  --pt-blue-deep: #0f547f;
+  --pt-navy: #123b58;
+  --pt-navy-deep: #08283d;
+  --pt-cyan: #19a8b5;
+  --pt-green: #35b985;
+  --pt-amber: #d7a84b;
+  --pt-red: #d86a6a;
+  --pt-paper: #f7f5ee;
+  --pt-paper-cool: #f7fafc;
+  --pt-text: #183f5b;
+  --pt-muted: #657f91;
+  --pt-line: rgba(18, 59, 88, 0.14);
+  --pt-line-strong: rgba(18, 59, 88, 0.28);
+  --pt-surface: #ffffff;
+  --pt-code: #0b2132;
+  --pt-code-text: #d9edf7;
+
+  --ifm-color-primary: var(--pt-blue-bright);
+  --ifm-color-primary-dark: #147aa8;
+  --ifm-color-primary-darker: #12729d;
+  --ifm-color-primary-darkest: #0f5e81;
+  --ifm-color-primary-light: #1c96d4;
+  --ifm-color-primary-lighter: #269fdb;
+  --ifm-color-primary-lightest: #45b0e1;
+
+  --ifm-background-color: var(--pt-paper);
+  --ifm-font-color-base: var(--pt-text);
+  --ifm-heading-color: var(--pt-navy);
+  --ifm-font-family-base: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ifm-heading-font-family: 'Space Grotesk', 'Manrope', sans-serif;
+  --ifm-code-font-size: 90%;
+  --ifm-font-family-monospace: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  --ifm-navbar-background-color: rgba(247, 245, 238, 0.92);
+  --ifm-footer-background-color: var(--pt-navy-deep);
+  --docusaurus-highlighted-code-line-bg: rgba(31, 117, 169, 0.12);
+}
+
+[data-theme='dark'] {
+  --pt-text: #dceaf3;
+  --pt-muted: #90aec2;
+  --ifm-color-primary: var(--pt-cyan);
+  --ifm-color-primary-dark: #16939e;
+  --ifm-color-primary-darker: #148a94;
+  --ifm-color-primary-darkest: #10717a;
+  --ifm-color-primary-light: #1cbdca;
+  --ifm-color-primary-lighter: #28c3cf;
+  --ifm-color-primary-lightest: #4fd0da;
+
+  --pt-line: rgba(255, 255, 255, 0.14);
+  --pt-line-strong: rgba(255, 255, 255, 0.28);
+  --pt-surface: #0d2234;
+
+  --ifm-background-color: var(--pt-navy-deep);
+  --ifm-background-surface-color: #0d2234;
+  --ifm-font-color-base: #dceaf3;
+  --ifm-heading-color: #ffffff;
+  --ifm-navbar-background-color: rgba(8, 40, 61, 0.92);
+  --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.08);
+}
+
+h1, h2, h3, h4 {
+  letter-spacing: -0.02em;
+}
+
+.navbar__title {
+  font-family: var(--ifm-heading-font-family);
+  font-weight: 700;
+}
+
+.navbar {
+  backdrop-filter: blur(10px);
+  box-shadow: 0 1px 0 var(--pt-line);
+}
+
+code {
+  border-radius: 6px;
+}
+
+.footer--dark {
+  --ifm-footer-background-color: var(--pt-navy-deep);
+}

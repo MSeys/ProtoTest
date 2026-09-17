@@ -1,0 +1,198 @@
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: 5rem 0 4.5rem;
+  background:
+    radial-gradient(circle at 72% 38%, rgba(25, 168, 181, 0.16), transparent 42%),
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 20px 20px,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 20px 20px,
+    var(--pt-navy-deep);
+  color: #fff;
+}
+
+.eyebrow {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pt-cyan);
+  margin-bottom: 1rem;
+}
+
+.heroInner {
+  display: grid;
+  grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
+  gap: 3rem;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+}
+
+@media (max-width: 996px) {
+  .heroInner {
+    grid-template-columns: 1fr;
+    gap: 2.25rem;
+  }
+}
+
+.heroTitle {
+  font-size: 3rem;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  color: #fff;
+  margin-bottom: 1.1rem;
+}
+
+@media (max-width: 600px) {
+  .heroTitle {
+    font-size: 2.25rem;
+  }
+}
+
+.heroLead {
+  font-size: 1.08rem;
+  line-height: 1.62;
+  color: rgba(255, 255, 255, 0.78);
+  max-width: 48ch;
+  margin-bottom: 2rem;
+}
+
+.heroButtons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btnPrimary {
+  background: var(--pt-cyan);
+  color: #05222c;
+  border: none;
+  font-weight: 700;
+}
+
+.btnPrimary:hover {
+  background: #22b9c7;
+  color: #05222c;
+}
+
+.btnGhost {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+
+.btnGhost:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.section {
+  padding: 5rem 0;
+}
+
+.sectionAlt {
+  background: var(--pt-surface);
+}
+
+.sectionHead {
+  max-width: 720px;
+  margin: 0 auto 3rem;
+  text-align: center;
+}
+
+.sectionHead h2 {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.025em;
+}
+
+.sectionHead p {
+  color: var(--pt-muted);
+  font-size: 1.05rem;
+  line-height: 1.62;
+}
+
+.honestyNote {
+  margin: 1.75rem auto 0;
+  max-width: 760px;
+  text-align: center;
+  font-size: 0.92rem;
+  color: var(--pt-muted);
+  line-height: 1.62;
+}
+
+.honestyNote code {
+  font-size: 0.85em;
+}
+
+/* Feature rows: copy beside a live visual */
+
+.featureRow {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 3rem;
+  align-items: center;
+  margin-bottom: 4rem;
+}
+
+.featureRow:last-child {
+  margin-bottom: 0;
+}
+
+.featureRowReverse > *:first-child {
+  order: 2;
+}
+
+@media (max-width: 900px) {
+  .featureRow {
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+  }
+
+  .featureRowReverse > *:first-child {
+    order: 0;
+  }
+}
+
+.featureCopy h3 {
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.85rem;
+}
+
+.featureCopy p {
+  color: var(--pt-muted);
+  line-height: 1.65;
+  margin-bottom: 0.85rem;
+}
+
+.featureLink {
+  display: inline-block;
+  font-weight: 600;
+  margin-top: 0.35rem;
+}
+
+.ctaBanner {
+  border-radius: 18px;
+  padding: 3.5rem 2.5rem;
+  text-align: center;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(25, 168, 181, 0.18), transparent 45%),
+    var(--pt-navy-deep);
+  color: #fff;
+}
+
+.ctaBanner h2 {
+  color: #fff;
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.ctaBanner p {
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 1.75rem;
+  max-width: 54ch;
+  margin-left: auto;
+  margin-right: auto;
+}

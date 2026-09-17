@@ -27,11 +27,10 @@ public sealed class OpenTelemetryInstrumentationTests
             var context = await host.StartTestAsync("exported test", TestMethod());
             context.Trace.WriteEvent("orders.requested", "Order requested", "ProtoTest.OpenTelemetry.Tests");
 
-            using (var operation = context.Trace.StartOperation(
-                       "orders.create",
-                       "Create order",
-                       "ProtoTest.OpenTelemetry.Tests",
-                       attributes: new Dictionary<string, string?> { ["order.product"] = "notebook" }))
+            using (var operation = context.Trace
+                       .Operation("orders.create", "Create order", "ProtoTest.OpenTelemetry.Tests")
+                       .With("order.product", "notebook")
+                       .Begin())
             {
                 context.Trace.WriteEvent(
                     "orders.validated",
@@ -84,7 +83,7 @@ public sealed class OpenTelemetryInstrumentationTests
             var context = await host.StartTestAsync("failing test", TestMethod());
 
             var failure = new InvalidOperationException("payment declined");
-            using (var operation = context.Trace.StartOperation("payments.charge", "Charge card", "Tests"))
+            using (var operation = context.Trace.Operation("payments.charge", "Charge card", "Tests").Begin())
             {
                 operation.Fail(failure);
             }

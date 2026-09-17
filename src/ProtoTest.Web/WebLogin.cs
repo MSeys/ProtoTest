@@ -31,22 +31,18 @@ public sealed class LoginAsAttribute<TStrategy>(string persona, params object[] 
     public string Session { get; init; } = "Default";
 
     public override Task BeforeTestAsync(ProtoExecutionContext context)
-        => context.Trace.ExecuteAsync(
-            "web.login",
-            $"Login · {Persona} [{Session}]",
-            "ProtoTest.Web",
-            async () =>
+        => context.Trace
+            .Operation("web.login", $"Login · {Persona} [{Session}]", "ProtoTest.Web")
+            .During(ProtoTracePhase.Setup)
+            .With("web.session", Session)
+            .With("web.login.persona", Persona)
+            .With("web.login.strategy", typeof(TStrategy).FullName)
+            .RunAsync(async () =>
             {
                 var strategy = ProtoAuthenticatorFactory.Create<TStrategy>(context, constructorArgs);
                 await strategy.LoginAsync(new WebLoginContext(context, context.Web(Session), Persona));
-            },
-            ProtoTracePhase.Setup,
-            new Dictionary<string, string?>
-            {
-                ["web.session"] = Session,
-                ["web.login.persona"] = Persona,
-                ["web.login.strategy"] = typeof(TStrategy).FullName
-            }).AsTask();
+            })
+            .AsTask();
 
     private static string Required(string value)
     {

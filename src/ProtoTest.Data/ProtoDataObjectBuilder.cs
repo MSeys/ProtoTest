@@ -39,11 +39,10 @@ public sealed class ProtoDataObjectBuilder<T>
     public ProtoDataExplanation Explain()
     {
         var context = Proto.Context;
-        using var operation = context.Trace.StartOperation(
-            "data.explain",
-            $"Explain · {typeof(T).Name}",
-            TraceSource,
-            attributes: BaseAttributes());
+        using var operation = context.Trace
+            .Operation("data.explain", $"Explain · {typeof(T).Name}", TraceSource)
+            .With(BaseAttributes())
+            .Begin();
 
         try
         {
@@ -81,11 +80,10 @@ public sealed class ProtoDataObjectBuilder<T>
     public T Build()
     {
         var context = Proto.Context;
-        using var operation = context.Trace.StartOperation(
-            "data.build",
-            $"Build · {typeof(T).Name}",
-            TraceSource,
-            attributes: BaseAttributes());
+        using var operation = context.Trace
+            .Operation("data.build", $"Build · {typeof(T).Name}", TraceSource)
+            .With(BaseAttributes())
+            .Begin();
 
         try
         {
@@ -122,11 +120,10 @@ public sealed class ProtoDataObjectBuilder<T>
     public async ValueTask<TResult> CreateAsync<TResult>(CancellationToken cancellationToken = default)
     {
         var context = Proto.Context;
-        using var operation = context.Trace.StartOperation(
-            "data.create",
-            $"Create · {typeof(T).Name}",
-            TraceSource,
-            attributes: BaseAttributes());
+        using var operation = context.Trace
+            .Operation("data.create", $"Create · {typeof(T).Name}", TraceSource)
+            .With(BaseAttributes())
+            .Begin();
 
         try
         {
@@ -155,15 +152,11 @@ public sealed class ProtoDataObjectBuilder<T>
     {
         ArgumentOutOfRangeException.ThrowIfNegative(count);
         var context = Proto.Context;
-        using var operation = context.Trace.StartOperation(
-            "data.build_many",
-            $"Build {count} · {typeof(T).Name}",
-            TraceSource,
-            attributes: new Dictionary<string, string?>
-            {
-                ["data.type"] = typeof(T).FullName,
-                ["data.count"] = count.ToString()
-            });
+        using var operation = context.Trace
+            .Operation("data.build_many", $"Build {count} · {typeof(T).Name}", TraceSource)
+            .With("data.type", typeof(T).FullName)
+            .With("data.count", count.ToString())
+            .Begin();
 
         try
         {
@@ -193,16 +186,12 @@ public sealed class ProtoDataObjectBuilder<T>
     {
         ArgumentOutOfRangeException.ThrowIfNegative(count);
         var context = Proto.Context;
-        using var operation = context.Trace.StartOperation(
-            "data.create_many",
-            $"Create {count} · {typeof(T).Name} → {typeof(TResult).Name}",
-            TraceSource,
-            attributes: new Dictionary<string, string?>
-            {
-                ["data.input_type"] = typeof(T).FullName,
-                ["data.result_type"] = typeof(TResult).FullName,
-                ["data.count"] = count.ToString()
-            });
+        using var operation = context.Trace
+            .Operation("data.create_many", $"Create {count} · {typeof(T).Name} → {typeof(TResult).Name}", TraceSource)
+            .With("data.input_type", typeof(T).FullName)
+            .With("data.result_type", typeof(TResult).FullName)
+            .With("data.count", count.ToString())
+            .Begin();
 
         try
         {

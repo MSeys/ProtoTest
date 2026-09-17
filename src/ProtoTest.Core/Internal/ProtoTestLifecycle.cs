@@ -91,29 +91,24 @@ internal sealed class ProtoTestLifecycle
 
     private async Task<ProtoExecutionContext> ExecuteBeforeAsync(ContextState state)
     {
-        state.SetupOperation = state.Context!.Trace.StartOperation(
-            "test.setup", "Setup", "ProtoTest.Core", ProtoTracePhase.Setup,
-            new Dictionary<string, string?>
-            {
-                ["hook.count"] = _hooks.Count.ToString(),
-                ["attribute.count"] = state.Attributes.Count.ToString(),
-                ["test.class"] = state.Context.TestMethod.DeclaringType?.FullName,
-                ["test.method"] = state.Context.TestMethod.Name
-            });
+        state.SetupOperation = state.Context!.Trace
+            .Operation("test.setup", "Setup", "ProtoTest.Core")
+            .During(ProtoTracePhase.Setup)
+            .With("hook.count", _hooks.Count.ToString())
+            .With("attribute.count", state.Attributes.Count.ToString())
+            .With("test.class", state.Context.TestMethod.DeclaringType?.FullName)
+            .With("test.method", state.Context.TestMethod.Name)
+            .Begin();
         try
         {
             foreach (var hook in _hooks)
             {
-                using var operation = state.Context!.Trace.StartOperation(
-                    "hook.before",
-                    $"Before · {hook.GetType().Name}",
-                    "ProtoTest.Core",
-                    ProtoTracePhase.Setup,
-                    new Dictionary<string, string?>
-                    {
-                        ["hook.type"] = hook.GetType().FullName,
-                        ["hook.order"] = hook.Order.ToString()
-                    });
+                using var operation = state.Context!.Trace
+                    .Operation("hook.before", $"Before · {hook.GetType().Name}", "ProtoTest.Core")
+                    .During(ProtoTracePhase.Setup)
+                    .With("hook.type", hook.GetType().FullName)
+                    .With("hook.order", hook.Order.ToString())
+                    .Begin();
                 try
                 {
                     await hook.BeforeTestAsync(state.Context);
@@ -129,16 +124,12 @@ internal sealed class ProtoTestLifecycle
 
             foreach (var attribute in state.Attributes)
             {
-                using var operation = state.Context!.Trace.StartOperation(
-                    "attribute.before",
-                    $"Before · {attribute.GetType().Name}",
-                    "ProtoTest.Core",
-                    ProtoTracePhase.Setup,
-                    new Dictionary<string, string?>
-                    {
-                        ["attribute.type"] = attribute.GetType().FullName,
-                        ["attribute.order"] = attribute.Order.ToString()
-                    });
+                using var operation = state.Context!.Trace
+                    .Operation("attribute.before", $"Before · {attribute.GetType().Name}", "ProtoTest.Core")
+                    .During(ProtoTracePhase.Setup)
+                    .With("attribute.type", attribute.GetType().FullName)
+                    .With("attribute.order", attribute.Order.ToString())
+                    .Begin();
                 try
                 {
                     await attribute.BeforeTestAsync(state.Context);
@@ -154,13 +145,12 @@ internal sealed class ProtoTestLifecycle
 
             state.SetupOperation.Succeed();
             state.SetupOperation.Dispose();
-            state.ExecutionOperation = state.Context!.Trace.StartOperation(
-                "test.execution", "Test execution", "ProtoTest.Core", ProtoTracePhase.Execution,
-                new Dictionary<string, string?>
-                {
-                    ["test.class"] = state.Context.TestMethod.DeclaringType?.FullName,
-                    ["test.method"] = state.Context.TestMethod.Name
-                });
+            state.ExecutionOperation = state.Context!.Trace
+                .Operation("test.execution", "Test execution", "ProtoTest.Core")
+                .During(ProtoTracePhase.Execution)
+                .With("test.class", state.Context.TestMethod.DeclaringType?.FullName)
+                .With("test.method", state.Context.TestMethod.Name)
+                .Begin();
             if (state.Context.Trace is ProtoTestTraceRecorder recorder)
             {
                 recorder.SetDefaultParent(state.ExecutionOperation.Id);
@@ -197,18 +187,17 @@ internal sealed class ProtoTestLifecycle
             testTrace.SetDefaultParent(null);
         }
 
-        using var lifecycleOperation = context.Trace.StartOperation(
-            isRollback ? "test.rollback" : "test.teardown",
-            isRollback ? "Rollback" : "Teardown",
-            "ProtoTest.Core",
-            isRollback ? ProtoTracePhase.Rollback : ProtoTracePhase.Teardown,
-            new Dictionary<string, string?>
-            {
-                ["hook.completed_count"] = state.CompletedHooks.Count.ToString(),
-                ["attribute.completed_count"] = state.CompletedAttributes.Count.ToString(),
-                ["attachment.count"] = context.Attachments.Count.ToString(),
-                ["test.outcome"] = result.Outcome.ToString()
-            });
+        using var lifecycleOperation = context.Trace
+            .Operation(
+                isRollback ? "test.rollback" : "test.teardown",
+                isRollback ? "Rollback" : "Teardown",
+                "ProtoTest.Core")
+            .During(isRollback ? ProtoTracePhase.Rollback : ProtoTracePhase.Teardown)
+            .With("hook.completed_count", state.CompletedHooks.Count.ToString())
+            .With("attribute.completed_count", state.CompletedAttributes.Count.ToString())
+            .With("attachment.count", context.Attachments.Count.ToString())
+            .With("test.outcome", result.Outcome.ToString())
+            .Begin();
         var exceptionCountBeforeTeardown = exceptions.Count;
 
         foreach (var attribute in state.CompletedAttributes.AsEnumerable().Reverse())
@@ -310,8 +299,11 @@ internal sealed class ProtoTestLifecycle
         List<Exception> exceptions,
         IReadOnlyDictionary<string, string?>? attributes = null)
     {
-        using var operation = context.Trace.StartOperation(
-            kind, name, "ProtoTest.Core", phase, attributes);
+        using var operation = context.Trace
+            .Operation(kind, name, "ProtoTest.Core")
+            .During(phase)
+            .With(attributes)
+            .Begin();
         try
         {
             await action();

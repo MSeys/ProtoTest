@@ -66,16 +66,14 @@ public sealed class RestResponse : IDisposable
 
     public T? ReadAsJson<T>(JsonSerializerOptions? options = null)
     {
-        using var operation = _context?.Trace.StartOperation(
-            "http.response.deserialize",
-            $"Deserialize response · {typeof(T).Name}",
-            "ProtoTest.Rest",
-            attributes: new Dictionary<string, string?>
-            {
-                ["target.type"] = typeof(T).FullName,
-                ["content.length"] = ContentBytes.Length.ToString()
-            },
-            parentId: _requestTraceId);
+        using var operation = _context is null
+            ? null
+            : _context.Trace
+                .Operation("http.response.deserialize", $"Deserialize response · {typeof(T).Name}", "ProtoTest.Rest")
+                .With("target.type", typeof(T).FullName)
+                .With("content.length", ContentBytes.Length.ToString())
+                .Parent(_requestTraceId)
+                .Begin();
         try
         {
             var result = string.IsNullOrWhiteSpace(Content)
@@ -115,17 +113,15 @@ public sealed class RestResponse : IDisposable
 
     public RestResponse ShouldHaveStatus(HttpStatusCode expectedStatusCode)
     {
-        using var operation = _context?.Trace.StartOperation(
-            "assert.http.status",
-            $"Assert status · {(int)expectedStatusCode} {expectedStatusCode}",
-            "ProtoTest.Rest",
-            attributes: new Dictionary<string, string?>
-            {
-                ["expected.status_code"] = ((int)expectedStatusCode).ToString(),
-                ["actual.status_code"] = ((int)StatusCode).ToString(),
-                ["request.identifier"] = _routeIdentifier
-            },
-            parentId: _requestTraceId);
+        using var operation = _context is null
+            ? null
+            : _context.Trace
+                .Operation("assert.http.status", $"Assert status · {(int)expectedStatusCode} {expectedStatusCode}", "ProtoTest.Rest")
+                .With("expected.status_code", ((int)expectedStatusCode).ToString())
+                .With("actual.status_code", ((int)StatusCode).ToString())
+                .With("request.identifier", _routeIdentifier)
+                .Parent(_requestTraceId)
+                .Begin();
         try
         {
             if (StatusCode != expectedStatusCode)
@@ -154,19 +150,17 @@ public sealed class RestResponse : IDisposable
             Content,
             RawResponse.Content.Headers.ContentType?.MediaType,
             _attachmentOptions);
-        using var operation = _context?.Trace.StartOperation(
-            "assert.json.shape",
-            "Assert response shape",
-            "ProtoTest.Rest",
-            attributes: new Dictionary<string, string?>
-            {
-                ["expected.type"] = expectedShape.GetType().FullName,
-                ["shape.expected"] = expectedShapeJson,
-                ["shape.actual"] = actualShapeJson,
-                ["actual.media_type"] = RawResponse.Content.Headers.ContentType?.MediaType,
-                ["request.identifier"] = _routeIdentifier
-            },
-            parentId: _requestTraceId);
+        using var operation = _context is null
+            ? null
+            : _context.Trace
+                .Operation("assert.json.shape", "Assert response shape", "ProtoTest.Rest")
+                .With("expected.type", expectedShape.GetType().FullName)
+                .With("shape.expected", expectedShapeJson)
+                .With("shape.actual", actualShapeJson)
+                .With("actual.media_type", RawResponse.Content.Headers.ContentType?.MediaType)
+                .With("request.identifier", _routeIdentifier)
+                .Parent(_requestTraceId)
+                .Begin();
 
         try
         {

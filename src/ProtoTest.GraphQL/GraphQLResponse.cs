@@ -146,18 +146,14 @@ public sealed class GraphQLResponse : IDisposable
         var actualShapeJson = SelectedData.HasValue
             ? JsonDiagnosticSanitizer.Sanitize(SelectedData.Value.GetRawText(), _attachmentOptions)
             : null;
-        using var operation = _context.Trace.StartOperation(
-            "assert.graphql.data_shape",
-            "Assert GraphQL data shape",
-            "ProtoTest.GraphQL",
-            attributes: new Dictionary<string, string?>
-            {
-                ["expected.type"] = expectedShape.GetType().FullName,
-                ["shape.expected"] = expectedShapeJson,
-                ["shape.actual"] = actualShapeJson,
-                ["graphql.operation"] = _identifier
-            },
-            parentId: _requestTraceId);
+        using var operation = _context.Trace
+            .Operation("assert.graphql.data_shape", "Assert GraphQL data shape", "ProtoTest.GraphQL")
+            .With("expected.type", expectedShape.GetType().FullName)
+            .With("shape.expected", expectedShapeJson)
+            .With("shape.actual", actualShapeJson)
+            .With("graphql.operation", _identifier)
+            .Parent(_requestTraceId)
+            .Begin();
         try
         {
             if (!SelectedData.HasValue) throw new GraphQLAssertionException("Expected GraphQL data, but the response did not contain data.");
@@ -198,12 +194,11 @@ public sealed class GraphQLResponse : IDisposable
 
     public T? ReadDataAs<T>(JsonSerializerOptions? options = null)
     {
-        using var operation = _context.Trace.StartOperation(
-            "graphql.response.deserialize",
-            $"Deserialize GraphQL data · {typeof(T).Name}",
-            "ProtoTest.GraphQL",
-            attributes: new Dictionary<string, string?> { ["target.type"] = typeof(T).FullName },
-            parentId: _requestTraceId);
+        using var operation = _context.Trace
+            .Operation("graphql.response.deserialize", $"Deserialize GraphQL data · {typeof(T).Name}", "ProtoTest.GraphQL")
+            .With("target.type", typeof(T).FullName)
+            .Parent(_requestTraceId)
+            .Begin();
         try
         {
             var result = SelectedData.HasValue
@@ -231,12 +226,11 @@ public sealed class GraphQLResponse : IDisposable
         IReadOnlyDictionary<string, string?> attributes,
         Action assertion)
     {
-        using var operation = _context.Trace.StartOperation(
-            kind,
-            name,
-            "ProtoTest.GraphQL",
-            attributes: attributes,
-            parentId: _requestTraceId);
+        using var operation = _context.Trace
+            .Operation(kind, name, "ProtoTest.GraphQL")
+            .With(attributes)
+            .Parent(_requestTraceId)
+            .Begin();
         try
         {
             assertion();

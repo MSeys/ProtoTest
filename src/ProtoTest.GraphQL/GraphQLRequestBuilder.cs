@@ -205,23 +205,18 @@ public sealed class GraphQLRequestBuilder
         if (operation.Type == "subscription")
             throw new InvalidOperationException("Subscriptions return a stream. Use SubscribeAsync instead of ExecuteAsync.");
         var identifier = $"{operation.Type} {operation.Name ?? "<anonymous>"}";
-        using var traceOperation = _context.Trace.StartOperation(
-            "graphql.operation",
-            $"GraphQL · {identifier}",
-            "ProtoTest.GraphQL",
-            attributes: new Dictionary<string, string?>
-            {
-                ["client.name"] = _targetName,
-                ["graphql.operation.type"] = operation.Type,
-                ["graphql.operation.name"] = operation.Name
-            });
+        using var traceOperation = _context.Trace
+            .Operation("graphql.operation", $"GraphQL · {identifier}", "ProtoTest.GraphQL")
+            .With("client.name", _targetName)
+            .With("graphql.operation.type", operation.Type)
+            .With("graphql.operation.name", operation.Name)
+            .Begin();
         var stopwatch = Stopwatch.StartNew();
         Uri endpoint;
-        using var resolveOperation = _context.Trace.StartOperation(
-            "graphql.endpoint.resolve",
-            $"Resolve endpoint · {_targetName}",
-            "ProtoTest.GraphQL",
-            attributes: new Dictionary<string, string?> { ["client.name"] = _targetName });
+        using var resolveOperation = _context.Trace
+            .Operation("graphql.endpoint.resolve", $"Resolve endpoint · {_targetName}", "ProtoTest.GraphQL")
+            .With("client.name", _targetName)
+            .Begin();
         try
         {
             endpoint = _baseAddressResolver is not null

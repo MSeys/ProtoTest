@@ -29,16 +29,11 @@ public sealed class ProtoCompositeHttpAuthenticator(
     {
         foreach (var authenticator in _authenticators)
         {
-            await context.Test.Trace.ExecuteAsync(
-                "auth.handler.apply",
-                $"Apply · {authenticator.GetType().Name}",
-                traceSource,
-                () => authenticator.AuthenticateAsync(context, cancellationToken),
-                attributes: new Dictionary<string, string?>
-                {
-                    ["auth.type"] = authenticator.GetType().FullName,
-                    ["client.name"] = context.ClientName
-                });
+            await context.Test.Trace
+                .Operation("auth.handler.apply", $"Apply · {authenticator.GetType().Name}", traceSource)
+                .With("auth.type", authenticator.GetType().FullName)
+                .With("client.name", context.ClientName)
+                .RunAsync(() => authenticator.AuthenticateAsync(context, cancellationToken));
         }
     }
 }

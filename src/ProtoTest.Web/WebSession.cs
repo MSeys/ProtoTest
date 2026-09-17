@@ -346,7 +346,10 @@ public sealed class WebSession : IAsyncDisposable
         var backend = await GetOrCreateBackendAsync(cancellationToken);
         attributes["web.backend"] = backend.Name;
         attributes["web.session"] = Name;
-        using var operation = _context.Trace.StartOperation(kind, name, TraceSource, attributes: attributes);
+        using var operation = _context.Trace
+            .Operation(kind, name, TraceSource)
+            .With(attributes)
+            .Begin();
         var backendContext = new WebBackendOperationContext(
             operation.Id, Name, operationKind, OperationName(name), element);
         var webOperation = new WebOperationContext(
@@ -355,17 +358,13 @@ public sealed class WebSession : IAsyncDisposable
         {
             WebOperationDelegate pipeline = async (context, ct) =>
             {
-                using var backendOperation = _context.Trace.StartOperation(
-                    "web.backend.execute",
-                    $"{backend.Name} · {operationKind}",
-                    TraceSource,
-                    attributes: new Dictionary<string, string?>
-                    {
-                        ["web.backend"] = backend.Name,
-                        ["web.session"] = Name,
-                        ["web.correlation_id"] = operation.Id
-                    },
-                    parentId: operation.Id);
+                using var backendOperation = _context.Trace
+                    .Operation("web.backend.execute", $"{backend.Name} · {operationKind}", TraceSource)
+                    .With("web.backend", backend.Name)
+                    .With("web.session", Name)
+                    .With("web.correlation_id", operation.Id)
+                    .Parent(operation.Id)
+                    .Begin();
                 Exception? failure = null;
                 var outcome = ProtoTraceOutcome.Unknown;
                 try
@@ -457,16 +456,12 @@ public sealed class WebSession : IAsyncDisposable
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        using var operation = _context.Trace.StartOperation(
-            "web.flow",
-            $"WEB flow · {name}",
-            TraceSource,
-            attributes: new Dictionary<string, string?>
-            {
-                ["web.session"] = Name,
-                ["web.backend"] = BackendName,
-                ["web.flow.step_count"] = steps.Count.ToString()
-            });
+        using var operation = _context.Trace
+            .Operation("web.flow", $"WEB flow · {name}", TraceSource)
+            .With("web.session", Name)
+            .With("web.backend", BackendName)
+            .With("web.flow.step_count", steps.Count.ToString())
+            .Begin();
         try
         {
             foreach (var step in steps)
@@ -496,15 +491,11 @@ public sealed class WebSession : IAsyncDisposable
 
     private async Task<IWebBackend> CreateBackendAsync(CancellationToken cancellationToken)
     {
-        using var operation = _context.Trace.StartOperation(
-            "web.session.initialize",
-            $"Initialize web session · {Name}",
-            TraceSource,
-            attributes: new Dictionary<string, string?>
-            {
-                ["web.session"] = Name,
-                ["web.backend"] = _factory.Name
-            });
+        using var operation = _context.Trace
+            .Operation("web.session.initialize", $"Initialize web session · {Name}", TraceSource)
+            .With("web.session", Name)
+            .With("web.backend", _factory.Name)
+            .Begin();
         try
         {
             var backend = await _factory.CreateAsync(_context, cancellationToken);
@@ -526,16 +517,12 @@ public sealed class WebSession : IAsyncDisposable
         var backendTask = _backendTask;
         if (backendTask is null) return;
         var backend = await backendTask;
-        using var operation = _context.Trace.StartOperation(
-            "web.session.complete",
-            $"Complete web session · {Name}",
-            TraceSource,
-            ProtoTracePhase.Teardown,
-            new Dictionary<string, string?>
-            {
-                ["web.backend"] = backend.Name,
-                ["web.session"] = Name
-            });
+        using var operation = _context.Trace
+            .Operation("web.session.complete", $"Complete web session · {Name}", TraceSource)
+            .During(ProtoTracePhase.Teardown)
+            .With("web.backend", backend.Name)
+            .With("web.session", Name)
+            .Begin();
         try
         {
             await backend.CompleteAsync();

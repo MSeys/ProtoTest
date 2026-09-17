@@ -41,17 +41,13 @@ internal sealed class ProtoDataService : IProtoData, IAsyncDisposable
         }
 
         var provisioner = provisioners[0];
-        using var operation = execution.Trace.StartOperation(
-            "data.provision",
-            $"Provision · {typeof(TInput).Name} → {typeof(TResult).Name}",
-            "ProtoTest.Data",
-            attributes: new Dictionary<string, string?>
-            {
-                ["data.input_type"] = typeof(TInput).FullName,
-                ["data.result_type"] = typeof(TResult).FullName,
-                ["data.provisioner"] = provisioner.GetType().FullName
-            },
-            parentId: parentId);
+        using var operation = execution.Trace
+            .Operation("data.provision", $"Provision · {typeof(TInput).Name} → {typeof(TResult).Name}", "ProtoTest.Data")
+            .With("data.input_type", typeof(TInput).FullName)
+            .With("data.result_type", typeof(TResult).FullName)
+            .With("data.provisioner", provisioner.GetType().FullName)
+            .Parent(parentId)
+            .Begin();
 
         try
         {
@@ -96,17 +92,13 @@ internal sealed class ProtoDataService : IProtoData, IAsyncDisposable
         for (var index = _ownedResources.Count - 1; index >= 0; index--)
         {
             var resource = _ownedResources[index];
-            using var operation = resource.Trace.StartOperation(
-                "data.cleanup",
-                $"Cleanup · {resource.DataType.Name}",
-                "ProtoTest.Data",
-                ProtoTracePhase.Teardown,
-                new Dictionary<string, string?>
-                {
-                    ["data.type"] = resource.DataType.FullName,
-                    ["data.identity"] = resource.Identity,
-                    ["data.provisioner"] = resource.ProvisionerType.FullName
-                });
+            using var operation = resource.Trace
+                .Operation("data.cleanup", $"Cleanup · {resource.DataType.Name}", "ProtoTest.Data")
+                .During(ProtoTracePhase.Teardown)
+                .With("data.type", resource.DataType.FullName)
+                .With("data.identity", resource.Identity)
+                .With("data.provisioner", resource.ProvisionerType.FullName)
+                .Begin();
             try
             {
                 await resource.Ownership.DisposeAsync();

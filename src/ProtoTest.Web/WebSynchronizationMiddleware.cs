@@ -35,17 +35,13 @@ internal sealed class WebSynchronizationMiddleware(
                      item.Timing == timing && item.Operations.Contains(operationContext.Kind)))
         {
             var condition = (IWebWaitCondition)operationContext.Execution.Services.GetRequiredService(registration.ConditionType);
-            using var trace = operationContext.Execution.Trace.StartOperation(
-                "web.wait",
-                $"Wait · {condition.Name}",
-                "ProtoTest.Web",
-                attributes: new Dictionary<string, string?>
-                {
-                    ["web.wait.timing"] = timing.ToString(),
-                    ["web.wait.condition"] = condition.GetType().FullName,
-                    ["web.wait.timeout"] = registration.Timeout.ToString(),
-                    ["web.operation"] = operationContext.Kind.ToString()
-                });
+            using var trace = operationContext.Execution.Trace
+                .Operation("web.wait", $"Wait · {condition.Name}", "ProtoTest.Web")
+                .With("web.wait.timing", timing.ToString())
+                .With("web.wait.condition", condition.GetType().FullName)
+                .With("web.wait.timeout", registration.Timeout.ToString())
+                .With("web.operation", operationContext.Kind.ToString())
+                .Begin();
             var stopwatch = Stopwatch.StartNew();
             string? lastObserved = null;
             try

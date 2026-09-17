@@ -19,32 +19,24 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
 
         foreach (var group in groups)
         {
-            using var clientOperation = context.Trace.StartOperation(
-                "client.initialize",
-                $"Initialize · {group.Key.Name} ({group.Key.ClientType.Name})",
-                "ProtoTest.Core",
-                ProtoTracePhase.Setup,
-                attributes: new Dictionary<string, string?>
-                {
-                    ["client.name"] = group.Key.Name,
-                    ["client.type"] = group.Key.ClientType.FullName,
-                    ["initializer.count"] = group.Count().ToString()
-                });
+            using var clientOperation = context.Trace
+                .Operation("client.initialize", $"Initialize · {group.Key.Name} ({group.Key.ClientType.Name})", "ProtoTest.Core")
+                .During(ProtoTracePhase.Setup)
+                .With("client.name", group.Key.Name)
+                .With("client.type", group.Key.ClientType.FullName)
+                .With("initializer.count", group.Count().ToString())
+                .Begin();
             var initialized = false;
 
             // IEnumerable<T> service resolution preserves registration order, which lets
             // Configure determine provider precedence without integration-specific coupling.
             foreach (var initializer in group)
             {
-                using var attempt = context.Trace.StartOperation(
-                    "client.initializer.attempt",
-                    $"Try · {initializer.GetType().Name}",
-                    "ProtoTest.Core",
-                    ProtoTracePhase.Setup,
-                    new Dictionary<string, string?>
-                    {
-                        ["initializer.type"] = initializer.GetType().FullName
-                    });
+                using var attempt = context.Trace
+                    .Operation("client.initializer.attempt", $"Try · {initializer.GetType().Name}", "ProtoTest.Core")
+                    .During(ProtoTracePhase.Setup)
+                    .With("initializer.type", initializer.GetType().FullName)
+                    .Begin();
                 try
                 {
                     if (await initializer.TryInitializeAsync(context))

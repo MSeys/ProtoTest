@@ -44,15 +44,11 @@ public sealed class FailureDiagnosticsTests
     [SampleUser]
     public void CapturedDependencyTimeoutShowsErrorAndStackWithoutFailingBuild()
     {
-        using var operation = Proto.Context.Trace.StartOperation(
-            "saas.webhook.deliver",
-            "Deliver subscription webhook",
-            "ProtoTest.Demo",
-            attributes: new Dictionary<string, string?>
-            {
-                ["webhook.destination"] = "billing-ledger",
-                ["webhook.attempt"] = "3"
-            });
+        using var operation = Proto.Context.Trace
+            .Operation("saas.webhook.deliver", "Deliver subscription webhook", "ProtoTest.Demo")
+            .With("webhook.destination", "billing-ledger")
+            .With("webhook.attempt", "3")
+            .Begin();
         var exception = new TimeoutException("The billing ledger did not acknowledge the webhook within 2 seconds.");
         operation.Fail(exception);
         Proto.Context.RecordObservation(

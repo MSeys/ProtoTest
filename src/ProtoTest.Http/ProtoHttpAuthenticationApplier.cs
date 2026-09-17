@@ -38,17 +38,12 @@ public static class ProtoHttpAuthenticationApplier
         authenticator ??= factory(context)
             ?? throw new InvalidOperationException("The authenticator factory returned null.");
 
-        await context.Trace.ExecuteAsync(
-            "auth.apply",
-            $"Apply {protocolLabel} authentication",
-            traceSource,
-            () => authenticator.AuthenticateAsync(
-                new ProtoHttpAuthenticationContext(request, context, clientName), cancellationToken),
-            attributes: new Dictionary<string, string?>
-            {
-                ["client.name"] = clientName,
-                ["auth.type"] = authenticator.GetType().FullName
-            });
+        await context.Trace
+            .Operation("auth.apply", $"Apply {protocolLabel} authentication", traceSource)
+            .With("client.name", clientName)
+            .With("auth.type", authenticator.GetType().FullName)
+            .RunAsync(() => authenticator.AuthenticateAsync(
+                new ProtoHttpAuthenticationContext(request, context, clientName), cancellationToken));
         return authenticator;
     }
 }

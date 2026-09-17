@@ -55,8 +55,9 @@ public sealed class ProtoTracingTests
             "response.json",
             "{\"status\":\"ready\"}",
             "application/json"));
-        using (var operation = context.Trace.StartOperation(
-                   "sample.operation", "Sample operation", "ProtoTest.Core.Tests"))
+        using (var operation = context.Trace
+                   .Operation("sample.operation", "Sample operation", "ProtoTest.Core.Tests")
+                   .Begin())
         {
             context.Trace.WriteEvent("sample.event", "Sample event", "ProtoTest.Core.Tests");
             operation.Succeed();
@@ -278,7 +279,7 @@ public sealed class ProtoTracingTests
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("activity trace", TestMethod());
-        using (var operation = context.Trace.StartOperation("sample.activity", "Sample activity", "ProtoTest.Core.Tests"))
+        using (var operation = context.Trace.Operation("sample.activity", "Sample activity", "ProtoTest.Core.Tests").Begin())
         {
             context.Trace.WriteEvent("sample.event", "Sample event", "ProtoTest.Core.Tests", outcome: ProtoTraceOutcome.Succeeded);
             operation.Succeed();
@@ -292,6 +293,86 @@ public sealed class ProtoTracingTests
             Assert.That(activity.Status, Is.EqualTo(ActivityStatusCode.Ok));
             Assert.That(activity.Events.Select(item => item.Name), Does.Contain("Sample event"));
             Assert.That(activity.GetTagItem("prototest.test.id"), Is.Not.Null);
+        });
+    }
+
+    [Test]
+    public async Task ExecuteAsync_WithOperationHandle_ShouldExposeLiveAttributes()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = TemporaryTracePath());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("handle trace", TestMethod());
+
+        await context.Trace.ExecuteAsync(
+            "sample.handle",
+            "Handle operation",
+            "ProtoTest.Core.Tests",
+            operation =>
+            {
+                operation.SetAttribute("handle.phase", "live");
+                return ValueTask.CompletedTask;
+            });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        var entry = host.Trace.Snapshot().Tests.Single().Entries.Single(item => item.Kind == "sample.handle");
+        Assert.Multiple(() =>
+        {
+            Assert.That(entry.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
+            Assert.That(entry.Attributes["handle.phase"], Is.EqualTo("live"));
+        });
+    }
+
+    [Test]
+    public async Task ExecuteAsync_WithOperationHandle_ShouldMarkFailedAndRethrow()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = TemporaryTracePath());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("handle failure trace", TestMethod());
+
+        Func<ProtoTraceOperation, ValueTask> fail = _ => throw new InvalidOperationException("boom");
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await context.Trace.ExecuteAsync("sample.handle.failure", "Failing operation", "ProtoTest.Core.Tests", fail));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+
+        var entry = host.Trace.Snapshot().Tests.Single().Entries.Single(item => item.Kind == "sample.handle.failure");
+        Assert.Multiple(() =>
+        {
+            Assert.That(entry.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(entry.Error!.Message, Is.EqualTo("boom"));
+        });
+    }
+
+    [Test]
+    public async Task FluentOperation_ShouldComposeMetadataAndReturnResult()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = TemporaryTracePath());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("fluent trace", TestMethod());
+
+        var result = await context.Trace
+            .Operation("sample.fluent", "Fluent operation", "ProtoTest.Core.Tests")
+            .With("sample.key", "sample-value")
+            .RunAsync(() => ValueTask.FromResult(42));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        var test = host.Trace.Snapshot().Tests.Single();
+        var entry = test.Entries.Single(item => item.Kind == "sample.fluent");
+        var execution = test.Entries.Single(item => item.Kind == "test.execution");
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(42));
+            Assert.That(entry.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
+            Assert.That(entry.ParentId, Is.EqualTo(execution.Id));
+            Assert.That(entry.Attributes["sample.key"], Is.EqualTo("sample-value"));
         });
     }
 

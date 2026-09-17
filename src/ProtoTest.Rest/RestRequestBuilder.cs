@@ -169,23 +169,18 @@ public sealed class RestRequestBuilder
     {
         ArgumentNullException.ThrowIfNull(method);
         var attachmentOptions = _context.TryService<RestAttachmentOptions>();
-        using var traceOperation = _context.Trace.StartOperation(
-            "http.request",
-            $"REST · {method.Method.ToUpperInvariant()} {routeTemplate}",
-            "ProtoTest.Rest",
-            attributes: new Dictionary<string, string?>
-            {
-                ["client.name"] = _targetName,
-                ["http.request.method"] = method.Method.ToUpperInvariant(),
-                ["http.route"] = routeTemplate
-            });
+        using var traceOperation = _context.Trace
+            .Operation("http.request", $"REST · {method.Method.ToUpperInvariant()} {routeTemplate}", "ProtoTest.Rest")
+            .With("client.name", _targetName)
+            .With("http.request.method", method.Method.ToUpperInvariant())
+            .With("http.route", routeTemplate)
+            .Begin();
         var stopwatch = Stopwatch.StartNew();
         Uri requestUri;
-        using var resolveOperation = _context.Trace.StartOperation(
-            "http.route.resolve",
-            $"Resolve route · {routeTemplate}",
-            "ProtoTest.Rest",
-            attributes: new Dictionary<string, string?> { ["http.route"] = routeTemplate });
+        using var resolveOperation = _context.Trace
+            .Operation("http.route.resolve", $"Resolve route · {routeTemplate}", "ProtoTest.Rest")
+            .With("http.route", routeTemplate)
+            .Begin();
         try
         {
             requestUri = await RestUriBuilder.BuildRequestUriAsync(

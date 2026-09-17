@@ -78,17 +78,13 @@ internal sealed class ProtoClientRegistry
                 continue;
             }
 
-            using var operation = trace.StartOperation(
-                "client.dispose",
-                $"Dispose · {key.Name} ({key.ClientType.Name})",
-                "ProtoTest.Core",
-                ProtoTracePhase.Teardown,
-                new Dictionary<string, string?>
-                {
-                    ["client.name"] = key.Name,
-                    ["client.type"] = key.ClientType.FullName,
-                    ["instance.type"] = client.GetType().FullName
-                });
+            using var operation = trace
+                .Operation("client.dispose", $"Dispose · {key.Name} ({key.ClientType.Name})", "ProtoTest.Core")
+                .During(ProtoTracePhase.Teardown)
+                .With("client.name", key.Name)
+                .With("client.type", key.ClientType.FullName)
+                .With("instance.type", client.GetType().FullName)
+                .Begin();
             try
             {
                 if (client is IAsyncDisposable asyncDisposable)

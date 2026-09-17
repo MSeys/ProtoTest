@@ -1,16 +1,42 @@
 namespace ProtoTest.SampleApp;
 
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using ProtoTest.SampleApp.Contracts;
+using ProtoTest.SampleApp.Domain;
 using ProtoTest.SampleApp.Northstar;
+using System.Data.Common;
 
 public class Program
 {
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
-        builder.Services.AddSingleton(TimeProvider.System);
-        builder.Services.AddSingleton<NorthstarEventBus>();
-        builder.Services.AddSingleton<NorthstarStore>();
+
+        // The database is infrastructure: by default an in-memory SQLite database kept alive for the
+        // application's lifetime, or whatever ConnectionStrings:Northstar points at. The same schema
+        // and the same store either way.
+        var connectionString = builder.Configuration.GetConnectionString("Northstar");
+        SqliteConnection? sharedConnection = null;
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            sharedConnection = new SqliteConnection("Data Source=:memory:");
+            sharedConnection.Open();
+            builder.Services.AddSingleton<DbConnection>(sharedConnection);
+        }
+
+        builder.Services.AddNorthstarDomain(options =>
+        {
+            if (sharedConnection is not null)
+            {
+                options.UseSqlite(sharedConnection);
+            }
+            else
+            {
+                options.UseSqlite(connectionString);
+            }
+        });
+
         builder.Services.AddSingleton<WebhookSinkRegistry>();
         // The sample runs in-process, so deliveries are routed to the sink registry. A real deployment
         // would register HttpWebhookTransport to POST to customer endpoints over the network.
@@ -25,6 +51,16 @@ public class Program
             .AddInMemorySubscriptions();
 
         var app = builder.Build();
+
+        // A real deployment migrates; the sample creates whatever is missing so a fresh in-memory
+        // database is ready on startup.
+        using (var scope = app.Services.CreateScope())
+        {
+            using var database = scope.ServiceProvider
+                .GetRequiredService<IDbContextFactory<NorthstarDbContext>>()
+                .CreateDbContext();
+            database.Database.EnsureCreated();
+        }
 
         app.UseWebSockets();
         app.Use(ProblemMiddleware);

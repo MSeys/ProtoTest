@@ -2,6 +2,7 @@ namespace ProtoTest.SampleApp.Northstar;
 
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.SampleApp.Contracts;
+using ProtoTest.SampleApp.Domain;
 
 internal static class NorthstarHttp
 {

@@ -1,6 +1,7 @@
 namespace ProtoTest.SampleApp.Northstar;
 
 using ProtoTest.SampleApp.Contracts;
+using ProtoTest.SampleApp.Domain;
 
 /// <summary>
 /// Scenario provisioning and control, deliberately kept out of the product surface. Every route lives

@@ -1,5 +1,6 @@
 namespace ProtoTest.SampleApp.Northstar;
 
+using ProtoTest.SampleApp.Domain;
 using System.Security.Cryptography;
 using System.Text;
 

@@ -1,9 +1,10 @@
 namespace ProtoTest.SampleApp.Northstar;
 
-using HotChocolate;
 using HotChocolate.Subscriptions;
+using HotChocolate;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.SampleApp.Contracts;
+using ProtoTest.SampleApp.Domain;
 
 public sealed record ApiInfo(string Name, string Version);
 

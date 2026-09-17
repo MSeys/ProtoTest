@@ -1,6 +1,7 @@
 namespace ProtoTest.SampleApp.Northstar;
 
 using ProtoTest.SampleApp.Contracts;
+using ProtoTest.SampleApp.Domain;
 
 /// <summary>A configurable receiving endpoint used by the demo to observe webhook deliveries.</summary>
 internal sealed class WebhookSinkRegistry

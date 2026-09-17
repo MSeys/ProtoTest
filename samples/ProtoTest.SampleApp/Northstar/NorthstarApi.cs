@@ -1,6 +1,7 @@
 namespace ProtoTest.SampleApp.Northstar;
 
 using ProtoTest.SampleApp.Contracts;
+using ProtoTest.SampleApp.Domain;
 
 /// <summary>The Northstar product API. Every route is tenant-scoped by the bearer token.</summary>
 internal static class NorthstarApi

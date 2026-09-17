@@ -5,6 +5,7 @@ using ProtoTest.Http;
 using ProtoTest.Json;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
+using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Testing;
 using System.Net;
 
@@ -73,6 +74,26 @@ public sealed class DiagnosticsShowcase
             new { exception.Message });
         using var organization = await Proto.Context.Rest().GetAsync("/api/v1/organization");
         organization.ShouldHaveHttpStatus(HttpStatusCode.OK);
+    }
+
+    [ProtoTest]
+    [SignedInAs]
+    public async Task FindingsReachTheReportWithoutFailingTheRun()
+    {
+        // Arrange
+        var project = await DemoSupport.CreateProjectAsync("ledger");
+        var production = await DemoSupport.CreateEnvironmentAsync(project.Id, "production", EnvironmentKinds.Production);
+
+        // Act
+        var deployment = await DemoSupport.DeployAsync(production.Id, "1.0.0", "abc1234");
+
+        // Assert: a finding is evidence, not a failure - the test still passes and the report shows it.
+        Proto.Context.AddFinding(
+            $"Deployment {deployment.Version} took {deployment.DeployMinutes:0.#} deploy-minutes.",
+            ProtoReportStatus.Warning,
+            category: "Delivery",
+            tags: ["delivery-budget"]);
+        Assert.That(deployment.Status, Is.EqualTo(DeploymentStatuses.Succeeded));
     }
 
     [ProtoTest]

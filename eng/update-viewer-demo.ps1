@@ -36,7 +36,7 @@ try {
         $runEntry = $archive.GetEntry("run.json")
         if ($null -eq $runEntry) { throw "The generated archive has no run.json entry." }
         $reader = [System.IO.StreamReader]::new($runEntry.Open())
-        try { $run = $reader.ReadToEnd() | ConvertFrom-Json -Depth 100 }
+        try { $run = $reader.ReadToEnd() | ConvertFrom-Json }
         finally { $reader.Dispose() }
     }
     finally {
@@ -47,9 +47,22 @@ try {
     $failedTests = @($tests | Where-Object outcome -eq "Failed")
     $succeededTests = @($tests | Where-Object outcome -eq "Succeeded")
     $partialTests = @($tests | Where-Object outcome -eq "Partial")
-    if ($tests.Count -ne 18 -or $succeededTests.Count -ne 15 -or $partialTests.Count -ne 2 -or $failedTests.Count -ne 1 -or
-        $failedTests[0].methodName -ne "IntentionalFailureShowsFailedTestShapeMismatchAndTeardown") {
-        throw "Expected 15 successful tests, 2 partial diagnostic tests and only the intentional shape-mismatch failure in the viewer trace."
+    if ($tests.Count -ne 37 -or $succeededTests.Count -ne 34 -or $partialTests.Count -ne 2 -or $failedTests.Count -ne 1 -or
+        $failedTests[0].methodName -ne "TheIntentionalFailureShowcaseStaysOptIn") {
+        throw "Expected 34 successful tests, 2 partial diagnostic tests and only the intentional shape-mismatch failure in the viewer trace."
+    }
+
+    # The run's own trace: what it owned and how its gates judged it.
+    $runEntries = @($run.entries)
+    if ($runEntries.Count -lt 1 -or -not ($runEntries | Where-Object kind -eq "gate.evaluate")) {
+        throw "Expected the run's gate verdicts in the viewer trace."
+    }
+
+    $kinds = @($tests | ForEach-Object { $_.entries } | ForEach-Object { $_.kind })
+    foreach ($expectedKind in @("resource.release", "finding.record")) {
+        if ($kinds -notcontains $expectedKind) {
+            throw "Expected '$expectedKind' entries in the viewer trace."
+        }
     }
 
     New-Item -ItemType Directory -Path $destinationDirectory -Force | Out-Null

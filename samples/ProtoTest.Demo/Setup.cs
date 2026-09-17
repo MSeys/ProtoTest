@@ -52,9 +52,25 @@ public sealed class Setup : ProtoTestAssembly
             builder.AddResource(postgres);
         }
 
+        // Without PostgreSQL the demo owns a file database: several connections can share it, WAL lets
+        // readers and the writer work at the same time, and a fresh file per run keeps tenant slugs
+        // from colliding with the previous run.
+        string? ownedDatabasePath = null;
+        if (postgres is null && configuredDatabase is null)
+        {
+            ownedDatabasePath = Path.GetFullPath(Path.Combine("TestResults", "ProtoTest.Demo", "northstar-demo.db"));
+            foreach (var suffix in new[] { "", "-wal", "-shm" })
+            {
+                if (File.Exists(ownedDatabasePath + suffix))
+                {
+                    File.Delete(ownedDatabasePath + suffix);
+                }
+            }
+        }
+
         var northstarDatabase = postgres?.ConnectionString
             ?? configuredDatabase
-            ?? "Data Source=file:northstar-demo;Mode=Memory;Cache=Shared;Pooling=False";
+            ?? $"Data Source={ownedDatabasePath}";
         var databaseProvider = postgres is not null ? "postgres" : "sqlite";
         var composeDomainInTests = hostedInProcess || configuredDatabase is not null || postgres is not null;
 
@@ -110,6 +126,11 @@ public sealed class Setup : ProtoTestAssembly
                 }
             })
             .AddTestHook<NorthstarScenarioHook>()
+            .AddRunGate("no error findings", context => context
+                .ItemsOfKind(ProtoReportItemKind.Finding)
+                .Any(item => item.Status == ProtoReportStatus.Error)
+                ? ProtoRunGateResult.Failed("The run recorded error findings.")
+                : ProtoRunGateResult.Passed("No error findings were recorded."))
             .AddData(data => data.AddDefaults<NorthstarDataDefaults>())
             .AddDataProvisioner<InviteMemberRequest, MembershipResponse, NorthstarMemberProvisioner>()
             .AddDataProvisioner<CreateProjectRequest, ProjectResponse, NorthstarDomainProjectProvisioner>()

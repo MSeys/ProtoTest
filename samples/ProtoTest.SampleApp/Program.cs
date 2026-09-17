@@ -69,6 +69,12 @@ public class Program
                 .GetRequiredService<IDbContextFactory<NorthstarDbContext>>()
                 .CreateDbContext();
             database.Database.EnsureCreated();
+            if (!postgres)
+            {
+                // Persistent for the database, so one connection is enough: readers and the writer stop
+                // blocking each other when several connections share the same file.
+                database.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
+            }
         }
 
         app.UseWebSockets();

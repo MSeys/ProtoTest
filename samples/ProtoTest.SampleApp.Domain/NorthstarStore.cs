@@ -904,6 +904,7 @@ internal sealed class NorthstarStore(
         {
             using var db = contexts.CreateDbContext();
             var jobs = new List<DispatchJob>();
+            var abandoned = false;
             // Ordered on the client: SQLite cannot order by a DateTimeOffset column.
             foreach (var organization in Aggregate(db).AsEnumerable().OrderBy(candidate => candidate.CreatedAtUtc))
             {
@@ -920,6 +921,7 @@ internal sealed class NorthstarStore(
                     {
                         delivery.Status = WebhookDeliveryStatuses.Failed;
                         delivery.LastError = "endpoint_removed";
+                        abandoned = true;
                         continue;
                     }
 
@@ -933,13 +935,22 @@ internal sealed class NorthstarStore(
                         delivery.Attempts));
                     if (jobs.Count >= maximum)
                     {
-                        db.SaveChanges();
+                        if (abandoned)
+                        {
+                            db.SaveChanges();
+                        }
+
                         return jobs;
                     }
                 }
             }
 
-            db.SaveChanges();
+            // The outbox is polled continuously, so it only writes when it actually abandoned something.
+            if (abandoned)
+            {
+                db.SaveChanges();
+            }
+
             return jobs;
         }
     }

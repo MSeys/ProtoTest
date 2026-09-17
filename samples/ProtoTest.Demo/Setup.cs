@@ -2,6 +2,7 @@ namespace ProtoTest.Demo;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using ProtoTest.AspNetCore;
 using ProtoTest.Core;
@@ -15,6 +16,7 @@ using ProtoTest.SampleApp;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Domain;
 using ProtoTest.SampleApp.Testing;
+using ProtoTest.Sql.Testcontainers;
 
 [SetUpFixture]
 public sealed class Setup : ProtoTestAssembly
@@ -28,12 +30,39 @@ public sealed class Setup : ProtoTestAssembly
         var hostedInProcess = string.IsNullOrWhiteSpace(targetUrl);
 
         // The application and the tests agree on the database the same way they agree on the URL:
-        // through configuration. In-process they share the sample's named in-memory database; against
-        // a published environment the connection string points at that environment's database.
+        // through configuration. Set PROTOTEST_DATABASE=postgres for a real server in a container;
+        // otherwise the suite shares the sample's named in-memory database. Against a published
+        // environment the connection string points at that environment's database.
         var configuredDatabase = System.Environment.GetEnvironmentVariable("ConnectionStrings__Northstar");
-        var northstarDatabase = configuredDatabase
-            ?? "Data Source=file:northstar;Mode=Memory;Cache=Shared;Pooling=False";
-        var composeDomainInTests = hostedInProcess || configuredDatabase is not null;
+        var usePostgres = string.Equals(
+            System.Environment.GetEnvironmentVariable("PROTOTEST_DATABASE"),
+            "postgres",
+            StringComparison.OrdinalIgnoreCase);
+
+        PostgresDatabase? postgres = null;
+        if (usePostgres && !PostgresDatabase.TryStart(configure: null, out postgres, out var postgresError))
+        {
+            throw new InvalidOperationException(
+                $"PROTOTEST_DATABASE=postgres was requested but the container did not start: {postgresError}");
+        }
+
+        if (postgres is not null)
+        {
+            // Owned by the whole run: started once here, released when the host is disposed.
+            builder.AddResource(postgres);
+        }
+
+        var northstarDatabase = postgres?.ConnectionString
+            ?? configuredDatabase
+            ?? "Data Source=file:northstar-demo;Mode=Memory;Cache=Shared;Pooling=False";
+        var databaseProvider = postgres is not null ? "postgres" : "sqlite";
+        var composeDomainInTests = hostedInProcess || configuredDatabase is not null || postgres is not null;
+
+        // The application reads its configuration from the environment, exactly as it would when
+        // published, so the tests configure the database the way an operator would - and the test-side
+        // domain and the application end up on one store.
+        System.Environment.SetEnvironmentVariable("ConnectionStrings__Northstar", northstarDatabase);
+        System.Environment.SetEnvironmentVariable("Database__Provider", databaseProvider);
 
         builder
             .ConfigureTracing(trace => trace.OutputPath = Path.Combine(
@@ -67,7 +96,17 @@ public sealed class Setup : ProtoTestAssembly
                 {
                     // The test's own composition of the same domain over the same database, so data can
                     // be arranged and verified through domain logic rather than only through the API.
-                    services.AddNorthstarDomain(options => options.UseSqlite(northstarDatabase));
+                    services.AddNorthstarDomain(options =>
+                    {
+                        if (postgres is not null)
+                        {
+                            options.UseNpgsql(northstarDatabase);
+                        }
+                        else
+                        {
+                            options.UseSqlite(northstarDatabase);
+                        }
+                    });
                 }
             })
             .AddTestHook<NorthstarScenarioHook>()

@@ -19,8 +19,11 @@ public class Program
         // domain itself.
         var connectionString = builder.Configuration.GetConnectionString("Northstar")
             ?? "Data Source=file:northstar;Mode=Memory;Cache=Shared;Pooling=False";
+        var provider = builder.Configuration["Database:Provider"] ?? "sqlite";
+        var postgres = string.Equals(provider, "postgres", StringComparison.OrdinalIgnoreCase);
+
         SqliteConnection? sharedConnection = null;
-        if (connectionString.Contains("Mode=Memory", StringComparison.OrdinalIgnoreCase))
+        if (!postgres && connectionString.Contains("Mode=Memory", StringComparison.OrdinalIgnoreCase))
         {
             sharedConnection = new SqliteConnection(connectionString);
             sharedConnection.Open();
@@ -29,7 +32,11 @@ public class Program
 
         builder.Services.AddNorthstarDomain(options =>
         {
-            if (sharedConnection is not null)
+            if (postgres)
+            {
+                options.UseNpgsql(connectionString);
+            }
+            else if (sharedConnection is not null)
             {
                 options.UseSqlite(sharedConnection);
             }

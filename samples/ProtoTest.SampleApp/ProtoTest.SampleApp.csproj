@@ -8,6 +8,7 @@
   <ItemGroup>
     <PackageReference Include="HotChocolate.AspNetCore" Version="16.6.3" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.*" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.*" />
     <PackageReference Include="HotChocolate.Subscriptions.InMemory" Version="16.6.3" />
     <ProjectReference Include="..\ProtoTest.SampleApp.Contracts\ProtoTest.SampleApp.Contracts.csproj" />
     <ProjectReference Include="..\ProtoTest.SampleApp.Domain\ProtoTest.SampleApp.Domain.csproj" />

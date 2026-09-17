@@ -31,3 +31,26 @@ jobs:
         with:
           name: prototest-packages
           path: artifacts/packages/*.*nupkg
+
+  postgres-demo:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      # The container path only runs where a container runtime exists, which is why it is its own job.
+      - name: Run the demo against a PostgreSQL container
+        shell: pwsh
+        env:
+          PROTOTEST_DATABASE: postgres
+        run: |
+          dotnet restore samples/ProtoTest.Demo/ProtoTest.Demo.csproj
+          dotnet build samples/ProtoTest.Demo/ProtoTest.Demo.csproj --configuration Release --no-restore
+          dotnet test samples/ProtoTest.Demo/ProtoTest.Demo.csproj --configuration Release --no-build --no-restore --verbosity minimal

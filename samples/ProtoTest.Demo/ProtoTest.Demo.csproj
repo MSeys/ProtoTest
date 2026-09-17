@@ -12,6 +12,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="NUnit3TestAdapter" Version="6.3.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.*" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.SampleApp\ProtoTest.SampleApp.csproj" />
@@ -24,6 +25,7 @@
     <ProjectReference Include="..\..\src\ProtoTest.OpenApi\ProtoTest.OpenApi.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Reporting\ProtoTest.Reporting.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Rest\ProtoTest.Rest.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Sql.Testcontainers\ProtoTest.Sql.Testcontainers.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\ProtoTest.SampleApp\openapi\northstar.v1.json" Link="northstar.openapi.json">

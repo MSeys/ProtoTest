@@ -5,9 +5,9 @@ internal sealed class ProtoRunGateHook(
     IEnumerable<IProtoCollector> collectors,
     IEnumerable<IProtoReportSource> reportSources) : IProtoRunHook
 {
-    // AfterRun executes in descending order. Gates run first so their findings reach the sinks,
-    // which run next, and the trace archive, which runs last.
-    public int Order => int.MinValue + 2;
+    // AfterRun executes in descending order. Gates run first so their findings reach the sinks, the
+    // run-scoped resources are still alive, and the trace archive picks everything up.
+    public int Order => int.MinValue + 3;
 
     public Task AfterRunAsync(CancellationToken cancellationToken = default)
     {

@@ -136,7 +136,7 @@ public sealed class ProtoHost : IAsyncDisposable
         {
             if (_rootServiceProvider.GetService<ProtoRunResourceStore>() is { } runResources)
             {
-                exceptions.AddRange(await runResources.ReleaseAllAsync(NoOpTraceWriter.Instance));
+                exceptions.AddRange(await runResources.ReleaseAllAsync(_trace.RunWriter));
             }
         }
         catch (Exception exception)

@@ -32,6 +32,17 @@ internal sealed class ProtoResourceRegistry
         }
     }
 
+    public IReadOnlyList<IProtoResource> Resources
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. _registrationOrder.Select(id => _byId[id].Resource)];
+            }
+        }
+    }
+
     public IReadOnlyList<ProtoResourceSnapshot> Snapshot()
     {
         lock (_gate)

@@ -5,6 +5,7 @@ public sealed class ProtoTraceOperation : IDisposable
 {
     private readonly ProtoTestTraceRecorder? _recorder;
     private readonly ProtoTestTraceRecorder.TraceEntryState? _entry;
+    private readonly Action<ProtoTraceOutcome, Exception?>? _complete;
     private int _completed;
 
     internal ProtoTraceOperation(
@@ -13,6 +14,12 @@ public sealed class ProtoTraceOperation : IDisposable
     {
         _recorder = recorder;
         _entry = entry;
+    }
+
+    /// <summary>Creates an operation that reports its completion to a callback instead of a recorder.</summary>
+    internal ProtoTraceOperation(Action<ProtoTraceOutcome, Exception?> complete)
+    {
+        _complete = complete ?? throw new ArgumentNullException(nameof(complete));
     }
 
     internal ProtoTraceOperation()
@@ -42,7 +49,13 @@ public sealed class ProtoTraceOperation : IDisposable
     public void Complete(ProtoTraceOutcome outcome, Exception? exception = null)
     {
         if (Interlocked.Exchange(ref _completed, 1) != 0) return;
-        _recorder?.Complete(_entry!, outcome, exception);
+        if (_recorder is not null)
+        {
+            _recorder.Complete(_entry!, outcome, exception);
+            return;
+        }
+
+        _complete?.Invoke(outcome, exception);
     }
 
     internal void Complete(ProtoTestResult result)

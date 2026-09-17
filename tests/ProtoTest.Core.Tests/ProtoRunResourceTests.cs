@@ -7,7 +7,33 @@ using System.Reflection;
 public class ProtoRunResourceTests
 {
     [Test]
-    public async Task RunResource_ShouldOutliveTheRunAndBeReleasedWithTheHost()
+    public async Task RunResource_ShouldBeReleasedWhenTheRunStops()
+    {
+        // Arrange
+        var released = new List<string>();
+        var builder = new ProtoHostBuilder();
+        builder.AddResource(new ProtoResource(
+            "database:container",
+            "database",
+            "Postgres container",
+            _ =>
+            {
+                released.Add("database:container");
+                return ValueTask.CompletedTask;
+            },
+            ProtoResourceScope.Run));
+        await using var host = builder.Build();
+
+        // Act
+        await host.StartAsync();
+        await host.StopAsync();
+
+        // Assert: released once the gates and the report sinks have had their turn.
+        Assert.That(released, Is.EqualTo(new[] { "database:container" }));
+    }
+
+    [Test]
+    public async Task RunResource_ShouldStillBeReleasedWhenTheHostIsDisposedWithoutStopping()
     {
         // Arrange
         var released = new List<string>();
@@ -23,15 +49,12 @@ public class ProtoRunResourceTests
             },
             ProtoResourceScope.Run));
         var host = builder.Build();
-
-        // Act
         await host.StartAsync();
-        await host.StopAsync();
 
-        // Assert: reports may still need it, so the run stopping is not enough.
-        Assert.That(released, Is.Empty);
-
+        // Act: `await using` alone must not leak the resource.
         await host.DisposeAsync();
+
+        // Assert
         Assert.That(released, Is.EqualTo(new[] { "database:container" }));
     }
 
@@ -82,6 +105,32 @@ public class ProtoRunResourceTests
         // Assert
         Assert.That(exception!.Message, Is.EqualTo("boom"));
         Assert.That(released, Is.EqualTo(new[] { "healthy" }));
+    }
+
+    [Test]
+    public async Task RunResources_ShouldBeRecordedInTheRunTrace()
+    {
+        // Arrange
+        var builder = new ProtoHostBuilder();
+        builder.AddResource(new ProtoResource(
+            "database:container", "database", "Postgres container", _ => default, ProtoResourceScope.Run));
+        await using var host = builder.Build();
+
+        // Act
+        await host.StartAsync();
+        await host.StopAsync();
+
+        // Assert: both the ownership and the release belong to the run, not to a test.
+        var entries = host.Trace.Snapshot().Entries;
+        Assert.That(entries, Is.Not.Null);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(entries!.Select(entry => entry.Kind), Does.Contain("resource.owned"));
+            var release = entries!.Single(entry => entry.Kind == "resource.release");
+            Assert.That(release.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
+            Assert.That(release.Phase, Is.EqualTo(ProtoTracePhase.Run));
+            Assert.That(release.Attributes["resource.kind"], Is.EqualTo("database"));
+        }
     }
 
     [Test]

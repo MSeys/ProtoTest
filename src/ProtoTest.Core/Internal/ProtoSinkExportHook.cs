@@ -8,8 +8,9 @@ internal sealed class ProtoSinkExportHook(
     IEnumerable<IProtoSink> sinks,
     ProtoTraceSession traceSession) : IProtoRunHook
 {
-    // AfterRun executes in descending order. Reports are generated immediately before the trace archive.
-    public int Order => int.MinValue + 1;
+    // AfterRun executes in descending order. Reports are generated after the gates and before the
+    // run-scoped resources are released and the trace archive is written.
+    public int Order => int.MinValue + 2;
 
     public async Task AfterRunAsync(CancellationToken cancellationToken = default)
     {

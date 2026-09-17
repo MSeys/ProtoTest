@@ -10,9 +10,10 @@ using System.Runtime.InteropServices;
 
 internal sealed class ProtoTraceSession : IProtoTraceSource
 {
-    internal const string CurrentFormatVersion = "1.2";
+    internal const string CurrentFormatVersion = "1.3";
     private readonly ConcurrentDictionary<string, ProtoTestTraceRecorder> _tests = new(StringComparer.Ordinal);
     private readonly ConcurrentQueue<ProtoTraceArtifactSource> _runArtifacts = new();
+    private readonly ProtoRunTraceWriter _runWriter = new();
     private readonly DateTimeOffset _startedAtUtc = DateTimeOffset.UtcNow;
     private readonly string _runId = Guid.NewGuid().ToString("N");
     private DateTimeOffset? _completedAtUtc;
@@ -32,6 +33,9 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
         }
         return recorder;
     }
+
+    /// <summary>Gets the writer for operations that belong to the run rather than to one test.</summary>
+    public IProtoTraceWriter RunWriter => _runWriter;
 
     public void CompleteRun() => _completedAtUtc ??= DateTimeOffset.UtcNow;
 
@@ -53,7 +57,8 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
                 ["processArchitecture"] = RuntimeInformation.ProcessArchitecture.ToString(),
                 ["osArchitecture"] = RuntimeInformation.OSArchitecture.ToString()
             },
-            _runArtifacts.Select(source => source.Artifact).ToArray());
+            _runArtifacts.Select(source => source.Artifact).ToArray(),
+            _runWriter.Snapshot());
 
     internal async Task CaptureRunArtifactsAsync(
         IReadOnlyCollection<ProtoTestAttachment> attachments,

@@ -20,6 +20,10 @@ internal sealed class ProtoRunResourceStore
 
     public IReadOnlyList<ProtoResourceSnapshot> Snapshot() => _resources.Snapshot();
 
+    public IReadOnlyList<IProtoResource> Resources => _resources.Resources;
+
+    public bool HasResources => Resources.Count > 0;
+
     public ValueTask<IReadOnlyList<Exception>> ReleaseAllAsync(IProtoTraceWriter trace)
         => _resources.ReleaseAllAsync(test: null, trace, ProtoTracePhase.Run);
 }

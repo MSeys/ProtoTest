@@ -78,7 +78,8 @@ public sealed record ProtoTraceRun(
     DateTimeOffset? CompletedAtUtc,
     IReadOnlyList<ProtoTestTrace> Tests,
     IReadOnlyDictionary<string, string> Environment,
-    IReadOnlyList<ProtoTraceArtifact>? Artifacts = null);
+    IReadOnlyList<ProtoTraceArtifact>? Artifacts = null,
+    IReadOnlyList<ProtoTraceEntry>? Entries = null);
 
 /// <summary>Provides immutable snapshots of the automatic ProtoTest execution trace.</summary>
 public interface IProtoTraceSource

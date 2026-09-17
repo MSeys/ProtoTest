@@ -108,6 +108,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
         _services.AddSingleton<IProtoTestHook, ProtoClientInitializerHook>();
         _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoRunHook, ProtoTraceExportHook>());
         _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoRunHook, ProtoRunGateHook>());
+        _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoRunHook, ProtoRunResourceHook>());
         _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoReportSource, ProtoRunGateReportSource>());
         var findingStore = new ProtoFindingStore();
         _services.AddSingleton(findingStore);

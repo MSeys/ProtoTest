@@ -15,6 +15,9 @@ public interface IProtoResource
     /// <summary>Gets a single line describing the resource for the trace, report and viewer.</summary>
     string Description { get; }
 
+    /// <summary>Gets how long the resource lives. Defaults to the test that registered it.</summary>
+    ProtoResourceScope Scope => ProtoResourceScope.Test;
+
     /// <summary>
     /// Releases the resource. Each resource is released at most once, so implementations do not have
     /// to guard against repeated calls, but must tolerate a failed release being reported.

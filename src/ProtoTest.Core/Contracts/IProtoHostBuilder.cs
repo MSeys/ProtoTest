@@ -47,6 +47,12 @@ public interface IProtoHostBuilder
     IProtoHostBuilder AddRunGate(string name, Func<ProtoRunGateContext, ProtoRunGateResult> evaluate);
 
     /// <summary>
+    /// Registers a run-scoped resource: infrastructure the whole suite owns, such as a database
+    /// container, released when the host is disposed after the run has stopped.
+    /// </summary>
+    IProtoHostBuilder AddResource(IProtoResource resource);
+
+    /// <summary>
     /// Builds and initializes the configured <see cref="ProtoHost"/> instance.
     /// </summary>
     /// <returns>A fully configured <see cref="ProtoHost"/>.</returns>

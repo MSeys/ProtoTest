@@ -260,6 +260,13 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     public void RegisterResource(IProtoResource resource)
     {
         ArgumentNullException.ThrowIfNull(resource);
+        if (resource.Scope != ProtoResourceScope.Test)
+        {
+            throw new InvalidOperationException(
+                $"Resource '{resource.Id}' is {resource.Scope}-scoped and outlives this test. " +
+                "Register it with AddResource on the host builder instead.");
+        }
+
         RegisterOwned(resource);
         Trace.WriteEvent(
             "resource.register",

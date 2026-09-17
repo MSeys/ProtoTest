@@ -4,19 +4,22 @@ namespace ProtoTest.Core;
 public sealed class ProtoResourceReleaseContext
 {
     internal ProtoResourceReleaseContext(
-        ProtoExecutionContext test,
+        ProtoExecutionContext? test,
         IProtoTraceWriter trace,
         ProtoTracePhase phase,
         CancellationToken cancellationToken)
     {
-        Test = test ?? throw new ArgumentNullException(nameof(test));
+        Test = test;
         Trace = trace ?? throw new ArgumentNullException(nameof(trace));
         Phase = phase;
         CancellationToken = cancellationToken;
     }
 
-    /// <summary>Gets the execution context of the test that owns the resource.</summary>
-    public ProtoExecutionContext Test { get; }
+    /// <summary>
+    /// Gets the execution context of the test that owns the resource, or <see langword="null"/> for a
+    /// run-scoped resource, which no single test owns.
+    /// </summary>
+    public ProtoExecutionContext? Test { get; }
 
     /// <summary>Gets the trace writer so a release can record its own operations and observations.</summary>
     public IProtoTraceWriter Trace { get; }

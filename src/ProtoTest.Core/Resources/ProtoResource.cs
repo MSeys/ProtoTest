@@ -9,8 +9,10 @@ public sealed class ProtoResource : IProtoResource
         string id,
         string kind,
         string description,
-        Func<ProtoResourceReleaseContext, ValueTask> release)
+        Func<ProtoResourceReleaseContext, ValueTask> release,
+        ProtoResourceScope scope = ProtoResourceScope.Test)
     {
+        Scope = scope;
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(kind);
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
@@ -26,6 +28,8 @@ public sealed class ProtoResource : IProtoResource
     public string Kind { get; }
 
     public string Description { get; }
+
+    public ProtoResourceScope Scope { get; }
 
     public ValueTask ReleaseAsync(ProtoResourceReleaseContext context)
     {

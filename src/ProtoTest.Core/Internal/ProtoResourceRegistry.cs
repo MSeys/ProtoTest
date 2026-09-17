@@ -42,7 +42,7 @@ internal sealed class ProtoResourceRegistry
 
     public async ValueTask<bool> ReleaseAsync(
         string id,
-        ProtoExecutionContext test,
+        ProtoExecutionContext? test,
         IProtoTraceWriter trace,
         ProtoTracePhase phase)
     {
@@ -61,7 +61,7 @@ internal sealed class ProtoResourceRegistry
     }
 
     public async ValueTask<IReadOnlyList<Exception>> ReleaseAllAsync(
-        ProtoExecutionContext test,
+        ProtoExecutionContext? test,
         IProtoTraceWriter trace,
         ProtoTracePhase phase)
     {
@@ -96,7 +96,7 @@ internal sealed class ProtoResourceRegistry
 
     private static async Task<Exception?> ReleaseEntryAsync(
         Entry entry,
-        ProtoExecutionContext test,
+        ProtoExecutionContext? test,
         IProtoTraceWriter trace,
         ProtoTracePhase phase)
     {

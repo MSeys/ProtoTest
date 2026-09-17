@@ -15,6 +15,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     private readonly ConfigurationBuilder _configurationBuilder = new();
     private readonly ProtoTestIdOptions _testIdOptions = new();
     private readonly ProtoTraceOptions _traceOptions = new();
+    private readonly ProtoRunResourceStore _runResources = new();
     private bool _built;
 
     /// <inheritdoc />
@@ -77,6 +78,13 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     }
 
     /// <inheritdoc />
+    public IProtoHostBuilder AddResource(IProtoResource resource)
+    {
+        _runResources.Add(resource);
+        return this;
+    }
+
+    /// <inheritdoc />
     public ProtoHost Build()
     {
         if (_built)
@@ -92,6 +100,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
         _services.TryAddSingleton<IProtoTestIdGenerator>(
             _ => new NumericProtoTestIdGenerator(_testIdOptions));
         _services.TryAddSingleton(_traceOptions);
+        _services.TryAddSingleton(_runResources);
         _services.TryAddSingleton<ProtoTraceSession>();
         _services.TryAddSingleton<IProtoTraceSource>(services => services.GetRequiredService<ProtoTraceSession>());
 

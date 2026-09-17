@@ -130,6 +130,20 @@ public sealed class ProtoHost : IAsyncDisposable
             return;
         }
 
+        // Run-scoped resources outlive the run itself, so they are released once the reports are
+        // written and before the provider they may depend on is disposed.
+        try
+        {
+            if (_rootServiceProvider.GetService<ProtoRunResourceStore>() is { } runResources)
+            {
+                exceptions.AddRange(await runResources.ReleaseAllAsync(NoOpTraceWriter.Instance));
+            }
+        }
+        catch (Exception exception)
+        {
+            exceptions.Add(exception);
+        }
+
         try
         {
             if (_rootServiceProvider is IAsyncDisposable asyncDisposable)

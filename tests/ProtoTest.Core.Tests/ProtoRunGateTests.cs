@@ -39,6 +39,29 @@ public class ProtoRunGateTests
     }
 
     [Test]
+    public async Task GateEvaluations_ShouldBeRecordedInTheRunTrace()
+    {
+        // Arrange
+        var builder = new ProtoHostBuilder();
+        builder.AddRunGate("coverage is complete", _ => ProtoRunGateResult.Warning("Worth a look."));
+        await using var host = builder.Build();
+
+        // Act
+        await host.StartAsync();
+        await host.StopAsync();
+
+        // Assert: a gate judges the run, so it belongs to the run's trace.
+        var entry = host.Trace.Snapshot().Entries!.Single(item => item.Kind == "gate.evaluate");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(entry.Phase, Is.EqualTo(ProtoTracePhase.Run));
+            Assert.That(entry.Outcome, Is.EqualTo(ProtoTraceOutcome.Partial));
+            Assert.That(entry.Attributes["gate.name"], Is.EqualTo("coverage is complete"));
+            Assert.That(entry.Attributes["gate.message"], Is.EqualTo("Worth a look."));
+        }
+    }
+
+    [Test]
     public async Task AdvisoryAndSkippedGates_ShouldNotFailTheRun()
     {
         // Arrange

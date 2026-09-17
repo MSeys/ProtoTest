@@ -3,7 +3,8 @@ namespace ProtoTest.Core.Internal;
 internal sealed class ProtoRunGateHook(
     IEnumerable<IProtoRunGate> gates,
     IEnumerable<IProtoCollector> collectors,
-    IEnumerable<IProtoReportSource> reportSources) : IProtoRunHook
+    IEnumerable<IProtoReportSource> reportSources,
+    ProtoTraceSession trace) : IProtoRunHook
 {
     // AfterRun executes in descending order. Gates run first so their findings reach the sinks, the
     // run-scoped resources are still alive, and the trace archive picks everything up.
@@ -46,6 +47,21 @@ internal sealed class ProtoRunGateHook(
                 Message: result.Message,
                 Tags: result.Details));
 
+            // A gate judges the run, so it belongs to the run's trace, not to any test's.
+            trace.RunWriter.WriteEvent(
+                "gate.evaluate",
+                $"Gate · {gate.Name}",
+                "ProtoTest.Core",
+                ProtoTracePhase.Run,
+                OutcomeOf(result.Outcome),
+                new Dictionary<string, string?>
+                {
+                    ["gate.name"] = gate.Name,
+                    ["gate.status"] = result.Outcome.ToString(),
+                    ["gate.message"] = result.Message,
+                    ["gate.details"] = result.Details is null ? null : string.Join(", ", result.Details)
+                });
+
             if (result.Outcome == ProtoRunGateOutcome.Failed)
             {
                 failures.Add(new ProtoRunGateFailure(gate.Name, result.Message, result.Details ?? []));
@@ -65,5 +81,13 @@ internal sealed class ProtoRunGateHook(
         ProtoRunGateOutcome.Warning => ProtoReportStatus.Warning,
         ProtoRunGateOutcome.Failed => ProtoReportStatus.Error,
         _ => ProtoReportStatus.Neutral
+    };
+
+    private static ProtoTraceOutcome OutcomeOf(ProtoRunGateOutcome outcome) => outcome switch
+    {
+        ProtoRunGateOutcome.Passed => ProtoTraceOutcome.Succeeded,
+        ProtoRunGateOutcome.Warning => ProtoTraceOutcome.Partial,
+        ProtoRunGateOutcome.Failed => ProtoTraceOutcome.Failed,
+        _ => ProtoTraceOutcome.Skipped
     };
 }

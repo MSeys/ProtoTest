@@ -4,13 +4,11 @@ using System.Reflection;
 using ProtoTest.Core;
 
 /// <summary>
-/// Resolves the ordered authenticator attributes for a protocol before each test, builds a composite
-/// authenticator when more than one applies, and records a "&lt;protocol&gt;.context.configure" trace
-/// event. The client a test uses is chosen separately by <c>[Application]</c>.
+/// Resolves the ordered authenticator attributes that apply to a protocol before each test, builds a
+/// composite authenticator when more than one applies, and records a "&lt;protocol&gt;.context.configure"
+/// trace event. The client a test uses is chosen separately by <c>[Application]</c>.
 /// </summary>
-public abstract class ProtoHttpAuthLifecycleHook<TAuthMetadata>(string protocolName)
-    : IProtoTestHook
-    where TAuthMetadata : class, IProtoHttpAuthMetadata
+public abstract class ProtoHttpAuthLifecycleHook(string protocolName) : IProtoTestHook
 {
     private readonly string _protocolName = string.IsNullOrWhiteSpace(protocolName)
         ? throw new ArgumentException("A protocol name is required.", nameof(protocolName))
@@ -27,8 +25,8 @@ public abstract class ProtoHttpAuthLifecycleHook<TAuthMetadata>(string protocolN
     {
         var method = context.TestMethod;
         var classType = method.DeclaringType;
-        var methodAuth = method.GetCustomAttributes(inherit: true).OfType<TAuthMetadata>().ToArray();
-        var classAuth = classType?.GetCustomAttributes(inherit: true).OfType<TAuthMetadata>().ToArray() ?? [];
+        var methodAuth = Applicable(method.GetCustomAttributes(inherit: true)).ToArray();
+        var classAuth = classType is null ? [] : Applicable(classType.GetCustomAttributes(inherit: true)).ToArray();
         var auth = methodAuth.Length > 0 ? methodAuth : classAuth;
         var orderedAuth = auth.OrderBy(attribute => attribute.Order).ToArray();
 
@@ -54,8 +52,15 @@ public abstract class ProtoHttpAuthLifecycleHook<TAuthMetadata>(string protocolN
 
     public Task AfterTestAsync(ProtoExecutionContext context) => Task.CompletedTask;
 
+    private IEnumerable<IProtoHttpAuthMetadata> Applicable(IEnumerable<object> attributes)
+        => attributes
+            .OfType<IProtoHttpAuthMetadata>()
+            .Where(metadata =>
+                metadata.Protocols.Count == 0
+                || metadata.Protocols.Contains(_protocolName, StringComparer.OrdinalIgnoreCase));
+
     private IProtoHttpAuthenticator CreateAuthenticator(
-        IReadOnlyList<TAuthMetadata> attributes,
+        IReadOnlyList<IProtoHttpAuthMetadata> attributes,
         ProtoExecutionContext context)
     {
         var authenticators = attributes.Select(attribute => attribute.Create(context)).ToArray();
@@ -64,7 +69,7 @@ public abstract class ProtoHttpAuthLifecycleHook<TAuthMetadata>(string protocolN
             : new ProtoCompositeHttpAuthenticator(authenticators, $"ProtoTest.{_protocolName}");
     }
 
-    private static string AuthTypeName(TAuthMetadata metadata)
+    private static string AuthTypeName(IProtoHttpAuthMetadata metadata)
         => metadata.GetType().GenericTypeArguments.FirstOrDefault()?.FullName
            ?? metadata.GetType().FullName
            ?? metadata.GetType().Name;

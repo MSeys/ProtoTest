@@ -25,7 +25,7 @@ ProtoTest provides:
 ```csharp
 [ProtoTest]
 [Application("Orders")]
-[RestAuth<BearerTokenAuthenticator>("orders-token")]
+[Auth<BearerTokenAuthenticator>("orders-token")]
 public async Task GetOrder_ReturnsExpectedOrder()
 {
 	var response = await Proto.Context.Rest()

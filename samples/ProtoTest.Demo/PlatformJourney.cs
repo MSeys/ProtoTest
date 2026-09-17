@@ -1,19 +1,19 @@
 namespace ProtoTest.Demo;
 
-using System.Net;
 using ProtoTest.Core;
 using ProtoTest.GraphQL;
+using ProtoTest.Http;
 using ProtoTest.Json;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Testing;
+using System.Net;
 
 /// <summary>REST, GraphQL and webhooks describing the same platform.</summary>
 [Application(NorthstarTargets.Api)]
 [NorthstarTenant(PlanIds.Growth)]
-[RestAuth<NorthstarAuthenticator>]
-[GraphQLAuth<NorthstarAuthenticator>]
+[Auth<NorthstarAuthenticator>]
 public sealed class PlatformJourney
 {
     [ProtoTest]

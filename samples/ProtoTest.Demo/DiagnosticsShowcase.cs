@@ -1,11 +1,12 @@
 namespace ProtoTest.Demo;
 
-using System.Net;
 using ProtoTest.Core;
+using ProtoTest.Http;
 using ProtoTest.Json;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Testing;
+using System.Net;
 
 /// <summary>
 /// ProtoTest's own diagnostics: captured shape mismatches, recorded failures and the opt-in
@@ -13,7 +14,7 @@ using ProtoTest.SampleApp.Testing;
 /// </summary>
 [Application(NorthstarTargets.Api)]
 [NorthstarTenant]
-[RestAuth<NorthstarAuthenticator>]
+[Auth<NorthstarAuthenticator>]
 public sealed class DiagnosticsShowcase
 {
     [ProtoTest]

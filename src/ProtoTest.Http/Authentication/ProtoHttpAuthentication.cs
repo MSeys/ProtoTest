@@ -39,28 +39,15 @@ public sealed class ProtoCompositeHttpAuthenticator(
 }
 
 /// <summary>
-/// Declares, via attribute metadata, an authenticator that a protocol's lifecycle hook applies to its
-/// named client.
+/// Declares, via attribute metadata, an authenticator that an HTTP protocol's lifecycle hook applies
+/// to its named client. <see cref="Protocols"/> keeps protocol hooks from picking up each other's
+/// authenticators when a test needs different authentication per protocol.
 /// </summary>
 public interface IProtoHttpAuthMetadata
 {
     int Order { get; }
+
+    IReadOnlyList<string> Protocols { get; }
+
     IProtoHttpAuthenticator Create(ProtoExecutionContext context);
-}
-
-/// <summary>
-/// Base for a protocol-specific generic <c>[XAuth&lt;TAuthenticator&gt;]</c> attribute. A concrete
-/// protocol keeps its own sealed attribute (and a private marker interface) so that a test class
-/// needing different authentication per client - for example a REST client and a GraphQL client on
-/// the same class - can apply one attribute per protocol without either lifecycle hook picking up the
-/// other's authenticator.
-/// </summary>
-public abstract class ProtoHttpAuthAttribute<TAuthenticator>(params object[] constructorArgs)
-    : Attribute, IProtoHttpAuthMetadata
-    where TAuthenticator : class, IProtoHttpAuthenticator
-{
-    public int Order { get; init; }
-
-    IProtoHttpAuthenticator IProtoHttpAuthMetadata.Create(ProtoExecutionContext context)
-        => ProtoAuthenticatorFactory.Create<TAuthenticator>(context, constructorArgs);
 }

@@ -1,17 +1,18 @@
 namespace ProtoTest.Demo;
 
-using System.Net;
 using ProtoTest.Core;
+using ProtoTest.Http;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Testing;
+using System.Net;
 
 /// <summary>Who may do what: the role matrix, token scopes, tenant isolation and rate limits.</summary>
 [Application(NorthstarTargets.Api)]
 [NorthstarTenant(PlanIds.Growth)]
 [SignedInAs]
-[RestAuth<NorthstarAuthenticator>]
+[Auth<NorthstarAuthenticator>]
 public sealed class AccessJourney
 {
     [ProtoTest]

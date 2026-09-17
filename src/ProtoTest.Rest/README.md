@@ -10,7 +10,7 @@ dotnet add package ProtoTest.Rest --prerelease
 builder.AddApplication("Api", app => app.AddRest(rest => rest.AddClient("Orders")));
 
 [Application("Api", "Rest:Orders")]
-[RestAuth<BearerTokenAuthenticator>("token")]
+[Auth<BearerTokenAuthenticator>("token")]
 public sealed class OrderTests
 {
     [ProtoTest]
@@ -25,4 +25,4 @@ public sealed class OrderTests
 }
 ```
 
-Per-test base addresses and custom `IRestAuthenticator` implementations can use typed state from `Proto.Context`. See the [REST guide](https://github.com/matthiasseys/ProtoTest/blob/main/docs/integrations/rest.md).
+Per-test base addresses and custom `IProtoHttpAuthenticator` implementations can use typed state from `Proto.Context`. See the [REST guide](https://github.com/matthiasseys/ProtoTest/blob/main/docs/integrations/rest.md).

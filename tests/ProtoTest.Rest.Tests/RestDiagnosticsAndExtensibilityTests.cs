@@ -346,14 +346,14 @@ public sealed class RestDiagnosticsAndExtensibilityTests
 
     private sealed class AuthenticationCases
     {
-        [RestAuth<DependencyAuthenticator>]
+        [Auth<DependencyAuthenticator>]
         public void UsesDependency() { }
 
-        [RestAuth<BearerTokenAuthenticator>("bearer-token", Order = 10)]
-        [RestAuth<ApiKeyAuthenticator>("X-Api-Key", "api-secret", ApiKeyLocation.Header, Order = 20)]
+        [Auth<BearerTokenAuthenticator>("bearer-token", Order = 10)]
+        [Auth<ApiKeyAuthenticator>("X-Api-Key", "api-secret", ApiKeyLocation.Header, Order = 20)]
         public void UsesMultipleSchemes() { }
 
-        [RestAuth<UserContextAuthenticator>]
+        [Auth<UserContextAuthenticator>]
         public void UsesUserContext() { }
     }
 

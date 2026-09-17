@@ -16,9 +16,9 @@ internal sealed class GraphQLContextState : IProtoContext
     public int NextRequestNumber() => Interlocked.Increment(ref _requestSequence);
 }
 
-/// <summary>Resolves <c>[GraphQLAuth]</c> authenticators for the test; the client comes from <c>[Application]</c>.</summary>
+/// <summary>Resolves <c>[Auth]</c> authenticators for the test; the client comes from <c>[Application]</c>.</summary>
 internal sealed class GraphQLLifecycleHook()
-    : ProtoHttpAuthLifecycleHook<IGraphQLAuthMetadata>("GraphQL")
+    : ProtoHttpAuthLifecycleHook("GraphQL")
 {
     protected override void SetContext(
         ProtoExecutionContext context,

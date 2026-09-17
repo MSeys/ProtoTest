@@ -56,7 +56,7 @@ Read the [ProtoTest documentation](docs/index.md), or start directly with:
 
 ## Demo
 
-[ProtoTest.Demo](samples/ProtoTest.Demo) is the single end-to-end showcase. It tests a multi-tenant control-plane SaaS through REST and GraphQL with parallel tenant provisioning, authentication, workspaces, releases, commerce, billing, audit, OpenAPI/GraphQL coverage, custom hooks, clients, contexts, observations, attachments, reports, and a complete ProtoTrace.
+[ProtoTest.Demo](samples/ProtoTest.Demo) is the single end-to-end showcase. It runs six journeys against Northstar, a multi-tenant release/deployment control-plane SaaS, through REST, GraphQL (including a live subscription) and signed webhooks: onboarding and plan limits, preview/production delivery and rollback, usage metering, invoicing, payments and proration, the role and token-scope matrix, tenant isolation and rate limiting. It also demonstrates parallel tenant provisioning, OpenAPI/GraphQL coverage, custom hooks, clients, contexts, observations, attachments, reports, and a complete ProtoTrace.
 
 ## Build and test
 

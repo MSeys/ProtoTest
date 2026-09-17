@@ -35,13 +35,13 @@ Collectors gather; [sinks](./reporting.md) write the results. Without a sink you
 ## Reading the report
 
 ```
-OpenAPI  GET /api/control-plane                 12 hits  ✓
+OpenAPI  GET /api/v1/organization                12 hits  ✓
          └ 200                                   12 hits  ✓
-           └ $.workspaceCount                    12 hits  ✓
-           └ $.monthlyRecurringRevenue            9 hits  ✓
-           └ $.trialEndsAt                        0 hits  ○   never asserted
+           └ $.seatCount                          12 hits  ✓
+           └ $.projectCount                        9 hits  ✓
+           └ $.cancelAtPeriodEnd                   0 hits  ○   never asserted
          └ 403                                    0 hits  ○   never reached
-OpenAPI  DELETE /api/workspaces/{id}             0 hits  ○   never called
+OpenAPI  POST /api/v1/deployments/{id}/rollback   0 hits  ○   never called
 ```
 
 Three different gaps, three different fixes:

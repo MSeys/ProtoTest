@@ -1,7 +1,5 @@
 # ProtoTest.SampleApp.Testing
 
-Reusable scenario infrastructure for every integration demo targeting `ProtoTest.SampleApp`.
+Reusable scenario infrastructure for every integration demo targeting Northstar.
 
-It currently provides `[SampleEnvironment]`, `[SampleUser]`, their typed contexts, and
-`SampleUserAuthenticator`. Environment cleanup is automatic and the ordering required by
-provisioning is encapsulated inside the attributes instead of repeated in test classes.
+It provides `[NorthstarTenant]` (provisions and removes an isolated organization, optionally on a given plan), `[SignedInAs(role)]` (acts as the owner or as a provisioned member with that role), their typed contexts, `NorthstarAuthenticator`, plus `NorthstarDataDefaults` and `NorthstarMemberProvisioner`. Ordering and cleanup live inside the attributes instead of being repeated in each test class.

@@ -25,19 +25,19 @@ public sealed class Setup : ProtoTestAssembly
             .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
-                    [$"ProtoTest:Applications:{SampleAppTargets.Api}:OpenApi:Specification"] = Path.Combine(
-                        AppContext.BaseDirectory, "control-plane.openapi.json"),
-                    [$"ProtoTest:Applications:{SampleAppTargets.Api}:Endpoints:GraphQL"] = "/graphql"
+                    [$"ProtoTest:Applications:{NorthstarTargets.Api}:OpenApi:Specification"] = Path.Combine(
+                        AppContext.BaseDirectory, "northstar.openapi.json"),
+                    [$"ProtoTest:Applications:{NorthstarTargets.Api}:Endpoints:GraphQL"] = "/graphql"
                 }))
             .ConfigureServices(services =>
             {
                 services.AddSingleton<IProtoClientInitializer, ScenarioProbeInitializer>();
-                services.AddSingleton<IGraphQLWebSocketFactory, SampleAppGraphQLWebSocketFactory>();
+                services.AddSingleton<IGraphQLWebSocketFactory, NorthstarGraphQLWebSocketFactory>();
             })
-            .AddTestHook<SaasScenarioHook>()
-            .AddData(data => data.AddDefaults<SampleAppDataDefaults>())
-            .AddDataProvisioner<CreateUserRequest, UserResponse, SampleUserProvisioner>()
-            .AddApplication(SampleAppTargets.Api, app => app
+            .AddTestHook<NorthstarScenarioHook>()
+            .AddData(data => data.AddDefaults<NorthstarDataDefaults>())
+            .AddDataProvisioner<InviteMemberRequest, MembershipResponse, NorthstarMemberProvisioner>()
+            .AddApplication(NorthstarTargets.Api, app => app
                 .AddAspNetCoreServer<Program>()
                 .AddRest(rest =>
                 {
@@ -49,13 +49,13 @@ public sealed class Setup : ProtoTestAssembly
                     .CaptureAttachments()
                     .AddClient("GraphQL")
                     .WithSubscriptionTransport(GraphQLSubscriptionTransport.WebSocket)
-                    .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "control-plane.graphql"))))
+                    .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "northstar.graphql"))))
             .AddSink<JsonReportSink>(sink => sink.OutputPath = Path.Combine(
                 "TestResults", "ProtoTest.Demo", "report.json"))
             .AddSink<HtmlReportSink>(sink =>
             {
                 sink.OutputPath = Path.Combine("TestResults", "ProtoTest.Demo", "report.html");
-                sink.Title = "Northstar Control Plane · ProtoTest Demo";
+                sink.Title = "Northstar Platform · ProtoTest Demo";
             });
     }
 }

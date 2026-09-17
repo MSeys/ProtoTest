@@ -26,8 +26,10 @@
     <ProjectReference Include="..\..\src\ProtoTest.Rest\ProtoTest.Rest.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="control-plane.openapi.json"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
-    <None Update="control-plane.graphql"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Include="..\ProtoTest.SampleApp\openapi\northstar.v1.json" Link="northstar.openapi.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="northstar.graphql"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 </Project>

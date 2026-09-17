@@ -1,0 +1,56 @@
+scalar Decimal
+scalar Long
+scalar DateTime
+
+type Query {
+  apiInfo: ApiInfo!
+  organization: OrganizationResponse!
+  subscription: SubscriptionResponse!
+  plans: [PlanResponse!]!
+  projects(first: Int, after: String): ProjectConnection!
+  deployments(first: Int, after: String, environmentId: String, projectId: String, status: String): DeploymentConnection!
+  invoices(first: Int, after: String, status: String): InvoiceConnection!
+  usageSummary(metric: String): UsageSummaryResponse!
+  audit(first: Int, after: String): AuditEventConnection!
+}
+
+type Mutation {
+  createProject(input: CreateProjectInput!): ProjectResponse!
+  createEnvironment(projectId: String!, input: CreateEnvironmentInput!): EnvironmentResponse!
+  deploy(environmentId: String!, input: CreateDeploymentInput!): DeploymentResponse!
+  rollbackDeployment(deploymentId: String!): DeploymentResponse!
+  changePlan(input: ChangePlanInput!): SubscriptionResponse!
+  inviteMember(input: InviteMemberInput!): MembershipResponse!
+  payInvoice(invoiceId: Long!, method: String!): InvoiceResponse!
+}
+
+type Subscription {
+  deploymentStatusChanged: DeploymentResponse!
+  invoicePaid: InvoiceResponse!
+}
+
+type ApiInfo { name: String! version: String! }
+type OrganizationResponse { id: String! slug: String! name: String! planId: String! planName: String! status: String! seatCount: Int! seatLimit: Int projectCount: Int! projectLimit: Int cancelAtPeriodEnd: Boolean! createdAtUtc: DateTime! currentPeriodStartUtc: DateTime! currentPeriodEndUtc: DateTime! }
+type SubscriptionResponse { planId: String! planName: String! status: String! seats: Int! includedSeats: Int! monthlyBasePrice: Decimal! extraSeatPrice: Decimal! includedDeployMinutes: Long! cancelAtPeriodEnd: Boolean! currentPeriodStartUtc: DateTime! currentPeriodEndUtc: DateTime! }
+type PlanResponse { id: String! name: String! monthlyBasePrice: Decimal! includedSeats: Int! maxSeats: Int maxProjects: Int includedDeployMinutes: Long! extraSeatPrice: Decimal! overagePricePerDeployMinute: Decimal! features: [String!]! }
+type ProjectResponse { id: String! name: String! slug: String! status: String! environmentCount: Int! createdAtUtc: DateTime! }
+type EnvironmentResponse { id: String! projectId: String! name: String! kind: String! status: String! currentVersion: String createdAtUtc: DateTime! }
+type DeploymentResponse { id: String! projectId: String! environmentId: String! version: String! commitSha: String! status: String! requestedBy: String! deployMinutes: Float! createdAtUtc: DateTime! completedAtUtc: DateTime }
+type InvoiceResponse { id: Long! number: String! status: String! periodStartUtc: DateTime! periodEndUtc: DateTime! issuedAtUtc: DateTime! dueAtUtc: DateTime! paidAtUtc: DateTime subtotal: Decimal! tax: Decimal! total: Decimal! lines: [InvoiceLineResponse!]! payments: [PaymentResponse!]! }
+type InvoiceLineResponse { description: String! quantity: Float! unitPrice: Decimal! amount: Decimal! }
+type PaymentResponse { id: Long! amount: Decimal! status: String! method: String! failureReason: String attemptedAtUtc: DateTime! }
+type MembershipResponse { id: String! organizationId: String! email: String! role: String! status: String! invitedAtUtc: DateTime! joinedAtUtc: DateTime }
+type UsageSummaryResponse { metric: String! total: Float! included: Long! overage: Float! fromUtc: DateTime! toUtc: DateTime! }
+type AuditEventResponse { sequence: Long! action: String! resource: String! actor: String! occurredAtUtc: DateTime! metadata: [AuditMetadataEntry!]! }
+type AuditMetadataEntry { key: String! value: String! }
+type ProjectConnection { nodes: [ProjectResponse!]! pageInfo: PageInfo! totalCount: Int! }
+type DeploymentConnection { nodes: [DeploymentResponse!]! pageInfo: PageInfo! totalCount: Int! }
+type InvoiceConnection { nodes: [InvoiceResponse!]! pageInfo: PageInfo! totalCount: Int! }
+type AuditEventConnection { nodes: [AuditEventResponse!]! pageInfo: PageInfo! totalCount: Int! }
+type PageInfo { hasNextPage: Boolean! hasPreviousPage: Boolean! }
+
+input CreateProjectInput { name: String! }
+input CreateEnvironmentInput { name: String! kind: String! }
+input CreateDeploymentInput { version: String! commitSha: String! }
+input ChangePlanInput { planId: String! seats: Int }
+input InviteMemberInput { email: String! role: String! }

@@ -17,7 +17,7 @@ builder
     .AddSink<HtmlReportSink>(sink =>
     {
         sink.OutputPath = "TestResults/report.html";
-        sink.Title = "Northstar Control Plane";
+        sink.Title = "Northstar Platform";
     });
 ```
 

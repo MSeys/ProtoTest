@@ -1,0 +1,62 @@
+{
+  "openapi": "3.0.1",
+  "info": { "title": "Northstar Platform API", "version": "2026-09" },
+  "paths": {
+    "/api/v1/organization": {
+      "get": { "responses": { "200": { "description": "Organization", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Organization" } } } }, "401": { "description": "Unauthorized" } } }
+    },
+    "/api/v1/subscription": {
+      "get": { "responses": { "200": { "description": "Subscription", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Subscription" } } } } } },
+      "post": { "responses": { "200": { "description": "Plan changed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Subscription" } } } }, "402": { "description": "Plan limit exceeded" } } }
+    },
+    "/api/v1/members": {
+      "get": { "responses": { "200": { "description": "Members" } } },
+      "post": { "responses": { "201": { "description": "Member invited", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Membership" } } } }, "402": { "description": "Seat limit exceeded" }, "409": { "description": "Already a member" } } }
+    },
+    "/api/v1/projects": {
+      "get": { "responses": { "200": { "description": "Projects" } } },
+      "post": { "responses": { "201": { "description": "Project created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Project" } } } }, "402": { "description": "Project limit exceeded" } } }
+    },
+    "/api/v1/projects/{projectId}/environments": {
+      "post": { "responses": { "201": { "description": "Environment created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Environment" } } } }, "402": { "description": "Feature unavailable" } } }
+    },
+    "/api/v1/environments/{environmentId}/deployments": {
+      "post": { "responses": { "201": { "description": "Deployment recorded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Deployment" } } } }, "403": { "description": "Role cannot deploy" }, "402": { "description": "Subscription past due" } } }
+    },
+    "/api/v1/deployments": {
+      "get": { "responses": { "200": { "description": "Deployments" } } }
+    },
+    "/api/v1/deployments/{deploymentId}/rollback": {
+      "post": { "responses": { "200": { "description": "Deployment rolled back", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Deployment" } } } }, "409": { "description": "Nothing to roll back to" } } }
+    },
+    "/api/v1/usage/summary": {
+      "get": { "responses": { "200": { "description": "Usage summary", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UsageSummary" } } } } } }
+    },
+    "/api/v1/invoices": {
+      "get": { "responses": { "200": { "description": "Invoices" } } }
+    },
+    "/api/v1/invoices/{invoiceId}/pay": {
+      "post": { "responses": { "200": { "description": "Payment attempted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Invoice" } } } }, "409": { "description": "Invoice not payable" } } }
+    },
+    "/api/v1/webhooks": {
+      "post": { "responses": { "201": { "description": "Webhook created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Webhook" } } } } } }
+    },
+    "/api/v1/audit": {
+      "get": { "responses": { "200": { "description": "Audit trail", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AuditEvent" } } } } }, "403": { "description": "Role cannot read audit" } } }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Organization": { "type": "object", "properties": { "id": { "type": "string" }, "slug": { "type": "string" }, "name": { "type": "string" }, "planId": { "type": "string" }, "status": { "type": "string" }, "seatCount": { "type": "integer" }, "projectCount": { "type": "integer" } } },
+      "Subscription": { "type": "object", "properties": { "planId": { "type": "string" }, "status": { "type": "string" }, "seats": { "type": "integer" }, "monthlyBasePrice": { "type": "number" } } },
+      "Membership": { "type": "object", "properties": { "id": { "type": "string" }, "email": { "type": "string" }, "role": { "type": "string" }, "status": { "type": "string" } } },
+      "Project": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "slug": { "type": "string" }, "status": { "type": "string" }, "environmentCount": { "type": "integer" } } },
+      "Environment": { "type": "object", "properties": { "id": { "type": "string" }, "projectId": { "type": "string" }, "name": { "type": "string" }, "kind": { "type": "string" }, "status": { "type": "string" }, "currentVersion": { "type": "string", "nullable": true } } },
+      "Deployment": { "type": "object", "properties": { "id": { "type": "string" }, "environmentId": { "type": "string" }, "version": { "type": "string" }, "commitSha": { "type": "string" }, "status": { "type": "string" }, "deployMinutes": { "type": "number" } } },
+      "UsageSummary": { "type": "object", "properties": { "metric": { "type": "string" }, "total": { "type": "number" }, "included": { "type": "integer" }, "overage": { "type": "number" } } },
+      "Invoice": { "type": "object", "properties": { "id": { "type": "integer" }, "number": { "type": "string" }, "status": { "type": "string" }, "subtotal": { "type": "number" }, "tax": { "type": "number" }, "total": { "type": "number" } } },
+      "Webhook": { "type": "object", "properties": { "id": { "type": "string" }, "url": { "type": "string" }, "active": { "type": "boolean" } } },
+      "AuditEvent": { "type": "object", "properties": { "sequence": { "type": "integer" }, "action": { "type": "string" }, "resource": { "type": "string" }, "actor": { "type": "string" }, "occurredAtUtc": { "type": "string", "format": "date-time" } } }
+    }
+  }
+}

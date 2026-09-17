@@ -1,0 +1,100 @@
+namespace ProtoTest.Demo;
+
+using System.Net;
+using ProtoTest.Core;
+using ProtoTest.Json;
+using ProtoTest.NUnit;
+using ProtoTest.Rest;
+using ProtoTest.SampleApp.Testing;
+
+/// <summary>
+/// ProtoTest's own diagnostics: captured shape mismatches, recorded failures and the opt-in
+/// intentional failure used to keep the trace viewer demo complete.
+/// </summary>
+[Application(NorthstarTargets.Api)]
+[NorthstarTenant]
+[RestAuth<NorthstarAuthenticator>]
+public sealed class DiagnosticsShowcase
+{
+    [ProtoTest]
+    [SignedInAs]
+    public async Task ShapeMismatchesAreCapturedWithoutFailingTheRun()
+    {
+        // Arrange
+        using var organization = await Proto.Context.Rest().GetAsync("/api/v1/organization");
+        organization.ShouldHaveHttpStatus(HttpStatusCode.OK);
+
+        // Act
+        JsonShapeMismatchException? mismatch = null;
+        try
+        {
+            organization.ShouldMatchShape(new
+            {
+                projectCount = 99,
+                planThatDoesNotExist = "enterprise"
+            });
+        }
+        catch (JsonShapeMismatchException exception)
+        {
+            mismatch = exception;
+        }
+
+        // Assert
+        Assert.That(mismatch, Is.Not.Null);
+        Proto.Context.RecordObservation(
+            "TraceViewer",
+            "failure.shape.captured",
+            Proto.Context.TestId,
+            new { mismatch!.Message, MismatchCount = mismatch.Mismatches.Count });
+    }
+
+    [ProtoTest]
+    [SignedInAs]
+    public async Task AFailedOperationRecordsItsDiagnosticsAndTheRunContinues()
+    {
+        // Arrange
+        var exception = new TimeoutException(
+            "The billing ledger did not acknowledge the webhook within 2 seconds.");
+
+        // Act
+        using var operation = Proto.Context.Trace
+            .Operation("northstar.webhook.deliver", "Deliver subscription webhook", "ProtoTest.Demo")
+            .With("webhook.destination", "billing-ledger")
+            .With("webhook.attempt", "3")
+            .Begin();
+        operation.Fail(exception);
+
+        // Assert
+        Proto.Context.RecordObservation(
+            "TraceViewer",
+            "failure.timeout.captured",
+            Proto.Context.TestId,
+            new { exception.Message });
+        using var organization = await Proto.Context.Rest().GetAsync("/api/v1/organization");
+        organization.ShouldHaveHttpStatus(HttpStatusCode.OK);
+    }
+
+    [ProtoTest]
+    [SignedInAs]
+    public async Task TheIntentionalFailureShowcaseStaysOptIn()
+    {
+        // Arrange
+        if (!string.Equals(
+                Environment.GetEnvironmentVariable("PROTOTEST_DEMO_INCLUDE_FAILURE"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            Assert.Ignore("Set PROTOTEST_DEMO_INCLUDE_FAILURE=1 to include the intentional viewer-demo failure.");
+        }
+
+        // Act
+        using var organization = await Proto.Context.Rest().GetAsync("/api/v1/organization");
+
+        // Assert
+        organization.ShouldHaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        {
+            projectCount = 99,
+            planId = "nonexistent-plan"
+        });
+    }
+}

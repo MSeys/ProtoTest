@@ -13,6 +13,8 @@
     <Project Path="src/ProtoTest.OpenTelemetry/ProtoTest.OpenTelemetry.csproj" />
     <Project Path="src/ProtoTest.Reporting/ProtoTest.Reporting.csproj" Id="1ad73a64-19cd-4807-a0d4-283da87581f6" />
     <Project Path="src/ProtoTest.Rest/ProtoTest.Rest.csproj" Id="0161cd20-8be1-40f2-a3c0-76335a74ccd2" />
+    <Project Path="src/ProtoTest.Sql/ProtoTest.Sql.csproj" />
+    <Project Path="src/ProtoTest.Sql.EntityFrameworkCore/ProtoTest.Sql.EntityFrameworkCore.csproj" />
     <Project Path="src/ProtoTest.Web/ProtoTest.Web.csproj" />
     <Project Path="src/ProtoTest.Web.Playwright/ProtoTest.Web.Playwright.csproj" />
     <Project Path="src/ProtoTest.Web.Selenium/ProtoTest.Web.Selenium.csproj" />
@@ -46,6 +48,8 @@
     <Project Path="tests/ProtoTest.OpenTelemetry.Tests/ProtoTest.OpenTelemetry.Tests.csproj" />
     <Project Path="tests/ProtoTest.Reporting.Tests/ProtoTest.Reporting.Tests.csproj" />
     <Project Path="tests/ProtoTest.Rest.Tests/ProtoTest.Rest.Tests.csproj" Id="da8c0737-a839-4f92-a4c2-f9bdecd6c96b" />
+    <Project Path="tests/ProtoTest.SampleApp.Domain.Tests/ProtoTest.SampleApp.Domain.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Sql.Tests/ProtoTest.Sql.Tests.csproj" />
     <Project Path="tests/ProtoTest.Web.Tests/ProtoTest.Web.Tests.csproj" />
   </Folder>
   <Folder Name="/5. Demo/">
@@ -53,6 +57,7 @@
   </Folder>
   <Folder Name="/5. Demo/Supporting projects/">
     <Project Path="samples/ProtoTest.SampleApp.Contracts/ProtoTest.SampleApp.Contracts.csproj" />
+    <Project Path="samples/ProtoTest.SampleApp.Domain/ProtoTest.SampleApp.Domain.csproj" />
     <Project Path="samples/ProtoTest.SampleApp.Testing/ProtoTest.SampleApp.Testing.csproj" />
     <Project Path="samples/ProtoTest.SampleApp/ProtoTest.SampleApp.csproj" />
   </Folder>

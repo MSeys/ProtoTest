@@ -3,6 +3,7 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using ProtoTest.AspNetCore.Internal;
 using ProtoTest.Core;
 
 /// <summary>
@@ -35,8 +36,11 @@ public static class ProtoHostBuilderExtensions
 
         // Registered through a factory so the host's service provider disposes the shared server with the run.
         return builder.ConfigureServices(services =>
+        {
             services.AddSingleton<IProtoClientInitializer>(_ =>
-                new AspNetCoreClientInitializer<TProgram>(name, configureWebHost, configureClientOptions, lifetime)));
+                new AspNetCoreClientInitializer<TProgram>(name, configureWebHost, configureClientOptions, lifetime));
+            RegisterApplicationServices<TProgram>(services, name);
+        });
     }
 
     /// <summary>
@@ -56,6 +60,17 @@ public static class ProtoHostBuilderExtensions
             new AspNetCoreClientInitializer<TProgram>(name, configureWebHost, configureClientOptions, lifetime));
         // The application's HTTP clients with no configured base reuse this transport.
         application.Services.AddSingleton(new ProtoApplicationTransport(name, name));
+        RegisterApplicationServices<TProgram>(application.Services, name);
         return application;
     }
+
+    /// <summary>
+    /// Registers the per-test scope over the application's container under the server's name, so
+    /// <c>ApplicationServices&lt;TProgram&gt;</c> can reach scoped domain services.
+    /// </summary>
+    private static void RegisterApplicationServices<TProgram>(IServiceCollection services, string name)
+        where TProgram : class
+        => services.AddKeyedScoped(
+            name,
+            (_, key) => ApplicationServicesScope<TProgram>.Create(Proto.Context, (string)key!));
 }

@@ -2,6 +2,7 @@ namespace ProtoTest.AspNetCore;
 
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using ProtoTest.AspNetCore.Internal;
 using ProtoTest.Core;
 
 /// <summary>
@@ -25,6 +26,7 @@ public static class ProtoExecutionContextExtensions
 
     /// <summary>
     /// Creates a dedicated <see cref="IServiceScope"/> from the specified ASP.NET Core server's DI container.
+    /// The caller owns the returned scope and must dispose it.
     /// </summary>
     /// <typeparam name="TProgram">The entry point class of the ASP.NET Core application.</typeparam>
     /// <param name="context">The active test execution context.</param>
@@ -37,18 +39,44 @@ public static class ProtoExecutionContextExtensions
     }
 
     /// <summary>
-    /// Resolves a required service directly from the root Service Provider of the specified ASP.NET Core server.
+    /// Gets the test's scope over the application under test, created on first use and disposed when the
+    /// test ends. Scoped domain services - repositories, command handlers, a <c>DbContext</c> - resolve
+    /// from it, so a provisioner can create data through the application's own logic.
+    /// </summary>
+    /// <typeparam name="TProgram">The entry point class of the ASP.NET Core application.</typeparam>
+    /// <param name="context">The active test execution context.</param>
+    /// <param name="name">
+    /// The registered server name. Defaults to the application selected for the test, or "Default".
+    /// </param>
+    public static IServiceProvider ApplicationServices<TProgram>(
+        this ProtoExecutionContext context,
+        string? name = null) where TProgram : class
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var key = name ?? context.TryResolve<ProtoApplicationState>()?.ApplicationName ?? "Default";
+        var scope = context.Services.GetKeyedService<ApplicationServicesScope<TProgram>>(key)
+            ?? throw new InvalidOperationException(
+                $"No in-process ASP.NET Core server is registered under '{key}', so its services cannot be reached. " +
+                $"Register one with AddAspNetCoreServer<{typeof(TProgram).Name}>(\"{key}\").");
+        return scope.Services;
+    }
+
+    /// <summary>
+    /// Resolves a required service from the application under test through the test's own scope, so
+    /// scoped services work and are disposed with the test.
     /// </summary>
     /// <typeparam name="TProgram">The entry point class of the ASP.NET Core application.</typeparam>
     /// <typeparam name="TService">The service type to resolve.</typeparam>
     /// <param name="context">The active test execution context.</param>
-    /// <param name="name">The registered server name. Defaults to "Default".</param>
+    /// <param name="name">
+    /// The registered server name. Defaults to the application selected for the test, or "Default".
+    /// </param>
     public static TService ServerService<TProgram, TService>(
         this ProtoExecutionContext context,
-        string name = "Default")
+        string? name = null)
         where TProgram : class
         where TService : notnull
     {
-        return context.ServerFactory<TProgram>(name).Services.GetRequiredService<TService>();
+        return context.ApplicationServices<TProgram>(name).GetRequiredService<TService>();
     }
 }

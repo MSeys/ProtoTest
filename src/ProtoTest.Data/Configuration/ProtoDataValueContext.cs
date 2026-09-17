@@ -8,8 +8,11 @@ public sealed class ProtoDataValueContext
 {
     private int _generatedValueIndex;
 
+    private readonly IProtoData _data;
+
     internal ProtoDataValueContext(
         IServiceProvider services,
+        IProtoData data,
         string testId,
         long objectSequence,
         Type targetType,
@@ -17,6 +20,7 @@ public sealed class ProtoDataValueContext
         string memberName)
     {
         Services = services;
+        _data = data;
         TestId = testId;
         ObjectSequence = objectSequence;
         TargetType = targetType;
@@ -42,4 +46,7 @@ public sealed class ProtoDataValueContext
     /// <summary>Creates a readable deterministic string for this member.</summary>
     public string NextString()
         => $"{TargetType.Name}.{MemberName}-{ObjectSequence:D4}-{_generatedValueIndex++:D2}";
+
+    /// <summary>Resolves an object provisioned earlier in this test, so a default can reference it.</summary>
+    public T Ref<T>(string? identity = null) => _data.Ref<T>(identity);
 }

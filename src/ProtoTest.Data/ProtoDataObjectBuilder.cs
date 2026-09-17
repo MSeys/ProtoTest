@@ -326,6 +326,7 @@ public sealed class ProtoDataObjectBuilder<T>
 
         var valueContext = new ProtoDataValueContext(
             executionContext.Services,
+            _data,
             executionContext.TestId,
             _objectSequence,
             typeof(T),

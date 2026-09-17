@@ -3,13 +3,14 @@ namespace ProtoTest.Data.Internal;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 
-internal sealed class ProtoDataService : IProtoData, IAsyncDisposable
+internal sealed class ProtoDataService : IProtoData
 {
     private readonly ProtoDataRegistry _registry;
     private readonly IServiceProvider _services;
-    private readonly List<OwnedResource> _ownedResources = [];
+    private readonly object _gate = new();
+    private readonly List<ProvisionedObject> _provisioned = [];
     private long _objectSequence;
-    private int _disposeStarted;
+    private int _provisionSequence;
 
     public ProtoDataService(ProtoDataRegistry registry, IServiceProvider services)
     {
@@ -19,6 +20,49 @@ internal sealed class ProtoDataService : IProtoData, IAsyncDisposable
 
     public ProtoDataObjectBuilder<T> For<T>()
         => new(_registry, this, Interlocked.Increment(ref _objectSequence));
+
+    public T Ref<T>(string? identity = null)
+    {
+        ProvisionedObject[] matches;
+        lock (_gate)
+        {
+            matches =
+            [
+                .. _provisioned.Where(entry => entry.Value is T
+                    && (identity is null || string.Equals(entry.Identity, identity, StringComparison.Ordinal)))
+            ];
+        }
+
+        if (matches.Length == 0)
+        {
+            throw new ProtoDataException(identity is null
+                ? $"No '{typeof(T).Name}' has been provisioned in this test, so it cannot be referenced. {DescribeProvisioned()}"
+                : $"No '{typeof(T).Name}' with identity '{identity}' has been provisioned in this test. {DescribeProvisioned()}");
+        }
+
+        if (matches.Length > 1)
+        {
+            throw new ProtoDataException(
+                $"Several '{typeof(T).Name}' values have been provisioned in this test. " +
+                $"Pass an identity to Ref<{typeof(T).Name}>(...) to choose one.");
+        }
+
+        return (T)matches[0].Value;
+    }
+
+    private string DescribeProvisioned()
+    {
+        lock (_gate)
+        {
+            var types = _provisioned
+                .Select(entry => entry.Value.GetType().Name)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            return types.Length == 0
+                ? "Nothing has been provisioned yet."
+                : $"Provisioned so far: {string.Join(", ", types)}.";
+        }
+    }
 
     internal async ValueTask<ProtoDataProvisioningResult<TResult>> ProvisionAsync<TInput, TResult>(
         TInput value,
@@ -63,10 +107,14 @@ internal sealed class ProtoDataService : IProtoData, IAsyncDisposable
 
             operation.SetAttribute("data.identity", result.Identity);
             operation.SetAttribute("data.owned", (result.Cleanup is not null).ToString().ToLowerInvariant());
+            lock (_gate)
+            {
+                _provisioned.Add(new ProvisionedObject(result.Identity, result.Value));
+            }
+
             if (result.Cleanup is not null)
             {
-                _ownedResources.Add(new OwnedResource(
-                    typeof(TResult), result.Identity, provisioner.GetType(), result.Cleanup, execution.Trace));
+                RegisterOwnedData(execution, result.Cleanup, typeof(TResult), result.Identity, provisioner.GetType());
             }
 
             operation.Succeed();
@@ -84,43 +132,48 @@ internal sealed class ProtoDataService : IProtoData, IAsyncDisposable
         }
     }
 
-    public async ValueTask DisposeAsync()
+    private sealed record ProvisionedObject(string? Identity, object Value);
+
+    private void RegisterOwnedData(
+        ProtoExecutionContext execution,
+        IAsyncDisposable cleanup,
+        Type dataType,
+        string? identity,
+        Type provisionerType)
     {
-        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0) return;
-
-        List<Exception>? failures = null;
-        for (var index = _ownedResources.Count - 1; index >= 0; index--)
-        {
-            var resource = _ownedResources[index];
-            using var operation = resource.Trace
-                .Operation("data.cleanup", $"Cleanup · {resource.DataType.Name}", "ProtoTest.Data")
-                .During(ProtoTracePhase.Teardown)
-                .With("data.type", resource.DataType.FullName)
-                .With("data.identity", resource.Identity)
-                .With("data.provisioner", resource.ProvisionerType.FullName)
-                .Begin();
-            try
-            {
-                await resource.Cleanup.DisposeAsync();
-                operation.Succeed();
-            }
-            catch (Exception exception)
-            {
-                operation.Fail(exception);
-                (failures ??= []).Add(exception);
-            }
-        }
-
-        if (failures is not null)
-        {
-            throw new AggregateException("One or more provisioned data resources failed cleanup.", failures);
-        }
+        var sequence = Interlocked.Increment(ref _provisionSequence);
+        execution.RegisterResource(new ProtoResource(
+            $"data:{dataType.Name}:{sequence}",
+            "data",
+            identity is null
+                ? $"Provisioned {dataType.Name}"
+                : $"Provisioned {dataType.Name} '{identity}'",
+            release => CleanupAsync(cleanup, dataType, identity, provisionerType, release)));
     }
 
-    private sealed record OwnedResource(
-        Type DataType,
-        string? Identity,
-        Type ProvisionerType,
-        IAsyncDisposable Cleanup,
-        IProtoTraceWriter Trace);
+    private static async ValueTask CleanupAsync(
+        IAsyncDisposable cleanup,
+        Type dataType,
+        string? identity,
+        Type provisionerType,
+        ProtoResourceReleaseContext release)
+    {
+        using var operation = release.Trace
+            .Operation("data.cleanup", $"Cleanup · {dataType.Name}", "ProtoTest.Data")
+            .During(release.Phase)
+            .With("data.type", dataType.FullName)
+            .With("data.identity", identity)
+            .With("data.provisioner", provisionerType.FullName)
+            .Begin();
+        try
+        {
+            await cleanup.DisposeAsync();
+            operation.Succeed();
+        }
+        catch (Exception exception)
+        {
+            operation.Fail(exception);
+            throw;
+        }
+    }
 }

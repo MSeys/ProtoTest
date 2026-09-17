@@ -82,7 +82,7 @@ public sealed class SaasScenarioHook : IProtoTestHook
 
     public Task AfterTestAsync(ProtoExecutionContext context)
     {
-        var correlation = context.Context<ScenarioCorrelationContext>();
+        var correlation = context.Resolve<ScenarioCorrelationContext>();
         var probe = context.Client<ScenarioProbe>("ScenarioProbe");
         probe.Mark("scenario-completed");
         var duration = DateTimeOffset.UtcNow - correlation.StartedAtUtc;
@@ -127,12 +127,12 @@ public sealed class SampleEnvironmentAttribute : ProtoAttribute
     public override async Task BeforeTestAsync(ProtoExecutionContext context)
     {
         var environmentName = $"test-{context.TestId}";
-        using var response = await context.Rest(SampleAppTargets.Api)
+        using var response = await context.Rest()
             .WithoutAuth()
             .Body(new CreateEnvironmentRequest(environmentName))
             .PostAsync("/test-support/environments");
 
-        response.ShouldHaveStatus(HttpStatusCode.Created);
+        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
         var environment = response.ReadAsJson<EnvironmentResponse>()
             ?? throw new InvalidOperationException("The sample app returned no environment.");
         context.SetContext(new SampleEnvironmentContext(
@@ -143,13 +143,13 @@ public sealed class SampleEnvironmentAttribute : ProtoAttribute
 
     public override async Task AfterTestAsync(ProtoExecutionContext context)
     {
-        var environment = context.TryContext<SampleEnvironmentContext>();
+        var environment = context.TryResolve<SampleEnvironmentContext>();
         if (environment is null) return;
 
-        using var response = await context.Rest(SampleAppTargets.Api)
+        using var response = await context.Rest()
             .WithoutAuth()
             .DeleteAsync("/test-support/environments/{tenant}", new { environment.Tenant });
-        response.ShouldHaveStatus(HttpStatusCode.NoContent);
+        response.ShouldHaveHttpStatus(HttpStatusCode.NoContent);
     }
 }
 
@@ -167,14 +167,14 @@ public sealed class SampleUserAttribute : ProtoAttribute
 
     public override async Task BeforeTestAsync(ProtoExecutionContext context)
     {
-        var environment = context.Context<SampleEnvironmentContext>();
+        var environment = context.Resolve<SampleEnvironmentContext>();
         var email = $"{Role}.{context.TestId}@example.test";
-        using var response = await context.Rest(SampleAppTargets.Api)
+        using var response = await context.Rest()
             .WithoutAuth()
             .Body(new CreateUserRequest(email, Role))
             .PostAsync("/test-support/environments/{tenant}/users", new { environment.Tenant });
 
-        response.ShouldHaveStatus(HttpStatusCode.Created);
+        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
         var user = response.ReadAsJson<UserResponse>()
             ?? throw new InvalidOperationException("The sample app returned no user.");
         context.SetContext(new SampleUserContext(
@@ -194,8 +194,8 @@ public sealed class SampleUserAuthenticator : IProtoHttpAuthenticator
         ProtoHttpAuthenticationContext context,
         CancellationToken cancellationToken = default)
     {
-        var environment = context.Test.Context<SampleEnvironmentContext>();
-        var user = context.Test.Context<SampleUserContext>();
+        var environment = context.Test.Resolve<SampleEnvironmentContext>();
+        var user = context.Test.Resolve<SampleUserContext>();
         context.Request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", user.AccessToken);
         context.Request.Headers.Add("X-Tenant", environment.Tenant);
         return ValueTask.CompletedTask;

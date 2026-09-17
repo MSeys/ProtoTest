@@ -5,7 +5,11 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Reflection;
 
-internal static class ProtoTraceValueFormatter
+/// <summary>
+/// Serializes a value into compact, cycle-safe, redacted JSON for trace attributes. Shared so every
+/// integration renders diagnostic values the same way.
+/// </summary>
+public static class ProtoTraceValueFormatter
 {
     private const int MaximumLength = 64 * 1024;
     private static readonly HashSet<string> SensitiveNames = new(StringComparer.OrdinalIgnoreCase)
@@ -34,15 +38,15 @@ internal static class ProtoTraceValueFormatter
                 ? result
                 : $"{result[..MaximumLength]}\n… [{result.Length - MaximumLength} characters truncated]";
         }
-        catch (Exception exception)
+        catch (Exception)
         {
-            var fallback = DescribeObject(value, exception);
+            var fallback = DescribeObject(value);
             Redact(fallback);
             return fallback.ToJsonString(SerializerOptions);
         }
     }
 
-    private static JsonObject DescribeObject(object value, Exception _)
+    private static JsonObject DescribeObject(object value)
     {
         var result = new JsonObject
         {

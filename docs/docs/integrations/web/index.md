@@ -54,10 +54,12 @@ public async Task Valid_credentials_sign_in()
 
 ## Registering a session
 
+Registration is the same `AddWeb(...)` call regardless of backend. The backend is selected by which ProtoTest web package you reference — `ProtoTest.Web.Playwright` or `ProtoTest.Web.Selenium` — so test code never names the backend.
+
 ### Playwright
 
 ```csharp
-builder.AddPlaywrightWeb(options =>
+builder.AddWeb(options =>
 {
     options.Browser = PlaywrightBrowser.Chromium;
     options.Headless = true;
@@ -65,10 +67,9 @@ builder.AddPlaywrightWeb(options =>
 ```
 
 ```csharp
-public static IProtoHostBuilder AddPlaywrightWeb(
+public static IProtoHostBuilder AddWeb(
     this IProtoHostBuilder builder,
-    Action<PlaywrightWebOptions>? configure = null,
-    string name = "Default");
+    Action<PlaywrightWebOptions>? configure = null);
 ```
 
 | Option | Default | |
@@ -86,22 +87,21 @@ public static IProtoHostBuilder AddPlaywrightWeb(
 
 Playwright needs its browsers installed once per machine — the standard `playwright.ps1 install` script from the Microsoft.Playwright package. Using `Channel = "msedge"` or `"chrome"` avoids that by driving a browser that's already installed.
 
-Within a test, sessions registered with identical launch options (`Browser`, `Headless`, `SlowMo`, `Channel`) share one browser process, each with its own isolated browser context.
+Within a test, sessions registered with identical launch options (`Browser`, `Headless`, `SlowMo`, `Channel`) share one browser process, each with its own isolated browser context. The browser is disposed when the test finishes, which contains browser-level failures and cleans up any native contexts the test opens directly.
 
 ### Selenium
 
 ```csharp
-builder.AddSeleniumWeb(
+builder.AddWeb(
     () => new ChromeDriver(),
     options => options.ActionTimeout = TimeSpan.FromSeconds(10));
 ```
 
 ```csharp
-public static IProtoHostBuilder AddSeleniumWeb(
+public static IProtoHostBuilder AddWeb(
     this IProtoHostBuilder builder,
     Func<IWebDriver> createDriver,
-    Action<SeleniumWebOptions>? configure = null,
-    string name = "Default");
+    Action<SeleniumWebOptions>? configure = null);
 ```
 
 | Option | Default | |
@@ -114,11 +114,13 @@ public static IProtoHostBuilder AddSeleniumWeb(
 
 The factory is called once per test that uses the browser; ProtoTest quits and disposes the driver afterwards.
 
+Unlike Playwright, Selenium has no isolated-context-within-a-browser primitive — a driver *is* a browser instance with its own profile. Reusing one across tests would leak cookies and storage, so each session deliberately gets its own driver instead of a pooled one.
+
 ### From configuration
 
 Both backends also read their options from configuration, so CI can run headless on another browser without code changes. Values are applied in this order, later winning:
 
-1. your `AddPlaywrightWeb` / `AddSeleniumWeb` callback,
+1. your `AddWeb(...)` callback,
 2. `ProtoTest:Web:Playwright` or `ProtoTest:Web:Selenium` — every session of that backend,
 3. `ProtoTest:Web:Sessions:{name}` — one named session.
 
@@ -152,25 +154,64 @@ public sealed class WebSession : IAsyncDisposable
     string Name { get; }
     string BackendName { get; }
     TPage Page<TPage>() where TPage : WebPage, new();
+    ValueTask WaitUntilAsync(Func<CancellationToken, ValueTask<bool>> condition, TimeSpan? timeout = null, string? description = null, CancellationToken cancellationToken = default);
     ValueTask<TBackend> GetBackendAsync<TBackend>(CancellationToken cancellationToken = default) where TBackend : class, IWebBackend;
     TBackend GetBackend<TBackend>() where TBackend : class, IWebBackend;
 }
 ```
 
-### Several browsers in one test
+### Several sessions in one test
 
-Register more than one session by name — for example, an administrator and a customer interacting with the same system:
+Sessions are per-test — the builder registers only the backend, and a test names the sessions it needs. Each named session is an isolated browser context (Playwright) or driver (Selenium), created lazily on first use and closed at teardown. Pages are cached per session, so `Web("Admin").Page<T>()` returns the same object each time.
 
 ```csharp
-builder
-    .AddPlaywrightWeb(name: "Admin")
-    .AddPlaywrightWeb(name: "Customer");
+builder.AddWeb();   // register the backend once
 ```
 
 ```csharp
 var admin = Proto.Context.Web("Admin").Page<BackOfficePage>();
 var customer = Proto.Context.Web("Customer").Page<StorefrontPage>();
+
+await admin.Orders.Row(42).ApproveAsync();
+
+// The customer waits until the admin's change is reflected, then verifies it.
+await customer.Orders.Row(42).Status.ShouldHaveTextAsync("Approved");
 ```
+
+The `Should*` methods on an element or page poll until they pass, so they double as cross-session waits. For any other condition — including one that spans sessions — use `WaitUntilAsync`; its description defaults to the predicate's source text:
+
+```csharp
+await customer.WaitUntilAsync(async ct =>
+    await customer.Orders.Row(42).Status.TextAsync(ct) == "Approved");
+
+await customer.WaitUntilAsync(
+    async _ => await customer.Total.TextAsync() == "€0.00",
+    timeout: TimeSpan.FromSeconds(10));
+```
+
+Sessions can also be declared on the test, so setup creates (and optionally navigates) them before the body. `[WebSession]` defaults to `Order = -10`, so it runs before `[LoginAs]`:
+
+```csharp
+[WebSession("Admin", Open = "/back-office")]
+[WebSession("Customer")]
+[LoginAs<BackOfficeLogin>("billing.admin", Session = "Admin")]
+public async Task ...() { ... }
+```
+
+Origins are environment-specific, so they come from the [application](../getting-started/configuration.md) the session targets. Each session selects one with `ProtoTest:Web:Sessions:{name}:Application` (or `[WebSession(..., Application = "…")]`), defaulting to its own name, and reads its `ProtoTest:Applications:{application}:BaseUrl` — the same address a REST/GraphQL client targeting that application uses. A relative `Open` (or `Page<T>().OpenAsync("/path")`) resolves against that base. If even the path differs per environment, `ProtoTest:Web:Sessions:{name}:Open` supplies the whole URL and takes precedence over the attribute.
+
+```json
+{
+  "ProtoTest": {
+    "Web": {
+      "BaseUrl": "https://staging.app.test",
+      "Sessions": { "Admin": { "Open": "https://staging.app.test/ops" } }
+    }
+  }
+}
+```
+
+Configure one named session's other settings through `ProtoTest:Web:Sessions:{name}`.
 
 ### Dropping down to the driver
 

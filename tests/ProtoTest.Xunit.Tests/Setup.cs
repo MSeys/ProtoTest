@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Xunit.Tests;
+namespace ProtoTest.Xunit.Tests;
 
 using global::Xunit;
 using Microsoft.Extensions.DependencyInjection;
@@ -52,7 +52,7 @@ public class TrackingHook : IProtoTestHook
 
     public static List<string> GetOrCreateLog(ProtoExecutionContext context)
     {
-        var state = context.TryContext<ExecutionLogState>();
+        var state = context.TryResolve<ExecutionLogState>();
         if (state == null)
         {
             state = new ExecutionLogState();

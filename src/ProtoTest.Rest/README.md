@@ -7,10 +7,10 @@ dotnet add package ProtoTest.Rest --prerelease
 ```
 
 ```csharp
-builder.AddRest(rest => rest.AddClient("Orders", "https://api.example.test"));
+builder.AddApplication("Api", app => app.AddRest(rest => rest.AddClient("Orders")));
 
-[RestClient("Orders")]
-[Auth<BearerTokenAuthenticator>("token")]
+[Application("Api", "Rest:Orders")]
+[RestAuth<BearerTokenAuthenticator>("token")]
 public sealed class OrderTests
 {
     [ProtoTest]
@@ -19,7 +19,7 @@ public sealed class OrderTests
         using var response = await Proto.Context.Rest()
             .GetAsync("/orders/{id}", new { id = 42 });
 
-        response.ShouldHaveStatus(HttpStatusCode.OK)
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK)
             .ShouldMatchShape(new { id = 42, status = JsonValue.NotNull() });
     }
 }

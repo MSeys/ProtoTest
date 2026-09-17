@@ -248,7 +248,7 @@ public sealed class ProtoTracingTests
         await host.StartAsync();
         var context = await host.StartTestAsync("context diagnostics", TestMethod());
         context.SetContext(new CallbackContext("configured", () => { }));
-        _ = context.Context<CallbackContext>();
+        _ = context.Resolve<CallbackContext>();
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
         var entries = host.Trace.Snapshot().Tests.Single().Entries;

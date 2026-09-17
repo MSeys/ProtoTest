@@ -26,20 +26,21 @@ builder
     .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
         new Dictionary<string, string?>
         {
-            ["ProtoTest:Clients:Api:OpenApi:Specification"] =
+            ["ProtoTest:Applications:Api:OpenApi:Specification"] =
                 Path.Combine(AppContext.BaseDirectory, "control-plane.openapi.json")
         }))
-    .AddRest(rest => rest
-        .AddClient("Api")
-        .WithCollector<OpenApiCoverageCollector>());
+    .AddApplication("Api", app => app
+        .AddRest(rest => rest
+            .AddClient("Api")
+            .WithCollector<OpenApiCoverageCollector>()));
 ```
 
-The collector reads `ProtoTest:Clients:{client}:OpenApi:Specification`, so in a real project you'd usually put that in `appsettings.json` instead. The value can be a file path, a URL, or the document itself as JSON or YAML. A relative URL is resolved against the client's configured `BaseUrl` — handy for pointing at `/swagger/v1/swagger.json` on a deployed API.
+The collector reads `ProtoTest:Applications:{application}:OpenApi:Specification`, where the application is the one the REST client belongs to. In a real project you'd usually put that in `appsettings.json` instead. The value can be a file path, a URL, or the document itself as JSON or YAML. A relative URL is resolved against the application's `ProtoTest:Applications:{application}:BaseUrl` — handy for pointing at `/swagger/v1/swagger.json` on a deployed API.
 
 If the key is missing you get:
 
 ```
-No OpenAPI specification configured for target 'Api'. Set 'ProtoTest:Clients:Api:OpenApi:Specification'.
+Application 'Api' has no 'OpenApi:Specification' configured. Set 'ProtoTest:Applications:Api:OpenApi:Specification'.
 ```
 
 A document that fails to parse throws with the parser's diagnostics.

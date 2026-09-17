@@ -7,30 +7,29 @@ The examples use `JsonValue` from `ProtoTest.Json`; GraphQL and REST intentional
 the same matcher API.
 
 ```csharp
-builder.AddGraphQL(graphQL => graphQL
+builder.AddApplication("Catalog", app => app.AddGraphQL(graphQL => graphQL
     .CaptureAttachments()
-    .AddClient("Catalog", "https://api.example.test/graphql")
+    .AddClient("Catalog")
     .WithSchemaCoverage("catalog.graphql")
-    .WithCollector<GraphQLCoverageCollector>());
+    .WithCollector<GraphQLCoverageCollector>()));
 ```
 
-As with REST, the URL can be supplied through
-`ProtoTest:Clients:Catalog:BaseUrl`. For an endpoint created per test, pass a
-`Func<ProtoExecutionContext, Uri>` to `AddClient`. Response buffering is bounded by
-`ConfigureResponses(options => options.MaxResponseBodyBytes = ...)`.
+As with REST, the endpoint comes from the application's
+`ProtoTest:Applications:Catalog:BaseUrl`, joined with `Endpoints:GraphQL` when configured. For an
+endpoint created per test, pass a `Func<ProtoExecutionContext, Uri>` to `AddClient`. Response
+buffering is bounded by `ConfigureResponses(options => options.MaxResponseBodyBytes = ...)`.
 
 When another integration already owns the transport, such as an in-process
 `ProtoTest.AspNetCore` server, reuse that client without opening a network connection:
 
 ```csharp
-builder
-    .AddAspNetCoreServer<Program>("SampleApp")
-    .AddGraphQL(graphQL => graphQL
-        .AddClientFrom("SampleAppGraphQL", "SampleApp", "/graphql"));
+builder.AddApplication("SampleApp", app => app
+    .AddAspNetCoreServer<Program>()
+    .AddGraphQL(graphQL => graphQL.AddClient("GraphQL")));   // reuses the server; set Endpoints:GraphQL for the path
 ```
 
 ```csharp
-[GraphQLClient("Catalog")]
+[Application("Catalog")]
 public async Task FindsProducts()
 {
     using var response = await Proto.Context.GraphQL()
@@ -93,7 +92,7 @@ a normal `GraphQLResponse` and contributes its own observations, shape assertion
 attachments, and schema coverage. Select
 `GraphQLSubscriptionTransport.Sse` with `WithSubscriptionTransport(...)` for HTTP-based
 streams. The appsettings equivalent is
-`ProtoTest:Clients:{name}:GraphQL:SubscriptionTransport`. Custom in-process hosts can
+`ProtoTest:Applications:{name}:GraphQL:SubscriptionTransport`. Custom in-process hosts can
 provide `IGraphQLWebSocketFactory`, and `ConnectionPayload(...)` configures optional
 `connection_init` metadata. Batching, persisted operations, and incremental responses
 remain separate future features.
@@ -103,7 +102,7 @@ that were not selected. Aliases are resolved to their schema field, and fragment
 inline fragments participate in coverage. Field arguments and nested input properties
 are tracked for both inline values and variables.
 The schema source accepts inline SDL, a file, or a URL. The parameterless
-`WithSchemaCoverage()` reads `ProtoTest:Clients:{name}:GraphQL:Schema`.
+`WithSchemaCoverage()` reads `ProtoTest:Applications:{name}:GraphQL:Schema`.
 
 Shape matching is powered by `ProtoTest.Json`, the protocol-independent matcher
 shared with `ProtoTest.Rest`.

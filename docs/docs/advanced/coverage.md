@@ -13,13 +13,14 @@ ProtoTest measures coverage against the *contract*: your OpenAPI document, your 
 
 ```csharp
 builder
-    .AddRest(rest => rest
-        .AddClient("Api")
-        .WithCollector<RestCoverageCollector>()
-        .WithCollector<OpenApiCoverageCollector>())
-    .AddGraphQL(graphQL => graphQL
-        .AddClientFrom("GraphQL", "Api")
-        .WithSchemaCoverage("schema.graphql"))
+    .AddApplication("Api", app => app
+        .AddRest(rest => rest
+            .AddClient("Api")
+            .WithCollector<RestCoverageCollector>()
+            .WithCollector<OpenApiCoverageCollector>())
+        .AddGraphQL(graphQL => graphQL
+            .AddClient("GraphQL")
+            .WithSchemaCoverage("schema.graphql")))
     .AddSink<HtmlReportSink>();
 ```
 
@@ -138,7 +139,8 @@ public sealed class InvoiceStateCoverage(string targetName) : ProtoCoverageColle
 Register it on a target — the target name is passed as the first constructor argument, and any extra arguments to `WithCollector` follow it:
 
 ```csharp
-builder.AddRest(rest => rest.AddClient("Billing").WithCollector<InvoiceStateCoverage>());
+builder.AddApplication("Api", app => app
+    .AddRest(rest => rest.AddClient("Billing").WithCollector<InvoiceStateCoverage>()));
 ```
 
 Collectors must be thread-safe; tests run in parallel. Use the base class's `Lock`.

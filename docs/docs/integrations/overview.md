@@ -13,7 +13,7 @@ Each integration is a NuGet package that adds a client to `ProtoExecutionContext
 | [`ProtoTest.GraphQL`](./graphql/index.md) | queries, mutations, subscriptions, uploads, schema coverage | `Proto.Context.GraphQL()` |
 | [`ProtoTest.Web`](./web/index.md) + `.Playwright` / `.Selenium` | page objects, flows, login, browser diagnostics | `Proto.Context.Web()` |
 | [`ProtoTest.Data`](./data/index.md) | deterministic test data and provisioning | `Proto.Context.Data()` |
-| [`ProtoTest.AspNetCore`](./aspnetcore.md) | in-process ASP.NET Core application | `Proto.Context.Server<TProgram>()` |
+| [`ProtoTest.AspNetCore`](./aspnetcore.md) | in-process ASP.NET Core application | `Proto.Context.ServerFactory<TProgram>()` |
 | [`ProtoTest.OpenApi`](./openapi.md) | OpenAPI contract coverage | a collector on a REST client |
 
 Supporting packages come along automatically when you install one of the above:
@@ -45,10 +45,10 @@ public async Task AdministratorCanProvisionAndListSevenAdditionalUsers()
         .With(request => request.Role, SampleRoles.Member)
         .CreateManyAsync<UserResponse>(7);
 
-    var administrator = Proto.Context.Context<SampleUserContext>();
+    var administrator = Proto.Context.Resolve<SampleUserContext>();
 
     using var response = await Proto.Context.Rest().GetAsync("/api/admin/users");
-    response.ShouldHaveStatus(HttpStatusCode.OK).ShouldMatchShape(new
+    response.ShouldHaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
     {
         tenant = administrator.Tenant,
         users = createdUsers

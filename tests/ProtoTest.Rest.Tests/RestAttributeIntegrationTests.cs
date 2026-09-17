@@ -3,6 +3,7 @@ namespace ProtoTest.Rest.Tests;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
@@ -29,7 +30,7 @@ public sealed class RestAttributeIntegrationTests
         try
         {
             using var response = await Proto.Context.Rest().GetAsync("/resource");
-            response.ShouldHaveStatus(HttpStatusCode.OK);
+            response.ShouldHaveHttpStatus(HttpStatusCode.OK);
 
             Assert.That(requests, Has.Count.EqualTo(1));
             Assert.Multiple(() =>
@@ -110,7 +111,7 @@ public sealed class RestAttributeIntegrationTests
         var attributes = GetProtoAttributes(method);
 
         await host.StartTestAsync(method.Name, "10004", method, attributes);
-        var state = Proto.Context.Context<AttributeOrderState>();
+        var state = Proto.Context.Resolve<AttributeOrderState>();
 
         try
         {
@@ -139,16 +140,20 @@ public sealed class RestAttributeIntegrationTests
 
     private static ProtoHost CreateHost(List<CapturedRequest> requests, params string[] clientNames)
     {
-        var builder = new ProtoHostBuilder().AddRest();
-        builder.ConfigureServices(services =>
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?> { ["ProtoTest:Applications:App:BaseUrl"] = "https://example.test" }));
+        builder.AddApplication("App", app => app.AddRest(rest =>
         {
             foreach (var clientName in clientNames)
             {
-                services.AddSingleton<IProtoClientInitializer>(
-                    new CapturingRestClientInitializer(clientName, requests));
+                rest.AddClient(clientName, configure: http =>
+                    http.ConfigurePrimaryHttpMessageHandler(() => new CapturingHandler(clientName, requests)));
             }
-        });
-
+        }));
+        // A host-level default for the case with no [Application].
+        builder.ConfigureServices(services =>
+            services.AddSingleton<IProtoClientInitializer>(new CapturingRestClientInitializer("Default", requests)));
         return builder.Build();
     }
 
@@ -159,26 +164,26 @@ public sealed class RestAttributeIntegrationTests
     private static IReadOnlyList<ProtoAttribute> GetProtoAttributes(MethodInfo method)
         => ProtoAttributeResolver.Resolve(method);
 
-    [RestClient("Orders")]
-    [Auth<BearerTokenAuthenticator>("class-token")]
+    [Application("App", "Rest:Orders")]
+    [RestAuth<BearerTokenAuthenticator>("class-token")]
     [RestStateTracking("Class", Order = 20)]
     private sealed class RestAttributeCases
     {
         public void ClassOnly() { }
 
-        [RestClient("Inventory")]
+        [Application("App", "Rest:Inventory")]
         public void MethodClientOverride() { }
 
-        [Auth<BearerTokenAuthenticator>("method-token")]
+        [RestAuth<BearerTokenAuthenticator>("method-token")]
         public void MethodAuthOverride() { }
 
-        [Auth<BearerTokenAuthenticator>("method-token")]
-        [RestClient("Inventory")]
+        [RestAuth<BearerTokenAuthenticator>("method-token")]
+        [Application("App", "Rest:Inventory")]
         public void MethodClientAndAuthOverride() { }
 
         [RestStateTracking("Method", Order = 10)]
-        [Auth<BearerTokenAuthenticator>("method-token")]
-        [RestClient("Inventory")]
+        [RestAuth<BearerTokenAuthenticator>("method-token")]
+        [Application("App", "Rest:Inventory")]
         public void WithOrderedProtoAttributes() { }
     }
 
@@ -187,8 +192,8 @@ public sealed class RestAttributeIntegrationTests
         public void NoAttributes() { }
     }
 
-    [RestClient("Orders")]
-    [Auth<BearerTokenAuthenticator>("base-token")]
+    [Application("App", "Rest:Orders")]
+    [RestAuth<BearerTokenAuthenticator>("base-token")]
     private abstract class RestAttributeBase
     {
     }
@@ -202,7 +207,7 @@ public sealed class RestAttributeIntegrationTests
     {
         public override async Task BeforeTestAsync(ProtoExecutionContext context)
         {
-            var state = context.TryContext<AttributeOrderState>();
+            var state = context.TryResolve<AttributeOrderState>();
             if (state is null)
             {
                 state = new AttributeOrderState();
@@ -216,7 +221,7 @@ public sealed class RestAttributeIntegrationTests
 
         public override Task AfterTestAsync(ProtoExecutionContext context)
         {
-            var state = context.Context<AttributeOrderState>();
+            var state = context.Resolve<AttributeOrderState>();
             state.Events.Add($"{name}:After:{state.SelectedClientName}");
             return Task.CompletedTask;
         }

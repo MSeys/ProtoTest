@@ -52,7 +52,7 @@ public sealed class SampleEnvironmentAttribute : ProtoAttribute
             .Body(new CreateEnvironmentRequest(environmentName))
             .PostAsync("/test-support/environments");
 
-        response.ShouldHaveStatus(HttpStatusCode.Created);
+        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
         var environment = response.ReadAsJson<EnvironmentResponse>()
             ?? throw new InvalidOperationException("The sample app returned no environment.");
 
@@ -64,13 +64,13 @@ public sealed class SampleEnvironmentAttribute : ProtoAttribute
 
     public override async Task AfterTestAsync(ProtoExecutionContext context)
     {
-        var environment = context.TryContext<SampleEnvironmentContext>();
+        var environment = context.TryResolve<SampleEnvironmentContext>();
         if (environment is null) return;
 
         using var response = await context.Rest(SampleAppTargets.Api)
             .WithoutAuth()
             .DeleteAsync("/test-support/environments/{tenant}", new { environment.Tenant });
-        response.ShouldHaveStatus(HttpStatusCode.NoContent);
+        response.ShouldHaveHttpStatus(HttpStatusCode.NoContent);
     }
 }
 ```
@@ -92,7 +92,7 @@ public sealed class SampleUserAttribute : ProtoAttribute
 
     public override async Task BeforeTestAsync(ProtoExecutionContext context)
     {
-        var environment = context.Context<SampleEnvironmentContext>();
+        var environment = context.Resolve<SampleEnvironmentContext>();
         var email = $"{Role}.{context.TestId}@example.test";
 
         using var response = await context.Rest(SampleAppTargets.Api)
@@ -100,7 +100,7 @@ public sealed class SampleUserAttribute : ProtoAttribute
             .Body(new CreateUserRequest(email, Role))
             .PostAsync("/test-support/environments/{tenant}/users", new { environment.Tenant });
 
-        response.ShouldHaveStatus(HttpStatusCode.Created);
+        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
         var user = response.ReadAsJson<UserResponse>()
             ?? throw new InvalidOperationException("The sample app returned no user.");
 
@@ -125,6 +125,7 @@ Attributes run in ascending `Order` before the test and in reverse afterwards. G
 | --- | --- |
 | `[SampleEnvironment]` | −200 |
 | `[SampleUser]` | −100 |
+| `[WebSession]` | −10 |
 | `[LoginAs<T>]` | 0 |
 
 Because `Order` is an `init` property, callers can override it where they apply the attribute:
@@ -139,7 +140,7 @@ Where the attribute is declared doesn't affect ordering: class-level and method-
 
 Attributes are collected from the test's class (including base classes) and from the method (including overridden base methods). Put suite-wide capabilities on the class and scenario-specific ones on the method.
 
-Unlike REST's `[Auth<T>]` — where a method-level attribute *replaces* class-level ones — `ProtoAttribute`s simply accumulate. If both the class and the method have a `[SampleUser]`, both run.
+Unlike REST's `[RestAuth<T>]` — where a method-level attribute *replaces* class-level ones — `ProtoAttribute`s simply accumulate. If both the class and the method have a `[SampleUser]`, both run.
 
 ## Services in attributes
 
@@ -159,9 +160,10 @@ Attribute arguments must be compile-time constants. Pass a *name* — a role, a 
 
 | Attribute | Kind |
 | --- | --- |
+| [`[WebSession]`](../integrations/web/index.md#several-sessions-in-one-test) | `ProtoAttribute` — declares and optionally opens a browser session |
 | [`[LoginAs<TStrategy>]`](../integrations/web/login.md) | `ProtoAttribute` — logs a browser session in |
-| [`[Auth<T>]`](../integrations/rest/authentication.md), [`[GraphQLAuth<T>]`](../integrations/graphql/index.md#authentication) | metadata read by the REST/GraphQL hooks |
-| `[RestClient]`, `[GraphQLClient]` | metadata choosing the default client |
+| [`[RestAuth<T>]`](../integrations/rest/authentication.md), [`[GraphQLAuth<T>]`](../integrations/graphql/index.md#authentication) | metadata read by the REST/GraphQL hooks |
+| `[Application("Name", "Protocol:Client")]` | `ProtoAttribute` — selects the application under test and, optionally, which client each protocol uses |
 | `[ProtoTest]`, `[ProtoTestFact]`, `[ProtoTestTheory]` | [runner](../runners/overview.md) entry points |
 
 Most of the capabilities in a real suite are ones you write — that's the point.

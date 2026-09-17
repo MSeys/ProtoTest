@@ -14,9 +14,10 @@ public class ProtoTestAttribute : TestAttribute, ITestAction
 
     public void BeforeTest(ITest test)
     {
-        var attributes = ProtoAttributeResolver.Resolve(test.Method!.MethodInfo);
+        var method = test.Method!.MethodInfo;
+        var attributes = ProtoAttributeResolver.Resolve(method);
         ProtoTestAssembly.Host
-            .StartTestAsync(test.FullName, test.Method!.MethodInfo, attributes, NUnitAttachmentPublisher.Instance)
+            .StartTestAsync(ProtoTestName.FromMethod(method), method, attributes, NUnitAttachmentPublisher.Instance)
             .GetAwaiter()
             .GetResult();
     }

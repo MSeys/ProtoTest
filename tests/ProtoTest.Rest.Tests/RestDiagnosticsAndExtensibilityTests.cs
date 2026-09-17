@@ -96,7 +96,7 @@ public sealed class RestDiagnosticsAndExtensibilityTests
         var builder = new ProtoHostBuilder();
         builder.AddRest(rest => rest.AddClient(
             "Environment",
-            context => context.Context<EnvironmentContext>().BaseUri,
+            context => context.Resolve<EnvironmentContext>().BaseUri,
             http => http.ConfigurePrimaryHttpMessageHandler(() => handler)));
         await using var host = builder.Build();
         await host.StartTestAsync(
@@ -246,10 +246,10 @@ public sealed class RestDiagnosticsAndExtensibilityTests
         handler.ResponseToReturn.Headers.Add("Set-Cookie", $"session={secret}");
         using var client = new HttpClient(handler) { BaseAddress = new Uri("https://example.test") };
 
-        using var response = await new RestRequestBuilder(client, context, "Orders", null).GetAsync("/secure");
+        using var response = await new RestRequestBuilder(client, context, "Orders").GetAsync("/secure");
         var observation = (RestResponseData)context.RecordedObservations.Single().Data!;
         var exception = Assert.Throws<RestStatusAssertionException>(() =>
-            response.ShouldHaveStatus(HttpStatusCode.OK));
+            response.ShouldHaveHttpStatus(HttpStatusCode.OK));
         var attachmentBytes = await context.Attachments.Single().ReadAllBytesAsync();
 
         using (Assert.EnterMultipleScope())
@@ -298,7 +298,7 @@ public sealed class RestDiagnosticsAndExtensibilityTests
         using var client = new HttpClient(handler) { BaseAddress = new Uri("https://example.test") };
 
         var exception = Assert.ThrowsAsync<ProtoResponseTooLargeException>(async () =>
-            await new RestRequestBuilder(client, context, "Orders", null).GetAsync("/large"));
+            await new RestRequestBuilder(client, context, "Orders").GetAsync("/large"));
 
         Assert.That(exception!.MaximumBytes, Is.EqualTo(4));
         Assert.That(context.RecordedObservations.Single().Kind, Is.EqualTo("http.failure"));
@@ -323,7 +323,7 @@ public sealed class RestDiagnosticsAndExtensibilityTests
         };
         using var client = new HttpClient(handler) { BaseAddress = new Uri("https://example.test") };
 
-        using var response = await new RestRequestBuilder(client, context, "Files", null).GetAsync("/file");
+        using var response = await new RestRequestBuilder(client, context, "Files").GetAsync("/file");
 
         Assert.That(response.ReadAsBytes(), Is.EqualTo(expected));
     }
@@ -346,14 +346,14 @@ public sealed class RestDiagnosticsAndExtensibilityTests
 
     private sealed class AuthenticationCases
     {
-        [Auth<DependencyAuthenticator>]
+        [RestAuth<DependencyAuthenticator>]
         public void UsesDependency() { }
 
-        [Auth<BearerTokenAuthenticator>("bearer-token", Order = 10)]
-        [Auth<ApiKeyAuthenticator>("X-Api-Key", "api-secret", ApiKeyLocation.Header, Order = 20)]
+        [RestAuth<BearerTokenAuthenticator>("bearer-token", Order = 10)]
+        [RestAuth<ApiKeyAuthenticator>("X-Api-Key", "api-secret", ApiKeyLocation.Header, Order = 20)]
         public void UsesMultipleSchemes() { }
 
-        [Auth<UserContextAuthenticator>]
+        [RestAuth<UserContextAuthenticator>]
         public void UsesUserContext() { }
     }
 
@@ -378,7 +378,7 @@ public sealed class RestDiagnosticsAndExtensibilityTests
             CancellationToken cancellationToken = default)
         {
             Assert.That(context.Test, Is.SameAs(constructedWith));
-            var user = context.Test.Context<UserContext>();
+            var user = context.Test.Resolve<UserContext>();
             context.Request.Headers.Authorization =
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", user.Token);
             return ValueTask.CompletedTask;

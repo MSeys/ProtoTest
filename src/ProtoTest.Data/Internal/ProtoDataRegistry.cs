@@ -1,4 +1,4 @@
-namespace ProtoTest.Data;
+namespace ProtoTest.Data.Internal;
 
 internal sealed class ProtoDataRegistry
 {

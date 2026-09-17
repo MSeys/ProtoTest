@@ -1,8 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-
-[assembly: InternalsVisibleTo("ProtoTest.Rest.Tests")]
-
-namespace ProtoTest.Rest.Internal;
+﻿namespace ProtoTest.Rest.Internal;
 
 using System.Collections;
 using System.Globalization;
@@ -31,7 +27,7 @@ internal static partial class RestUriBuilder
         {
             if (!Uri.TryCreate(target, UriKind.Absolute, out var absoluteUri))
                 throw new InvalidOperationException($"REST request URI '{target}' is not a valid absolute URI.");
-            if (!IsHttpUri(absoluteUri))
+            if (!ProtoHttpUri.IsHttpUri(absoluteUri))
             {
                 throw new InvalidOperationException(
                     $"REST requests require an HTTP or HTTPS URI, but '{absoluteUri.Scheme}' was supplied.");
@@ -50,7 +46,7 @@ internal static partial class RestUriBuilder
                 "A relative REST request requires a configured or per-test base address.");
         }
 
-        if (!baseAddress.IsAbsoluteUri || !IsHttpUri(baseAddress))
+        if (!baseAddress.IsAbsoluteUri || !ProtoHttpUri.IsHttpUri(baseAddress))
         {
             throw new InvalidOperationException(
                 "A REST base address must be an absolute HTTP or HTTPS URI.");
@@ -175,8 +171,4 @@ internal static partial class RestUriBuilder
         IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty,
         _ => value.ToString() ?? string.Empty
     };
-
-    private static bool IsHttpUri(Uri uri)
-        => string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-           || string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
 }

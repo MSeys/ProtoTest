@@ -7,13 +7,12 @@ using ProtoTest.Core;
 [Tracking("ClassLevel", Order = 1)]
 public class ProtoAttributeLifecycleTests
 {
-    [Fact]
-    [ProtoTest]
+    [ProtoTestFact]
     [Tracking("MethodLevel", Order = 2)]
     public void ProtoTest_ShouldExecuteClassAndMethodAttributesInOrder()
     {
         // Act
-        Proto.Context.Context<ExecutionLogState>().Log.Add("TestExecution");
+        Proto.Context.Resolve<ExecutionLogState>().Log.Add("TestExecution");
 
         // Assert
         var expectedBeforeSequence = new[]
@@ -24,7 +23,7 @@ public class ProtoAttributeLifecycleTests
             "TestExecution"
         };
 
-        Assert.Equal(expectedBeforeSequence, Proto.Context.Context<ExecutionLogState>().Log);
+        Assert.Equal(expectedBeforeSequence, Proto.Context.Resolve<ExecutionLogState>().Log);
     }
 }
 
@@ -33,13 +32,13 @@ public class TrackingAttribute(string name) : ProtoAttribute
 {
     public override Task BeforeTestAsync(ProtoExecutionContext context)
     {
-        Proto.Context.Context<ExecutionLogState>().Log.Add($"{name}:Before");
+        Proto.Context.Resolve<ExecutionLogState>().Log.Add($"{name}:Before");
         return Task.CompletedTask;
     }
 
     public override Task AfterTestAsync(ProtoExecutionContext context)
     {
-        Proto.Context.Context<ExecutionLogState>().Log.Add($"{name}:After");
+        Proto.Context.Resolve<ExecutionLogState>().Log.Add($"{name}:After");
         return Task.CompletedTask;
     }
 }

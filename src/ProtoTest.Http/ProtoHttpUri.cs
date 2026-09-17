@@ -17,6 +17,14 @@ public static class ProtoHttpUri
         uri = null;
         if (!HasExplicitScheme(value) || !Uri.TryCreate(value, UriKind.Absolute, out var created)) return false;
         uri = created;
-        return created.Scheme is "http" or "https";
+        return IsHttpUri(created);
+    }
+
+    /// <summary>Returns whether <paramref name="uri"/> uses the HTTP or HTTPS scheme.</summary>
+    public static bool IsHttpUri(Uri uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        return string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
     }
 }

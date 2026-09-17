@@ -28,7 +28,7 @@ public class Setup : ProtoTestAssembly
     [Before(Assembly)]
     public static Task AssemblyInitializeAsync(AssemblyHookContext context) =>
         InitializeAsync(builder =>
-            builder.AddRest(rest => rest.AddClient("Api", "https://api.example.test/")));
+            builder.AddApplication("Api", app => app.AddRest(rest => rest.AddClient("Api"))));
 
     [After(Assembly)]
     public static Task AssemblyCleanupAsync(AssemblyHookContext context) => CleanupAsync();
@@ -46,13 +46,14 @@ using ProtoTest.Core;
 using ProtoTest.Rest;
 using System.Net;
 
+[Application("Api")]
 public class OrderTests
 {
     [Test]
     public async Task Orders_endpoint_responds()
     {
-        var response = await Proto.Context.Rest("Api").GetAsync("/api/orders");
-        response.ShouldHaveStatus(HttpStatusCode.OK);
+        var response = await Proto.Context.Rest().GetAsync("/api/orders");
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
     }
 }
 ```

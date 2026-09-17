@@ -80,15 +80,16 @@ RestRequestBuilder Auth<TAuthenticator>(params object[] constructorArgs);
 RestRequestBuilder WithoutAuth();
 ```
 
-See [Authentication](./authentication.md) for how these interact with `[Auth<T>]`.
+See [Authentication](./authentication.md) for how these interact with `[RestAuth<T>]`.
 
 ## Response size limit
 
 Responses are buffered with a cap of 10 MiB by default. Exceeding it throws `ProtoResponseTooLargeException`. Change it in code or configuration:
 
 ```csharp
-builder.AddRest(rest => rest.ConfigureResponses(options =>
-    options.MaxResponseBodyBytes = 32 * 1024 * 1024));
+builder.AddApplication("Api", app => app.AddRest(rest => rest
+    .ConfigureResponses(options => options.MaxResponseBodyBytes = 32 * 1024 * 1024)
+    .AddClient("Api")));
 ```
 
 ```json

@@ -27,7 +27,7 @@ using Xunit;
 public class Setup : ProtoTestAssembly
 {
     protected override void Configure(IProtoHostBuilder builder) =>
-        builder.AddRest(rest => rest.AddClient("Api", "https://api.example.test/"));
+        builder.AddApplication("Api", app => app.AddRest(rest => rest.AddClient("Api")));
 }
 ```
 
@@ -42,13 +42,14 @@ using ProtoTest.Xunit3;
 using System.Net;
 using Xunit;
 
+[Application("Api")]
 public class OrderTests
 {
     [ProtoTestFact]
     public async Task Orders_endpoint_responds()
     {
-        var response = await Proto.Context.Rest("Api").GetAsync("/api/orders");
-        response.ShouldHaveStatus(HttpStatusCode.OK);
+        var response = await Proto.Context.Rest().GetAsync("/api/orders");
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
     }
 
     [ProtoTestTheory]
@@ -56,10 +57,10 @@ public class OrderTests
     [InlineData("paid")]
     public async Task Invoices_filter_by_state(string state)
     {
-        var response = await Proto.Context.Rest("Api")
+        var response = await Proto.Context.Rest()
             .GetAsync("/api/billing/invoices", new { state });
 
-        response.ShouldHaveStatus(HttpStatusCode.OK);
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
     }
 }
 ```

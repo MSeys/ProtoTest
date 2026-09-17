@@ -1,6 +1,7 @@
 namespace ProtoTest.Web;
 
 using ProtoTest.Core;
+using ProtoTest.Web.Internal;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -40,60 +41,29 @@ public static class ProtoHostBuilderExtensions
         });
     }
 
-    /// <summary>Registers one named, test-scoped web session supplied by an adapter.</summary>
+    /// <summary>
+    /// Registers the web backend for the host. Sessions are not declared here; a test creates them on
+    /// demand by name via <c>Proto.Context.Web(name)</c>, so the sessions are per-test rather than per-run.
+    /// </summary>
     public static IProtoHostBuilder AddWebBackend(
         this IProtoHostBuilder builder,
-        IWebBackendFactory factory,
-        string name = "Default")
+        IWebBackendFactory factory)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(factory);
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-
-        return builder.ConfigureServices(services =>
-        {
-            services.TryAddScoped<WebSessionRegistry>();
-            services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, WebLifecycleHook>());
-            services.AddSingleton<IProtoClientInitializer>(new WebClientInitializer(name, factory));
-        });
+        return builder.ConfigureServices(services => services.AddWebBackend(factory));
     }
 
-    private sealed class WebClientInitializer(string name, IWebBackendFactory factory)
-        : IProtoClientInitializer<WebSession>
+    /// <summary>Registers the web backend services. Shared by the host and application registration paths.</summary>
+    public static IServiceCollection AddWebBackend(
+        this IServiceCollection services,
+        IWebBackendFactory factory)
     {
-        public string Name { get; } = name;
-
-        public async Task<bool> TryInitializeAsync(
-            ProtoExecutionContext context,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var session = new WebSession(context, factory, Name);
-            context.RegisterClient(session, Name);
-            context.Service<WebSessionRegistry>().Add(session);
-            return true;
-        }
-    }
-
-    private sealed class WebLifecycleHook : IProtoTestHook
-    {
-        // Core client initialization is int.MinValue. Web finalization runs after normal
-        // user teardown hooks, but before attachment publication and client disposal.
-        public int Order => int.MinValue + 1;
-
-        public Task BeforeTestAsync(ProtoExecutionContext context) => Task.CompletedTask;
-
-        public async Task AfterTestAsync(ProtoExecutionContext context)
-        {
-            foreach (var session in context.Service<WebSessionRegistry>().Sessions.Reverse())
-                await session.CompleteAsync();
-        }
-    }
-
-    private sealed class WebSessionRegistry
-    {
-        private readonly List<WebSession> _sessions = [];
-        public IReadOnlyList<WebSession> Sessions => _sessions;
-        public void Add(WebSession session) => _sessions.Add(session);
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(factory);
+        services.TryAddScoped<WebSessionRegistry>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, WebLifecycleHook>());
+        services.TryAddSingleton<IWebBackendFactory>(factory);
+        return services;
     }
 }

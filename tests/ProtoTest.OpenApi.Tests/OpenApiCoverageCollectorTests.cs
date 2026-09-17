@@ -174,13 +174,13 @@ public class OpenApiCoverageCollectorTests
     }
 
     [Test]
-    public void WithCollector_ShouldResolveOpenApiSpecificationFromClientConfiguration()
+    public void AddCollector_ShouldResolveOpenApiSpecificationFromClientConfiguration()
     {
         // Arrange
         var configuration = new ConfigurationBuilder()
             .Add(new StaticConfigurationSource(new Dictionary<string, string?>
             {
-                ["ProtoTest:Clients:TestApi:OpenApi:Specification"] = OpenApiTestHelper.SampleJsonSpec
+                ["ProtoTest:Applications:TestApi:OpenApi:Specification"] = OpenApiTestHelper.SampleJsonSpec
             }))
             .Build();
 
@@ -189,7 +189,7 @@ public class OpenApiCoverageCollectorTests
         IProtoTargetBuilder targetBuilder = new TestTargetBuilder("TestApi", services);
 
         // Act
-        targetBuilder.WithCollector<OpenApiCoverageCollector>();
+        targetBuilder.AddCollector<OpenApiCoverageCollector>();
         using var provider = services.BuildServiceProvider();
         var collector = provider.GetRequiredService<IProtoCollector>();
 

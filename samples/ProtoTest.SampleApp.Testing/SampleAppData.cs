@@ -5,7 +5,7 @@ using ProtoTest.Data;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
 
-public sealed class SampleAppDataDefaults : IDataDefaultsModule
+public sealed class SampleAppDataDefaults : IProtoDataDefaultsModule
 {
     public void Configure(ProtoDataConfiguration data)
     {
@@ -23,15 +23,15 @@ public sealed class SampleUserProvisioner : IProtoDataProvisioner<CreateUserRequ
         ProtoDataProvisioningContext context,
         CancellationToken cancellationToken)
     {
-        var environment = context.Execution.Context<SampleEnvironmentContext>();
-        using var response = await context.Execution.Rest(SampleAppTargets.Api)
+        var environment = context.Execution.Resolve<SampleEnvironmentContext>();
+        using var response = await context.Execution.Rest()
             .WithoutAuth()
             .Body(value)
             .PostAsync(
                 "/test-support/environments/{tenant}/users",
                 new { environment.Tenant },
                 cancellationToken);
-        response.ShouldHaveStatus(HttpStatusCode.Created);
+        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
         var user = response.ReadAsJson<UserResponse>()
             ?? throw new InvalidOperationException("The sample app returned no provisioned user.");
         return new ProtoDataProvisioningResult<UserResponse>(user, user.Id);

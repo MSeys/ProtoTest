@@ -22,7 +22,7 @@ using Xunit;
 public class ProtoTestFixture : ProtoTestAssembly
 {
     protected override void Configure(IProtoHostBuilder builder) =>
-        builder.AddRest(rest => rest.AddClient("Api", "https://api.example.test/"));
+        builder.AddApplication("Api", app => app.AddRest(rest => rest.AddClient("Api")));
 }
 
 [CollectionDefinition(Name)]
@@ -44,13 +44,14 @@ using System.Net;
 using Xunit;
 
 [Collection(ProtoTestCollection.Name)]
+[Application("Api")]
 public class OrderTests
 {
     [ProtoTestFact]
     public async Task Orders_endpoint_responds()
     {
-        var response = await Proto.Context.Rest("Api").GetAsync("/api/orders");
-        response.ShouldHaveStatus(HttpStatusCode.OK);
+        var response = await Proto.Context.Rest().GetAsync("/api/orders");
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
     }
 
     [ProtoTestTheory]
@@ -58,10 +59,10 @@ public class OrderTests
     [InlineData("paid")]
     public async Task Invoices_filter_by_state(string state)
     {
-        var response = await Proto.Context.Rest("Api")
+        var response = await Proto.Context.Rest()
             .GetAsync("/api/billing/invoices", new { state });
 
-        response.ShouldHaveStatus(HttpStatusCode.OK);
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
     }
 }
 ```
@@ -92,4 +93,4 @@ ProtoTest attachment 'rest-01-response': /path/to/TestResults/.../rest-01-respon
 public async Task Orders_endpoint_responds() { … }
 ```
 
-This still works, but `[ProtoTest]` is a `BeforeAfterTestAttribute`, and xUnit v2 only reports a test's result *after* those attributes have finished. So with this style every test is recorded with outcome `Unknown`, and the lifecycle blocks on async work (`.GetAwaiter().GetResult()`) because the hook is synchronous. Prefer `[ProtoTestFact]`.
+This still works, but `[ProtoTest]` is a `BeforeAfterTestAttribute`, and xUnit v2 only reports a test's result *after* those attributes have finished. So with this style every test is recorded with outcome `Unknown`, and the lifecycle blocks on async work (`.GetAwaiter().GetResult()`) because the hook is synchronous. `ProtoTestAttribute` is marked `[Obsolete]`; prefer `[ProtoTestFact]` / `[ProtoTestTheory]`.

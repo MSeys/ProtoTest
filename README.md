@@ -24,15 +24,15 @@ ProtoTest provides:
 
 ```csharp
 [ProtoTest]
-[RestClient("Orders")]
-[Auth<BearerTokenAuthenticator>("orders-token")]
+[Application("Orders")]
+[RestAuth<BearerTokenAuthenticator>("orders-token")]
 public async Task GetOrder_ReturnsExpectedOrder()
 {
 	var response = await Proto.Context.Rest()
 		.GetAsync("/orders/{id}", new { id = 42 });
 
 	response
-		.ShouldHaveStatus(HttpStatusCode.OK)
+		.ShouldHaveHttpStatus(HttpStatusCode.OK)
 		.ShouldMatchShape(new { id = 42, status = "confirmed" });
 }
 ```

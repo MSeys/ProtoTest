@@ -16,7 +16,9 @@ public sealed record ProtoReportItem(
     string? Message = null,
     IReadOnlyList<string>? Tags = null,
     IReadOnlyList<ProtoReportItem>? Children = null,
-    IReadOnlyDictionary<string, object>? Metadata = null);
+    IReadOnlyDictionary<string, object>? Metadata = null,
+    string? DisplayName = null,
+    string? DisplayGroup = null);
 
 public enum ProtoReportItemKind
 {

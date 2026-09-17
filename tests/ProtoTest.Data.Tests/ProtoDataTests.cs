@@ -361,7 +361,7 @@ public sealed class ProtoDataTests
     private static MethodInfo TestMethod()
         => typeof(ProtoDataTests).GetMethod(nameof(TestMethod), BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    public sealed class TestDefaults : IDataDefaultsModule
+    public sealed class TestDefaults : IProtoDataDefaultsModule
     {
         public void Configure(ProtoDataConfiguration data)
         {

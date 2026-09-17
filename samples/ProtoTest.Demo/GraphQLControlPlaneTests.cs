@@ -9,10 +9,9 @@ using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Testing;
 
-[RestClient(SampleAppTargets.Api)]
-[GraphQLClient(SampleAppTargets.GraphQL)]
+[Application(SampleAppTargets.Api)]
 [SampleEnvironment]
-[Auth<SampleUserAuthenticator>]
+[RestAuth<SampleUserAuthenticator>]
 [GraphQLAuth<SampleUserAuthenticator>]
 public sealed class GraphQLControlPlaneTests
 {
@@ -120,7 +119,7 @@ public sealed class GraphQLControlPlaneTests
     [SampleUser]
     public async Task TypedSelectionCanStayOwnedByTheTest()
     {
-        var user = Proto.Context.Context<SampleUserContext>();
+        var user = Proto.Context.Resolve<SampleUserContext>();
         using var response = await Proto.Context.GraphQL()
             .Query("me")
             .Select<ViewerSelection>()
@@ -171,7 +170,7 @@ public sealed class GraphQLControlPlaneTests
         using var provisioned = await Proto.Context.Rest()
             .Body(new CreateWorkspaceRequest("analytics", "eu-central", "growth"))
             .PostAsync("/api/workspaces");
-        provisioned.ShouldHaveStatus(HttpStatusCode.Created);
+        provisioned.ShouldHaveHttpStatus(HttpStatusCode.Created);
 
         using var workspaces = await Proto.Context.GraphQL()
             .Query("workspaces")

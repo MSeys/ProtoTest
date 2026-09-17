@@ -1,4 +1,4 @@
-namespace ProtoTest.Core;
+namespace ProtoTest.Core.Internal;
 
 internal sealed class ProtoClientRegistry
 {
@@ -113,19 +113,5 @@ internal sealed class ProtoClientRegistry
         return new ClientKey(typeof(TClient), name);
     }
 
-    private readonly record struct ClientKey(Type ClientType, string Name);
-
     private readonly record struct Registration(object Client, bool DisposeWithContext);
-
-    private sealed class ClientKeyComparer : IEqualityComparer<ClientKey>
-    {
-        public static ClientKeyComparer Instance { get; } = new();
-
-        public bool Equals(ClientKey x, ClientKey y)
-            => x.ClientType == y.ClientType
-               && StringComparer.OrdinalIgnoreCase.Equals(x.Name, y.Name);
-
-        public int GetHashCode(ClientKey obj)
-            => HashCode.Combine(obj.ClientType, StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Name));
-    }
 }

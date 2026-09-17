@@ -11,7 +11,7 @@ Everything in ProtoTest sits on a handful of concepts from `ProtoTest.Core`. Lea
 flowchart TB
     Host["ProtoHost<br/><small>one per test process</small>"]
     Host -->|runs once| RunHooks["Run hooks"]
-    Host -->|per test| Context["ProtoExecutionContext<br/><small>Proto.Context</small>"]
+    Host -->|per test| Context["ProtoExecutionContext<br/><small>Proto.Resolve</small>"]
     Context --> Clients["Clients<br/><small>Rest · GraphQL · Web · Data · …</small>"]
     Context --> State["Typed state<br/><small>Context&lt;T&gt;</small>"]
     Context --> Attachments["Attachments"]
@@ -43,21 +43,21 @@ Two things build on top and have their own sections:
 ## A test, end to end
 
 ```csharp
-[RestClient("Api")]
+[Application("Api")]                         // attribute: selects the system under test
 [SampleEnvironment]                          // attribute: provisions a tenant, deletes it afterwards
-[Auth<SampleUserAuthenticator>]              // attribute metadata read by the REST hook
+[RestAuth<SampleUserAuthenticator>]              // attribute metadata read by the REST hook
 public sealed class BillingTests
 {
     [ProtoTest]                              // runner attribute: starts and completes the context
     [SampleUser(SampleRoles.BillingAdministrator)]
     public async Task Open_invoices_are_listed()
     {
-        var user = Proto.Context.Context<SampleUserContext>();       // typed state an attribute set
+        var user = Proto.Context.Resolve<SampleUserContext>();       // typed state an attribute set
 
         using var response = await Proto.Context.Rest()              // client, created for this test
             .GetAsync("/api/billing/invoices", new { state = "open" });
 
-        response.ShouldHaveStatus(HttpStatusCode.OK);                 // traced, observed, attached
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK);                 // traced, observed, attached
     }
 }
 ```
@@ -65,7 +65,7 @@ public sealed class BillingTests
 What happens around that method:
 
 1. The runner calls `StartTestAsync`. A context and DI scope are created.
-2. **Test hooks** run — including ProtoTest's own, which creates clients and applies `[Auth<T>]`.
+2. **Test hooks** run — including ProtoTest's own, which creates clients and applies `[RestAuth<T>]`.
 3. **Attributes** run in `Order`: `[SampleEnvironment]` (−200), then `[SampleUser]` (−100).
 4. Your test body runs. Every request, assertion and state access is traced.
 5. The runner calls `CompleteTestAsync`. Attributes and hooks tear down in reverse, attachments are published, clients and the scope are disposed.

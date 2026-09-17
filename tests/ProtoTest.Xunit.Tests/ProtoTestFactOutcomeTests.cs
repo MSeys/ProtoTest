@@ -11,7 +11,7 @@ public sealed class ProtoTestFactOutcomeTests
     [ProtoTestFact]
     public void ProtoTestFact_ShouldRunInsideAContextWithHooksApplied()
     {
-        Assert.Equal(["Hook:Before"], Proto.Context.Context<ExecutionLogState>().Log);
+        Assert.Equal(["Hook:Before"], Proto.Context.Resolve<ExecutionLogState>().Log);
         Assert.Equal("ProtoTest_Xunit_Success", Proto.Context.Service<ITestService>().GetValue());
     }
 

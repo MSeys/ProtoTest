@@ -25,8 +25,9 @@ public sealed class Setup : ProtoTestAssembly
             .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
-                    [$"ProtoTest:Clients:{SampleAppTargets.Api}:OpenApi:Specification"] = Path.Combine(
-                        AppContext.BaseDirectory, "control-plane.openapi.json")
+                    [$"ProtoTest:Applications:{SampleAppTargets.Api}:OpenApi:Specification"] = Path.Combine(
+                        AppContext.BaseDirectory, "control-plane.openapi.json"),
+                    [$"ProtoTest:Applications:{SampleAppTargets.Api}:Endpoints:GraphQL"] = "/graphql"
                 }))
             .ConfigureServices(services =>
             {
@@ -36,16 +37,19 @@ public sealed class Setup : ProtoTestAssembly
             .AddTestHook<SaasScenarioHook>()
             .AddData(data => data.AddDefaults<SampleAppDataDefaults>())
             .AddDataProvisioner<CreateUserRequest, UserResponse, SampleUserProvisioner>()
-            .AddRest(rest => rest
-                .AddClient(SampleAppTargets.Api)
-                .WithCollector<RestCoverageCollector>()
-                .WithCollector<OpenApiCoverageCollector>())
-            .AddAspNetCoreServer<Program>(SampleAppTargets.Api)
-            .AddGraphQL(graphQL => graphQL
-                .CaptureAttachments()
-                .AddClientFrom(SampleAppTargets.GraphQL, SampleAppTargets.Api)
-                .WithSubscriptionTransport(GraphQLSubscriptionTransport.WebSocket)
-                .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "control-plane.graphql")))
+            .AddApplication(SampleAppTargets.Api, app => app
+                .AddAspNetCoreServer<Program>()
+                .AddRest(rest =>
+                {
+                    rest.AddClient("Api")
+                        .AddCollector<RestCoverageCollector>()
+                        .AddCollector<OpenApiCoverageCollector>();
+                })
+                .AddGraphQL(graphQL => graphQL
+                    .CaptureAttachments()
+                    .AddClient("GraphQL")
+                    .WithSubscriptionTransport(GraphQLSubscriptionTransport.WebSocket)
+                    .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "control-plane.graphql"))))
             .AddSink<JsonReportSink>(sink => sink.OutputPath = Path.Combine(
                 "TestResults", "ProtoTest.Demo", "report.json"))
             .AddSink<HtmlReportSink>(sink =>

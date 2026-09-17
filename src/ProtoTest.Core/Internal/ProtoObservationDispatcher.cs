@@ -1,4 +1,4 @@
-namespace ProtoTest.Core;
+namespace ProtoTest.Core.Internal;
 
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;

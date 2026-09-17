@@ -1,5 +1,7 @@
 namespace ProtoTest.Core;
 
+using ProtoTest.Core.Internal;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;

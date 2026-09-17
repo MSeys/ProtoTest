@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.MSTest.Tests;
+namespace ProtoTest.MSTest.Tests;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using ProtoTest.Core;
@@ -12,7 +12,7 @@ public class ProtoAttributeLifecycleTests
     public void ProtoTestMethod_ShouldExecuteHooksAndAttributesInOrder()
     {
         // Fetch test-scoped log state
-        var logState = Proto.Context.Context<ExecutionLogState>();
+        var logState = Proto.Context.Resolve<ExecutionLogState>();
 
         // Act
         logState.Log.Add("TestExecution");

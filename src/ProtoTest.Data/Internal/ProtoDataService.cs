@@ -1,4 +1,4 @@
-namespace ProtoTest.Data;
+namespace ProtoTest.Data.Internal;
 
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
@@ -62,11 +62,11 @@ internal sealed class ProtoDataService : IProtoData, IAsyncDisposable
             }
 
             operation.SetAttribute("data.identity", result.Identity);
-            operation.SetAttribute("data.owned", (result.Ownership is not null).ToString().ToLowerInvariant());
-            if (result.Ownership is not null)
+            operation.SetAttribute("data.owned", (result.Cleanup is not null).ToString().ToLowerInvariant());
+            if (result.Cleanup is not null)
             {
                 _ownedResources.Add(new OwnedResource(
-                    typeof(TResult), result.Identity, provisioner.GetType(), result.Ownership, execution.Trace));
+                    typeof(TResult), result.Identity, provisioner.GetType(), result.Cleanup, execution.Trace));
             }
 
             operation.Succeed();
@@ -101,7 +101,7 @@ internal sealed class ProtoDataService : IProtoData, IAsyncDisposable
                 .Begin();
             try
             {
-                await resource.Ownership.DisposeAsync();
+                await resource.Cleanup.DisposeAsync();
                 operation.Succeed();
             }
             catch (Exception exception)
@@ -121,6 +121,6 @@ internal sealed class ProtoDataService : IProtoData, IAsyncDisposable
         Type DataType,
         string? Identity,
         Type ProvisionerType,
-        IAsyncDisposable Ownership,
+        IAsyncDisposable Cleanup,
         IProtoTraceWriter Trace);
 }

@@ -48,8 +48,8 @@ await Proto.Context.Rest()
 ### Per test or class, with an attribute
 
 ```csharp
-[RestClient("Api")]
-[Auth<BearerTokenAuthenticator>("orders-token")]
+[Application("Api")]
+[RestAuth<BearerTokenAuthenticator>("orders-token")]
 public class OrderTests
 {
     [ProtoTest]
@@ -57,12 +57,12 @@ public class OrderTests
     {
         // Authorization is already applied.
         var response = await Proto.Context.Rest().GetAsync("/api/orders");
-        response.ShouldHaveStatus(HttpStatusCode.OK);
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
     }
 }
 ```
 
-`[RestClient("Api")]` names the client the attribute applies to (and the one `Rest()` uses without an argument). Without it, the target is `"Default"`.
+`[Application("Api")]` selects the application the test targets; `Rest()` uses that application's default REST client. Bind a different client with `[Application("Api", "Rest:Billing")]`.
 
 ### Opting out
 
@@ -82,7 +82,7 @@ using var response = await Proto.Context.Rest()
     .GetAsync("/api/control-plane");
 
 response
-    .ShouldHaveStatus(HttpStatusCode.Forbidden)
+    .ShouldHaveHttpStatus(HttpStatusCode.Forbidden)
     .ShouldMatchShape(new { error = "tenant-access-denied" });
 ```
 
@@ -90,9 +90,9 @@ response
 
 When several of these apply, this is what wins:
 
-1. **`[RestClient]`** on the method beats the one on the class.
-2. **`[Auth<T>]` on the method replaces the class-level ones entirely** — they don't merge.
-3. Several `[Auth<T>]` attributes at the same level are ordered by their `Order` property and **composed**: each runs in turn on the same request.
+1. **`[Application]`** on the method beats the one on the class (and its client bindings replace the class's).
+2. **`[RestAuth<T>]` on the method replaces the class-level ones entirely** — they don't merge.
+3. Several `[RestAuth<T>]` attributes at the same level are ordered by their `Order` property and **composed**: each runs in turn on the same request.
 4. **A per-request `.Auth(...)` overrides** whatever the attributes resolved, and **`.WithoutAuth()` clears it**.
 
 An authenticator is created once per request builder and reused if that builder sends more than once. A skipped authentication shows up in the trace as `auth.skip`, an applied one as `auth.apply`.
@@ -111,8 +111,8 @@ public sealed class SampleUserAuthenticator : IProtoHttpAuthenticator
         ProtoHttpAuthenticationContext context,
         CancellationToken cancellationToken = default)
     {
-        var environment = context.Test.Context<SampleEnvironmentContext>();
-        var user = context.Test.Context<SampleUserContext>();
+        var environment = context.Test.Resolve<SampleEnvironmentContext>();
+        var user = context.Test.Resolve<SampleUserContext>();
 
         context.Request.Headers.Authorization =
             new AuthenticationHeaderValue("Bearer", user.AccessToken);
@@ -124,11 +124,11 @@ public sealed class SampleUserAuthenticator : IProtoHttpAuthenticator
 
 ### Constructor arguments and services
 
-`[Auth<T>(args)]` and `.Auth<T>(args)` construct `T` with `ActivatorUtilities`, so the constructor can mix **positional arguments** from the attribute with **services** from the test's DI scope — including `ProtoExecutionContext` itself:
+`[RestAuth<T>(args)]` and `.Auth<T>(args)` construct `T` with `ActivatorUtilities`, so the constructor can mix **positional arguments** from the attribute with **services** from the test's DI scope — including `ProtoExecutionContext` itself:
 
 ```csharp
 public sealed class TenantTokenAuthenticator(
-    string tenant,                 // from [Auth<TenantTokenAuthenticator>("tenant-a")]
+    string tenant,                 // from [RestAuth<TenantTokenAuthenticator>("tenant-a")]
     ITokenService tokens)          // resolved from DI
     : IProtoHttpAuthenticator
 {

@@ -9,42 +9,20 @@ using ProtoTest.Core;
 /// </summary>
 public abstract class ProtoTestAssembly : IAsyncLifetime
 {
-    private static ProtoHost? _host;
+    private static readonly ProtoTestHostLifetime Lifetime = new(
+        "Register your fixture with [assembly: AssemblyFixture(...)].");
 
     /// <summary>
     /// Gets the global <see cref="ProtoHost"/> instance.
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown when accessed before host initialization.</exception>
-    public static ProtoHost Host => _host
-        ?? throw new InvalidOperationException("ProtoHost is not initialized. Register your fixture with [assembly: AssemblyFixture(...)].");
+    public static ProtoHost Host => Lifetime.Host;
 
     /// <inheritdoc />
-    public async ValueTask InitializeAsync()
-    {
-        var builder = new ProtoHostBuilder();
-        Configure(builder);
-
-        _host = builder.Build();
-
-        await _host.StartAsync();
-    }
+    public ValueTask InitializeAsync() => new(Lifetime.StartAsync(Configure));
 
     /// <inheritdoc />
-    public async ValueTask DisposeAsync()
-    {
-        if (_host != null)
-        {
-            try
-            {
-                await _host.StopAsync();
-            }
-            finally
-            {
-                await _host.DisposeAsync();
-                _host = null;
-            }
-        }
-    }
+    public ValueTask DisposeAsync() => new(Lifetime.StopAsync());
 
     /// <summary>
     /// Configures the <see cref="IProtoHostBuilder"/> with custom services, collectors, and hooks.

@@ -15,7 +15,7 @@ public sealed class PlaywrightConformanceTests
             Assert.Ignore("The browser-backed conformance test requires a local Microsoft Edge installation.");
 
         var host = new ProtoHostBuilder()
-            .AddPlaywrightWeb(options =>
+            .AddWeb(options =>
             {
                 options.Channel = "msedge";
                 options.Headless = true;
@@ -63,7 +63,7 @@ public sealed class PlaywrightConformanceTests
                     ["ProtoTest:Web:Playwright:Channel"] = "msedge",
                     ["ProtoTest:Web:Sessions:Default:Context:Locale"] = "nl-BE"
                 }))
-            .AddPlaywrightWeb(options => options.TraceRetention = PlaywrightTraceRetention.Off)
+            .AddWeb(options => options.TraceRetention = PlaywrightTraceRetention.Off)
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();

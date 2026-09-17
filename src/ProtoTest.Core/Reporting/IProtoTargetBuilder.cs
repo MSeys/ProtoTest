@@ -16,7 +16,7 @@ public interface IProtoTargetBuilder
     /// target name, any <paramref name="additionalArguments"/>, and optionally services resolvable
     /// from DI.
     /// </summary>
-    public IProtoTargetBuilder WithCollector<TCollector>(params object[] additionalArguments)
+    IProtoTargetBuilder AddCollector<TCollector>(params object[] additionalArguments)
         where TCollector : class, IProtoCollector
     {
         Services.AddSingleton<IProtoCollector>(sp =>

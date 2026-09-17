@@ -14,7 +14,7 @@ internal sealed class SampleAppGraphQLWebSocketFactory : IGraphQLWebSocketFactor
         IReadOnlyDictionary<string, string> headers,
         CancellationToken cancellationToken = default)
     {
-        var client = Proto.Context.Server<Program>(SampleAppTargets.Api).Server.CreateWebSocketClient();
+        var client = Proto.Context.ServerFactory<Program>(SampleAppTargets.Api).Server.CreateWebSocketClient();
         client.SubProtocols.Add("graphql-transport-ws");
         client.ConfigureRequest = request =>
         {

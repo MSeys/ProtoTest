@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.MSTest.Tests;
+namespace ProtoTest.MSTest.Tests;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using ProtoTest.Core;
@@ -26,7 +26,7 @@ public class ProtoTestMethodTests
 
         // Act
         await Task.Delay(10);
-        var retrieved = Proto.Context.Context<CustomState>();
+        var retrieved = Proto.Context.Resolve<CustomState>();
 
         // Assert
         Assert.IsNotNull(retrieved);

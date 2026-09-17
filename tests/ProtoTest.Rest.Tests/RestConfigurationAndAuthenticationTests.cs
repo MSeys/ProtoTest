@@ -20,7 +20,7 @@ public class RestConfigurationAndAuthenticationTests
         builder.ConfigureAppConfiguration(configuration => configuration.Add(
             new StaticConfigurationSource(new Dictionary<string, string?>
             {
-                ["ProtoTest:Clients:Orders:BaseUrl"] = "https://configured.example/"
+                ["ProtoTest:Applications:Orders:BaseUrl"] = "https://configured.example/"
             })));
         builder.AddRest(rest => rest.AddClient("Orders"));
         await using var host = builder.Build();
@@ -49,7 +49,7 @@ public class RestConfigurationAndAuthenticationTests
         builder.ConfigureAppConfiguration(configuration => configuration.Add(
             new StaticConfigurationSource(new Dictionary<string, string?>
             {
-                ["ProtoTest:Clients:Orders:BaseUrl"] = "https://configured.example/"
+                ["ProtoTest:Applications:Orders:BaseUrl"] = "https://configured.example/"
             })));
         builder.AddRest(rest => rest.AddClient("Orders", "https://explicit.example/"));
         await using var host = builder.Build();

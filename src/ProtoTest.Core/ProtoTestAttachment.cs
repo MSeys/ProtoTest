@@ -1,5 +1,7 @@
 namespace ProtoTest.Core;
 
+using ProtoTest.Core.Internal;
+
 using System.Text;
 
 /// <summary>
@@ -99,7 +101,7 @@ public sealed class ProtoTestAttachment
         var directory = Path.Combine(Path.GetTempPath(), "ProtoTest", "attachments");
         Directory.CreateDirectory(directory);
 
-        var fileName = SanitizeFileName(Name);
+        var fileName = ProtoPathSanitizer.FileName(Name, "attachment");
         if (!Path.HasExtension(fileName))
         {
             fileName += ExtensionFor(MediaType);
@@ -108,13 +110,6 @@ public sealed class ProtoTestAttachment
         var path = Path.Combine(directory, $"{Guid.NewGuid():N}-{fileName}");
         await File.WriteAllBytesAsync(path, _content!, cancellationToken);
         return path;
-    }
-
-    private static string SanitizeFileName(string name)
-    {
-        var invalidCharacters = Path.GetInvalidFileNameChars();
-        var sanitized = new string([.. name.Select(character => invalidCharacters.Contains(character) ? '_' : character)]);
-        return string.IsNullOrWhiteSpace(sanitized) ? "attachment" : sanitized;
     }
 
     private static string ExtensionFor(string mediaType) => mediaType.ToLowerInvariant() switch

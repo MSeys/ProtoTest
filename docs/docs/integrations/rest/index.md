@@ -13,15 +13,19 @@ dotnet add package ProtoTest.Rest
 
 It brings `ProtoTest.Http` (the shared authentication building blocks) and `ProtoTest.Json` (shape matching) with it — you don't add those yourself.
 
-## Registering a client
+## Registering an application
+
+An application describes a system under test and the protocols it exposes. Each protocol has named clients:
 
 ```csharp
-builder.AddRest(rest =>
+builder.AddApplication("Api", app => app.AddRest(rest =>
 {
-    rest.AddClient("Api", "https://api.example.test/");
-    rest.AddClient("Billing", "https://billing.example.test/");
-});
+    rest.AddClient("Api");
+    rest.AddClient("Billing");
+}));
 ```
+
+A test selects the application with `[Application("Api")]`; the protocol accessors then use its clients (the first registered is the default).
 
 `AddClient` has three overloads:
 
@@ -53,18 +57,21 @@ You can leave `baseUrl` out and set it per environment instead:
 ```json
 {
   "ProtoTest": {
-    "Clients": {
-      "Api": { "BaseUrl": "https://staging.example.test/" }
+    "Applications": {
+      "Api": {
+        "BaseUrl": "https://staging.example.test/",
+        "Endpoints": { "Billing": "/api/billing" }
+      }
     }
   }
 }
 ```
 
-An explicitly passed `baseUrl` wins over the configured one.
+A client's base address is its application's `BaseUrl`, joined with `Endpoints:{client}` when that endpoint is configured. An explicit `baseUrl` passed to `AddClient` wins over both.
 
 ### No base URL at all
 
-If the target is an in-process ASP.NET Core application, register it with [`AddAspNetCoreServer<TProgram>`](../aspnetcore.md) under the same name instead of giving a base URL.
+If the target is an in-process ASP.NET Core application, back the application with it (`AddApplication("Api", app => app.AddAspNetCoreServer<Program>()…)`) instead of giving a base URL. See [ASP.NET Core](../aspnetcore.md).
 
 ## Making a request
 
@@ -74,7 +81,7 @@ using ProtoTest.Rest;
 var response = await Proto.Context.Rest("Api").GetAsync("/api/orders");
 ```
 
-`Proto.Context.Rest(clientName)` resolves the client by name. Omit the name and it uses, in order: the `[RestClient("…")]` attribute on the test or its class, then `"Default"`.
+`Proto.Context.Rest(clientName)` resolves the client by name. Omit the name and it uses, in order: the client bound by `[Application(…)]` for REST, then the selected application's first REST client, then `"Default"`.
 
 ## What you get automatically
 

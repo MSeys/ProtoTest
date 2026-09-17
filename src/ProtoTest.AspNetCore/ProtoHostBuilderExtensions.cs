@@ -17,7 +17,7 @@ public static class ProtoHostBuilderExtensions
     /// <param name="builder">The <see cref="IProtoHostBuilder"/> instance.</param>
     /// <param name="name">The unique identifier for this server instance. Defaults to "Default".</param>
     /// <param name="configureWebHost">Optional callback for replacing services or changing the in-process web host.</param>
-    /// <param name="configureClient">Optional callback for configuring the generated HTTP client.</param>
+    /// <param name="configureClientOptions">Optional callback for configuring the generated HTTP client options.</param>
     /// <param name="lifetime">
     /// Whether one application instance serves the whole run (the default) or each test starts its own.
     /// </param>
@@ -26,7 +26,7 @@ public static class ProtoHostBuilderExtensions
         this IProtoHostBuilder builder,
         string name = "Default",
         Action<IWebHostBuilder>? configureWebHost = null,
-        Action<WebApplicationFactoryClientOptions>? configureClient = null,
+        Action<WebApplicationFactoryClientOptions>? configureClientOptions = null,
         AspNetCoreServerLifetime lifetime = AspNetCoreServerLifetime.PerRun) where TProgram : class
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -36,6 +36,26 @@ public static class ProtoHostBuilderExtensions
         // Registered through a factory so the host's service provider disposes the shared server with the run.
         return builder.ConfigureServices(services =>
             services.AddSingleton<IProtoClientInitializer>(_ =>
-                new AspNetCoreClientInitializer<TProgram>(name, configureWebHost, configureClient, lifetime)));
+                new AspNetCoreClientInitializer<TProgram>(name, configureWebHost, configureClientOptions, lifetime)));
+    }
+
+    /// <summary>
+    /// Backs an application with an in-process ASP.NET Core server, registered under the application
+    /// name so the application's HTTP clients can reuse its transport (for example
+    /// <c>rest.AddClientFrom("Api", app.Name)</c>).
+    /// </summary>
+    public static IProtoApplicationBuilder AddAspNetCoreServer<TProgram>(
+        this IProtoApplicationBuilder application,
+        Action<IWebHostBuilder>? configureWebHost = null,
+        Action<WebApplicationFactoryClientOptions>? configureClientOptions = null,
+        AspNetCoreServerLifetime lifetime = AspNetCoreServerLifetime.PerRun) where TProgram : class
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        var name = application.ApplicationName;
+        application.Services.AddSingleton<IProtoClientInitializer>(_ =>
+            new AspNetCoreClientInitializer<TProgram>(name, configureWebHost, configureClientOptions, lifetime));
+        // The application's HTTP clients with no configured base reuse this transport.
+        application.Services.AddSingleton(new ProtoApplicationTransport(name, name));
+        return application;
     }
 }

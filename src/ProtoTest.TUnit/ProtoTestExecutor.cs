@@ -17,14 +17,16 @@ public class ProtoTestExecutor : ITestExecutor
     /// <returns>A <see cref="ValueTask"/> representing the execution flow.</returns>
     public async ValueTask ExecuteTest(TestContext context, Func<ValueTask> action)
     {
-        var methodInfo = context.Metadata.TestDetails.MethodMetadata.GetReflectionInfo();
+        var methodInfo = context.Metadata.TestDetails.MethodMetadata.GetReflectionInfo()
+            ?? throw new InvalidOperationException("TUnit did not expose a reflection MethodInfo for the test method.");
         var attributes = ProtoAttributeResolver.Resolve(methodInfo);
         var lifecycleStarted = false;
         var result = ProtoTestResult.Unknown;
+        Exception? failure = null;
         try
         {
             await ProtoTestAssembly.Host.StartTestAsync(
-                methodInfo.Name, methodInfo, attributes, new TUnitAttachmentPublisher(context));
+                ProtoTestName.FromMethod(methodInfo), methodInfo, attributes, new TUnitAttachmentPublisher(context));
             lifecycleStarted = true;
             await action();
             result = ProtoTestResult.Passed;
@@ -32,19 +34,29 @@ public class ProtoTestExecutor : ITestExecutor
         catch (OperationCanceledException exception)
         {
             result = ProtoTestResult.Cancelled(exception);
-            throw;
+            failure = exception;
         }
         catch (Exception exception)
         {
             result = ProtoTestResult.Failed(exception);
-            throw;
+            failure = exception;
         }
-        finally
+
+        if (lifecycleStarted)
         {
-            if (lifecycleStarted)
+            try
             {
                 await ProtoTestAssembly.Host.CompleteTestAsync(result);
             }
+            catch when (failure is not null)
+            {
+                // Teardown must never replace the original test failure.
+            }
+        }
+
+        if (failure is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
         }
     }
 

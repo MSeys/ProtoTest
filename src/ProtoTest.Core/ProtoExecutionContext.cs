@@ -2,6 +2,7 @@ namespace ProtoTest.Core;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ProtoTest.Core.Internal;
 using System.Reflection;
 
 /// <summary>
@@ -121,7 +122,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     }
 
     /// <summary>Retrieves contextual state when it is present.</summary>
-    public T? TryContext<T>() where T : class, IProtoContext
+    public T? TryResolve<T>() where T : class, IProtoContext
     {
         var context = _state.TryGet<T>();
         Trace.WriteEvent(
@@ -138,7 +139,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     }
 
     /// <summary>Retrieves required contextual state.</summary>
-    public T Context<T>() where T : class, IProtoContext
+    public T Resolve<T>() where T : class, IProtoContext
     {
         try
         {

@@ -8,9 +8,9 @@ public abstract class ProtoCoverageCollector(string targetName) : IProtoCollecto
     public string TargetName { get; } = targetName ?? throw new ArgumentNullException(nameof(targetName));
     public abstract string Category { get; }
 
-    protected readonly ProtoLock Lock = new();
+    protected readonly ProtoLock _lock = new();
 
-    protected readonly Dictionary<string, ProtoReportItem> Items = new(StringComparer.OrdinalIgnoreCase);
+    protected readonly Dictionary<string, ProtoReportItem> _items = new(StringComparer.OrdinalIgnoreCase);
 
     public virtual bool CanCollect(ProtoObservation observation)
         => string.Equals(TargetName, observation.TargetName, StringComparison.OrdinalIgnoreCase);
@@ -19,9 +19,9 @@ public abstract class ProtoCoverageCollector(string targetName) : IProtoCollecto
     {
         ArgumentNullException.ThrowIfNull(observation);
 
-        lock (Lock)
+        lock (_lock)
         {
-            if (!Items.TryGetValue(observation.Identifier, out var item))
+            if (!_items.TryGetValue(observation.Identifier, out var item))
             {
                 item = new ProtoReportItem(
                     TargetName,
@@ -32,7 +32,7 @@ public abstract class ProtoCoverageCollector(string targetName) : IProtoCollecto
                     IsCovered: false);
             }
 
-            Items[observation.Identifier] = item with
+            _items[observation.Identifier] = item with
             {
                 Status = ProtoReportStatus.Success,
                 Count = item.Count + 1,
@@ -44,9 +44,9 @@ public abstract class ProtoCoverageCollector(string targetName) : IProtoCollecto
 
     public virtual IEnumerable<ProtoReportItem> GetReportItems()
     {
-        lock (Lock)
+        lock (_lock)
         {
-            return [.. Items.Values];
+            return [.. _items.Values];
         }
     }
 

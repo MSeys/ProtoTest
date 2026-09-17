@@ -65,6 +65,65 @@ public sealed class WebModelTests
     }
 
     [Test]
+    public async Task Page_ShouldReturnTheSameInstancePerSession()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web test", TestMethod());
+        var session = context.Web();
+
+        var page = session.Page<InvoicesPage>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Page<InvoicesPage>(), Is.SameAs(page));
+            Assert.That(page, Is.Not.SameAs(context.Web("Other").Page<InvoicesPage>()));
+        });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
+    public async Task WaitUntilAsync_ShouldPollUntilTheConditionHolds()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web test", TestMethod());
+        var session = context.Web();
+
+        var attempts = 0;
+        await session.WaitUntilAsync(
+            async _ =>
+            {
+                await Task.Yield();
+                return Interlocked.Increment(ref attempts) >= 2;
+            },
+            TimeSpan.FromSeconds(5));
+
+        Assert.That(attempts, Is.GreaterThanOrEqualTo(2));
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
+    public async Task WaitUntilAsync_ShouldThrowWhenTheTimeoutElapses()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web test", TestMethod());
+        var session = context.Web();
+
+        Assert.ThrowsAsync<WebAssertionException>(async () =>
+            await session.WaitUntilAsync(_ => ValueTask.FromResult(false), TimeSpan.FromMilliseconds(100)));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(new InvalidOperationException("expected timeout")));
+    }
+
+    [Test]
     public async Task CollectionsAndTables_ShouldSupportLazyZeroAndOneBasedAddressing()
     {
         var factory = new FakeBackendFactory();
@@ -271,7 +330,7 @@ public sealed class WebModelTests
         var driver = new StubWebDriver();
         var publisher = new RecordingAttachmentPublisher();
         var host = new ProtoHostBuilder()
-            .AddSeleniumWeb(
+            .AddWeb(
                 () => driver,
                 options => options.DiagnosticTraceRetention = SeleniumDiagnosticTraceRetention.Always)
             .Build();
@@ -321,6 +380,139 @@ public sealed class WebModelTests
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
     }
+
+    [Test]
+    public async Task WebSession_ShouldCreateAndOpenTheDeclaredSessionDuringSetup()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+
+        await host.StartTestAsync(
+            "web session",
+            TestMethod(),
+            [
+                new WebSessionAttribute("Anon"),
+                new WebSessionAttribute("Admin") { Open = "https://example.test/dashboard" }
+            ]);
+
+        var admin = Proto.Context.Web("Admin");
+        Assert.Multiple(() =>
+        {
+            Assert.That(factory.Backend.Operations.Select(item => item.Kind), Does.Contain("navigate"));
+            Assert.That(admin, Is.SameAs(Proto.Context.Web("Admin")));
+            Assert.That(Proto.Context.Web("Anon"), Is.Not.SameAs(admin));
+        });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
+    public async Task WebSession_ShouldResolveRelativeOpenAgainstItsApplication()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory, builder => builder.ConfigureAppConfiguration(configuration =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Applications:Admin:BaseUrl"] = "https://env.test"
+            })));
+        await using var ownedHost = host;
+        await host.StartAsync();
+
+        await host.StartTestAsync(
+            "web session",
+            TestMethod(),
+            [new WebSessionAttribute("Admin") { Open = "/back-office" }]);
+
+        Assert.That(factory.Backend.Operations.Single().Value, Is.EqualTo("https://env.test/back-office"));
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
+    public async Task WebSession_ShouldUseTheApplicationNamedOnTheAttribute()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory, builder => builder.ConfigureAppConfiguration(configuration =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Applications:ControlPlane:BaseUrl"] = "https://control.test"
+            })));
+        await using var ownedHost = host;
+        await host.StartAsync();
+
+        await host.StartTestAsync(
+            "web session",
+            TestMethod(),
+            [new WebSessionAttribute("Admin") { Application = "ControlPlane", Open = "/back-office" }]);
+
+        Assert.That(factory.Backend.Operations.Single().Value, Is.EqualTo("https://control.test/back-office"));
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
+    public async Task WebSession_ShouldUseTheApplicationFromConfiguration()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory, builder => builder.ConfigureAppConfiguration(configuration =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Web:Sessions:Admin:Application"] = "ControlPlane",
+                ["ProtoTest:Applications:ControlPlane:BaseUrl"] = "https://control.test"
+            })));
+        await using var ownedHost = host;
+        await host.StartAsync();
+
+        await host.StartTestAsync(
+            "web session",
+            TestMethod(),
+            [new WebSessionAttribute("Admin") { Open = "/back-office" }]);
+
+        Assert.That(factory.Backend.Operations.Single().Value, Is.EqualTo("https://control.test/back-office"));
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
+    public async Task WebSession_ShouldPreferAConfiguredOpenUrlOverTheAttribute()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory, builder => builder.ConfigureAppConfiguration(configuration =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Web:Sessions:Admin:Open"] = "https://env.test/from-config"
+            })));
+        await using var ownedHost = host;
+        await host.StartAsync();
+
+        await host.StartTestAsync(
+            "web session",
+            TestMethod(),
+            [new WebSessionAttribute("Admin") { Open = "https://code.test/from-code" }]);
+
+        Assert.That(factory.Backend.Operations.Single().Value, Is.EqualTo("https://env.test/from-config"));
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
+    public async Task WebSession_ShouldRequireAnOriginForRelativeOpen()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await host.StartTestAsync(
+                "web session",
+                TestMethod(),
+                [new WebSessionAttribute("Admin") { Open = "/back-office" }]));
+
+        Assert.That(exception!.Message, Does.Contain("BaseUrl"));
+    }
+
+    // Compile-time guard: [WebSession] must resolve to WebSessionAttribute even though WebSession is a type.
+    [WebSession("Admin", Open = "/dashboard")]
+    private sealed class WebSessionAttributeSyntax;
 
     [Test]
     public async Task Flow_ShouldRunStepsInOrderInsideOneTracedOperation()
@@ -578,8 +770,7 @@ public sealed class WebModelTests
                     ["ProtoTest:Web:Selenium:DiagnosticTraceRetention"] = "Always",
                     ["ProtoTest:Web:Sessions:Quiet:DiagnosticTraceRetention"] = "Off"
                 }))
-            .AddSeleniumWeb(() => new StubWebDriver())
-            .AddSeleniumWeb(() => new StubWebDriver(), name: "Quiet")
+            .AddWeb(() => new StubWebDriver())
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
@@ -617,7 +808,7 @@ public sealed class WebModelTests
             ["ProtoTest:Web:Sessions:Admin:TraceRetention"] = "Always"
         }).Build();
         var binder = new WebBackendOptionsBinder<ProtoTest.Web.Playwright.PlaywrightWebOptions>(
-            options, "Playwright", "Admin");
+            options, "Admin");
 
         var resolved = binder.Resolve(configuration);
 
@@ -643,14 +834,14 @@ public sealed class WebModelTests
             ["ProtoTest:Web:Selenium:ActionTimeout"] = "00:00:00"
         }).Build();
         var invalid = new WebBackendOptionsBinder<SeleniumWebOptions>(
-            new SeleniumWebOptions(), "Selenium", "Default", SeleniumWebOptions.Validate);
+            new SeleniumWebOptions(), "Default", SeleniumWebOptions.Validate);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => invalid.Resolve(configuration));
         Assert.Throws<ArgumentOutOfRangeException>(() => new WebBackendOptionsBinder<SeleniumWebOptions>(
-            new SeleniumWebOptions { PollInterval = TimeSpan.Zero }, "Selenium", "Default", SeleniumWebOptions.Validate));
+            new SeleniumWebOptions { PollInterval = TimeSpan.Zero }, "Default", SeleniumWebOptions.Validate));
 
         var options = new SeleniumWebOptions();
-        var binder = new WebBackendOptionsBinder<SeleniumWebOptions>(options, "Selenium", "Default");
+        var binder = new WebBackendOptionsBinder<SeleniumWebOptions>(options, "Default");
         var first = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ProtoTest:Web:Selenium:ActionTimeout"] = "00:00:07"
@@ -734,14 +925,17 @@ public sealed class WebModelTests
         public string Name => "Fake";
         public FakeBackend Backend { get; } = new();
         public Exception? Failure { get => Backend.Failure; init => Backend.Failure = value; }
-        public ValueTask<IWebBackend> CreateAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
+        public ValueTask<IWebBackend> CreateAsync(
+            ProtoExecutionContext context,
+            string sessionName,
+            CancellationToken cancellationToken = default)
         {
             Backend.Context = context;
             return ValueTask.FromResult<IWebBackend>(Backend);
         }
     }
 
-    private sealed class FakeBackend : IWebBackend
+    private sealed class FakeBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics
     {
         public string Name => "Fake";
         public List<(string Kind, WebElementReference? Element, string? Value)> Operations { get; } = [];

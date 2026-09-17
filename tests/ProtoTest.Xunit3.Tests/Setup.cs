@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 using ProtoTest.Xunit3.Tests;
@@ -49,7 +49,7 @@ public class TrackingHook : IProtoTestHook
 
     public static List<string> GetOrCreateLog(ProtoExecutionContext context)
     {
-        var state = context.TryContext<ExecutionLogState>();
+        var state = context.TryResolve<ExecutionLogState>();
         if (state == null)
         {
             state = new ExecutionLogState();

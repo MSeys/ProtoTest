@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Xunit3.Tests;
+namespace ProtoTest.Xunit3.Tests;
 
 using ProtoTest.Core;
 using Xunit;
@@ -11,7 +11,7 @@ public class ProtoAttributeLifecycleTests
     public void ProtoTestFact_ShouldExecuteHooksAndAttributesInOrder()
     {
         // Act
-        Proto.Context.Context<ExecutionLogState>().Log.Add("TestExecution");
+        Proto.Context.Resolve<ExecutionLogState>().Log.Add("TestExecution");
 
         // Assert
         var expectedBeforeSequence = new[]
@@ -23,7 +23,7 @@ public class ProtoAttributeLifecycleTests
         };
 
 
-        Assert.Equal(expectedBeforeSequence, Proto.Context.Context<ExecutionLogState>().Log);
+        Assert.Equal(expectedBeforeSequence, Proto.Context.Resolve<ExecutionLogState>().Log);
     }
 }
 
@@ -32,13 +32,13 @@ public class TrackingAttribute(string name) : ProtoAttribute
 {
     public override Task BeforeTestAsync(ProtoExecutionContext context)
     {
-        Proto.Context.Context<ExecutionLogState>().Log.Add($"{name}:Before");
+        Proto.Context.Resolve<ExecutionLogState>().Log.Add($"{name}:Before");
         return Task.CompletedTask;
     }
 
     public override Task AfterTestAsync(ProtoExecutionContext context)
     {
-        Proto.Context.Context<ExecutionLogState>().Log.Add($"{name}:After");
+        Proto.Context.Resolve<ExecutionLogState>().Log.Add($"{name}:After");
         return Task.CompletedTask;
     }
 }

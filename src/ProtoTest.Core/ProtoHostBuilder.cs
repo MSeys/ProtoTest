@@ -1,4 +1,6 @@
-﻿namespace ProtoTest.Core;
+namespace ProtoTest.Core;
+
+using ProtoTest.Core.Internal;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -90,7 +92,16 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
         }
         catch
         {
-            rootProvider.Dispose();
+            try
+            {
+                rootProvider.Dispose();
+            }
+            catch (Exception)
+            {
+                // Disposing a provider that holds async-only services can fail; the original
+                // construction failure is what the caller needs to see.
+            }
+
             throw;
         }
     }

@@ -1,5 +1,7 @@
 namespace ProtoTest.Core;
 
+using ProtoTest.Core.Internal;
+
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
@@ -62,7 +64,7 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
         {
             var sequence = _runArtifacts.Count + 1;
             var id = $"run-artifact-{sequence}";
-            var archivePath = $"resources/run/{SanitizePathSegment(sourceName)}/{id}/{SanitizePathSegment(attachment.Name)}";
+            var archivePath = $"resources/run/{ProtoPathSanitizer.FileName(sourceName, "artifact")}/{id}/{ProtoPathSanitizer.FileName(attachment.Name, "artifact")}";
             var artifact = new ProtoTraceArtifact(id, attachment.Name, attachment.MediaType, attachment.Description, archivePath);
             ReadOnlyMemory<byte> content = ReadOnlyMemory<byte>.Empty;
             try
@@ -82,12 +84,6 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
             .Concat(_tests.Values.SelectMany(test => test.SnapshotArtifactSources()))
             .ToArray();
 
-    private static string SanitizePathSegment(string value)
-    {
-        var invalid = Path.GetInvalidFileNameChars();
-        var sanitized = new string([.. value.Select(character => invalid.Contains(character) ? '_' : character)]);
-        return string.IsNullOrWhiteSpace(sanitized) ? "artifact" : sanitized;
-    }
 }
 
 internal sealed record ProtoTraceArtifactSource(ProtoTraceArtifact Artifact, ReadOnlyMemory<byte> Content);
@@ -228,7 +224,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         {
             var attachment = attachments[index];
             var id = $"artifact-{index + 1}";
-            var archivePath = $"resources/{SanitizePathSegment(TestId)}/{id}/{SanitizePathSegment(attachment.Name)}";
+            var archivePath = $"resources/{ProtoPathSanitizer.Segment(TestId, "artifact")}/{id}/{ProtoPathSanitizer.Segment(attachment.Name, "artifact")}";
             var artifact = new ProtoTraceArtifact(
                 id,
                 attachment.Name,
@@ -308,13 +304,6 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
             _error,
             _entries.Select(entry => entry.Snapshot()).ToArray(),
             _artifacts.Select(source => source.Artifact).ToArray());
-    }
-
-    private static string SanitizePathSegment(string value)
-    {
-        var sanitized = new string(value.Select(character =>
-            char.IsLetterOrDigit(character) || character is '.' or '-' or '_' ? character : '_').ToArray());
-        return string.IsNullOrWhiteSpace(sanitized) ? "artifact" : sanitized;
     }
 
     private string NextId() => Interlocked.Increment(ref _sequence).ToString(CultureInfo.InvariantCulture);

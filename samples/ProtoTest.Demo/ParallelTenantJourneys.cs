@@ -7,9 +7,9 @@ using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Testing;
 
-[RestClient(SampleAppTargets.Api)]
+[Application(SampleAppTargets.Api)]
 [SampleEnvironment]
-[Auth<SampleUserAuthenticator>]
+[RestAuth<SampleUserAuthenticator>]
 public sealed class ParallelTenantJourneys
 {
     [ProtoTest]
@@ -22,7 +22,7 @@ public sealed class ParallelTenantJourneys
         using var response = await Proto.Context.Rest()
             .Body(new CreateWorkspaceRequest($"workspace-{region}", region, plan))
             .PostAsync("/api/workspaces");
-        response.ShouldHaveStatus(HttpStatusCode.Created);
+        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
         await Task.Delay(120);
         Proto.Context.RecordObservation("ControlPlane", "parallel.tenant", region, new { plan });
     }

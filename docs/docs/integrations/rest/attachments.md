@@ -10,19 +10,20 @@ title: Attachments and coverage
 Turn capture on when registering REST:
 
 ```csharp
-builder.AddRest(rest => rest
-    .CaptureAttachments()
-    .AddClient("Api"));
+builder.AddApplication("Api", app => app
+    .AddRest(rest => rest
+        .CaptureAttachments()
+        .AddClient("Api")));
 ```
 
 `CaptureAttachments` returns the REST builder while `AddClient` returns the client's *target* builder, so call it first — or in its own statement when you want to tune it:
 
 ```csharp
-builder.AddRest(rest =>
+builder.AddApplication("Api", app => app.AddRest(rest =>
 {
     rest.CaptureAttachments(options => options.CaptureExpectedShapes = false);
     rest.AddClient("Api");
-});
+}));
 ```
 
 Without `CaptureAttachments()`, nothing is attached — requests are still traced and observed.
@@ -82,9 +83,10 @@ The same sanitiser is used for the response body included in `RestStatusAssertio
 REST emits an `http.response` observation for every response, identified by method and route template — `GET /api/orders/{id}`, not the concrete URL. Attach a collector to a client to turn those into report items:
 
 ```csharp
-builder.AddRest(rest => rest
-    .AddClient("Api")
-    .WithCollector<RestCoverageCollector>());
+builder.AddApplication("Api", app => app
+    .AddRest(rest => rest
+        .AddClient("Api")
+        .WithCollector<RestCoverageCollector>()));
 ```
 
 `RestCoverageCollector` reports every endpoint your suite **called**, with a hit count. It can only list what it saw — to find endpoints you **never** called, and response fields you never asserted, use [`OpenApiCoverageCollector`](../openapi.md), which walks your whole specification.

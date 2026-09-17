@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Rest.Tests;
+namespace ProtoTest.Rest.Tests;
 
 using System.Net;
 using System.Reflection;
@@ -44,7 +44,7 @@ public class RestRequestBuilderTests
             Content = new StringContent("""{"status":"ok"}""")
         };
 
-        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null)
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget")
             .Header("X-Custom-Header", "TestValue")
             .Header("User-Agent", "ProtoTest-Runner");
 
@@ -59,7 +59,7 @@ public class RestRequestBuilderTests
         Assert.That(_handler.LastRequest.Headers.GetValues("User-Agent").Single(), Is.EqualTo("ProtoTest-Runner"));
 
         // Assert - Response Verification via RestResponse Helpers
-        response.ShouldHaveStatus(HttpStatusCode.OK);
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
 
         var body = response.ReadAsAnonymous(new { status = "" });
         Assert.That(body, Is.Not.Null);
@@ -75,7 +75,7 @@ public class RestRequestBuilderTests
             Content = new StringContent("""{"id": 1}""")
         };
 
-        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null);
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget");
 
         // Act
         await builder.GetAsync("/users/{id}", new { id = 1 });
@@ -98,7 +98,7 @@ public class RestRequestBuilderTests
     {
         var content = new TrackingContent("raw response");
         _handler.ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
-        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null);
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget");
 
         var response = await builder.GetAsync("/raw");
 
@@ -119,7 +119,7 @@ public class RestRequestBuilderTests
             Content = new StringContent("""{"id": 1, "created": true}""")
         };
 
-        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null)
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget")
             .Body(new { name = "Matthias", role = "Admin" });
 
         // Act
@@ -134,7 +134,7 @@ public class RestRequestBuilderTests
 
         // Assert - Response Verification & Shape Hit Recording
         response
-            .ShouldHaveStatus(HttpStatusCode.Created)
+            .ShouldHaveHttpStatus(HttpStatusCode.Created)
             .ShouldMatchShape(new { id = JsonValue.GreaterThan(0), created = true });
 
         var shapeHit = _context.RecordedObservations.FirstOrDefault(h => h.Data is RestShapeMatchData);
@@ -167,7 +167,7 @@ public class RestRequestBuilderTests
             Content = new StringContent("<response>ok</response>", System.Text.Encoding.UTF8, "application/xml")
         };
 
-        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null)
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget")
             .Body("<xml><user>Matthias</user></xml>", "application/xml");
 
         // Act
@@ -177,7 +177,7 @@ public class RestRequestBuilderTests
         Assert.That(_handler.LastRequest!.Content!.Headers.ContentType?.MediaType, Is.EqualTo("application/xml"));
         Assert.That(_handler.LastRequestBody, Is.EqualTo("<xml><user>Matthias</user></xml>"));
 
-        response.ShouldHaveStatus(HttpStatusCode.OK);
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
         Assert.That(response.Content, Is.EqualTo("<response>ok</response>"));
     }
 
@@ -188,7 +188,7 @@ public class RestRequestBuilderTests
         _handler.ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"auth": true}""") };
         var authenticator = new TestDummyAuthenticator("Bearer custom-token-123");
 
-        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null)
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget")
             .Auth(authenticator);
 
         // Act
@@ -197,7 +197,7 @@ public class RestRequestBuilderTests
         // Assert
         Assert.That(_handler.LastRequest!.Headers.Authorization?.ToString(), Is.EqualTo("Bearer custom-token-123"));
 
-        response.ShouldHaveStatus(HttpStatusCode.OK);
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
         Assert.That(response.IsSuccessStatusCode, Is.True);
     }
 
@@ -207,7 +207,7 @@ public class RestRequestBuilderTests
         // Arrange
         _handler.ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"auth": true}""") };
 
-        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null)
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget")
             .Auth<TestDummyAuthenticator>("Bearer di-token-456");
 
         // Act
@@ -216,7 +216,7 @@ public class RestRequestBuilderTests
         // Assert
         Assert.That(_handler.LastRequest!.Headers.Authorization?.ToString(), Is.EqualTo("Bearer di-token-456"));
 
-        response.ShouldHaveStatus(HttpStatusCode.OK);
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
         Assert.That(response.IsSuccessStatusCode, Is.True);
     }
 
@@ -227,7 +227,7 @@ public class RestRequestBuilderTests
         {
             Content = new StringContent("ok")
         };
-        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null)
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget")
             .Body(new { value = 42 });
 
         using var first = await builder.PostAsync("/first");
@@ -240,7 +240,7 @@ public class RestRequestBuilderTests
     public void RequestFailure_ShouldEmitFailureObservation()
     {
         _handler.ExceptionToThrow = new HttpRequestException("Connection failed");
-        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget", null);
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget");
 
         Assert.ThrowsAsync<HttpRequestException>(async () => await builder.GetAsync("/unavailable"));
 

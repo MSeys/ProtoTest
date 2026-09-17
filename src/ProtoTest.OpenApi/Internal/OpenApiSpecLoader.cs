@@ -1,8 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-
-[assembly: InternalsVisibleTo("ProtoTest.OpenApi.Tests")]
-
-namespace ProtoTest.OpenApi.Internal;
+﻿namespace ProtoTest.OpenApi.Internal;
 
 using Microsoft.OpenApi.Models;
 using Microsoft.OpenApi.Readers;

@@ -2,7 +2,11 @@ namespace ProtoTest.Web.Playwright;
 
 using Microsoft.Playwright;
 
-/// <summary>Test-scoped browser pool; named Web sessions receive isolated contexts on shared browser processes.</summary>
+/// <summary>
+/// Test-scoped browser pool. Browser processes are shared by the sessions of one test, each receiving
+/// its own isolated browser context, and are disposed with the test. Scoping per test contains
+/// browser-level failures and cleans up any native contexts a test opens directly.
+/// </summary>
 internal sealed class PlaywrightBrowserPool : IAsyncDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);

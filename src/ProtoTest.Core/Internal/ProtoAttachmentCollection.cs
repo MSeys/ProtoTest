@@ -1,4 +1,4 @@
-namespace ProtoTest.Core;
+namespace ProtoTest.Core.Internal;
 
 internal sealed class ProtoAttachmentCollection(string testId)
 {

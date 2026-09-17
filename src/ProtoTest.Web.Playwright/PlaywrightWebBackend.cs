@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using ProtoTest.Core;
 
-public sealed class PlaywrightWebBackend : IWebBackend
+public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics
 {
     private readonly ProtoExecutionContext _context;
     private readonly IBrowserContext _browserContext;
@@ -220,7 +220,7 @@ public sealed class PlaywrightWebBackend : IWebBackend
     {
         _webFailure = true;
         cancellationToken.ThrowIfCancellationRequested();
-        var prefix = SafeName(failure.Element?.Name ?? failure.Operation);
+        var prefix = WebNames.SafeName(failure.Element?.Name ?? failure.Operation);
         var attachments = new List<ProtoTestAttachment>();
         await TryCaptureAsync("screenshot", async () => attachments.Add(ProtoTestAttachment.FromBytes(
             $"web-{prefix}-failure.png",
@@ -266,8 +266,8 @@ public sealed class PlaywrightWebBackend : IWebBackend
                 ? Page.Locator("th, td")
                 : scope.Locator(":scope > th, :scope > td")).Nth(value.Index),
             TableCellByHeaderWebLocator value => scope is null
-                ? Page.Locator($"xpath={TableCellXPath(value)}")
-                : scope.Locator($"xpath={TableCellXPath(value)}"),
+                ? Page.Locator($"xpath={WebXPath.TableCellByHeader(value)}")
+                : scope.Locator($"xpath={WebXPath.TableCellByHeader(value)}"),
             AndWebLocator value => And(scope, value),
             HasTextWebLocator => throw new WebBackendCapabilityException("HasText is a filter and must be composed with another locator using And()."),
             _ => throw new WebBackendCapabilityException($"Playwright does not support locator type '{locator.GetType().Name}'.")
@@ -388,33 +388,6 @@ public sealed class PlaywrightWebBackend : IWebBackend
     }
 
     private static string CssString(string value) => $"\"{value.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
-
-    private static string TableCellXPath(TableCellByHeaderWebLocator locator)
-    {
-        const string upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        const string lower = "abcdefghijklmnopqrstuvwxyz";
-        var expression = "normalize-space(.)";
-        var expected = locator.Header;
-        if (locator.IgnoreCase)
-        {
-            expression = $"translate({expression},'{upper}','{lower}')";
-            expected = expected.ToLowerInvariant();
-        }
-        var predicate = locator.Exact
-            ? $"{expression}={XPathLiteral(expected)}"
-            : $"contains({expression},{XPathLiteral(expected)})";
-        var headers = $"ancestor::table[1]//tr[1]/*[self::th or self::td][{predicate}]";
-        return $"./*[self::th or self::td][{headers} and position()=count({headers}/preceding-sibling::*[self::th or self::td])+1]";
-    }
-
-    private static string XPathLiteral(string value)
-    {
-        if (!value.Contains('\'')) return $"'{value}'";
-        if (!value.Contains('"')) return $"\"{value}\"";
-        return "concat(" + string.Join(",\"'\",", value.Split('\'').Select(part => $"'{part}'")) + ")";
-    }
-
-    private static string SafeName(string value) => string.Concat(value.Select(character => char.IsLetterOrDigit(character) ? character : '-')).Trim('-').ToLowerInvariant();
 
     private void WireDiagnostics()
     {
@@ -545,7 +518,7 @@ public sealed class PlaywrightWebBackend : IWebBackend
                         await _browserContext.Tracing.StopAsync(new TracingStopOptions { Path = path });
                         var bytes = await File.ReadAllBytesAsync(path);
                         _context.AddAttachment(ProtoTestAttachment.FromBytes(
-                            $"playwright-{SafeName(_sessionName)}-trace.zip",
+                            $"playwright-{WebNames.SafeName(_sessionName)}-trace.zip",
                             bytes,
                             "application/vnd.microsoft.playwright.trace+zip",
                             $"Native Playwright trace for Web session '{_sessionName}'."));
@@ -584,18 +557,23 @@ public sealed class PlaywrightWebBackend : IWebBackend
     }
 }
 
-internal sealed class PlaywrightWebBackendFactory(
-    WebBackendOptionsBinder<PlaywrightWebOptions> options,
-    string sessionName) : IWebBackendFactory
+internal sealed class PlaywrightWebBackendFactory(Action<PlaywrightWebOptions>? configure) : IWebBackendFactory
 {
     public string Name => PlaywrightWebOptions.BackendName;
+
     public async ValueTask<IWebBackend> CreateAsync(
         ProtoExecutionContext context,
+        string sessionName,
         CancellationToken cancellationToken = default)
-        => await PlaywrightWebBackend.CreateAsync(
+    {
+        var options = new PlaywrightWebOptions();
+        configure?.Invoke(options);
+        var binder = new WebBackendOptionsBinder<PlaywrightWebOptions>(options, sessionName);
+        return await PlaywrightWebBackend.CreateAsync(
             context,
             context.Service<PlaywrightBrowserPool>(),
-            options.Resolve(context.Configuration),
+            binder.Resolve(context.Configuration),
             sessionName,
             cancellationToken);
+    }
 }

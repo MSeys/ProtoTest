@@ -62,7 +62,7 @@ public sealed class GraphQLWebSocketSubscriptionTests
         builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>
             {
-                ["ProtoTest:Clients:Default:GraphQL:SubscriptionTransport"] = "Sse"
+                ["ProtoTest:Applications:Default:GraphQL:SubscriptionTransport"] = "Sse"
             }));
         builder.AddGraphQL(graphQL => graphQL.AddClient("Default", "https://example.test/graphql", http =>
             http.ConfigurePrimaryHttpMessageHandler(() => new StubHttpHandler(request =>

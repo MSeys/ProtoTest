@@ -25,7 +25,7 @@ public class ProtoTestFactTests
 
         // Act
         await Task.Delay(10);
-        var retrieved = Proto.Context.Context<CustomState>();
+        var retrieved = Proto.Context.Resolve<CustomState>();
 
         // Assert
         Assert.NotNull(retrieved);

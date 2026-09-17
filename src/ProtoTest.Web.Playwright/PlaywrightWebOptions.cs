@@ -1,6 +1,7 @@
 namespace ProtoTest.Web.Playwright;
 
 using Microsoft.Playwright;
+using ProtoTest.Core;
 
 public enum PlaywrightBrowser
 {
@@ -28,9 +29,11 @@ public enum PlaywrightConsoleCapture
 /// Playwright session options. Besides code, they bind from <c>ProtoTest:Web:Playwright</c> and
 /// <c>ProtoTest:Web:Sessions:{name}</c>, in that order.
 /// </summary>
-public sealed class PlaywrightWebOptions
+public sealed class PlaywrightWebOptions : IProtoConfigurableOptions
 {
     public const string BackendName = "Playwright";
+
+    string IProtoConfigurableOptions.ConfigurationSectionName => $"ProtoTest:Web:{BackendName}";
 
     public PlaywrightBrowser Browser { get; set; } = PlaywrightBrowser.Chromium;
     public bool Headless { get; set; } = true;

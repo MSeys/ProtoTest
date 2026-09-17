@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.MSTest;
+namespace ProtoTest.MSTest;
 
 using System.Runtime.CompilerServices;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -20,7 +20,7 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
         try
         {
             await ProtoTestAssembly.Host.StartTestAsync(
-                methodInfo.Name, methodInfo, attributes, attachmentPublisher);
+                ProtoTestName.FromMethod(methodInfo), methodInfo, attributes, attachmentPublisher);
             lifecycleStarted = true;
 
             results = await base.ExecuteAsync(testMethod);
@@ -37,12 +37,12 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
             }
             finally
             {
-                if (results is not null && attachmentPublisher.Files.Count > 0)
+                // The lifecycle spans every data row, so attach the collected files to the first
+                // result rather than duplicating them onto each row.
+                if (results is { Length: > 0 } && attachmentPublisher.Files.Count > 0)
                 {
-                    foreach (var result in results)
-                    {
-                        result.ResultFiles = [.. result.ResultFiles ?? [], .. attachmentPublisher.Files];
-                    }
+                    var primary = results[0];
+                    primary.ResultFiles = [.. primary.ResultFiles ?? [], .. attachmentPublisher.Files];
                 }
             }
         }
@@ -67,5 +67,4 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
 
         return ProtoTestResult.Unknown;
     }
-
 }

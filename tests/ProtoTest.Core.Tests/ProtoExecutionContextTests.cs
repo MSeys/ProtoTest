@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Core.Tests;
+namespace ProtoTest.Core.Tests;
 
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
@@ -32,7 +32,7 @@ public class ProtoExecutionContextTests
 
         // Act
         context.SetContext(customState);
-        var retrieved = context.TryContext<SampleContext>();
+        var retrieved = context.TryResolve<SampleContext>();
 
         // Assert
         Assert.That(retrieved, Is.SameAs(customState));
@@ -47,7 +47,7 @@ public class ProtoExecutionContextTests
         context.SetContext(customState);
 
         // Act
-        var result = context.Context<SampleContext>();
+        var result = context.Resolve<SampleContext>();
 
         // Assert
         Assert.That(result, Is.SameAs(customState));
@@ -60,7 +60,7 @@ public class ProtoExecutionContextTests
         var context = new ProtoExecutionContext("TestMethod", _scope, "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
 
         // Act & Assert
-        var exception = Assert.Throws<InvalidOperationException>(() => context.Context<SampleContext>());
+        var exception = Assert.Throws<InvalidOperationException>(() => context.Resolve<SampleContext>());
         Assert.That(exception!.Message, Does.Contain(nameof(SampleContext)));
     }
 

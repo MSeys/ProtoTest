@@ -64,7 +64,7 @@ public sealed class ProvisionedUserLogin : IWebLoginStrategy
 {
     public async ValueTask LoginAsync(WebLoginContext context, CancellationToken cancellationToken = default)
     {
-        var user = context.Execution.Context<SampleUserContext>();
+        var user = context.Execution.Resolve<SampleUserContext>();
         // ... sign in with user.Email / user.AccessToken
     }
 }
@@ -100,9 +100,11 @@ public sealed class LoginAsAttribute<TStrategy>(string persona, params object[] 
   public sealed class TenantLogin(string tenant, ICredentialStore credentials) : IWebLoginStrategy { … }
   ```
 
-- **`Session`** picks which [named session](./index.md#several-browsers-in-one-test) to log in, so one test can have two different people signed in:
+- **`Session`** picks which [named session](./index.md#several-sessions-in-one-test) to log in, so one test can have two different people signed in. Declare each session with `[WebSession]` (which can also open a start URL) — it runs before `[LoginAs]`:
 
   ```csharp
+  [WebSession("Admin", Application = "ControlPlane", Open = "/back-office")]   // address from ProtoTest:Applications:ControlPlane:BaseUrl
+  [WebSession("Customer")]
   [LoginAs<BackOfficeLogin>("billing.admin", Session = "Admin")]
   [LoginAs<StorefrontLogin>("customer@example.test", Session = "Customer")]
   ```

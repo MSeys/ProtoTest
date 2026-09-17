@@ -1,30 +1,30 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-	<TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-	<LangVersion>latest</LangVersion>
-	<IsPackable>true</IsPackable>
-	<Description>In-process ASP.NET Core application testing for ProtoTest.</Description>
-	<PackageTags>testing;integration-testing;aspnetcore;webapplicationfactory;dotnet</PackageTags>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>true</IsPackable>
+    <Description>In-process ASP.NET Core application testing for ProtoTest.</Description>
+    <PackageTags>testing;integration-testing;aspnetcore;webapplicationfactory;dotnet</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
   </ItemGroup>
-	
+    
   <!-- Conditional Version Mapping -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-  	<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.*" />
+      <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.*" />
   </ItemGroup>
   
   <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
-  	<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.*" />
+      <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.*" />
   </ItemGroup>
   
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
-  	<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.*" />
+      <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.*" />
   </ItemGroup>
 
 </Project>

@@ -118,8 +118,8 @@ public sealed class GraphQLIntegrationTests
         builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>
             {
-                ["ProtoTest:Clients:Catalog:BaseUrl"] = "https://example.test/graphql",
-                ["ProtoTest:Clients:Catalog:GraphQL:Schema"] =
+                ["ProtoTest:Applications:Catalog:BaseUrl"] = "https://example.test/graphql",
+                ["ProtoTest:Applications:Catalog:GraphQL:Schema"] =
                     "type Query { product: Product } type Product { id: ID! name: String! }"
             }));
         builder.AddGraphQL(graphQL => graphQL
@@ -168,7 +168,7 @@ public sealed class GraphQLIntegrationTests
         builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>
             {
-                ["ProtoTest:Clients:Catalog:BaseUrl"] = "https://configured.example/graphql"
+                ["ProtoTest:Applications:Catalog:BaseUrl"] = "https://configured.example/graphql"
             }));
         builder.AddGraphQL(graphQL => graphQL.AddClient("Catalog"));
         await using var host = builder.Build();

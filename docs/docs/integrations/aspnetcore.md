@@ -13,25 +13,26 @@ dotnet add package ProtoTest.AspNetCore
 
 ## Registering
 
+Back an application with the in-process server. The application's REST and GraphQL clients reuse its transport, so no network connection is opened:
+
 ```csharp
-builder
-    .AddRest(rest => rest.AddClient("Api"))
-    .AddAspNetCoreServer<Program>("Api");
+builder.AddApplication("Api", app => app
+    .AddAspNetCoreServer<Program>()
+    .AddRest(rest => rest.AddClient("Api")));
 ```
 
 ```csharp
-public static IProtoHostBuilder AddAspNetCoreServer<TProgram>(
-    this IProtoHostBuilder builder,
-    string name = "Default",
+public static IProtoApplicationBuilder AddAspNetCoreServer<TProgram>(
+    this IProtoApplicationBuilder application,
     Action<IWebHostBuilder>? configureWebHost = null,
-    Action<WebApplicationFactoryClientOptions>? configureClient = null,
+    Action<WebApplicationFactoryClientOptions>? configureClientOptions = null,
     AspNetCoreServerLifetime lifetime = AspNetCoreServerLifetime.PerRun)
     where TProgram : class;
 ```
 
-The **name is the client name**: `Proto.Context.Rest("Api")` now talks to the in-process application. `TProgram` is your application's entry point — for minimal APIs, add `public partial class Program;` to the application so the test project can see it.
+The server's client is registered under the **application name**. `TProgram` is your application's entry point — for minimal APIs, add `public partial class Program;` to the application so the test project can see it.
 
-Every test gets its own `HttpClient` from `factory.CreateClient(...)`, registered as the client `name`. The factory itself is available as `"{name}:Factory"` — see [reaching into the application](#reaching-into-the-application).
+Every test gets its own `HttpClient` from `factory.CreateClient(...)` under that name. The factory is available as `"{name}:Factory"` via `Proto.Context.ServerFactory<TProgram>(name)` — see [reaching into the application](#reaching-into-the-application).
 
 ## One application, or one per test
 
@@ -43,7 +44,7 @@ Starting an ASP.NET Core application takes time, so by default **one instance se
 | `PerTest` | Each test starts its own instance and disposes it afterwards. Nothing is shared, and every test pays the startup cost. |
 
 ```csharp
-builder.AddAspNetCoreServer<Program>("Api", lifetime: AspNetCoreServerLifetime.PerTest);
+builder.AddApplication("Api", app => app.AddAspNetCoreServer<Program>(lifetime: AspNetCoreServerLifetime.PerTest));
 ```
 
 Choose `PerTest` when the application keeps state you can't partition — static caches, a single in-memory database without tenant separation — or when tests leave state behind in singleton services, such as a recording fake.
@@ -68,7 +69,7 @@ builder.AddAspNetCoreServer<Program>(
 ## Reaching into the application
 
 ```csharp
-WebApplicationFactory<TProgram> Server<TProgram>(this ProtoExecutionContext context, string name = "Default");
+WebApplicationFactory<TProgram> ServerFactory<TProgram>(this ProtoExecutionContext context, string name = "Default");
 IServiceScope CreateServerScope<TProgram>(this ProtoExecutionContext context, string name = "Default");
 TService ServerService<TProgram, TService>(this ProtoExecutionContext context, string name = "Default");
 ```
@@ -80,18 +81,17 @@ using var scope = Proto.Context.CreateServerScope<Program>("Api");
 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 ```
 
-`Server<TProgram>()` also gives you the underlying `TestServer` — the GraphQL [WebSocket factory](./graphql/subscriptions.md#supplying-your-own-websocket) uses it to open in-process WebSockets.
+`ServerFactory<TProgram>()` also gives you the underlying `TestServer` — the GraphQL [WebSocket factory](./graphql/subscriptions.md#supplying-your-own-websocket) uses it to open in-process WebSockets.
 
 ## Real server or in-process?
 
-A client name can be served by a configured URL *or* by the in-process server, and ProtoTest picks one per test. Initializers are tried in **registration order**, and the first one able to create the client wins:
+An application's HTTP clients reuse its in-process server when no URL is configured, and switch to a deployed environment when one is:
 
-| Registration order | `ProtoTest:Clients:Api:BaseUrl` set? | Result |
-| --- | --- | --- |
-| `AddRest(… "Api")` then `AddAspNetCoreServer("Api")` | yes | real server at the configured URL |
-| `AddRest(… "Api")` then `AddAspNetCoreServer("Api")` | no | in-process server |
-| `AddAspNetCoreServer("Api")` then `AddRest(… "Api")` | either | in-process server |
+| `ProtoTest:Applications:Api:BaseUrl` set? | Result |
+| --- | --- |
+| yes | real server at the configured URL |
+| no | the application's in-process server |
 
-The first row is the useful one: the same suite runs in-process on a developer machine and against a deployed environment in CI, just by setting `BaseUrl` there.
+The same suite runs in-process on a developer machine and against a deployed environment in CI, just by setting `BaseUrl` there. `AddClientFrom(name, sourceClientName, basePath?)` remains available when a client must reuse a *differently named* client's transport or a path prefix.
 
 In the first row the application is never started — with the default `PerRun` lifetime it only starts the first time a test actually needs it.

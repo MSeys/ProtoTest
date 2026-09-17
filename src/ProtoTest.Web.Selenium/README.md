@@ -4,7 +4,7 @@ Selenium execution backend for `ProtoTest.Web`.
 
 ```csharp
 var host = new ProtoHostBuilder()
-    .AddSeleniumWeb(
+    .AddWeb(
         () => new ChromeDriver(),
         options => options.ActionTimeout = TimeSpan.FromSeconds(8))
     .Build();

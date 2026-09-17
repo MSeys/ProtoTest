@@ -23,7 +23,7 @@ builder.ConfigureAppConfiguration(configuration => configuration
 <None Update="appsettings.Test.json" CopyToOutputDirectory="PreserveNewest" />
 ```
 
-With environment variables, use `__` for the section separator: `ProtoTest__Clients__Api__BaseUrl`.
+With environment variables, use `__` for the section separator: `ProtoTest__Applications__Api__BaseUrl`.
 
 You can also supply values in code, which the sample suite does for file paths that depend on the build output:
 
@@ -31,7 +31,7 @@ You can also supply values in code, which the sample suite does for file paths t
 builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
     new Dictionary<string, string?>
     {
-        ["ProtoTest:Clients:Api:OpenApi:Specification"] =
+        ["ProtoTest:Applications:Api:OpenApi:Specification"] =
             Path.Combine(AppContext.BaseDirectory, "control-plane.openapi.json")
     }));
 ```
@@ -48,24 +48,22 @@ For options that support both, values are applied in this order — **later wins
 
 So code sets sensible defaults for the suite, and an environment overrides them without a rebuild.
 
-The one exception is a client's `BaseUrl`: a URL passed directly to `AddClient("Api", "https://…")` wins over `ProtoTest:Clients:Api:BaseUrl`. Leave it out of code when you want configuration to decide.
+The one exception is a base address: a URL passed directly to `AddClient("Api", "https://…")` wins over the client's base address under `ProtoTest:Applications:{app}` — the application's `BaseUrl` joined with `Endpoints:{client}` when that endpoint is configured. Leave it out of code when you want configuration to decide.
 
 ## Everything configurable
 
 ```json
 {
   "ProtoTest": {
-    "Clients": {
-      "Api": {
+    "Applications": {
+      "ControlPlane": {
         "BaseUrl": "https://staging.example.test/",
-        "OpenApi": { "Specification": "https://staging.example.test/swagger/v1/swagger.json" }
-      },
-      "GraphQL": {
-        "BaseUrl": "https://staging.example.test/graphql",
-        "GraphQL": {
-          "Schema": "schema.graphql",
-          "SubscriptionTransport": "WebSocket"
-        }
+        "Endpoints": {
+          "Api": "/api",
+          "GraphQL": "/graphql"
+        },
+        "OpenApi": { "Specification": "https://staging.example.test/swagger/v1/swagger.json" },
+        "GraphQL": { "Schema": "schema.graphql", "SubscriptionTransport": "WebSocket" }
       }
     },
     "Rest": {
@@ -97,9 +95,10 @@ The one exception is a client's `BaseUrl`: a URL passed directly to `AddClient("
 
 | Section | Documented in |
 | --- | --- |
-| `ProtoTest:Clients:{name}:BaseUrl` | [REST](../integrations/rest/index.md#base-url-from-configuration), [GraphQL](../integrations/graphql/index.md) |
-| `ProtoTest:Clients:{name}:OpenApi:Specification` | [OpenAPI](../integrations/openapi.md) |
-| `ProtoTest:Clients:{name}:GraphQL:*` | [GraphQL](../integrations/graphql/index.md#target-options), [schema coverage](../integrations/graphql/coverage.md) |
+| `ProtoTest:Applications:{name}:BaseUrl` | the address of a system under test, shared by its HTTP clients and [web sessions](../integrations/web/index.md) |
+| `ProtoTest:Applications:{name}:Endpoints:{client}` | a relative path appended to `BaseUrl` for that client |
+| `ProtoTest:Applications:{name}:OpenApi:Specification` | [OpenAPI](../integrations/openapi.md) |
+| `ProtoTest:Applications:{name}:GraphQL:*` | [GraphQL](../integrations/graphql/index.md#target-options), [schema coverage](../integrations/graphql/coverage.md) |
 | `ProtoTest:Rest:*` | [REST attachments](../integrations/rest/attachments.md), [request limits](../integrations/rest/requests.md#response-size-limit) |
 | `ProtoTest:GraphQL:*` | [GraphQL](../integrations/graphql/index.md#builder-options) |
 | `ProtoTest:Web:*` | [Web](../integrations/web/index.md#from-configuration) |

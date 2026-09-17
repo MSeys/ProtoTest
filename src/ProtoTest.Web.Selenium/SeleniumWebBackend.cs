@@ -6,7 +6,7 @@ using System.Text.Json;
 using OpenQA.Selenium;
 using ProtoTest.Core;
 
-public sealed class SeleniumWebBackend : IWebBackend
+public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics
 {
     private readonly ProtoExecutionContext _context;
     private readonly SeleniumWebOptions _options;
@@ -163,7 +163,7 @@ public sealed class SeleniumWebBackend : IWebBackend
         return await Task.Run<IReadOnlyList<ProtoTestAttachment>>(() =>
         {
             var attachments = new List<ProtoTestAttachment>();
-            var prefix = $"{SafeName(_sessionName)}-{SafeName(failure.Element?.Name ?? failure.Operation)}";
+            var prefix = $"{WebNames.SafeName(_sessionName)}-{WebNames.SafeName(failure.Element?.Name ?? failure.Operation)}";
             try
             {
                 if (Driver is ITakesScreenshot screenshots)
@@ -440,8 +440,6 @@ public sealed class SeleniumWebBackend : IWebBackend
     private static ValueTask Background(Action action, CancellationToken cancellationToken)
         => new(Task.Run(action, cancellationToken));
 
-    private static string SafeName(string value) => string.Concat(value.Select(character => char.IsLetterOrDigit(character) ? character : '-')).Trim('-').ToLowerInvariant();
-
     private void RecordCaptureFailure(string artifact, Exception exception)
         => _context.Trace.WriteEvent(
             "web.diagnostics.artifact_failed",
@@ -479,7 +477,7 @@ public sealed class SeleniumWebBackend : IWebBackend
                 entries = _diagnostics.ToArray()
             };
             _context.AddAttachment(
-                $"selenium-{SafeName(_sessionName)}-diagnostics.json",
+                $"selenium-{WebNames.SafeName(_sessionName)}-diagnostics.json",
                 JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }),
                 "application/json",
                 "Selenium backend diagnostic timeline embedded in ProtoTrace.");
@@ -511,14 +509,20 @@ public sealed class SeleniumWebBackend : IWebBackend
 
 internal sealed class SeleniumWebBackendFactory(
     Func<IWebDriver> createDriver,
-    WebBackendOptionsBinder<SeleniumWebOptions> options,
-    string sessionName) : IWebBackendFactory
+    Action<SeleniumWebOptions>? configure) : IWebBackendFactory
 {
     public string Name => SeleniumWebOptions.BackendName;
-    public ValueTask<IWebBackend> CreateAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
+
+    public ValueTask<IWebBackend> CreateAsync(
+        ProtoExecutionContext context,
+        string sessionName,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var resolved = options.Resolve(context.Configuration);
-        return ValueTask.FromResult<IWebBackend>(new SeleniumWebBackend(context, createDriver(), resolved, sessionName));
+        var options = new SeleniumWebOptions();
+        configure?.Invoke(options);
+        var binder = new WebBackendOptionsBinder<SeleniumWebOptions>(options, sessionName, SeleniumWebOptions.Validate);
+        return ValueTask.FromResult<IWebBackend>(
+            new SeleniumWebBackend(context, createDriver(), binder.Resolve(context.Configuration), sessionName));
     }
 }

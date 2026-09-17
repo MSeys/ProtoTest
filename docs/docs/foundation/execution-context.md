@@ -45,14 +45,14 @@ context.SetContext(new SampleUserContext(user.Id, user.Tenant, user.Email, user.
 ```
 
 ```csharp
-var user = Proto.Context.Context<SampleUserContext>();        // throws if missing
-var maybe = Proto.Context.TryContext<SampleUserContext>();    // null if missing
+var user = Proto.Context.Resolve<SampleUserContext>();        // throws if missing
+var maybe = Proto.Context.TryResolve<SampleUserContext>();    // null if missing
 ```
 
 ```csharp
 void SetContext<T>(T context) where T : class, IProtoContext;
 T Context<T>() where T : class, IProtoContext;
-T? TryContext<T>() where T : class, IProtoContext;
+T? TryResolve<T>() where T : class, IProtoContext;
 ```
 
 - `IProtoContext` is an empty marker interface.

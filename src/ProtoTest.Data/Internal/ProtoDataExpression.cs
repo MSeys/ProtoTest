@@ -1,4 +1,4 @@
-namespace ProtoTest.Data;
+namespace ProtoTest.Data.Internal;
 
 using System.Linq.Expressions;
 using System.Reflection;

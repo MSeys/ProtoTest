@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.AspNetCore;
+namespace ProtoTest.AspNetCore;
 
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,12 +15,12 @@ public static class ProtoExecutionContextExtensions
     /// <typeparam name="TProgram">The entry point class of the ASP.NET Core application.</typeparam>
     /// <param name="context">The active test execution context.</param>
     /// <param name="name">The registered server name. Defaults to "Default".</param>
-    public static WebApplicationFactory<TProgram> Server<TProgram>(
+    public static WebApplicationFactory<TProgram> ServerFactory<TProgram>(
         this ProtoExecutionContext context,
         string name = "Default") where TProgram : class
     {
         ArgumentNullException.ThrowIfNull(context);
-        return context.Client<WebApplicationFactory<TProgram>>($"{name}:Factory");
+        return context.Client<WebApplicationFactory<TProgram>>(AspNetCoreClientInitializer<TProgram>.FactoryName(name));
     }
 
     /// <summary>
@@ -33,7 +33,7 @@ public static class ProtoExecutionContextExtensions
         this ProtoExecutionContext context,
         string name = "Default") where TProgram : class
     {
-        return context.Server<TProgram>(name).Services.CreateScope();
+        return context.ServerFactory<TProgram>(name).Services.CreateScope();
     }
 
     /// <summary>
@@ -49,6 +49,6 @@ public static class ProtoExecutionContextExtensions
         where TProgram : class
         where TService : notnull
     {
-        return context.Server<TProgram>(name).Services.GetRequiredService<TService>();
+        return context.ServerFactory<TProgram>(name).Services.GetRequiredService<TService>();
     }
 }

@@ -49,7 +49,7 @@ public class IntegrationTests
         // 1. Arrange: Provide Configuration override for the client BaseUrl
         var inMemoryConfig = new Dictionary<string, string?>
         {
-            { "ProtoTest:Clients:ExternalApi:BaseUrl", "https://api.example.com" }
+            { "ProtoTest:Applications:ExternalApi:BaseUrl", "https://api.example.com" }
         };
 
         var host = new ProtoHostBuilder()
@@ -92,8 +92,8 @@ public class IntegrationTests
         {
             var response = await Proto.Context.Rest("OrderApi").GetAsync("/ping");
 
-            response.ShouldHaveStatus(HttpStatusCode.OK);
-            Assert.That(Proto.Context.Server<SampleApi.Program>("OrderApi"), Is.Not.Null);
+            response.ShouldHaveHttpStatus(HttpStatusCode.OK);
+            Assert.That(Proto.Context.ServerFactory<SampleApi.Program>("OrderApi"), Is.Not.Null);
         }
         finally
         {
@@ -107,7 +107,7 @@ public class IntegrationTests
     {
         var inMemoryConfig = new Dictionary<string, string?>
         {
-            ["ProtoTest:Clients:OrderApi:BaseUrl"] = "https://api.example.com"
+            ["ProtoTest:Applications:OrderApi:BaseUrl"] = "https://api.example.com"
         };
 
         var host = new ProtoHostBuilder()
@@ -123,7 +123,7 @@ public class IntegrationTests
             var response = await Proto.Context.Client<HttpClient>("OrderApi").GetAsync("/ping");
 
             Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(Proto.Context.Server<SampleApi.Program>("OrderApi"), Is.Not.Null);
+            Assert.That(Proto.Context.ServerFactory<SampleApi.Program>("OrderApi"), Is.Not.Null);
         }
         finally
         {
@@ -209,7 +209,7 @@ public class IntegrationTests
         var method = (MethodInfo)MethodInfo.GetCurrentMethod()!;
 
         await host.StartTestAsync("First", "00007", method);
-        var first = Proto.Context.Server<SampleApi.Program>("SharedApi");
+        var first = Proto.Context.ServerFactory<SampleApi.Program>("SharedApi");
         using (var response = await Proto.Context.Client<HttpClient>("SharedApi").GetAsync("/ping"))
         {
             Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
@@ -217,7 +217,7 @@ public class IntegrationTests
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
         await host.StartTestAsync("Second", "00008", method);
-        var second = Proto.Context.Server<SampleApi.Program>("SharedApi");
+        var second = Proto.Context.ServerFactory<SampleApi.Program>("SharedApi");
         using (var response = await Proto.Context.Client<HttpClient>("SharedApi").GetAsync("/ping"))
         {
             Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
@@ -253,14 +253,14 @@ public class IntegrationTests
         var method = (MethodInfo)MethodInfo.GetCurrentMethod()!;
 
         await host.StartTestAsync("First", "00009", method);
-        var first = Proto.Context.Server<SampleApi.Program>("IsolatedApi");
+        var first = Proto.Context.ServerFactory<SampleApi.Program>("IsolatedApi");
         Assert.That(ResolveMessage(first), Is.EqualTo("Hello from AspNetCore DI!"));
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
         Assert.Throws<ObjectDisposedException>(() => ResolveMessage(first));
 
         await host.StartTestAsync("Second", "00010", method);
-        var second = Proto.Context.Server<SampleApi.Program>("IsolatedApi");
+        var second = Proto.Context.ServerFactory<SampleApi.Program>("IsolatedApi");
         Assert.Multiple(() =>
         {
             Assert.That(second, Is.Not.SameAs(first));

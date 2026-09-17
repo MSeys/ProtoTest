@@ -107,7 +107,7 @@ graphQL.AddClient("Api", "https://api.example.test/graphql")
     .WithSubscriptionTransport(GraphQLSubscriptionTransport.Sse);
 ```
 
-or `ProtoTest:Clients:Api:GraphQL:SubscriptionTransport = "Sse"` in configuration.
+or `ProtoTest:Applications:Api:GraphQL:SubscriptionTransport = "Sse"` in configuration.
 
 ## Supplying your own WebSocket
 
@@ -138,7 +138,7 @@ internal sealed class SampleAppGraphQLWebSocketFactory : IGraphQLWebSocketFactor
         IReadOnlyDictionary<string, string> headers,
         CancellationToken cancellationToken = default)
     {
-        var client = Proto.Context.Server<Program>("Api").Server.CreateWebSocketClient();
+        var client = Proto.Context.ServerFactory<Program>("Api").Server.CreateWebSocketClient();
         client.SubProtocols.Add("graphql-transport-ws");
         client.ConfigureRequest = request =>
         {

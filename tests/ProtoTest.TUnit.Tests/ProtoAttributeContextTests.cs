@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.TUnit.Tests;
+namespace ProtoTest.TUnit.Tests;
 
 using ProtoTest.Core;
 
@@ -9,7 +9,7 @@ public class ProtoAttributeContextTests
     public async Task ProtoTest_ShouldAccessContextSetByProtoAttribute()
     {
         // Act
-        var userState = Proto.Context.Context<UserState>();
+        var userState = Proto.Context.Resolve<UserState>();
 
         // Assert
         await Assert.That(userState).IsNotNull();

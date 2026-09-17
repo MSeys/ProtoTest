@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Xunit.Tests;
+namespace ProtoTest.Xunit.Tests;
 
 using global::Xunit;
 using ProtoTest.Core;
@@ -6,13 +6,12 @@ using ProtoTest.Core;
 [Collection(ProtoTestCollection.Name)]
 public class ProtoAttributeContextTests
 {
-    [Fact]
-    [ProtoTest]
+    [ProtoTestFact]
     [SetContextUser("Xunit2User")]
     public void ProtoTest_ShouldAccessContextSetByProtoAttribute()
     {
         // Act
-        var userState = Proto.Context.Context<UserState>();
+        var userState = Proto.Context.Resolve<UserState>();
 
         // Assert
         Assert.NotNull(userState);

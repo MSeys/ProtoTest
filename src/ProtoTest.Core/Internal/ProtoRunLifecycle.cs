@@ -1,4 +1,4 @@
-namespace ProtoTest.Core;
+namespace ProtoTest.Core.Internal;
 
 internal sealed class ProtoRunLifecycle(IEnumerable<IProtoRunHook> hooks)
 {
@@ -94,6 +94,18 @@ internal sealed class ProtoRunLifecycle(IEnumerable<IProtoRunHook> hooks)
         }
 
         LifecycleExceptionHelper.ThrowIfAny("One or more run hooks failed during shutdown.", exceptions);
+    }
+
+    /// <summary>Gets whether the run is currently started and awaiting shutdown.</summary>
+    public bool IsStarted
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _state == State.Started;
+            }
+        }
     }
 
     public void EnsureTestCanStart()

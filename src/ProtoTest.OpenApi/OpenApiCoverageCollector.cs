@@ -7,7 +7,7 @@ using ProtoTest.OpenApi.Internal;
 using ProtoTest.Rest;
 using ProtoTest.Http;
 
-public class OpenApiCoverageCollector : ProtoCoverageCollector
+public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
 {
     private readonly OpenApiDocument _document;
     private readonly Dictionary<(string Method, string Route), int> _endpointHits = new();
@@ -16,22 +16,25 @@ public class OpenApiCoverageCollector : ProtoCoverageCollector
 
     public override string Category => "OpenAPI";
 
-    public OpenApiCoverageCollector(string targetName, IConfiguration configuration)
+    public OpenApiCoverageCollector(
+        string targetName,
+        IConfiguration configuration,
+        IEnumerable<ProtoApplicationTarget> applicationTargets)
         : base(targetName)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var clientConfiguration = configuration.GetSection($"ProtoTest:Clients:{targetName}");
-        var source = clientConfiguration["OpenApi:Specification"];
+        var applicationName = ProtoApplicationTargets.ResolveApplication(targetName, applicationTargets);
+        var application = ProtoApplication.Section(configuration, applicationName);
+        var source = application["OpenApi:Specification"];
 
         if (string.IsNullOrWhiteSpace(source))
         {
             throw new InvalidOperationException(
-                $"No OpenAPI specification configured for target '{targetName}'. " +
-                $"Set 'ProtoTest:Clients:{targetName}:OpenApi:Specification'.");
+                ProtoApplication.MissingSettingMessage(applicationName, "OpenApi:Specification"));
         }
 
-        _document = OpenApiSpecLoader.Load(source, clientConfiguration["BaseUrl"]);
+        _document = OpenApiSpecLoader.Load(source, application["BaseUrl"]);
     }
 
     public OpenApiCoverageCollector(string targetName, string openApiSpecSource)
@@ -50,7 +53,7 @@ public class OpenApiCoverageCollector : ProtoCoverageCollector
     {
         ArgumentNullException.ThrowIfNull(observation);
 
-        lock (Lock)
+        lock (_lock)
         {
             if (observation.Data is RestResponseData restHit)
             {
@@ -108,7 +111,7 @@ public class OpenApiCoverageCollector : ProtoCoverageCollector
     /// </summary>
     public override IEnumerable<ProtoReportItem> GetReportItems()
     {
-        lock (Lock)
+        lock (_lock)
         {
             var reportItems = new List<ProtoReportItem>();
 
@@ -138,7 +141,9 @@ public class OpenApiCoverageCollector : ProtoCoverageCollector
                                     Kind: ProtoReportItemKind.Coverage,
                                     Status: propertyHits > 0 ? ProtoReportStatus.Success : ProtoReportStatus.Neutral,
                                     Count: propertyHits,
-                                    IsCovered: propertyHits > 0);
+                                    IsCovered: propertyHits > 0,
+                                    DisplayName: FormatPropertyPath(propertyPath),
+                                    DisplayGroup: "Property");
                             })
                             .ToArray();
 
@@ -150,7 +155,11 @@ public class OpenApiCoverageCollector : ProtoCoverageCollector
                             Status: responseHits > 0 ? ProtoReportStatus.Success : ProtoReportStatus.Neutral,
                             Count: responseHits,
                             IsCovered: responseHits > 0,
-                            Children: propertyItems));
+                            Children: propertyItems,
+                            DisplayName: string.Equals(responseKey, "default", StringComparison.OrdinalIgnoreCase)
+                                ? "Default response"
+                                : $"{responseKey} response",
+                            DisplayGroup: "Response"));
                     }
                     reportItems.Add(new ProtoReportItem(
                         TargetName: TargetName,
@@ -251,6 +260,15 @@ public class OpenApiCoverageCollector : ProtoCoverageCollector
         path = path.Trim();
         if (!path.StartsWith('/')) path = $"/{path}";
         return path.Length > 1 ? path.TrimEnd('/') : path;
+    }
+
+    private static string FormatPropertyPath(string path)
+    {
+        var trimmed = path.Trim();
+        if (trimmed == "$") return "Response body";
+        if (trimmed.StartsWith("$.", StringComparison.Ordinal)) trimmed = trimmed[2..];
+        trimmed = trimmed.Replace("[]", ".item", StringComparison.Ordinal);
+        return string.Join(" › ", trimmed.Split('.', StringSplitOptions.RemoveEmptyEntries));
     }
 
     private static string NormalizePropertyPath(string path)

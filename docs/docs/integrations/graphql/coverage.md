@@ -8,19 +8,23 @@ title: Schema coverage
 Point ProtoTest at your GraphQL schema and it reports which types, fields, arguments and input fields your suite actually exercised.
 
 ```csharp
-builder.AddGraphQL(graphQL => graphQL
-    .AddClientFrom("GraphQL", "Api")
-    .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "control-plane.graphql")));
+builder.AddApplication("Api", app => app
+    .AddGraphQL(graphQL => graphQL
+        .AddClient("GraphQL")
+        .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "control-plane.graphql"))));
 ```
 
 `schemaSource` is an SDL document — a file path or URL. Leave it out to read it from configuration instead:
 
 ```csharp
-graphQL.AddClient("GraphQL", "https://api.example.test/graphql").WithSchemaCoverage();
+builder.AddApplication("Api", app => app
+    .AddGraphQL(graphQL => graphQL
+        .AddClient("GraphQL", "https://api.example.test/graphql")
+        .WithSchemaCoverage()));
 ```
 
 ```json
-{ "ProtoTest": { "Clients": { "GraphQL": { "GraphQL": { "Schema": "schema.graphql" } } } } }
+{ "ProtoTest": { "Applications": { "Api": { "GraphQL": { "Schema": "schema.graphql" } } } } }
 ```
 
 Without a schema from either source, the collector throws `InvalidOperationException`.

@@ -10,42 +10,19 @@ using ProtoTest.Core;
 [SetUpFixture]
 public abstract class ProtoTestAssembly
 {
-    private static ProtoHost? _host;
+    private static readonly ProtoTestHostLifetime Lifetime = new(
+        "Ensure your setup class inherits from ProtoTestAssembly.");
 
     /// <summary>
     /// Gets the global <see cref="ProtoHost"/> instance.
     /// </summary>
-    public static ProtoHost Host => _host
-        ?? throw new InvalidOperationException("ProtoHost is not initialized. Ensure your setup class inherits from ProtoTestAssembly.");
+    public static ProtoHost Host => Lifetime.Host;
 
     [OneTimeSetUp]
-    public async Task GlobalSetUp()
-    {
-        var builder = new ProtoHostBuilder();
-        Configure(builder);
-
-        _host = builder.Build();
-
-        // Trigger suite-level before run hooks (e.g. downloading OpenAPI specs, starting test environments)
-        await _host.StartAsync();
-    }
+    public Task GlobalSetUp() => Lifetime.StartAsync(Configure);
 
     [OneTimeTearDown]
-    public async Task GlobalTearDown()
-    {
-        if (_host != null)
-        {
-            try
-            {
-                // Trigger suite-level after run hooks (e.g. generating coverage reports)
-                await _host.StopAsync();
-            }
-            finally
-            {
-                await _host.DisposeAsync();
-            }
-        }
-    }
+    public Task GlobalTearDown() => Lifetime.StopAsync();
 
     /// <summary>
     /// Configures the <see cref="IProtoHostBuilder"/> with custom services, collectors, and hooks.

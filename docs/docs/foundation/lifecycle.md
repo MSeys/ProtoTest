@@ -18,7 +18,7 @@ protected override void Configure(IProtoHostBuilder builder) =>
         .ConfigureTestIds(ids => ids.RunPrefix = 42)
         .AddRunHook<StartDependenciesHook>()
         .AddTestHook<ResetMailboxHook>()
-        .AddRest(rest => rest.AddClient("Api"));
+        .AddApplication("Api", app => app.AddRest(rest => rest.AddClient("Api")));
 ```
 
 ```csharp

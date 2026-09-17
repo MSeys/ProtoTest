@@ -42,13 +42,13 @@ namespace Orders.Tests;
 public sealed class Setup : ProtoTestAssembly
 {
     protected override void Configure(IProtoHostBuilder builder) =>
-        builder
-            .AddRest(rest => rest.AddClient("Api"))
-            .AddAspNetCoreServer<Program>("Api");
+        builder.AddApplication("Api", app => app
+            .AddAspNetCoreServer<Program>()
+            .AddRest(rest => rest.AddClient("Api")));
 }
 ```
 
-This registers a REST client called `Api` and serves it from your application running **in-process** — no deployed environment and no port.
+This describes one application, `Api`, exposing REST, served from your application running **in-process** — no deployed environment and no port. Point it at a real address in an environment by setting `ProtoTest:Applications:Api:BaseUrl`.
 
 :::tip
 A `[SetUpFixture]` only covers its own namespace and the namespaces below it. Keep your tests in or under `Orders.Tests`.
@@ -65,7 +65,7 @@ using ProtoTest.Rest;
 
 namespace Orders.Tests;
 
-[RestClient("Api")]
+[Application("Api")]
 public sealed class OrderTests
 {
     [ProtoTest]
@@ -75,13 +75,13 @@ public sealed class OrderTests
             .Body(new { product = "notebook", quantity = 2 })
             .PostAsync("/api/orders");
 
-        response.ShouldHaveStatus(HttpStatusCode.Created);
+        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
     }
 }
 ```
 
 - `[ProtoTest]` replaces NUnit's `[Test]` and wraps the test in a ProtoTest context.
-- `[RestClient("Api")]` makes `Api` the default for `Proto.Context.Rest()` in this class.
+- `[Application("Api")]` selects the `Api` application; `Proto.Context.Rest()` then uses its default REST client.
 - `Proto.Context` is available anywhere in the test — no base class, no injected parameter.
 
 Run it with `dotnet test`.
@@ -92,7 +92,7 @@ A status code says little. Describe the parts of the body the behaviour depends 
 
 ```csharp
 response
-    .ShouldHaveStatus(HttpStatusCode.Created)
+    .ShouldHaveHttpStatus(HttpStatusCode.Created)
     .ShouldMatchShape(new
     {
         id = JsonValue.GreaterThan(0),
@@ -127,7 +127,7 @@ public sealed class CustomerAttribute : ProtoAttribute
             .PostAsync("/test-support/customers");
 
         var customer = response
-            .ShouldHaveStatus(HttpStatusCode.Created)
+            .ShouldHaveHttpStatus(HttpStatusCode.Created)
             .ReadAsJson<CustomerContext>()!;
 
         context.SetContext(customer);
@@ -147,7 +147,7 @@ public sealed class CustomerAuthenticator : IProtoHttpAuthenticator
 {
     public ValueTask AuthenticateAsync(ProtoHttpAuthenticationContext context, CancellationToken cancellationToken = default)
     {
-        var customer = context.Test.Context<CustomerContext>();
+        var customer = context.Test.Resolve<CustomerContext>();
         context.Request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", customer.AccessToken);
         return ValueTask.CompletedTask;
     }
@@ -157,9 +157,9 @@ public sealed class CustomerAuthenticator : IProtoHttpAuthenticator
 Now compose them:
 
 ```csharp
-[RestClient("Api")]
+[Application("Api")]
 [Customer]
-[Auth<CustomerAuthenticator>]
+[RestAuth<CustomerAuthenticator>]
 public sealed class OrderTests
 {
     [ProtoTest]
@@ -180,10 +180,11 @@ Add a trace path and a report to `Setup`, plus coverage:
 protected override void Configure(IProtoHostBuilder builder) =>
     builder
         .ConfigureTracing(trace => trace.OutputPath = "TestResults/orders.prototrace")
-        .AddRest(rest => rest
-            .AddClient("Api")
-            .WithCollector<RestCoverageCollector>())
-        .AddAspNetCoreServer<Program>("Api")
+        .AddApplication("Api", app => app
+            .AddAspNetCoreServer<Program>()
+            .AddRest(rest => rest
+                .AddClient("Api")
+                .WithCollector<RestCoverageCollector>()))
         .AddSink<HtmlReportSink>(sink => sink.OutputPath = "TestResults/report.html");
 ```
 

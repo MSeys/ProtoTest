@@ -9,9 +9,9 @@ using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Testing;
 
-[RestClient(SampleAppTargets.Api)]
+[Application(SampleAppTargets.Api)]
 [SampleEnvironment]
-[Auth<SampleUserAuthenticator>]
+[RestAuth<SampleUserAuthenticator>]
 public sealed class CommerceAndSecurityTests
 {
     [ProtoTest]
@@ -22,7 +22,7 @@ public sealed class CommerceAndSecurityTests
             .For<CreateUserRequest>()
             .With(request => request.Role, SampleRoles.Member)
             .CreateManyAsync<UserResponse>(7);
-        var administrator = Proto.Context.Context<SampleUserContext>();
+        var administrator = Proto.Context.Resolve<SampleUserContext>();
         var expectedUsers = createdUsers
             .Select(user => new { user.Id, user.Email, user.Role })
             .Append(new { administrator.Id, administrator.Email, administrator.Role })
@@ -30,7 +30,7 @@ public sealed class CommerceAndSecurityTests
             .ToArray();
 
         using var response = await Proto.Context.Rest().GetAsync("/api/admin/users");
-        response.ShouldHaveStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
         {
             tenant = administrator.Tenant,
             users = expectedUsers
@@ -44,14 +44,14 @@ public sealed class CommerceAndSecurityTests
         using var created = await Proto.Context.Rest()
             .Body(new CreateOrderRequest("observability-seat", 12, 19.95m))
             .PostAsync("/api/orders");
-        created.ShouldHaveStatus(HttpStatusCode.Created).ShouldMatchShape(new
+        created.ShouldHaveHttpStatus(HttpStatusCode.Created).ShouldMatchShape(new
         {
             id = JsonValue.GreaterThan(0), product = "observability-seat", quantity = 12,
             total = JsonValue.GreaterThan(200m), status = "pending"
         });
 
         using var invoices = await Proto.Context.Rest().GetAsync("/api/billing/invoices", new { state = "open" });
-        invoices.ShouldHaveStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        invoices.ShouldHaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
         {
             state = "open",
             invoices = new[] { new { id = JsonValue.GreaterThan(0), state = "open", total = JsonValue.GreaterThan(0m) } }
@@ -62,13 +62,13 @@ public sealed class CommerceAndSecurityTests
     [SampleUser]
     public async Task TenantBoundaryRejectsValidTokenFromDifferentOrganization()
     {
-        var user = Proto.Context.Context<SampleUserContext>();
+        var user = Proto.Context.Resolve<SampleUserContext>();
         using var response = await Proto.Context.Rest()
             .WithoutAuth()
             .Header("Authorization", $"Bearer {user.AccessToken}")
             .Header("X-Tenant", "competitor-tenant")
             .GetAsync("/api/control-plane");
-        response.ShouldHaveStatus(HttpStatusCode.Forbidden)
+        response.ShouldHaveHttpStatus(HttpStatusCode.Forbidden)
             .ShouldMatchShape(new { error = "tenant-access-denied" });
     }
 

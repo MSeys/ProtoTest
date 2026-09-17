@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Core;
+namespace ProtoTest.Core.Internal;
 
 /// <summary>
 /// Global lifecycle hook responsible for selecting and executing a registered
@@ -72,18 +72,4 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
 
     public Task AfterTestAsync(ProtoExecutionContext context)
         => Task.CompletedTask;
-
-    private readonly record struct ClientKey(Type ClientType, string Name);
-
-    private sealed class ClientKeyComparer : IEqualityComparer<ClientKey>
-    {
-        public static ClientKeyComparer Instance { get; } = new();
-
-        public bool Equals(ClientKey x, ClientKey y)
-            => x.ClientType == y.ClientType
-               && StringComparer.OrdinalIgnoreCase.Equals(x.Name, y.Name);
-
-        public int GetHashCode(ClientKey obj)
-            => HashCode.Combine(obj.ClientType, StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Name));
-    }
 }

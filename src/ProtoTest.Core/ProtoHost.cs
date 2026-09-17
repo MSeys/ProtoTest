@@ -2,6 +2,7 @@ namespace ProtoTest.Core;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ProtoTest.Core.Internal;
 using System.Reflection;
 
 /// <summary>
@@ -105,8 +106,27 @@ public sealed class ProtoHost : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        var exceptions = new List<Exception>();
+
+        // Completing the run here means `await using var host = ...` alone still runs AfterRun
+        // hooks (report sinks, trace export). StopAsync is idempotent, so an explicit stop first
+        // makes this a no-op.
+        if (_runLifecycle.IsStarted)
+        {
+            try
+            {
+                await _runLifecycle.StopAsync(default);
+            }
+            catch (Exception exception)
+            {
+                exceptions.Add(exception);
+            }
+        }
+
         if (!_runLifecycle.TryMarkDisposed())
         {
+            LifecycleExceptionHelper.ThrowIfAny(
+                "One or more run hooks failed during disposal.", exceptions);
             return;
         }
 
@@ -121,9 +141,17 @@ public sealed class ProtoHost : IAsyncDisposable
                 disposable.Dispose();
             }
         }
+        catch (Exception exception)
+        {
+            exceptions.Add(exception);
+        }
         finally
         {
+            _trace.CompleteRun();
             ProtoHostRegistry.Unregister(this);
         }
+
+        LifecycleExceptionHelper.ThrowIfAny(
+            "One or more resources failed to dispose.", exceptions);
     }
 }

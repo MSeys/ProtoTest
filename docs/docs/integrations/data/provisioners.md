@@ -38,14 +38,14 @@ public sealed class SampleUserProvisioner : IProtoDataProvisioner<CreateUserRequ
         ProtoDataProvisioningContext context,
         CancellationToken cancellationToken)
     {
-        var environment = context.Execution.Context<SampleEnvironmentContext>();
+        var environment = context.Execution.Resolve<SampleEnvironmentContext>();
 
         using var response = await context.Execution.Rest("Api")
             .WithoutAuth()
             .Body(value)
             .PostAsync("/test-support/environments/{tenant}/users", new { environment.Tenant }, cancellationToken);
 
-        response.ShouldHaveStatus(HttpStatusCode.Created);
+        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
         var user = response.ReadAsJson<UserResponse>()
             ?? throw new InvalidOperationException("The sample app returned no provisioned user.");
 

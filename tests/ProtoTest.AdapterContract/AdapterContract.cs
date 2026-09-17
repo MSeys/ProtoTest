@@ -23,7 +23,7 @@ public static class AdapterContract
     public static void VerifyTestBody<TDeclaringType>(string methodName)
     {
         var context = Proto.Context;
-        var state = context.Context<AdapterContractState>();
+        var state = context.Resolve<AdapterContractState>();
 
         Ensure(
             state.Events.SequenceEqual(ExpectedBeforeSequence),
@@ -63,7 +63,7 @@ public sealed class AdapterContractAttribute(string name) : ProtoAttribute
     public override Task BeforeTestAsync(ProtoExecutionContext context)
     {
         _beforeRan = true;
-        context.Context<AdapterContractState>().Events.Add($"{name}:Before");
+        context.Resolve<AdapterContractState>().Events.Add($"{name}:Before");
         return Task.CompletedTask;
     }
 
@@ -71,7 +71,7 @@ public sealed class AdapterContractAttribute(string name) : ProtoAttribute
     {
         AdapterContract.Ensure(_beforeRan,
             $"The '{name}' attribute instance was recreated between setup and teardown.");
-        context.Context<AdapterContractState>().Events.Add($"{name}:After");
+        context.Resolve<AdapterContractState>().Events.Add($"{name}:After");
         return Task.CompletedTask;
     }
 }
@@ -93,7 +93,7 @@ public sealed class AdapterContractHook : IProtoTestHook
 
     public Task AfterTestAsync(ProtoExecutionContext context)
     {
-        var state = context.TryContext<AdapterContractState>();
+        var state = context.TryResolve<AdapterContractState>();
         if (state is null)
         {
             return Task.CompletedTask;

@@ -6,27 +6,66 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
 using ProtoTest.Http;
 
-public sealed class ProtoGraphQLBuilder(IServiceCollection services)
+public sealed class ProtoGraphQLBuilder
 {
-    public IServiceCollection Services { get; } = services;
+    private readonly IProtoApplicationBuilder? _application;
 
+    internal ProtoGraphQLBuilder(IServiceCollection services, IProtoApplicationBuilder? application = null)
+    {
+        Services = services ?? throw new ArgumentNullException(nameof(services));
+        _application = application;
+    }
+
+    public IServiceCollection Services { get; }
+
+    /// <summary>
+    /// Registers a named GraphQL client. Inside <c>AddApplication</c> the client belongs to that
+    /// application and takes its endpoint from <c>ProtoTest:Applications:{app}</c>.
+    /// </summary>
     public IProtoTargetBuilder AddClient(
         string name = "Default",
         string? baseUrl = null,
-        Action<IHttpClientBuilder>? configure = null)
-        => ProtoHttpClientRegistration.AddClient(Services, "GraphQL", "GraphQL", name, baseUrl, configure);
+        Action<IHttpClientBuilder>? configure = null,
+        string? endpoint = "GraphQL")
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var applicationName = _application?.ApplicationName;
+        var registeredName = Qualify(name, applicationName);
+        _application?.RegisterClient("GraphQL", name);
+
+        return ProtoHttpClientRegistration.AddClient(
+            Services,
+            "GraphQL",
+            "GraphQL",
+            registeredName,
+            baseUrl,
+            configure,
+            applicationName,
+            endpoint,
+            allowMissingBaseUrl: applicationName is not null && baseUrl is null);
+    }
 
     public IProtoTargetBuilder AddClient(
         string name,
         Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> baseAddressResolver,
         Action<IHttpClientBuilder>? configure = null)
-        => ProtoHttpClientRegistration.AddClient(Services, "GraphQL", name, baseAddressResolver, configure);
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var applicationName = _application?.ApplicationName;
+        var registeredName = Qualify(name, applicationName);
+        _application?.RegisterClient("GraphQL", name);
+        return ProtoHttpClientRegistration.AddClient(
+            Services, "GraphQL", registeredName, baseAddressResolver, configure, applicationName);
+    }
 
     public IProtoTargetBuilder AddClient(
         string name,
         Func<ProtoExecutionContext, Uri> baseAddressResolver,
         Action<IHttpClientBuilder>? configure = null)
-        => AddClient(name, (context, _) => ValueTask.FromResult(baseAddressResolver(context)), configure);
+    {
+        ArgumentNullException.ThrowIfNull(baseAddressResolver);
+        return AddClient(name, (context, _) => ValueTask.FromResult(baseAddressResolver(context)), configure);
+    }
 
     /// <summary>
     /// Uses an HTTP client registered by another integration, such as an in-process ASP.NET Core server.
@@ -39,9 +78,13 @@ public sealed class ProtoGraphQLBuilder(IServiceCollection services)
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceClientName);
         ArgumentException.ThrowIfNullOrWhiteSpace(endpointPath);
+        var applicationName = _application?.ApplicationName;
+        var registeredName = Qualify(name, applicationName);
+        _application?.RegisterClient("GraphQL", name);
+        Services.AddSingleton(new ProtoApplicationTarget(registeredName, applicationName ?? registeredName));
         Services.AddSingleton(new ProtoHttpClientAliasRegistration(
             "GraphQL",
-            name,
+            registeredName,
             sourceClientName,
             (context, _) =>
             {
@@ -49,7 +92,7 @@ public sealed class ProtoGraphQLBuilder(IServiceCollection services)
                     ?? throw new InvalidOperationException($"HTTP client '{sourceClientName}' has no base address.");
                 return ValueTask.FromResult(new Uri(baseAddress, endpointPath));
             }));
-        return new ProtoHttpTargetBuilder(name, Services);
+        return new ProtoHttpTargetBuilder(registeredName, Services);
     }
 
     public ProtoGraphQLBuilder CaptureAttachments(Action<GraphQLAttachmentOptions>? configure = null)
@@ -78,29 +121,7 @@ public sealed class ProtoGraphQLBuilder(IServiceCollection services)
         });
         return this;
     }
-}
 
-public static class ProtoGraphQLTargetBuilderExtensions
-{
-    public static IProtoTargetBuilder WithSubscriptionTransport(
-        this IProtoTargetBuilder target,
-        GraphQLSubscriptionTransport transport)
-    {
-        ArgumentNullException.ThrowIfNull(target);
-        target.Services.AddSingleton(new GraphQLSubscriptionTransportRegistration(target.TargetName, transport));
-        return target;
-    }
-
-    public static IProtoTargetBuilder WithSchemaCoverage(this IProtoTargetBuilder target)
-    {
-        ArgumentNullException.ThrowIfNull(target);
-        return target.WithCollector<GraphQLSchemaCoverageCollector>();
-    }
-
-    public static IProtoTargetBuilder WithSchemaCoverage(this IProtoTargetBuilder target, string schemaSource)
-    {
-        ArgumentNullException.ThrowIfNull(target);
-        ArgumentException.ThrowIfNullOrWhiteSpace(schemaSource);
-        return target.WithCollector<GraphQLSchemaCoverageCollector>(schemaSource);
-    }
+    private static string Qualify(string name, string? applicationName)
+        => applicationName is null ? name : $"{applicationName}:{name}";
 }

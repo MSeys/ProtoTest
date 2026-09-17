@@ -33,4 +33,25 @@ public static class ProtoHostBuilderExtensions
 
         return builder;
     }
+
+    /// <summary>
+    /// Exposes REST under an application. Named clients are registered relative to the application,
+    /// take their base address from <c>ProtoTest:Applications:{app}</c>, and become the application's
+    /// REST clients in registration order (the first is the default).
+    /// </summary>
+    public static IProtoApplicationBuilder AddRest(
+        this IProtoApplicationBuilder application,
+        Action<ProtoRestBuilder>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        application.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, RestLifecycleHook>());
+        application.Services.TryAddSingleton(serviceProvider =>
+        {
+            var options = new RestResponseOptions();
+            options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
+            return options;
+        });
+        configure?.Invoke(new ProtoRestBuilder(application.Services, application));
+        return application;
+    }
 }

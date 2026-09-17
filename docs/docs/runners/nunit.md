@@ -25,7 +25,8 @@ using ProtoTest.Rest;
 public sealed class Setup : ProtoTestAssembly
 {
     protected override void Configure(IProtoHostBuilder builder) =>
-        builder.AddRest(rest => rest.AddClient("Api", "https://api.example.test/"));
+        builder.AddApplication("Api", app => app
+            .AddRest(rest => rest.AddClient("Api")));
 }
 ```
 
@@ -45,13 +46,14 @@ using ProtoTest.Rest;
 using System.Net;
 
 [TestFixture]
+[Application("Api")]
 public class OrderTests
 {
     [ProtoTest]
     public async Task Orders_endpoint_responds()
     {
-        var response = await Proto.Context.Rest("Api").GetAsync("/api/orders");
-        response.ShouldHaveStatus(HttpStatusCode.OK);
+        var response = await Proto.Context.Rest().GetAsync("/api/orders");
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
     }
 }
 ```

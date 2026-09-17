@@ -1,5 +1,7 @@
 namespace ProtoTest.Web.Selenium;
 
+using ProtoTest.Core;
+
 public enum SeleniumDiagnosticTraceRetention
 {
     Off,
@@ -11,9 +13,11 @@ public enum SeleniumDiagnosticTraceRetention
 /// Selenium session options. Besides code, they bind from <c>ProtoTest:Web:Selenium</c> and
 /// <c>ProtoTest:Web:Sessions:{name}</c>, in that order.
 /// </summary>
-public sealed class SeleniumWebOptions
+public sealed class SeleniumWebOptions : IProtoConfigurableOptions
 {
     public const string BackendName = "Selenium";
+
+    string IProtoConfigurableOptions.ConfigurationSectionName => $"ProtoTest:Web:{BackendName}";
 
     public TimeSpan ActionTimeout { get; set; } = TimeSpan.FromSeconds(5);
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(50);

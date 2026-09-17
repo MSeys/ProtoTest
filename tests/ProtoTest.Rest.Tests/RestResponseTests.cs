@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Rest.Tests;
+namespace ProtoTest.Rest.Tests;
 
 using System.Net;
 using System.Reflection;
@@ -64,12 +64,12 @@ public class RestResponseTests
     }
 
     [Test]
-    public void ShouldHaveStatus_Should_Throw_When_StatusCode_Mismatches()
+    public void ShouldHaveHttpStatus_Should_Throw_When_StatusCode_Mismatches()
     {
         var rawResponse = new HttpResponseMessage(HttpStatusCode.NotFound);
         var response = new RestResponse(rawResponse, "Not Found Error", TimeSpan.FromMilliseconds(100));
 
-        var ex = Assert.Throws<RestStatusAssertionException>(() => response.ShouldHaveStatus(HttpStatusCode.OK));
+        var ex = Assert.Throws<RestStatusAssertionException>(() => response.ShouldHaveHttpStatus(HttpStatusCode.OK));
 
         using (Assert.EnterMultipleScope())
         {

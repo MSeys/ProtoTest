@@ -1,5 +1,7 @@
 namespace ProtoTest.Data;
 
+using ProtoTest.Data.Internal;
+
 using ProtoTest.Core;
 using System.Collections;
 using System.Linq.Expressions;
@@ -35,7 +37,10 @@ public sealed class ProtoDataObjectBuilder<T>
         return this;
     }
 
-    /// <summary>Resolves and describes all values without constructing the object.</summary>
+    /// <summary>
+    /// Resolves and describes all values without constructing the object. For types registered with a
+    /// factory, only the explicit <c>With(...)</c> values and the construction source are described.
+    /// </summary>
     public ProtoDataExplanation Explain()
     {
         var context = Proto.Context;
@@ -666,25 +671,12 @@ public sealed class ProtoDataObjectBuilder<T>
                     ["data.type"] = typeof(T).FullName,
                     ["data.member"] = value.MemberName,
                     ["data.value_type"] = value.ValueType.FullName,
-                    ["data.value"] = redacted ? "[REDACTED]" : FormatValue(value.Value),
+                    ["data.value"] = redacted ? "[REDACTED]" : ProtoTraceValueFormatter.Serialize(value.Value),
                     ["data.redacted"] = redacted.ToString().ToLowerInvariant(),
                     ["data.source_kind"] = value.SourceKind,
                     ["data.source"] = value.Source
                 },
                 parentId: parentId);
-        }
-    }
-
-    private static string? FormatValue(object? value)
-    {
-        if (value is null) return null;
-        try
-        {
-            return JsonSerializer.Serialize(value, value.GetType());
-        }
-        catch
-        {
-            return value.ToString();
         }
     }
 

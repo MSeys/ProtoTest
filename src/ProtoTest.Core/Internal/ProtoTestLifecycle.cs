@@ -1,4 +1,4 @@
-namespace ProtoTest.Core;
+namespace ProtoTest.Core.Internal;
 
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
@@ -57,16 +57,36 @@ internal sealed class ProtoTestLifecycle
         ArgumentNullException.ThrowIfNull(testName);
         ArgumentNullException.ThrowIfNull(testMethod);
 
+        // This method stays synchronous so the ambient AsyncLocal context it sets is visible to the
+        // caller's execution context; awaiting here would scope the change to this state machine.
         var scope = _rootServiceProvider.CreateScope();
-        var testTrace = _trace.StartTest(testName, testId, testMethod);
-        var context = new ProtoExecutionContext(testName, scope, testId, testMethod, testTrace);
-        var state = new ContextState(
-            _host,
-            context,
-            attributes?.OrderBy(attribute => attribute.Order).ToArray() ?? [],
-            attachmentPublisher);
-        Current.Value = state;
+        ContextState state;
+        try
+        {
+            var testTrace = _trace.StartTest(testName, testId, testMethod);
+            var context = new ProtoExecutionContext(testName, scope, testId, testMethod, testTrace);
+            state = new ContextState(
+                _host,
+                context,
+                attributes?.OrderBy(attribute => attribute.Order).ToArray() ?? [],
+                attachmentPublisher);
+        }
+        catch
+        {
+            // Execution has not begun, so no teardown will dispose the scope: release it here.
+            if (scope is IAsyncDisposable asyncDisposable)
+            {
+                asyncDisposable.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            else
+            {
+                scope.Dispose();
+            }
 
+            throw;
+        }
+
+        Current.Value = state;
         return ExecuteBeforeAsync(state);
     }
 

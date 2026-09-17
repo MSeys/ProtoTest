@@ -3,17 +3,14 @@ namespace ProtoTest.Rest.Internal;
 using ProtoTest.Core;
 using ProtoTest.Http;
 
-internal sealed class RestLifecycleHook() : ProtoHttpAuthLifecycleHook<RestClientAttribute, IRestAuthMetadata>("Rest")
+/// <summary>Resolves <c>[RestAuth]</c> authenticators for the test; the client comes from <c>[Application]</c>.</summary>
+internal sealed class RestLifecycleHook() : ProtoHttpAuthLifecycleHook<IRestAuthMetadata>("Rest")
 {
-    protected override string GetClientName(RestClientAttribute? attribute) => attribute?.ClientName ?? "Default";
-
     protected override void SetContext(
         ProtoExecutionContext context,
-        string clientName,
         Func<ProtoExecutionContext, IProtoHttpAuthenticator>? authenticatorFactory)
         => context.SetContext(new RestContextState
         {
-            ClientName = clientName,
             AuthenticatorFactory = authenticatorFactory
         });
 }

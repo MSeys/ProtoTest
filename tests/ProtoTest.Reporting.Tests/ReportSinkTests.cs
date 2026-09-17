@@ -84,8 +84,10 @@ public sealed class ReportSinkTests
                             [
                                 new ProtoReportItem(
                                     "Orders", "OpenAPI Property", "$.address.city",
-                                    ProtoReportItemKind.Coverage, ProtoReportStatus.Success, 1, true)
-                            ])
+                                    ProtoReportItemKind.Coverage, ProtoReportStatus.Success, 1, true,
+                                    DisplayName: "address › city", DisplayGroup: "Property")
+                            ],
+                            DisplayName: "200 response", DisplayGroup: "Response")
                     ])
             };
             var sink = new HtmlReportSink(new HtmlReportSinkOptions { OutputPath = path });

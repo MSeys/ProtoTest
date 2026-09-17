@@ -8,9 +8,9 @@ using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Testing;
 
-[RestClient(SampleAppTargets.Api)]
+[Application(SampleAppTargets.Api)]
 [SampleEnvironment]
-[Auth<SampleUserAuthenticator>]
+[RestAuth<SampleUserAuthenticator>]
 public sealed class FailureDiagnosticsTests
 {
     [ProtoTest]
@@ -18,7 +18,7 @@ public sealed class FailureDiagnosticsTests
     public async Task CapturedShapeMismatchKeepsPropertyDiagnosticsInSuccessfulRun()
     {
         using var response = await Proto.Context.Rest().GetAsync("/api/control-plane");
-        response.ShouldHaveStatus(HttpStatusCode.OK);
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
 
         try
         {
@@ -71,7 +71,7 @@ public sealed class FailureDiagnosticsTests
         }
 
         using var response = await Proto.Context.Rest().GetAsync("/api/control-plane");
-        response.ShouldHaveStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        response.ShouldHaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
         {
             workspaceCount = 99,
             releaseCount = 42,

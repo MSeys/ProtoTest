@@ -1,17 +1,17 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-	<TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-	<LangVersion>latest</LangVersion>
-	<IsPackable>true</IsPackable>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>true</IsPackable>
   </PropertyGroup>
 
   <PropertyGroup>
-  	<PackageId>ProtoTest.NUnit</PackageId>
-	<Description>NUnit adapter for ProtoTest, bringing frictionless lifecycle management and dependency injection to your test suites.</Description>
-	<PackageTags>testing;integration-testing;nunit;dependency-injection;dotnet</PackageTags>
+      <PackageId>ProtoTest.NUnit</PackageId>
+    <Description>NUnit adapter for ProtoTest, bringing frictionless lifecycle management and dependency injection to your test suites.</Description>
+    <PackageTags>testing;integration-testing;nunit;dependency-injection;dotnet</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

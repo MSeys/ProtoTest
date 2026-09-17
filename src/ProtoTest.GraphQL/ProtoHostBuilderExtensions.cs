@@ -30,4 +30,26 @@ public static class ProtoHostBuilderExtensions
         }
         return builder;
     }
+
+    /// <summary>
+    /// Exposes GraphQL under an application. Named clients are registered relative to the application,
+    /// take their endpoint from <c>ProtoTest:Applications:{app}</c>, and become the application's
+    /// GraphQL clients in registration order (the first is the default).
+    /// </summary>
+    public static IProtoApplicationBuilder AddGraphQL(
+        this IProtoApplicationBuilder application,
+        Action<ProtoGraphQLBuilder>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        application.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, GraphQLLifecycleHook>());
+        application.Services.TryAddSingleton<IGraphQLWebSocketFactory, ClientGraphQLWebSocketFactory>();
+        application.Services.TryAddSingleton(sp =>
+        {
+            var options = new GraphQLResponseOptions();
+            options.BindFromConfiguration(sp.GetRequiredService<IConfiguration>());
+            return options;
+        });
+        configure?.Invoke(new ProtoGraphQLBuilder(application.Services, application));
+        return application;
+    }
 }

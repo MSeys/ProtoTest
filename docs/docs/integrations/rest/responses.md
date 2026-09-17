@@ -17,7 +17,7 @@ using var response = await Proto.Context.Rest()
     .PostAsync("/api/orders");
 
 response
-    .ShouldHaveStatus(HttpStatusCode.Created)
+    .ShouldHaveHttpStatus(HttpStatusCode.Created)
     .ShouldMatchShape(new
     {
         product = "observability-seat",
@@ -27,10 +27,10 @@ response
     });
 ```
 
-### `ShouldHaveStatus`
+### `ShouldHaveHttpStatus`
 
 ```csharp
-RestResponse ShouldHaveStatus(HttpStatusCode expectedStatusCode);
+RestResponse ShouldHaveHttpStatus(HttpStatusCode expectedStatusCode);
 ```
 
 On failure it throws `RestStatusAssertionException` with `ExpectedStatusCode`, `ActualStatusCode` and `ResponseBody`. The body is appended to the message (with sensitive values redacted), so a failing `400` tells you *why* without re-running anything.
@@ -91,7 +91,7 @@ A common pattern is assert-then-read, so the test fails with a useful message be
 
 ```csharp
 var workspace = response
-    .ShouldHaveStatus(HttpStatusCode.Created)
+    .ShouldHaveHttpStatus(HttpStatusCode.Created)
     .ReadAsJson<WorkspaceResponse>()!;
 ```
 

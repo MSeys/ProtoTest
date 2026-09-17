@@ -49,6 +49,27 @@ public sealed class ProtoHttpClientInitializerTests
     }
 
     [Test]
+    public async Task Initializer_ShouldUseTheTargetApplicationBaseUrl()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?> { ["ProtoTest:Applications:Catalog:BaseUrl"] = "https://app.example/" }));
+        builder.ConfigureServices(services =>
+        {
+            services.AddHttpClient(ProtoHttpClientInitializer.GetFactoryName("REST", "Catalog"));
+            services.AddSingleton<IProtoClientInitializer>(new ProtoHttpClientInitializer("REST", "Catalog"));
+        });
+        await using var host = builder.Build();
+        await host.StartTestAsync("initializer", "4", TestMethod());
+        try
+        {
+            Assert.That(Proto.Context.Client<HttpClient>("Catalog").BaseAddress,
+                Is.EqualTo(new Uri("https://app.example/")));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
     public async Task Initializer_ShouldFailForInvalidConfiguredBaseUrl()
     {
         await using var host = BuildHost("GraphQL", new ProtoHttpClientInitializer("GraphQL", "Catalog"), "/graphql");
@@ -70,7 +91,7 @@ public sealed class ProtoHttpClientInitializerTests
     {
         var builder = new ProtoHostBuilder();
         builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
-            new Dictionary<string, string?> { ["ProtoTest:Clients:Catalog:BaseUrl"] = configuredBaseUrl }));
+            new Dictionary<string, string?> { ["ProtoTest:Applications:Catalog:BaseUrl"] = configuredBaseUrl }));
         builder.ConfigureServices(services =>
         {
             services.AddHttpClient(ProtoHttpClientInitializer.GetFactoryName(protocol, "Catalog"));

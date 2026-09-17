@@ -278,7 +278,7 @@ internal sealed class ProtoTestLifecycle
             "context.dispose",
             "Dispose execution context",
             isRollback ? ProtoTracePhase.Rollback : ProtoTracePhase.Teardown,
-            async () => await context.DisposeAsync(),
+            () => context.DisposeAsync(isRollback ? ProtoTracePhase.Rollback : ProtoTracePhase.Teardown).AsTask(),
             exceptions,
             new Dictionary<string, string?>
             {

@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Core;
+namespace ProtoTest.Core;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,6 +36,15 @@ public interface IProtoHostBuilder
 
     /// <summary>Configures the automatic execution trace written by ProtoTest.Core.</summary>
     IProtoHostBuilder ConfigureTracing(Action<ProtoTraceOptions> configure);
+
+    /// <summary>
+    /// Registers a Run gate evaluated once the suite finishes. Gates see everything the run's
+    /// collectors produced; a failed gate fails the run after the reports are written.
+    /// </summary>
+    IProtoHostBuilder AddRunGate<TGate>() where TGate : class, IProtoRunGate;
+
+    /// <summary>Registers a Run gate defined by a delegate.</summary>
+    IProtoHostBuilder AddRunGate(string name, Func<ProtoRunGateContext, ProtoRunGateResult> evaluate);
 
     /// <summary>
     /// Builds and initializes the configured <see cref="ProtoHost"/> instance.

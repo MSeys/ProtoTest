@@ -14,8 +14,10 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     private readonly ProtoAttachmentCollection _attachments;
     private readonly ProtoContextStateStore _state = new();
     private readonly ProtoClientRegistry _clients = new();
+    private readonly ProtoResourceRegistry _resources = new();
     private readonly ProtoObservationDispatcher _observations;
     private int _disposeStarted;
+    private int _findingSequence;
 
     public ProtoExecutionContext(string testName, IServiceScope scope, string testId, MethodInfo testMethod)
         : this(testName, scope, ProtoTestId.Parse(testId), testMethod)
@@ -169,14 +171,20 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     }
 
     /// <summary>
-    /// Registers a named client for this test. Owned clients are disposed in reverse registration order
-    /// when the test completes; pass <paramref name="disposeWithContext"/> as <see langword="false"/> for
-    /// shared clients whose lifetime is managed elsewhere.
+    /// Registers a named client for this test. The client is owned by the test and released in reverse
+    /// registration order when the test completes; pass <paramref name="disposeWithContext"/> as
+    /// <see langword="false"/> for shared clients whose lifetime is managed elsewhere.
     /// </summary>
     public void RegisterClient<TClient>(TClient client, string name = "Default", bool disposeWithContext = true)
         where TClient : class
     {
-        _clients.Register(client, name, disposeWithContext);
+        ArgumentNullException.ThrowIfNull(client);
+        _clients.Register(client, name);
+        RegisterOwned(new ProtoResource(
+            $"client:{typeof(TClient).FullName}:{name}",
+            "client",
+            $"{(disposeWithContext ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
+            context => ReleaseClientAsync(client, disposeWithContext)));
         Trace.WriteEvent(
             "client.register",
             $"Register · {name} ({typeof(TClient).Name})",
@@ -242,6 +250,104 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         return client;
     }
 
+    /// <summary>Gets a snapshot of the resources owned by this test, in registration order.</summary>
+    public IReadOnlyList<ProtoResourceSnapshot> Resources => _resources.Snapshot();
+
+    /// <summary>
+    /// Registers a resource owned by this test. Owned resources are released in reverse registration
+    /// order during teardown, after hooks and attributes and before clients are disposed.
+    /// </summary>
+    public void RegisterResource(IProtoResource resource)
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        RegisterOwned(resource);
+        Trace.WriteEvent(
+            "resource.register",
+            $"Register · {resource.Id}",
+            "ProtoTest.Core",
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: new Dictionary<string, string?>
+            {
+                ["resource.id"] = resource.Id,
+                ["resource.kind"] = resource.Kind,
+                ["resource.description"] = resource.Description
+            });
+    }
+
+    /// <summary>Registers a resource and returns it, so ownership can be expressed inline.</summary>
+    public T RegisterResource<T>(T resource) where T : class, IProtoResource
+    {
+        RegisterResource((IProtoResource)resource);
+        return resource;
+    }
+
+    /// <summary>Registers a resource described by a release callback.</summary>
+    public void RegisterResource(
+        string id,
+        string kind,
+        string description,
+        Func<ProtoResourceReleaseContext, ValueTask> release)
+        => RegisterResource(new ProtoResource(id, kind, description, release));
+
+    /// <summary>
+    /// Releases one owned resource before teardown. Returns <see langword="false"/> when the resource
+    /// is unknown or was already released.
+    /// </summary>
+    public ValueTask<bool> ReleaseResourceAsync(string id)
+        => _resources.ReleaseAsync(id, this, Trace, ProtoTracePhase.Execution);
+
+    /// <summary>
+    /// Records a finding: something worth reporting that is deliberately not a test failure. Findings
+    /// reach the run's reports and run gates, and are traced so they appear in ProtoTrace.
+    /// </summary>
+    public ProtoReportItem AddFinding(
+        string message,
+        ProtoReportStatus status = ProtoReportStatus.Warning,
+        string? identifier = null,
+        string? category = null,
+        string? targetName = null,
+        IReadOnlyList<string>? tags = null,
+        IReadOnlyDictionary<string, object>? metadata = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        var sequence = Interlocked.Increment(ref _findingSequence);
+        var item = new ProtoReportItem(
+            TargetName: targetName ?? "Test findings",
+            Category: category ?? "Finding",
+            Identifier: identifier ?? $"finding-{sequence:D3}",
+            Kind: ProtoReportItemKind.Finding,
+            Status: status,
+            Message: message,
+            Tags: tags,
+            Metadata: WithTestIdentity(metadata),
+            DisplayGroup: TestName);
+        TryService<ProtoFindingStore>()?.Add(item);
+        Trace.WriteEvent(
+            "finding.record",
+            $"Finding · {item.Identifier}",
+            "ProtoTest.Core",
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: new Dictionary<string, string?>
+            {
+                ["finding.status"] = status.ToString(),
+                ["finding.target"] = item.TargetName,
+                ["finding.category"] = item.Category,
+                ["finding.message"] = message,
+                ["finding.tags"] = tags is null ? null : string.Join(", ", tags)
+            });
+        return item;
+    }
+
+    private IReadOnlyDictionary<string, object> WithTestIdentity(IReadOnlyDictionary<string, object>? metadata)
+    {
+        var merged = metadata is null
+            ? new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, object>(metadata, StringComparer.OrdinalIgnoreCase);
+        merged["test.id"] = TestId;
+        merged["test.name"] = TestName;
+        return merged;
+    }
+
     /// <summary>Gets a snapshot of observations recorded for this test.</summary>
     public IReadOnlyCollection<ProtoObservation> RecordedObservations => _observations.Snapshot();
 
@@ -274,16 +380,24 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         => RecordObservation(new ProtoObservation(targetName, kind, identifier, data, metadata));
 
     /// <summary>
-    /// Disposes owned clients and the service scope. Disposal is idempotent and attempts every resource.
+    /// Releases owned resources, disposes owned clients and the service scope. Disposal is idempotent
+    /// and attempts every resource.
     /// </summary>
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync() => DisposeAsync(ProtoTracePhase.Teardown);
+
+    /// <summary>
+    /// Releases owned resources, disposes owned clients and the service scope. Disposal is idempotent
+    /// and attempts every resource.
+    /// </summary>
+    internal async ValueTask DisposeAsync(ProtoTracePhase phase)
     {
         if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
         {
             return;
         }
 
-        var exceptions = (await _clients.DisposeClientsAsync(Trace)).ToList();
+        _clients.Seal();
+        var exceptions = (await _resources.ReleaseAllAsync(this, Trace, phase)).ToList();
         try
         {
             if (_scope is IAsyncDisposable asyncDisposable)
@@ -303,6 +417,25 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         if (exceptions.Count > 0)
         {
             throw new AggregateException("One or more execution context resources failed to dispose.", exceptions);
+        }
+    }
+
+    private void RegisterOwned(IProtoResource resource) => _resources.Register(resource);
+
+    private static async ValueTask ReleaseClientAsync(object client, bool dispose)
+    {
+        if (!dispose)
+        {
+            return;
+        }
+
+        if (client is IAsyncDisposable asyncDisposable)
+        {
+            await asyncDisposable.DisposeAsync();
+        }
+        else if (client is IDisposable disposable)
+        {
+            disposable.Dispose();
         }
     }
 }

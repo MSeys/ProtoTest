@@ -98,7 +98,7 @@ builder.ConfigureServices(services =>
     services.AddSingleton<IProtoClientInitializer>(_ => new SharedBusInitializer()));
 ```
 
-With `disposeWithContext: false` the test only releases its reference (a `client.release` trace entry) instead of disposing. Registering through a factory delegate, as above, lets the host's service provider dispose the initializer — and with it the shared client — when the run ends. This is how the [ASP.NET Core integration](../integrations/aspnetcore.md#one-application-or-one-per-test) shares one application across tests. Remember that tests running in parallel will use a shared client concurrently.
+With `disposeWithContext: false` the test releases its reference to the client (a `resource.release` trace entry) without disposing it. Registering through a factory delegate, as above, lets the host's service provider dispose the initializer — and with it the shared client — when the run ends. This is how the [ASP.NET Core integration](../integrations/aspnetcore.md#one-application-or-one-per-test) shares one application across tests. Remember that tests running in parallel will use a shared client concurrently.
 
 ## Fallback chains
 

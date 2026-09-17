@@ -63,6 +63,20 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     }
 
     /// <inheritdoc />
+    public IProtoHostBuilder AddRunGate<TGate>() where TGate : class, IProtoRunGate
+    {
+        _services.AddSingleton<IProtoRunGate, TGate>();
+        return this;
+    }
+
+    /// <inheritdoc />
+    public IProtoHostBuilder AddRunGate(string name, Func<ProtoRunGateContext, ProtoRunGateResult> evaluate)
+    {
+        _services.AddSingleton<IProtoRunGate>(new ProtoRunGate(name, evaluate));
+        return this;
+    }
+
+    /// <inheritdoc />
     public ProtoHost Build()
     {
         if (_built)
@@ -84,6 +98,11 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
         // Internal hooks
         _services.AddSingleton<IProtoTestHook, ProtoClientInitializerHook>();
         _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoRunHook, ProtoTraceExportHook>());
+        _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoRunHook, ProtoRunGateHook>());
+        _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoReportSource, ProtoRunGateReportSource>());
+        var findingStore = new ProtoFindingStore();
+        _services.AddSingleton(findingStore);
+        _services.AddSingleton<IProtoReportSource>(findingStore);
 
         var rootProvider = _services.BuildServiceProvider();
         try

@@ -13,14 +13,7 @@ internal sealed class ProtoSinkExportHook(
 
     public async Task AfterRunAsync(CancellationToken cancellationToken = default)
     {
-        var items = collectors.OfType<IProtoReportSource>()
-            .Concat(reportSources)
-            .Distinct<IProtoReportSource>(ReferenceEqualityComparer.Instance)
-            .SelectMany(source => source.GetReportItems())
-            .OrderBy(item => item.TargetName, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(item => item.Category, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(item => item.Identifier, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var items = ProtoReportItems.Collect(collectors, reportSources);
         var exceptions = new List<Exception>();
 
         foreach (var sink in sinks)

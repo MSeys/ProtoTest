@@ -1,28 +1,33 @@
 namespace ProtoTest.Core.Internal;
 
+/// <summary>
+/// Resolves the named clients registered for a test by type and name. Ownership and release live in
+/// <see cref="ProtoResourceRegistry"/>; this registry only answers lookups.
+/// </summary>
 internal sealed class ProtoClientRegistry
 {
     private readonly ProtoLock _gate = new();
-    private readonly Dictionary<ClientKey, Registration> _clients = new(ClientKeyComparer.Instance);
-    private readonly List<ClientKey> _registrationOrder = [];
-    private int _disposeStarted;
+    private readonly Dictionary<ClientKey, object> _clients = new(ClientKeyComparer.Instance);
+    private int _sealed;
 
-    public void Register<TClient>(TClient client, string name, bool disposeWithContext) where TClient : class
+    /// <summary>Stops further registrations once the execution context starts releasing resources.</summary>
+    public void Seal() => Interlocked.Exchange(ref _sealed, 1);
+
+    public void Register<TClient>(TClient client, string name) where TClient : class
     {
         ArgumentNullException.ThrowIfNull(client);
         var key = BuildKey<TClient>(name);
 
         lock (_gate)
         {
-            ObjectDisposedException.ThrowIf(_disposeStarted != 0, this);
+            ObjectDisposedException.ThrowIf(_sealed != 0, this);
             if (_clients.ContainsKey(key))
             {
                 throw new InvalidOperationException(
                     $"A client of type '{typeof(TClient).Name}' is already registered with name '{name}'.");
             }
 
-            _registrationOrder.Add(key);
-            _clients[key] = new Registration(client, disposeWithContext);
+            _clients[key] = client;
         }
     }
 
@@ -36,75 +41,10 @@ internal sealed class ProtoClientRegistry
         var key = BuildKey<TClient>(name);
         lock (_gate)
         {
-            return _clients.TryGetValue(key, out var registration) && registration.Client is TClient typedClient
+            return _clients.TryGetValue(key, out var client) && client is TClient typedClient
                 ? typedClient
                 : null;
         }
-    }
-
-    public async ValueTask<IReadOnlyList<Exception>> DisposeClientsAsync(IProtoTraceWriter trace)
-    {
-        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
-        {
-            return [];
-        }
-
-        List<(ClientKey Key, Registration Registration)> clients;
-        lock (_gate)
-        {
-            clients = [.. _registrationOrder.AsEnumerable().Reverse().Select(key => (key, _clients[key]))];
-            _clients.Clear();
-            _registrationOrder.Clear();
-        }
-
-        var exceptions = new List<Exception>();
-        foreach (var (key, (client, disposeWithContext)) in clients)
-        {
-            if (!disposeWithContext)
-            {
-                // Shared clients outlive the test; the context only drops its reference.
-                trace.WriteEvent(
-                    "client.release",
-                    $"Release · {key.Name} ({key.ClientType.Name})",
-                    "ProtoTest.Core",
-                    ProtoTracePhase.Teardown,
-                    ProtoTraceOutcome.Succeeded,
-                    new Dictionary<string, string?>
-                    {
-                        ["client.name"] = key.Name,
-                        ["client.type"] = key.ClientType.FullName,
-                        ["instance.type"] = client.GetType().FullName
-                    });
-                continue;
-            }
-
-            using var operation = trace
-                .Operation("client.dispose", $"Dispose · {key.Name} ({key.ClientType.Name})", "ProtoTest.Core")
-                .During(ProtoTracePhase.Teardown)
-                .With("client.name", key.Name)
-                .With("client.type", key.ClientType.FullName)
-                .With("instance.type", client.GetType().FullName)
-                .Begin();
-            try
-            {
-                if (client is IAsyncDisposable asyncDisposable)
-                {
-                    await asyncDisposable.DisposeAsync();
-                }
-                else if (client is IDisposable disposable)
-                {
-                    disposable.Dispose();
-                }
-                operation.Succeed();
-            }
-            catch (Exception exception)
-            {
-                operation.Fail(exception);
-                exceptions.Add(exception);
-            }
-        }
-
-        return exceptions;
     }
 
     private static ClientKey BuildKey<TClient>(string name)
@@ -112,6 +52,4 @@ internal sealed class ProtoClientRegistry
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         return new ClientKey(typeof(TClient), name);
     }
-
-    private readonly record struct Registration(object Client, bool DisposeWithContext);
 }

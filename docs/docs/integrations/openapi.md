@@ -32,7 +32,7 @@ builder
     .AddApplication("Api", app => app
         .AddRest(rest => rest
             .AddClient("Api")
-            .WithCollector<OpenApiCoverageCollector>()));
+            .AddCollector<OpenApiCoverageCollector>()));
 ```
 
 The collector reads `ProtoTest:Applications:{application}:OpenApi:Specification`, where the application is the one the REST client belongs to. In a real project you'd usually put that in `appsettings.json` instead. The value can be a file path, a URL, or the document itself as JSON or YAML. A relative URL is resolved against the application's `ProtoTest:Applications:{application}:BaseUrl` — handy for pointing at `/swagger/v1/swagger.json` on a deployed API.
@@ -47,11 +47,11 @@ A document that fails to parse throws with the parser's diagnostics.
 
 ### Passing the document directly
 
-`WithCollector` forwards extra arguments to the collector's constructor, which has overloads for a source string and a parsed document (the configuration route is the one exercised by the sample suite):
+`AddCollector` forwards extra arguments to the collector's constructor, which has overloads for a source string and a parsed document (the configuration route is the one exercised by the sample suite):
 
 ```csharp
 rest.AddClient("Api")
-    .WithCollector<OpenApiCoverageCollector>("https://api.example.test/swagger/v1/swagger.json");
+    .AddCollector<OpenApiCoverageCollector>("https://api.example.test/swagger/v1/swagger.json");
 ```
 
 ```csharp

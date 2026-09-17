@@ -86,7 +86,7 @@ REST emits an `http.response` observation for every response, identified by meth
 builder.AddApplication("Api", app => app
     .AddRest(rest => rest
         .AddClient("Api")
-        .WithCollector<RestCoverageCollector>()));
+        .AddCollector<RestCoverageCollector>()));
 ```
 
 `RestCoverageCollector` reports every endpoint your suite **called**, with a hit count. It can only list what it saw — to find endpoints you **never** called, and response fields you never asserted, use [`OpenApiCoverageCollector`](../openapi.md), which walks your whole specification.

@@ -11,7 +11,7 @@ builder.AddApplication("Catalog", app => app.AddGraphQL(graphQL => graphQL
     .CaptureAttachments()
     .AddClient("Catalog")
     .WithSchemaCoverage("catalog.graphql")
-    .WithCollector<GraphQLCoverageCollector>()));
+    .AddCollector<GraphQLCoverageCollector>()));
 ```
 
 As with REST, the endpoint comes from the application's

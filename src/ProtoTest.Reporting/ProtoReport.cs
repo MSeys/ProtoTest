@@ -19,7 +19,11 @@ public sealed record ProtoReport(
             DateTimeOffset.UtcNow,
             new ProtoReportSummary(
                 Total: flattened.Length,
-                TotalOccurrences: flattened.Sum(item => item.Count),
+                // An occurrence is an observed fact: coverage hits and observations. A gate verdict or a
+                // finding is recorded once, not observed repeatedly, so it does not inflate the count.
+                TotalOccurrences: flattened
+                    .Where(item => item.Kind is ProtoReportItemKind.Coverage or ProtoReportItemKind.Observation)
+                    .Sum(item => item.Count),
                 CoverageTotal: coverageItems.Length,
                 Covered: covered,
                 Uncovered: coverageItems.Length - covered,
@@ -27,7 +31,9 @@ public sealed record ProtoReport(
                     ? 0
                     : Math.Round(covered * 100d / coverageItems.Length, 2),
                 Warnings: flattened.Count(item => item.Status == ProtoReportStatus.Warning),
-                Errors: flattened.Count(item => item.Status == ProtoReportStatus.Error)),
+                Errors: flattened.Count(item => item.Status == ProtoReportStatus.Error),
+                Findings: flattened.Count(item => item.Kind == ProtoReportItemKind.Finding),
+                Gates: flattened.Count(item => item.Kind == ProtoReportItemKind.Gate)),
             roots);
     }
 
@@ -55,4 +61,6 @@ public sealed record ProtoReportSummary(
     int Uncovered,
     double CoveragePercentage,
     int Warnings,
-    int Errors);
+    int Errors,
+    int Findings,
+    int Gates);

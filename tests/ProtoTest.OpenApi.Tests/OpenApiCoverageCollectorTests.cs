@@ -198,6 +198,72 @@ public class OpenApiCoverageCollectorTests
         Assert.That(((IProtoReportSource)collector).GetReportItems().Single().Identifier, Is.EqualTo("GET /users/{id}"));
     }
 
+    [Test]
+    public async Task Collector_ShouldSeeObservationsUnderTheApplicationsQualifiedTargetName()
+    {
+        // Arrange: under an application the client is registered as "TestApi:Api", so observations must
+        // carry that target name or every collector keyed on it goes blind.
+        var handler = new StubHttpHandler(_ => new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"id":"42","name":"Ada","address":{"city":"Ghent"}}""")
+        });
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Applications:TestApi:BaseUrl"] = "https://api.example.test",
+                ["ProtoTest:Applications:TestApi:OpenApi:Specification"] = OpenApiTestHelper.SampleJsonSpec
+            }));
+        builder.AddApplication("TestApi", app => app.AddRest(rest => rest
+            .AddClient("Api", configure: http => http.ConfigurePrimaryHttpMessageHandler(() => handler))
+            .AddCollector<RestCoverageCollector>()
+            .AddCollector<OpenApiCoverageCollector>()));
+        await using var host = builder.Build();
+        await host.StartTestAsync("application coverage", "10", TestMethod(), [new ApplicationAttribute("TestApi")]);
+        try
+        {
+            // Act
+            using var response = await Proto.Context.Rest().GetAsync("/users/{id}", new { id = 42 });
+            response.ShouldHaveHttpStatus(System.Net.HttpStatusCode.OK)
+                .ShouldMatchShape(new { id = "42", name = "Ada" });
+
+            // Assert
+            var collectors = Proto.Context.Services.GetServices<IProtoCollector>().ToArray();
+            var openApi = collectors.OfType<OpenApiCoverageCollector>().Single();
+            var rest = collectors.OfType<RestCoverageCollector>().Single();
+            var endpoint = openApi.GetReportItems().Single(item => item.Identifier == "GET /users/{id}");
+            var property = endpoint.Children!
+                .Single(child => child.Identifier == "200").Children!
+                .Single(child => child.Identifier == "$.id");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(endpoint.IsCovered, Is.True);
+                Assert.That(endpoint.Count, Is.GreaterThan(0));
+                Assert.That(property.IsCovered, Is.True);
+                Assert.That(rest.GetReportItems().Single().Identifier, Is.EqualTo("GET /users/{id}"));
+            }
+        }
+        finally
+        {
+            await host.CompleteTestAsync();
+        }
+    }
+
+    private static System.Reflection.MethodInfo TestMethod()
+        => typeof(OpenApiCoverageCollectorTests).GetMethod(
+            nameof(TestPlaceholder), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+
+    private static void TestPlaceholder()
+    {
+    }
+
+    private sealed class StubHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(respond(request));
+    }
+
     private sealed class StaticConfigurationSource(IReadOnlyDictionary<string, string?> values) : IConfigurationSource
     {
         public IConfigurationProvider Build(IConfigurationBuilder builder)

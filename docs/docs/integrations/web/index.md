@@ -198,7 +198,7 @@ Sessions can also be declared on the test, so setup creates (and optionally navi
 public async Task ...() { ... }
 ```
 
-Origins are environment-specific, so they come from the [application](../getting-started/configuration.md) the session targets. Each session selects one with `ProtoTest:Web:Sessions:{name}:Application` (or `[WebSession(..., Application = "…")]`), defaulting to its own name, and reads its `ProtoTest:Applications:{application}:BaseUrl` — the same address a REST/GraphQL client targeting that application uses. A relative `Open` (or `Page<T>().OpenAsync("/path")`) resolves against that base. If even the path differs per environment, `ProtoTest:Web:Sessions:{name}:Open` supplies the whole URL and takes precedence over the attribute.
+Origins are environment-specific, so they come from the [application](../../getting-started/configuration.md) the session targets. Each session selects one with `ProtoTest:Web:Sessions:{name}:Application` (or `[WebSession(..., Application = "…")]`), defaulting to its own name, and reads its `ProtoTest:Applications:{application}:BaseUrl` — the same address a REST/GraphQL client targeting that application uses. A relative `Open` (or `Page<T>().OpenAsync("/path")`) resolves against that base. If even the path differs per environment, `ProtoTest:Web:Sessions:{name}:Open` supplies the whole URL and takes precedence over the attribute.
 
 ```json
 {

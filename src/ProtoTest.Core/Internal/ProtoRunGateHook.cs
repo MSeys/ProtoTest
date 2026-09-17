@@ -6,7 +6,7 @@ internal sealed class ProtoRunGateHook(
     IEnumerable<IProtoReportSource> reportSources,
     ProtoTraceSession trace) : IProtoRunHook
 {
-    // AfterRun executes in descending order. Gates run first so their findings reach the sinks, the
+    // AfterRun executes in descending order. Gates run first so their verdicts reach the sinks, the
     // run-scoped resources are still alive, and the trace archive picks everything up.
     public int Order => int.MinValue + 3;
 
@@ -20,7 +20,7 @@ internal sealed class ProtoRunGateHook(
         }
 
         var context = new ProtoRunGateContext(ProtoReportItems.Collect(collectors, reportSources));
-        var findings = new List<ProtoReportItem>(gateList.Length);
+        var verdicts = new List<ProtoReportItem>(gateList.Length);
         var failures = new List<ProtoRunGateFailure>();
 
         foreach (var gate in gateList)
@@ -37,11 +37,11 @@ internal sealed class ProtoRunGateHook(
                     $"The gate threw {exception.GetType().Name}: {exception.Message}");
             }
 
-            findings.Add(new ProtoReportItem(
+            verdicts.Add(new ProtoReportItem(
                 "Run gates",
                 "Gate",
                 gate.Name,
-                Kind: ProtoReportItemKind.Finding,
+                Kind: ProtoReportItemKind.Gate,
                 Status: StatusOf(result.Outcome),
                 Count: 1,
                 Message: result.Message,
@@ -68,7 +68,7 @@ internal sealed class ProtoRunGateHook(
             }
         }
 
-        reportSources.OfType<ProtoRunGateReportSource>().FirstOrDefault()?.Publish(findings);
+        reportSources.OfType<ProtoRunGateReportSource>().FirstOrDefault()?.Publish(verdicts);
 
         return failures.Count == 0
             ? Task.CompletedTask

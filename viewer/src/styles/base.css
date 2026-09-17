@@ -1,0 +1,67 @@
+/* The app shell and the handful of utilities every view shares.
+   Everything else is a component in src/ui: if it renders, it was designed. */
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+
+/* One scrolling surface at a time: the shell fills the viewport and the views scroll inside it. */
+#app { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { min-height: 36px; border: 2px solid transparent; border-radius: var(--radius-chip); background: var(--border-strong); background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background-color: var(--blueprint); }
+*::-webkit-scrollbar-corner { background: transparent; }
+
+body {
+  color: var(--text);
+  font: var(--text-body)/var(--leading) var(--font-ui);
+  background-color: var(--bg);
+  background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: var(--grid-size) var(--grid-size);
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input { color: inherit; font: inherit; }
+button { cursor: pointer; }
+button:focus-visible, input:focus-visible, [tabindex]:focus-visible, a:focus-visible {
+  outline: 2px solid var(--blueprint);
+  outline-offset: 2px;
+  border-radius: var(--radius-chip);
+}
+h1, h2, h3 { margin: 0; font-family: var(--font-display); font-weight: var(--weight-bold); letter-spacing: -.01em; }
+p { margin: 0; }
+a { color: var(--blueprint); }
+
+/* Utilities: the three words every view needs and no component should own. */
+.eyebrow { color: var(--dim); font-size: var(--text-meta); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; }
+.mono { font-family: var(--font-mono); }
+.muted { color: var(--muted); }
+
+/* Status is a shape plus a colour: the dot never carries the meaning alone. */
+.status { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--outcome-unknown); }
+.status.success { background: var(--outcome-succeeded); }
+.status.warning { background: var(--outcome-partial); }
+.status.danger { background: var(--outcome-failed); }
+.status.neutral { background: var(--outcome-unknown); }
+
+/* The start screen: the only place in the app that is deliberately empty. */
+.empty-state { width: min(820px, 100% - var(--space-7)); height: 100%; margin: 0 auto; padding: var(--space-5) 0; display: grid; overflow: auto; }
+.drop-zone {
+  min-height: min(320px, 60dvh);
+  padding: clamp(20px, 5vw, 40px) clamp(14px, 4vw, 32px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  text-align: center;
+}
+.drop-zone.dragging { border-style: dashed; border-color: var(--blueprint); background: var(--blueprint-soft); }
+.drop-zone h1 { margin-top: var(--space-3); font-size: var(--text-display); }
+.drop-zone p { margin-bottom: var(--space-5); color: var(--muted); }
+.drop-zone small { margin-top: var(--space-4); color: var(--muted); }

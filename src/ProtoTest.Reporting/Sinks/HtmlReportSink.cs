@@ -9,8 +9,34 @@ using System.Text.Json;
 public sealed class HtmlReportSink : FileReportSink<HtmlReportSinkOptions>
 {
     private static readonly string BrandMark = ReadEmbeddedText("ProtoTest.Reporting.BrandMark.svg");
+
+    /// <summary>
+    /// The report shares one token file with the ProtoTrace viewer and the documentation, so the three
+    /// surfaces cannot drift apart. The file is embedded from <c>design/prototest-tokens.css</c>.
+    /// </summary>
+    private static readonly string Styles = $"<style>{ReadEmbeddedText("ProtoTest.Reporting.Tokens.css")}{ComponentStyles}</style>";
+
     private static readonly string Favicon = "data:image/svg+xml;base64," + Convert.ToBase64String(
-        Encoding.UTF8.GetBytes(BrandMark));
+        Encoding.UTF8.GetBytes(ThemedForImage(BrandMark)));
+
+    /// <summary>The viewer's expander: a plus that loses its stem when the row is open.</summary>
+    private const string Expander =
+        "<span class=\"chevron\" aria-hidden=\"true\"><svg viewBox=\"0 0 10 10\" width=\"10\" height=\"10\">"
+        + "<path d=\"M1.6 5H8.4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/>"
+        + "<path class=\"stem\" d=\"M5 1.6V8.4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/>"
+        + "</svg></span>";
+
+    /// <summary>
+    /// The inline mark takes its colours from the page's surface tokens. A favicon is an image and cannot see
+    /// them, so it carries its own light and dark fills and follows the operating system instead.
+    /// </summary>
+    private static string ThemedForImage(string svg)
+    {
+        const string style = "<style>path:nth-of-type(1){fill:#123B58}path:nth-of-type(2){fill:#1688BF}"
+            + "@media (prefers-color-scheme: dark){path:nth-of-type(1){fill:#F7F5EE}path:nth-of-type(2){fill:#19A8B5}}</style>";
+        var tagEnd = svg.IndexOf('>', svg.IndexOf("<svg", StringComparison.Ordinal));
+        return tagEnd < 0 ? svg : svg.Insert(tagEnd + 1, style);
+    }
 
     public HtmlReportSink() : this(new HtmlReportSinkOptions()) { }
 
@@ -75,7 +101,9 @@ public sealed class HtmlReportSink : FileReportSink<HtmlReportSinkOptions>
                 ? $"{report.Summary.Uncovered} uncovered"
                 : report.Summary.Warnings > 0
                     ? $"{report.Summary.Warnings} warning{PluralSuffix(report.Summary.Warnings)}"
-                    : "All covered";
+                    : report.Summary.CoverageTotal > 0
+                        ? "All covered"
+                        : "Clean run";
         html.Append("<span class=\"state-pill ").Append(stateClass).Append("\"><i></i>")
             .Append(Encode(stateText)).Append("</span></div>");
         html.Append("""
@@ -87,7 +115,7 @@ public sealed class HtmlReportSink : FileReportSink<HtmlReportSinkOptions>
             <main>
               <section class="hero">
                 <div>
-                  <p class="eyebrow">OBSERVATION / COVERAGE</p>
+                  <p class="eyebrow">RUN REPORT</p>
             """);
         html.Append("<h1>").Append(Encode(Options.Title)).Append("</h1>");
         html.Append("<p class=\"generated\">Generated <time datetime=\"")
@@ -105,12 +133,13 @@ public sealed class HtmlReportSink : FileReportSink<HtmlReportSinkOptions>
         }
 
         html.Append("</section><section class=\"metrics\">");
-        SummaryCard(html, "Items", report.Summary.Total, "All report entries", "accent");
-        SummaryCard(html, "Covered", report.Summary.Covered, $"of {report.Summary.CoverageTotal} coverage entries", "success");
+        SummaryCard(html, "Covered", report.Summary.Covered,
+            $"of {report.Summary.CoverageTotal} coverage {(report.Summary.CoverageTotal == 1 ? "entry" : "entries")}", "success");
         SummaryCard(html, "Uncovered", report.Summary.Uncovered, "Coverage gaps", "danger");
-        SummaryCard(html, "Occurrences", report.Summary.TotalOccurrences, "Observed events", "neutral");
-        SummaryCard(html, "Warnings", report.Summary.Warnings, "Need review", "warning");
-        SummaryCard(html, "Errors", report.Summary.Errors, "Failed observations", "danger");
+        SummaryCard(html, "Occurrences", report.Summary.TotalOccurrences, "Observed hits", "accent");
+        SummaryCard(html, "Findings", report.Summary.Findings, "Recorded by tests", "warning");
+        SummaryCard(html, "Run gates", report.Summary.Gates, "Run verdicts", GateTone(report.Items));
+        SummaryCard(html, "Errors", report.Summary.Errors, "Failed entries", "danger");
         html.Append("""
             </section>
             <section class="report-panel">
@@ -128,10 +157,7 @@ public sealed class HtmlReportSink : FileReportSink<HtmlReportSinkOptions>
               <div class="report-list" id="reportList">
             """);
 
-        foreach (var item in report.Items)
-        {
-            RenderItem(html, item, isRoot: true, depth: 0);
-        }
+        RenderSections(html, report.Items);
 
         html.Append("""
               </div>
@@ -187,7 +213,7 @@ public sealed class HtmlReportSink : FileReportSink<HtmlReportSinkOptions>
 
         html.Append(hasDetails ? "<summary>" : "<div class=\"item-summary\">");
         html.Append(hasDetails
-                ? "<span class=\"chevron\" aria-hidden=\"true\">›</span>"
+                ? Expander
                 : "<span class=\"chevron-placeholder\" aria-hidden=\"true\"></span>")
             .Append("<span class=\"status-dot\" aria-hidden=\"true\"></span>")
             .Append("<span class=\"item-heading\"><strong");
@@ -206,11 +232,11 @@ public sealed class HtmlReportSink : FileReportSink<HtmlReportSinkOptions>
             html.Append("<span class=\"badge coverage-badge\">")
                 .Append(coverageState).Append("</span>");
         }
-        if (item.Status != ProtoReportStatus.Neutral)
+        if (item.Kind == ProtoReportItemKind.Gate || item.Status != ProtoReportStatus.Neutral)
         {
-            html.Append("<span class=\"badge status-badge\">").Append(Encode(item.Status.ToString())).Append("</span>");
+            html.Append("<span class=\"badge status-badge\">").Append(Encode(GetStatusLabel(item))).Append("</span>");
         }
-        if (item.Count > 0)
+        if (item.Count > 0 && item.Kind is ProtoReportItemKind.Coverage or ProtoReportItemKind.Observation)
         {
             html.Append("<span class=\"badge\">").Append(item.Count.ToString(CultureInfo.InvariantCulture))
                 .Append(" occurrence").Append(PluralSuffix(item.Count)).Append("</span>");
@@ -270,10 +296,83 @@ public sealed class HtmlReportSink : FileReportSink<HtmlReportSinkOptions>
     private static string GetDisplayIdentifier(ProtoReportItem item)
         => item.DisplayName ?? item.Identifier;
 
+    /// <summary>
+    /// Gates speak their own language: a gate does not succeed or error, it passes, advises or fails.
+    /// </summary>
+    private static string GetStatusLabel(ProtoReportItem item)
+        => item.Kind != ProtoReportItemKind.Gate
+            ? item.Status.ToString()
+            : item.Status switch
+            {
+                ProtoReportStatus.Success => "Passed",
+                ProtoReportStatus.Warning => "Warning",
+                ProtoReportStatus.Error => "Failed",
+                ProtoReportStatus.Info => "Info",
+                _ => "Skipped"
+            };
+
     private static string GetContextLabel(ProtoReportItem item, bool isRoot)
     {
+        if (item.Kind == ProtoReportItemKind.Gate)
+        {
+            return "Run gate";
+        }
+
+        if (item.Kind == ProtoReportItemKind.Finding)
+        {
+            return item.DisplayGroup is { Length: > 0 }
+                ? $"{item.Category} · {item.DisplayGroup}"
+                : item.Category;
+        }
+
         var category = item.DisplayGroup ?? item.Category;
         return isRoot ? $"{item.TargetName} · {category}" : category;
+    }
+
+    /// <summary>
+    /// Report items are different things, so the report keeps them in different categories rather
+    /// than one undifferentiated list: coverage, findings, run verdicts, metrics and observations.
+    /// </summary>
+    private static readonly (ProtoReportItemKind Kind, string Title)[] Sections =
+    [
+        (ProtoReportItemKind.Coverage, "Coverage"),
+        (ProtoReportItemKind.Finding, "Findings"),
+        (ProtoReportItemKind.Gate, "Run gates"),
+        (ProtoReportItemKind.Metric, "Metrics"),
+        (ProtoReportItemKind.Observation, "Observations")
+    ];
+
+    private static void RenderSections(StringBuilder html, IReadOnlyList<ProtoReportItem> items)
+    {
+        foreach (var (kind, title) in Sections)
+        {
+            var roots = items.Where(item => item.Kind == kind).ToArray();
+            if (roots.Length == 0) continue;
+
+            html.Append("<section class=\"report-section\" data-report-section data-kind=\"")
+                .Append(kind.ToString().ToLowerInvariant())
+                .Append("\"><header class=\"section-head\"><i aria-hidden=\"true\"></i><h3>")
+                .Append(Encode(title)).Append("</h3><span class=\"section-count\" data-section-count data-total=\"")
+                .Append(roots.Length.ToString(CultureInfo.InvariantCulture)).Append("\">")
+                .Append(roots.Length.ToString(CultureInfo.InvariantCulture)).Append(PluralSuffix(roots.Length, " entry", " entries"))
+                .Append("</span></header>");
+
+            foreach (var item in roots)
+            {
+                RenderItem(html, item, isRoot: true, depth: 0);
+            }
+
+            html.Append("</section>");
+        }
+    }
+
+    private static string GateTone(IEnumerable<ProtoReportItem> items)
+    {
+        var gates = items.SelectMany(Flatten).Where(item => item.Kind == ProtoReportItemKind.Gate).ToArray();
+        if (gates.Length == 0) return "neutral";
+        if (gates.Any(item => item.Status == ProtoReportStatus.Error)) return "danger";
+        if (gates.Any(item => item.Status == ProtoReportStatus.Warning)) return "warning";
+        return "success";
     }
 
     private static string GetFilterTokens(IEnumerable<ProtoReportItem> items)
@@ -329,11 +428,14 @@ public sealed class HtmlReportSink : FileReportSink<HtmlReportSinkOptions>
         string tone)
     {
         html.Append("<article class=\"metric ").Append(tone).Append("\"><span>").Append(Encode(label))
-            .Append("</span><strong>").Append(value.ToString(CultureInfo.InvariantCulture))
+            .Append(value == 0 ? "</span><strong data-zero>" : "</span><strong>").Append(value.ToString(CultureInfo.InvariantCulture))
             .Append("</strong><small>").Append(Encode(description)).Append("</small></article>");
     }
 
     private static string PluralSuffix(int count) => count == 1 ? string.Empty : "s";
+
+    private static string PluralSuffix(int count, string singular, string plural)
+        => count == 1 ? singular : plural;
 
     private static string Encode(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
 
@@ -345,16 +447,283 @@ public sealed class HtmlReportSink : FileReportSink<HtmlReportSinkOptions>
         Uncovered
     }
 
-    private const string Styles = """
-        <style>
-        *{box-sizing:border-box}html,body{margin:0;min-height:100%}body{background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}.topbar{position:sticky;top:0;z-index:20;height:64px;padding:0 24px;display:grid;grid-template-columns:minmax(180px,1fr) auto minmax(180px,1fr);align-items:center;gap:20px;background:color-mix(in srgb,var(--surface) 92%,transparent);border-bottom:1px solid var(--border);backdrop-filter:blur(14px)}.brand{display:flex;align-items:center;gap:10px}.brand-mark{width:36px;height:36px;display:block}.brand-mark svg{width:36px;height:36px;display:block;overflow:visible}.brand span:last-child{display:flex;flex-direction:column;line-height:1.15}.brand strong{font-size:14px}.brand small,.eyebrow{font-size:9px;letter-spacing:.13em;color:var(--dim)}.run-state{justify-self:center}.state-pill{display:inline-flex;align-items:center;gap:8px;padding:5px 11px;border:1px solid var(--border);border-radius:999px;font-size:12px;font-weight:600;background:var(--surface-2)}.state-pill i,.status-dot{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 0 3px var(--success-soft)}.state-pill.attention i{background:var(--danger);box-shadow:0 0 0 3px var(--danger-soft)}.top-actions{justify-self:end;display:flex;align-items:center;gap:8px}.search{height:34px;width:260px;display:flex;align-items:center;gap:8px;padding:0 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--dim)}.search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);background:var(--surface)}.search input{min-width:0;flex:1;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-size:12px}.search kbd{padding:0 5px;border:1px solid var(--border);border-radius:4px;background:var(--surface);font-size:10px}.icon-button{width:34px;height:34px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--muted);cursor:pointer;font-size:16px}.icon-button:hover{background:var(--hover);color:var(--text)}main{width:min(1240px,calc(100% - 40px));margin:0 auto 64px}.hero{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:42px 4px 24px}.hero h1{margin:3px 0 4px;font-size:28px;letter-spacing:-.035em}.generated{margin:0;color:var(--muted);font-size:12px}.coverage-ring{--coverage:0;width:88px;height:88px;position:relative;display:grid;place-items:center;border-radius:50%;background:conic-gradient(var(--accent) calc(var(--coverage)*1%),var(--surface-2) 0)}.coverage-ring:before{content:"";position:absolute;inset:7px;border-radius:inherit;background:var(--bg)}.coverage-ring span,.coverage-ring em{position:relative;z-index:1}.coverage-ring span{font-weight:750;font-size:20px;line-height:1;margin-top:-8px}.coverage-ring small{font-size:11px;color:var(--muted)}.coverage-ring em{position:absolute;top:52px;font-size:9px;color:var(--dim);font-style:normal;text-transform:uppercase;letter-spacing:.08em}.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:18px}.metric{position:relative;min-width:0;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);overflow:hidden}.metric:before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--dim)}.metric.accent:before{background:var(--accent)}.metric.success:before{background:var(--success)}.metric.warning:before{background:var(--warning)}.metric.danger:before{background:var(--danger)}.metric>span{display:block;color:var(--muted);font-size:11px}.metric>strong{display:block;margin:2px 0;font-size:23px;letter-spacing:-.03em}.metric>small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim);font-size:10px}.report-panel{border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden;box-shadow:0 8px 30px #0000000d}.panel-toolbar{min-height:62px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--border)}.panel-toolbar h2{display:inline;margin:0 8px 0 0;font-size:14px}.panel-toolbar #resultCount{color:var(--dim);font-size:11px}.filters{display:flex;gap:3px;padding:3px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2)}.filter{border:0;border-radius:6px;padding:5px 10px;background:transparent;color:var(--muted);font:inherit;font-size:11px;cursor:pointer}.filter:hover{color:var(--text)}.filter.active{background:var(--surface);color:var(--text);box-shadow:0 1px 4px #0002}.report-list{padding:10px}.report-item{border:1px solid var(--border);border-radius:9px;background:var(--surface);overflow:hidden}.report-item.root+.report-item.root{margin-top:7px}.report-item.child{margin-top:6px;background:var(--surface-2)}.report-item[hidden]{display:none}.report-item>summary,.report-item>.item-summary{list-style:none;min-height:54px;padding:10px 12px;display:flex;align-items:center;gap:10px;transition:background .12s}.report-item>summary{cursor:pointer}.report-item>summary::-webkit-details-marker{display:none}.report-item>summary:hover{background:var(--hover)}.chevron,.chevron-placeholder{width:11px;flex:0 0 11px}.chevron{color:var(--dim);font-size:19px;transition:transform .15s}.report-item[open]>summary .chevron{transform:rotate(90deg)}.status-dot{flex:0 0 auto}.uncovered>summary .status-dot,.uncovered>.item-summary .status-dot,.status-error>summary .status-dot,.status-error>.item-summary .status-dot{background:var(--danger);box-shadow:0 0 0 3px var(--danger-soft)}.status-warning>summary .status-dot,.status-warning>.item-summary .status-dot{background:var(--warning);box-shadow:0 0 0 3px var(--warning-soft)}.not-applicable.status-neutral>summary .status-dot,.not-applicable.status-neutral>.item-summary .status-dot{background:var(--dim);box-shadow:none}.item-heading{display:flex;min-width:0;flex:1;flex-direction:column}.item-heading strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.item-context{color:var(--dim);font-size:10px}.item-badges{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px}.badge,.tag{display:inline-flex;align-items:center;padding:2px 7px;border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:9px;white-space:nowrap}.covered>summary .coverage-badge,.covered>.item-summary .coverage-badge{border-color:color-mix(in srgb,var(--success) 35%,var(--border));color:var(--success);background:var(--success-soft)}.uncovered>summary .coverage-badge,.uncovered>.item-summary .coverage-badge{border-color:color-mix(in srgb,var(--danger) 35%,var(--border));color:var(--danger);background:var(--danger-soft)}.status-warning>summary .status-badge,.status-warning>.item-summary .status-badge{color:var(--warning);background:var(--warning-soft)}.status-error>summary .status-badge,.status-error>.item-summary .status-badge{color:var(--danger);background:var(--danger-soft)}.item-body{padding:0 12px 12px 41px;border-top:1px solid var(--border)}.report-item:not([open])>.item-body{display:none}.message{margin:12px 0 0;padding:9px 11px;border-left:3px solid var(--accent);border-radius:0 6px 6px 0;background:var(--accent-soft);white-space:pre-wrap}.measured-value{display:flex;align-items:baseline;gap:7px;margin-top:12px}.measured-value strong{font-size:24px}.measured-value span{color:var(--muted)}.tags{display:flex;gap:5px;margin-top:10px}.tag{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,var(--border));background:var(--accent-soft)}.metadata{margin-top:10px}.metadata>summary{width:max-content;color:var(--muted);font-size:11px;cursor:pointer}.metadata pre{max-height:320px;overflow:auto;margin:8px 0 0;padding:12px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--muted);font:11px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}.children{margin-top:10px;padding-left:12px;border-left:1px solid var(--border)}.empty-state{padding:70px 20px;text-align:center}.empty-state strong,.empty-state span{display:block}.empty-state span{margin-top:4px;color:var(--dim);font-size:12px}
-        .partial>summary .status-dot,.partial>.item-summary .status-dot{background:var(--warning);box-shadow:0 0 0 3px var(--warning-soft)}.partial>summary .coverage-badge,.partial>.item-summary .coverage-badge{border-color:color-mix(in srgb,var(--warning) 35%,var(--border));color:var(--warning);background:var(--warning-soft)}
-        :root{--bg:#0b1115;--surface:#111a20;--surface-2:#17232b;--hover:#1b2b34;--border:#263943;--border-strong:#385461;--text:#ecf4f7;--muted:#a2b4bd;--dim:#718892;--blueprint:#4eb7ee;--blueprint-soft:#4eb7ee18;--accent:var(--blueprint);--accent-soft:var(--blueprint-soft);--success:#5cdb95;--success-soft:#5cdb9517;--warning:#f0bd55;--warning-soft:#f0bd5519;--danger:#fb7185;--danger-soft:#fb718519;--shadow:#00000035}
-        :root[data-theme="light"]{--bg:#f6f7f8;--surface:#fff;--surface-2:#f1f5f7;--hover:#eaf4f8;--border:#d8e2e7;--border-strong:#b8ccd6;--text:#102a3b;--muted:#587080;--dim:#8aa0ad;--blueprint:#087fc4;--blueprint-soft:#087fc414;--accent:var(--blueprint);--accent-soft:var(--blueprint-soft);--success:#16835a;--success-soft:#16835a14;--warning:#a66b08;--warning-soft:#a66b0817;--danger:#d74355;--danger-soft:#d7435514;--shadow:#13394d12}
-        *{scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent}*::-webkit-scrollbar{width:10px;height:10px}*::-webkit-scrollbar-track{background:transparent}*::-webkit-scrollbar-thumb{min-height:36px;border:2px solid transparent;border-radius:999px;background:var(--border-strong);background-clip:padding-box}*::-webkit-scrollbar-thumb:hover{background-color:var(--blueprint)}*::-webkit-scrollbar-corner{background:transparent}
-        body{background-color:var(--bg);background-image:linear-gradient(#168ac108 1px,transparent 1px),linear-gradient(90deg,#168ac108 1px,transparent 1px);background-size:28px 28px}.brand strong{letter-spacing:.02em}.brand small,.eyebrow{text-transform:uppercase}.icon-button{border-color:var(--border-strong)}.generated{font:11px ui-monospace,Consolas,monospace}.coverage-ring,.metric,.report-panel{box-shadow:0 8px 28px var(--shadow)}.metric>strong{font-family:ui-monospace,Consolas,monospace}
-        @media(max-width:1000px){.metrics{grid-template-columns:repeat(3,1fr)}.topbar{grid-template-columns:auto 1fr auto}.run-state{display:none}}@media(max-width:720px){.topbar{padding:0 12px}.search{width:min(45vw,220px)}main{width:min(100% - 20px,1240px)}.hero{padding-top:26px}.metrics{grid-template-columns:repeat(2,1fr)}.panel-toolbar{align-items:flex-start;flex-direction:column}.filters{max-width:100%;overflow:auto}.item-badges .badge:not(.coverage-badge):not(.status-badge){display:none}.item-body{padding-left:20px}.children{padding-left:7px}}@media(max-width:440px){.brand span:last-child{display:none}.search kbd{display:none}.hero h1{font-size:23px}.coverage-ring{width:74px;height:74px}.coverage-ring em{top:45px}.metrics{grid-template-columns:repeat(2,1fr)}.metric{padding:11px}.item-context{display:none}}
-        </style>
+    private const string ComponentStyles = """
+        /* The report speaks the ProtoTrace viewer's grammar: the same tokens, panels, chips, pills, rows and
+           brand mark. Every value comes from design/prototest-tokens.css, embedded above this sheet. */
+        * { box-sizing: border-box; }
+        html, body { margin: 0; min-height: 100%; }
+        body {
+          color: var(--text);
+          font: var(--text-body)/var(--leading) var(--font-ui);
+          background-color: var(--bg);
+          background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+          background-size: var(--grid-size) var(--grid-size);
+          -webkit-font-smoothing: antialiased;
+        }
+        * { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+        *::-webkit-scrollbar { width: 10px; height: 10px; }
+        *::-webkit-scrollbar-track { background: transparent; }
+        *::-webkit-scrollbar-thumb { min-height: 36px; border: 2px solid transparent; border-radius: var(--radius-chip); background: var(--border-strong); background-clip: padding-box; }
+        *::-webkit-scrollbar-thumb:hover { background-color: var(--blueprint); }
+        *::-webkit-scrollbar-corner { background: transparent; }
+        button, input { color: inherit; font: inherit; }
+        button { cursor: pointer; }
+        :focus-visible { outline: 2px solid var(--blueprint); outline-offset: 2px; border-radius: var(--radius-chip); }
+        h1, h2, h3 { margin: 0; font-family: var(--font-display); font-weight: var(--weight-bold); letter-spacing: -.01em; }
+        p { margin: 0; }
+        .eyebrow { margin: 0; color: var(--dim); font-size: var(--text-meta); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; }
+
+        /* ── Header: the viewer's header, with the report's own search ─────────────────────────────── */
+        .topbar {
+          position: sticky;
+          top: 0;
+          z-index: 20;
+          min-height: 56px;
+          padding: var(--space-3) clamp(12px, 2vw, 24px);
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+          align-items: center;
+          gap: var(--space-4);
+          border-bottom: 1px solid var(--border);
+          background: var(--surface);
+        }
+        .brand { min-width: 0; display: flex; align-items: center; gap: var(--space-3); }
+        .brand-mark { width: 32px; height: 32px; flex: none; display: block; }
+        .brand-mark svg { width: 100%; height: 100%; display: block; overflow: visible; }
+        /* One mark, coloured by the surface: navy on paper, paper on the blueprint. */
+        .brand-mark svg path:nth-of-type(1) { fill: var(--brand-mark-body); }
+        .brand-mark svg path:nth-of-type(2) { fill: var(--brand-mark-check); }
+        .brand > span:last-child { min-width: 0; display: flex; flex-direction: column; line-height: var(--leading-tight); }
+        .brand strong { font-family: var(--font-display); font-size: var(--text-title); letter-spacing: .01em; }
+        .brand small { color: var(--dim); font-size: var(--text-micro); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; }
+        .run-state { justify-self: center; }
+        /* An outcome is a dot and a word, as in the viewer: no pill, no glow. */
+        .state-pill { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--success); font-size: var(--text-meta); font-weight: var(--weight-semibold); white-space: nowrap; }
+        .state-pill i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+        .state-pill.attention { color: var(--danger); }
+        .top-actions { justify-self: end; display: flex; align-items: center; gap: var(--space-3); }
+        .search {
+          width: 260px;
+          height: var(--control-height);
+          padding: 0 var(--space-3);
+          display: flex;
+          align-items: center;
+          gap: var(--space-2);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-control);
+          background: var(--surface-2);
+          color: var(--dim);
+        }
+        .search:hover { border-color: var(--border-strong); }
+        .search:focus-within { border-color: var(--blueprint); box-shadow: 0 0 0 3px var(--blueprint-soft); }
+        .search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--text); font-size: var(--text-meta); }
+        .search input::placeholder { color: var(--dim); }
+        .search kbd { padding: 0 var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-chip); color: var(--muted); font: var(--text-micro) var(--font-mono); }
+        .icon-button {
+          width: var(--control-height);
+          height: var(--control-height);
+          display: grid;
+          place-items: center;
+          padding: 0;
+          border: 1px solid var(--border-strong);
+          border-radius: var(--radius-control);
+          background: var(--surface-2);
+          color: var(--text);
+          font-size: var(--text-title);
+          line-height: 1;
+        }
+        .icon-button:hover { border-color: var(--blueprint); }
+
+        /* ── Run heading and metrics ────────────────────────────────────────────────────────────────── */
+        main { width: min(1240px, 100% - var(--space-7)); margin: 0 auto var(--space-7); display: grid; gap: var(--space-4); }
+        .hero { padding-top: var(--space-6); display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-5); }
+        .hero h1 { margin: var(--space-1) 0; font-size: var(--text-display); letter-spacing: var(--tracking-display); }
+        .generated { color: var(--muted); font: var(--text-body) var(--font-mono); }
+        .coverage-ring {
+          --coverage: 0;
+          width: 84px;
+          height: 84px;
+          position: relative;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: conic-gradient(var(--success) calc(var(--coverage) * 1%), var(--surface-2) 0);
+        }
+        .coverage-ring::before { content: ""; position: absolute; inset: 6px; border-radius: inherit; background: var(--bg); }
+        .coverage-ring span, .coverage-ring em { position: relative; z-index: 1; }
+        .coverage-ring span { margin-top: -10px; font: var(--weight-bold) var(--text-title)/1 var(--font-mono); }
+        .coverage-ring small { color: var(--muted); font-size: var(--text-meta); }
+        .coverage-ring em { position: absolute; top: 48px; color: var(--dim); font-size: var(--text-micro); font-style: normal; letter-spacing: .08em; text-transform: uppercase; }
+        /* The viewer's metric tile: label, a mono value coloured only when it means something, a caption. */
+        .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-2); }
+        .metric { min-width: 0; min-height: 52px; padding: var(--space-2) var(--space-4); display: grid; gap: 1px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); }
+        .metric > span { color: var(--muted); font-size: var(--text-meta); }
+        .metric > strong { font: var(--weight-bold) var(--text-title) var(--font-mono); }
+        .metric > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); font-size: var(--text-micro); }
+        .metric.success > strong { color: var(--success); }
+        .metric.warning > strong { color: var(--warning); }
+        .metric.danger > strong { color: var(--danger); }
+        .metric.accent > strong { color: var(--blueprint); }
+        /* A zero is not a warning: colour only numbers that carry news. */
+        .metric > strong:is(:empty, [data-zero]) { color: var(--text); }
+
+        /* ── The panel, its toolbar and the filter chips ────────────────────────────────────────────── */
+        .report-panel { border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); overflow: hidden; }
+        .panel-toolbar {
+          min-height: var(--panel-head-height);
+          padding: var(--space-2) var(--space-4);
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: space-between;
+          gap: var(--space-2) var(--space-4);
+          border-bottom: 1px solid var(--border);
+        }
+        .panel-toolbar > div:first-child { display: flex; align-items: baseline; gap: var(--space-3); }
+        .panel-toolbar h2 { font-family: var(--font-ui); font-size: var(--text-strong); }
+        .panel-toolbar #resultCount { color: var(--muted); font: var(--text-micro) var(--font-mono); }
+        .filters { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+        .filter {
+          height: 24px;
+          padding: 0 var(--space-3);
+          display: inline-flex;
+          align-items: center;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-pill);
+          background: transparent;
+          color: var(--muted);
+          font-size: var(--text-micro);
+          transition: border-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+        }
+        .filter:hover { border-color: var(--border-strong); color: var(--text); }
+        .filter.active { border-color: var(--blueprint); background: var(--blueprint-soft); color: var(--text); font-weight: var(--weight-bold); }
+        .filter.active[data-filter="covered"] { border-color: var(--success-line); background: var(--success-soft); }
+        .filter.active[data-filter="partial"], .filter.active[data-filter="warning"] { border-color: var(--warning-line); background: var(--warning-soft); }
+        .filter.active[data-filter="uncovered"], .filter.active[data-filter="error"] { border-color: var(--danger-line); background: var(--danger-soft); }
+
+        /* ── Sections: a heading per kind of result, as the viewer heads its phases ─────────────────── */
+        .report-list { padding: 0 var(--space-3) var(--space-4); }
+        .report-section[hidden] { display: none; }
+        .report-section + .report-section { margin-top: var(--space-5); }
+        .section-head {
+          position: sticky;
+          top: 56px;
+          z-index: 1;
+          padding: var(--space-2);
+          display: grid;
+          grid-template-columns: 8px minmax(0, 1fr) auto;
+          align-items: center;
+          gap: var(--space-3);
+          border-bottom: 1px solid var(--border);
+          background: var(--surface);
+        }
+        .section-head i { width: 8px; height: 8px; border-radius: var(--radius-hairline); background: var(--dim); }
+        .section-head h3 { color: var(--muted); font-family: var(--font-ui); font-size: var(--text-micro); letter-spacing: .08em; text-transform: uppercase; }
+        .section-head .section-count { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+        .report-section[data-kind=coverage] .section-head i { background: var(--type-evidence); }
+        .report-section[data-kind=finding] .section-head i { background: var(--type-finding); }
+        .report-section[data-kind=gate] .section-head i { background: var(--type-gate); }
+        .report-section[data-kind=metric] .section-head i { background: var(--type-data); }
+        .report-section[data-kind=observation] .section-head i { background: var(--type-observation); }
+        .report-section > .report-item.root:first-of-type { margin-top: var(--space-2); }
+
+        /* ── Items: rows, with the viewer's expander, status dot and chips ──────────────────────────── */
+        .report-item { border: 1px solid transparent; border-radius: var(--radius-control); }
+        .report-item.root + .report-item.root { margin-top: 1px; }
+        .report-item[hidden] { display: none; }
+        .report-item[open].root { border-color: var(--border); background: var(--surface-2); }
+        .report-item > summary, .report-item > .item-summary {
+          min-height: 34px;
+          padding: var(--space-1) var(--space-2);
+          display: flex;
+          align-items: center;
+          gap: var(--space-3);
+          border-radius: var(--radius-control);
+          list-style: none;
+        }
+        .report-item > summary { cursor: pointer; }
+        .report-item > summary::-webkit-details-marker { display: none; }
+        .report-item > summary:hover { background: var(--hover); }
+        .chevron, .chevron-placeholder { width: 14px; height: 14px; flex: none; }
+        .chevron { display: grid; place-items: center; border: 1px solid var(--border-strong); border-radius: var(--radius-hairline); background: var(--surface); color: var(--muted); }
+        .report-item > summary:hover .chevron { border-color: var(--blueprint); color: var(--text); }
+        .chevron .stem { transition: opacity var(--motion-fast) var(--motion-ease); }
+        .report-item[open] > summary .chevron .stem { opacity: 0; }
+        .status-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--success); }
+        .uncovered > summary .status-dot, .uncovered > .item-summary .status-dot,
+        .status-error > summary .status-dot, .status-error > .item-summary .status-dot { background: var(--danger); }
+        .partial > summary .status-dot, .partial > .item-summary .status-dot,
+        .status-warning > summary .status-dot, .status-warning > .item-summary .status-dot { background: var(--warning); }
+        .not-applicable.status-neutral > summary .status-dot, .not-applicable.status-neutral > .item-summary .status-dot { background: var(--dim); }
+        .item-heading { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+        .item-heading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-body); font-weight: var(--weight-semibold); }
+        .item-context { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); font-size: var(--text-micro); }
+        .item-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-1); }
+        /* Badges are the viewer's chips: mono, square-cornered, tinted by what they say. */
+        .badge, .tag {
+          padding: 0 var(--space-2);
+          display: inline-flex;
+          align-items: center;
+          border-radius: var(--radius-chip);
+          background: color-mix(in srgb, var(--muted) 14%, transparent);
+          color: var(--muted);
+          font: var(--weight-semibold) var(--text-micro)/1.8 var(--font-mono);
+          white-space: nowrap;
+        }
+        .covered > summary .coverage-badge, .covered > .item-summary .coverage-badge { background: var(--success-soft); color: var(--success); }
+        .partial > summary .coverage-badge, .partial > .item-summary .coverage-badge { background: var(--warning-soft); color: var(--warning); }
+        .uncovered > summary .coverage-badge, .uncovered > .item-summary .coverage-badge { background: var(--danger-soft); color: var(--danger); }
+        .status-success > summary .status-badge, .status-success > .item-summary .status-badge { background: var(--success-soft); color: var(--success); }
+        .status-warning > summary .status-badge, .status-warning > .item-summary .status-badge { background: var(--warning-soft); color: var(--warning); }
+        .status-error > summary .status-badge, .status-error > .item-summary .status-badge { background: var(--danger-soft); color: var(--danger); }
+        /* On a coverage row, "Covered" already says it went well; a second "Success" chip is noise. */
+        .status-success > summary .coverage-badge + .status-badge, .status-success > .item-summary .coverage-badge + .status-badge { display: none; }
+        .item-body { padding: 0 var(--space-3) var(--space-3) calc(var(--space-2) + 14px + var(--space-3)); display: grid; gap: var(--space-3); }
+        .report-item:not([open]) > .item-body { display: none; }
+        .message { padding: var(--space-2) var(--space-3); border-left: 2px solid var(--blueprint); border-radius: 0 var(--radius-chip) var(--radius-chip) 0; background: var(--blueprint-soft); font-size: var(--text-meta); white-space: pre-wrap; }
+        .status-warning > .item-body > .message { border-color: var(--warning); background: var(--warning-soft); }
+        .status-error > .item-body > .message { border-color: var(--danger); background: var(--danger-soft); }
+        .measured-value { display: flex; align-items: baseline; gap: var(--space-2); }
+        .measured-value strong { font: var(--weight-bold) var(--text-heading) var(--font-mono); }
+        .measured-value span { color: var(--muted); font-size: var(--text-meta); }
+        .tags { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+        .tag { background: var(--blueprint-soft); color: var(--blueprint); }
+        .metadata > summary { width: max-content; color: var(--muted); font-size: var(--text-micro); cursor: pointer; }
+        .metadata pre {
+          max-height: 320px;
+          margin: var(--space-2) 0 0;
+          padding: var(--space-3);
+          overflow: auto;
+          border-radius: var(--radius-chip);
+          background: var(--surface-sunken);
+          color: var(--text-on-sunken);
+          font: var(--text-micro)/1.6 var(--font-mono);
+        }
+        /* Children hang off a drawn guide, the same branch language the viewer's tree uses. */
+        .children { margin-left: 6px; padding-left: var(--space-3); display: grid; gap: 1px; border-left: 1px solid var(--border); }
+        .report-item.child > summary, .report-item.child > .item-summary { min-height: 28px; }
+        .empty-state { padding: var(--space-7) var(--space-4); display: grid; gap: var(--space-1); text-align: center; }
+        /* A display on the element would otherwise beat the hidden attribute the script toggles. */
+        .empty-state[hidden] { display: none; }
+        .empty-state strong { font-size: var(--text-body); }
+        .empty-state span { color: var(--muted); font-size: var(--text-meta); }
+
+        @media (max-width: 1000px) {
+          .topbar { grid-template-columns: minmax(0, 1fr) auto; }
+          .run-state { display: none; }
+        }
+        @media (max-width: 720px) {
+          .search { width: min(45vw, 220px); }
+          .hero { padding-top: var(--space-5); }
+          .item-badges .badge:not(.coverage-badge):not(.status-badge) { display: none; }
+          .item-body { padding-left: var(--space-3); }
+        }
+        @media (max-width: 440px) {
+          .brand > span:last-child, .search kbd { display: none; }
+          .coverage-ring { width: 72px; height: 72px; }
+          .coverage-ring em { top: 43px; }
+          .item-context { display: none; }
+        }
         """;
 
     private static string ReadEmbeddedText(string resourceName)
@@ -371,6 +740,7 @@ public sealed class HtmlReportSink : FileReportSink<HtmlReportSinkOptions>
           const root = document.documentElement;
           const search = document.getElementById('reportSearch');
           const entries = [...document.querySelectorAll('[data-report-item="root"]')];
+          const sections = [...document.querySelectorAll('[data-report-section]')];
           const filters = [...document.querySelectorAll('[data-filter]')];
           const count = document.getElementById('resultCount');
           const empty = document.getElementById('emptyState');
@@ -387,13 +757,24 @@ public sealed class HtmlReportSink : FileReportSink<HtmlReportSinkOptions>
           function applyFilters() {
             const query = search.value.trim().toLocaleLowerCase();
             let visible = 0;
-            for (const entry of entries) {
-              const matchesText = !query || entry.dataset.search.includes(query);
-              const matchesFilter = activeFilter === 'all' || entry.dataset.filters.split(' ').includes(activeFilter);
-              entry.hidden = !(matchesText && matchesFilter);
-              if (!entry.hidden) visible++;
+            for (const section of sections) {
+              const sectionEntries = [...section.querySelectorAll('[data-report-item="root"]')];
+              let sectionVisible = 0;
+              for (const entry of sectionEntries) {
+                const matchesText = !query || entry.dataset.search.includes(query);
+                const matchesFilter = activeFilter === 'all' || entry.dataset.filters.split(' ').includes(activeFilter);
+                entry.hidden = !(matchesText && matchesFilter);
+                if (!entry.hidden) sectionVisible++;
+              }
+              section.hidden = sectionVisible === 0;
+              const counter = section.querySelector('[data-section-count]');
+              const total = Number(counter.dataset.total);
+              counter.textContent = sectionVisible === total
+                ? `${total} ${total === 1 ? 'entry' : 'entries'}`
+                : `${sectionVisible} of ${total} entries`;
+              visible += sectionVisible;
             }
-            count.textContent = `${visible} of ${entries.length} groups`;
+            count.textContent = `${visible} of ${entries.length} shown`;
             empty.hidden = visible !== 0;
           }
 

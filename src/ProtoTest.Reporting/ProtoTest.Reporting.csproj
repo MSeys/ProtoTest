@@ -17,6 +17,8 @@
 
   <ItemGroup>
     <EmbeddedResource Include="..\..\assets\brand\prototest-mark.svg" LogicalName="ProtoTest.Reporting.BrandMark.svg" />
+    <!-- The one shared design token file, also imported by the viewer and the docs. -->
+    <EmbeddedResource Include="..\..\design\prototest-tokens.css" LogicalName="ProtoTest.Reporting.Tokens.css" />
   </ItemGroup>
 
 </Project>

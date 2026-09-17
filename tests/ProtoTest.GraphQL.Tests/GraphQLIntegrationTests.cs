@@ -139,6 +139,56 @@ public sealed class GraphQLIntegrationTests
     }
 
     [Test]
+    public async Task SchemaCollector_ShouldSeeObservationsUnderTheApplicationsQualifiedTargetName()
+    {
+        // Arrange: under an application the client is registered as "Catalog:Api", so observations must
+        // carry that target name or the schema collector keyed on it goes blind.
+        const string schema = """
+            type Query { product: Product }
+            type Product { id: ID! name: String! }
+            """;
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"data":{"product":{"id":"42","name":"Notebook"}}}""")
+        });
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Applications:Catalog:BaseUrl"] = "https://app.test",
+                ["ProtoTest:Applications:Catalog:Endpoints:GraphQL"] = "/graphql"
+            }));
+        builder.AddApplication("Catalog", app => app.AddGraphQL(graphQL => graphQL
+            .AddClient("Api", configure: http => http.ConfigurePrimaryHttpMessageHandler(() => handler))
+            .WithSchemaCoverage(schema)));
+        await using var host = builder.Build();
+        await host.StartTestAsync("application coverage", "11", TestMethod(), [new ApplicationAttribute("Catalog")]);
+        try
+        {
+            // Act
+            using var response = await Proto.Context.GraphQL()
+                .Query("Product", query => query.Field("product", field => field.Fields("id", "name")))
+                .ExecuteAsync();
+            response.ShouldHaveNoErrors();
+
+            // Assert
+            var collector = Proto.Context.Services.GetServices<IProtoCollector>()
+                .OfType<GraphQLSchemaCoverageCollector>()
+                .Single();
+            var fields = Flatten(collector.GetReportItems())
+                .Where(item => item.Category == "GraphQL field")
+                .ToDictionary(item => item.Identifier);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(fields["Query.product"].IsCovered, Is.True);
+                Assert.That(fields["Product.name"].IsCovered, Is.True);
+                Assert.That(fields["Product.id"].IsCovered, Is.True);
+            }
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
     public async Task GraphQLErrors_ShouldRemainInspectable()
     {
         var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)

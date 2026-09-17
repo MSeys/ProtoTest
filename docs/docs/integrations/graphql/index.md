@@ -41,7 +41,7 @@ builder.AddGraphQL(graphQL => graphQL
     .AddClient("Api", "https://api.example.test/graphql"));
 ```
 
-`AddClient` has the same three overloads as [REST](../rest/index.md#registering-a-client) — fixed URL, or a resolver that depends on the running test. Configuration works the same way too: the endpoint comes from the application (`ProtoTest:Applications:{application}:BaseUrl` + `Endpoints:GraphQL`), unless an explicit `baseUrl` overrides it.
+`AddClient` has the same three overloads as [REST](../rest/index.md#registering-an-application) — fixed URL, or a resolver that depends on the running test. Configuration works the same way too: the endpoint comes from the application (`ProtoTest:Applications:{application}:BaseUrl` + `Endpoints:GraphQL`), unless an explicit `baseUrl` overrides it.
 
 ### Reusing another client
 

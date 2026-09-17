@@ -30,7 +30,9 @@ Both files are also added to the [`.prototrace` archive](./prototrace.md#the-fil
 
 ## The HTML report
 
-A single self-contained page: a summary (items, covered, uncovered, coverage percentage, warnings, errors) and every report item as an expandable tree — endpoint → response → property for OpenAPI, type → field → argument for GraphQL — with covered, partially covered and uncovered paths marked.
+A single self-contained page: a summary (covered, uncovered, occurrences, findings, run gates, errors) and every report item — endpoint → response → property for OpenAPI, type → field → argument for GraphQL — with covered, partially covered and uncovered paths marked.
+
+Items are different things, so the report keeps them apart in sections: **Coverage** for what the contract exercises, **Findings** for evidence tests deliberately recorded, and **Run gates** for run verdicts, labelled passed, advisory, failed or skipped. Searching and filtering apply across all sections, and a section that filters to nothing disappears.
 
 ## The JSON report
 
@@ -47,13 +49,15 @@ The same data, for tooling:
     "Uncovered": 47,
     "CoveragePercentage": 76.26,
     "Warnings": 0,
-    "Errors": 0
+    "Errors": 0,
+    "Findings": 2,
+    "Gates": 1
   },
   "Items": [ … ]
 }
 ```
 
-Property names match the .NET types (`ProtoReport`, `ProtoReportSummary`, `ProtoReportItem`) and enums are written as strings. The summary counts nested items too; `CoveragePercentage` is rounded to two decimals and is `0` when there are no coverage items.
+Property names match the .NET types (`ProtoReport`, `ProtoReportSummary`, `ProtoReportItem`) and enums are written as strings. The summary counts nested items too; `TotalOccurrences` counts observed hits only, so a finding or a gate verdict does not inflate it, and `CoveragePercentage` is rounded to two decimals and is `0` when there are no coverage items.
 
 :::tip A coverage gate
 The JSON report makes a CI gate a few lines of script — fail the build when `Summary.CoveragePercentage` drops below a threshold. A built-in quality gate is on the roadmap.

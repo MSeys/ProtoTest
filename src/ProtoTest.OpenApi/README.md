@@ -9,7 +9,7 @@ dotnet add package ProtoTest.OpenApi --prerelease
 ```csharp
 builder.AddApplication("Orders", app => app.AddRest(rest => rest
     .AddClient("Orders")
-    .WithCollector<OpenApiCoverageCollector>()));
+    .AddCollector<OpenApiCoverageCollector>()));
 ```
 
 Specifications can come from configuration, a file, a URL, raw JSON/YAML, or an `OpenApiDocument`. Add `ProtoTest.Reporting` to export the collected coverage. See the [OpenAPI guide](https://github.com/matthiasseys/ProtoTest/blob/main/docs/integrations/openapi.md).

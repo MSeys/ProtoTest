@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "docs", "run", "start", "--", "--port", "3100"],
       "port": 3100
+    },
+    {
+      "name": "viewer",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "viewer", "run", "dev", "--", "--port", "5273"],
+      "port": 5273
     }
   ]
 }

@@ -16,8 +16,8 @@ builder
     .AddApplication("Api", app => app
         .AddRest(rest => rest
             .AddClient("Api")
-            .WithCollector<RestCoverageCollector>()
-            .WithCollector<OpenApiCoverageCollector>())
+            .AddCollector<RestCoverageCollector>()
+            .AddCollector<OpenApiCoverageCollector>())
         .AddGraphQL(graphQL => graphQL
             .AddClient("GraphQL")
             .WithSchemaCoverage("schema.graphql")))
@@ -76,7 +76,7 @@ flowchart LR
 
 ```csharp
 public sealed record ProtoObservation(
-    string TargetName,      // which client/target it concerns, e.g. "Api"
+    string TargetName,      // the registered target, e.g. "Api", or "Northstar:Api" under an application
     string Kind,            // what kind of fact, e.g. "http.response"
     string Identifier,      // what it's about, e.g. "GET /api/orders/{id}"
     object? Data = null,
@@ -107,7 +107,7 @@ public sealed class InvoiceStateCoverage(string targetName) : ProtoCoverageColle
 }
 ```
 
-The base class matches observations whose `TargetName` equals its own (ignoring case), and records one covered item per distinct `Identifier` with a hit count. That's exactly how `RestCoverageCollector` is built.
+The base class matches observations whose `TargetName` equals its own (ignoring case), and records one covered item per distinct `Identifier` with a hit count. That's exactly how `RestCoverageCollector` is built. Under an `[Application]` the client is registered under its qualified name (`Api` becomes `Northstar:Api`), and observations carry that same qualified name, so collectors attached to the client keep matching.
 
 To report things that were **not** observed — the valuable part — override `GetReportItems` and enumerate the full set, as the OpenAPI collector does with the specification:
 
@@ -136,18 +136,18 @@ public sealed class InvoiceStateCoverage(string targetName) : ProtoCoverageColle
 }
 ```
 
-Register it on a target — the target name is passed as the first constructor argument, and any extra arguments to `WithCollector` follow it:
+Register it on a target — the target name is passed as the first constructor argument, and any extra arguments to `AddCollector` follow it:
 
 ```csharp
 builder.AddApplication("Api", app => app
-    .AddRest(rest => rest.AddClient("Billing").WithCollector<InvoiceStateCoverage>()));
+    .AddRest(rest => rest.AddClient("Billing").AddCollector<InvoiceStateCoverage>()));
 ```
 
 Collectors must be thread-safe; tests run in parallel. Use the base class's `Lock`.
 
 ### Collectors not tied to a client
 
-`WithCollector` hangs off a client registration. For a collector that isn't about any client, register it directly:
+`AddCollector` hangs off a client registration. For a collector that isn't about any client, register it directly:
 
 ```csharp
 builder.ConfigureServices(services =>
@@ -176,7 +176,7 @@ public sealed record ProtoReportItem(
     string TargetName,
     string Category,
     string Identifier,
-    ProtoReportItemKind Kind = ProtoReportItemKind.Observation,   // Observation, Coverage, Finding, Metric
+    ProtoReportItemKind Kind = ProtoReportItemKind.Observation,   // Observation, Coverage, Finding, Gate, Metric
     ProtoReportStatus Status = ProtoReportStatus.Neutral,         // Neutral, Info, Success, Warning, Error
     int Count = 0,
     bool? IsCovered = null,
@@ -188,4 +188,4 @@ public sealed record ProtoReportItem(
     IReadOnlyDictionary<string, object>? Metadata = null);
 ```
 
-Items nest through `Children`, and the kinds cover more than coverage: a `Metric` with a `Value` and `Unit`, or a `Finding` with a `Warning` status and a `Message`, show up in the same reports.
+Items nest through `Children`, and the kinds cover more than coverage: a `Metric` with a `Value` and `Unit`, or a `Finding` with a `Warning` status and a `Message`, show up in the same reports. The HTML report keeps the kinds in their own sections — coverage, findings, run gates — so a passed gate is never read as a finding.

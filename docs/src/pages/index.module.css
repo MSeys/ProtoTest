@@ -92,7 +92,7 @@
 }
 
 .sectionAlt {
-  background: var(--pt-surface);
+  background: var(--surface);
 }
 
 .sectionHead {
@@ -108,7 +108,7 @@
 }
 
 .sectionHead p {
-  color: var(--pt-muted);
+  color: var(--muted);
   font-size: 1.05rem;
   line-height: 1.62;
 }
@@ -118,7 +118,7 @@
   max-width: 760px;
   text-align: center;
   font-size: 0.92rem;
-  color: var(--pt-muted);
+  color: var(--muted);
   line-height: 1.62;
 }
 
@@ -162,7 +162,7 @@
 }
 
 .featureCopy p {
-  color: var(--pt-muted);
+  color: var(--muted);
   line-height: 1.65;
   margin-bottom: 0.85rem;
 }

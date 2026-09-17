@@ -23,7 +23,80 @@ public sealed class ReportSinkTests
             Assert.That(summary.GetProperty("Total").GetInt32(), Is.EqualTo(3));
             Assert.That(summary.GetProperty("Covered").GetInt32(), Is.EqualTo(2));
             Assert.That(summary.GetProperty("Warnings").GetInt32(), Is.EqualTo(1));
+            // Gate verdicts are their own kind, so they never count as findings.
+            Assert.That(summary.GetProperty("Findings").GetInt32(), Is.Zero);
+            Assert.That(summary.GetProperty("Gates").GetInt32(), Is.Zero);
             Assert.That(json.RootElement.GetProperty("Items")[0].GetProperty("Status").GetString(), Is.EqualTo("Warning"));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public async Task Summary_ShouldCountCategoriesAndObservedOccurrencesOnly()
+    {
+        var directory = CreateTempDirectory();
+        var path = Path.Combine(directory, "report.json");
+        try
+        {
+            var items = new[]
+            {
+                new ProtoReportItem("Orders", "REST", "GET /orders",
+                    ProtoReportItemKind.Coverage, ProtoReportStatus.Success, Count: 4, IsCovered: true),
+                new ProtoReportItem("Test findings", "Delivery", "finding-001",
+                    ProtoReportItemKind.Finding, ProtoReportStatus.Warning, Message: "Slow deployment."),
+                new ProtoReportItem("Run gates", "Gate", "no error findings",
+                    ProtoReportItemKind.Gate, ProtoReportStatus.Success, Count: 1, Message: "No errors found.")
+            };
+            var sink = new JsonReportSink(new JsonReportSinkOptions { OutputPath = path });
+
+            await sink.ExportAsync(items);
+
+            using var json = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+            var summary = json.RootElement.GetProperty("Summary");
+            using (Assert.EnterMultipleScope())
+            {
+                // A gate verdict happens once; it is not an observed occurrence.
+                Assert.That(summary.GetProperty("TotalOccurrences").GetInt32(), Is.EqualTo(4));
+                Assert.That(summary.GetProperty("Findings").GetInt32(), Is.EqualTo(1));
+                Assert.That(summary.GetProperty("Gates").GetInt32(), Is.EqualTo(1));
+            }
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public async Task HtmlSink_ShouldKeepReportCategoriesApartAndLabelGateVerdicts()
+    {
+        var directory = CreateTempDirectory();
+        var path = Path.Combine(directory, "report.html");
+        try
+        {
+            var items = new[]
+            {
+                new ProtoReportItem("Orders", "OpenAPI", "GET /orders",
+                    ProtoReportItemKind.Coverage, ProtoReportStatus.Success, Count: 4, IsCovered: true),
+                new ProtoReportItem("Test findings", "Delivery", "finding-001",
+                    ProtoReportItemKind.Finding, ProtoReportStatus.Warning, Message: "Slow deployment."),
+                new ProtoReportItem("Run gates", "Gate", "no error findings",
+                    ProtoReportItemKind.Gate, ProtoReportStatus.Success, Count: 1, Message: "No errors found.")
+            };
+            var sink = new HtmlReportSink(new HtmlReportSinkOptions { OutputPath = path });
+
+            await sink.ExportAsync(items);
+
+            var html = await File.ReadAllTextAsync(path);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(html, Does.Contain("data-report-section data-kind=\"coverage\""));
+                Assert.That(html, Does.Contain("data-report-section data-kind=\"finding\""));
+                Assert.That(html, Does.Contain("data-report-section data-kind=\"gate\""));
+                Assert.That(html, Does.Contain(">Coverage</h3>"));
+                Assert.That(html, Does.Contain(">Findings</h3>"));
+                Assert.That(html, Does.Contain(">Run gates</h3>"));
+                // A passed gate reads as passed, not as a finding with a success status.
+                Assert.That(html, Does.Contain("status-badge\">Passed</span>"));
+                Assert.That(html, Does.Contain("1 entry"));
+            }
         }
         finally { Directory.Delete(directory, recursive: true); }
     }
@@ -53,10 +126,18 @@ public sealed class ReportSinkTests
             Assert.That(html, Does.Contain("REPORTING BLUEPRINT"));
             Assert.That(html, Does.Contain("<path fill=\"#123B58\" d=\"M301 263V300H383"));
             Assert.That(html, Does.Contain("data:image/svg+xml;base64,"));
-            Assert.That(html, Does.Contain("--blueprint:#4eb7ee"));
-            Assert.That(html, Does.Contain("background-size:28px 28px"));
-            Assert.That(html, Does.Contain("scrollbar-color:var(--border-strong) transparent"));
-            Assert.That(html, Does.Contain("*::-webkit-scrollbar-thumb:hover{background-color:var(--blueprint)}"));
+            // The report carries the shared design tokens rather than a palette of its own, so the
+            // report, the ProtoTrace viewer and the documentation cannot drift apart.
+            Assert.That(html, Does.Contain("--pt-blue-bright: #1688bf"));
+            Assert.That(html, Does.Contain("--phase-execution: var(--pt-cyan)"));
+            Assert.That(html, Does.Contain("background-size: var(--grid-size) var(--grid-size)"));
+            // One brand mark, coloured by the surface like the viewer's, instead of navy on every theme.
+            Assert.That(html, Does.Contain("fill: var(--brand-mark-body)"));
+            Assert.That(html, Does.Contain("fill: var(--brand-mark-check)"));
+            // The viewer's expander rather than a rotating glyph.
+            Assert.That(html, Does.Contain("<path class=\"stem\""));
+            // The empty state is shown by clearing its hidden attribute; its own display must not override that.
+            Assert.That(html, Does.Contain(".empty-state[hidden] { display: none; }"));
             Assert.That(html, Does.Contain("class=\"report-item partial status-warning root\""));
             Assert.That(html, Does.Contain(">Partial</span>"));
         }

@@ -1,6 +1,6 @@
 namespace ProtoTest.Core.Internal;
 
-/// <summary>Holds the gate findings so they appear in the run's reports.</summary>
+/// <summary>Holds the gate verdicts so they appear in the run's reports as their own category.</summary>
 internal sealed class ProtoRunGateReportSource : IProtoReportSource
 {
     private ProtoReportItem[] _items = [];

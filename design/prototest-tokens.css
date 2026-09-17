@@ -1,0 +1,228 @@
+/* ProtoTest design tokens — the single source of truth for every ProtoTest surface.
+ *
+ * Consumed by:
+ *   - viewer/src/main.ts                     (ProtoTrace, execution blueprint surface)
+ *   - docs/src/css/custom.css                (documentation, technical paper surface)
+ *   - src/ProtoTest.Reporting (embedded)     (HTML report, execution blueprint surface)
+ *
+ * All three import this file directly; there are no copies. Edit here, nowhere else.
+ * Values follow assets/internal/prototest-complete-design-handoff-v6.html §2.
+ *
+ * Surfaces are chosen with `data-theme` on <html>: the paper surface is the default,
+ * `data-theme="dark"` selects the blueprint surface. The viewer and the report set
+ * `data-theme="dark"` in their markup; the docs follow the reader's preference.
+ */
+
+:root {
+  /* ── Brand constants ──────────────────────────────────────────────────────
+     Identical on every surface. Never redefined by a theme. */
+  --pt-navy: #123b58;
+  --pt-navy-deep: #08283d;
+  --pt-navy-abyss: #061a28;
+  --pt-blue: #1f75a9;
+  --pt-blue-bright: #1688bf;
+  --pt-blue-deep: #0f547f;
+  --pt-cyan: #19a8b5;
+  --pt-green: #35b985;
+  --pt-amber: #d7a84b;
+  --pt-red: #d86a6a;
+  --pt-violet: #8f74c7;
+  --pt-paper: #f7f5ee;
+  --pt-paper-cool: #f7fafc;
+  --pt-white: #ffffff;
+  --pt-code: #0b2132;
+  --pt-code-text: #d9edf7;
+
+  /* ── Typography ───────────────────────────────────────────────────────────
+     Display for headings and the wordmark, UI for everything a person reads,
+     mono for data: durations, ids, kinds, routes, attribute values, code. */
+  --font-display: "Space Grotesk", Manrope, ui-sans-serif, system-ui, sans-serif;
+  --font-ui: Manrope, Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Nothing below 10px: metadata still has to be readable. */
+  --text-micro: 10px;
+  --text-meta: 11px;
+  --text-body: 12px;
+  --text-strong: 13px;
+  --text-title: 15px;
+  --text-heading: 20px;
+  --text-display: clamp(20px, 2.2vw, 26px);
+  --leading: 1.55;
+  --leading-tight: 1.25;
+  --tracking-eyebrow: 0.13em;
+  --tracking-display: -0.025em;
+
+  /* ── Spacing ──────────────────────────────────────────────────────────────
+     Six steps. Padding, gaps and margins come from here, never from raw px. */
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 22px;
+  --space-7: 32px;
+
+  /* ── Radii ────────────────────────────────────────────────────────────────
+     Four roles and a pill. A radius names what a thing is. */
+  /* A hairline radius for markers and bars: shapes, not containers. */
+  --radius-hairline: 2px;
+  --radius-chip: 4px;
+  --radius-control: 7px;
+  --radius-panel: 10px;
+  --radius-overlay: 14px;
+  --radius-pill: 999px;
+
+  /* ── Motion ───────────────────────────────────────────────────────────────
+     One fast duration for state, one slow for layout. */
+  --motion-fast: 120ms;
+  --motion-slow: 220ms;
+  --motion-ease: cubic-bezier(0.2, 0.6, 0.3, 1);
+
+  /* ── Structure ────────────────────────────────────────────────────────────
+     The blueprint grid behind a surface, never behind prose or code. */
+  --grid-size: 28px;
+  --control-height: 30px;
+  --row-height: 26px;
+  --panel-head-height: 44px;
+}
+
+/* ══ Technical paper — the light surface (docs default) ═════════════════════ */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: var(--pt-paper);
+  --surface: var(--pt-white);
+  --surface-2: var(--pt-paper-cool);
+  --surface-sunken: var(--pt-code);
+  --text-on-sunken: var(--pt-code-text);
+  --hover: #eaf4f8;
+
+  --text: #183f5b;
+  --muted: #657f91;
+  --dim: #8299a8;
+  --border: rgba(18, 59, 88, 0.14);
+  --border-strong: rgba(18, 59, 88, 0.28);
+
+  --blueprint: var(--pt-blue);
+  --blueprint-soft: rgba(31, 117, 169, 0.09);
+  --blueprint-line: rgba(31, 117, 169, 0.34);
+  --success: #17835a;
+  --success-soft: rgba(23, 131, 90, 0.09);
+  --success-line: rgba(23, 131, 90, 0.34);
+  --warning: #9a6c14;
+  --warning-soft: rgba(154, 108, 20, 0.1);
+  --warning-line: rgba(154, 108, 20, 0.34);
+  --danger: #c1444b;
+  --danger-soft: rgba(193, 68, 75, 0.09);
+  --danger-line: rgba(193, 68, 75, 0.34);
+  --violet: #7459a8;
+
+  /* The brand mark is one asset; the surface decides its colours. */
+  --brand-mark-body: var(--pt-navy);
+  --brand-mark-check: var(--pt-blue-bright);
+
+  --shadow: rgba(19, 57, 77, 0.1);
+  --elevation-overlay: 0 18px 40px var(--shadow);
+  --grid-line: rgba(31, 117, 169, 0.05);
+}
+
+/* ══ Execution blueprint — the dark surface (viewer and report default) ═════ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: var(--pt-navy-abyss);
+  --surface: #0d2234;
+  --surface-2: #132d3e;
+  --surface-sunken: #04131d;
+  --text-on-sunken: var(--pt-code-text);
+  --hover: #1a3548;
+
+  --text: #dceaf3;
+  --muted: #90aec2;
+  --dim: #6f93a8;
+  --border: rgba(255, 255, 255, 0.11);
+  --border-strong: rgba(255, 255, 255, 0.22);
+
+  --blueprint: var(--pt-blue-bright);
+  --blueprint-soft: rgba(22, 136, 191, 0.14);
+  --blueprint-line: rgba(22, 136, 191, 0.42);
+  --success: var(--pt-green);
+  --success-soft: rgba(53, 185, 133, 0.13);
+  --success-line: rgba(53, 185, 133, 0.42);
+  --warning: var(--pt-amber);
+  --warning-soft: rgba(215, 168, 75, 0.13);
+  --warning-line: rgba(215, 168, 75, 0.42);
+  --danger: var(--pt-red);
+  --danger-soft: rgba(216, 106, 106, 0.13);
+  --danger-line: rgba(216, 106, 106, 0.42);
+  --violet: #b29ae1;
+
+  --brand-mark-body: var(--pt-paper);
+  --brand-mark-check: var(--pt-cyan);
+
+  --shadow: rgba(0, 0, 0, 0.38);
+  --elevation-overlay: 0 18px 40px var(--shadow);
+  --grid-line: rgba(255, 255, 255, 0.028);
+}
+
+/* ══ Execution vocabulary ═══════════════════════════════════════════════════
+   Declared once, for the viewer, the report and the docs alike. Both surfaces
+   resolve these through the semantic tokens above, so they need no theme of
+   their own. */
+:root {
+  /* Phases of a test, in the order they run. */
+  --phase-setup: var(--blueprint);
+  --phase-execution: var(--pt-cyan);
+  --phase-rollback: var(--warning);
+  --phase-teardown: var(--violet);
+  --phase-run: var(--dim);
+
+  /* Entry types, in four families: what a test did, what it proved, what it
+     decided, and the framework machinery that carried it. The chip's label
+     carries the detail; colour only separates the families. */
+  --type-action: var(--blueprint);
+  --type-evidence: var(--pt-cyan);
+  --type-verdict: var(--warning);
+  --type-framework: var(--muted);
+
+  --type-call: var(--type-action);
+  --type-data: var(--type-action);
+  --type-custom: var(--type-action);
+  --type-assertion: var(--type-evidence);
+  --type-observation: var(--type-evidence);
+  --type-artifact: var(--type-evidence);
+  --type-finding: var(--type-verdict);
+  --type-gate: var(--type-verdict);
+  --type-lifecycle: var(--type-framework);
+  --type-extension: var(--type-framework);
+  --type-client: var(--type-framework);
+  --type-context: var(--type-framework);
+  --type-auth: var(--type-framework);
+  --type-ownership: var(--type-framework);
+
+  /* Outcomes of a test, an operation or a phase. */
+  --outcome-succeeded: var(--success);
+  --outcome-partial: var(--warning);
+  --outcome-failed: var(--danger);
+  --outcome-cancelled: var(--warning);
+  --outcome-skipped: var(--dim);
+  --outcome-unknown: var(--dim);
+
+  /* The report sink names the active colour `accent`. */
+  --accent: var(--blueprint);
+  --accent-soft: var(--blueprint-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-slow: 0ms;
+  }
+}

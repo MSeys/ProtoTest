@@ -1,4 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="235 225 290 270">
-  <path fill="#F7F5EE" d="M301 263V300H383A21 21 0 0 1 404 321A21 21 0 0 1 383 342H333V312H301V342H267V376H301V440H333V376H383A56 56 0 0 0 439 320A56 56 0 0 0 383 264H301Z"/>
-  <path fill="#19A8B5" d="M349 400L366 383L392 407L453 346L470 363L392 441Z"/>
+  <style>
+    /* A favicon is rendered as an image, so it follows the operating system rather than the page. */
+    .body { fill: #123B58 }
+    .check { fill: #1688BF }
+    @media (prefers-color-scheme: dark) {
+      .body { fill: #F7F5EE }
+      .check { fill: #19A8B5 }
+    }
+  </style>
+  <path class="body" d="M301 263V300H383A21 21 0 0 1 404 321A21 21 0 0 1 383 342H333V312H301V342H267V376H301V440H333V376H383A56 56 0 0 0 439 320A56 56 0 0 0 383 264H301Z"/>
+  <path class="check" d="M349 400L366 383L392 407L453 346L470 363L392 441Z"/>
 </svg>

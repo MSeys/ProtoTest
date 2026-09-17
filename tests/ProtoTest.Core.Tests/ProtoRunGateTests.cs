@@ -76,7 +76,7 @@ public class ProtoRunGateTests
     }
 
     [Test]
-    public async Task GateFindings_ShouldReachTheReport()
+    public async Task GateVerdicts_ShouldReachTheReportAsTheirOwnKind()
     {
         // Arrange
         var sink = new CapturingSink();
@@ -97,15 +97,15 @@ public class ProtoRunGateTests
             // The report is written before the run fails.
         }
 
-        // Assert
-        var finding = sink.Items.Single(item => item.Category == "Gate");
+        // Assert: a gate verdict is not a finding; the report shows it in its own category.
+        var verdict = sink.Items.Single(item => item.Category == "Gate");
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(finding.Identifier, Is.EqualTo("coverage is complete"));
-            Assert.That(finding.Kind, Is.EqualTo(ProtoReportItemKind.Finding));
-            Assert.That(finding.Status, Is.EqualTo(ProtoReportStatus.Error));
-            Assert.That(finding.Message, Is.EqualTo("Only half covered."));
-            Assert.That(finding.Tags, Has.Count.EqualTo(2));
+            Assert.That(verdict.Identifier, Is.EqualTo("coverage is complete"));
+            Assert.That(verdict.Kind, Is.EqualTo(ProtoReportItemKind.Gate));
+            Assert.That(verdict.Status, Is.EqualTo(ProtoReportStatus.Error));
+            Assert.That(verdict.Message, Is.EqualTo("Only half covered."));
+            Assert.That(verdict.Tags, Has.Count.EqualTo(2));
         }
     }
 

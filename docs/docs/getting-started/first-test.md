@@ -184,7 +184,7 @@ protected override void Configure(IProtoHostBuilder builder) =>
             .AddAspNetCoreServer<Program>()
             .AddRest(rest => rest
                 .AddClient("Api")
-                .WithCollector<RestCoverageCollector>()))
+                .AddCollector<RestCoverageCollector>()))
         .AddSink<HtmlReportSink>(sink => sink.OutputPath = "TestResults/report.html");
 ```
 

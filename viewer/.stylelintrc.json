@@ -1,0 +1,17 @@
+{
+  "comment": "The design-system rules only. Tokens come from design/prototest-tokens.css; nothing in the viewer may reinvent them. Hairline 1-2px values stay allowed: they are optical adjustments below the smallest step, not spacing.",
+  "overrides": [
+    { "files": ["**/*.vue"], "customSyntax": "postcss-html" }
+  ],
+  "rules": {
+    "color-no-hex": true,
+    "declaration-no-important": true,
+    "declaration-property-value-disallowed-list": {
+      "/^(padding|margin|gap|row-gap|column-gap)(-(top|right|bottom|left))?$/": [
+        "/^(?!.*(clamp|calc))(.*\\b([3-9]|[1-9]\\d+)px)/"
+      ],
+      "border-radius": ["/^(?!.*(clamp|calc))(.*\\d+px)/"],
+      "font-size": ["/\\d+px/"]
+    }
+  }
+}

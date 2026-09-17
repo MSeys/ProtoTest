@@ -25,6 +25,7 @@ public enum ProtoReportItemKind
     Observation,
     Coverage,
     Finding,
+    Gate,
     Metric
 }
 

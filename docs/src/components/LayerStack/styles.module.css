@@ -27,8 +27,8 @@
   width: 2px;
   background: repeating-linear-gradient(
     to bottom,
-    var(--pt-line-strong) 0,
-    var(--pt-line-strong) 5px,
+    var(--border-strong) 0,
+    var(--border-strong) 5px,
     transparent 5px,
     transparent 10px
   );
@@ -45,17 +45,17 @@
   border-radius: 10px;
   padding: 0.55rem 0.75rem;
   cursor: pointer;
-  color: var(--pt-text);
+  color: var(--text);
   font: inherit;
 }
 
 .node:hover {
-  background: var(--pt-surface);
-  border-color: var(--pt-line);
+  background: var(--surface);
+  border-color: var(--border);
 }
 
 .nodeActive {
-  background: var(--pt-surface);
+  background: var(--surface);
   border-color: var(--pt-blue-bright);
   box-shadow: 0 6px 20px rgba(18, 59, 88, 0.1);
 }
@@ -79,7 +79,7 @@
 .nodeIndex {
   font-family: var(--ifm-font-family-monospace);
   font-size: 0.7rem;
-  color: var(--pt-muted);
+  color: var(--muted);
 }
 
 .nodeLabel {
@@ -99,10 +99,10 @@
 }
 
 .detail {
-  border: 1px solid var(--pt-line);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 2rem 2.25rem;
-  background: var(--pt-surface);
+  background: var(--surface);
   min-height: 260px;
 }
 
@@ -121,7 +121,7 @@
 }
 
 .detailBody {
-  color: var(--pt-muted);
+  color: var(--muted);
   line-height: 1.65;
   font-size: 1rem;
   max-width: 56ch;
@@ -139,7 +139,7 @@
   padding: 0.3rem 0.6rem;
   border-radius: 6px;
   background: var(--ifm-background-color);
-  border: 1px solid var(--pt-line);
+  border: 1px solid var(--border);
 }
 
 .detailLink {

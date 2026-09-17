@@ -83,7 +83,9 @@ public static class ProtoExecutionContextExtensions
                 ["endpoint.resolver"] = alias is not null ? "alias" : registration is not null ? "per-test" : "client"
             });
 
-        return new GraphQLRequestBuilder(client, context, selected)
+        // The builder works with the registered target name: it is the identity clients, observations,
+        // and collectors agree on. The selected name is only how the caller addressed the client.
+        return new GraphQLRequestBuilder(client, context, resolvedName)
             .UseAuthenticatorFactory(authenticatorFactory)
             .UseBaseAddressResolver(transportResolver ?? alias?.ResolveEndpointAsync ?? registration?.ResolveAsync)
             .UseSubscriptionTransport(subscriptionTransport);

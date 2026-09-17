@@ -13,14 +13,16 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // The database is infrastructure: by default an in-memory SQLite database kept alive for the
-        // application's lifetime, or whatever ConnectionStrings:Northstar points at. The same schema
-        // and the same store either way.
-        var connectionString = builder.Configuration.GetConnectionString("Northstar");
+        // The database is infrastructure: by default a named in-memory SQLite database kept alive for
+        // the application's lifetime, or whatever ConnectionStrings:Northstar points at. The same
+        // schema and the same store either way, and a test can join the named database to compose the
+        // domain itself.
+        var connectionString = builder.Configuration.GetConnectionString("Northstar")
+            ?? "Data Source=file:northstar;Mode=Memory;Cache=Shared;Pooling=False";
         SqliteConnection? sharedConnection = null;
-        if (string.IsNullOrWhiteSpace(connectionString))
+        if (connectionString.Contains("Mode=Memory", StringComparison.OrdinalIgnoreCase))
         {
-            sharedConnection = new SqliteConnection("Data Source=:memory:");
+            sharedConnection = new SqliteConnection(connectionString);
             sharedConnection.Open();
             builder.Services.AddSingleton<DbConnection>(sharedConnection);
         }

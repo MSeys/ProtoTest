@@ -112,11 +112,35 @@ public static IProtoHostBuilder AddSeleniumWeb(
 | `CheckClickObstruction` | `true` | fail if something covers the element |
 | `DiagnosticTraceRetention` | `OnWebFailure` | `Off`, `OnWebFailure`, `Always` |
 
-The factory is called once per test; ProtoTest quits and disposes the driver afterwards.
+The factory is called once per test that uses the browser; ProtoTest quits and disposes the driver afterwards.
 
-:::note Configuration files
-Web options are code-only — they aren't bound from `appsettings.json`.
-:::
+### From configuration
+
+Both backends also read their options from configuration, so CI can run headless on another browser without code changes. Values are applied in this order, later winning:
+
+1. your `AddPlaywrightWeb` / `AddSeleniumWeb` callback,
+2. `ProtoTest:Web:Playwright` or `ProtoTest:Web:Selenium` — every session of that backend,
+3. `ProtoTest:Web:Sessions:{name}` — one named session.
+
+```json
+{
+  "ProtoTest": {
+    "Web": {
+      "Playwright": {
+        "Browser": "Firefox",
+        "Headless": true,
+        "TraceRetention": "Always",
+        "Context": { "Locale": "nl-BE", "ViewportSize": { "Width": 1280, "Height": 720 } }
+      },
+      "Sessions": {
+        "Admin": { "Channel": "msedge" }
+      }
+    }
+  }
+}
+```
+
+Nested Playwright context options such as `Context:Locale` bind too. Options are bound once, the first time a session of that name opens a browser, and Selenium's timeouts are validated again after binding.
 
 ## Sessions
 

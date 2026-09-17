@@ -511,13 +511,14 @@ public sealed class SeleniumWebBackend : IWebBackend
 
 internal sealed class SeleniumWebBackendFactory(
     Func<IWebDriver> createDriver,
-    SeleniumWebOptions options,
+    WebBackendOptionsBinder<SeleniumWebOptions> options,
     string sessionName) : IWebBackendFactory
 {
-    public string Name => "Selenium";
+    public string Name => SeleniumWebOptions.BackendName;
     public ValueTask<IWebBackend> CreateAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.FromResult<IWebBackend>(new SeleniumWebBackend(context, createDriver(), options, sessionName));
+        var resolved = options.Resolve(context.Configuration);
+        return ValueTask.FromResult<IWebBackend>(new SeleniumWebBackend(context, createDriver(), resolved, sessionName));
     }
 }

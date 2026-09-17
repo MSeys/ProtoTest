@@ -71,6 +71,35 @@ Before any of your hooks or attributes run, ProtoTest's client hook goes through
 
 If a client implements `IDisposable` or `IAsyncDisposable`, it's disposed when the test ends — in reverse order of registration.
 
+## Sharing one client across tests
+
+Some clients are expensive to create — a started application, a connection pool, a container. Create them once, keep them in the initializer (or a singleton service), and register them per test **without** handing over ownership:
+
+```csharp
+public sealed class SharedBusInitializer : IProtoClientInitializer<BusConnection>, IAsyncDisposable
+{
+    private readonly Lazy<BusConnection> _connection = new(BusConnection.Open);
+
+    public string Name => "Bus";
+
+    public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
+    {
+        context.RegisterClient(_connection.Value, Name, disposeWithContext: false);
+        return Task.FromResult(true);
+    }
+
+    public ValueTask DisposeAsync() =>
+        _connection.IsValueCreated ? _connection.Value.DisposeAsync() : ValueTask.CompletedTask;
+}
+```
+
+```csharp
+builder.ConfigureServices(services =>
+    services.AddSingleton<IProtoClientInitializer>(_ => new SharedBusInitializer()));
+```
+
+With `disposeWithContext: false` the test only releases its reference (a `client.release` trace entry) instead of disposing. Registering through a factory delegate, as above, lets the host's service provider dispose the initializer — and with it the shared client — when the run ends. This is how the [ASP.NET Core integration](../integrations/aspnetcore.md#one-application-or-one-per-test) shares one application across tests. Remember that tests running in parallel will use a shared client concurrently.
+
 ## Fallback chains
 
 Several initializers can offer the same client type and name. They're tried **in registration order**, and the first to return `true` wins. Returning `false` means "not me" — and the initializer must leave the context untouched when it does.

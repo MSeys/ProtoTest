@@ -328,7 +328,12 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         IReadOnlyDictionary<string, string?>? attributes,
         string? logicalParentId)
     {
-        var activity = ProtoTestDiagnostics.ActivitySource.StartActivity(name, ActivityKind.Internal);
+        // The logical parent's Activity may not be Activity.Current: the test's execution operation is started
+        // inside StartTestAsync, whose ambient Activity does not flow back out to the test body.
+        var parent = ParentActivity(logicalParentId);
+        var activity = parent is null || ReferenceEquals(Activity.Current, parent)
+            ? ProtoTestDiagnostics.ActivitySource.StartActivity(name, ActivityKind.Internal)
+            : ProtoTestDiagnostics.ActivitySource.StartActivity(name, ActivityKind.Internal, parent.Context);
         if (activity is null) return null;
         activity.SetTag("prototest.test.id", TestId);
         activity.SetTag("prototest.entry.id", entryId);
@@ -340,9 +345,12 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         return activity;
     }
 
-    private static void WriteActivityEvent(TraceEntryState entry)
+    private Activity? ParentActivity(string? parentId)
+        => parentId is not null && _entriesById.TryGetValue(parentId, out var parent) ? parent.Activity : null;
+
+    private void WriteActivityEvent(TraceEntryState entry)
     {
-        var activity = Activity.Current;
+        var activity = ParentActivity(entry.ParentId) ?? Activity.Current;
         if (activity is null) return;
         var tags = new ActivityTagsCollection
         {
@@ -379,7 +387,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
 
     internal sealed class TraceEntryState
     {
-        private readonly object _gate = new();
+        private readonly ProtoLock _gate = new();
         private readonly long _startedTimestamp;
         private readonly Dictionary<string, string?> _attributes;
         private int _completed;
@@ -427,6 +435,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         public ProtoTracePhase Phase { get; }
         public DateTimeOffset TimestampUtc { get; }
         public TraceEntryState? Parent { get; }
+        public Activity? Activity => _activity;
         public ProtoTraceOutcome Outcome { get { lock (_gate) return _outcome; } }
         public IReadOnlyDictionary<string, string?> Attributes { get { lock (_gate) return new Dictionary<string, string?>(_attributes); } }
 

@@ -168,11 +168,14 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     }
 
     /// <summary>
-    /// Registers a named client owned by this test. Clients are disposed in reverse registration order.
+    /// Registers a named client for this test. Owned clients are disposed in reverse registration order
+    /// when the test completes; pass <paramref name="disposeWithContext"/> as <see langword="false"/> for
+    /// shared clients whose lifetime is managed elsewhere.
     /// </summary>
-    public void RegisterClient<TClient>(TClient client, string name = "Default") where TClient : class
+    public void RegisterClient<TClient>(TClient client, string name = "Default", bool disposeWithContext = true)
+        where TClient : class
     {
-        _clients.Register(client, name);
+        _clients.Register(client, name, disposeWithContext);
         Trace.WriteEvent(
             "client.register",
             $"Register · {name} ({typeof(TClient).Name})",
@@ -183,7 +186,8 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
             {
                 ["client.name"] = name,
                 ["client.type"] = typeof(TClient).FullName,
-                ["instance.type"] = client.GetType().FullName
+                ["instance.type"] = client.GetType().FullName,
+                ["client.owned"] = disposeWithContext ? "true" : "false"
             });
     }
 

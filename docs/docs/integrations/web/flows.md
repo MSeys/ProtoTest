@@ -55,7 +55,3 @@ For one-off interactions that deserve a name in the trace, `InteractAsync` wraps
 ```csharp
 await page.Banner.InteractAsync("Dismiss cookie banner", banner => banner.Accept.ClickAsync());
 ```
-
-:::note
-Flows are new and don't have dedicated tests in the repository yet. The API is stable in shape, but report anything unexpected.
-:::

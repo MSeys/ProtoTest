@@ -24,8 +24,14 @@ public enum PlaywrightConsoleCapture
     All
 }
 
+/// <summary>
+/// Playwright session options. Besides code, they bind from <c>ProtoTest:Web:Playwright</c> and
+/// <c>ProtoTest:Web:Sessions:{name}</c>, in that order.
+/// </summary>
 public sealed class PlaywrightWebOptions
 {
+    public const string BackendName = "Playwright";
+
     public PlaywrightBrowser Browser { get; set; } = PlaywrightBrowser.Chromium;
     public bool Headless { get; set; } = true;
     public float? SlowMo { get; set; }

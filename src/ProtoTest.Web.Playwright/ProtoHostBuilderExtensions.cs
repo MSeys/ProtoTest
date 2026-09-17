@@ -12,9 +12,11 @@ public static class ProtoHostBuilderExtensions
         string name = "Default")
     {
         ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var options = new PlaywrightWebOptions();
         configure?.Invoke(options);
+        var binder = new WebBackendOptionsBinder<PlaywrightWebOptions>(options, PlaywrightWebOptions.BackendName, name);
         builder.ConfigureServices(services => services.TryAddScoped<PlaywrightBrowserPool>());
-        return builder.AddWebBackend(new PlaywrightWebBackendFactory(options, name), name);
+        return builder.AddWebBackend(new PlaywrightWebBackendFactory(binder, name), name);
     }
 }

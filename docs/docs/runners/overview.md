@@ -9,11 +9,11 @@ ProtoTest doesn't replace your test runner. It plugs into the one you already us
 
 | Runner | Package | Test attribute | Assembly setup |
 | --- | --- | --- | --- |
-| [xUnit v2](./xunit) | `ProtoTest.Xunit` | `[Fact]` **+** `[ProtoTest]` | Collection fixture |
-| [xUnit v3](./xunit3) | `ProtoTest.Xunit3` | `[ProtoTestFact]` / `[ProtoTestTheory]` | `[assembly: AssemblyFixture]` |
-| [NUnit](./nunit) | `ProtoTest.NUnit` | `[ProtoTest]` (replaces `[Test]`) | `[SetUpFixture]` |
-| [MSTest](./mstest) | `ProtoTest.MSTest` | `[ProtoTest]` (replaces `[TestMethod]`) | `[AssemblyInitialize]` |
-| [TUnit](./tunit) | `ProtoTest.TUnit` | `[Test]` (TUnit's own) | `[assembly: TestExecutor<…>]` |
+| [xUnit v2](./xunit.md) | `ProtoTest.Xunit` | `[ProtoTestFact]` / `[ProtoTestTheory]` | Collection fixture |
+| [xUnit v3](./xunit3.md) | `ProtoTest.Xunit3` | `[ProtoTestFact]` / `[ProtoTestTheory]` | `[assembly: AssemblyFixture]` |
+| [NUnit](./nunit.md) | `ProtoTest.NUnit` | `[ProtoTest]` (replaces `[Test]`) | `[SetUpFixture]` |
+| [MSTest](./mstest.md) | `ProtoTest.MSTest` | `[ProtoTest]` (replaces `[TestMethod]`) | `[AssemblyInitialize]` |
+| [TUnit](./tunit.md) | `ProtoTest.TUnit` | `[Test]` (TUnit's own) | `[assembly: TestExecutor<…>]` |
 
 ## The two pieces
 
@@ -39,10 +39,9 @@ The runners differ in how much outcome information they can hand back, which sho
 | Runner | Recorded outcome |
 | --- | --- |
 | xUnit v3, NUnit, MSTest | Passed / Failed / Skipped, with the exception |
+| xUnit v2 with `[ProtoTestFact]` / `[ProtoTestTheory]` | Passed / Failed / Cancelled, with the exception |
 | TUnit | Passed / Failed / **Cancelled**, with the exception |
-| xUnit v2 | Always `Unknown` — v2 exposes no outcome to a `BeforeAfterTestAttribute` |
-
-If a precise pass/fail outcome in ProtoTrace matters to you, prefer xUnit v3 over v2.
+| xUnit v2 with `[Fact]` + `[ProtoTest]` | Always `Unknown` — see [xUnit v2](./xunit.md#the-older-fact--prototest-style) |
 
 ## Attachments
 

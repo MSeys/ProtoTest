@@ -3,11 +3,11 @@ namespace ProtoTest.Core;
 internal sealed class ProtoClientRegistry
 {
     private readonly ProtoLock _gate = new();
-    private readonly Dictionary<ClientKey, object> _clients = new(ClientKeyComparer.Instance);
+    private readonly Dictionary<ClientKey, Registration> _clients = new(ClientKeyComparer.Instance);
     private readonly List<ClientKey> _registrationOrder = [];
     private int _disposeStarted;
 
-    public void Register<TClient>(TClient client, string name) where TClient : class
+    public void Register<TClient>(TClient client, string name, bool disposeWithContext) where TClient : class
     {
         ArgumentNullException.ThrowIfNull(client);
         var key = BuildKey<TClient>(name);
@@ -22,7 +22,7 @@ internal sealed class ProtoClientRegistry
             }
 
             _registrationOrder.Add(key);
-            _clients[key] = client;
+            _clients[key] = new Registration(client, disposeWithContext);
         }
     }
 
@@ -36,7 +36,7 @@ internal sealed class ProtoClientRegistry
         var key = BuildKey<TClient>(name);
         lock (_gate)
         {
-            return _clients.TryGetValue(key, out var client) && client is TClient typedClient
+            return _clients.TryGetValue(key, out var registration) && registration.Client is TClient typedClient
                 ? typedClient
                 : null;
         }
@@ -49,7 +49,7 @@ internal sealed class ProtoClientRegistry
             return [];
         }
 
-        List<(ClientKey Key, object Client)> clients;
+        List<(ClientKey Key, Registration Registration)> clients;
         lock (_gate)
         {
             clients = [.. _registrationOrder.AsEnumerable().Reverse().Select(key => (key, _clients[key]))];
@@ -58,8 +58,26 @@ internal sealed class ProtoClientRegistry
         }
 
         var exceptions = new List<Exception>();
-        foreach (var (key, client) in clients)
+        foreach (var (key, (client, disposeWithContext)) in clients)
         {
+            if (!disposeWithContext)
+            {
+                // Shared clients outlive the test; the context only drops its reference.
+                trace.WriteEvent(
+                    "client.release",
+                    $"Release · {key.Name} ({key.ClientType.Name})",
+                    "ProtoTest.Core",
+                    ProtoTracePhase.Teardown,
+                    ProtoTraceOutcome.Succeeded,
+                    new Dictionary<string, string?>
+                    {
+                        ["client.name"] = key.Name,
+                        ["client.type"] = key.ClientType.FullName,
+                        ["instance.type"] = client.GetType().FullName
+                    });
+                continue;
+            }
+
             using var operation = trace.StartOperation(
                 "client.dispose",
                 $"Dispose · {key.Name} ({key.ClientType.Name})",
@@ -100,6 +118,8 @@ internal sealed class ProtoClientRegistry
     }
 
     private readonly record struct ClientKey(Type ClientType, string Name);
+
+    private readonly record struct Registration(object Client, bool DisposeWithContext);
 
     private sealed class ClientKeyComparer : IEqualityComparer<ClientKey>
     {

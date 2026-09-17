@@ -16,8 +16,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="..\..\assets\brand\prototest-mark-transparent.svg" LogicalName="ProtoTest.Reporting.BrandMark.svg" />
-    <EmbeddedResource Include="..\..\assets\brand\prototest-mark-blueprint.svg" LogicalName="ProtoTest.Reporting.BlueprintMark.svg" />
-  </ItemGroup>
+    <EmbeddedResource Include="..\..\assets\brand\prototest-mark.svg" LogicalName="ProtoTest.Reporting.BrandMark.svg" />  </ItemGroup>
 
 </Project>

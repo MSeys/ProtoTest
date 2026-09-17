@@ -82,6 +82,11 @@ The one exception is a client's `BaseUrl`: a URL passed directly to `AddClient("
       "Attachments": { "CaptureResponses": true },
       "Responses": { "MaxResponseBodyBytes": 10485760 }
     },
+    "Web": {
+      "Playwright": { "Browser": "Chromium", "Headless": true },
+      "Selenium": { "ActionTimeout": "00:00:05" },
+      "Sessions": { "Admin": { "TraceRetention": "Always" } }
+    },
     "Reporting": {
       "Json": { "OutputPath": "TestResults/report.json", "Indented": true },
       "Html": { "OutputPath": "TestResults/report.html", "Title": "ProtoTest Report" }
@@ -97,13 +102,13 @@ The one exception is a client's `BaseUrl`: a URL passed directly to `AddClient("
 | `ProtoTest:Clients:{name}:GraphQL:*` | [GraphQL](../integrations/graphql/index.md#target-options), [schema coverage](../integrations/graphql/coverage.md) |
 | `ProtoTest:Rest:*` | [REST attachments](../integrations/rest/attachments.md), [request limits](../integrations/rest/requests.md#response-size-limit) |
 | `ProtoTest:GraphQL:*` | [GraphQL](../integrations/graphql/index.md#builder-options) |
+| `ProtoTest:Web:*` | [Web](../integrations/web/index.md#from-configuration) |
 | `ProtoTest:Reporting:*` | [Reporting](../advanced/reporting.md#configuring-from-files) |
 
 Configured only in code:
 
 - tracing — `ConfigureTracing`,
 - test ids — `ConfigureTestIds`,
-- browser options — `AddPlaywrightWeb` / `AddSeleniumWeb`,
 - data defaults — `AddData`.
 
-Those callbacks run while the host is being built, before configuration exists, so they can't read `IConfiguration`. If a value needs to vary per environment, read it yourself — for example `options.Headless = Environment.GetEnvironmentVariable("HEADED") is null;`. Inside tests, hooks and attributes, `context.Configuration` has everything.
+Those callbacks run while the host is being built, before configuration exists, so they can't read `IConfiguration`. If a value needs to vary per environment, read it yourself — for example `trace.OutputPath = Environment.GetEnvironmentVariable("TRACE_PATH") ?? "TestResults/run.prototrace";`. Inside tests, hooks and attributes, `context.Configuration` has everything.

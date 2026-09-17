@@ -43,6 +43,7 @@
     <Project Path="tests/ProtoTest.Data.Tests/ProtoTest.Data.Tests.csproj" />
     <Project Path="tests/ProtoTest.GraphQL.Tests/ProtoTest.GraphQL.Tests.csproj" />
     <Project Path="tests/ProtoTest.OpenApi.Tests/ProtoTest.OpenApi.Tests.csproj" Id="4d4c7e56-9c4e-4193-b73e-64b067c9268b" />
+    <Project Path="tests/ProtoTest.OpenTelemetry.Tests/ProtoTest.OpenTelemetry.Tests.csproj" />
     <Project Path="tests/ProtoTest.Reporting.Tests/ProtoTest.Reporting.Tests.csproj" />
     <Project Path="tests/ProtoTest.Rest.Tests/ProtoTest.Rest.Tests.csproj" Id="da8c0737-a839-4f92-a4c2-f9bdecd6c96b" />
     <Project Path="tests/ProtoTest.Web.Tests/ProtoTest.Web.Tests.csproj" />

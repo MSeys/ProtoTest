@@ -49,9 +49,13 @@ The package adds exactly one method — `AddProtoTestInstrumentation()`, which i
 | ProtoTrace | OpenTelemetry |
 | --- | --- |
 | an operation | an `Internal` span |
-| an event | an event on the current span |
+| an event | an event on the span of its parent operation |
+| a failed operation | status `Error`, plus an `exception` event with type, message and stack trace |
+| a succeeded operation | status `Ok` |
 
-Spans carry these tags:
+Spans nest the same way the ProtoTrace tree does: a test's `test.setup`, `test.execution` and `test.teardown` spans contain everything that happened in those phases, and an operation started in your test body is a child of `test.execution` — so one test is one connected trace in your backend.
+
+Spans and events carry these tags:
 
 | Tag | |
 | --- | --- |
@@ -59,16 +63,12 @@ Spans carry these tags:
 | `prototest.entry.id` | the ProtoTrace entry id |
 | `prototest.entry.kind` | e.g. `web.click` |
 | `prototest.source` | the integration that wrote it |
-| `prototest.phase` | `Setup`, `Execution`, … |
-| `prototest.logical_parent_id` | the ProtoTrace parent, when it differs from the span parent |
-| `prototest.outcome` | on events |
+| `prototest.phase` | `setup`, `execution`, `teardown`, `rollback` or `run` |
+| `prototest.outcome` | `succeeded`, `failed`, `partial`, `cancelled`, `skipped` or `unknown` |
+| `prototest.logical_parent_id` | the ProtoTrace parent entry id (spans only) |
 
-Large structured values — shape snapshots, serialised context state — stay in the `.prototrace` file only, so spans remain lightweight.
+The operation's own trace attributes — `http.method`, `web.locator`, your custom ones — are exported as tags too, except values longer than 2,048 characters and the large structured ones (shape snapshots, serialised context state, observation data). Those stay in the `.prototrace` file only, so spans remain lightweight.
 
 ## Correlating with your application
 
 Because operations are real `Activity` instances, `HttpClient`'s standard W3C trace-context propagation applies to requests sent while one is current. If your application is instrumented with OpenTelemetry too, that is what lets its server spans line up under the test step that caused them — this end-to-end path isn't covered by the repository's tests yet, so treat it as expected rather than guaranteed.
-
-:::note
-This package has no dedicated test project in the repository yet. The instrumentation it subscribes to is part of `ProtoTest.Core` and is exercised by every run.
-:::

@@ -198,6 +198,80 @@ public class IntegrationTests
         }
     }
 
+    [Test]
+    public async Task PerRunLifetime_ShouldShareOneApplicationAcrossTests_AndDisposeItWithTheHost()
+    {
+        var host = new ProtoHostBuilder()
+            .AddAspNetCoreServer<SampleApi.Program>(
+                "SharedApi",
+                webHost => webHost.UseSetting("ProtoTest:Configured", "true"))
+            .Build();
+        var method = (MethodInfo)MethodInfo.GetCurrentMethod()!;
+
+        await host.StartTestAsync("First", "00007", method);
+        var first = Proto.Context.Server<SampleApi.Program>("SharedApi");
+        using (var response = await Proto.Context.Client<HttpClient>("SharedApi").GetAsync("/ping"))
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        }
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        await host.StartTestAsync("Second", "00008", method);
+        var second = Proto.Context.Server<SampleApi.Program>("SharedApi");
+        using (var response = await Proto.Context.Client<HttpClient>("SharedApi").GetAsync("/ping"))
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        }
+        var initializations = host.Trace.Snapshot().Tests
+            .SelectMany(test => test.Entries)
+            .Where(entry => entry.Kind == "aspnetcore.server.initialize")
+            .Select(entry => entry.Attributes["server.reused"])
+            .ToArray();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(second, Is.SameAs(first));
+            Assert.That(initializations, Is.EqualTo(new[] { "false", "true" }));
+            Assert.That(ResolveMessage(first), Is.EqualTo("Hello from AspNetCore DI!"));
+        });
+
+        await host.DisposeAsync();
+        Assert.Throws<ObjectDisposedException>(() => ResolveMessage(first));
+    }
+
+    [Test]
+    public async Task PerTestLifetime_ShouldStartAndDisposeAnApplicationForEachTest()
+    {
+        var host = new ProtoHostBuilder()
+            .AddAspNetCoreServer<SampleApi.Program>(
+                "IsolatedApi",
+                webHost => webHost.UseSetting("ProtoTest:Configured", "true"),
+                lifetime: AspNetCoreServerLifetime.PerTest)
+            .Build();
+        await using var ownedHost = host;
+        var method = (MethodInfo)MethodInfo.GetCurrentMethod()!;
+
+        await host.StartTestAsync("First", "00009", method);
+        var first = Proto.Context.Server<SampleApi.Program>("IsolatedApi");
+        Assert.That(ResolveMessage(first), Is.EqualTo("Hello from AspNetCore DI!"));
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        Assert.Throws<ObjectDisposedException>(() => ResolveMessage(first));
+
+        await host.StartTestAsync("Second", "00010", method);
+        var second = Proto.Context.Server<SampleApi.Program>("IsolatedApi");
+        Assert.Multiple(() =>
+        {
+            Assert.That(second, Is.Not.SameAs(first));
+            Assert.That(ResolveMessage(second), Is.EqualTo("Hello from AspNetCore DI!"));
+        });
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    private static string ResolveMessage(WebApplicationFactory<SampleApi.Program> factory)
+        => factory.Services.GetRequiredService<SampleApi.ITestMessageService>().GetMessage();
+
     private sealed class ReplacementMessageService : SampleApi.ITestMessageService
     {
         public string GetMessage() => "replacement";

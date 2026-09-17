@@ -13,10 +13,11 @@ public static class ProtoHostBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(createDriver);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var options = new SeleniumWebOptions();
         configure?.Invoke(options);
-        if (options.ActionTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(options.ActionTimeout));
-        if (options.PollInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(options.PollInterval));
-        return builder.AddWebBackend(new SeleniumWebBackendFactory(createDriver, options, name), name);
+        var binder = new WebBackendOptionsBinder<SeleniumWebOptions>(
+            options, SeleniumWebOptions.BackendName, name, SeleniumWebOptions.Validate);
+        return builder.AddWebBackend(new SeleniumWebBackendFactory(createDriver, binder, name), name);
     }
 }

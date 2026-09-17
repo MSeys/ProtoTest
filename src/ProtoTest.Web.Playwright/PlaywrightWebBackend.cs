@@ -298,7 +298,8 @@ public sealed class PlaywrightWebBackend : IWebBackend
                 : scope.GetByText(locator.Value, new LocatorGetByTextOptions { Exact = locator.Exact });
 
         var pattern = locator.Exact ? $"^{Regex.Escape(locator.Value)}$" : Regex.Escape(locator.Value);
-        var regex = new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        // Playwright evaluates the pattern in the browser and only accepts JavaScript-compatible flags.
+        var regex = new Regex(pattern, RegexOptions.IgnoreCase);
         return scope is null ? Page.GetByText(regex) : scope.GetByText(regex);
     }
 
@@ -312,7 +313,7 @@ public sealed class PlaywrightWebBackend : IWebBackend
             var pattern = text.Exact ? $"^{Regex.Escape(text.Value)}$" : Regex.Escape(text.Value);
             return left.Filter(new LocatorFilterOptions
             {
-                HasTextRegex = new Regex(pattern, text.IgnoreCase ? RegexOptions.IgnoreCase | RegexOptions.CultureInvariant : RegexOptions.None)
+                HasTextRegex = new Regex(pattern, text.IgnoreCase ? RegexOptions.IgnoreCase : RegexOptions.None)
             });
         }
 
@@ -583,16 +584,18 @@ public sealed class PlaywrightWebBackend : IWebBackend
     }
 }
 
-internal sealed class PlaywrightWebBackendFactory(PlaywrightWebOptions options, string sessionName) : IWebBackendFactory
+internal sealed class PlaywrightWebBackendFactory(
+    WebBackendOptionsBinder<PlaywrightWebOptions> options,
+    string sessionName) : IWebBackendFactory
 {
-    public string Name => "Playwright";
+    public string Name => PlaywrightWebOptions.BackendName;
     public async ValueTask<IWebBackend> CreateAsync(
         ProtoExecutionContext context,
         CancellationToken cancellationToken = default)
         => await PlaywrightWebBackend.CreateAsync(
             context,
             context.Service<PlaywrightBrowserPool>(),
-            options,
+            options.Resolve(context.Configuration),
             sessionName,
             cancellationToken);
 }

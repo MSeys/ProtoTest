@@ -91,6 +91,14 @@ public sealed class RestResponse : IDisposable
         }
     }
 
+    /// <summary>
+    /// Deserializes the body into an anonymous type described by example, e.g.
+    /// <c>ReadAsAnonymous(new { id = 0, status = "" })</c>.
+    /// </summary>
+    /// <param name="anonymousTypeDefinition">
+    /// Only its type is used, so the compiler can infer the anonymous type; its values are ignored.
+    /// </param>
+    /// <param name="options">Serializer options; property names are case-insensitive by default.</param>
     public T? ReadAsAnonymous<T>(T anonymousTypeDefinition, JsonSerializerOptions? options = null)
     {
         return ReadAsJson<T>(options);

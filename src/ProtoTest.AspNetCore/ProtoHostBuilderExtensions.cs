@@ -18,19 +18,24 @@ public static class ProtoHostBuilderExtensions
     /// <param name="name">The unique identifier for this server instance. Defaults to "Default".</param>
     /// <param name="configureWebHost">Optional callback for replacing services or changing the in-process web host.</param>
     /// <param name="configureClient">Optional callback for configuring the generated HTTP client.</param>
+    /// <param name="lifetime">
+    /// Whether one application instance serves the whole run (the default) or each test starts its own.
+    /// </param>
     /// <returns>The modified <see cref="IProtoHostBuilder"/>.</returns>
     public static IProtoHostBuilder AddAspNetCoreServer<TProgram>(
         this IProtoHostBuilder builder,
         string name = "Default",
         Action<IWebHostBuilder>? configureWebHost = null,
-        Action<WebApplicationFactoryClientOptions>? configureClient = null) where TProgram : class
+        Action<WebApplicationFactoryClientOptions>? configureClient = null,
+        AspNetCoreServerLifetime lifetime = AspNetCoreServerLifetime.PerRun) where TProgram : class
     {
         ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (!Enum.IsDefined(lifetime)) throw new ArgumentOutOfRangeException(nameof(lifetime));
 
+        // Registered through a factory so the host's service provider disposes the shared server with the run.
         return builder.ConfigureServices(services =>
-        {
-            services.AddSingleton<IProtoClientInitializer>(
-                new AspNetCoreClientInitializer<TProgram>(name, configureWebHost, configureClient));
-        });
+            services.AddSingleton<IProtoClientInitializer>(_ =>
+                new AspNetCoreClientInitializer<TProgram>(name, configureWebHost, configureClient, lifetime)));
     }
 }

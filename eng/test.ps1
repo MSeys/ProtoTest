@@ -32,6 +32,8 @@ $vstestProjects = @(
     "tests/ProtoTest.MSTest.Tests/ProtoTest.MSTest.Tests.csproj",
     "tests/ProtoTest.Xunit.Tests/ProtoTest.Xunit.Tests.csproj",
     "tests/ProtoTest.Rest.Tests/ProtoTest.Rest.Tests.csproj",
+    "tests/ProtoTest.Data.Tests/ProtoTest.Data.Tests.csproj",
+    "tests/ProtoTest.OpenTelemetry.Tests/ProtoTest.OpenTelemetry.Tests.csproj",
     "tests/ProtoTest.GraphQL.Tests/ProtoTest.GraphQL.Tests.csproj",
     "tests/ProtoTest.AspNetCore.Tests/ProtoTest.AspNetCore.Tests.csproj",
     "tests/ProtoTest.OpenApi.Tests/ProtoTest.OpenApi.Tests.csproj",

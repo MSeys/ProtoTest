@@ -10,7 +10,7 @@ public sealed class HtmlReportSink : IProtoSink, IProtoSinkArtifactSource, IProt
 {
     private static readonly string BrandMark = ReadEmbeddedText("ProtoTest.Reporting.BrandMark.svg");
     private static readonly string Favicon = "data:image/svg+xml;base64," + Convert.ToBase64String(
-        Encoding.UTF8.GetBytes(ReadEmbeddedText("ProtoTest.Reporting.BlueprintMark.svg")));
+        Encoding.UTF8.GetBytes(BrandMark));
     private readonly HtmlReportSinkOptions _options;
     private string? _lastOutputPath;
 

@@ -35,6 +35,26 @@ public sealed class ProtoExecutionContextResourceTests
     }
 
     [Test]
+    public async Task DisposeAsync_ShouldLeaveSharedClientsUndisposed()
+    {
+        using var rootProvider = new ServiceCollection().BuildServiceProvider();
+        var owned = new DisposableClient();
+        var shared = new DisposableClient();
+        var context = CreateContext(rootProvider);
+        context.RegisterClient(owned, "Owned");
+        context.RegisterClient(shared, "Shared", disposeWithContext: false);
+
+        Assert.That(context.Client<DisposableClient>("Shared"), Is.SameAs(shared));
+        await context.DisposeAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(owned.DisposeCount, Is.EqualTo(1));
+            Assert.That(shared.DisposeCount, Is.Zero);
+        });
+    }
+
+    [Test]
     public async Task RegisterClient_ShouldRejectRegistrationAfterDisposalStarts()
     {
         using var rootProvider = new ServiceCollection().BuildServiceProvider();

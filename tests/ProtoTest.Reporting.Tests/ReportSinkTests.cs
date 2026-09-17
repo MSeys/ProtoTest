@@ -51,7 +51,7 @@ public sealed class ReportSinkTests
             Assert.That(html, Does.Contain("data-search=\"get /orders"));
             Assert.That(html, Does.Contain("localStorage.getItem('prototest-report-theme')"));
             Assert.That(html, Does.Contain("REPORTING BLUEPRINT"));
-            Assert.That(html, Does.Contain("ProtoTest transparent mark"));
+            Assert.That(html, Does.Contain("<path fill=\"#123B58\" d=\"M301 263V300H383"));
             Assert.That(html, Does.Contain("data:image/svg+xml;base64,"));
             Assert.That(html, Does.Contain("--blueprint:#4eb7ee"));
             Assert.That(html, Does.Contain("background-size:28px 28px"));

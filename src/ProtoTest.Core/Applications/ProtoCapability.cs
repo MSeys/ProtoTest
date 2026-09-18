@@ -17,6 +17,7 @@ public static class ProtoCapabilityKinds
     public const string Store = "store";
     public const string Broker = "broker";
     public const string Data = "data";
+    public const string Document = "document";
 }
 
 /// <summary>Registers capability descriptors from the host builder or from an application builder.</summary>

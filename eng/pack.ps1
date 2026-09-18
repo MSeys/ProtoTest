@@ -26,6 +26,7 @@ $packages = @(
     "src/ProtoTest.Grpc/ProtoTest.Grpc.csproj",
     "src/ProtoTest.Messaging/ProtoTest.Messaging.csproj",
     "src/ProtoTest.Messaging.RabbitMq/ProtoTest.Messaging.RabbitMq.csproj",
+    "src/ProtoTest.Sheets/ProtoTest.Sheets.csproj",
     "src/ProtoTest.AspNetCore/ProtoTest.AspNetCore.csproj",
     "src/ProtoTest.OpenApi/ProtoTest.OpenApi.csproj",
     "src/ProtoTest.OpenTelemetry/ProtoTest.OpenTelemetry.csproj",

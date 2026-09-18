@@ -54,3 +54,35 @@ jobs:
           dotnet restore samples/ProtoTest.Demo/ProtoTest.Demo.csproj
           dotnet build samples/ProtoTest.Demo/ProtoTest.Demo.csproj --configuration Release --no-restore
           dotnet test samples/ProtoTest.Demo/ProtoTest.Demo.csproj --configuration Release --no-build --no-restore --verbosity minimal
+
+  rabbitmq-demo:
+    runs-on: ubuntu-latest
+
+    services:
+      rabbitmq:
+        image: rabbitmq:3
+        ports:
+          - 5672:5672
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      # The broker path: the adapter's round trip and the demo's event journey only run here.
+      - name: Run the messaging adapter and the demo against a RabbitMQ broker
+        shell: pwsh
+        env:
+          ProtoTest__Messaging__Broker: container
+        run: |
+          dotnet restore tests/ProtoTest.Messaging.RabbitMq.Tests/ProtoTest.Messaging.RabbitMq.Tests.csproj
+          dotnet build tests/ProtoTest.Messaging.RabbitMq.Tests/ProtoTest.Messaging.RabbitMq.Tests.csproj --configuration Release --no-restore
+          dotnet test tests/ProtoTest.Messaging.RabbitMq.Tests/ProtoTest.Messaging.RabbitMq.Tests.csproj --configuration Release --no-build --no-restore --verbosity minimal
+          dotnet restore samples/ProtoTest.Demo/ProtoTest.Demo.csproj
+          dotnet build samples/ProtoTest.Demo/ProtoTest.Demo.csproj --configuration Release --no-restore
+          dotnet test samples/ProtoTest.Demo/ProtoTest.Demo.csproj --configuration Release --no-build --no-restore --verbosity minimal

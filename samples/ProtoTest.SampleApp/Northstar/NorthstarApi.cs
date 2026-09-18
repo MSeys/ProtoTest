@@ -1,5 +1,6 @@
 namespace ProtoTest.SampleApp.Northstar;
 
+using System.Text.Json;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Domain;
 
@@ -129,8 +130,15 @@ internal static class NorthstarApi
         api.MapGet("/invoices/{invoiceId:long}", (HttpContext http, long invoiceId) =>
             Results.Ok(Store(http).GetInvoice(Principal(http), invoiceId)));
 
-        api.MapPost("/invoices/{invoiceId:long}/pay", (HttpContext http, long invoiceId, PayInvoiceRequest body) =>
-            Results.Ok(Store(http).PayInvoice(Principal(http), invoiceId, body.Method)));
+        api.MapPost("/invoices/{invoiceId:long}/pay", async (HttpContext http, long invoiceId, PayInvoiceRequest body) =>
+        {
+            var invoice = Store(http).PayInvoice(Principal(http), invoiceId, body.Method);
+            await http.RequestServices.GetRequiredService<IEventPublisher>().PublishAsync(
+                "invoice.paid",
+                JsonSerializer.Serialize(new { id = invoice.Id, number = invoice.Number, status = invoice.Status }),
+                http.RequestAborted);
+            return Results.Ok(invoice);
+        });
 
         api.MapPost("/invoices/{invoiceId:long}/void", (HttpContext http, long invoiceId) =>
             Results.Ok(Store(http).VoidInvoice(Principal(http), invoiceId)));

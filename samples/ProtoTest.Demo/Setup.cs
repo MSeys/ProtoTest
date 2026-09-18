@@ -11,6 +11,9 @@ using ProtoTest.Core;
 using ProtoTest.Data;
 using ProtoTest.GraphQL;
 using ProtoTest.Grpc;
+using ProtoTest.Messaging;
+using ProtoTest.Messaging.RabbitMq;
+using ProtoTest.Messaging.RabbitMq.Testcontainers;
 using ProtoTest.NUnit;
 using ProtoTest.OpenApi;
 using ProtoTest.Reporting;
@@ -46,6 +49,31 @@ public sealed class Setup : ProtoTestAssembly
             demoConfiguration["ProtoTest:Database"],
             "postgres",
             StringComparison.OrdinalIgnoreCase);
+        // Messaging is configured the same way: a connection string points at an existing broker, or
+        // ProtoTest:Messaging:Broker=container owns one for the run. Without either, the in-memory broker
+        // keeps the API usable and broker-dependent tests skip through [RequiresCapability(Broker)].
+        var configuredMessaging = demoConfiguration["ProtoTest:Messaging:RabbitMq:ConnectionString"];
+        var useMessagingContainer = string.Equals(
+            demoConfiguration["ProtoTest:Messaging:Broker"],
+            "container",
+            StringComparison.OrdinalIgnoreCase);
+        RabbitMqBroker? rabbit = null;
+        if (useMessagingContainer
+            && !RabbitMqBroker.TryStart(configure: null, out rabbit, out var rabbitError))
+        {
+            throw new InvalidOperationException(
+                $"ProtoTest:Messaging:Broker=container was requested but the container did not start: {rabbitError}");
+        }
+
+        if (rabbit is not null)
+        {
+            // Owned by the whole run, like the database container.
+            builder.AddResource(rabbit);
+        }
+
+        var messagingConnection = string.IsNullOrWhiteSpace(configuredMessaging)
+            ? rabbit?.ConnectionString
+            : configuredMessaging;
 
         PostgresDatabase? postgres = null;
         if (usePostgres && !PostgresDatabase.TryStart(configure: null, out postgres, out var postgresError))
@@ -163,6 +191,10 @@ public sealed class Setup : ProtoTestAssembly
                         webHost.UseSetting("ConnectionStrings:Northstar", northstarDatabase);
                         webHost.UseSetting("Database:Provider", databaseProvider);
                         webHost.UseSetting("ProtoTest:TestSupport", "true");
+                        if (!string.IsNullOrWhiteSpace(messagingConnection))
+                        {
+                            webHost.UseSetting("Messaging:RabbitMq:ConnectionString", messagingConnection);
+                        }
                     });
                 }
 
@@ -186,6 +218,19 @@ public sealed class Setup : ProtoTestAssembly
                 sink.OutputPath = Path.Combine("TestResults", "ProtoTest.Demo", "report.html");
                 sink.Title = "Northstar Platform · ProtoTest Demo";
             });
+
+        // Registered last on purpose: the application's client initializer runs first and starts the
+        // in-process app, which declares its event topology - the messaging initializer then finds the
+        // exchanges it binds its per-test taps to.
+        if (string.IsNullOrWhiteSpace(messagingConnection))
+        {
+            builder.AddMessaging();
+        }
+        else
+        {
+            builder.AddMessaging(messaging => messaging.UseRabbitMq(options =>
+                options.ConnectionString = messagingConnection));
+        }
     }
 
     private static DbConnection CreateDatabaseConnection(string connectionString, bool postgres)

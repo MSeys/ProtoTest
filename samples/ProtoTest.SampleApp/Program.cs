@@ -50,6 +50,17 @@ public class Program
         // The sample runs in-process, so deliveries are routed to the sink registry. A real deployment
         // would register HttpWebhookTransport to POST to customer endpoints over the network.
         builder.Services.AddSingleton<IWebhookTransport, InProcessWebhookTransport>();
+        var messagingConnection = builder.Configuration["Messaging:RabbitMq:ConnectionString"];
+        if (string.IsNullOrWhiteSpace(messagingConnection))
+        {
+            builder.Services.AddSingleton<IEventPublisher>(NullEventPublisher.Instance);
+        }
+        else
+        {
+            var eventPublisher = new RabbitMqEventPublisher(messagingConnection);
+            eventPublisher.EnsureTopology();
+            builder.Services.AddSingleton<IEventPublisher>(eventPublisher);
+        }
         builder.Services.AddHostedService<WebhookDispatcher>();
         builder.Services.AddHttpClient();
         builder.Services.AddHttpContextAccessor();

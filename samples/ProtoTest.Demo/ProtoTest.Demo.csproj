@@ -27,6 +27,9 @@
     <ProjectReference Include="..\..\src\ProtoTest.GraphQL\ProtoTest.GraphQL.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Grpc\ProtoTest.Grpc.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Sheets\ProtoTest.Sheets.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Messaging\ProtoTest.Messaging.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Messaging.RabbitMq\ProtoTest.Messaging.RabbitMq.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Messaging.RabbitMq.Testcontainers\ProtoTest.Messaging.RabbitMq.Testcontainers.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.NUnit\ProtoTest.NUnit.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.OpenApi\ProtoTest.OpenApi.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Reporting\ProtoTest.Reporting.csproj" />

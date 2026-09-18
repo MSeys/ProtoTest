@@ -18,6 +18,15 @@ jobs:
             9.0.x
             10.0.x
 
+      # The browser binaries plus the operating-system libraries they need on a clean image. The
+      # in-code InstallBrowsers option covers machines that skip this step; browsers otherwise.
+      - name: Install the Chromium browser for the web tests and demo
+        shell: pwsh
+        run: |
+          dotnet restore tests/ProtoTest.Web.Tests/ProtoTest.Web.Tests.csproj
+          dotnet build tests/ProtoTest.Web.Tests/ProtoTest.Web.Tests.csproj --configuration Release --no-restore
+          pwsh tests/ProtoTest.Web.Tests/bin/Release/net8.0/playwright.ps1 install --with-deps chromium
+
       - name: Restore, build, and test every runner
         shell: pwsh
         run: ./eng/test.ps1 -Configuration Release

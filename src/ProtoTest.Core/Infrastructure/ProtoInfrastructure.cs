@@ -19,6 +19,16 @@ public interface IProtoConnectionInfrastructure : IProtoInfrastructure
 }
 
 /// <summary>
+/// Infrastructure that fills configuration keys with values only it can know after starting, for example
+/// the address of a standalone application a browser should visit.
+/// </summary>
+public interface IProtoSettingsInfrastructure : IProtoInfrastructure
+{
+    /// <summary>Gets the configuration values the started piece provides.</summary>
+    IReadOnlyDictionary<string, string> Settings { get; }
+}
+
+/// <summary>
 /// Registered infrastructure with the configuration keys it provides, for example
 /// <c>ConnectionStrings:Northstar</c> for the application and <c>ProtoTest:...</c> for the adapter. The
 /// host exposes started values through <see cref="ProtoInfrastructureSettings"/>, and the in-process

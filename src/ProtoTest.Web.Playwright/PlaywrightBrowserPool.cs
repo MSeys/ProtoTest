@@ -9,6 +9,9 @@ using Microsoft.Playwright;
 /// </summary>
 internal sealed class PlaywrightBrowserPool : IAsyncDisposable
 {
+    private static readonly SemaphoreSlim InstallGate = new(1, 1);
+    private static readonly HashSet<string> InstalledBrowsers = new(StringComparer.Ordinal);
+
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Dictionary<BrowserKey, IBrowser> _browsers = [];
     private IPlaywright? _playwright;
@@ -25,6 +28,7 @@ internal sealed class PlaywrightBrowserPool : IAsyncDisposable
             var key = new BrowserKey(options.Browser, options.Headless, options.SlowMo, options.Channel);
             if (_browsers.TryGetValue(key, out var existing)) return existing;
 
+            await EnsureBrowserInstalledAsync(options);
             _playwright ??= await Microsoft.Playwright.Playwright.CreateAsync();
             var browserType = options.Browser switch
             {
@@ -61,6 +65,51 @@ internal sealed class PlaywrightBrowserPool : IAsyncDisposable
         catch (Exception exception) { failure ??= exception; }
         _gate.Dispose();
         if (failure is not null) throw failure;
+    }
+
+    private static async Task EnsureBrowserInstalledAsync(PlaywrightWebOptions options)
+    {
+        if (!options.InstallBrowsers || !string.IsNullOrWhiteSpace(options.Channel))
+        {
+            return;
+        }
+
+        var browser = options.Browser switch
+        {
+            PlaywrightBrowser.Firefox => "firefox",
+            PlaywrightBrowser.Webkit => "webkit",
+            _ => "chromium"
+        };
+        if (InstalledBrowsers.Contains(browser))
+        {
+            return;
+        }
+
+        await InstallGate.WaitAsync();
+        try
+        {
+            if (InstalledBrowsers.Contains(browser))
+            {
+                return;
+            }
+
+            // The driver ships with the package and downloads only what it is missing; installing a
+            // present browser is a cheap no-op.
+            var exitCode = await Task.Run(() => Microsoft.Playwright.Program.Main(["install", browser]));
+            if (exitCode != 0)
+            {
+                throw new InvalidOperationException(
+                    $"Installing the Playwright '{browser}' browser failed with exit code {exitCode}. " +
+                    $"Run 'playwright.ps1 install {browser}' once, or set " +
+                    "'ProtoTest:Web:Playwright:InstallBrowsers=false' and provide the browser yourself.");
+            }
+
+            InstalledBrowsers.Add(browser);
+        }
+        finally
+        {
+            InstallGate.Release();
+        }
     }
 
     private sealed record BrowserKey(

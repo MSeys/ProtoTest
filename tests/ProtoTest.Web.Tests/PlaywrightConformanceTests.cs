@@ -2,6 +2,7 @@ namespace ProtoTest.Web.Tests;
 
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Playwright;
 using ProtoTest.Core;
 using ProtoTest.Web.Playwright;
 
@@ -11,14 +12,11 @@ public sealed class PlaywrightConformanceTests
     [Test]
     public async Task SharedWebModel_ShouldRunAgainstARealBrowser()
     {
-        if (!OperatingSystem.IsWindows() || !EdgeIsInstalled())
-            Assert.Ignore("The browser-backed conformance test requires a local Microsoft Edge installation.");
-
         var host = new ProtoHostBuilder()
             .AddWeb(options =>
             {
-                options.Channel = "msedge";
                 options.Headless = true;
+                options.InstallBrowsers = true;
                 options.TraceRetention = PlaywrightTraceRetention.Always;
             })
             .Build();
@@ -26,7 +24,7 @@ public sealed class PlaywrightConformanceTests
         await host.StartAsync();
         var context = await host.StartTestAsync("Playwright conformance", TestMethod());
         var web = context.Web();
-        var backend = await web.GetBackendAsync<PlaywrightWebBackend>();
+        var backend = await OpenBrowserAsync(web);
         await backend.Page.SetContentAsync(Html);
         var page = web.Page<ConformancePage>();
 
@@ -53,23 +51,24 @@ public sealed class PlaywrightConformanceTests
     [Test]
     public async Task EscapeHatchLocatorsFlowsAndConfiguredContext_ShouldRunAgainstARealBrowser()
     {
-        if (!OperatingSystem.IsWindows() || !EdgeIsInstalled())
-            Assert.Ignore("The browser-backed conformance test requires a local Microsoft Edge installation.");
-
         var host = new ProtoHostBuilder()
             .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
-                    ["ProtoTest:Web:Playwright:Channel"] = "msedge",
                     ["ProtoTest:Web:Sessions:Default:Context:Locale"] = "nl-BE"
                 }))
-            .AddWeb(options => options.TraceRetention = PlaywrightTraceRetention.Off)
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Off;
+            })
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
         var context = await host.StartTestAsync("Playwright escape hatches", TestMethod());
         var web = context.Web();
-        var backend = await web.GetBackendAsync<PlaywrightWebBackend>();
+        var backend = await OpenBrowserAsync(web);
         await backend.Page.SetContentAsync(EscapeHatchHtml);
         var page = web.Page<EscapeHatchPage>();
 
@@ -102,9 +101,22 @@ public sealed class PlaywrightConformanceTests
         });
     }
 
-    private static bool EdgeIsInstalled()
-        => File.Exists(@"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe") ||
-           File.Exists(@"C:\Program Files\Microsoft\Edge\Application\msedge.exe");
+    /// <summary>
+    /// Opens the browser, skipping with the reason when no browser can run here - a headless CI image
+    /// without the browser dependencies should report a skip, not a failure.
+    /// </summary>
+    private static async Task<PlaywrightWebBackend> OpenBrowserAsync(WebSession web)
+    {
+        try
+        {
+            return await web.GetBackendAsync<PlaywrightWebBackend>();
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or PlaywrightException)
+        {
+            Assert.Ignore($"No Playwright browser is available: {exception.Message}");
+            throw;
+        }
+    }
 
     private static MethodInfo TestMethod()
         => typeof(PlaywrightConformanceTests).GetMethod(nameof(Placeholder), BindingFlags.Static | BindingFlags.NonPublic)!;

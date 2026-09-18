@@ -39,6 +39,13 @@ public sealed class PlaywrightWebOptions : IProtoConfigurableOptions
     public bool Headless { get; set; } = true;
     public float? SlowMo { get; set; }
     public string? Channel { get; set; }
+
+    /// <summary>
+    /// Downloads the selected browser through the Playwright driver before the first launch, so a clean
+    /// machine or CI runner needs no separate install step. Ignored when <see cref="Channel"/> names a
+    /// system browser (for example <c>msedge</c> or <c>chrome</c>).
+    /// </summary>
+    public bool InstallBrowsers { get; set; }
     public BrowserNewContextOptions Context { get; set; } = new();
     public PlaywrightTraceRetention TraceRetention { get; set; } = PlaywrightTraceRetention.OnWebFailure;
     public bool CorrelateTraceGroups { get; set; } = true;

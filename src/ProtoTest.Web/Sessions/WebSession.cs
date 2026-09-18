@@ -32,7 +32,7 @@ public sealed class WebSession : IAsyncDisposable
         Name = name;
         Application = application
             ?? ProtoApplication.ResolveName(context.Configuration, $"ProtoTest:Web:Sessions:{name}", name);
-        BaseUrl = ResolveBaseUrl(context.Configuration, Application);
+        BaseUrl = ResolveBaseUrl(context, name, Application);
     }
 
     public string Name { get; }
@@ -109,13 +109,30 @@ public sealed class WebSession : IAsyncDisposable
 
         var baseUrl = BaseUrl ?? throw new InvalidOperationException(
             $"Web session '{Name}' was asked to open the relative address '{address}', but application " +
-            $"'{Application}' has no base address. Set 'ProtoTest:Applications:{Application}:BaseUrl'.");
+            $"'{Application}' has no base address. Set 'ProtoTest:Applications:{Application}:BaseUrl' or " +
+            $"'ProtoTest:Web:Sessions:{Name}:BaseUrl'.");
         return new Uri(baseUrl, address);
     }
 
-    private static Uri? ResolveBaseUrl(IConfiguration configuration, string applicationName)
+    private static Uri? ResolveBaseUrl(ProtoExecutionContext context, string sessionName, string applicationName)
     {
-        var configured = ProtoApplication.BaseUrl(configuration, applicationName);
+        // A session can target its own address (for example a standalone instance infrastructure started,
+        // which fills it after the host started); otherwise it shares the application's address with the
+        // HTTP-based protocols.
+        string? configured = null;
+        var sessionKey = $"ProtoTest:Web:Sessions:{sessionName}:BaseUrl";
+        if (context.TryService<ProtoInfrastructureSettings>() is { } settings
+            && settings.Values.TryGetValue(sessionKey, out var provided))
+        {
+            configured = provided;
+        }
+
+        configured ??= context.Configuration[sessionKey];
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            configured = ProtoApplication.BaseUrl(context.Configuration, applicationName);
+        }
+
         if (string.IsNullOrWhiteSpace(configured))
         {
             return null;
@@ -124,7 +141,7 @@ public sealed class WebSession : IAsyncDisposable
         return Uri.TryCreate(configured, UriKind.Absolute, out var uri)
             ? uri
             : throw new InvalidOperationException(
-                $"The base URL '{configured}' for application '{applicationName}' must be an absolute URI.");
+                $"The base URL '{configured}' for web session '{sessionName}' must be an absolute URI.");
     }
 
     internal ValueTask ClickAsync(WebElementReference element, CancellationToken cancellationToken)

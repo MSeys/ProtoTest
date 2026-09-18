@@ -18,6 +18,22 @@ dotnet add package ProtoTest.Web.Playwright    # brings ProtoTest.Web with it
 dotnet add package ProtoTest.Web.Selenium
 ```
 
+## Browsers
+
+Playwright launches Chromium by default, which runs on Windows, Linux and macOS; set `Channel` (`msedge`, `chrome`) to use an installed system browser instead. `InstallBrowsers` downloads the selected browser through the Playwright driver before the first launch, so a clean machine or CI runner needs no separate step:
+
+```csharp
+.AddWeb(options =>
+{
+    options.Browser = PlaywrightBrowser.Chromium;   // the default
+    options.InstallBrowsers = true;                 // download it when missing
+})
+```
+
+On a clean Linux image the operating-system libraries still come from `playwright.ps1 install --with-deps chromium`. Selenium takes a driver factory you provide (Selenium Manager resolves drivers), so the browser itself must already be installed.
+
+A session can target its own address instead of the application's: `ProtoTest:Web:Sessions:{name}:BaseUrl` wins over `ProtoTest:Applications:{app}:BaseUrl`. Infrastructure that starts an application with the run fills that key, so a browser journey needs no fixture code.
+
 ## A first browser test
 
 ```csharp

@@ -118,6 +118,14 @@ public sealed class ProtoHost : IAsyncDisposable
                 }
             }
 
+            if (infrastructure is IProtoSettingsInfrastructure sourced)
+            {
+                foreach (var (key, value) in sourced.Settings)
+                {
+                    settings.Set(key, value);
+                }
+            }
+
             _trace.RunWriter.SetEntityState(
                 infrastructure.Kind,
                 infrastructure.Id,

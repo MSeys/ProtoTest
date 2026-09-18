@@ -49,50 +49,36 @@ public sealed class Setup : ProtoTestAssembly
             demoConfiguration["ProtoTest:Database"],
             "postgres",
             StringComparison.OrdinalIgnoreCase);
-        // Messaging is configured the same way: a connection string points at an existing broker, or
-        // ProtoTest:Messaging:Broker=container owns one for the run. Without either, the in-memory broker
-        // keeps the API usable and broker-dependent tests skip through [RequiresCapability(Broker)].
+        // A configured connection string points at an existing broker; Broker=container lets the run own
+        // one. The adapter reads it under its own key, the in-process application under its own - both
+        // are filled from the same started container.
         var configuredMessaging = demoConfiguration["ProtoTest:Messaging:RabbitMq:ConnectionString"];
         var useMessagingContainer = string.Equals(
             demoConfiguration["ProtoTest:Messaging:Broker"],
             "container",
             StringComparison.OrdinalIgnoreCase);
-        RabbitMqBroker? rabbit = null;
-        if (useMessagingContainer
-            && !RabbitMqBroker.TryStart(configure: null, out rabbit, out var rabbitError))
+        if (useMessagingContainer)
         {
-            throw new InvalidOperationException(
-                $"ProtoTest:Messaging:Broker=container was requested but the container did not start: {rabbitError}");
+            builder.AddInfrastructure(
+                RabbitMqBroker.Container(),
+                ProtoRabbitMqOptions.ConnectionStringSetting,
+                "Messaging:RabbitMq:ConnectionString");
         }
 
-        if (rabbit is not null)
-        {
-            // Owned by the whole run, like the database container.
-            builder.AddResource(rabbit);
-        }
+        var useMessaging = useMessagingContainer || !string.IsNullOrWhiteSpace(configuredMessaging);
 
-        var messagingConnection = string.IsNullOrWhiteSpace(configuredMessaging)
-            ? rabbit?.ConnectionString
-            : configuredMessaging;
-
-        PostgresDatabase? postgres = null;
-        if (usePostgres && !PostgresDatabase.TryStart(configure: null, out postgres, out var postgresError))
+        if (usePostgres)
         {
-            throw new InvalidOperationException(
-                $"ProtoTest:Database=postgres was requested but the container did not start: {postgresError}");
-        }
-
-        if (postgres is not null)
-        {
-            // Owned by the whole run: started once here, released when the host is disposed.
-            builder.AddResource(postgres);
+            // Owned by the whole run and started with the host; its connection string reaches the
+            // test-side domain and the in-process application through infrastructure settings.
+            builder.AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar");
         }
 
         // Without PostgreSQL the demo owns a file database: several connections can share it, WAL lets
         // readers and the writer work at the same time, and a fresh file per run keeps tenant slugs
         // from colliding with the previous run.
         string? ownedDatabasePath = null;
-        if (postgres is null && configuredDatabase is null)
+        if (!usePostgres && configuredDatabase is null)
         {
             ownedDatabasePath = Path.GetFullPath(Path.Combine("TestResults", "ProtoTest.Demo", "northstar-demo.db"));
             foreach (var suffix in new[] { "", "-wal", "-shm" })
@@ -104,11 +90,9 @@ public sealed class Setup : ProtoTestAssembly
             }
         }
 
-        var northstarDatabase = postgres?.ConnectionString
-            ?? configuredDatabase
-            ?? $"Data Source={ownedDatabasePath}";
-        var databaseProvider = postgres is not null ? "postgres" : "sqlite";
-        var composeDomainInTests = hostedInProcess || configuredDatabase is not null || postgres is not null;
+        var fallbackDatabase = configuredDatabase ?? $"Data Source={ownedDatabasePath}";
+        var databaseProvider = usePostgres ? "postgres" : "sqlite";
+        var composeDomainInTests = hostedInProcess || configuredDatabase is not null || usePostgres;
 
         if (composeDomainInTests)
         {
@@ -118,13 +102,13 @@ public sealed class Setup : ProtoTestAssembly
             // release what they create.
             builder
                 .AddSql(
-                    _ => CreateDatabaseConnection(northstarDatabase, postgres is not null),
+                    provider => CreateDatabaseConnection(ResolveDatabase(provider, fallbackDatabase), usePostgres),
                     sql => sql.Isolation = SqlIsolation.None)
                 .ConfigureServices(services => services.AddNorthstarDomain(
                     (provider, options) =>
                     {
                         var connection = provider.GetRequiredService<DbConnection>();
-                        if (postgres is not null)
+                        if (usePostgres)
                         {
                             options.UseNpgsql(connection);
                         }
@@ -188,12 +172,18 @@ public sealed class Setup : ProtoTestAssembly
                     // no process-wide environment variables involved.
                     app.AddAspNetCoreServer<Program>(configureWebHost: webHost =>
                     {
-                        webHost.UseSetting("ConnectionStrings:Northstar", northstarDatabase);
+                        if (!usePostgres)
+                        {
+                            // A container's connection string arrives as infrastructure settings.
+                            webHost.UseSetting("ConnectionStrings:Northstar", fallbackDatabase);
+                        }
+
                         webHost.UseSetting("Database:Provider", databaseProvider);
                         webHost.UseSetting("ProtoTest:TestSupport", "true");
-                        if (!string.IsNullOrWhiteSpace(messagingConnection))
+                        if (!string.IsNullOrWhiteSpace(configuredMessaging))
                         {
-                            webHost.UseSetting("Messaging:RabbitMq:ConnectionString", messagingConnection);
+                            // An external broker is configuration, not infrastructure; pass it through.
+                            webHost.UseSetting("Messaging:RabbitMq:ConnectionString", configuredMessaging);
                         }
                     });
                 }
@@ -222,16 +212,21 @@ public sealed class Setup : ProtoTestAssembly
         // Registered last on purpose: the application's client initializer runs first and starts the
         // in-process app, which declares its event topology - the messaging initializer then finds the
         // exchanges it binds its per-test taps to.
-        if (string.IsNullOrWhiteSpace(messagingConnection))
+        if (useMessaging)
         {
-            builder.AddMessaging();
+            builder.AddMessaging(messaging => messaging.UseRabbitMq());
         }
         else
         {
-            builder.AddMessaging(messaging => messaging.UseRabbitMq(options =>
-                options.ConnectionString = messagingConnection));
+            builder.AddMessaging();
         }
     }
+
+    private static string ResolveDatabase(IServiceProvider provider, string fallback)
+        => provider.GetService<ProtoInfrastructureSettings>() is { } settings
+            && settings.Values.TryGetValue("ConnectionStrings:Northstar", out var connection)
+            ? connection
+            : fallback;
 
     private static DbConnection CreateDatabaseConnection(string connectionString, bool postgres)
         => postgres

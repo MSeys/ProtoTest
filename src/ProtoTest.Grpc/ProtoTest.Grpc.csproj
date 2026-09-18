@@ -5,16 +5,22 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
-    <IsPackable>false</IsPackable>
+    <IsPackable>true</IsPackable>
     <PackageId>ProtoTest.Grpc</PackageId>
     <AssemblyName>ProtoTest.Grpc</AssemblyName>
     <RootNamespace>ProtoTest.Grpc</RootNamespace>
-    <Description>Planned gRPC integration for ProtoTest. This package is not yet published.</Description>
+    <Description>gRPC integration for ProtoTest: named channels, metadata authentication, unary and streaming helpers, tracing and coverage.</Description>
     <PackageTags>testing;integration-testing;grpc;dotnet</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Grpc.Net.Client" Version="2.70.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <ProjectReference Include="..\ProtoTest.Http\ProtoTest.Http.csproj" />
   </ItemGroup>
 
 </Project>
+

@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package prototest.echo;
+
+option csharp_namespace = "ProtoTest.Grpc.Tests.Echo";
+
+service Echo {
+  rpc Say (EchoRequest) returns (EchoReply);
+  rpc Stream (EchoRequest) returns (stream EchoReply);
+  rpc Collect (stream EchoRequest) returns (EchoReply);
+  rpc Chat (stream EchoRequest) returns (stream EchoReply);
+}
+
+message EchoRequest {
+  string message = 1;
+}
+
+message EchoReply {
+  string message = 1;
+}

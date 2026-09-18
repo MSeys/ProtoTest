@@ -212,11 +212,14 @@ public sealed class SheetsTests
         model.Verify();
 
         var emea = model.Row(row => row.Region == "EMEA");
+        model.Column(row => row.Amount).ShouldBe([1200m, 900m]);
+        model.Column(row => row.Amount).ShouldAll(value => value > 0);
+        model.Column(row => row.Amount).ShouldBeSortedBy(ascending: false);
         Assert.Multiple(() =>
         {
             Assert.That(emea.Amount, Is.EqualTo(1200m));
             Assert.That(emea.Count, Is.EqualTo(12));
-            Assert.That(model.Column(row => row.Amount), Is.EqualTo(new decimal?[] { 1200m, 900m }));
+            Assert.That(model.Column(row => row.Amount).Values, Is.EqualTo(new decimal?[] { 1200m, 900m }));
             Assert.That(model.Rows.Select(row => row.Region), Is.EqualTo(new[] { "EMEA", "APAC" }));
         });
         await host.CompleteTestAsync(ProtoTestResult.Passed);

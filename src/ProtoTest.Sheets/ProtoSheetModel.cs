@@ -50,12 +50,15 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
             $"No row of '{Sheet.Name}' matched the predicate.");
     }
 
-    /// <summary>Reads a whole column as typed values, addressed by the record property.</summary>
-    public IReadOnlyList<TValue?> Column<TValue>(Expression<Func<TRow, TValue>> property)
+    /// <summary>Reads a whole column as typed values with property-style assertions.</summary>
+    public ProtoModelColumn<TValue> Column<TValue>(Expression<Func<TRow, TValue>> property)
     {
-        var number = _columns[PropertyOf(property)];
-        return [.. Enumerable.Range(_table.DataStartRow, _table.RowCount)
-            .Select(row => (TValue?)ConvertValue(typeof(TValue), _table.Cell(row, number)))];
+        var info = PropertyOf(property);
+        var number = _columns[info];
+        var values = Enumerable.Range(_table.DataStartRow, _table.RowCount)
+            .Select(row => (TValue?)ConvertValue(typeof(TValue), _table.Cell(row, number)))
+            .ToArray();
+        return new ProtoModelColumn<TValue>(Sheet.Name, info.Name, values, _table.DataStartRow, _context);
     }
 
     /// <summary>Checks every declared column against the record's shape; all violations are reported.</summary>

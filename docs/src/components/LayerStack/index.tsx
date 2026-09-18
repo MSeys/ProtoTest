@@ -90,44 +90,46 @@ export default function LayerStack(): ReactNode {
   const active = layers.find((layer) => layer.id === activeId)!;
 
   return (
-    <div className={styles.wrapper}>
-      <div className={styles.rail}>
-        <div className={styles.railLine} />
-        {layers.map((layer) => (
-          <button
-            key={layer.id}
-            type="button"
-            className={`${styles.node} ${layer.id === activeId ? styles.nodeActive : ''}`}
-            onClick={() => setActiveId(layer.id)}
-            aria-pressed={layer.id === activeId}>
-            <span className={`${styles.dot} ${layer.status === 'planned' ? styles.dotPlanned : ''}`} />
-            <span className={styles.nodeIndex}>{layer.index}</span>
-            <span className={styles.nodeLabel}>{layer.label}</span>
-            {layer.status === 'planned' && <span className={styles.plannedTag}>Planned</span>}
-          </button>
-        ))}
-      </div>
-
-      <div className={styles.detail}>
-        <div className={styles.detailKicker}>
-          {active.status === 'shipped' ? 'Available today' : 'On the roadmap'}
+    <div className={styles.stack}>
+      <div className={styles.wrapper}>
+        <div className={styles.rail}>
+          <div className={styles.railLine} />
+          {layers.map((layer) => (
+            <button
+              key={layer.id}
+              type="button"
+              className={`${styles.node} ${layer.id === activeId ? styles.nodeActive : ''}`}
+              onClick={() => setActiveId(layer.id)}
+              aria-pressed={layer.id === activeId}>
+              <span className={`${styles.dot} ${layer.status === 'planned' ? styles.dotPlanned : ''}`} />
+              <span className={styles.nodeIndex}>{layer.index}</span>
+              <span className={styles.nodeLabel}>{layer.label}</span>
+              {layer.status === 'planned' && <span className={styles.plannedTag}>Planned</span>}
+            </button>
+          ))}
         </div>
-        <h3 className={styles.detailTitle}>{active.label}</h3>
-        <p className={styles.detailBody}>{active.body}</p>
-        {active.packages.length > 0 && (
-          <div className={styles.packageRow}>
-            {active.packages.map((pkg) => (
-              <code key={pkg} className={styles.packageChip}>
-                {pkg}
-              </code>
-            ))}
+
+        <div className={styles.detail}>
+          <div className={styles.detailKicker}>
+            {active.status === 'shipped' ? 'Available today' : 'On the roadmap'}
           </div>
-        )}
-        {active.to && (
-          <Link className={styles.detailLink} to={active.to}>
-            Read the docs →
-          </Link>
-        )}
+          <h3 className={styles.detailTitle}>{active.label}</h3>
+          <p className={styles.detailBody}>{active.body}</p>
+          {active.packages.length > 0 && (
+            <div className={styles.packageRow}>
+              {active.packages.map((pkg) => (
+                <code key={pkg} className={styles.packageChip}>
+                  {pkg}
+                </code>
+              ))}
+            </div>
+          )}
+          {active.to && (
+            <Link className={styles.detailLink} to={active.to}>
+              Read the docs →
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );

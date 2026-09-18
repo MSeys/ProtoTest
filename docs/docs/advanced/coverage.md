@@ -52,7 +52,7 @@ Three different gaps, three different fixes:
 
 The summary at the top of each report gives the total, covered and uncovered counts and a coverage percentage.
 
-:::tip Coverage rewards shape assertions
+:::tip[Coverage rewards shape assertions]
 Property coverage comes from the paths `ShouldMatchShape` matched. A test that only checks the status code covers the endpoint and the status, but none of the fields. That's deliberate — a field nobody asserts is a field that can break silently.
 :::
 
@@ -123,9 +123,9 @@ public sealed class InvoiceStateCoverage(string targetName) : ProtoCoverageColle
 
     public override IEnumerable<ProtoReportItem> GetReportItems()
     {
-        lock (Lock)
+        lock (_lock)
         {
-            return AllStates.Select(state => Items.TryGetValue(state, out var hit)
+            return AllStates.Select(state => _items.TryGetValue(state, out var hit)
                 ? hit
                 : new ProtoReportItem(TargetName, Category, state,
                     Kind: ProtoReportItemKind.Coverage,
@@ -176,7 +176,7 @@ public sealed record ProtoReportItem(
     string TargetName,
     string Category,
     string Identifier,
-    ProtoReportItemKind Kind = ProtoReportItemKind.Observation,   // Observation, Coverage, Finding, Gate, Metric
+    string Kind = ProtoReportItemKinds.Observation,               // observation, coverage, finding, gate, metric, resource, or your own
     ProtoReportStatus Status = ProtoReportStatus.Neutral,         // Neutral, Info, Success, Warning, Error
     int Count = 0,
     bool? IsCovered = null,
@@ -188,4 +188,4 @@ public sealed record ProtoReportItem(
     IReadOnlyDictionary<string, object>? Metadata = null);
 ```
 
-Items nest through `Children`, and the kinds cover more than coverage: a `Metric` with a `Value` and `Unit`, or a `Finding` with a `Warning` status and a `Message`, show up in the same reports. The HTML report keeps the kinds in their own sections — coverage, findings, run gates — so a passed gate is never read as a finding.
+Items nest through `Children`, and the kinds cover more than coverage: a `Metric` with a `Value` and `Unit`, or a `Finding` with a `Warning` status and a `Message`, show up in the same reports. A kind is an open string, so an integration can define its own; the built-in ones are named by `ProtoReportItemKinds`. The HTML report keeps the kinds in their own sections — coverage, findings, run gates, resources — and gives an unknown kind its own section titled after it, so a passed gate is never read as a finding.

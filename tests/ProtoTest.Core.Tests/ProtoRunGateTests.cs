@@ -62,6 +62,32 @@ public class ProtoRunGateTests
     }
 
     [Test]
+    public async Task GateEvaluations_ShouldReachTheSpanWireAsScopeEvents()
+    {
+        // Arrange
+        var tracePath = Path.Combine(Path.GetTempPath(), "ProtoTest.Core.Tests", Guid.NewGuid().ToString("N"), "run.prototrace");
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = tracePath);
+        builder.AddRunGate("coverage is complete", _ => ProtoRunGateResult.Warning("Worth a look."));
+        await using var host = builder.Build();
+
+        // Act
+        await host.StartAsync();
+        await host.StopAsync();
+
+        // Assert: a verdict has no operation above it, and must still reach spans.json - on the run's scope.
+        using var archive = System.IO.Compression.ZipFile.OpenRead(tracePath);
+        using var reader = new StreamReader(archive.GetEntry("spans.json")!.Open());
+        using var spans = System.Text.Json.JsonDocument.Parse(await reader.ReadToEndAsync());
+        var runScope = spans.RootElement.GetProperty("resourceSpans").EnumerateArray()
+            .Single(group => group.GetProperty("resource").GetProperty("attributes").TryGetProperty("runId", out _))
+            .GetProperty("scopeSpans")[0];
+        var gate = runScope.GetProperty("events").EnumerateArray()
+            .Single(item => item.TryGetProperty("kind", out var kind) && kind.GetString() == "gate.evaluate");
+        Assert.That(gate.GetProperty("outcome").GetString(), Is.EqualTo("partial"));
+    }
+
+    [Test]
     public async Task AdvisoryAndSkippedGates_ShouldNotFailTheRun()
     {
         // Arrange
@@ -102,7 +128,7 @@ public class ProtoRunGateTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(verdict.Identifier, Is.EqualTo("coverage is complete"));
-            Assert.That(verdict.Kind, Is.EqualTo(ProtoReportItemKind.Gate));
+            Assert.That(verdict.Kind, Is.EqualTo(ProtoReportItemKinds.Gate));
             Assert.That(verdict.Status, Is.EqualTo(ProtoReportStatus.Error));
             Assert.That(verdict.Message, Is.EqualTo("Only half covered."));
             Assert.That(verdict.Tags, Has.Count.EqualTo(2));
@@ -161,10 +187,10 @@ public class ProtoRunGateTests
         // Arrange
         var items = new[]
         {
-            new ProtoReportItem("api", "Endpoints", "GET /a", Kind: ProtoReportItemKind.Coverage, IsCovered: true),
-            new ProtoReportItem("api", "Endpoints", "GET /b", Kind: ProtoReportItemKind.Coverage, IsCovered: false),
-            new ProtoReportItem("api", "Endpoints", "POST /c", Kind: ProtoReportItemKind.Coverage, IsCovered: true),
-            new ProtoReportItem("api", "Findings", "note", Kind: ProtoReportItemKind.Finding)
+            new ProtoReportItem("api", "Endpoints", "GET /a", Kind: ProtoReportItemKinds.Coverage, IsCovered: true),
+            new ProtoReportItem("api", "Endpoints", "GET /b", Kind: ProtoReportItemKinds.Coverage, IsCovered: false),
+            new ProtoReportItem("api", "Endpoints", "POST /c", Kind: ProtoReportItemKinds.Coverage, IsCovered: true),
+            new ProtoReportItem("api", "Findings", "note", Kind: ProtoReportItemKinds.Finding)
         };
 
         // Act
@@ -178,7 +204,7 @@ public class ProtoRunGateTests
             Assert.That(coverage!.Covered, Is.EqualTo(2));
             Assert.That(coverage.Total, Is.EqualTo(3));
             Assert.That(coverage.Ratio, Is.EqualTo(2d / 3d));
-            Assert.That(context.ItemsOfKind(ProtoReportItemKind.Finding), Has.Exactly(1).Items);
+            Assert.That(context.ItemsOfKind(ProtoReportItemKinds.Finding), Has.Exactly(1).Items);
         }
     }
 
@@ -188,8 +214,8 @@ public class ProtoRunGateTests
         // Arrange: a collector reporting findings and metrics, with no coverage at all.
         var items = new[]
         {
-            new ProtoReportItem("billing", "Findings", "orphaned invoices", Kind: ProtoReportItemKind.Finding, Status: ProtoReportStatus.Error),
-            new ProtoReportItem("billing", "Metrics", "avg latency", Kind: ProtoReportItemKind.Metric, Status: ProtoReportStatus.Warning, Value: 812d, Unit: "ms")
+            new ProtoReportItem("billing", "Findings", "orphaned invoices", Kind: ProtoReportItemKinds.Finding, Status: ProtoReportStatus.Error),
+            new ProtoReportItem("billing", "Metrics", "avg latency", Kind: ProtoReportItemKinds.Metric, Status: ProtoReportStatus.Warning, Value: 812d, Unit: "ms")
         };
         var context = new ProtoRunGateContext(items);
 

@@ -31,7 +31,8 @@ public static class ProtoHostBuilderExtensions
             });
         }
 
-        return builder;
+        return builder.AddCapability(new ProtoCapabilityDescriptor(
+            "REST", ProtoCapabilityKinds.Protocol, "ProtoTest.Rest"));
     }
 
     /// <summary>
@@ -52,6 +53,7 @@ public static class ProtoHostBuilderExtensions
             return options;
         });
         configure?.Invoke(new ProtoRestBuilder(application.Services, application));
-        return application;
+        return application.AddCapability(new ProtoCapabilityDescriptor(
+            "REST", ProtoCapabilityKinds.Protocol, "ProtoTest.Rest"));
     }
 }

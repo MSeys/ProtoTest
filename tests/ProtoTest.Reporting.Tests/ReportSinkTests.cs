@@ -3,6 +3,8 @@ namespace ProtoTest.Reporting.Tests;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 [TestFixture]
@@ -41,11 +43,11 @@ public sealed class ReportSinkTests
             var items = new[]
             {
                 new ProtoReportItem("Orders", "REST", "GET /orders",
-                    ProtoReportItemKind.Coverage, ProtoReportStatus.Success, Count: 4, IsCovered: true),
+                    ProtoReportItemKinds.Coverage, ProtoReportStatus.Success, Count: 4, IsCovered: true),
                 new ProtoReportItem("Test findings", "Delivery", "finding-001",
-                    ProtoReportItemKind.Finding, ProtoReportStatus.Warning, Message: "Slow deployment."),
+                    ProtoReportItemKinds.Finding, ProtoReportStatus.Warning, Message: "Slow deployment."),
                 new ProtoReportItem("Run gates", "Gate", "no error findings",
-                    ProtoReportItemKind.Gate, ProtoReportStatus.Success, Count: 1, Message: "No errors found.")
+                    ProtoReportItemKinds.Gate, ProtoReportStatus.Success, Count: 1, Message: "No errors found.")
             };
             var sink = new JsonReportSink(new JsonReportSinkOptions { OutputPath = path });
 
@@ -74,11 +76,13 @@ public sealed class ReportSinkTests
             var items = new[]
             {
                 new ProtoReportItem("Orders", "OpenAPI", "GET /orders",
-                    ProtoReportItemKind.Coverage, ProtoReportStatus.Success, Count: 4, IsCovered: true),
+                    ProtoReportItemKinds.Coverage, ProtoReportStatus.Success, Count: 4, IsCovered: true),
                 new ProtoReportItem("Test findings", "Delivery", "finding-001",
-                    ProtoReportItemKind.Finding, ProtoReportStatus.Warning, Message: "Slow deployment."),
+                    ProtoReportItemKinds.Finding, ProtoReportStatus.Warning, Message: "Slow deployment."),
                 new ProtoReportItem("Run gates", "Gate", "no error findings",
-                    ProtoReportItemKind.Gate, ProtoReportStatus.Success, Count: 1, Message: "No errors found.")
+                    ProtoReportItemKinds.Gate, ProtoReportStatus.Success, Count: 1, Message: "No errors found."),
+                new ProtoReportItem("Test resources", "Resources", "database:connection",
+                    ProtoReportItemKinds.Resource, ProtoReportStatus.Success, Message: "SqliteConnection · None")
             };
             var sink = new HtmlReportSink(new HtmlReportSinkOptions { OutputPath = path });
 
@@ -90,12 +94,42 @@ public sealed class ReportSinkTests
                 Assert.That(html, Does.Contain("data-report-section data-kind=\"coverage\""));
                 Assert.That(html, Does.Contain("data-report-section data-kind=\"finding\""));
                 Assert.That(html, Does.Contain("data-report-section data-kind=\"gate\""));
+                Assert.That(html, Does.Contain("data-report-section data-kind=\"resource\""));
                 Assert.That(html, Does.Contain(">Coverage</h3>"));
                 Assert.That(html, Does.Contain(">Findings</h3>"));
                 Assert.That(html, Does.Contain(">Run gates</h3>"));
+                Assert.That(html, Does.Contain(">Resources</h3>"));
                 // A passed gate reads as passed, not as a finding with a success status.
                 Assert.That(html, Does.Contain("status-badge\">Passed</span>"));
                 Assert.That(html, Does.Contain("1 entry"));
+            }
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public async Task HtmlSink_ShouldGiveAnUnknownKindItsOwnSection()
+    {
+        var directory = CreateTempDirectory();
+        var path = Path.Combine(directory, "report.html");
+        try
+        {
+            // An integration's own kind is not dropped; it gets a section titled after the kind.
+            var items = new[]
+            {
+                new ProtoReportItem("Message broker", "Queues", "orders.created",
+                    Kind: "broker.message", Status: ProtoReportStatus.Neutral, Message: "A message was observed.")
+            };
+            var sink = new HtmlReportSink(new HtmlReportSinkOptions { OutputPath = path });
+
+            await sink.ExportAsync(items);
+
+            var html = await File.ReadAllTextAsync(path);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(html, Does.Contain("data-report-section data-kind=\"broker.message\""));
+                Assert.That(html, Does.Contain(">Broker message</h3>"));
+                Assert.That(html, Does.Contain("A message was observed."));
             }
         }
         finally { Directory.Delete(directory, recursive: true); }
@@ -155,17 +189,17 @@ public sealed class ReportSinkTests
             {
                 new ProtoReportItem(
                     "Orders", "OpenAPI", "GET /orders/{id}",
-                    ProtoReportItemKind.Coverage, ProtoReportStatus.Success, 1, true,
+                    ProtoReportItemKinds.Coverage, ProtoReportStatus.Success, 1, true,
                     Children:
                     [
                         new ProtoReportItem(
                             "Orders", "OpenAPI Response", "200",
-                            ProtoReportItemKind.Coverage, ProtoReportStatus.Success, 1, true,
+                            ProtoReportItemKinds.Coverage, ProtoReportStatus.Success, 1, true,
                             Children:
                             [
                                 new ProtoReportItem(
                                     "Orders", "OpenAPI Property", "$.address.city",
-                                    ProtoReportItemKind.Coverage, ProtoReportStatus.Success, 1, true,
+                                    ProtoReportItemKinds.Coverage, ProtoReportStatus.Success, 1, true,
                                     DisplayName: "address › city", DisplayGroup: "Property")
                             ],
                             DisplayName: "200 response", DisplayGroup: "Response")
@@ -283,11 +317,53 @@ public sealed class ReportSinkTests
         finally { Directory.Delete(directory, recursive: true); }
     }
 
+    [Test]
+    public async Task ViewerContentSecurityPolicy_ShouldAllowTheReportScript()
+    {
+        // The viewer hosts the report in a sandboxed blob iframe, which inherits the viewer's policy. An
+        // inline script only runs there when its hash is listed, so this hashes the rendered report itself:
+        // it fails on a stale hash and on a script that is no longer inside a script element.
+        var directory = CreateTempDirectory();
+        var path = Path.Combine(directory, "report.html");
+        try
+        {
+            var sink = new HtmlReportSink(new HtmlReportSinkOptions { OutputPath = path });
+            await sink.ExportAsync(SampleItems());
+
+            var html = await File.ReadAllTextAsync(path);
+            var open = html.IndexOf("<script>", StringComparison.Ordinal);
+            var close = html.IndexOf("</script>", open + 1, StringComparison.Ordinal);
+            Assert.That(open, Is.GreaterThanOrEqualTo(0), "The report must carry its script inside a script element.");
+            Assert.That(close, Is.GreaterThan(open), "The report's script element must be closed.");
+
+            var script = html[(open + "<script>".Length)..close].Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+            var hash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(script)));
+
+            var headers = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "viewer", "public", "_headers"));
+
+            Assert.That(headers, Does.Contain($"'sha256-{hash}'"),
+                "Add the report script's hash to the viewer's Content-Security-Policy, or the report preview renders without JavaScript.");
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "ProtoTest.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName
+            ?? throw new InvalidOperationException("The repository root could not be found from the test output.");
+    }
+
     private static ProtoReportItem[] SampleItems() =>
     [
         new(
             "Orders", "REST", "GET /orders",
-            Kind: ProtoReportItemKind.Coverage,
+            Kind: ProtoReportItemKinds.Coverage,
             Status: ProtoReportStatus.Warning,
             Count: 2,
             IsCovered: true,
@@ -295,8 +371,8 @@ public sealed class ReportSinkTests
             Tags: ["contract"],
             Children:
             [
-                new("Orders", "Status", "200", ProtoReportItemKind.Coverage, ProtoReportStatus.Success, 2, true),
-                new("Orders", "Status", "404", ProtoReportItemKind.Coverage, IsCovered: false)
+                new("Orders", "Status", "200", ProtoReportItemKinds.Coverage, ProtoReportStatus.Success, 2, true),
+                new("Orders", "Status", "404", ProtoReportItemKinds.Coverage, IsCovered: false)
             ])
     ];
 

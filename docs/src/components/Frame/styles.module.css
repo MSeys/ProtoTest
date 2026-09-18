@@ -1,0 +1,32 @@
+/* The viewer's Panel: border only — the blueprint against the page is contrast enough. */
+.frame {
+  min-width: 0;
+  overflow: clip;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  line-height: var(--leading);
+}
+
+.head {
+  min-height: var(--panel-head-height);
+  padding: var(--space-2) var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.foot {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--text-meta);
+  line-height: var(--leading);
+}

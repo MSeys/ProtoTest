@@ -8,7 +8,7 @@ title: Defaults
 Defaults live in **modules** — small classes, ideally one per feature area, next to the tests that use them.
 
 ```csharp
-public sealed class InvoiceDataDefaults : IDataDefaultsModule
+public sealed class InvoiceDataDefaults : IProtoDataDefaultsModule
 {
     public void Configure(ProtoDataConfiguration data)
     {

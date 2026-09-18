@@ -61,7 +61,8 @@ public static class ProtoHostBuilderExtensions
         // The application's HTTP clients with no configured base reuse this transport.
         application.Services.AddSingleton(new ProtoApplicationTransport(name, name));
         RegisterApplicationServices<TProgram>(application.Services, name);
-        return application;
+        return application.AddCapability(new ProtoCapabilityDescriptor(
+            "ASP.NET Core", ProtoCapabilityKinds.Server, "ProtoTest.AspNetCore"));
     }
 
     /// <summary>

@@ -30,7 +30,7 @@ public sealed class Setup : ProtoTestAssembly
 }
 ```
 
-:::warning Namespace scoping
+:::warning[Namespace scoping]
 This is NUnit behaviour, not ProtoTest's: a `[SetUpFixture]` **outside** any namespace applies to the whole assembly, while one **inside** a namespace applies only to that namespace and its children. If tests in another namespace can't find the host, that's usually why.
 :::
 

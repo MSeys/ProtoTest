@@ -22,7 +22,10 @@ public static class PlaywrightWebHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(builder);
         // Test-scoped so a browser process is shared by the sessions of one test and disposed with it.
         builder.ConfigureServices(services => services.TryAddScoped<PlaywrightBrowserPool>());
-        return builder.AddWebBackend(new PlaywrightWebBackendFactory(configure));
+        return builder
+            .AddCapability(new ProtoCapabilityDescriptor(
+                "Playwright", ProtoCapabilityKinds.Protocol, "ProtoTest.Web.Playwright"))
+            .AddWebBackend(new PlaywrightWebBackendFactory(configure));
     }
 
     /// <summary>Exposes web under an application. The application's sessions share this backend.</summary>
@@ -34,6 +37,7 @@ public static class PlaywrightWebHostBuilderExtensions
         application.Services.TryAddScoped<PlaywrightBrowserPool>();
         application.Services.AddWebBackend(new PlaywrightWebBackendFactory(configure));
         application.RegisterClient("Web", "Default");
-        return application;
+        return application.AddCapability(new ProtoCapabilityDescriptor(
+            "Playwright", ProtoCapabilityKinds.Protocol, "ProtoTest.Web.Playwright"));
     }
 }

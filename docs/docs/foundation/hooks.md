@@ -123,7 +123,7 @@ ProtoTest's built-in hooks sit at the extremes on purpose:
 - The hook that creates clients runs **first** on the way in, so your hooks can use them.
 - The hooks that export reports and write the trace archive run **last** on the way out.
 
-Integrations add their own test hooks too — REST applies `[RestAuth<T>]` from a hook with `Order = 100`.
+Integrations add their own test hooks too — the HTTP integrations apply `[Auth<T>]` from a hook with `Order = 100`.
 
 Remember that **all test hooks run before any [attribute](./attributes.md)**. See [Host and lifecycle](./lifecycle.md) for the full sequence and failure rules.
 

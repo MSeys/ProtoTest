@@ -30,9 +30,9 @@ Both files are also added to the [`.prototrace` archive](./prototrace.md#the-fil
 
 ## The HTML report
 
-A single self-contained page: a summary (covered, uncovered, occurrences, findings, run gates, errors) and every report item — endpoint → response → property for OpenAPI, type → field → argument for GraphQL — with covered, partially covered and uncovered paths marked.
+A single self-contained page: a summary (covered, uncovered, occurrences, findings, run gates, resources, errors) and every report item — endpoint → response → property for OpenAPI, type → field → argument for GraphQL — with covered, partially covered and uncovered paths marked.
 
-Items are different things, so the report keeps them apart in sections: **Coverage** for what the contract exercises, **Findings** for evidence tests deliberately recorded, and **Run gates** for run verdicts, labelled passed, advisory, failed or skipped. Searching and filtering apply across all sections, and a section that filters to nothing disappears.
+Items are different things, so the report keeps them apart in sections: **Coverage** for what the contract exercises, **Findings** for evidence tests deliberately recorded, **Run gates** for run verdicts, labelled passed, advisory, failed or skipped, and **Resources** for what tests owned and released. An integration's own kind gets a section too, titled after the kind, rather than being dropped. Searching and filtering apply across all sections, and a section that filters to nothing disappears.
 
 ## The JSON report
 
@@ -51,7 +51,8 @@ The same data, for tooling:
     "Warnings": 0,
     "Errors": 0,
     "Findings": 2,
-    "Gates": 1
+    "Gates": 1,
+    "Resources": 37
   },
   "Items": [ … ]
 }
@@ -59,8 +60,8 @@ The same data, for tooling:
 
 Property names match the .NET types (`ProtoReport`, `ProtoReportSummary`, `ProtoReportItem`) and enums are written as strings. The summary counts nested items too; `TotalOccurrences` counts observed hits only, so a finding or a gate verdict does not inflate it, and `CoveragePercentage` is rounded to two decimals and is `0` when there are no coverage items.
 
-:::tip A coverage gate
-The JSON report makes a CI gate a few lines of script — fail the build when `Summary.CoveragePercentage` drops below a threshold. A built-in quality gate is on the roadmap.
+:::tip[A coverage gate]
+A **run gate** checks the finished report and fails the run when it says no. Register one with `AddRunGate`; it can read coverage through `CoverageFor` / `CoverageSummaries`, so a threshold gate is a few lines rather than a CI script.
 :::
 
 ## Configuring from files
@@ -94,7 +95,7 @@ public sealed class ConsoleSummarySink : IProtoSink
 {
     public Task ExportAsync(IEnumerable<ProtoReportItem> items, CancellationToken cancellationToken = default)
     {
-        var coverage = items.Where(item => item.Kind == ProtoReportItemKind.Coverage).ToList();
+        var coverage = items.Where(item => item.Kind == ProtoReportItemKinds.Coverage).ToList();
         var uncovered = coverage.Where(item => item.IsCovered == false).ToList();
 
         Console.WriteLine($"Coverage: {coverage.Count - uncovered.Count}/{coverage.Count}");

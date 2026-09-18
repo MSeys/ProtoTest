@@ -1,22 +1,23 @@
+/* The container is here so the rail/details split can restack on its own width, not the viewport's. */
+.stack { container-type: inline-size; }
+
 .wrapper {
   display: grid;
   grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
-  gap: 2.5rem;
+  gap: calc(var(--space-7) * 1.25);
   align-items: start;
 }
 
-@media (max-width: 860px) {
-  .wrapper {
-    grid-template-columns: 1fr;
-  }
+@container (max-width: 860px) {
+  .wrapper { grid-template-columns: 1fr; }
 }
 
 .rail {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding-left: 1.75rem;
+  gap: var(--space-1);
+  padding-left: calc(var(--space-7) / 2);
 }
 
 .railLine {
@@ -38,112 +39,101 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  text-align: left;
-  background: transparent;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border: 1px solid transparent;
-  border-radius: 10px;
-  padding: 0.55rem 0.75rem;
-  cursor: pointer;
+  border-radius: var(--radius-control);
+  background: transparent;
   color: var(--text);
   font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-.node:hover {
-  background: var(--surface);
-  border-color: var(--border);
-}
+.node:hover { background: var(--surface); border-color: var(--border); }
 
 .nodeActive {
+  border-color: var(--blueprint);
   background: var(--surface);
-  border-color: var(--pt-blue-bright);
-  box-shadow: 0 6px 20px rgba(18, 59, 88, 0.1);
 }
 
 .dot {
   position: absolute;
-  left: -1.75rem;
+  left: calc(var(--space-7) / -2);
   width: 12px;
   height: 12px;
+  border: 2px solid var(--bg);
   border-radius: 50%;
-  background: var(--pt-blue-bright);
-  border: 2px solid var(--ifm-background-color);
-  box-shadow: 0 0 0 2px var(--pt-blue-bright);
+  background: var(--blueprint);
+  box-shadow: 0 0 0 2px var(--blueprint);
 }
 
 .dotPlanned {
-  background: var(--ifm-background-color);
-  box-shadow: 0 0 0 2px var(--pt-amber);
+  background: var(--bg);
+  box-shadow: 0 0 0 2px var(--warning);
 }
 
-.nodeIndex {
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.7rem;
-  color: var(--muted);
-}
-
-.nodeLabel {
-  font-weight: 600;
-}
+.nodeIndex { color: var(--muted); font: var(--text-micro) var(--font-mono); }
+.nodeLabel { font-weight: var(--weight-semibold); }
 
 .plannedTag {
   margin-left: auto;
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.65rem;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-pill);
+  color: var(--warning);
+  font: var(--weight-medium) var(--text-micro) var(--font-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--pt-amber);
-  border: 1px solid var(--pt-amber);
-  border-radius: 999px;
-  padding: 0.1rem 0.5rem;
 }
 
 .detail {
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 2rem 2.25rem;
-  background: var(--surface);
   min-height: 260px;
+  padding: var(--space-7) var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
 }
 
 .detailKicker {
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.72rem;
+  margin-bottom: var(--space-2);
+  color: var(--blueprint);
+  font: var(--weight-medium) var(--text-meta) var(--font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--pt-blue-bright);
-  margin-bottom: 0.6rem;
 }
 
 .detailTitle {
-  font-size: 1.6rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--space-3);
+  font-size: clamp(1.3rem, 2vw, 1.6rem);
+  letter-spacing: var(--tracking-display);
 }
 
 .detailBody {
-  color: var(--muted);
-  line-height: 1.65;
-  font-size: 1rem;
   max-width: 56ch;
+  color: var(--muted);
+  font-size: clamp(0.95rem, 1.1vw, 1rem);
+  line-height: 1.65;
 }
 
 .packageRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 1.25rem;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
 }
 
 .packageChip {
-  font-size: 0.78rem;
-  padding: 0.3rem 0.6rem;
-  border-radius: 6px;
-  background: var(--ifm-background-color);
+  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: var(--surface-2);
+  color: var(--text);
+  font: var(--text-meta) var(--font-mono);
 }
 
 .detailLink {
   display: inline-block;
-  margin-top: 1.5rem;
-  font-weight: 600;
+  margin-top: var(--space-6);
+  font-weight: var(--weight-semibold);
 }

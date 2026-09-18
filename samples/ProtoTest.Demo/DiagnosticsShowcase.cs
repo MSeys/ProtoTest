@@ -96,9 +96,13 @@ public sealed class DiagnosticsShowcase
         Assert.That(deployment.Status, Is.EqualTo(DeploymentStatuses.Succeeded));
     }
 
+    /// <summary>
+    /// The demo's one intentional failure: the expected plan and project count are deliberately wrong, so the
+    /// viewer demo always has a failed shape check to show. Opt-in, so an ordinary run stays green.
+    /// </summary>
     [ProtoTest]
     [SignedInAs]
-    public async Task TheIntentionalFailureShowcaseStaysOptIn()
+    public async Task TheOrganizationReportsItsPlanAndProjectCount()
     {
         // Arrange
         if (!string.Equals(

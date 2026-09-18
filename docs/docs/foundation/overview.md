@@ -45,7 +45,7 @@ Two things build on top and have their own sections:
 ```csharp
 [Application("Api")]                         // attribute: selects the system under test
 [SampleEnvironment]                          // attribute: provisions a tenant, deletes it afterwards
-[RestAuth<SampleUserAuthenticator>]              // attribute metadata read by the REST hook
+[Auth<SampleUserAuthenticator>]              // attribute metadata read by the HTTP hooks
 public sealed class BillingTests
 {
     [ProtoTest]                              // runner attribute: starts and completes the context
@@ -65,7 +65,7 @@ public sealed class BillingTests
 What happens around that method:
 
 1. The runner calls `StartTestAsync`. A context and DI scope are created.
-2. **Test hooks** run — including ProtoTest's own, which creates clients and applies `[RestAuth<T>]`.
+2. **Test hooks** run — including ProtoTest's own, which creates clients and applies `[Auth<T>]`.
 3. **Attributes** run in `Order`: `[SampleEnvironment]` (−200), then `[SampleUser]` (−100).
 4. Your test body runs. Every request, assertion and state access is traced.
 5. The runner calls `CompleteTestAsync`. Attributes and hooks tear down in reverse, attachments are published, clients and the scope are disposed.

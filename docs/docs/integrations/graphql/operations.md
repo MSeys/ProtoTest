@@ -191,7 +191,7 @@ response.ShouldHaveNoErrors().ShouldMatchData(new
 
 The filter builder emits the `{ field: { op: value } }` convention used by Hot Chocolate: `Equal`, `NotEqual`, `Contains`, `StartsWith`, `EndsWith`, `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual`, `In`, plus `Nested(field, …)`, `Some(field, …)` for lists, and `Or(...)`.
 
-:::note Fluent responses aren't unwrapped
+:::note[Fluent responses aren't unwrapped]
 With shape-driven operations, `ShouldMatchData` compares against the **root field's value**. With fluent and raw operations there's no single root, so it compares against the whole `data` object — which is why the example above wraps its shape in `orders = …`.
 :::
 

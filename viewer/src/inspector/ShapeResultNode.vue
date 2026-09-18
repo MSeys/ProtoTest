@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import type { ShapeCheckNode } from "../model/trace-schema";
+import type { ShapeCheckNode } from "../trace/shapes";
 
 defineOptions({ name: "ShapeResultNode" });
 const props = defineProps<{ node: ShapeCheckNode }>();
@@ -51,7 +51,7 @@ function literal(value: unknown): string {
 <style scoped>
 .node { position: relative; }
 .row {
-  min-height: 24px;
+  min-height: var(--row-height);
   display: grid;
   grid-template-columns: 16px 14px minmax(0, 1fr);
   align-items: center;
@@ -76,11 +76,11 @@ function literal(value: unknown): string {
 .node.matched > .row > .icon { color: var(--success); }
 .node.failed > .row > .icon { color: var(--danger); }
 
-.property { min-width: 0; display: flex; align-items: baseline; gap: var(--space-1); white-space: nowrap; }
+.property { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1); }
 .property strong { color: var(--blueprint); font: var(--weight-semibold) var(--text-micro) var(--font-mono); }
 .property > i { color: var(--muted); font-style: normal; }
-.property code { min-width: 0; overflow: hidden; color: var(--text); font: var(--text-micro) var(--font-mono); text-overflow: ellipsis; }
-.property small { min-width: 0; margin-left: var(--space-1); overflow: hidden; color: var(--dim); font: var(--text-micro) var(--font-mono); text-overflow: ellipsis; }
+.property code { min-width: 0; color: var(--text); font: var(--text-micro) var(--font-mono); overflow-wrap: anywhere; }
+.property small { min-width: 0; margin-left: var(--space-1); color: var(--dim); font: var(--text-micro) var(--font-mono); overflow-wrap: anywhere; }
 .expected { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--danger-line); }
 .actual { color: var(--danger); font-weight: var(--weight-bold); }
 .arrow { color: var(--danger); font-size: var(--text-micro); }

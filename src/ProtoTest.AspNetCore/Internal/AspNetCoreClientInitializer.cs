@@ -2,6 +2,7 @@ namespace ProtoTest.AspNetCore;
 
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Mvc.Testing.Handlers;
 using ProtoTest.Core;
 
 /// <summary>
@@ -53,27 +54,57 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
 
         var clientOptions = new WebApplicationFactoryClientOptions();
         _configureClientOptions?.Invoke(clientOptions);
-        context.RegisterClient(server.Factory.CreateClient(clientOptions), Name);
+        var handlers = CreateClientHandlers(clientOptions)
+            .Append(new ProtoTraceContextHandler())
+            .ToArray();
+        var client = server.Factory.CreateDefaultClient(clientOptions.BaseAddress, handlers);
+        context.RegisterClient(client, Name);
+        var serverState = new Dictionary<string, string?>
+        {
+            ["application.type"] = typeof(TProgram).FullName,
+            ["server.lifetime"] = _lifetime.ToString(),
+            ["server.reused"] = reused ? "true" : "false",
+            ["web_host.customized"] = (_configureWebHost is not null).ToString().ToLowerInvariant(),
+            ["client.customized"] = (_configureClientOptions is not null).ToString().ToLowerInvariant()
+        };
+        context.Trace.SetEntityState(
+            ProtoTraceEntityKinds.Server,
+            typeof(TProgram).FullName!,
+            $"Server · {typeof(TProgram).Name}",
+            serverState,
+            scope: context.TestName,
+            change: "initialized");
         context.Trace.WriteEvent(
             "aspnetcore.server.initialize",
             $"ASP.NET Core server · {Name}",
             "ProtoTest.AspNetCore",
             ProtoTracePhase.Setup,
             ProtoTraceOutcome.Succeeded,
-            new Dictionary<string, string?>
-            {
-                ["client.name"] = Name,
-                ["application.type"] = typeof(TProgram).FullName,
-                ["server.lifetime"] = _lifetime.ToString(),
-                ["server.reused"] = reused ? "true" : "false",
-                ["web_host.customized"] = (_configureWebHost is not null).ToString().ToLowerInvariant(),
-                ["client.customized"] = (_configureClientOptions is not null).ToString().ToLowerInvariant()
-            });
+            serverState,
+            entityKind: ProtoTraceEntityKinds.Server,
+            entityId: typeof(TProgram).FullName);
         return Task.FromResult(true);
     }
 
     public ValueTask DisposeAsync()
         => _sharedServer.IsValueCreated ? _sharedServer.Value.DisposeAsync() : ValueTask.CompletedTask;
+
+    /// <summary>
+    /// Mirrors <see cref="WebApplicationFactoryClientOptions"/>'s internal handler list so the client keeps
+    /// the framework's redirect and cookie behavior while ProtoTest appends its own context propagator.
+    /// </summary>
+    private static IEnumerable<DelegatingHandler> CreateClientHandlers(WebApplicationFactoryClientOptions options)
+    {
+        if (options.AllowAutoRedirect)
+        {
+            yield return new RedirectHandler(options.MaxAutomaticRedirections);
+        }
+
+        if (options.HandleCookies)
+        {
+            yield return new CookieContainerHandler();
+        }
+    }
 
     /// <summary>Builds the registration name of the per-client <see cref="WebApplicationFactory{TEntryPoint}"/>.</summary>
     internal static string FactoryName(string name) => $"{name}:Factory";

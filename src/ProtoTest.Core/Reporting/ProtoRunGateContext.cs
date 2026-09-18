@@ -14,8 +14,12 @@ public sealed class ProtoRunGateContext
     /// <summary>Gets every item the run collected.</summary>
     public IReadOnlyList<ProtoReportItem> Items { get; }
 
-    public IEnumerable<ProtoReportItem> ItemsOfKind(ProtoReportItemKind kind)
-        => Items.Where(item => item.Kind == kind);
+    /// <summary>Returns the items of one kind; <see cref="ProtoReportItemKinds"/> names the core kinds.</summary>
+    public IEnumerable<ProtoReportItem> ItemsOfKind(string kind)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
+        return Items.Where(item => string.Equals(item.Kind, kind, StringComparison.OrdinalIgnoreCase));
+    }
 
     public IEnumerable<ProtoReportItem> InCategory(string category)
     {

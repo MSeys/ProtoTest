@@ -67,25 +67,26 @@ public sealed class RestResponse : IDisposable
 
     public T? ReadAsJson<T>(JsonSerializerOptions? options = null)
     {
-        using var operation = _context is null
-            ? null
-            : _context.Trace
-                .Operation("http.response.deserialize", $"Deserialize response · {typeof(T).Name}", "ProtoTest.Rest")
-                .With("target.type", typeof(T).FullName)
-                .With("content.length", ContentBytes.Length.ToString())
-                .Parent(_requestTraceId)
-                .Begin();
         try
         {
-            var result = string.IsNullOrWhiteSpace(Content)
+            return string.IsNullOrWhiteSpace(Content)
                 ? default
                 : JsonSerializer.Deserialize<T>(Content, options ?? DefaultJsonOptions);
-            operation?.Succeed();
-            return result;
         }
         catch (Exception exception)
         {
-            operation?.Fail(exception);
+            _context?.Trace.WriteEvent(
+                "http.response.deserialize",
+                $"Deserialize response · {typeof(T).Name}",
+                "ProtoTest.Rest",
+                outcome: ProtoTraceOutcome.Failed,
+                attributes: new Dictionary<string, string?>
+                {
+                    ["target.type"] = typeof(T).FullName,
+                    ["content.length"] = ContentBytes.Length.ToString()
+                },
+                exception: exception,
+                parentId: _requestTraceId);
             throw;
         }
     }
@@ -123,6 +124,17 @@ public sealed class RestResponse : IDisposable
                 .With("request.identifier", _routeIdentifier)
                 .Parent(_requestTraceId)
                 .Begin();
+        var statusPassed = StatusCode == expectedStatusCode;
+        operation?.AddSection(new ProtoTraceSection(
+            "Result",
+            ProtoTraceSectionKind.Checks,
+            [
+                new(
+                    "status",
+                    ((int)StatusCode).ToString(),
+                    statusPassed ? null : $"expected {(int)expectedStatusCode}",
+                    statusPassed ? ProtoTraceSectionTone.Success : ProtoTraceSectionTone.Error)
+            ]));
         try
         {
             if (StatusCode != expectedStatusCode)
@@ -181,6 +193,15 @@ public sealed class RestResponse : IDisposable
             operation?.SetAttribute("matched.properties", string.Join(", ", matchedProps));
             operation?.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(matchedProps, _attachmentOptions));
             operation?.SetAttribute("shape.result", "matched");
+            operation?.AddSection(new ProtoTraceSection(
+                "Result",
+                ProtoTraceSectionKind.Checks,
+                [
+                    new(
+                        "shape",
+                        $"{matchedProps.Count} {(matchedProps.Count == 1 ? "property" : "properties")}",
+                        Tone: ProtoTraceSectionTone.Success)
+                ]));
 
             // Record the shape-match observation when an execution context is available.
             if (_context != null && !string.IsNullOrEmpty(_targetName) && !string.IsNullOrEmpty(_routeIdentifier))
@@ -207,6 +228,16 @@ public sealed class RestResponse : IDisposable
             operation?.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(exception.MatchedProperties, _attachmentOptions));
             operation?.SetAttribute("shape.mismatches", JsonDiagnosticSanitizer.Serialize(exception.Mismatches, _attachmentOptions));
             operation?.SetAttribute("shape.mismatch_count", exception.Mismatches.Count.ToString());
+            operation?.AddSection(new ProtoTraceSection(
+                "Result",
+                ProtoTraceSectionKind.Checks,
+                [
+                    new(
+                        "shape",
+                        $"{exception.Mismatches.Count} {(exception.Mismatches.Count == 1 ? "mismatch" : "mismatches")}",
+                        exception.Message,
+                        ProtoTraceSectionTone.Error)
+                ]));
             operation?.Fail(exception);
             throw;
         }

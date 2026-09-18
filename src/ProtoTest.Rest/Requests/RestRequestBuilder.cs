@@ -14,6 +14,7 @@ public sealed class RestRequestBuilder
     private readonly ProtoExecutionContext _context;
     private readonly string _targetName;
     private readonly Dictionary<string, string> _headers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string?> _requestAttributes = new(StringComparer.Ordinal);
     private Func<HttpContent>? _contentFactory;
     private Func<ProtoExecutionContext, IProtoHttpAuthenticator>? _authenticatorFactory;
     private IProtoHttpAuthenticator? _resolvedAuthenticator;
@@ -33,11 +34,7 @@ public sealed class RestRequestBuilder
     {
         _resolvedAuthenticator = authenticator ?? throw new ArgumentNullException(nameof(authenticator));
         _authenticatorFactory = _ => authenticator;
-        TraceConfiguration("auth.select", $"Authentication · {authenticator.GetType().Name}", new Dictionary<string, string?>()
-        {
-            ["auth.source"] = "request",
-            ["auth.type"] = authenticator.GetType().FullName
-        });
+        Configure(("auth.source", "request"), ("auth.type", authenticator.GetType().FullName));
         return this;
     }
 
@@ -45,11 +42,7 @@ public sealed class RestRequestBuilder
     {
         _resolvedAuthenticator = null;
         _authenticatorFactory = context => ProtoAuthenticatorFactory.Create<TAuth>(context, constructorArgs);
-        TraceConfiguration("auth.select", $"Authentication · {typeof(TAuth).Name}", new Dictionary<string, string?>()
-        {
-            ["auth.source"] = "request",
-            ["auth.type"] = typeof(TAuth).FullName
-        });
+        Configure(("auth.source", "request"), ("auth.type", typeof(TAuth).FullName));
         return this;
     }
 
@@ -58,7 +51,7 @@ public sealed class RestRequestBuilder
     {
         _resolvedAuthenticator = null;
         _authenticatorFactory = null;
-        TraceConfiguration("auth.disable", "Authentication · Disabled", new Dictionary<string, string?> { ["auth.source"] = "request" });
+        Configure(("auth.source", "request"), ("auth.outcome", "disabled"));
         return this;
     }
 
@@ -80,11 +73,7 @@ public sealed class RestRequestBuilder
     public RestRequestBuilder Header(string name, string value)
     {
         _headers[name] = value;
-        TraceConfiguration("http.header.configure", $"Header · {name}", new Dictionary<string, string?>()
-        {
-            ["http.header.name"] = name,
-            ["http.header.value_recorded"] = "false"
-        });
+        Configure(("http.request.header_count", _headers.Count.ToString()));
         return this;
     }
 
@@ -100,11 +89,9 @@ public sealed class RestRequestBuilder
         ArgumentNullException.ThrowIfNull(rawContent);
         ArgumentException.ThrowIfNullOrWhiteSpace(mediaType);
         _contentFactory = () => new StringContent(rawContent, Encoding.UTF8, mediaType);
-        TraceConfiguration("http.body.configure", $"Body · {mediaType}", new Dictionary<string, string?>()
-        {
-            ["http.request.body.media_type"] = mediaType,
-            ["http.request.body.length"] = Encoding.UTF8.GetByteCount(rawContent).ToString()
-        });
+        Configure(
+            ("http.request.body.media_type", mediaType),
+            ("http.request.body.length", Encoding.UTF8.GetByteCount(rawContent).ToString()));
         return this;
     }
 
@@ -112,11 +99,9 @@ public sealed class RestRequestBuilder
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(mediaType);
         var bytes = content.ToArray();
-        TraceConfiguration("http.body.configure", $"Body · {mediaType}", new Dictionary<string, string?>()
-        {
-            ["http.request.body.media_type"] = mediaType,
-            ["http.request.body.length"] = bytes.Length.ToString()
-        });
+        Configure(
+            ("http.request.body.media_type", mediaType),
+            ("http.request.body.length", bytes.Length.ToString()));
         _contentFactory = () =>
         {
             var byteContent = new ByteArrayContent(bytes);
@@ -130,10 +115,7 @@ public sealed class RestRequestBuilder
     public RestRequestBuilder Body(Func<HttpContent> contentFactory)
     {
         _contentFactory = contentFactory ?? throw new ArgumentNullException(nameof(contentFactory));
-        TraceConfiguration("http.body.configure", "Body · Content factory", new Dictionary<string, string?>()
-        {
-            ["http.request.body.source"] = "factory"
-        });
+        Configure(("http.request.body.source", "factory"));
         return this;
     }
 
@@ -168,16 +150,14 @@ public sealed class RestRequestBuilder
         var attachmentOptions = _context.TryService<RestAttachmentOptions>();
         using var traceOperation = _context.Trace
             .Operation("http.request", $"REST · {method.Method.ToUpperInvariant()} {routeTemplate}", "ProtoTest.Rest")
+            .For(ProtoTraceEntityKinds.Client, $"client:{typeof(HttpClient).FullName}:{_targetName}")
             .With("client.name", _targetName)
             .With("http.request.method", method.Method.ToUpperInvariant())
             .With("http.route", routeTemplate)
+            .With(_requestAttributes)
             .Begin();
         var stopwatch = Stopwatch.StartNew();
         Uri requestUri;
-        using var resolveOperation = _context.Trace
-            .Operation("http.route.resolve", $"Resolve route · {routeTemplate}", "ProtoTest.Rest")
-            .With("http.route", routeTemplate)
-            .Begin();
         try
         {
             requestUri = await RestUriBuilder.BuildRequestUriAsync(
@@ -187,13 +167,13 @@ public sealed class RestRequestBuilder
                 _baseAddressResolver,
                 _context,
                 ct);
-            resolveOperation.SetAttribute("server.address", ProtoHttpDiagnosticSanitizer.SanitizeUri(requestUri, attachmentOptions));
-            resolveOperation.Succeed();
+            traceOperation.SetAttribute(
+                "http.request.url",
+                ProtoHttpDiagnosticSanitizer.SanitizeUri(requestUri, attachmentOptions));
         }
         catch (Exception exception)
         {
             stopwatch.Stop();
-            resolveOperation.Fail(exception);
             traceOperation.Fail(exception);
             TryRecordFailure(method, routeTemplate, null, stopwatch.Elapsed, exception, ct, attachmentOptions);
             throw;
@@ -246,9 +226,26 @@ public sealed class RestRequestBuilder
                 request,
                 _context,
                 _targetName,
-                "REST",
-                "ProtoTest.Rest",
+                traceOperation,
                 ct);
+
+            var requestFacts = new List<ProtoTraceSectionItem>
+            {
+                new("url", ProtoHttpDiagnosticSanitizer.SanitizeUri(request.RequestUri, attachmentOptions)),
+                new("auth", _authenticatorFactory is null ? "none" : _resolvedAuthenticator?.GetType().Name ?? "applied")
+            };
+            if (_requestAttributes.TryGetValue("http.request.body.media_type", out var bodyMediaType) && bodyMediaType is not null)
+            {
+                requestFacts.Add(new(
+                    "body",
+                    bodyMediaType,
+                    _requestAttributes.GetValueOrDefault("http.request.body.length") is { } bodyLength ? $"{bodyLength} B" : null));
+            }
+            if (_headers.Count > 0)
+            {
+                requestFacts.Add(new("headers", _headers.Count.ToString()));
+            }
+            traceOperation.AddSection(new ProtoTraceSection("Request", ProtoTraceSectionKind.Fields, requestFacts));
         }
         catch (Exception exception)
         {
@@ -284,6 +281,28 @@ public sealed class RestRequestBuilder
                 bodyString,
                 attachmentOptions);
 
+            var responseFacts = new List<ProtoTraceSectionItem>
+            {
+                new(
+                    "status",
+                    ((int)responseMessage.StatusCode).ToString(),
+                    Tone: responseMessage.IsSuccessStatusCode ? ProtoTraceSectionTone.Success : ProtoTraceSectionTone.Warning)
+            };
+            if (responseMediaType is not null)
+            {
+                responseFacts.Add(new("type", responseMediaType));
+            }
+            responseFacts.Add(new("length", $"{bodyBytes.Length} B"));
+            traceOperation.AddSection(new ProtoTraceSection("Response", ProtoTraceSectionKind.Fields, responseFacts));
+            if (!string.IsNullOrWhiteSpace(diagnosticBody))
+            {
+                traceOperation.AddSection(new ProtoTraceSection(
+                    "Body",
+                    ProtoTraceSectionKind.Code,
+                    Content: Preview(diagnosticBody),
+                    Language: "json"));
+            }
+
             if (attachmentOptions?.CaptureResponses == true)
             {
                 _context.AddAttachment(
@@ -315,8 +334,7 @@ public sealed class RestRequestBuilder
             ));
 
             traceOperation
-                .SetAttribute("http.response.status_code", ((int)responseMessage.StatusCode).ToString())
-                .SetAttribute("server.address", ProtoHttpDiagnosticSanitizer.SanitizeUri(request.RequestUri, attachmentOptions));
+                .SetAttribute("http.response.status_code", ((int)responseMessage.StatusCode).ToString());
             traceOperation.Succeed();
 
             return new RestResponse(
@@ -349,13 +367,29 @@ public sealed class RestRequestBuilder
         }
     }
 
-    private void TraceConfiguration(string kind, string name, IReadOnlyDictionary<string, string?> attributes)
-        => _context.Trace.WriteEvent(
-            kind,
-            name,
-            "ProtoTest.Rest",
-            outcome: ProtoTraceOutcome.Succeeded,
-            attributes: attributes);
+    private void Configure(params (string Key, string? Value)[] attributes)
+    {
+        foreach (var (key, value) in attributes)
+        {
+            _requestAttributes[key] = value;
+        }
+    }
+
+    /// <summary>Pretty-prints a JSON body for the trace, capped so the artifact stays a trace and not a dump.</summary>
+    private static string Preview(string body)
+    {
+        const int limit = 8000;
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            var pretty = JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions { WriteIndented = true });
+            return pretty.Length > limit ? $"{pretty[..limit]}\n…" : pretty;
+        }
+        catch (JsonException)
+        {
+            return body.Length > limit ? $"{body[..limit]}…" : body;
+        }
+    }
 
     private void TryRecordFailure(
         HttpMethod method,

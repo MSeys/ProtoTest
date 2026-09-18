@@ -41,8 +41,8 @@ public sealed class RestAttributeIntegrationTests
                     Is.EqualTo(new AuthenticationHeaderValue("Bearer", expectedToken)));
                 var entries = host.Trace.Snapshot().Tests.Single().Entries;
                 var request = entries.Single(entry => entry.Kind == "http.request");
-                Assert.That(entries, Has.Some.Matches<ProtoTraceEntry>(entry =>
-                    entry.Kind == "auth.apply" && entry.ParentId == request.Id));
+                Assert.That(request.Attributes["auth.outcome"], Is.EqualTo("applied"));
+                Assert.That(request.Attributes["auth.type"], Is.Not.Null);
                 Assert.That(entries, Has.Some.Matches<ProtoTraceEntry>(entry =>
                     entry.Kind == "assert.http.status" && entry.ParentId == request.Id));
                 Assert.That(entries.SelectMany(entry => entry.Attributes.Values),

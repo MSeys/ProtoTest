@@ -3,7 +3,9 @@ namespace ProtoTest.Demo;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using ProtoTest.AspNetCore;
 using ProtoTest.Core;
 using ProtoTest.Data;
@@ -16,7 +18,9 @@ using ProtoTest.SampleApp;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Domain;
 using ProtoTest.SampleApp.Testing;
+using ProtoTest.Sql;
 using ProtoTest.Sql.Testcontainers;
+using System.Data.Common;
 
 [SetUpFixture]
 public sealed class Setup : ProtoTestAssembly
@@ -79,10 +83,45 @@ public sealed class Setup : ProtoTestAssembly
         // domain and the application end up on one store.
         System.Environment.SetEnvironmentVariable("ConnectionStrings__Northstar", northstarDatabase);
         System.Environment.SetEnvironmentVariable("Database__Provider", databaseProvider);
+        if (hostedInProcess)
+        {
+            // Scenario provisioning is a development affordance; the in-process demo enables it.
+            System.Environment.SetEnvironmentVariable("PROTOTEST_TEST_SUPPORT", "1");
+        }
+
+        if (composeDomainInTests)
+        {
+            // The test's own composition of the same domain, over a connection ProtoTest owns and
+            // releases as a resource. Isolation stays None because the application has its own
+            // connection: a test transaction would hide the test's writes from it. Provisioners
+            // release what they create.
+            builder
+                .AddSql(
+                    _ => CreateDatabaseConnection(northstarDatabase, postgres is not null),
+                    sql => sql.Isolation = SqlIsolation.None)
+                .ConfigureServices(services => services.AddNorthstarDomain(
+                    (provider, options) =>
+                    {
+                        var connection = provider.GetRequiredService<DbConnection>();
+                        if (postgres is not null)
+                        {
+                            options.UseNpgsql(connection);
+                        }
+                        else
+                        {
+                            options.UseSqlite(connection);
+                        }
+                    },
+                    ServiceLifetime.Scoped));
+        }
 
         builder
-            .ConfigureTracing(trace => trace.OutputPath = Path.Combine(
-                "TestResults", "ProtoTest.Demo", "prototest-demo.prototrace"))
+            .ConfigureTracing(trace =>
+            {
+                trace.OutputPath = Path.Combine("TestResults", "ProtoTest.Demo", "prototest-demo.prototrace");
+                // Watch the application's own instrumentation the way any OpenTelemetry consumer would.
+                trace.ActivitySources.Add("Northstar.Domain");
+            })
             .ConfigureAppConfiguration(configuration =>
             {
                 var settings = new Dictionary<string, string?>
@@ -107,27 +146,10 @@ public sealed class Setup : ProtoTestAssembly
                     // In-process subscriptions ride the test server's own WebSocket client.
                     services.AddSingleton<IGraphQLWebSocketFactory, NorthstarGraphQLWebSocketFactory>();
                 }
-
-                if (composeDomainInTests)
-                {
-                    // The test's own composition of the same domain over the same database, so data can
-                    // be arranged and verified through domain logic rather than only through the API.
-                    services.AddNorthstarDomain(options =>
-                    {
-                        if (postgres is not null)
-                        {
-                            options.UseNpgsql(northstarDatabase);
-                        }
-                        else
-                        {
-                            options.UseSqlite(northstarDatabase);
-                        }
-                    });
-                }
             })
             .AddTestHook<NorthstarScenarioHook>()
             .AddRunGate("no error findings", context => context
-                .ItemsOfKind(ProtoReportItemKind.Finding)
+                .ItemsOfKind(ProtoReportItemKinds.Finding)
                 .Any(item => item.Status == ProtoReportStatus.Error)
                 ? ProtoRunGateResult.Failed("The run recorded error findings.")
                 : ProtoRunGateResult.Passed("No error findings were recorded."))
@@ -161,4 +183,9 @@ public sealed class Setup : ProtoTestAssembly
                 sink.Title = "Northstar Platform · ProtoTest Demo";
             });
     }
+
+    private static DbConnection CreateDatabaseConnection(string connectionString, bool postgres)
+        => postgres
+            ? new NpgsqlConnection(connectionString)
+            : new SqliteConnection(connectionString);
 }

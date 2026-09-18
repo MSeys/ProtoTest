@@ -22,13 +22,17 @@ public static class ProtoHostBuilderExtensions
         var options = new ProtoSqlOptions();
         configure?.Invoke(options);
 
-        return builder.ConfigureServices(services =>
-        {
+        return builder
+            .AddCapability(new ProtoCapabilityDescriptor("SQL", ProtoCapabilityKinds.Store, "ProtoTest.Sql"))
+            .ConfigureServices(services =>
+            {
             services.AddScoped(connectionFactory);
             services.AddScoped(services =>
                 new ProtoSqlSession(services.GetRequiredService<DbConnection>()));
             services.AddSingleton(options);
             services.AddSingleton<IProtoTestHook>(new SqlConnectionHook(options));
+            services.AddSingleton<IProtoRunHook>(provider =>
+                new SqlIsolationGuardHook(options, provider.GetServices<ProtoApplicationClients>()));
         });
     }
 }

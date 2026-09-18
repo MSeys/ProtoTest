@@ -29,7 +29,7 @@ builder.AddApplication("Api", app => app
 
 Without a schema from either source, the collector throws `InvalidOperationException`.
 
-:::tip Ship the schema with the tests
+:::tip[Ship the schema with the tests]
 Copy the `.graphql` file to the output directory so `AppContext.BaseDirectory` finds it:
 
 ```xml

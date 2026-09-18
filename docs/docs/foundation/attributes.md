@@ -114,7 +114,7 @@ What makes these work well:
 - **They publish typed state** with `SetContext`, so tests, authenticators and other attributes can read it.
 - **They derive names from `context.TestId`**, so parallel tests never collide.
 - **They use other ProtoTest clients** — attributes run after clients are created.
-- **Their teardown tolerates partial setup** (`TryContext`, early return), because after a failed setup only completed components are rolled back.
+- **Their teardown tolerates partial setup** (`TryResolve`, early return), because after a failed setup only completed components are rolled back.
 - **The user attribute doesn't delete the user** — deleting the tenant already takes care of it.
 
 ## Ordering
@@ -140,7 +140,7 @@ Where the attribute is declared doesn't affect ordering: class-level and method-
 
 Attributes are collected from the test's class (including base classes) and from the method (including overridden base methods). Put suite-wide capabilities on the class and scenario-specific ones on the method.
 
-Unlike REST's `[RestAuth<T>]` — where a method-level attribute *replaces* class-level ones — `ProtoAttribute`s simply accumulate. If both the class and the method have a `[SampleUser]`, both run.
+Unlike `[Auth<T>]` — where a method-level attribute *replaces* class-level ones — `ProtoAttribute`s simply accumulate. If both the class and the method have a `[SampleUser]`, both run.
 
 ## Services in attributes
 
@@ -162,7 +162,7 @@ Attribute arguments must be compile-time constants. Pass a *name* — a role, a 
 | --- | --- |
 | [`[WebSession]`](../integrations/web/index.md#several-sessions-in-one-test) | `ProtoAttribute` — declares and optionally opens a browser session |
 | [`[LoginAs<TStrategy>]`](../integrations/web/login.md) | `ProtoAttribute` — logs a browser session in |
-| [`[RestAuth<T>]`](../integrations/rest/authentication.md), [`[GraphQLAuth<T>]`](../integrations/graphql/index.md#authentication) | metadata read by the REST/GraphQL hooks |
+| [`[Auth<T>]`](../integrations/rest/authentication.md) | metadata read by the HTTP hooks — one authenticator for REST and GraphQL, narrowed with `Protocols` |
 | `[Application("Name", "Protocol:Client")]` | `ProtoAttribute` — selects the application under test and, optionally, which client each protocol uses |
 | `[ProtoTest]`, `[ProtoTestFact]`, `[ProtoTestTheory]` | [runner](../runners/overview.md) entry points |
 

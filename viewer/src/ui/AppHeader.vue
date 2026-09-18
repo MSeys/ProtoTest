@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import AppButton from "./AppButton.vue";
+import Icon from "./Icon.vue";
 import BrandMark from "./BrandMark.vue";
 
 defineEmits<{ open: [] }>();
@@ -25,8 +26,11 @@ function toggleTheme() {
     </a>
     <p class="privacy"><span aria-hidden="true">◇</span> Trace stays in this browser</p>
     <div class="actions">
-      <AppButton variant="icon" :label="`Use ${theme === 'dark' ? 'light' : 'dark'} mode`" @click="toggleTheme">{{ theme === 'dark' ? '☀' : '◐' }}</AppButton>
+      <!-- Same order as the HTML report and the docs: the page's own action first, the theme switch last. -->
       <AppButton variant="primary" @click="$emit('open')">Open trace</AppButton>
+      <AppButton variant="icon" :label="`Use ${theme === 'dark' ? 'light' : 'dark'} mode`" @click="toggleTheme">
+        <Icon :name="theme === 'dark' ? 'sun' : 'moon'" />
+      </AppButton>
     </div>
   </header>
 </template>
@@ -44,16 +48,17 @@ function toggleTheme() {
   background: var(--surface);
   container-type: inline-size;
 }
-.brand { min-width: 0; display: flex; align-items: center; gap: var(--space-3); color: inherit; text-decoration: none; }
+.brand { grid-column: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-3); color: inherit; text-decoration: none; }
 .brand > span { min-width: 0; display: flex; flex-direction: column; line-height: var(--leading-tight); }
 .brand strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-display); font-size: var(--text-title); letter-spacing: .01em; }
 .brand small { color: var(--dim); font-size: var(--text-micro); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; }
-.privacy { justify-self: center; color: var(--muted); font-size: var(--text-meta); white-space: nowrap; }
+.privacy { grid-column: 2; justify-self: center; color: var(--muted); font-size: var(--text-meta); white-space: nowrap; }
 .privacy span { color: var(--success); }
-.actions { justify-self: end; display: flex; align-items: center; gap: var(--space-3); }
+/* Each part owns its column, so hiding the middle one never lets the buttons drift in from the right edge.
+   (A container query cannot restyle its own container, so the columns themselves never change.) */
+.actions { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: var(--space-3); }
 
 @container (max-width: 760px) {
-  .topbar { grid-template-columns: minmax(0, 1fr) auto; }
   .privacy { display: none; }
   .brand small { display: none; }
 }

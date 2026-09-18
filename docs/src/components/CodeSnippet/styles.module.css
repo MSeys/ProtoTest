@@ -1,40 +1,59 @@
 .pre {
   margin: 0;
-  padding: 1rem 1.1rem;
-  font-size: 0.8rem;
-  line-height: 1.62;
-  overflow-x: auto;
-  background: transparent !important;
+  padding: var(--space-5) var(--space-5);
+  border-radius: 0;
+  background: var(--surface-sunken);
+  color: var(--code-text);
+  font: var(--text-strong)/1.65 var(--font-mono);
   tab-size: 4;
 }
 
-@media (max-width: 600px) {
-  .pre {
-    font-size: 0.7rem;
-    padding: 0.85rem 0.9rem;
-  }
-}
-
 .line {
+  position: relative;
   display: flex;
-  gap: 0.9rem;
-  transition: opacity 160ms ease;
+  gap: var(--space-3);
+  padding-left: var(--space-3);
 }
 
+/* The number is the gutter's anchor and never dims: it has to stay countable on every line. */
 .lineNo {
   flex: 0 0 auto;
-  width: 1.6em;
+  width: 2ch;
+  color: var(--code-comment);
   text-align: right;
-  opacity: 0.32;
   user-select: none;
 }
 
+/* Wrap instead of scrolling: a continuation line hangs under the first so the indentation still reads. */
 .lineContent {
   flex: 1 1 auto;
-  white-space: pre;
+  min-width: 0;
+  padding-left: 4ch;
+  text-indent: -4ch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
-/* Infrastructure lines: present, but visibly not the point. */
-.dim {
-  opacity: 0.3;
+/* Plumbing (blueprint, not solid): a dashed gutter rule and a tinted band say "supporting", while the code
+   stays readable — the signal is the band, not a fade that hides what the line says. */
+.plumbing {
+  background: color-mix(in srgb, var(--code-text) 7%, transparent);
+}
+
+.plumbing::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: repeating-linear-gradient(to bottom, var(--muted) 0 4px, transparent 4px 8px);
+}
+
+.plumbing .lineContent {
+  opacity: 0.72;
+}
+
+@media (max-width: 600px) {
+  .pre { padding: var(--space-4); font-size: var(--text-body); }
 }

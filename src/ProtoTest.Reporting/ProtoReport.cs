@@ -12,7 +12,7 @@ public sealed record ProtoReport(
         ArgumentNullException.ThrowIfNull(items);
         var roots = items.ToArray();
         var flattened = Flatten(roots).ToArray();
-        var coverageItems = flattened.Where(item => item.Kind == ProtoReportItemKind.Coverage).ToArray();
+        var coverageItems = flattened.Where(item => item.Kind == ProtoReportItemKinds.Coverage).ToArray();
         var covered = coverageItems.Count(item => item.IsCovered is true);
 
         return new ProtoReport(
@@ -22,7 +22,7 @@ public sealed record ProtoReport(
                 // An occurrence is an observed fact: coverage hits and observations. A gate verdict or a
                 // finding is recorded once, not observed repeatedly, so it does not inflate the count.
                 TotalOccurrences: flattened
-                    .Where(item => item.Kind is ProtoReportItemKind.Coverage or ProtoReportItemKind.Observation)
+                    .Where(item => item.Kind is ProtoReportItemKinds.Coverage or ProtoReportItemKinds.Observation)
                     .Sum(item => item.Count),
                 CoverageTotal: coverageItems.Length,
                 Covered: covered,
@@ -32,8 +32,9 @@ public sealed record ProtoReport(
                     : Math.Round(covered * 100d / coverageItems.Length, 2),
                 Warnings: flattened.Count(item => item.Status == ProtoReportStatus.Warning),
                 Errors: flattened.Count(item => item.Status == ProtoReportStatus.Error),
-                Findings: flattened.Count(item => item.Kind == ProtoReportItemKind.Finding),
-                Gates: flattened.Count(item => item.Kind == ProtoReportItemKind.Gate)),
+                Findings: flattened.Count(item => item.Kind == ProtoReportItemKinds.Finding),
+                Gates: flattened.Count(item => item.Kind == ProtoReportItemKinds.Gate),
+                Resources: flattened.Count(item => item.Kind == ProtoReportItemKinds.Resource)),
             roots);
     }
 
@@ -63,4 +64,5 @@ public sealed record ProtoReportSummary(
     int Warnings,
     int Errors,
     int Findings,
-    int Gates);
+    int Gates,
+    int Resources);

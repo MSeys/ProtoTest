@@ -154,8 +154,80 @@ public class ProtoResourceTests
         }
     }
 
+    [Test]
+    public async Task OwnedResources_ShouldReachTheRunReportAndSkipHealthyClients()
+    {
+        // Arrange
+        var sink = new CapturingSink();
+        var builder = new ProtoHostBuilder();
+        builder.AddSink(sink);
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("Ownership", "00009", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        context.RegisterClient(new TrackedClient([]), "Shared", disposeWithContext: false);
+        context.RegisterResource(ProtoResource.From(
+            "database:connection",
+            "database",
+            "Test database",
+            (_, _) => ValueTask.CompletedTask));
+
+        // Act
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        // Assert: framework client plumbing is trace content, not report content.
+        var resources = sink.Items.Where(item => item.Kind == ProtoReportItemKinds.Resource).ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(resources, Has.Exactly(1).Items);
+            Assert.That(resources[0].Identifier, Is.EqualTo("database:connection"));
+            Assert.That(resources[0].Status, Is.EqualTo(ProtoReportStatus.Success));
+            Assert.That(resources[0].DisplayGroup, Is.EqualTo("Ownership"));
+        }
+    }
+
+    [Test]
+    public async Task FailedClientRelease_ShouldReachTheRunReport()
+    {
+        // Arrange
+        var sink = new CapturingSink();
+        var builder = new ProtoHostBuilder();
+        builder.AddSink(sink);
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("Broken", "00010", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        context.RegisterClient(new FailingClient(), "Broken");
+
+        // Act
+        Assert.ThrowsAsync<AggregateException>(() =>
+            host.CompleteTestAsync(ProtoTestResult.Failed(new InvalidOperationException("The test failed."))));
+
+        // Assert: a failed teardown is report content even for framework-managed plumbing.
+        await host.StopAsync();
+        var resources = sink.Items.Where(item => item.Kind == ProtoReportItemKinds.Resource).ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(resources, Has.Exactly(1).Items);
+            Assert.That(resources[0].Status, Is.EqualTo(ProtoReportStatus.Error));
+            Assert.That(resources[0].Metadata!["resource.error"], Is.EqualTo("Client release failed."));
+        }
+    }
+
     private ProtoExecutionContext CreateContext()
         => new("TestMethod", _scope, "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+
+    private sealed class CapturingSink : IProtoSink
+    {
+        private ProtoReportItem[] _items = [];
+
+        public IReadOnlyList<ProtoReportItem> Items => _items;
+
+        public Task ExportAsync(IEnumerable<ProtoReportItem> items, CancellationToken cancellationToken = default)
+        {
+            _items = [.. items];
+            return Task.CompletedTask;
+        }
+    }
 
     private sealed class TrackedResource(string id, List<string> released) : IProtoResource
     {
@@ -187,5 +259,10 @@ public class ProtoResourceTests
     private sealed class TrackedClient(List<string> events, string name = "Tracked") : IDisposable
     {
         public void Dispose() => events.Add($"dispose:{name}");
+    }
+
+    private sealed class FailingClient : IDisposable
+    {
+        public void Dispose() => throw new InvalidOperationException("Client release failed.");
     }
 }

@@ -10,6 +10,7 @@ internal sealed class ProtoDataService : IProtoData
     private readonly object _gate = new();
     private readonly List<ProvisionedObject> _provisioned = [];
     private long _objectSequence;
+    private long _valueSequence;
     private int _provisionSequence;
 
     public ProtoDataService(ProtoDataRegistry registry, IServiceProvider services)
@@ -107,9 +108,30 @@ internal sealed class ProtoDataService : IProtoData
 
             operation.SetAttribute("data.identity", result.Identity);
             operation.SetAttribute("data.owned", (result.Cleanup is not null).ToString().ToLowerInvariant());
+            var valueKind = typeof(TResult).Name;
+            var valueIdentity = result.Identity is { Length: > 0 } identity
+                ? identity
+                : $"#{Interlocked.Increment(ref _valueSequence)}";
+            operation.SetAttribute("data.value_id", $"{valueKind}:{valueIdentity}");
+            var valueName = result.Identity is { Length: > 0 }
+                ? $"Value · {valueKind} '{result.Identity}'"
+                : $"Value · {valueKind}";
+            execution.Trace.Value(
+                valueKind,
+                valueIdentity,
+                valueName,
+                "created",
+                new Dictionary<string, string?>
+                {
+                    ["value.type"] = typeof(TResult).FullName,
+                    ["value.identity"] = result.Identity,
+                    ["value.provisioner"] = provisioner.GetType().FullName,
+                    ["value.owned"] = (result.Cleanup is not null).ToString().ToLowerInvariant()
+                },
+                scope: execution.TestName);
             lock (_gate)
             {
-                _provisioned.Add(new ProvisionedObject(result.Identity, result.Value));
+                _provisioned.Add(new ProvisionedObject(result.Identity, result.Value, $"{valueKind}:{valueIdentity}"));
             }
 
             if (result.Cleanup is not null)
@@ -132,7 +154,7 @@ internal sealed class ProtoDataService : IProtoData
         }
     }
 
-    private sealed record ProvisionedObject(string? Identity, object Value);
+    private sealed record ProvisionedObject(string? Identity, object Value, string ValueKey);
 
     private void RegisterOwnedData(
         ProtoExecutionContext execution,

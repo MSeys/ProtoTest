@@ -21,7 +21,7 @@ dotnet test samples/ProtoTest.Demo
 
 The assembly runs testcases and fixtures concurrently with eight NUnit workers. Its HTML/JSON reports, the OpenAPI and GraphQL coverage and `prototest-demo.prototrace` are written under `TestResults/ProtoTest.Demo`.
 
-`DiagnosticsShowcase.TheIntentionalFailureShowcaseStaysOptIn` is skipped unless `PROTOTEST_DEMO_INCLUDE_FAILURE=1` is set, so CI stays green while the run still contains deliberately failed child operations that the tests inspect.
+`DiagnosticsShowcase.TheOrganizationReportsItsPlanAndProjectCount` is skipped unless `PROTOTEST_DEMO_INCLUDE_FAILURE=1` is set, so CI stays green while the run still contains deliberately failed child operations that the tests inspect.
 
 Regenerate the viewer's bundled trace with all successful scenarios and that intentional failure in one parallel run:
 

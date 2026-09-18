@@ -70,7 +70,7 @@ public sealed class ProtoTracingTests
         var execution = test.Entries.Single(entry => entry.Kind == "test.execution");
         var sampleOperation = test.Entries.Single(entry => entry.Kind == "sample.operation");
         var sampleEvent = test.Entries.Single(entry => entry.Kind == "sample.event");
-        var attachmentEntry = test.Entries.Single(entry => entry.Kind == "attachment.register");
+        var attachmentEntry = test.Record!.Attachments!.Single();
 
         Assert.Multiple(() =>
         {
@@ -78,9 +78,9 @@ public sealed class ProtoTracingTests
             Assert.That(sampleOperation.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
             Assert.That(sampleOperation.ParentId, Is.EqualTo(execution.Id));
             Assert.That(sampleEvent.ParentId, Is.EqualTo(sampleOperation.Id));
-            Assert.That(attachmentEntry.Attributes["attachment.artifact_id"], Is.EqualTo("artifact-1"));
-            Assert.That(attachmentEntry.Attributes["attachment.archive_path"], Is.Not.Empty);
-            Assert.That(attachmentEntry.Attributes["attachment.size_bytes"], Is.EqualTo("18"));
+            Assert.That(attachmentEntry.ArtifactId, Is.EqualTo("artifact-1"));
+            Assert.That(attachmentEntry.ArchivePath, Is.Not.Empty);
+            Assert.That(attachmentEntry.SizeBytes, Is.EqualTo(18));
             Assert.That(test.Entries, Has.Some.Matches<ProtoTraceEntry>(entry => entry.Kind == "test.setup"));
             Assert.That(test.Entries, Has.Some.Matches<ProtoTraceEntry>(entry => entry.Kind == "test.teardown"));
             Assert.That(File.Exists(path), Is.True);
@@ -88,12 +88,43 @@ public sealed class ProtoTracingTests
 
         using var archive = ZipFile.OpenRead(path);
         Assert.That(archive.GetEntry("manifest.json"), Is.Not.Null);
-        Assert.That(archive.GetEntry("run.json"), Is.Not.Null);
+        Assert.That(archive.GetEntry("spans.json"), Is.Not.Null);
+        Assert.That(archive.GetEntry("state.json"), Is.Not.Null);
+        Assert.That(archive.GetEntry("run.json"), Is.Null, "the v2 archive has no compatibility view");
         var artifact = test.Artifacts.Single();
         Assert.That(archive.GetEntry(artifact.ArchivePath), Is.Not.Null);
         await using var artifactStream = archive.GetEntry(artifact.ArchivePath)!.Open();
         using var reader = new StreamReader(artifactStream);
         Assert.That(await reader.ReadToEndAsync(), Is.EqualTo("{\"status\":\"ready\"}"));
+
+        // spans.json carries everything the old run.json did: each artifact once on its resource group, attachment
+        // events that refer to it, and the run's timing and environment as resource attributes.
+        using var spansReader = new StreamReader(archive.GetEntry("spans.json")!.Open());
+        using var spans = JsonDocument.Parse(await spansReader.ReadToEndAsync());
+        var groups = spans.RootElement.GetProperty("resourceSpans").EnumerateArray().ToArray();
+        var testGroup = groups.Single(group => group.GetProperty("resource").GetProperty("attributes").TryGetProperty("testId", out _));
+        var runAttributes = groups.Single(group => group.GetProperty("resource").GetProperty("attributes").TryGetProperty("runId", out _))
+            .GetProperty("resource").GetProperty("attributes");
+        var declared = testGroup.GetProperty("artifacts").EnumerateArray().Single();
+        // Added before any operation began, the attachment is an orphan event of the scope rather than a span's.
+        var scope = testGroup.GetProperty("scopeSpans")[0];
+        var attachmentEvent = scope.GetProperty("spans").EnumerateArray()
+            .SelectMany(span => span.GetProperty("events").EnumerateArray())
+            .Concat(scope.GetProperty("events").ValueKind == JsonValueKind.Array ? scope.GetProperty("events").EnumerateArray() : [])
+            .Single(item => item.TryGetProperty("record", out var record) && record.GetString() == "attachment");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(declared.GetProperty("id").GetString(), Is.EqualTo("artifact-1"));
+            Assert.That(declared.GetProperty("mediaType").GetString(), Is.EqualTo("application/json"));
+            Assert.That(declared.GetProperty("archivePath").GetString(), Is.EqualTo(artifact.ArchivePath));
+            Assert.That(declared.GetProperty("sizeBytes").GetInt64(), Is.EqualTo(18));
+            Assert.That(attachmentEvent.GetProperty("artifactId").GetString(), Is.EqualTo("artifact-1"));
+            Assert.That(attachmentEvent.TryGetProperty("mediaType", out _), Is.False, "declared once, on the artifact");
+            Assert.That(runAttributes.GetProperty("runCompletedAtUtc").ValueKind, Is.EqualTo(JsonValueKind.String));
+            Assert.That(runAttributes.GetProperty("environment.runtime").GetString(), Is.Not.Empty);
+            Assert.That(runAttributes.GetProperty("environment.os").GetString(), Is.Not.Empty);
+        });
     }
 
     [Test]
@@ -179,12 +210,13 @@ public sealed class ProtoTracingTests
         context.SetContext(new DiagnosticContext("orders", "do-not-record"));
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
-        var entry = host.Trace.Snapshot().Tests.Single().Entries.Single(item => item.Kind == "context.set");
+        var entity = host.Trace.Snapshot().Tests.Single().Entities!.Single(item =>
+            item.Kind == ProtoTraceEntityKinds.Context && item.Id.Contains(nameof(DiagnosticContext)));
         Assert.Multiple(() =>
         {
-            Assert.That(entry.Attributes["context.value"], Does.Contain("orders"));
-            Assert.That(entry.Attributes["context.value"], Does.Contain("[REDACTED]"));
-            Assert.That(entry.Attributes["context.value"], Does.Not.Contain("do-not-record"));
+            Assert.That(entity.State["context.value"], Does.Contain("orders"));
+            Assert.That(entity.State["context.value"], Does.Contain("[REDACTED]"));
+            Assert.That(entity.State["context.value"], Does.Not.Contain("do-not-record"));
         });
     }
 
@@ -207,10 +239,10 @@ public sealed class ProtoTracingTests
 
         Assert.DoesNotThrowAsync(async () => await host.StopAsync());
         using var archive = ZipFile.OpenRead(tracePath);
-        using var reader = new StreamReader(archive.GetEntry("run.json")!.Open());
-        using var json = JsonDocument.Parse(await reader.ReadToEndAsync());
-        var error = json.RootElement.GetProperty("tests")[0].GetProperty("artifacts")[0].GetProperty("error");
-        Assert.That(error.GetString(), Is.Not.Empty);
+        using var spansReader = new StreamReader(archive.GetEntry("spans.json")!.Open());
+        using var spans = JsonDocument.Parse(await spansReader.ReadToEndAsync());
+        var declared = spans.RootElement.GetProperty("resourceSpans")[0].GetProperty("artifacts")[0];
+        Assert.That(declared.GetProperty("error").GetString(), Is.Not.Empty);
     }
 
     [Test]
@@ -251,15 +283,13 @@ public sealed class ProtoTracingTests
         _ = context.Resolve<CallbackContext>();
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
-        var entries = host.Trace.Snapshot().Tests.Single().Entries;
-        var set = entries.Single(entry => entry.Kind == "context.set" && entry.Attributes["context.type"]!.Contains(nameof(CallbackContext)));
-        var resolved = entries.Single(entry => entry.Kind == "context.resolve" && entry.Attributes["context.type"]!.Contains(nameof(CallbackContext)));
+        var entity = host.Trace.Snapshot().Tests.Single().Entities!.Single(item =>
+            item.Kind == ProtoTraceEntityKinds.Context && item.Id.Contains(nameof(CallbackContext)));
         Assert.Multiple(() =>
         {
-            Assert.That(set.Attributes["context.value"], Does.Contain("configured"));
-            Assert.That(set.Attributes["context.value"], Does.Contain("delegate"));
-            Assert.That(set.Attributes["context.value"], Does.Not.Contain("\"unavailable\":true"));
-            Assert.That(resolved.Attributes, Does.Not.ContainKey("context.value"));
+            Assert.That(entity.State["context.value"], Does.Contain("configured"));
+            Assert.That(entity.State["context.value"], Does.Contain("delegate"));
+            Assert.That(entity.State["context.value"], Does.Not.Contain("\"unavailable\":true"));
         });
     }
 
@@ -293,6 +323,57 @@ public sealed class ProtoTracingTests
             Assert.That(activity.Status, Is.EqualTo(ActivityStatusCode.Ok));
             Assert.That(activity.Events.Select(item => item.Name), Does.Contain("Sample event"));
             Assert.That(activity.GetTagItem("prototest.test.id"), Is.Not.Null);
+        });
+    }
+
+    [Test]
+    public async Task ApplicationActivities_ShouldBeRoutedToTheirTestByTraceContext()
+    {
+        var testContext = new TaskCompletionSource<ActivityContext>();
+        using var contextListener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == ProtoTestDiagnostics.ActivitySourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStarted = activity =>
+            {
+                if (activity.DisplayName == "Test execution")
+                {
+                    testContext.TrySetResult(activity.Context);
+                }
+            }
+        };
+        ActivitySource.AddActivityListener(contextListener);
+
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options =>
+        {
+            options.OutputPath = TemporaryTracePath();
+            options.ActivitySources.Add("ProtoTest.Core.Tests.Dummy");
+        });
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("application trace context", TestMethod());
+
+        var parent = await testContext.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        using var applicationSource = new ActivitySource("ProtoTest.Core.Tests.Dummy");
+        using (var applicationSpan = applicationSource.StartActivity(
+            "invoice.pay",
+            ActivityKind.Server,
+            parent))
+        {
+            applicationSpan?.SetTag("invoice.number", "INV-1");
+        }
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        var run = host.Trace.Snapshot();
+        var entry = run.Tests.Single().Entries.Single(item => item.Kind == "ProtoTest.Core.Tests.Dummy");
+        Assert.Multiple(() =>
+        {
+            Assert.That(entry.Name, Is.EqualTo("invoice.pay"));
+            Assert.That(entry.Attributes["invoice.number"], Is.EqualTo("INV-1"));
+            Assert.That(run.Entries!.Any(item => item.Kind == "ProtoTest.Core.Tests.Dummy"), Is.False,
+                "An application span must not leak into the run-level trace when its trace context is known.");
         });
     }
 

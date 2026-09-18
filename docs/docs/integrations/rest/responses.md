@@ -59,7 +59,7 @@ The full rules and every available matcher are on the [Shape matching](../../adv
 
 Shape assertions also do double duty: the property paths they match are what [OpenAPI coverage](../../advanced/coverage.md) uses to report which response fields your suite actually checked.
 
-:::tip Shape a whole array
+:::tip[Shape a whole array]
 Because arrays are positional, a list assertion is precise:
 
 ```csharp

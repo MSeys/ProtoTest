@@ -17,7 +17,7 @@ var context = Proto.Context;
 
 Outside a test, `Proto.Context` throws *"No active ProtoExecutionContext available on this thread."* The usual cause is work started with `Task.Run` or a timer callback that escaped the test's flow, or using it from a static initializer.
 
-:::tip Parallel tests are isolated
+:::tip[Parallel tests are isolated]
 The context is stored in an `AsyncLocal`, so parallel tests each see their own. You don't need to pass it around, and one test can't accidentally read another's state.
 :::
 
@@ -51,13 +51,13 @@ var maybe = Proto.Context.TryResolve<SampleUserContext>();    // null if missing
 
 ```csharp
 void SetContext<T>(T context) where T : class, IProtoContext;
-T Context<T>() where T : class, IProtoContext;
+T Resolve<T>() where T : class, IProtoContext;
 T? TryResolve<T>() where T : class, IProtoContext;
 ```
 
 - `IProtoContext` is an empty marker interface.
 - State is keyed by the **exact type** you pass. Setting the same type again replaces it, and you must read it back with the same type — not a base class or interface.
-- A missing `Context<T>()` throws *"No context of type 'X' registered."* Use `TryContext` in teardown code, where setup may not have got that far.
+- A missing `Resolve<T>()` throws *"No context of type 'X' registered."* Use `TryResolve` in teardown code, where setup may not have got that far.
 - Every set and read is traced — including a snapshot of the value — so the [trace viewer](../advanced/prototrace.md) shows what state each step saw.
 
 ## Services

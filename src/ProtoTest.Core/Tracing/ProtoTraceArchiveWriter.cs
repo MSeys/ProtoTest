@@ -6,6 +6,12 @@ using System.Text.Json.Serialization;
 
 internal static class ProtoTraceArchiveWriter
 {
+    /// <summary>
+    /// The archive layout: a manifest naming the two v2 documents, plus the artifact files they declare.
+    /// 2.0 dropped the run.json compatibility view; a reader that finds no spans entry has an older trace.
+    /// </summary>
+    private const string ArchiveFormatVersion = "2.0";
+
     private static readonly JsonSerializerOptions SerializerOptions = CreateSerializerOptions();
 
     public static async Task WriteAsync(
@@ -14,6 +20,8 @@ internal static class ProtoTraceArchiveWriter
         IReadOnlyList<ProtoTraceArtifactSource>? artifacts = null,
         CancellationToken cancellationToken = default)
     {
+        // Every document describes a finished run, so an open run is closed once here rather than per document.
+        run = run.CompletedAtUtc is null ? run with { CompletedAtUtc = DateTimeOffset.UtcNow } : run;
         var fullPath = Path.GetFullPath(path);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
         await using var destination = File.Create(fullPath);
@@ -30,15 +38,10 @@ internal static class ProtoTraceArchiveWriter
         await WriteJsonAsync(
             archive,
             "manifest.json",
-            new ProtoTraceManifest(run.FormatVersion, "run.json"),
+            new ProtoTraceManifest(ArchiveFormatVersion, "spans.json", "state.json"),
             cancellationToken);
-        await WriteJsonAsync(
-            archive,
-            "run.json",
-            run.CompletedAtUtc is null
-                ? run with { CompletedAtUtc = DateTimeOffset.UtcNow }
-                : run,
-            cancellationToken);
+        await WriteJsonAsync(archive, "spans.json", ProtoTraceWire.Spans(run), cancellationToken);
+        await WriteJsonAsync(archive, "state.json", ProtoTraceWire.State(run), cancellationToken);
     }
 
     private static async Task WriteJsonAsync<T>(
@@ -63,5 +66,8 @@ internal static class ProtoTraceArchiveWriter
         return options;
     }
 
-    private sealed record ProtoTraceManifest(string FormatVersion, string RunEntry);
+    private sealed record ProtoTraceManifest(
+        string FormatVersion,
+        string SpansEntry,
+        string StateEntry);
 }

@@ -3,6 +3,7 @@ namespace ProtoTest.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core.Internal;
+using System.Diagnostics;
 using System.Reflection;
 
 /// <summary>
@@ -37,9 +38,23 @@ public sealed class ProtoHost : IAsyncDisposable
     public static ProtoExecutionContext CurrentContext => ProtoTestLifecycle.CurrentContext;
 
     /// <summary>
+    /// Gets the current test execution context, or <see langword="null"/> when none is active on this flow -
+    /// the safe lookup for telemetry callbacks, which can run outside the test's context.
+    /// </summary>
+    public static ProtoExecutionContext? CurrentContextOrNull => ProtoTestLifecycle.TryGetCurrentContext;
+
+    /// <summary>
     /// Gets the host owning the current test, or the sole active host outside a test.
     /// </summary>
     public static ProtoHost CurrentHost => ProtoHostRegistry.GetCurrent(ProtoTestLifecycle.CurrentHost);
+
+    /// <summary>
+    /// Finds the trace writer of the test an application span belongs to, matched by its W3C trace id.
+    /// This is the safe lookup for application telemetry callbacks, which run outside the test's flow:
+    /// <see cref="CurrentContextOrNull"/> is empty there and <see cref="CurrentHost"/> cannot be resolved.
+    /// </summary>
+    public static IProtoTraceWriter? FindTraceWriter(ActivityTraceId traceId)
+        => ProtoHostRegistry.FindTraceWriter(traceId);
 
     public IConfiguration Configuration => _rootServiceProvider.GetRequiredService<IConfiguration>();
 
@@ -47,10 +62,30 @@ public sealed class ProtoHost : IAsyncDisposable
     public IProtoTraceSource Trace => _trace;
 
     /// <summary>
-    /// Executes all suite-level BeforeRun hooks in ascending order.
+    /// Executes all suite-level BeforeRun hooks in ascending order, then records the capabilities the
+    /// host is composed of as run entities.
     /// </summary>
-    public Task StartAsync(CancellationToken cancellationToken = default)
-        => _runLifecycle.StartAsync(cancellationToken);
+    public async Task StartAsync(CancellationToken cancellationToken = default)
+    {
+        await _runLifecycle.StartAsync(cancellationToken);
+        foreach (var capability in _rootServiceProvider.GetServices<ProtoCapabilityDescriptor>())
+        {
+            _trace.RunWriter.SetEntityState(
+                ProtoTraceEntityKinds.Capability,
+                $"{capability.Kind}:{capability.Name}",
+                capability.Name,
+                new Dictionary<string, string?>
+                {
+                    ["capability.name"] = capability.Name,
+                    ["capability.kind"] = capability.Kind,
+                    ["capability.source"] = capability.Source
+                },
+                scope: "run",
+                change: "activated");
+        }
+
+        _trace.StartListening();
+    }
 
     /// <summary>
     /// Executes all suite-level AfterRun hooks in descending order.
@@ -161,6 +196,7 @@ public sealed class ProtoHost : IAsyncDisposable
         }
         finally
         {
+            _trace.StopListening();
             _trace.CompleteRun();
             ProtoHostRegistry.Unregister(this);
         }

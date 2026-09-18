@@ -24,7 +24,7 @@ public class ProtoFindingTests
         await host.StopAsync();
 
         // Assert
-        var finding = sink.Items.Single(item => item.Kind == ProtoReportItemKind.Finding);
+        var finding = sink.Items.Single(item => item.Kind == ProtoReportItemKinds.Finding);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(finding.Message, Is.EqualTo("Orphaned invoices were left behind."));
@@ -72,13 +72,12 @@ public class ProtoFindingTests
         await host.StopAsync();
 
         // Assert
-        var entry = host.Trace.Snapshot().Tests.Single().Entries.Single(item => item.Kind == "finding.record");
+        var finding = host.Trace.Snapshot().Tests.Single().Record!.Findings!.Single();
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(entry.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
-            Assert.That(entry.Attributes["finding.status"], Is.EqualTo("Warning"));
-            Assert.That(entry.Attributes["finding.message"], Is.EqualTo("Worth a look."));
-            Assert.That(entry.Attributes["finding.tags"], Is.EqualTo("baseline"));
+            Assert.That(finding.Status, Is.EqualTo("Warning"));
+            Assert.That(finding.Message, Is.EqualTo("Worth a look."));
+            Assert.That(finding.Tags, Is.EqualTo(new[] { "baseline" }));
         }
     }
 

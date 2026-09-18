@@ -1,0 +1,80 @@
+/* The external-link controls share one shape: transparent until hover, then the navbar's hover box. */
+.link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: var(--control-height);
+  height: var(--control-height);
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  color: var(--muted);
+  transition: color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease);
+}
+
+.link:hover {
+  border-color: var(--border);
+  background: var(--hover);
+  color: var(--text);
+}
+
+.link:focus-visible { outline: 2px solid var(--blueprint); outline-offset: 2px; }
+.link svg { display: block; }
+
+/* The name only where the header has room; the mark carries it elsewhere. */
+.label { display: none; }
+
+@media (min-width: 1200px) {
+  .label { display: inline; }
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--muted);
+  font: var(--text-micro) var(--font-mono);
+}
+
+/* A tooltip for the icon-only states; the label makes it redundant once the name is visible. */
+.link::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 10;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+  color: var(--text);
+  font: var(--text-micro) var(--font-ui);
+  white-space: nowrap;
+  box-shadow: var(--elevation-overlay);
+  opacity: 0;
+  transform: translateY(-2px);
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--motion-ease), transform var(--motion-fast) var(--motion-ease);
+}
+
+.link:hover::after,
+.link:focus-visible::after {
+  opacity: 1;
+  transform: none;
+}
+
+@media (min-width: 1200px) {
+  .link::after { display: none; }
+}
+
+/* Docusaurus turns the search into an absolutely positioned button at 996px, so the items would sit under it.
+   The framework's own breakpoint is the honest one here; from there the drawer carries the labelled rows. */
+@media (max-width: 996px) {
+  .link { display: none; }
+}
+
+.mobile { gap: var(--space-2); }
+.mobile svg { flex: none; }

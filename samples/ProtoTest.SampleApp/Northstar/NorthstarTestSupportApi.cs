@@ -11,6 +11,9 @@ internal static class NorthstarTestSupportApi
 {
     public static void MapNorthstarTestSupport(this WebApplication app)
     {
+        // A probe the testing layer hits once per run so a missing surface fails with a clear message.
+        app.MapGet("/test-support", () => Results.Ok(new { enabled = true }));
+
         app.MapPost("/test-support/tenants", (HttpContext http, ProvisionTenantRequest body) =>
         {
             var baseUrl = new Uri($"{http.Request.Scheme}://{http.Request.Host}");

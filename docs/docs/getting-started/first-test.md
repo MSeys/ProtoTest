@@ -159,7 +159,7 @@ Now compose them:
 ```csharp
 [Application("Api")]
 [Customer]
-[RestAuth<CustomerAuthenticator>]
+[Auth<CustomerAuthenticator>]
 public sealed class OrderTests
 {
     [ProtoTest]

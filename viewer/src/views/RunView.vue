@@ -1,284 +1,244 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import type { TestTrace, TraceArtifact, TraceEntry, TraceRun } from "../model/trace-schema";
-import { entryTitle, formatDate, formatDuration, milliseconds, testDisplayName, testGroupName, tone } from "../model/trace-format";
-import { nodeType } from "../model/trace-levels";
-import { primaryFailure, runDuration, testSegments } from "../model/trace-rows";
+import type { Run, TestTrace } from "../trace/model";
+import { formatDate, formatDuration, pad, phaseSegments, testCodeName, testGroup, testMatches, testTitle, tone } from "../trace/format";
 import Panel from "../ui/Panel.vue";
-import MetricTile from "../ui/MetricTile.vue";
-import TimelineRow from "../ui/TimelineRow.vue";
-import FilterChip from "../ui/FilterChip.vue";
 import TextInput from "../ui/TextInput.vue";
-import KindChip from "../ui/KindChip.vue";
-import PhaseKey from "../ui/PhaseKey.vue";
+import FilterChip from "../ui/FilterChip.vue";
 import EmptyState from "../ui/EmptyState.vue";
+import VisibilityStrip from "../ui/VisibilityStrip.vue";
 
-const props = defineProps<{ run: TraceRun; fileName: string }>();
-const filter = ref<"all" | "failed" | "partial" | "passed">("all");
+const props = defineProps<{ run: Run; fileName: string }>();
+const emit = defineEmits<{ select: [test: TestTrace] }>();
+
 const query = ref("");
-const emit = defineEmits<{ select: [test: TestTrace]; artifact: [artifact: TraceArtifact] }>();
+const filter = ref<"all" | "attention">("all");
 
-const passed = computed(() => props.run.tests.filter(test => test.outcome === "Succeeded").length);
-const partial = computed(() => props.run.tests.filter(test => test.outcome === "Partial").length);
-const failed = computed(() => props.run.tests.filter(test => test.outcome === "Failed").length);
-const entryCount = computed(() => props.run.tests.reduce((sum, test) => sum + test.entries.length, 0));
-const artifactCount = computed(() => (props.run.artifacts?.length ?? 0) + props.run.tests.reduce((sum, test) => sum + (test.artifacts?.length ?? 0), 0));
-const runEntries = computed(() => props.run.entries ?? []);
+const needsAttention = (test: TestTrace) => test.outcome !== "succeeded" && test.outcome !== "skipped";
+const attention = computed(() => props.run.tests.filter(needsAttention)
+  .sort((left, right) => (left.outcome === "failed" ? 0 : 1) - (right.outcome === "failed" ? 0 : 1) || left.number - right.number));
 
-interface StatusItem {
-  id: string;
-  outcome: TestTrace["outcome"];
-  type: { id: string; label: string };
-  label: string;
-  /** The operation that explains the outcome, in the trace's own words. */
-  cause?: string;
-  detail: string;
-  test?: TestTrace;
-}
-
-function excerpt(value: string, length = 160): string {
-  return value.length > length ? `${value.slice(0, length)}…` : value;
-}
-
-/**
- * What needs attention, most severe first. A test that failed or went partial is shown with the
- * operation that caused it, so the run screen answers "what is wrong" without opening the test.
- */
-const status = computed(() => {
-  const items: StatusItem[] = [];
-  for (const test of props.run.tests) {
-    if (test.outcome === "Succeeded" || test.outcome === "Skipped" || test.outcome === "Unknown") continue;
-    const failure = primaryFailure(test);
-    items.push({
-      id: test.testId,
-      outcome: test.outcome,
-      type: failure ? nodeType(failure) : { id: "lifecycle", label: "Test" },
-      label: testDisplayName(test),
-      cause: failure ? entryTitle(failure) : undefined,
-      detail: excerpt(failure?.error?.message ?? test.error?.message ?? `${testGroupName(test)} · ${test.outcome}`),
-      test
-    });
-  }
-  for (const test of props.run.tests) {
-    for (const entry of test.entries) {
-      if (entry.kind !== "finding.record") continue;
-      items.push(findingItem(entry, testDisplayName(test), test));
-    }
-  }
-  for (const entry of runEntries.value) {
-    if (entry.kind !== "gate.evaluate" && entry.kind !== "finding.record") continue;
-    items.push(findingItem(entry, entry.kind));
-  }
-  return items.sort((left, right) => severity(right.outcome) - severity(left.outcome));
+/** The run in one sentence: what went wrong first, then what passed. */
+const verdict = computed(() => {
+  const counts = props.run.counts;
+  const parts: { text: string; tone: string }[] = [];
+  if (counts.failed) parts.push({ text: `${counts.failed} failed`, tone: "danger" });
+  if (counts.partial) parts.push({ text: `${counts.partial} partial`, tone: "warning" });
+  if (counts.cancelled) parts.push({ text: `${counts.cancelled} cancelled`, tone: "warning" });
+  parts.push({ text: `${counts.succeeded} passed`, tone: "success" });
+  if (counts.skipped) parts.push({ text: `${counts.skipped} skipped`, tone: "neutral" });
+  return parts;
 });
 
-function findingItem(entry: TraceEntry, fallback: string, test?: TestTrace): StatusItem {
-  const attributes = entry.attributes ?? {};
-  return {
-    id: entry.id,
-    outcome: entry.outcome,
-    type: nodeType(entry),
-    label: entryTitle(entry),
-    cause: attributes["finding.status"] ?? attributes["gate.status"] ?? undefined,
-    detail: excerpt(attributes["finding.message"] ?? attributes["gate.message"] ?? fallback),
-    test
-  };
+const environment = computed(() => [props.run.environment.runtime, props.run.environment.os].filter(Boolean).join(" on "));
+
+const visible = computed(() => props.run.tests.filter(test =>
+  (filter.value === "all" || needsAttention(test)) && testMatches(test, query.value)));
+
+/** Each test's phases placed on the run's own time axis, so parallel and slow tests show as such. */
+function bars(test: TestTrace) {
+  const total = Math.max(props.run.duration, 1);
+  return phaseSegments(test).map(segment => ({
+    phase: segment.phase,
+    left: Math.max(0, ((segment.start - props.run.start) / total) * 100),
+    width: Math.max(0.4, (segment.duration / total) * 100)
+  }));
 }
 
-function severity(outcome: TestTrace["outcome"]): number {
-  return outcome === "Failed" ? 3 : outcome === "Partial" || outcome === "Cancelled" ? 2 : 1;
-}
-
-const counts = computed(() => ({
-  all: props.run.tests.length,
-  failed: failed.value,
-  partial: partial.value,
-  passed: passed.value
-}));
-const filters = [
-  { id: "all", label: "All", tone: "neutral" },
-  { id: "failed", label: "Failed", tone: "danger" },
-  { id: "partial", label: "Partial", tone: "warning" },
-  { id: "passed", label: "Passed", tone: "success" }
-] as const;
-
-const visibleTests = computed(() => props.run.tests.filter(test =>
-  (filter.value === "all" || (filter.value === "failed" ? test.outcome === "Failed" : filter.value === "partial" ? test.outcome === "Partial" : test.outcome === "Succeeded"))
-  && (!query.value || testDisplayName(test).toLocaleLowerCase().includes(query.value.toLocaleLowerCase())
-    || (test.className ?? "").toLocaleLowerCase().includes(query.value.toLocaleLowerCase()))));
-
-const bounds = computed(() => {
-  const stamps: number[] = [];
-  for (const test of props.run.tests) {
-    stamps.push(Date.parse(test.startedAtUtc), Date.parse(test.startedAtUtc) + milliseconds(test.duration));
-  }
-  for (const entry of runEntries.value) {
-    stamps.push(Date.parse(entry.timestampUtc), Date.parse(entry.timestampUtc) + milliseconds(entry.duration));
-  }
-  if (props.run.completedAtUtc) stamps.push(Date.parse(props.run.completedAtUtc));
-  if (!stamps.length) return { start: 0, duration: 1 };
-  const start = Math.min(...stamps);
-  return { start, duration: Math.max(Math.max(...stamps) - start, 1) };
-});
-
-const rows = computed(() => [...visibleTests.value]
-  .sort((left, right) => Date.parse(left.startedAtUtc) - Date.parse(right.startedAtUtc))
-  .map((test, index) => ({
-    test,
-    index: index + 1,
-    left: ((Date.parse(test.startedAtUtc) - bounds.value.start) / bounds.value.duration) * 100,
-    width: Math.max((milliseconds(test.duration) / bounds.value.duration) * 100, .6),
-    segments: testSegments(test)
-  })));
-
-function artifactKind(artifact: TraceArtifact): string {
-  return artifact.mediaType.includes("html") ? "HTML" : artifact.mediaType.includes("json") ? "JSON" : "FILE";
+/** Why a test needs attention, in the words of the check that decided it. */
+function reason(test: TestTrace): { title: string; detail: string } {
+  const failure = test.failure;
+  if (!failure) return { title: test.outcome === "partial" ? "Finished with a partial result" : "No failing operation recorded", detail: "" };
+  const mismatch = failure.mismatches[0];
+  const detail = mismatch
+    ? `${mismatch.path}: expected ${JSON.stringify(mismatch.expected)}, got ${JSON.stringify(mismatch.actual)}${failure.mismatches.length > 1 ? `, and ${failure.mismatches.length - 1} more` : ""}`
+    : failure.span.error?.message.split(/\r?\n/)[0] ?? failure.check?.detail ?? "";
+  return { title: failure.span.name, detail };
 }
 </script>
 
 <template>
-  <div class="run-view">
-    <header class="run-heading">
-      <div class="identity">
-        <span class="eyebrow">Test run</span>
-        <h1>{{ fileName }}</h1>
-        <p class="mono">{{ formatDate(run.startedAtUtc) }} · RUN {{ run.runId.slice(0, 8).toUpperCase() }}</p>
-        <ul v-if="run.environment" class="environment">
-          <li>{{ run.environment.runtime }}</li>
-          <li>{{ run.environment.os }}</li>
-          <li>{{ run.environment.processArchitecture }}</li>
-        </ul>
+  <div class="run">
+    <header class="summary">
+      <div class="headline">
+        <h1>
+          <template v-for="(part, index) in verdict" :key="part.text">
+            <span :class="part.tone">{{ part.text }}</span><span v-if="index < verdict.length - 1" class="sep">, </span>
+          </template>
+        </h1>
+        <p class="meta">
+          <span>{{ run.tests.length }} tests in {{ formatDuration(run.duration) }}</span>
+          <span>{{ formatDate(run.start) }}</span>
+          <span v-if="environment">{{ environment }}</span>
+          <span class="file">{{ fileName }}</span>
+        </p>
       </div>
-      <div class="metrics">
-        <MetricTile label="Tests" :value="run.tests.length" />
-        <MetricTile label="Passed" :value="passed" tone="success" />
-        <MetricTile label="Partial" :value="partial" :tone="partial ? 'warning' : 'neutral'" />
-        <MetricTile label="Failed" :value="failed" :tone="failed ? 'danger' : 'neutral'" />
-        <MetricTile label="Trace entries" :value="entryCount" />
-        <MetricTile label="Artifacts" :value="artifactCount" />
-        <MetricTile label="Duration" :value="formatDuration(runDuration(run.tests))" />
+      <!-- The run's shape at a glance: one segment per test, in the order they started, coloured by outcome. -->
+      <div class="strip" role="img" :aria-label="verdict.map(part => part.text).join(', ')">
+        <button v-for="test in run.tests" :key="test.id" type="button" class="tick" :class="tone(test.outcome)"
+                :title="`${pad(test.number)} ${testTitle(test)}`" @click="emit('select', test)" />
       </div>
     </header>
 
-    <Panel title="Run status" subtitle="What needs attention, then how the run judged itself" pad="tight">
-      <template #actions><span class="count">{{ status.length }}</span></template>
-      <p v-if="!status.length" class="clear"><i class="status success" />Every test passed and nothing was reported.</p>
-      <div v-else class="status-list">
-        <button v-for="item in status" :key="item.id" type="button" class="status-row" :class="tone(item.outcome)"
-                :title="item.detail" @click="item.test && emit('select', item.test)">
-          <i class="status" :class="tone(item.outcome)" />
-          <span class="status-body">
-            <strong>{{ item.label }}</strong>
-            <small><b v-if="item.cause" class="mono">{{ item.cause }}</b>{{ item.detail }}</small>
+    <VisibilityStrip :visibility="run.visibility" />
+
+    <Panel v-if="attention.length || run.findings.length || run.gates.length" title="Needs attention"
+           subtitle="Failing and partial tests first, then what the run itself found and how its gates judged it." pad="none">
+      <div class="attention">
+        <button v-for="test in attention" :key="test.id" type="button" class="issue" :class="tone(test.outcome)" @click="emit('select', test)">
+          <b>{{ pad(test.number) }}</b>
+          <span class="issue-main">
+            <strong>{{ testTitle(test) }}</strong>
+            <span class="issue-reason">{{ reason(test).title }}</span>
+            <span v-if="reason(test).detail" class="issue-detail">{{ reason(test).detail }}</span>
           </span>
-          <KindChip :type="item.type" />
+          <span class="issue-kind">{{ test.outcome === "failed" ? "Failed" : "Partial" }}</span>
         </button>
+        <component :is="item.test ? 'button' : 'div'" v-for="(item, index) in run.findings" :key="`finding-${index}`"
+                   :type="item.test ? 'button' : undefined" class="issue finding" :class="item.finding.status.toLowerCase()"
+                   @click="item.test && emit('select', item.test)">
+          <b>{{ item.test ? pad(item.test.number) : "Run" }}</b>
+          <span class="issue-main">
+            <strong>{{ item.finding.message }}</strong>
+            <span class="issue-reason">{{ [item.finding.category, ...item.finding.tags].filter(Boolean).join(", ") }}</span>
+          </span>
+          <span class="issue-kind">{{ item.finding.status }} finding</span>
+        </component>
+        <div v-for="gate in run.gates" :key="gate.name" class="issue gate" :class="tone(gate.outcome)">
+          <b>Gate</b>
+          <span class="issue-main">
+            <strong>{{ gate.name }}</strong>
+            <span v-if="gate.message" class="issue-reason">{{ gate.message }}</span>
+          </span>
+          <span class="issue-kind">{{ gate.status }}</span>
+        </div>
       </div>
     </Panel>
 
-    <Panel title="Tests" subtitle="One row per test, in start order; the bar is the test, split by phase" pad="tight">
+    <Panel title="Tests" subtitle="In the order they started. The bar is where the test ran within the run, split by phase." pad="none">
       <template #actions>
-        <PhaseKey class="legend" />
-        <TextInput v-model="query" type="search" placeholder="Filter tests" label="Filter tests" class="search" />
-        <div class="chips">
-          <FilterChip v-for="item in filters" :key="item.id" :label="item.label" :count="counts[item.id]"
-                      :tone="item.tone" :active="filter === item.id" @select="filter = item.id" />
+        <div class="filters">
+          <FilterChip label="All" :count="run.tests.length" :active="filter === 'all'" @select="filter = 'all'" />
+          <FilterChip label="Needs attention" :count="attention.length" :tone="attention.length ? 'danger' : 'neutral'"
+                      :active="filter === 'attention'" @select="filter = 'attention'" />
+          <TextInput v-model="query" type="search" placeholder="Find a test" label="Find a test" class="find" />
         </div>
       </template>
-      <div v-if="rows.length" class="rows">
-        <TimelineRow v-for="row in rows" :key="row.test.testId"
-                     :index="row.index" :name="testDisplayName(row.test)" :group="testGroupName(row.test)"
-                     :outcome="row.test.outcome" :duration="milliseconds(row.test.duration)"
-                     :offset="row.left" :width="row.width" :segments="row.segments"
-                     @select="emit('select', row.test)" />
+      <div class="legend" aria-hidden="true">
+        <span v-for="phase in ['setup', 'execution', 'rollback', 'teardown']" :key="phase"><i :style="{ background: `var(--phase-${phase})` }" />{{ phase }}</span>
       </div>
-      <EmptyState v-else message="No test matches this filter." />
-    </Panel>
-
-    <Panel v-if="run.artifacts?.length" title="Run outputs" subtitle="Generated by report sinks and bundled inside this trace" pad="tight">
-      <template #actions><span class="count">{{ run.artifacts.length }}</span></template>
-      <div class="outputs">
-        <button v-for="artifact in run.artifacts" :key="artifact.id" type="button" class="output" @click="emit('artifact', artifact)">
-          <span class="output-kind mono">{{ artifactKind(artifact) }}</span>
-          <span class="output-body">
-            <strong>{{ artifact.name }}</strong>
-            <small>{{ artifact.description || artifact.mediaType }}</small>
+      <div v-if="visible.length" class="tests">
+        <button v-for="test in visible" :key="test.id" type="button" class="test-row" :class="tone(test.outcome)"
+                :title="testCodeName(test)" @click="emit('select', test)">
+          <b>{{ pad(test.number) }}</b>
+          <span class="test-name">
+            <span>{{ testTitle(test) }}</span>
+            <small>{{ testGroup(test) }}</small>
           </span>
+          <span class="bar">
+            <i v-for="segment in bars(test)" :key="segment.phase"
+               :style="{ left: `${segment.left}%`, width: `${segment.width}%`, background: `var(--phase-${segment.phase})` }" />
+          </span>
+          <small class="duration">{{ formatDuration(test.duration) }}</small>
+          <i class="status" :class="tone(test.outcome)" />
         </button>
       </div>
+      <EmptyState v-else message="No test matches this filter.">
+        <FilterChip label="Show all tests" @select="filter = 'all'; query = ''" />
+      </EmptyState>
     </Panel>
   </div>
 </template>
 
 <style scoped>
-.run-view { display: grid; gap: var(--space-4); align-content: start; }
-.run-heading { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-5); }
-.identity { min-width: 0; }
-.run-heading h1 { margin: var(--space-1) 0; font-size: var(--text-display); letter-spacing: var(--tracking-display); }
-.run-heading p { color: var(--muted); font-size: var(--text-body); }
-.environment { margin: var(--space-2) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); list-style: none; }
-.environment li { padding: 2px var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-chip); color: var(--muted); font: var(--text-micro) var(--font-mono); }
-.metrics { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
-.count { color: var(--muted); font: var(--text-micro) var(--font-mono); }
+.run { display: grid; gap: var(--space-4); container-type: inline-size; }
 
-.status-list { display: grid; gap: var(--space-2); }
-.status-row {
+.summary {
+  padding: var(--space-4) var(--space-1) 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.headline { display: grid; gap: var(--space-1); }
+.headline h1 { font-size: var(--text-display); letter-spacing: var(--tracking-display); line-height: var(--leading-tight); }
+.headline h1 .danger { color: var(--danger); }
+.headline h1 .warning { color: var(--warning); }
+.headline h1 .success { color: var(--text); }
+.headline h1 .sep { color: var(--dim); }
+.meta { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); color: var(--muted); font-size: var(--text-meta); }
+.file { color: var(--dim); }
+
+/* The one bold element on this screen: every test as a tick, so the run's outcome has a shape. */
+.strip { display: flex; align-items: flex-end; gap: 2px; height: 12px; }
+/* Passing tests are the quiet majority; what did not pass stands up out of the line. */
+.tick { flex: 1 1 0; min-width: 3px; height: 5px; padding: 0; border: 0; border-radius: var(--radius-hairline); background: var(--outcome-succeeded); opacity: .45; }
+.tick:hover { opacity: 1; }
+.tick.danger, .tick.warning { height: 12px; }
+.tick.danger { background: var(--outcome-failed); opacity: 1; }
+.tick.warning { background: var(--outcome-partial); opacity: 1; }
+.tick.neutral { background: var(--outcome-unknown); }
+
+.attention { display: grid; }
+.issue {
+  width: 100%;
   padding: var(--space-3) var(--space-4);
   display: grid;
-  grid-template-columns: 7px minmax(0, 1fr) auto;
-  align-items: center;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: start;
   gap: var(--space-3);
-  border: 1px solid var(--border);
-  border-left-width: 3px;
-  border-radius: var(--radius-control);
-  background: var(--surface-2);
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
   text-align: left;
 }
-.status-row:hover { border-color: var(--border-strong); background: var(--hover); }
-.status-row.danger { border-left-color: var(--danger); }
-.status-row.warning { border-left-color: var(--warning); }
-.status-row.success { border-left-color: var(--success); }
-.status-body { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.status-body strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-body); }
-.status-body small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--text-micro); }
-/* The operation that caused the outcome leads the line, in mono, because it is data. */
-.status-body small b { margin-right: var(--space-2); color: var(--text); font-weight: var(--weight-semibold); }
-.clear {
-  padding: var(--space-3) var(--space-4);
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--success);
-  border-radius: var(--radius-control);
-  background: var(--surface-2);
-  color: var(--muted);
-  font-size: var(--text-meta);
-}
+.issue + .issue { border-top: 1px solid var(--border); }
+button.issue:hover { background: var(--hover); }
+.issue.danger { border-left-color: var(--danger); }
+.issue.warning { border-left-color: var(--warning); }
+.issue.success { border-left-color: var(--success); }
+.issue b { padding-top: 1px; color: var(--dim); font: var(--text-micro) var(--font-mono); }
+.issue-main { min-width: 0; display: grid; gap: 2px; }
+.issue-main strong { font-size: var(--text-body); }
+.issue-reason { color: var(--muted); font-size: var(--text-meta); }
+.issue-detail { overflow-wrap: anywhere; color: var(--text); font: var(--text-micro)/var(--leading) var(--font-mono); }
+.issue-kind { color: var(--muted); font-size: var(--text-micro); white-space: nowrap; }
+.issue.danger .issue-kind { color: var(--danger); }
+.issue.warning .issue-kind { color: var(--warning); }
 
-.legend { margin-right: auto; }
-.search { width: clamp(140px, 16vw, 220px); }
-.chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
-.rows { display: grid; gap: 2px; }
+.filters { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+.find { width: clamp(140px, 24cqi, 240px); }
+.legend { padding: var(--space-2) var(--space-4) 0; display: flex; flex-wrap: wrap; gap: var(--space-4); color: var(--muted); font-size: var(--text-micro); text-transform: capitalize; }
+.legend span { display: inline-flex; align-items: center; gap: var(--space-1); }
+.legend i { width: 10px; height: 4px; border-radius: var(--radius-hairline); }
 
-.outputs { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.output {
-  min-width: 240px;
-  flex: 1 1 280px;
-  padding: var(--space-3);
+.tests { padding: var(--space-2) var(--space-2) var(--space-3); display: grid; }
+.test-row {
+  width: 100%;
+  min-height: var(--row-height);
+  padding: var(--space-1) var(--space-2);
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: 22px minmax(0, 1.1fr) minmax(0, 1fr) 58px 7px;
   align-items: center;
   gap: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface-2);
+  border: 0;
+  border-radius: var(--radius-chip);
+  background: transparent;
   text-align: left;
 }
-.output:hover { border-color: var(--blueprint); background: var(--hover); }
-.output-kind { padding: 1px var(--space-2); border: 1px solid var(--border-strong); border-radius: var(--radius-chip); color: var(--muted); font-size: var(--text-micro); }
-.output-body { min-width: 0; display: flex; flex-direction: column; }
-.output-body strong, .output-body small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.output-body strong { font-size: var(--text-body); }
-.output-body small { color: var(--muted); font-size: var(--text-micro); }
+.test-row:hover { background: var(--hover); }
+.test-row b { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+.test-row.danger b { color: var(--danger); }
+.test-row.warning b { color: var(--warning); }
+.test-name { min-width: 0; display: flex; align-items: baseline; gap: var(--space-2); }
+.test-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-meta); }
+.test-name small { flex: none; color: var(--dim); font-size: var(--text-micro); }
+.bar { position: relative; height: 6px; border-radius: var(--radius-hairline); background: var(--surface-2); }
+.bar i { position: absolute; top: 0; bottom: 0; border-radius: var(--radius-hairline); }
+.duration { color: var(--muted); font-size: var(--text-micro); text-align: right; font-variant-numeric: tabular-nums; }
+
+@container (max-width: 640px) {
+  .test-row { grid-template-columns: 22px minmax(0, 1fr) 52px 7px; }
+  .bar, .test-name small { display: none; }
+  .issue { grid-template-columns: 30px minmax(0, 1fr); }
+  .issue-kind { grid-column: 2; }
+}
 </style>

@@ -61,19 +61,6 @@ public static class ProtoExecutionContextExtensions
 
         var authenticatorFactory = restState?.AuthenticatorFactory;
 
-        context.Trace.WriteEvent(
-            "rest.builder.create",
-            $"REST builder · {requested}",
-            "ProtoTest.Rest",
-            outcome: ProtoTraceOutcome.Succeeded,
-            attributes: new Dictionary<string, string?>
-            {
-                ["client.name"] = requested,
-                ["application.name"] = application,
-                ["auth.configured"] = (authenticatorFactory is not null).ToString().ToLowerInvariant(),
-                ["endpoint.resolver"] = alias is not null ? "alias" : registration is not null ? "per-test" : "client"
-            });
-
         // The builder works with the registered target name: it is the identity clients, observations,
         // and collectors agree on. The requested name is only how the caller addressed the client.
         return new RestRequestBuilder(httpClient, context, resolvedName)

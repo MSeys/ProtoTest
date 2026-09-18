@@ -9,7 +9,7 @@ title: Introduction
 
 ProtoTest is a composable integration-testing foundation for .NET. REST, GraphQL, browser automation, test data and in-process ASP.NET Core all attach to **one host, one execution context and one lifecycle** — so a test describes behaviour, and the infrastructure around it is written once and reused.
 
-:::caution Work in progress
+:::caution[Work in progress]
 ProtoTest and this documentation are under active development. APIs may still change before a first stable release, and some pages are still being written. If something looks wrong or missing, [open an issue](https://github.com/MSeys/ProtoTest/issues).
 :::
 

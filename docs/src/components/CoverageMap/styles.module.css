@@ -1,109 +1,56 @@
-.frame {
-  border-radius: 14px;
-  overflow: hidden;
-  background: var(--pt-code);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 20px 48px rgba(3, 15, 24, 0.28);
-  font-family: var(--ifm-font-family-monospace);
-}
+.headTitle { color: var(--text); font-size: var(--text-body); font-weight: var(--weight-semibold); }
+.headMeta { color: var(--dim); font: var(--text-micro) var(--font-mono); }
 
-.head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem 1.1rem;
-  background: rgba(255, 255, 255, 0.04);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.headTitle {
-  font-size: 0.78rem;
-  color: #fff;
-  font-weight: 700;
-}
-
-.headMeta {
-  font-size: 0.68rem;
-  color: rgba(255, 255, 255, 0.38);
-}
-
-.rows {
-  padding: 0.7rem 0.5rem 0.8rem;
-}
+.rows { padding: var(--space-2) 0 var(--space-3); container-type: inline-size; }
 
 .row {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.24rem 0.7rem;
-  font-size: 0.76rem;
-  color: rgba(255, 255, 255, 0.85);
+  gap: var(--space-3);
+  min-height: 26px;
+  padding: 0 var(--space-4);
 }
 
-.endpoint {
-  font-weight: 600;
-  margin-top: 0.35rem;
+/* Children hang off a drawn guide, the same branch the report and the viewer use. */
+.children {
+  margin-left: var(--space-2);
+  padding-left: var(--space-3);
+  display: grid;
+  gap: 1px;
+  border-left: 1px solid var(--border);
 }
 
-.response {
-  padding-left: 2rem;
-  color: rgba(255, 255, 255, 0.72);
-}
-
-.property {
-  padding-left: 3.4rem;
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.uncovered .label {
-  color: rgba(255, 255, 255, 0.42);
-}
-
-.mark {
-  flex: 0 0 auto;
-  width: 1em;
-}
-
-.markOk {
-  color: var(--pt-green);
-}
-
-.markMiss {
-  color: var(--pt-amber);
-}
+.dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; }
 
 .label {
   flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text);
+  font: var(--text-meta)/1.4 var(--font-mono);
 }
 
-.note {
+.noteText { flex: 0 0 auto; color: var(--dim); font: var(--text-micro) var(--font-mono); }
+
+/* Badges are the report's coverage chips: mono, square-cornered, tinted by what they say. */
+.badge {
   flex: 0 0 auto;
-  font-size: 0.68rem;
-  color: rgba(255, 255, 255, 0.32);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-chip);
+  font: var(--weight-semibold) var(--text-micro)/1.8 var(--font-mono);
+  white-space: nowrap;
 }
 
-.noteMiss {
-  color: var(--pt-amber);
-}
+.dot.covered { background: var(--success); }
+.dot.partial { background: var(--warning); }
+.dot.uncovered { background: var(--danger); }
 
-.foot {
-  padding: 0.75rem 1.1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-  font-size: 0.7rem;
-  line-height: 1.55;
-  color: rgba(255, 255, 255, 0.5);
-}
+.badge.covered { background: var(--success-soft); color: var(--success); }
+.badge.partial { background: var(--warning-soft); color: var(--warning); }
+.badge.uncovered { background: var(--danger-soft); color: var(--danger); }
 
-.foot code {
-  background: rgba(25, 168, 181, 0.16);
-  color: var(--pt-cyan);
-  border: none;
-  font-size: 0.95em;
-  padding: 0.05rem 0.3rem;
+@container (max-width: 460px) {
+  .noteText { display: none; }
 }

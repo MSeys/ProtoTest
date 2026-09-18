@@ -1,19 +1,16 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import type { ShapeMismatch } from "../model/trace-schema";
-import { buildShapeTree } from "../model/trace-shapes";
+import type { ShapeCheckNode } from "../trace/shapes";
 import ShapeResultNode from "./ShapeResultNode.vue";
 import EmptyState from "../ui/EmptyState.vue";
 
-const props = defineProps<{ matches: string[]; mismatches: ShapeMismatch[]; expected?: unknown; actual?: unknown }>();
-const nodes = computed(() => buildShapeTree(props.matches, props.mismatches, props.expected, props.actual));
+defineProps<{ nodes: ShapeCheckNode[] }>();
 </script>
 
 <template>
   <section class="shape">
     <header>
       <strong>Validated document</strong>
-      <small><b>✓</b> matched · <em>×</em> expected → actual</small>
+      <small><b>✓</b> matched <em>×</em> expected, then actual</small>
     </header>
     <div v-if="nodes.length" class="root">
       <ShapeResultNode v-for="node in nodes" :key="node.path" :node="node" />

@@ -20,6 +20,7 @@ public sealed class NorthstarTenantAttribute : ProtoAttribute
 
     public override async Task BeforeTestAsync(ProtoExecutionContext context)
     {
+        await TestSupportProbe.EnsureAvailableAsync(context);
         var name = $"northstar-{context.TestId}";
         using var response = await context.Rest()
             .WithoutAuth()

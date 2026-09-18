@@ -1,5 +1,7 @@
 namespace ProtoTest.Core.Internal;
 
+using System.Diagnostics;
+
 internal static class ProtoHostRegistry
 {
     private static readonly ProtoLock Gate = new();
@@ -38,5 +40,29 @@ internal static class ProtoHostRegistry
                     "Multiple ProtoHost instances are active. Proto.Host is only available inside a test context.")
             };
         }
+    }
+
+    /// <summary>
+    /// Finds the test trace that an application span belongs to, searching every active host. Telemetry
+    /// callbacks run outside the test's flow and may see multiple hosts, but a W3C trace id is unique,
+    /// so the search is unambiguous.
+    /// </summary>
+    public static IProtoTraceWriter? FindTraceWriter(ActivityTraceId traceId)
+    {
+        ProtoHost[] hosts;
+        lock (Gate)
+        {
+            hosts = ActiveHosts.ToArray();
+        }
+
+        foreach (var host in hosts)
+        {
+            if (host.Trace.FindWriter(traceId) is { } writer)
+            {
+                return writer;
+            }
+        }
+
+        return null;
     }
 }

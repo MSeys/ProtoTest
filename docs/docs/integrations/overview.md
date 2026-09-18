@@ -69,4 +69,5 @@ Not available yet:
 - **gRPC** — a `ProtoTest.Grpc` project exists in the repository as a placeholder; it has no implementation and isn't published.
 - **Files and documents** — starting with spreadsheets, such as Excel workbooks generated with SpreadsheetGear.
 - **Messaging** — asserting on messages published to and consumed from brokers such as RabbitMQ.
-- **Infrastructure** — starting real dependencies for a run with Testcontainers.
+
+Real dependencies ship today for PostgreSQL: `ProtoTest.Sql.Testcontainers` owns a database container for a run, and the demo suite exercises it in CI.

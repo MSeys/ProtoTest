@@ -34,18 +34,18 @@ public abstract class ProtoHttpAuthLifecycleHook(string protocolName) : IProtoTe
             ? null
             : executionContext => CreateAuthenticator(orderedAuth, executionContext));
 
-        context.Trace.WriteEvent(
-            $"{_protocolName.ToLowerInvariant()}.context.configure",
-            $"{_protocolName} auth",
-            $"ProtoTest.{_protocolName}",
-            ProtoTracePhase.Setup,
-            ProtoTraceOutcome.Succeeded,
+        context.Trace.SetEntityState(
+            ProtoTraceEntityKinds.Auth,
+            _protocolName,
+            $"{_protocolName} authentication",
             new Dictionary<string, string?>
             {
                 ["auth.source"] = methodAuth.Length > 0 ? "method" : classAuth.Length > 0 ? "class" : "none",
                 ["auth.count"] = orderedAuth.Length.ToString(),
                 ["auth.types"] = string.Join(", ", orderedAuth.Select(AuthTypeName))
-            });
+            },
+            scope: context.TestName,
+            change: "configured");
 
         return Task.CompletedTask;
     }

@@ -4,15 +4,16 @@ using ProtoTest.Core;
 
 /// <summary>
 /// Resolves and applies (or explicitly skips) authentication for one outgoing HTTP request, shared by
-/// every protocol request builder so the resolve/trace/apply sequence is written once.
+/// every protocol request builder. The outcome is an attribute of the request operation the caller owns,
+/// not a separate entry: authentication is part of the request, not a step beside it.
 /// </summary>
 public static class ProtoHttpAuthenticationApplier
 {
     /// <summary>
     /// Resolves <paramref name="authenticator"/> from <paramref name="factory"/> when not already
     /// resolved, applies it, and returns the resolved authenticator so the caller can cache it for
-    /// later requests built from the same fluent builder. Traces an "auth.skip" event instead of
-    /// "auth.apply" when no factory is configured.
+    /// later requests built from the same fluent builder. Sets <c>auth.outcome</c> and <c>auth.type</c>
+    /// on <paramref name="requestOperation"/>.
     /// </summary>
     public static async ValueTask<IProtoHttpAuthenticator?> ApplyAsync(
         Func<ProtoExecutionContext, IProtoHttpAuthenticator>? factory,
@@ -20,30 +21,23 @@ public static class ProtoHttpAuthenticationApplier
         HttpRequestMessage request,
         ProtoExecutionContext context,
         string clientName,
-        string protocolLabel,
-        string traceSource,
+        ProtoTraceOperation? requestOperation,
         CancellationToken cancellationToken)
     {
         if (factory is null)
         {
-            context.Trace.WriteEvent(
-                "auth.skip",
-                "Authentication · None",
-                traceSource,
-                outcome: ProtoTraceOutcome.Succeeded,
-                attributes: new Dictionary<string, string?> { ["client.name"] = clientName });
+            requestOperation?.SetAttribute("auth.outcome", "skipped");
             return authenticator;
         }
 
         authenticator ??= factory(context)
             ?? throw new InvalidOperationException("The authenticator factory returned null.");
 
-        await context.Trace
-            .Operation("auth.apply", $"Apply {protocolLabel} authentication", traceSource)
-            .With("client.name", clientName)
-            .With("auth.type", authenticator.GetType().FullName)
-            .RunAsync(() => authenticator.AuthenticateAsync(
-                new ProtoHttpAuthenticationContext(request, context, clientName), cancellationToken));
+        requestOperation?
+            .SetAttribute("auth.outcome", "applied")
+            .SetAttribute("auth.type", authenticator.GetType().FullName);
+        await authenticator.AuthenticateAsync(
+            new ProtoHttpAuthenticationContext(request, context, clientName), cancellationToken);
         return authenticator;
     }
 }

@@ -1,4 +1,4 @@
-import type {ComparisonFile} from '@site/src/components/Comparison';
+import type {ComparisonConcern, ComparisonFile} from '@site/src/components/Comparison';
 
 /**
  * The same scenario — a billing administrator creates an order and reconciles
@@ -164,7 +164,7 @@ public sealed class BillingTests
             .Body(new CreateOrderRequest("observability-seat", 12, 19.95m))
             .PostAsync("/api/orders");
 
-        created.ShouldHaveStatus(HttpStatusCode.Created).ShouldMatchShape(new
+        created.ShouldHaveHttpStatus(HttpStatusCode.Created).ShouldMatchShape(new
         {
             product = "observability-seat",
             quantity = 12,
@@ -175,7 +175,7 @@ public sealed class BillingTests
         using var invoices = await Proto.Context.Rest()
             .GetAsync("/api/billing/invoices", new { state = "open" });
 
-        invoices.ShouldHaveStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        invoices.ShouldHaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
         {
             state = "open",
             invoices = new[]
@@ -202,8 +202,8 @@ public sealed class Setup : ProtoTestAssembly
         builder
             .AddRest(rest => rest
                 .AddClient(SampleAppTargets.Api)
-                .WithCollector<RestCoverageCollector>()
-                .WithCollector<OpenApiCoverageCollector>())
+                .AddCollector<RestCoverageCollector>()
+                .AddCollector<OpenApiCoverageCollector>())
             .AddAspNetCoreServer<Program>(SampleAppTargets.Api)
             .ConfigureTracing(trace =>
                 trace.OutputPath = "TestResults/billing.prototrace")
@@ -231,7 +231,7 @@ public sealed class SampleEnvironmentAttribute : ProtoAttribute
             .PostAsync("/test-support/environments");
 
         var environment = response
-            .ShouldHaveStatus(HttpStatusCode.Created)
+            .ShouldHaveHttpStatus(HttpStatusCode.Created)
             .ReadAsJson<EnvironmentResponse>()!;
 
         context.SetContext(new SampleEnvironmentContext(
@@ -240,14 +240,14 @@ public sealed class SampleEnvironmentAttribute : ProtoAttribute
 
     public override async Task AfterTestAsync(ProtoExecutionContext context)
     {
-        var environment = context.TryContext<SampleEnvironmentContext>();
+        var environment = context.TryResolve<SampleEnvironmentContext>();
         if (environment is null) return;
 
         using var response = await context.Rest(SampleAppTargets.Api)
             .WithoutAuth()
             .DeleteAsync("/test-support/environments/{tenant}",
                 new { environment.Tenant });
-        response.ShouldHaveStatus(HttpStatusCode.NoContent);
+        response.ShouldHaveHttpStatus(HttpStatusCode.NoContent);
     }
 }
 
@@ -255,7 +255,7 @@ public sealed class SampleUserAttribute(string role) : ProtoAttribute
 {
     public override async Task BeforeTestAsync(ProtoExecutionContext context)
     {
-        var environment = context.Context<SampleEnvironmentContext>();
+        var environment = context.Resolve<SampleEnvironmentContext>();
         using var response = await context.Rest(SampleAppTargets.Api)
             .WithoutAuth()
             .Body(new CreateUserRequest($"{role}.{context.TestId}@example.test", role))
@@ -263,7 +263,7 @@ public sealed class SampleUserAttribute(string role) : ProtoAttribute
                 new { environment.Tenant });
 
         var user = response
-            .ShouldHaveStatus(HttpStatusCode.Created)
+            .ShouldHaveHttpStatus(HttpStatusCode.Created)
             .ReadAsJson<UserResponse>()!;
 
         context.SetContext(new SampleUserContext(
@@ -277,8 +277,8 @@ public sealed class SampleUserAuthenticator : IProtoHttpAuthenticator
         ProtoHttpAuthenticationContext context,
         CancellationToken cancellationToken = default)
     {
-        var environment = context.Test.Context<SampleEnvironmentContext>();
-        var user = context.Test.Context<SampleUserContext>();
+        var environment = context.Test.Resolve<SampleEnvironmentContext>();
+        var user = context.Test.Resolve<SampleUserContext>();
 
         context.Request.Headers.Authorization =
             new AuthenticationHeaderValue("Bearer", user.AccessToken);
@@ -295,7 +295,27 @@ export const withoutProtoTest: ComparisonFile[] = [
     note: 'The fixture wires up the app, the client, authentication and cleanup itself — and the next fixture will do it again.',
     infrastructureLines: [
       1, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 20, 21, 22, 23, 24, 26, 27, 28, 29, 31,
-      32, 33, 34, 35, 36, 38, 39, 43, 50, 52, 53, 58, 64, 66, 67, 73, 74, 75,
+      32, 33, 34, 35, 36, 38, 39, 50, 64, 75,
+    ],
+    folds: [
+      {
+        line: 23,
+        label: 'Environments.CreateAsync',
+        source: 'TestSupport.cs',
+        from: 12,
+        to: 21,
+        summary: 'Creates a tenant by calling the app’s test-support endpoint.',
+        reuse: 'called from every fixture',
+      },
+      {
+        line: 24,
+        label: 'Users.CreateAsync',
+        source: 'TestSupport.cs',
+        from: 33,
+        to: 42,
+        summary: 'Creates a user over HTTP, with a client of its own.',
+        reuse: 'called from every fixture',
+      },
     ],
   },
   {
@@ -323,14 +343,54 @@ export const withProtoTest: ComparisonFile[] = [
     code: withTest,
     scope: 'test',
     note: 'Three attributes replace the setup and teardown. Adding another fixture costs those three lines.',
-    infrastructureLines: [1, 3, 4, 5, 6, 7, 12, 13, 17, 23, 28, 34, 37, 39, 40, 41, 42],
+    infrastructureLines: [1, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 15, 42],
+    folds: [
+      {
+        line: 9,
+        label: '[RestClient]',
+        source: 'Setup.cs',
+        from: 15,
+        to: 18,
+        summary: 'Registers the client and its collectors once, for the whole suite.',
+        reuse: 'written once',
+      },
+      {
+        line: 10,
+        label: '[SampleEnvironment]',
+        source: 'Scenario.cs',
+        from: 9,
+        to: 39,
+        summary: 'Provisions a tenant before the test and deletes it in teardown.',
+        reuse: 'composed onto any test',
+      },
+      {
+        line: 11,
+        label: '[Auth<SampleUserAuthenticator>]',
+        source: 'Scenario.cs',
+        from: 61,
+        to: 75,
+        summary: 'Attaches the signed-in user to every request.',
+        reuse: 'composed onto any test',
+      },
+      {
+        line: 15,
+        label: '[SampleUser]',
+        source: 'Scenario.cs',
+        from: 41,
+        to: 59,
+        summary: 'Creates a user with the role this test asks for.',
+        reuse: 'composed onto any test',
+      },
+    ],
   },
   {
     filename: 'Setup.cs',
     code: withSetup,
     scope: 'suite',
     note: 'One host for the whole suite — and where the trace, the contract coverage and the HTML report come from.',
-    infrastructureLines: [1, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 24],
+    infrastructureLines: [
+      1, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+    ],
   },
   {
     filename: 'Scenario.cs',
@@ -338,8 +398,142 @@ export const withProtoTest: ComparisonFile[] = [
     scope: 'suite',
     note: 'This is where the setup went: capabilities written once, then composed onto any test as attributes.',
     infrastructureLines: [
-      1, 3, 4, 5, 6, 7, 9, 10, 13, 14, 26, 28, 29, 38, 39, 41, 42, 43, 44, 58, 59, 61, 62, 63, 64,
-      65, 66, 74, 75,
+      1, 3, 4, 5, 6, 7, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28, 29,
+      30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
+      54, 55, 56, 57, 58, 59, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75,
     ],
+  },
+];
+
+/**
+ * The same comparison, task by task: what a fixture has to do, the lines each side spends on it and where
+ * those lines live. Ranges are 1-based and inclusive, into the files above; the fixture file of each side is
+ * what a new test pays again, every other file is written once.
+ */
+export const comparisonConcerns: ComparisonConcern[] = [
+  {
+    id: 'host',
+    task: 'Run the application in-process',
+    without: {
+      summary: 'A WebApplicationFactory per fixture, created and disposed by hand.',
+      slices: [{file: 'BillingTests.cs', ranges: [[11, 11], [16, 18], [38, 39]]}],
+    },
+    with: {
+      home: 'suite host',
+      summary: 'Registered once for the suite. Every test gets the running app.',
+      slices: [{file: 'Setup.cs', ranges: [[19, 19]]}],
+    },
+  },
+  {
+    id: 'tenant',
+    task: 'A tenant of its own',
+    without: {
+      summary: 'A field, a SetUp call and an HTTP helper with its own client.',
+      slices: [
+        {file: 'BillingTests.cs', ranges: [[13, 13], [23, 23]]},
+        {file: 'TestSupport.cs', ranges: [[12, 21]]},
+      ],
+    },
+    with: {
+      home: 'attribute',
+      summary: '[SampleEnvironment] provisions it before the test and hands it to the context.',
+      slices: [
+        {file: 'BillingTests.cs', ranges: [[10, 10]]},
+        {file: 'Scenario.cs', ranges: [[9, 26]]},
+      ],
+    },
+  },
+  {
+    id: 'user',
+    task: 'A user with the right role',
+    without: {
+      summary: 'Created in SetUp, so every test in the fixture gets the same role.',
+      slices: [
+        {file: 'BillingTests.cs', ranges: [[14, 14], [24, 24]]},
+        {file: 'TestSupport.cs', ranges: [[33, 42]]},
+      ],
+    },
+    with: {
+      home: 'attribute',
+      summary: 'The role is declared on the test that needs it.',
+      slices: [
+        {file: 'BillingTests.cs', ranges: [[15, 15]]},
+        {file: 'Scenario.cs', ranges: [[41, 59]]},
+      ],
+    },
+  },
+  {
+    id: 'auth',
+    task: 'Authenticate every request',
+    without: {
+      summary: 'Default headers on one HttpClient shared by the whole fixture.',
+      slices: [{file: 'BillingTests.cs', ranges: [[12, 12], [26, 28]]}],
+    },
+    with: {
+      home: 'authenticator',
+      summary: 'Applied per request from the test’s own context, so parallel tests never share a header.',
+      slices: [
+        {file: 'BillingTests.cs', ranges: [[9, 9], [11, 11]]},
+        {file: 'Scenario.cs', ranges: [[61, 75]]},
+      ],
+    },
+  },
+  {
+    id: 'calls',
+    task: 'Make the calls',
+    without: {
+      summary: 'HttpClient calls, with the query string written into the route.',
+      slices: [{file: 'BillingTests.cs', ranges: [[44, 46], [60, 60]]}],
+    },
+    with: {
+      home: 'the test',
+      summary: 'The fluent client. Routes, parameters and bodies are recorded in the trace.',
+      slices: [{file: 'BillingTests.cs', ranges: [[18, 20], [30, 31]]}],
+    },
+  },
+  {
+    id: 'assert',
+    task: 'Check the responses',
+    without: {
+      summary: 'Deserialize into DTOs written for the purpose, then assert field by field.',
+      slices: [
+        {file: 'BillingTests.cs', ranges: [[48, 48], [50, 58], [62, 62], [64, 73]]},
+        {file: 'Dtos.cs', ranges: [[3, 13]]},
+      ],
+    },
+    with: {
+      home: 'the test',
+      summary: 'The expected shape is the assertion. No DTOs, and a mismatch lists every property that differs.',
+      slices: [{file: 'BillingTests.cs', ranges: [[22, 28], [33, 40]]}],
+    },
+  },
+  {
+    id: 'cleanup',
+    task: 'Clean up, even when the test fails',
+    without: {
+      summary: 'TearDown disposes the client and deletes the tenant — if SetUp got that far.',
+      slices: [
+        {file: 'BillingTests.cs', ranges: [[31, 36]]},
+        {file: 'TestSupport.cs', ranges: [[23, 28]]},
+      ],
+    },
+    with: {
+      home: 'attribute teardown',
+      summary: 'The attribute that created the tenant deletes it. Teardown runs in reverse order and is traced.',
+      slices: [{file: 'Scenario.cs', ranges: [[28, 38]]}],
+    },
+  },
+  {
+    id: 'diagnose',
+    task: 'Find out what happened',
+    without: {
+      summary: 'Whatever the assertion message says, and the console output.',
+      slices: [],
+    },
+    with: {
+      home: 'suite host',
+      summary: 'Every step, request and assertion lands in a .prototrace and an HTML report, with contract coverage.',
+      slices: [{file: 'Setup.cs', ranges: [[17, 23]]}],
+    },
   },
 ];

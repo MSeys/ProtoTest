@@ -36,13 +36,10 @@ public sealed class ApplicationRestTests
         context.Rest();
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
-        var entry = host.Trace.Snapshot().Tests.Single().Entries
-            .Single(item => item.Kind == "rest.builder.create");
-        Assert.Multiple(() =>
-        {
-            Assert.That(entry.Attributes["client.name"], Is.EqualTo("Billing"));
-            Assert.That(entry.Attributes["application.name"], Is.EqualTo("ControlPlane"));
-        });
+        var client = host.Trace.Snapshot().Tests.Single().Entities!
+            .Single(entity => entity.Kind == ProtoTraceEntityKinds.Client
+                && entity.Id.EndsWith("ControlPlane:Billing", StringComparison.Ordinal));
+        Assert.That(client.Versions, Is.Not.Empty);
     }
 
     [Test]
@@ -63,9 +60,10 @@ public sealed class ApplicationRestTests
         context.Rest("Orders");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
-        var entry = host.Trace.Snapshot().Tests.Single().Entries
-            .Single(item => item.Kind == "rest.builder.create");
-        Assert.That(entry.Attributes["client.name"], Is.EqualTo("Orders"));
+        var client = host.Trace.Snapshot().Tests.Single().Entities!
+            .Single(entity => entity.Kind == ProtoTraceEntityKinds.Client
+                && entity.Id.EndsWith("ControlPlane:Orders", StringComparison.Ordinal));
+        Assert.That(client.Versions, Is.Not.Empty);
     }
 
     private static MethodInfo TestMethod()

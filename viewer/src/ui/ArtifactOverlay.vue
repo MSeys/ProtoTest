@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import type { TraceArtifact } from "../model/trace-schema";
+import type { Artifact as TraceArtifact } from "../trace/model";
 import ArtifactView from "./ArtifactView.vue";
 import AppButton from "./AppButton.vue";
 
@@ -20,14 +20,14 @@ watch(() => props.artifact?.id, id => {
 
 <template>
   <dialog ref="dialog" class="overlay" aria-label="Artifact" @close="emit('close')" @click.self="emit('close')">
+    <!-- One header, one scroller: the artifact's own title and actions head the sheet, and the preview under
+         them is the only thing that scrolls. -->
     <div v-if="artifact" class="sheet">
-      <header>
-        <span class="eyebrow">Bundled output</span>
-        <AppButton variant="icon" label="Close artifact" @click="emit('close')">×</AppButton>
-      </header>
-      <div class="body">
-        <ArtifactView :artifact="artifact" :read-artifact="readArtifact" />
-      </div>
+      <ArtifactView :artifact="artifact" :read-artifact="readArtifact" fill>
+        <template #actions>
+          <AppButton variant="icon" label="Close artifact" @click="emit('close')">×</AppButton>
+        </template>
+      </ArtifactView>
     </div>
   </dialog>
 </template>
@@ -35,24 +35,17 @@ watch(() => props.artifact?.id, id => {
 <style scoped>
 .overlay {
   width: min(1040px, calc(100vw - var(--space-7)));
+  height: min(86dvh, 900px);
   max-width: none;
-  max-height: min(86dvh, 900px);
+  max-height: none;
   padding: 0;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-overlay);
   background: var(--surface);
   color: var(--text);
   box-shadow: var(--elevation-overlay);
+  overflow: hidden;
 }
 .overlay::backdrop { background: color-mix(in srgb, var(--pt-navy-abyss) 72%, transparent); }
-.sheet { display: grid; grid-template-rows: auto minmax(0, 1fr); max-height: inherit; }
-header {
-  padding: var(--space-3) var(--space-5);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  border-bottom: 1px solid var(--border);
-}
-.body { min-height: 0; padding: var(--space-5); overflow: auto; }
+.sheet { height: 100%; padding: var(--space-4) var(--space-5) var(--space-5); }
 </style>

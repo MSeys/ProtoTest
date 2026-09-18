@@ -30,7 +30,7 @@ public sealed class SqlIsolationTests
     public void TearDown() => _keeper.Dispose();
 
     [Test]
-    public async Task RawCommands_ShouldRollBackWithTransactionPerTest()
+    public async Task RawCommands_ShouldRollBackWithTransaction()
     {
         // Arrange
         await using var host = CreateHost();
@@ -125,7 +125,41 @@ public sealed class SqlIsolationTests
         await host.StopAsync();
     }
 
-    private static ProtoHost CreateHost(SqlIsolation isolation = SqlIsolation.TransactionPerTest)
+    [Test]
+    public async Task Transaction_ShouldFailAtRunStartWhenAnApplicationIsNotDeclaredAsSharing()
+    {
+        // Arrange
+        await using var host = new ProtoHostBuilder()
+            .AddApplication("TestApp", _ => { })
+            .AddSql(_ => new SqliteConnection(ConnectionString))
+            .Build();
+
+        // Act
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync());
+
+        // Assert
+        Assert.That(exception!.Message, Does.Contain("ShareConnectionWith"));
+    }
+
+    [Test]
+    public async Task Transaction_ShouldStartWhenEveryApplicationIsDeclaredAsSharing()
+    {
+        // Arrange
+        await using var host = new ProtoHostBuilder()
+            .AddApplication("TestApp", _ => { })
+            .AddSql(_ => new SqliteConnection(ConnectionString), sql => sql.ShareConnectionWith("TestApp"))
+            .Build();
+
+        // Act
+        await host.StartAsync();
+
+        // Assert
+        Assert.That(host.Trace.Snapshot().RunId, Is.Not.Empty);
+
+        await host.StopAsync();
+    }
+
+    private static ProtoHost CreateHost(SqlIsolation isolation = SqlIsolation.Transaction)
         => new ProtoHostBuilder()
             .AddSql(_ => new SqliteConnection(ConnectionString), sql => sql.Isolation = isolation)
             .AddEntityFrameworkCore<WidgetDbContext>((services, options) =>

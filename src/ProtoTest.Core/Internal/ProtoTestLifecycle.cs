@@ -29,6 +29,9 @@ internal sealed class ProtoTestLifecycle
     public static ProtoExecutionContext CurrentContext => Current.Value?.Context
         ?? throw new InvalidOperationException("No active ProtoExecutionContext available on this thread.");
 
+    /// <summary>Gets the current test context, or <see langword="null"/> when none is active on this flow.</summary>
+    public static ProtoExecutionContext? TryGetCurrentContext => Current.Value?.Context;
+
     public static ProtoHost? CurrentHost => Current.Value?.Host;
 
     public Task<ProtoExecutionContext> StartAsync(

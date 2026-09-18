@@ -25,6 +25,16 @@ export function useColumnResize(
   let origin = 0;
   let originWidth = 0;
 
+  // The column is the nearest sibling that takes up room: a hidden control between them (the sheet's grabber
+  // on a wide screen) must not be measured as the column, or the drag starts from zero and jumps.
+  function visibleSibling(element: HTMLElement, direction: "previous" | "next"): HTMLElement | null {
+    let sibling = direction === "previous" ? element.previousElementSibling : element.nextElementSibling;
+    while (sibling && (sibling as HTMLElement).getBoundingClientRect().width === 0) {
+      sibling = direction === "previous" ? sibling.previousElementSibling : sibling.nextElementSibling;
+    }
+    return sibling as HTMLElement | null;
+  }
+
   function clamp(value: number): number {
     return Math.min(options.max, Math.max(options.min, value));
   }
@@ -45,8 +55,7 @@ export function useColumnResize(
   }
 
   function start(event: PointerEvent) {
-    const column = (event.currentTarget as HTMLElement).previousElementSibling as HTMLElement | null;
-    const neighbour = options.edge === "leading" ? column : (event.currentTarget as HTMLElement).nextElementSibling as HTMLElement | null;
+    const neighbour = visibleSibling(event.currentTarget as HTMLElement, options.edge === "leading" ? "previous" : "next");
     origin = event.clientX;
     originWidth = neighbour?.getBoundingClientRect().width ?? options.min;
     document.body.classList.add("is-resizing");

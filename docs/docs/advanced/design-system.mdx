@@ -1,0 +1,125 @@
+---
+sidebar_position: 7
+title: Design system
+description: The one visual language ProtoTrace, the HTML report and these docs share, and how to use it in your own sinks and entry kinds.
+---
+
+import {BrandMarks, Outcomes, Phases, Swatches, TypeFamilies, TypeScale} from '@site/src/components/DesignTokens';
+
+# Design system
+
+ProtoTest has three surfaces people read: the [ProtoTrace viewer](./prototrace.md), the
+[HTML report](./reporting.md) and these docs. They share **one** stylesheet of design tokens,
+`design/prototest-tokens.css` at the root of the repository. There are no copies:
+
+| Surface | How it gets the tokens |
+| --- | --- |
+| ProtoTrace viewer | imports the file directly |
+| HTML report sink | embeds the file into every report it writes |
+| Documentation | imports the file at the top of its theme |
+
+Every swatch on this page is drawn from that file, so this page is also a live check that the tokens
+render the way this page describes them.
+
+## Two surfaces
+
+The same tokens resolve differently on two surfaces, chosen with `data-theme` on `<html>`:
+
+- **Technical paper**, the light surface. It is the default for these docs.
+- **Execution blueprint**, the dark surface. It is the default for the viewer and the report.
+
+Switch the theme of this site to see the blueprint values.
+
+<Swatches tokens={['--bg', '--surface', '--surface-2', '--hover', '--surface-sunken']} />
+
+Colour carries meaning and nothing else:
+
+<Swatches tokens={['--blueprint', '--success', '--warning', '--danger', '--violet', '--muted']} />
+
+## The execution vocabulary
+
+These tokens describe a test run rather than a page. Anything that draws a ProtoTest execution uses
+them, so a phase, an outcome or an entry kind looks the same everywhere.
+
+### Phases
+
+Each test runs through up to four phases, in this order:
+
+<Phases />
+
+### Outcomes
+
+An outcome is always a dot **and** a word, never colour alone:
+
+<Outcomes />
+
+### Entry types
+
+Each trace entry belongs to one of four families. The chip's label names the specific kind; the colour
+only separates the families.
+
+<TypeFamilies />
+
+An entry kind ProtoTrace has never seen — your own
+`Proto.Context.Trace.Operation("billing.webhook.deliver", …)`, say — is drawn as an **action**, exactly like a
+built-in call. Your integration's operations are as visible
+as ProtoTest's.
+
+## Typography
+
+| Face | Used for |
+| --- | --- |
+| Space Grotesk | Headings and the wordmark |
+| Manrope | Everything a person reads |
+| JetBrains Mono | Data: durations, ids, kinds, routes, attribute values, code |
+
+<TypeScale />
+
+Nothing is set below 10px.
+
+## Spacing, radii and motion
+
+- **Spacing:** seven steps, `--space-1` (4px) to `--space-7` (32px). Padding, gaps and margins use these
+  steps, never raw pixels. The only exception is a 1–2px hairline.
+- **Radii:** a radius names what a thing is.
+  - `--radius-chip` (4px) for chips
+  - `--radius-control` (7px) for buttons and inputs
+  - `--radius-panel` (10px) for panels
+  - `--radius-overlay` (14px) for dialogs and sheets
+  - `--radius-pill` for filter chips
+  - `--radius-hairline` for small markers and bars
+- **Elevation:** a single shadow, `--elevation-overlay`, used only by things that float. Panels have a
+  border and no shadow.
+- **Motion:** `--motion-fast` for state changes, `--motion-slow` for layout changes. Both drop to zero
+  when the reader asks the operating system to reduce motion.
+
+## The mark
+
+There is one mark geometry, and it is never redrawn or simplified. The surface decides its colours
+through `--brand-mark-body` and `--brand-mark-check`, so pages that inline the SVG get the right mark on
+either theme without swapping files.
+
+<BrandMarks />
+
+A favicon is an image, so it can't read the page's theme. The viewer's and the report's favicons carry
+their own `prefers-color-scheme` rule and follow the operating system instead.
+
+## Using the tokens yourself
+
+If you write your own [report sink](./reporting.md) or render trace data somewhere else, start from the
+same file rather than copying colours out of it:
+
+```html
+<style>
+  /* design/prototest-tokens.css, embedded or linked */
+</style>
+<html data-theme="dark">
+  …
+  <span class="outcome" style="color: var(--outcome-failed)">Failed</span>
+  <i style="background: var(--phase-execution)"></i>
+</html>
+```
+
+The viewer enforces this with a style lint that runs in its build. It rejects raw colours, spacing off the
+scale, and radii that are not tokens. The HTML report's tests check that it embeds the shared file rather
+than a palette of its own.

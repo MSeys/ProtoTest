@@ -1,198 +1,129 @@
+/* The home page is the marketing surface: fluid type, intrinsic columns, section rhythm built from the
+   spacing scale. Every value is a token; the hero opts into the blueprint surface in the markup. */
+
 .hero {
   position: relative;
   overflow: hidden;
-  padding: 5rem 0 4.5rem;
+  padding: calc(var(--space-7) * 2.5) 0 calc(var(--space-7) * 2.25);
+  border-bottom: 1px solid var(--border-strong);
   background:
-    radial-gradient(circle at 72% 38%, rgba(25, 168, 181, 0.16), transparent 42%),
-    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 20px 20px,
-    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 20px 20px,
+    radial-gradient(circle at 72% 38%, color-mix(in srgb, var(--pt-cyan) 16%, transparent), transparent 42%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
     var(--pt-navy-deep);
-  color: #fff;
+  color: var(--text);
 }
 
 .eyebrow {
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  margin-bottom: var(--space-5);
   color: var(--pt-cyan);
-  margin-bottom: 1rem;
+  font: var(--weight-semibold) var(--text-meta) var(--font-mono);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
 }
 
 .heroInner {
-  display: grid;
-  grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
-  gap: 3rem;
-  align-items: center;
   position: relative;
   z-index: 2;
-}
-
-@media (max-width: 996px) {
-  .heroInner {
-    grid-template-columns: 1fr;
-    gap: 2.25rem;
-  }
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr));
+  gap: calc(var(--space-7) * 1.5);
+  align-items: center;
 }
 
 .heroTitle {
-  font-size: 3rem;
+  margin-bottom: var(--space-5);
+  color: var(--pt-white);
+  font-size: clamp(2.25rem, 4.5vw, 3.25rem);
   line-height: 1.04;
-  letter-spacing: -0.03em;
-  color: #fff;
-  margin-bottom: 1.1rem;
-}
-
-@media (max-width: 600px) {
-  .heroTitle {
-    font-size: 2.25rem;
-  }
+  letter-spacing: var(--tracking-display);
 }
 
 .heroLead {
-  font-size: 1.08rem;
-  line-height: 1.62;
-  color: rgba(255, 255, 255, 0.78);
   max-width: 48ch;
-  margin-bottom: 2rem;
+  margin-bottom: var(--space-7);
+  color: var(--muted);
+  font-size: clamp(1rem, 1.1vw, 1.08rem);
+  line-height: 1.62;
 }
 
-.heroButtons {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+.heroButtons { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.heroButtonsCenter { justify-content: center; }
+
+/* The viewer's button roles, scaled for a page CTA. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 var(--space-6);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  font: var(--weight-semibold) var(--text-strong) var(--font-ui);
+  white-space: nowrap;
+  transition: background var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease);
 }
 
-.btnPrimary {
-  background: var(--pt-cyan);
-  color: #05222c;
-  border: none;
-  font-weight: 700;
-}
+.btnPrimary { background: var(--blueprint); color: var(--bg); font-weight: var(--weight-bold); }
+.btnPrimary:hover { background: color-mix(in srgb, var(--blueprint) 85%, white); color: var(--bg); }
 
-.btnPrimary:hover {
-  background: #22b9c7;
-  color: #05222c;
-}
+.btnSecondary { border-color: var(--border-strong); background: var(--surface-2); color: var(--text); }
+.btnSecondary:hover { border-color: var(--blueprint); color: var(--text); }
 
-.btnGhost {
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: #fff;
-}
+.section { padding: calc(var(--space-7) * 2) 0; }
+.sectionAlt { background: var(--surface); }
 
-.btnGhost:hover {
-  border-color: rgba(255, 255, 255, 0.5);
-  color: #fff;
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.section {
-  padding: 5rem 0;
-}
-
-.sectionAlt {
-  background: var(--surface);
-}
-
-.sectionHead {
-  max-width: 720px;
-  margin: 0 auto 3rem;
-  text-align: center;
-}
+.sectionHead { max-width: 720px; margin: 0 auto var(--space-7); text-align: center; }
 
 .sectionHead h2 {
-  font-size: 2rem;
-  margin-bottom: 0.75rem;
-  letter-spacing: -0.025em;
+  margin-bottom: var(--space-3);
+  font-size: clamp(1.6rem, 2.4vw, 2rem);
+  letter-spacing: var(--tracking-display);
 }
 
-.sectionHead p {
-  color: var(--muted);
-  font-size: 1.05rem;
-  line-height: 1.62;
-}
+.sectionHead p { color: var(--muted); font-size: clamp(1rem, 1.1vw, 1.05rem); line-height: 1.62; }
 
-.honestyNote {
-  margin: 1.75rem auto 0;
-  max-width: 760px;
-  text-align: center;
-  font-size: 0.92rem;
-  color: var(--muted);
-  line-height: 1.62;
-}
-
-.honestyNote code {
-  font-size: 0.85em;
-}
-
-/* Feature rows: copy beside a live visual */
-
+/* Feature rows: copy beside a live visual. The row is its own container, so the alternation flips on the
+   row's width rather than the viewport's. */
 .featureRow {
+  container-type: inline-size;
   display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-  gap: 3rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  gap: calc(var(--space-7) * 1.25);
   align-items: center;
-  margin-bottom: 4rem;
 }
 
-.featureRow:last-child {
-  margin-bottom: 0;
-}
+.featureRow + .featureRow { margin-top: calc(var(--space-7) * 2); }
+.featureRowReverse > *:first-child { order: 2; }
 
-.featureRowReverse > *:first-child {
-  order: 2;
-}
-
-@media (max-width: 900px) {
-  .featureRow {
-    grid-template-columns: 1fr;
-    gap: 1.75rem;
-  }
-
-  .featureRowReverse > *:first-child {
-    order: 0;
-  }
+@container (max-width: 46rem) {
+  .featureRowReverse > *:first-child { order: 0; }
 }
 
 .featureCopy h3 {
-  font-size: 1.45rem;
-  letter-spacing: -0.02em;
-  margin-bottom: 0.85rem;
+  margin-bottom: var(--space-3);
+  font-size: clamp(1.2rem, 1.8vw, 1.45rem);
+  letter-spacing: var(--tracking-display);
 }
 
-.featureCopy p {
-  color: var(--muted);
-  line-height: 1.65;
-  margin-bottom: 0.85rem;
-}
+.featureCopy p { margin-bottom: var(--space-3); color: var(--muted); line-height: 1.65; }
 
-.featureLink {
-  display: inline-block;
-  font-weight: 600;
-  margin-top: 0.35rem;
-}
+.featureLink { display: inline-block; margin-top: var(--space-2); font-weight: var(--weight-semibold); }
 
+/* The closing CTA is a quiet panel: the hero spent the boldness. */
 .ctaBanner {
-  border-radius: 18px;
-  padding: 3.5rem 2.5rem;
+  padding: calc(var(--space-7) * 2) var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
   text-align: center;
-  background:
-    radial-gradient(circle at 30% 30%, rgba(25, 168, 181, 0.18), transparent 45%),
-    var(--pt-navy-deep);
-  color: #fff;
 }
 
-.ctaBanner h2 {
-  color: #fff;
-  font-size: 2rem;
-  margin-bottom: 0.75rem;
-}
+.ctaBanner h2 { margin-bottom: var(--space-3); font-size: clamp(1.6rem, 2.4vw, 2rem); }
 
 .ctaBanner p {
-  color: rgba(255, 255, 255, 0.75);
-  margin-bottom: 1.75rem;
   max-width: 54ch;
-  margin-left: auto;
-  margin-right: auto;
+  margin: 0 auto var(--space-6);
+  color: var(--muted);
 }

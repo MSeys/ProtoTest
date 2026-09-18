@@ -1,0 +1,279 @@
+/* The report speaks the ProtoTrace viewer's grammar: the same tokens, panels, chips, pills, rows and
+   brand mark. Every value comes from design/prototest-tokens.css, embedded above this sheet. */
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  color: var(--text);
+  font: var(--text-body)/var(--leading) var(--font-ui);
+  background-color: var(--bg);
+  background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: var(--grid-size) var(--grid-size);
+  -webkit-font-smoothing: antialiased;
+}
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { min-height: 36px; border: 2px solid transparent; border-radius: var(--radius-chip); background: var(--border-strong); background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background-color: var(--blueprint); }
+*::-webkit-scrollbar-corner { background: transparent; }
+button, input { color: inherit; font: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--blueprint); outline-offset: 2px; border-radius: var(--radius-chip); }
+h1, h2, h3 { margin: 0; font-family: var(--font-display); font-weight: var(--weight-bold); letter-spacing: -.01em; }
+p { margin: 0; }
+.eyebrow { margin: 0; color: var(--dim); font-size: var(--text-meta); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; }
+
+/* ── Header: the viewer's header, with the report's own search ─────────────────────────────── */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  min-height: 56px;
+  padding: var(--space-3) clamp(12px, 2vw, 24px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.brand { min-width: 0; display: flex; align-items: center; gap: var(--space-3); }
+.brand-mark { width: 32px; height: 32px; flex: none; display: block; }
+.brand-mark svg { width: 100%; height: 100%; display: block; overflow: visible; }
+/* One mark, coloured by the surface: navy on paper, paper on the blueprint. */
+.brand-mark svg path:nth-of-type(1) { fill: var(--brand-mark-body); }
+.brand-mark svg path:nth-of-type(2) { fill: var(--brand-mark-check); }
+.brand > span:last-child { min-width: 0; display: flex; flex-direction: column; line-height: var(--leading-tight); }
+.brand strong { font-family: var(--font-display); font-size: var(--text-title); letter-spacing: .01em; }
+.brand small { color: var(--dim); font-size: var(--text-micro); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; }
+.run-state { justify-self: center; }
+/* An outcome is a dot and a word, as in the viewer: no pill, no glow. */
+.state-pill { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--success); font-size: var(--text-meta); font-weight: var(--weight-semibold); white-space: nowrap; }
+.state-pill i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.state-pill.attention { color: var(--danger); }
+.top-actions { justify-self: end; display: flex; align-items: center; gap: var(--space-3); }
+.search {
+  width: 260px;
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  color: var(--dim);
+}
+.search:hover { border-color: var(--border-strong); }
+.search:focus-within { border-color: var(--blueprint); box-shadow: 0 0 0 3px var(--blueprint-soft); }
+.search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--text); font-size: var(--text-meta); }
+.search input::placeholder { color: var(--dim); }
+.search kbd { padding: 0 var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-chip); color: var(--muted); font: var(--text-micro) var(--font-mono); }
+.icon-button {
+  width: var(--control-height);
+  height: var(--control-height);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--text-title);
+  line-height: 1;
+}
+.icon-button:hover { border-color: var(--blueprint); }
+/* The viewer's theme icons: the sun offers daylight on the blueprint, the moon offers the blueprint on paper. */
+.icon-button svg { display: block; }
+:root[data-theme="dark"] .icon-moon, :root[data-theme="light"] .icon-sun { display: none; }
+
+/* ── Run heading and metrics ────────────────────────────────────────────────────────────────── */
+main { width: min(1240px, 100% - var(--space-7)); margin: 0 auto var(--space-7); display: grid; gap: var(--space-4); }
+.hero { padding-top: var(--space-6); display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-5); }
+.hero h1 { margin: var(--space-1) 0; font-size: var(--text-display); letter-spacing: var(--tracking-display); }
+.generated { color: var(--muted); font: var(--text-body) var(--font-mono); }
+.coverage-ring {
+  --coverage: 0;
+  width: 84px;
+  height: 84px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(var(--success) calc(var(--coverage) * 1%), var(--surface-2) 0);
+}
+.coverage-ring::before { content: ""; position: absolute; inset: 6px; border-radius: inherit; background: var(--bg); }
+.coverage-ring span, .coverage-ring em { position: relative; z-index: 1; }
+.coverage-ring span { margin-top: -10px; font: var(--weight-bold) var(--text-title)/1 var(--font-mono); }
+.coverage-ring small { color: var(--muted); font-size: var(--text-meta); }
+.coverage-ring em { position: absolute; top: 48px; color: var(--dim); font-size: var(--text-micro); font-style: normal; letter-spacing: .08em; text-transform: uppercase; }
+/* The viewer's metric tile: label, a mono value coloured only when it means something, a caption. */
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-2); }
+.metric { min-width: 0; min-height: 52px; padding: var(--space-2) var(--space-4); display: grid; gap: 1px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); }
+.metric > span { color: var(--muted); font-size: var(--text-meta); }
+.metric > strong { font: var(--weight-bold) var(--text-title) var(--font-mono); }
+.metric > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); font-size: var(--text-micro); }
+.metric.success > strong { color: var(--success); }
+.metric.warning > strong { color: var(--warning); }
+.metric.danger > strong { color: var(--danger); }
+.metric.accent > strong { color: var(--blueprint); }
+/* A zero is not a warning: colour only numbers that carry news. */
+.metric > strong:is(:empty, [data-zero]) { color: var(--text); }
+
+/* ── The panel, its toolbar and the filter chips ────────────────────────────────────────────── */
+.report-panel { border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); overflow: hidden; }
+.panel-toolbar {
+  min-height: var(--panel-head-height);
+  padding: var(--space-2) var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+.panel-toolbar > div:first-child { display: flex; align-items: baseline; gap: var(--space-3); }
+.panel-toolbar h2 { font-family: var(--font-ui); font-size: var(--text-strong); }
+.panel-toolbar #resultCount { color: var(--muted); font: var(--text-micro) var(--font-mono); }
+.filters { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.filter {
+  height: 24px;
+  padding: 0 var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-micro);
+  transition: border-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+.filter:hover { border-color: var(--border-strong); color: var(--text); }
+.filter.active { border-color: var(--blueprint); background: var(--blueprint-soft); color: var(--text); font-weight: var(--weight-bold); }
+.filter.active[data-filter="covered"] { border-color: var(--success-line); background: var(--success-soft); }
+.filter.active[data-filter="partial"], .filter.active[data-filter="warning"] { border-color: var(--warning-line); background: var(--warning-soft); }
+.filter.active[data-filter="uncovered"], .filter.active[data-filter="error"] { border-color: var(--danger-line); background: var(--danger-soft); }
+
+/* ── Sections: a heading per kind of result, as the viewer heads its phases ─────────────────── */
+.report-list { padding: 0 var(--space-3) var(--space-4); }
+.report-section[hidden] { display: none; }
+.report-section + .report-section { margin-top: var(--space-5); }
+.section-head {
+  position: sticky;
+  top: 56px;
+  z-index: 1;
+  padding: var(--space-2);
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.section-head i { width: 8px; height: 8px; border-radius: var(--radius-hairline); background: var(--dim); }
+.section-head h3 { color: var(--muted); font-family: var(--font-ui); font-size: var(--text-micro); letter-spacing: .08em; text-transform: uppercase; }
+.section-head .section-count { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+.report-section[data-kind=coverage] .section-head i { background: var(--type-evidence); }
+.report-section[data-kind=finding] .section-head i { background: var(--type-finding); }
+.report-section[data-kind=gate] .section-head i { background: var(--type-gate); }
+.report-section[data-kind=metric] .section-head i { background: var(--type-data); }
+.report-section[data-kind=observation] .section-head i { background: var(--type-observation); }
+.report-section > .report-item.root:first-of-type { margin-top: var(--space-2); }
+
+/* ── Items: rows, with the viewer's expander, status dot and chips ──────────────────────────── */
+.report-item { border: 1px solid transparent; border-radius: var(--radius-control); }
+.report-item.root + .report-item.root { margin-top: 1px; }
+.report-item[hidden] { display: none; }
+.report-item[open].root { border-color: var(--border); background: var(--surface-2); }
+.report-item > summary, .report-item > .item-summary {
+  min-height: 34px;
+  padding: var(--space-1) var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  border-radius: var(--radius-control);
+  list-style: none;
+}
+.report-item > summary { cursor: pointer; }
+.report-item > summary::-webkit-details-marker { display: none; }
+.report-item > summary:hover { background: var(--hover); }
+.chevron, .chevron-placeholder { width: 14px; height: 14px; flex: none; }
+.chevron { display: grid; place-items: center; border: 1px solid var(--border-strong); border-radius: var(--radius-hairline); background: var(--surface); color: var(--muted); }
+.report-item > summary:hover .chevron { border-color: var(--blueprint); color: var(--text); }
+.chevron .stem { transition: opacity var(--motion-fast) var(--motion-ease); }
+.report-item[open] > summary .chevron .stem { opacity: 0; }
+.status-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--success); }
+.uncovered > summary .status-dot, .uncovered > .item-summary .status-dot,
+.status-error > summary .status-dot, .status-error > .item-summary .status-dot { background: var(--danger); }
+.partial > summary .status-dot, .partial > .item-summary .status-dot,
+.status-warning > summary .status-dot, .status-warning > .item-summary .status-dot { background: var(--warning); }
+.not-applicable.status-neutral > summary .status-dot, .not-applicable.status-neutral > .item-summary .status-dot { background: var(--dim); }
+.item-heading { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.item-heading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-body); font-weight: var(--weight-semibold); }
+.item-context { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); font-size: var(--text-micro); }
+.item-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-1); }
+/* Badges are the viewer's chips: mono, square-cornered, tinted by what they say. */
+.badge, .tag {
+  padding: 0 var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-chip);
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  color: var(--muted);
+  font: var(--weight-semibold) var(--text-micro)/1.8 var(--font-mono);
+  white-space: nowrap;
+}
+.covered > summary .coverage-badge, .covered > .item-summary .coverage-badge { background: var(--success-soft); color: var(--success); }
+.partial > summary .coverage-badge, .partial > .item-summary .coverage-badge { background: var(--warning-soft); color: var(--warning); }
+.uncovered > summary .coverage-badge, .uncovered > .item-summary .coverage-badge { background: var(--danger-soft); color: var(--danger); }
+.status-success > summary .status-badge, .status-success > .item-summary .status-badge { background: var(--success-soft); color: var(--success); }
+.status-warning > summary .status-badge, .status-warning > .item-summary .status-badge { background: var(--warning-soft); color: var(--warning); }
+.status-error > summary .status-badge, .status-error > .item-summary .status-badge { background: var(--danger-soft); color: var(--danger); }
+/* On a coverage row, "Covered" already says it went well; a second "Success" chip is noise. */
+.status-success > summary .coverage-badge + .status-badge, .status-success > .item-summary .coverage-badge + .status-badge { display: none; }
+.item-body { padding: 0 var(--space-3) var(--space-3) calc(var(--space-2) + 14px + var(--space-3)); display: grid; gap: var(--space-3); }
+.report-item:not([open]) > .item-body { display: none; }
+.message { padding: var(--space-2) var(--space-3); border-left: 2px solid var(--blueprint); border-radius: 0 var(--radius-chip) var(--radius-chip) 0; background: var(--blueprint-soft); font-size: var(--text-meta); white-space: pre-wrap; }
+.status-warning > .item-body > .message { border-color: var(--warning); background: var(--warning-soft); }
+.status-error > .item-body > .message { border-color: var(--danger); background: var(--danger-soft); }
+.measured-value { display: flex; align-items: baseline; gap: var(--space-2); }
+.measured-value strong { font: var(--weight-bold) var(--text-heading) var(--font-mono); }
+.measured-value span { color: var(--muted); font-size: var(--text-meta); }
+.tags { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.tag { background: var(--blueprint-soft); color: var(--blueprint); }
+.metadata > summary { width: max-content; color: var(--muted); font-size: var(--text-micro); cursor: pointer; }
+.metadata pre {
+  max-height: 320px;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  overflow: auto;
+  border-radius: var(--radius-chip);
+  background: var(--surface-sunken);
+  color: var(--text-on-sunken);
+  font: var(--text-micro)/1.6 var(--font-mono);
+}
+/* Children hang off a drawn guide, the same branch language the viewer's tree uses. */
+.children { margin-left: 6px; padding-left: var(--space-3); display: grid; gap: 1px; border-left: 1px solid var(--border); }
+.report-item.child > summary, .report-item.child > .item-summary { min-height: 28px; }
+.empty-state { padding: var(--space-7) var(--space-4); display: grid; gap: var(--space-1); text-align: center; }
+/* A display on the element would otherwise beat the hidden attribute the script toggles. */
+.empty-state[hidden] { display: none; }
+.empty-state strong { font-size: var(--text-body); }
+.empty-state span { color: var(--muted); font-size: var(--text-meta); }
+
+@media (max-width: 1000px) {
+  .topbar { grid-template-columns: minmax(0, 1fr) auto; }
+  .run-state { display: none; }
+}
+@media (max-width: 720px) {
+  .search { width: min(45vw, 220px); }
+  .hero { padding-top: var(--space-5); }
+  .item-badges .badge:not(.coverage-badge):not(.status-badge) { display: none; }
+  .item-body { padding-left: var(--space-3); }
+}
+@media (max-width: 440px) {
+  .brand > span:last-child, .search kbd { display: none; }
+  .coverage-ring { width: 72px; height: 72px; }
+  .coverage-ring em { top: 43px; }
+  .item-context { display: none; }
+}

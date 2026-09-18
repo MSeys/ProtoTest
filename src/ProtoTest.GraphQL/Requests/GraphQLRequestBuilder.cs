@@ -267,8 +267,7 @@ public sealed class GraphQLRequestBuilder
                 request,
                 _context,
                 _targetName,
-                "GraphQL",
-                "ProtoTest.GraphQL",
+                traceOperation,
                 cancellationToken);
 
             HttpResponseMessage? rawResponse = null;
@@ -353,14 +352,15 @@ public sealed class GraphQLRequestBuilder
             if (requestContent.RequiresPreflight)
                 request.Headers.TryAddWithoutValidation("GraphQL-preflight", "1");
 
+            // A subscription has no request operation to attach the outcome to; an auth failure still
+            // surfaces through the subscription's error path.
             _resolvedAuthenticator = await ProtoHttpAuthenticationApplier.ApplyAsync(
                 _authenticatorFactory,
                 _resolvedAuthenticator,
                 request,
                 _context,
                 _targetName,
-                "GraphQL",
-                "ProtoTest.GraphQL",
+                requestOperation: null,
                 cancellationToken);
 
             var attachmentOptions = _context.TryService<GraphQLAttachmentOptions>();

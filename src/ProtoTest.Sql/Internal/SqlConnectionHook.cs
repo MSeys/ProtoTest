@@ -15,15 +15,18 @@ internal sealed class SqlConnectionHook(ProtoSqlOptions options) : IProtoTestHoo
     {
         var session = context.Service<ProtoSqlSession>();
         await session.Connection.OpenAsync();
-        if (options.Isolation == SqlIsolation.TransactionPerTest)
+        if (options.Isolation == SqlIsolation.Transaction)
         {
             session.Transaction = await session.Connection.BeginTransactionAsync();
         }
 
+        var sharing = options.SharedWith.Count == 0
+            ? string.Empty
+            : $" · shared with {string.Join(", ", options.SharedWith)}";
         context.RegisterResource(new ProtoResource(
             "database:connection",
             "database",
-            $"{session.Connection.GetType().Name} · {options.Isolation}",
+            $"{session.Connection.GetType().Name} · {options.Isolation}{sharing}",
             release => ReleaseAsync(session, release)));
     }
 

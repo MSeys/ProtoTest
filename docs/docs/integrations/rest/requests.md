@@ -80,7 +80,7 @@ RestRequestBuilder Auth<TAuthenticator>(params object[] constructorArgs);
 RestRequestBuilder WithoutAuth();
 ```
 
-See [Authentication](./authentication.md) for how these interact with `[RestAuth<T>]`.
+See [Authentication](./authentication.md) for how these interact with `[Auth<T>]`.
 
 ## Response size limit
 

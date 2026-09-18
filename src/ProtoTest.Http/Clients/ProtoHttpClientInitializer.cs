@@ -27,8 +27,7 @@ public sealed class ProtoHttpClientInitializer(
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
             if (!allowMissingBaseUrl) return Task.FromResult(false);
-            Register(context, baseAddress: null);
-            TraceConfiguration(context, null, "deferred");
+            TraceConfiguration(context, Register(context, baseAddress: null), "deferred");
             return Task.FromResult(true);
         }
 
@@ -36,8 +35,7 @@ public sealed class ProtoHttpClientInitializer(
             throw new InvalidOperationException(
                 $"The base URL configured for {protocolName} client '{Name}' must be an absolute HTTP or HTTPS URI.");
 
-        Register(context, baseAddress);
-        TraceConfiguration(context, baseAddress, explicitBaseUrl is null ? "configuration" : "registration");
+        TraceConfiguration(context, Register(context, baseAddress), explicitBaseUrl is null ? "configuration" : "registration");
         return Task.FromResult(true);
     }
 
@@ -70,25 +68,49 @@ public sealed class ProtoHttpClientInitializer(
         return new Uri(origin, endpointPath).ToString();
     }
 
-    private void Register(ProtoExecutionContext context, Uri? baseAddress)
+    private HttpClient Register(ProtoExecutionContext context, Uri? baseAddress)
     {
         var client = context.Service<IHttpClientFactory>().CreateClient(GetFactoryName(protocolName, Name));
         client.BaseAddress = baseAddress;
         context.RegisterClient(client, Name);
+        return client;
     }
 
-    private void TraceConfiguration(ProtoExecutionContext context, Uri? baseAddress, string source)
-        => context.Trace.WriteEvent(
-            "http.client.configure",
-            $"HTTP client · {Name}",
-            "ProtoTest.Http",
-            ProtoTracePhase.Setup,
-            ProtoTraceOutcome.Succeeded,
-            new Dictionary<string, string?>
-            {
-                ["client.name"] = Name,
-                ["protocol.name"] = protocolName,
-                ["endpoint.source"] = source,
-                ["server.address"] = baseAddress?.GetLeftPart(UriPartial.Authority)
-            });
+    /// <summary>
+    /// Records the client's state once - address with its path, timeout, where the address came from -
+    /// instead of an event per call.
+    /// </summary>
+    private void TraceConfiguration(ProtoExecutionContext context, HttpClient client, string source)
+    {
+        var state = new Dictionary<string, string?>
+        {
+            ["client.name"] = Name,
+            ["client.protocol"] = protocolName,
+            ["client.type"] = typeof(HttpClient).FullName,
+            ["client.timeout_seconds"] = client.Timeout.TotalSeconds.ToString(
+                "0.###", System.Globalization.CultureInfo.InvariantCulture),
+            ["client.endpoint_source"] = source
+        };
+        if (client.BaseAddress is not null)
+        {
+            state["client.base_address"] = SafeAddress(client.BaseAddress);
+        }
+
+        context.Trace.SetEntityState(
+            ProtoTraceEntityKinds.Client,
+            $"client:{typeof(HttpClient).FullName}:{Name}",
+            $"HTTP client {Name}",
+            state,
+            scope: context.TestName);
+    }
+
+    private static string SafeAddress(Uri address)
+    {
+        if (string.IsNullOrEmpty(address.UserInfo))
+        {
+            return address.ToString();
+        }
+
+        return new UriBuilder(address) { UserName = string.Empty, Password = string.Empty }.Uri.ToString();
+    }
 }

@@ -1,30 +1,39 @@
 import { ref } from "vue";
 
+export type TestView = "story" | "state" | "spans";
+export const testViews: TestView[] = ["story", "state", "spans"];
+
+/** What the inspector shows: an operation, or a tracked item by kind and id. */
+export type Selection = { span: string } | { item: { kind: string; id: string } };
+
 export type Route =
   | { name: "run" }
-  | { name: "styleguide" }
-  | { name: "test"; testId: string; tab: string; entryId?: string };
-
-export const defaultTestTab = "story";
+  | { name: "test"; testId: string; view: TestView; selection?: Selection };
 
 export const route = ref<Route>(parse(location.hash));
 
 function parse(hash: string): Route {
-  if (hash.startsWith("#/styleguide")) return { name: "styleguide" };
   const match = /^#\/test\/([^/?#]+)(?:\/([a-z]+))?(?:\?(.*))?/.exec(hash);
-  if (match) {
-    // A selected entry belongs in the address: a link to a failure has to survive a reload.
-    const entryId = new URLSearchParams(match[3] ?? "").get("entry") ?? undefined;
-    return { name: "test", testId: decodeURIComponent(match[1]), tab: match[2] ?? defaultTestTab, entryId };
-  }
-  return { name: "run" };
+  if (!match) return { name: "run" };
+  const view = (testViews as string[]).includes(match[2] ?? "") ? match[2] as TestView : "story";
+  // The selection belongs in the address: a link to a failure has to survive a reload and a share.
+  const query = new URLSearchParams(match[3] ?? "");
+  const span = query.get("span") ?? query.get("entry");
+  const kind = query.get("kind");
+  const id = query.get("item");
+  const selection: Selection | undefined = span ? { span } : kind && id ? { item: { kind, id } } : undefined;
+  return { name: "test", testId: decodeURIComponent(match[1]), view, selection };
 }
 
 export function href(next: Route): string {
-  if (next.name === "styleguide") return "#/styleguide";
   if (next.name === "run") return "#/";
-  const base = `#/test/${encodeURIComponent(next.testId)}/${next.tab}`;
-  return next.entryId ? `${base}?entry=${encodeURIComponent(next.entryId)}` : base;
+  const base = `#/test/${encodeURIComponent(next.testId)}/${next.view}`;
+  const selection = next.selection;
+  if (!selection) return base;
+  const query = "span" in selection
+    ? new URLSearchParams({ span: selection.span })
+    : new URLSearchParams({ kind: selection.item.kind, item: selection.item.id });
+  return `${base}?${query}`;
 }
 
 export function navigate(next: Route) {
@@ -33,11 +42,10 @@ export function navigate(next: Route) {
   else location.hash = target;
 }
 
-/** Changes the selection without adding a history entry for every click in a tree. */
+/** Changes the selection without a history entry for every click in a list. */
 export function replace(next: Route) {
   const target = href(next);
-  if (location.hash === target) { route.value = next; return; }
-  history.replaceState(null, "", target);
+  if (location.hash !== target) history.replaceState(null, "", target);
   route.value = next;
 }
 

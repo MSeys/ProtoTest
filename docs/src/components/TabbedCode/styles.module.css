@@ -1,65 +1,30 @@
-.frame {
-  background: var(--pt-code);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 24px 60px rgba(3, 15, 24, 0.45);
-}
-
-.tabs {
-  display: flex;
-  gap: 0.25rem;
-  padding: 0.55rem 0.6rem 0;
-  background: rgba(255, 255, 255, 0.04);
-}
+/* The viewer's underline tabs: they navigate between snippets, so they are not pills. */
+/* The tabs sit on the head's bottom rule, so the active underline replaces it. */
+.tabs { display: flex; align-self: stretch; gap: 2px; margin-bottom: calc(var(--space-2) * -1 - 1px); }
 
 .tab {
-  border: none;
+  height: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-chip) var(--radius-chip) 0 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.55);
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.72rem;
-  padding: 0.45rem 0.8rem;
-  border-radius: 8px 8px 0 0;
+  color: var(--muted);
+  font: var(--weight-medium) var(--text-meta) var(--font-ui);
   cursor: pointer;
-  transition: all 140ms ease;
+  transition: color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease);
 }
+.tab:hover { background: var(--hover); color: var(--text); }
+.tabActive { border-bottom-color: var(--blueprint); color: var(--text); font-weight: var(--weight-bold); }
 
-.tab:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.06);
-}
+.filename { color: var(--dim); font: var(--text-micro) var(--font-mono); }
 
-.tabActive {
-  color: var(--pt-cyan);
-  background: var(--pt-code);
-  font-weight: 700;
-}
+/* Every snippet gets the same height, so switching tabs never makes the hero jump. */
+.body { min-height: 340px; background: var(--surface-sunken); }
 
-.tabActive:hover {
-  background: var(--pt-code);
-  color: var(--pt-cyan);
-}
-
-.filename {
-  padding: 0.5rem 1.1rem 0;
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.68rem;
-  color: rgba(255, 255, 255, 0.32);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 0.6rem;
-}
-
-.body {
-  min-height: 340px;
-}
-
-.footnote {
-  padding: 0.7rem 1.1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.7rem;
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.5);
+@media (max-width: 600px) {
+  .filename { display: none; }
+  .tab { padding: 0 var(--space-3); }
+  .body { min-height: 0; }
 }

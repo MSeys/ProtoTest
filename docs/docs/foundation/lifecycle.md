@@ -117,7 +117,7 @@ FirstHook:After
 
 The test is recorded as failed, the trace shows a `Rollback` phase instead of `Teardown`, and the exception reads *"Test setup failed and completed lifecycle components were rolled back."*
 
-This is why teardown code should tolerate partial setup. The sample environment attribute uses `TryContext` rather than `Context` in its `AfterTestAsync` for exactly that reason.
+This is why teardown code should tolerate partial setup. The sample environment attribute uses `TryResolve` rather than `Resolve` in its `AfterTestAsync` for exactly that reason.
 
 ### One test per async flow
 

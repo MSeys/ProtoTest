@@ -1,204 +1,177 @@
-.frame {
-  border-radius: 14px;
-  overflow: hidden;
-  background: var(--pt-code);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 24px 60px rgba(3, 15, 24, 0.28);
-}
+.title { font-size: var(--text-strong); font-weight: var(--weight-semibold); }
 
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.6rem 0.75rem;
-  background: rgba(255, 255, 255, 0.04);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
+.delta { color: var(--muted); font: var(--text-micro) var(--font-mono); }
+.delta strong { color: var(--text); font-weight: var(--weight-bold); }
 
-.tabs {
-  display: flex;
-  gap: 0.35rem;
-}
+.once { color: var(--muted); }
+.once strong { color: var(--text); }
 
-.tab {
-  border: 1px solid transparent;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.6);
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.75rem;
-  padding: 0.4rem 0.85rem;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: all 150ms ease;
-}
+.ledger { display: grid; }
 
-.tab:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.06);
-}
+.row { padding: var(--space-3) var(--space-4); }
+.row + .row { border-top: 1px solid var(--border); }
 
-.tabActive {
-  color: #05222c;
-  background: var(--pt-cyan);
-  font-weight: 700;
-}
-
-.tabActive:hover {
-  color: #05222c;
-  background: var(--pt-cyan);
-}
-
-.suiteTotal {
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-@media (max-width: 720px) {
-  .suiteTotal {
-    display: none;
-  }
-}
-
-.files {
+.rowHead {
+  container-type: inline-size;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
-  padding: 0.6rem 0.75rem 0.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
-.file {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: transparent;
-  color: rgba(255, 255, 255, 0.55);
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.7rem;
-  padding: 0.35rem 0.6rem;
-  border-radius: 7px;
-  cursor: pointer;
-  transition: all 140ms ease;
-}
-
-.file:hover {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.3);
-}
-
-.fileActive {
-  color: #fff;
-  border-color: var(--pt-cyan);
-  background: rgba(25, 168, 181, 0.12);
-}
-
-.scope {
-  font-size: 0.6rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 0.1rem 0.35rem;
-  border-radius: 999px;
-}
-
-.scopeTest {
-  background: rgba(216, 106, 106, 0.18);
-  color: #e89a9a;
-}
-
-.scopeSuite {
-  background: rgba(53, 185, 133, 0.16);
-  color: var(--pt-green);
-}
-
-.note {
-  padding: 0.65rem 1.1rem;
-  font-size: 0.78rem;
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.62);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
+.side { font-size: var(--text-body); font-weight: var(--weight-semibold); }
+.file { color: var(--muted); font: var(--text-micro) var(--font-mono); }
 
 .stats {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  color: var(--muted);
+  font: var(--text-micro) var(--font-mono);
+}
+
+.stats strong { color: var(--text); font-weight: var(--weight-bold); }
+.stats span { display: inline-flex; align-items: center; gap: var(--space-1); }
+
+/* Narrow: the numbers read as a quiet second line under the label instead of hugging the right edge. */
+@container (max-width: 32rem) {
+  .stats { margin-left: 0; }
+}
+
+/* The ledger: hatched plumbing, solid scenario, both sides on one scale. The empty tail on the with-bar
+   is the plumbing that stops being written per fixture. */
+.track {
+  display: flex;
+  height: 10px;
+  overflow: clip;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-hairline);
+  background: var(--surface-2);
+}
+
+.plumbing { background: repeating-linear-gradient(to right, var(--dim) 0 4px, transparent 4px 8px); }
+.scenario { background: var(--blueprint); }
+
+.swatchPlumbing,
+.swatchScenario {
+  display: inline-block;
+  width: 12px;
+  height: 4px;
+  border-radius: var(--radius-hairline);
+}
+
+.swatchPlumbing { background: repeating-linear-gradient(to right, var(--dim) 0 3px, transparent 3px 6px); }
+.swatchScenario { background: var(--blueprint); }
+
+/* The two test files side by side: the same scenario, with every capability hanging off the line that uses it. */
+.preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-top: 1px solid var(--border);
+  align-items: start;
+}
+
+.doc {
+  overflow: clip;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+}
+
+.docHead {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1.35rem;
-  padding: 0.7rem 1.1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.55);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
 }
 
-.stats strong {
-  color: #fff;
-  font-weight: 700;
+.docSide { color: var(--text); font-size: var(--text-body); font-weight: var(--weight-semibold); }
+.docName { color: var(--muted); font: var(--text-micro) var(--font-mono); }
+
+.docScope {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+  color: var(--muted);
+  font: var(--weight-semibold) var(--text-micro)/1.8 var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.statTotal strong {
-  font-size: 0.95rem;
-}
-
-.statSplit {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-
-.swatchBehaviour,
-.swatchInfra {
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
-  display: inline-block;
-}
-
-.swatchBehaviour {
-  background: var(--pt-cyan);
-}
-
-.swatchInfra {
-  background: rgba(255, 255, 255, 0.22);
-}
-
-.codeArea {
+/* A file is the proof, not the argument: the pane shows its top and opens on request. Opening a capability
+   opens the pane with it, so the implementation is never revealed behind a cap. */
+.docBody {
   position: relative;
-  max-height: 460px;
-  overflow: hidden;
+  /* About sixteen lines: the test method and its first steps, enough to compare the two sides at a glance. */
+  max-height: 340px;
+  overflow: clip;
+  background: var(--surface-sunken);
 }
 
-.codeAreaExpanded {
-  max-height: none;
-}
+.docBodyOpen { max-height: none; }
 
 .fade {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 120px;
-  background: linear-gradient(to bottom, rgba(11, 33, 50, 0), var(--pt-code));
+  inset: auto 0 0 0;
+  height: 96px;
+  background: linear-gradient(to bottom, transparent, var(--surface-sunken));
   pointer-events: none;
 }
 
-.expand {
+.docExpand {
   display: block;
   width: 100%;
-  border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.72);
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.72rem;
-  padding: 0.7rem;
+  padding: var(--space-3);
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font: var(--text-micro) var(--font-mono);
   cursor: pointer;
-  transition: background 150ms ease;
+  transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 
-.expand:hover {
-  background: rgba(255, 255, 255, 0.07);
-  color: #fff;
+.docExpand:hover { background: var(--hover); color: var(--text); }
+
+/* The files the rows are cut from, for a reader who wants to check the cut. */
+.filesToggle {
+  display: block;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--blueprint);
+  font: var(--weight-semibold) var(--text-micro) var(--font-mono);
+  text-align: left;
+  cursor: pointer;
 }
+
+.filesToggle:hover { background: var(--hover); }
+
+.notes {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.contrast { color: var(--muted); font-size: var(--text-meta); line-height: 1.6; }
+
+.owned { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
+
+.ownedLabel {
+  color: var(--muted);
+  font: var(--weight-semibold) var(--text-micro) var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ownedItem { color: var(--text); font-size: var(--text-meta); }
+.ownedItem + .ownedItem { padding-left: var(--space-4); border-left: 1px solid var(--border); }

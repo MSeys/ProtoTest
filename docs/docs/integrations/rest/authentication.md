@@ -49,7 +49,7 @@ await Proto.Context.Rest()
 
 ```csharp
 [Application("Api")]
-[RestAuth<BearerTokenAuthenticator>("orders-token")]
+[Auth<BearerTokenAuthenticator>("orders-token")]
 public class OrderTests
 {
     [ProtoTest]
@@ -91,8 +91,8 @@ response
 When several of these apply, this is what wins:
 
 1. **`[Application]`** on the method beats the one on the class (and its client bindings replace the class's).
-2. **`[RestAuth<T>]` on the method replaces the class-level ones entirely** — they don't merge.
-3. Several `[RestAuth<T>]` attributes at the same level are ordered by their `Order` property and **composed**: each runs in turn on the same request.
+2. **`[Auth<T>]` on the method replaces the class-level ones entirely** — they don't merge.
+3. Several `[Auth<T>]` attributes at the same level are ordered by their `Order` property and **composed**: each runs in turn on the same request.
 4. **A per-request `.Auth(...)` overrides** whatever the attributes resolved, and **`.WithoutAuth()` clears it**.
 
 An authenticator is created once per request builder and reused if that builder sends more than once. A skipped authentication shows up in the trace as `auth.skip`, an applied one as `auth.apply`.
@@ -124,11 +124,11 @@ public sealed class SampleUserAuthenticator : IProtoHttpAuthenticator
 
 ### Constructor arguments and services
 
-`[RestAuth<T>(args)]` and `.Auth<T>(args)` construct `T` with `ActivatorUtilities`, so the constructor can mix **positional arguments** from the attribute with **services** from the test's DI scope — including `ProtoExecutionContext` itself:
+`[Auth<T>(args)]` and `.Auth<T>(args)` construct `T` with `ActivatorUtilities`, so the constructor can mix **positional arguments** from the attribute with **services** from the test's DI scope — including `ProtoExecutionContext` itself:
 
 ```csharp
 public sealed class TenantTokenAuthenticator(
-    string tenant,                 // from [RestAuth<TenantTokenAuthenticator>("tenant-a")]
+    string tenant,                 // from [Auth<TenantTokenAuthenticator>("tenant-a")]
     ITokenService tokens)          // resolved from DI
     : IProtoHttpAuthenticator
 {
@@ -144,4 +144,4 @@ public sealed class TenantTokenAuthenticator(
 
 This keeps secrets out of attribute metadata: the attribute carries only a name, and the authenticator looks up the real value.
 
-The same authenticator works for GraphQL through [`[GraphQLAuth<T>]`](../graphql/index.md#authentication).
+The same authenticator serves GraphQL too: [`[Auth<T>]`](../graphql/index.md#authentication) applies to every HTTP-based protocol the application exposes, and its `Protocols` property narrows it when an application exposes both and you only want one.

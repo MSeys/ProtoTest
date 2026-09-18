@@ -20,10 +20,13 @@ public static class ProtoHostBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(configure);
-        return builder.ConfigureServices(services =>
-        {
-            services.AddDbContext<TContext>(configure, ServiceLifetime.Scoped);
-            services.AddSingleton<IProtoTestHook>(new SqlEnlistmentHook<TContext>());
-        });
+        return builder
+            .AddCapability(new ProtoCapabilityDescriptor(
+                "Entity Framework Core", ProtoCapabilityKinds.Store, "ProtoTest.Sql.EntityFrameworkCore"))
+            .ConfigureServices(services =>
+            {
+                services.AddDbContext<TContext>(configure, ServiceLifetime.Scoped);
+                services.AddSingleton<IProtoTestHook>(new SqlEnlistmentHook<TContext>());
+            });
     }
 }

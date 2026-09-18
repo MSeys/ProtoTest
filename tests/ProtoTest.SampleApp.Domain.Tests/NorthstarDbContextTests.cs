@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.SampleApp.Contracts;
+using System.Diagnostics;
 
 [TestFixture]
 public sealed class NorthstarDbContextTests
@@ -113,6 +114,41 @@ public sealed class NorthstarDbContextTests
         // Assert
         Assert.That(jobs, Has.Count.EqualTo(1));
         Assert.That(jobs[0].EventType, Is.EqualTo(WebhookEventTypes.ProjectCreated));
+    }
+
+    [Test]
+    public async Task StoreCommands_ShouldEmitDomainActivities()
+    {
+        // Arrange
+        var activities = new List<Activity>();
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == "Northstar.Domain",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activities.Add
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var provider = new ServiceCollection()
+            .AddNorthstarDomain(options => options.UseSqlite(connection))
+            .BuildServiceProvider();
+        await using (var schema = await provider.GetRequiredService<IDbContextFactory<NorthstarDbContext>>()
+                         .CreateDbContextAsync())
+        {
+            await schema.Database.EnsureCreatedAsync();
+        }
+
+        var store = provider.GetRequiredService<NorthstarStore>();
+        var tenant = store.ProvisionTenant("activity-store", PlanIds.Growth, new Uri("http://localhost"));
+        var principal = store.Authenticate(tenant.ApiToken);
+
+        // Act
+        store.CreateProject(principal, "atlas");
+
+        // Assert
+        Assert.That(activities.Select(activity => activity.DisplayName), Does.Contain("project.create"));
     }
 
     [Test]

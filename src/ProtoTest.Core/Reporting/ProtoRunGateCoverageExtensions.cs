@@ -12,7 +12,7 @@ public static class ProtoRunGateCoverageExtensions
         ArgumentNullException.ThrowIfNull(context);
         return
         [
-            .. context.ItemsOfKind(ProtoReportItemKind.Coverage)
+            .. context.ItemsOfKind(ProtoReportItemKinds.Coverage)
                 .GroupBy(item => (item.TargetName, item.Category))
                 .Select(group => new ProtoCoverageSummary(
                     group.Key.TargetName,

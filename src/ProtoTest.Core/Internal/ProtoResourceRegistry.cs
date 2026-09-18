@@ -112,25 +112,72 @@ internal sealed class ProtoResourceRegistry
         ProtoTracePhase phase)
     {
         var resource = entry.Resource;
-        using var operation = trace
-            .Operation("resource.release", $"Release · {resource.Id}", "ProtoTest.Core")
-            .During(phase)
-            .With("resource.id", resource.Id)
-            .With("resource.kind", resource.Kind)
-            .With("resource.description", resource.Description)
-            .Begin();
+        // A client is framework plumbing: its life is on the client entity, not a lifecycle step. A
+        // failed release still produces an entry, because a failing teardown must be explainable.
+        var frameworkManaged = string.Equals(resource.Kind, "client", StringComparison.OrdinalIgnoreCase);
+        using var operation = frameworkManaged
+            ? null
+            : trace
+                .Operation("resource.release", $"Release · {resource.Id}", "ProtoTest.Core")
+                .During(phase)
+                .For(resource.Kind, resource.Id)
+                .With("resource.id", resource.Id)
+                .With("resource.kind", resource.Kind)
+                .With("resource.description", resource.Description)
+                .Begin();
         var started = Stopwatch.GetTimestamp();
         try
         {
             await resource.ReleaseAsync(new ProtoResourceReleaseContext(test, trace, phase, CancellationToken.None));
-            entry.MarkReleased(Stopwatch.GetElapsedTime(started));
-            operation.Succeed();
+            var elapsed = Stopwatch.GetElapsedTime(started);
+            entry.MarkReleased(elapsed);
+            operation?.Succeed();
+            trace.SetEntityState(
+                resource.Kind,
+                resource.Id,
+                $"Resource · {resource.Id}",
+                new Dictionary<string, string?>
+                {
+                    ["resource.state"] = "released",
+                    ["resource.release_ms"] = Math.Round(elapsed.TotalMilliseconds, 3).ToString(
+                        System.Globalization.CultureInfo.InvariantCulture)
+                },
+                change: "released");
             return null;
         }
         catch (Exception exception)
         {
             entry.MarkFailed(Stopwatch.GetElapsedTime(started), exception);
-            operation.Fail(exception);
+            operation?.Fail(exception);
+            if (frameworkManaged)
+            {
+                trace.WriteEvent(
+                    "resource.release",
+                    $"Release · {resource.Id}",
+                    "ProtoTest.Core",
+                    phase,
+                    ProtoTraceOutcome.Failed,
+                    new Dictionary<string, string?>
+                    {
+                        ["resource.id"] = resource.Id,
+                        ["resource.kind"] = resource.Kind,
+                        ["resource.description"] = resource.Description
+                    },
+                    exception,
+                    entityKind: resource.Kind,
+                    entityId: resource.Id);
+            }
+
+            trace.SetEntityState(
+                resource.Kind,
+                resource.Id,
+                $"Resource · {resource.Id}",
+                new Dictionary<string, string?>
+                {
+                    ["resource.state"] = "release_failed",
+                    ["resource.error"] = exception.Message
+                },
+                change: "failed");
             return exception;
         }
     }

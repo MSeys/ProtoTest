@@ -19,12 +19,14 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
 
         foreach (var group in groups)
         {
+            var clientId = $"client:{group.Key.ClientType.FullName}:{group.Key.Name}";
+            var clientName = $"Client {group.Key.ClientType.Name} '{group.Key.Name}'";
             using var clientOperation = context.Trace
                 .Operation("client.initialize", $"Initialize · {group.Key.Name} ({group.Key.ClientType.Name})", "ProtoTest.Core")
                 .During(ProtoTracePhase.Setup)
+                .For(ProtoTraceEntityKinds.Client, clientId)
                 .With("client.name", group.Key.Name)
                 .With("client.type", group.Key.ClientType.FullName)
-                .With("initializer.count", group.Count().ToString())
                 .Begin();
             var initialized = false;
 
@@ -32,26 +34,24 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
             // Configure determine provider precedence without integration-specific coupling.
             foreach (var initializer in group)
             {
-                using var attempt = context.Trace
-                    .Operation("client.initializer.attempt", $"Try · {initializer.GetType().Name}", "ProtoTest.Core")
-                    .During(ProtoTracePhase.Setup)
-                    .With("initializer.type", initializer.GetType().FullName)
-                    .Begin();
                 try
                 {
                     if (await initializer.TryInitializeAsync(context))
                     {
-                        attempt.SetAttribute("selected", "true");
-                        attempt.Succeed();
+                        context.Trace.SetEntityState(
+                            ProtoTraceEntityKinds.Client,
+                            clientId,
+                            clientName,
+                            new Dictionary<string, string?>
+                            {
+                                ["client.initializer"] = initializer.GetType().Name
+                            });
                         initialized = true;
                         break;
                     }
-                    attempt.SetAttribute("selected", "false");
-                    attempt.Succeed();
                 }
                 catch (Exception exception)
                 {
-                    attempt.Fail(exception);
                     clientOperation.Fail(exception);
                     throw;
                 }

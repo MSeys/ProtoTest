@@ -28,7 +28,8 @@ public static class ProtoHostBuilderExtensions
         {
             builder.ConfigureServices(services => configure(new ProtoGraphQLBuilder(services)));
         }
-        return builder;
+        return builder.AddCapability(new ProtoCapabilityDescriptor(
+            "GraphQL", ProtoCapabilityKinds.Protocol, "ProtoTest.GraphQL"));
     }
 
     /// <summary>
@@ -50,6 +51,7 @@ public static class ProtoHostBuilderExtensions
             return options;
         });
         configure?.Invoke(new ProtoGraphQLBuilder(application.Services, application));
-        return application;
+        return application.AddCapability(new ProtoCapabilityDescriptor(
+            "GraphQL", ProtoCapabilityKinds.Protocol, "ProtoTest.GraphQL"));
     }
 }

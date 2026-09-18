@@ -1,72 +1,312 @@
 /**
  * ProtoTest documentation theme.
  *
- * The palette, type scale, spacing, radii and execution vocabulary come from the one
- * shared token file at the repository root — the same file the ProtoTrace viewer and the
- * HTML report sink use. Nothing here redefines a --pt-* value; this file only maps the
- * shared tokens onto Infima's variables.
+ * The palette, type scale, spacing, radii and execution vocabulary come from the one shared token file at
+ * the repository root — the same file the ProtoTrace viewer and the HTML report sink use. This file maps
+ * those tokens onto Infima and restyles the few Docusaurus parts Infima's variables do not reach. It
+ * declares no colour of its own.
  */
 
 @import '../../../design/prototest-tokens.css';
+@import './marks.css';
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
+/* ── Infima, mapped onto the tokens ──────────────────────────────────────────────────────── */
 :root {
-  --ifm-color-primary: var(--pt-blue-bright);
-  --ifm-color-primary-dark: #147aa8;
-  --ifm-color-primary-darker: #12729d;
-  --ifm-color-primary-darkest: #0f5e81;
-  --ifm-color-primary-light: #1c96d4;
-  --ifm-color-primary-lighter: #269fdb;
-  --ifm-color-primary-lightest: #45b0e1;
+  --ifm-color-primary: var(--blueprint);
+  --ifm-color-primary-dark: color-mix(in srgb, var(--ifm-color-primary) 90%, black);
+  --ifm-color-primary-darker: color-mix(in srgb, var(--ifm-color-primary) 85%, black);
+  --ifm-color-primary-darkest: color-mix(in srgb, var(--ifm-color-primary) 70%, black);
+  --ifm-color-primary-light: color-mix(in srgb, var(--ifm-color-primary) 88%, white);
+  --ifm-color-primary-lighter: color-mix(in srgb, var(--ifm-color-primary) 80%, white);
+  --ifm-color-primary-lightest: color-mix(in srgb, var(--ifm-color-primary) 65%, white);
 
   --ifm-background-color: var(--bg);
   --ifm-background-surface-color: var(--surface);
   --ifm-font-color-base: var(--text);
+  --ifm-font-color-secondary: var(--muted);
   --ifm-heading-color: var(--pt-navy);
   --ifm-font-family-base: var(--font-ui);
   --ifm-heading-font-family: var(--font-display);
   --ifm-font-family-monospace: var(--font-mono);
-  --ifm-code-font-size: 90%;
-  --ifm-navbar-background-color: rgba(247, 245, 238, 0.92);
-  --ifm-footer-background-color: var(--pt-navy-deep);
+  --ifm-hr-background-color: var(--border);
+  --ifm-toc-border-color: var(--border);
   --ifm-transition-fast: var(--motion-fast);
-  --docusaurus-highlighted-code-line-bg: rgba(31, 117, 169, 0.12);
+  --ifm-global-radius: var(--radius-control);
+
+  /* Code: the sunken surface on both themes, the same as the home page, the viewer and the report. */
+  --ifm-code-font-size: 88%;
+  --ifm-code-border-radius: var(--radius-chip);
+  --ifm-code-background: var(--blueprint-soft);
+  --ifm-code-padding-horizontal: 0.3rem;
+  --ifm-pre-background: var(--surface-sunken);
+  --ifm-pre-color: var(--code-text);
+  --ifm-pre-border-radius: var(--radius-control);
+  --docusaurus-highlighted-code-line-bg: var(--code-highlight);
+
+  --ifm-table-border-color: var(--border);
+  --ifm-table-head-background: var(--surface-2);
+  --ifm-table-head-color: var(--text);
+  --ifm-table-stripe-background: transparent;
+
+  --ifm-menu-color: var(--muted);
+  --ifm-menu-color-active: var(--text);
+  --ifm-menu-color-background-active: var(--blueprint-soft);
+  --ifm-menu-color-background-hover: var(--hover);
+  --ifm-toc-link-color: var(--muted);
+
+  --ifm-navbar-background-color: color-mix(in srgb, var(--bg) 92%, transparent);
+  --ifm-navbar-shadow: none;
+  --ifm-footer-background-color: var(--pt-navy-deep);
+  --ifm-card-background-color: var(--surface);
+  --ifm-dropdown-background-color: var(--surface);
+  --ifm-breadcrumb-item-background-active: var(--blueprint-soft);
 }
 
 [data-theme='dark'] {
   --ifm-color-primary: var(--pt-cyan);
-  --ifm-color-primary-dark: #16939e;
-  --ifm-color-primary-darker: #148a94;
-  --ifm-color-primary-darkest: #10717a;
-  --ifm-color-primary-light: #1cbdca;
-  --ifm-color-primary-lighter: #28c3cf;
-  --ifm-color-primary-lightest: #4fd0da;
-
-  --ifm-background-color: var(--pt-navy-deep);
-  --ifm-background-surface-color: var(--surface);
   --ifm-heading-color: var(--pt-white);
-  --ifm-navbar-background-color: rgba(8, 40, 61, 0.92);
-  --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.08);
 }
 
-h1, h2, h3, h4 {
-  letter-spacing: -0.02em;
-}
+/* ── Type ─────────────────────────────────────────────────────────────────────────────────── */
+h1, h2, h3, h4 { letter-spacing: -0.02em; }
+.markdown h2 { margin-top: calc(var(--space-7) + var(--space-3)); }
 
+/* ── Navbar and announcement bar ──────────────────────────────────────────────────────────── */
 .navbar__title {
   font-family: var(--ifm-heading-font-family);
   font-weight: var(--weight-bold);
 }
 
-.navbar {
-  backdrop-filter: blur(10px);
-  box-shadow: 0 1px 0 var(--border);
+.navbar { box-shadow: 0 1px 0 var(--border); }
+
+/* ── Navbar controls ───────────────────────────────────────────────────────────────────────
+   The search field, the theme switch and the GitHub item are one cluster: the same radius and hover box,
+   on token surfaces. The search plugin ships a grey pill in Arial, so it has to be re-dressed. */
+.navbar__search-input {
+  height: var(--control-height);
+  padding: 0 var(--space-3) 0 var(--space-7);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--text-meta);
 }
 
-code {
+.navbar__search-input::placeholder { color: var(--muted); }
+.navbar__search-input:focus { border-color: var(--blueprint); outline: none; box-shadow: none; }
+
+[class*='toggleButton'] {
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  color: var(--muted);
+}
+
+[class*='toggleButton']:hover {
+  border-color: var(--border);
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* The shortcut hint is the last stock-looking thing in the field. */
+kbd[class*='searchHint'] {
+  padding: 0 var(--space-1);
+  border: 1px solid var(--border);
   border-radius: var(--radius-chip);
+  background: var(--surface-2);
+  color: var(--muted);
+  box-shadow: none;
+  font: var(--text-micro) var(--font-mono);
 }
 
+/* The blur lives on a layer behind the navbar, not on the navbar itself: a backdrop-filter makes its element
+   the containing block for fixed-position descendants, which clipped the mobile sidebar to the navbar's own
+   60px height and left the hamburger menu opening into nothing. */
+.navbar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+
+/* A quiet strip rather than a third navy band above the navbar and the hero. */
+div[class*='announcementBar'] {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--text-meta);
+}
+div[class*='announcementBar'] a { color: var(--blueprint); }
+
+/* The one chip in the strip, so the notice reads as a status rather than decoration. */
+.announcement-preview {
+  display: inline-flex;
+  align-items: center;
+  margin-right: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-chip);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font: var(--weight-semibold) var(--text-micro)/1.8 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── Code ─────────────────────────────────────────────────────────────────────────────────── */
+.theme-code-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  box-shadow: none;
+}
+[data-theme='dark'] .theme-code-block { border-color: var(--border-strong); }
+div[class*='codeBlockTitle'] {
+  border-bottom: 1px solid color-mix(in srgb, var(--code-text) 12%, transparent);
+  background: var(--surface-sunken);
+  color: var(--code-comment);
+  font: var(--text-meta) var(--font-mono);
+}
+.theme-code-block button { color: var(--code-punctuation); }
+/* Reference code keeps its lines and scrolls; the scrollbar belongs to the code surface, not the page. */
+.theme-code-block pre { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--code-text) 28%, transparent) transparent; }
+
+:not(pre) > code {
+  border: 0;
+  color: var(--text);
+  vertical-align: baseline;
+}
+
+/* ── Tables: a panel with a header row, not zebra stripes ────────────────────────────────── */
+.markdown table {
+  display: table;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: clip;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  font-size: 0.94em;
+}
+.markdown table thead tr { border-bottom: 0; }
+.markdown table th {
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--text-meta);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+.markdown table td { border: 0; border-top: 1px solid var(--border); }
+.markdown table tbody tr:first-child td { border-top: 0; }
+.markdown table tr { border: 0; }
+
+/* ── Admonitions: the viewer's left-edge blocks ──────────────────────────────────────────── */
+.theme-admonition {
+  --admonition-color: var(--blueprint);
+  --admonition-soft: var(--blueprint-soft);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--admonition-color);
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
+  background: var(--admonition-soft);
+  box-shadow: none;
+  color: var(--text);
+}
+.theme-admonition.alert--success { --admonition-color: var(--pt-cyan); --admonition-soft: color-mix(in srgb, var(--pt-cyan) 12%, transparent); }
+.theme-admonition.alert--secondary { --admonition-color: var(--muted); --admonition-soft: var(--surface-2); }
+.theme-admonition.alert--warning { --admonition-color: var(--warning); --admonition-soft: var(--warning-soft); }
+.theme-admonition.alert--danger { --admonition-color: var(--danger); --admonition-soft: var(--danger-soft); }
+.theme-admonition div[class*='admonitionHeading'] {
+  color: var(--admonition-color);
+  font: var(--weight-semibold) var(--text-meta) var(--font-mono);
+  letter-spacing: 0.08em;
+}
+.theme-admonition div[class*='admonitionIcon'] svg { fill: var(--admonition-color); }
+.theme-admonition a { color: var(--text); text-decoration-color: var(--admonition-color); }
+
+/* ── Sidebar, table of contents, breadcrumbs, pagination ──────────────────────────────────── */
+.menu__link { border-radius: var(--radius-chip); }
+.menu__link--active:not(.menu__link--sublist) {
+  box-shadow: inset 2px 0 0 var(--ifm-color-primary);
+  font-weight: var(--weight-semibold);
+}
+.table-of-contents__link--active { font-weight: var(--weight-semibold); }
+.breadcrumbs__link { border-radius: var(--radius-chip); }
+.pagination-nav__link {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+.pagination-nav__link:hover { border-color: var(--ifm-color-primary); }
+
+/* ── Diagrams ─────────────────────────────────────────────────────────────────────────────────
+   Mermaid writes its colours into an id-scoped stylesheet inside each SVG, which outranks any class rule;
+   !important is the only way to recolour it from the tokens. It is confined to this block. */
+.docusaurus-mermaid-container svg {
+  font-family: var(--font-ui) !important;
+}
+.docusaurus-mermaid-container :is(.node rect, .node polygon, .node circle, .node path) {
+  fill: var(--surface) !important;
+  stroke: var(--blueprint-line) !important;
+  stroke-width: 1px !important;
+}
+.docusaurus-mermaid-container :is(.cluster rect) {
+  fill: var(--surface-2) !important;
+  stroke: var(--border-strong) !important;
+}
+.docusaurus-mermaid-container :is(.nodeLabel, .cluster-label, .label, text) {
+  color: var(--text) !important;
+  fill: var(--text) !important;
+  font-family: var(--font-ui) !important;
+}
+.docusaurus-mermaid-container :is(.edgePath path, .flowchart-link, path.relation) {
+  stroke: var(--muted) !important;
+}
+.docusaurus-mermaid-container :is(marker path, .arrowheadPath) {
+  fill: var(--muted) !important;
+  stroke: var(--muted) !important;
+}
+.docusaurus-mermaid-container :is(.edgeLabel, .edgeLabel rect, .edgeLabel p) {
+  background: var(--bg) !important;
+  fill: var(--bg) !important;
+  color: var(--muted) !important;
+  font-family: var(--font-mono) !important;
+  font-size: var(--text-micro) !important;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────────────────────────── */
 .footer--dark {
   --ifm-footer-background-color: var(--pt-navy-deep);
+  --ifm-footer-link-color: color-mix(in srgb, var(--pt-paper) 72%, transparent);
+  --ifm-footer-link-hover-color: var(--pt-white);
+  --ifm-footer-title-color: var(--pt-white);
+  border-top: 1px solid color-mix(in srgb, var(--pt-white) 8%, transparent);
 }
+/* On the blueprint surface the page is darker than the footer, so the footer reads as its own band. */
+[data-theme='dark'] .footer--dark { border-top-color: var(--border-strong); }
+.footer__title {
+  color: color-mix(in srgb, var(--pt-paper) 55%, transparent);
+  font: var(--weight-semibold) var(--text-meta) var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.footer__copyright { color: color-mix(in srgb, var(--pt-paper) 55%, transparent); font-size: var(--text-meta); }
+
+/* Footer marks: a mask takes the link's colour, so one geometry serves both themes. */
+.footer__link-item[href*='github.com']::before {
+  content: '';
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-right: var(--space-3);
+  vertical-align: -2px;
+  background: currentColor;
+  mask: var(--mark-github) center / contain no-repeat;
+  -webkit-mask: var(--mark-github) center / contain no-repeat;
+}
+
+/* The mark already says the link leaves the site; the arrow would be a second glyph for the same job. */
+.footer__link-item[href*='github.com'] svg { display: none; }

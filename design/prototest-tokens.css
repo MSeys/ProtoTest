@@ -92,9 +92,12 @@
   --panel-head-height: 44px;
 }
 
-/* ══ Technical paper — the light surface (docs default) ═════════════════════ */
+/* ══ Technical paper — the light surface (docs default) ═════════════════════
+   Any element can opt into a surface with data-surface, whatever the page's theme: the docs draw product
+   screens on the blueprint inside a paper page this way. */
 :root,
-:root[data-theme="light"] {
+:root[data-theme="light"],
+[data-surface="paper"] {
   color-scheme: light;
 
   --bg: var(--pt-paper);
@@ -134,7 +137,8 @@
 }
 
 /* ══ Execution blueprint — the dark surface (viewer and report default) ═════ */
-:root[data-theme="dark"] {
+:root[data-theme="dark"],
+[data-surface="blueprint"] {
   color-scheme: dark;
 
   --bg: var(--pt-navy-abyss);
@@ -175,8 +179,10 @@
 /* ══ Execution vocabulary ═══════════════════════════════════════════════════
    Declared once, for the viewer, the report and the docs alike. Both surfaces
    resolve these through the semantic tokens above, so they need no theme of
-   their own. */
-:root {
+   their own — but they are declared again on every opted-in surface, because a
+   custom property resolves where it is declared, not where it is used. */
+:root,
+[data-surface] {
   /* Phases of a test, in the order they run. */
   --phase-setup: var(--blueprint);
   --phase-execution: var(--pt-cyan);
@@ -218,6 +224,20 @@
   /* The report sink names the active colour `accent`. */
   --accent: var(--blueprint);
   --accent-soft: var(--blueprint-soft);
+
+  /* Code sits on the sunken surface on both surfaces, so one syntax palette serves both themes.
+     Blueprint cyan for structure, paper-green for literals, amber for numbers, a dimmed navy-grey for
+     comments — the handoff's code swatches. */
+  --code-text: var(--pt-code-text);
+  --code-comment: #6f8ea3;
+  --code-keyword: #71bfd3;
+  --code-type: #8fd3e0;
+  --code-function: #9ec9f5;
+  --code-string: #91d4b3;
+  --code-number: #e2c07d;
+  --code-attribute: #b8a4e6;
+  --code-punctuation: #90aec2;
+  --code-highlight: rgba(113, 191, 211, 0.12);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -226,3 +246,9 @@
     --motion-slow: 0ms;
   }
 }
+
+/* Code is read as it was typed: `=>`, `!=` and `->` stay the characters a reader copies, not ligature glyphs.
+   JetBrains Mono draws those through contextual alternates. Every `font:` shorthand resets the feature
+   settings of its element, so the one rule that holds on all three surfaces is an important one on every
+   element. It only switches contextual alternates off; nothing else depends on them. */
+*, ::before, ::after { font-feature-settings: "calt" 0 !important; }

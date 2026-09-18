@@ -57,7 +57,7 @@ Component<InvoiceRow>(By.Role(WebRole.Row).And(By.HasText("INV-123")))
 
 `HasText` is **only valid as the right-hand side of `And`** — on its own, both backends throw `WebBackendCapabilityException`.
 
-:::caution Selenium limitations
+:::caution[Selenium limitations]
 Selenium supports a narrower set of combinations: the right-hand side of `And` must be `HasText`, and the left-hand side can't be `By.Css`. Playwright accepts both.
 :::
 

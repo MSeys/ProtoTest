@@ -69,7 +69,7 @@ Assertions **poll**: every 50 ms until the condition holds or the timeout passes
 - `ShouldContainTextAsync` checks for a substring.
 - A timeout of zero or less throws `ArgumentOutOfRangeException`.
 
-:::note Form values stay out of the trace
+:::note[Form values stay out of the trace]
 `FillAsync` records only the *length* of what was typed, and `ShouldHaveValueAsync` failures report the value's length rather than the value. Passwords and personal data you type in tests never end up in a `.prototrace` file.
 :::
 

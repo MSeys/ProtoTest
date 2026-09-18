@@ -62,8 +62,7 @@ public sealed class GraphQLIntegrationTests
                 var request = entries.Single(entry => entry.Kind == "graphql.operation");
                 Assert.That(entries, Has.Some.Matches<ProtoTraceEntry>(entry =>
                     entry.Kind == "graphql.builder.create"));
-                Assert.That(entries, Has.Some.Matches<ProtoTraceEntry>(entry =>
-                    entry.Kind == "auth.skip" && entry.ParentId == request.Id));
+                Assert.That(request.Attributes["auth.outcome"], Is.EqualTo("skipped"));
                 Assert.That(entries, Has.Some.Matches<ProtoTraceEntry>(entry =>
                     entry.Kind == "assert.graphql.no_errors" && entry.ParentId == request.Id));
                 var shape = entries.Single(entry => entry.Kind == "assert.graphql.data_shape");

@@ -41,7 +41,7 @@ internal sealed class ProtoRunGateHook(
                 "Run gates",
                 "Gate",
                 gate.Name,
-                Kind: ProtoReportItemKind.Gate,
+                Kind: ProtoReportItemKinds.Gate,
                 Status: StatusOf(result.Outcome),
                 Count: 1,
                 Message: result.Message,

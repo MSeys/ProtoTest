@@ -110,7 +110,7 @@ options.BindFromConfiguration(configuration);   // configuration wins over code
 
 ### Authenticator-style construction
 
-`ProtoAuthenticatorFactory.Create<T>(context, constructorArgs)` is what `[RestAuth<T>]` and `[LoginAs<T>]` use to build their types: positional arguments from an attribute, the rest from DI and the `ProtoExecutionContext`. Use it for your own generic attributes so they behave the same way.
+`ProtoAuthenticatorFactory.Create<T>(context, constructorArgs)` is what `[Auth<T>]` and `[LoginAs<T>]` use to build their types: positional arguments from an attribute, the rest from DI and the `ProtoExecutionContext`. Use it for your own generic attributes so they behave the same way.
 
 ## Adding to the trace
 

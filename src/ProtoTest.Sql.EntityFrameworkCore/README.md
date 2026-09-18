@@ -21,4 +21,4 @@ public async Task Order_ShouldPersistThroughTheContext()
 }
 ```
 
-The context is built on the connection ProtoTest owns, so `TransactionPerTest` rolls back Entity Framework Core writes and raw commands alike, and the connection is released as an owned resource when the test ends.
+The context is built on the connection ProtoTest owns, so `Transaction` rolls back Entity Framework Core writes and raw commands alike, and the connection is released as an owned resource when the test ends.

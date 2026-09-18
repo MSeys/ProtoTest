@@ -113,6 +113,10 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
         var findingStore = new ProtoFindingStore();
         _services.AddSingleton(findingStore);
         _services.AddSingleton<IProtoReportSource>(findingStore);
+        var resourceReportStore = new ProtoResourceReportStore();
+        _services.AddSingleton(resourceReportStore);
+        _services.AddSingleton<IProtoReportSource>(resourceReportStore);
+        _services.AddSingleton<IProtoReportSource>(_runResources);
 
         var rootProvider = _services.BuildServiceProvider();
         try

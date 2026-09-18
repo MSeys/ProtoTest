@@ -1,7 +1,7 @@
 namespace ProtoTest.Core.Internal;
 
 /// <summary>Owns the resources that live for a whole run and releases them when the host is disposed.</summary>
-internal sealed class ProtoRunResourceStore
+internal sealed class ProtoRunResourceStore : IProtoReportSource
 {
     private readonly ProtoResourceRegistry _resources = new();
 
@@ -26,4 +26,7 @@ internal sealed class ProtoRunResourceStore
 
     public ValueTask<IReadOnlyList<Exception>> ReleaseAllAsync(IProtoTraceWriter trace)
         => _resources.ReleaseAllAsync(test: null, trace, ProtoTracePhase.Run);
+
+    public IEnumerable<ProtoReportItem> GetReportItems()
+        => [.. Snapshot().Select(resource => resource.ToReportItem("Run resources", scope: "run", displayGroup: null))];
 }

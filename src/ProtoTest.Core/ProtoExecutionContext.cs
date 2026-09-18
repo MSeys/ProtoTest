@@ -15,6 +15,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     private readonly ProtoContextStateStore _state = new();
     private readonly ProtoClientRegistry _clients = new();
     private readonly ProtoResourceRegistry _resources = new();
+    private readonly HashSet<string> _reportedResources = new(StringComparer.Ordinal);
     private readonly ProtoObservationDispatcher _observations;
     private int _disposeStarted;
     private int _findingSequence;
@@ -92,18 +93,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     public ProtoTestAttachment AddAttachment(ProtoTestAttachment attachment)
     {
         var registered = _attachments.Add(attachment);
-        Trace.WriteEvent(
-            "attachment.register",
-            $"Attachment · {registered.Name}",
-            "ProtoTest.Core",
-            outcome: ProtoTraceOutcome.Succeeded,
-            attributes: new Dictionary<string, string?>
-            {
-                ["attachment.name"] = registered.Name,
-                ["attachment.media_type"] = registered.MediaType,
-                ["attachment.description"] = registered.Description,
-                ["attachment.source"] = registered.IsFile ? "file" : "memory"
-            });
+        Trace.Attachment(registered.Name, registered.MediaType, registered.Description);
         return registered;
     }
 
@@ -111,33 +101,23 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     public void SetContext<T>(T context) where T : class, IProtoContext
     {
         _state.Set(context);
-        Trace.WriteEvent(
-            "context.set",
+        Trace.SetEntityState(
+            ProtoTraceEntityKinds.Context,
+            typeof(T).FullName!,
             $"Context · {typeof(T).Name}",
-            "ProtoTest.Core",
-            outcome: ProtoTraceOutcome.Succeeded,
-            attributes: new Dictionary<string, string?>
+            new Dictionary<string, string?>
             {
                 ["context.type"] = typeof(T).FullName,
                 ["context.value"] = ProtoTraceValueFormatter.Serialize(context)
-            });
+            },
+            scope: TestName,
+            change: "set");
     }
 
     /// <summary>Retrieves contextual state when it is present.</summary>
     public T? TryResolve<T>() where T : class, IProtoContext
     {
-        var context = _state.TryGet<T>();
-        Trace.WriteEvent(
-            "context.try_resolve",
-            $"Try context · {typeof(T).Name}",
-            "ProtoTest.Core",
-            outcome: ProtoTraceOutcome.Succeeded,
-            attributes: new Dictionary<string, string?>
-            {
-                ["context.type"] = typeof(T).FullName,
-                ["context.found"] = (context is not null).ToString().ToLowerInvariant()
-            });
-        return context;
+        return _state.TryGet<T>();
     }
 
     /// <summary>Retrieves required contextual state.</summary>
@@ -145,17 +125,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     {
         try
         {
-            var context = _state.Get<T>();
-            Trace.WriteEvent(
-                "context.resolve",
-                $"Resolve context · {typeof(T).Name}",
-                "ProtoTest.Core",
-                outcome: ProtoTraceOutcome.Succeeded,
-                attributes: new Dictionary<string, string?>
-                {
-                    ["context.type"] = typeof(T).FullName
-                });
-            return context;
+            return _state.Get<T>();
         }
         catch (Exception exception)
         {
@@ -165,7 +135,9 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
                 "ProtoTest.Core",
                 outcome: ProtoTraceOutcome.Failed,
                 attributes: new Dictionary<string, string?> { ["context.type"] = typeof(T).FullName },
-                exception: exception);
+                exception: exception,
+                entityKind: ProtoTraceEntityKinds.Context,
+                entityId: typeof(T).FullName);
             throw;
         }
     }
@@ -180,44 +152,34 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(client);
         _clients.Register(client, name);
+        var clientId = $"client:{typeof(TClient).FullName}:{name}";
         RegisterOwned(new ProtoResource(
-            $"client:{typeof(TClient).FullName}:{name}",
+            clientId,
             "client",
             $"{(disposeWithContext ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
             context => ReleaseClientAsync(client, disposeWithContext)));
-        Trace.WriteEvent(
-            "client.register",
-            $"Register · {name} ({typeof(TClient).Name})",
-            "ProtoTest.Core",
-            phase: ProtoTracePhase.Setup,
-            outcome: ProtoTraceOutcome.Succeeded,
-            attributes: new Dictionary<string, string?>
+        Trace.SetEntityState(
+            ProtoTraceEntityKinds.Client,
+            clientId,
+            $"{(disposeWithContext ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
+            new Dictionary<string, string?>
             {
                 ["client.name"] = name,
                 ["client.type"] = typeof(TClient).FullName,
                 ["instance.type"] = client.GetType().FullName,
                 ["client.owned"] = disposeWithContext ? "true" : "false"
-            });
+            },
+            scope: TestName,
+            change: "created");
     }
 
     /// <summary>Retrieves a required named client.</summary>
     public TClient Client<TClient>(string name = "Default") where TClient : class
     {
-        var attributes = new Dictionary<string, string?>
-        {
-            ["client.name"] = name,
-            ["client.type"] = typeof(TClient).FullName
-        };
+        var clientId = $"client:{typeof(TClient).FullName}:{name}";
         try
         {
-            var client = _clients.Get<TClient>(name);
-            Trace.WriteEvent(
-                "client.resolve",
-                $"Resolve · {name} ({typeof(TClient).Name})",
-                "ProtoTest.Core",
-                outcome: ProtoTraceOutcome.Succeeded,
-                attributes: attributes);
-            return client;
+            return _clients.Get<TClient>(name);
         }
         catch (Exception exception)
         {
@@ -226,8 +188,14 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
                 $"Resolve · {name} ({typeof(TClient).Name})",
                 "ProtoTest.Core",
                 outcome: ProtoTraceOutcome.Failed,
-                attributes: attributes,
-                exception: exception);
+                attributes: new Dictionary<string, string?>
+                {
+                    ["client.name"] = name,
+                    ["client.type"] = typeof(TClient).FullName
+                },
+                exception: exception,
+                entityKind: ProtoTraceEntityKinds.Client,
+                entityId: clientId);
             throw;
         }
     }
@@ -235,19 +203,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     /// <summary>Retrieves a named client when it is present.</summary>
     public TClient? TryClient<TClient>(string name = "Default") where TClient : class
     {
-        var client = _clients.TryGet<TClient>(name);
-        Trace.WriteEvent(
-            "client.try_resolve",
-            $"Try resolve · {name} ({typeof(TClient).Name})",
-            "ProtoTest.Core",
-            outcome: ProtoTraceOutcome.Succeeded,
-            attributes: new Dictionary<string, string?>
-            {
-                ["client.name"] = name,
-                ["client.type"] = typeof(TClient).FullName,
-                ["client.found"] = (client is not null).ToString().ToLowerInvariant()
-            });
-        return client;
+        return _clients.TryGet<TClient>(name);
     }
 
     /// <summary>Gets a snapshot of the resources owned by this test, in registration order.</summary>
@@ -255,7 +211,8 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
 
     /// <summary>
     /// Registers a resource owned by this test. Owned resources are released in reverse registration
-    /// order during teardown, after hooks and attributes and before clients are disposed.
+    /// order during teardown, after hooks and attributes and before clients are disposed. Resources
+    /// registered here reach the run's report; framework-managed clients do not, unless their release fails.
     /// </summary>
     public void RegisterResource(IProtoResource resource)
     {
@@ -268,17 +225,21 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         }
 
         RegisterOwned(resource);
-        Trace.WriteEvent(
-            "resource.register",
-            $"Register · {resource.Id}",
-            "ProtoTest.Core",
-            outcome: ProtoTraceOutcome.Succeeded,
-            attributes: new Dictionary<string, string?>
+        _reportedResources.Add(resource.Id);
+        Trace.SetEntityState(
+            resource.Kind,
+            resource.Id,
+            $"Resource · {resource.Id}",
+            new Dictionary<string, string?>
             {
                 ["resource.id"] = resource.Id,
                 ["resource.kind"] = resource.Kind,
-                ["resource.description"] = resource.Description
-            });
+                ["resource.scope"] = "test",
+                ["resource.description"] = resource.Description,
+                ["resource.state"] = "registered"
+            },
+            scope: TestName,
+            change: "created");
     }
 
     /// <summary>Registers a resource and returns it, so ownership can be expressed inline.</summary>
@@ -322,26 +283,14 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
             TargetName: targetName ?? "Test findings",
             Category: category ?? "Finding",
             Identifier: identifier ?? $"finding-{sequence:D3}",
-            Kind: ProtoReportItemKind.Finding,
+            Kind: ProtoReportItemKinds.Finding,
             Status: status,
             Message: message,
             Tags: tags,
             Metadata: WithTestIdentity(metadata),
             DisplayGroup: TestName);
         TryService<ProtoFindingStore>()?.Add(item);
-        Trace.WriteEvent(
-            "finding.record",
-            $"Finding · {item.Identifier}",
-            "ProtoTest.Core",
-            outcome: ProtoTraceOutcome.Succeeded,
-            attributes: new Dictionary<string, string?>
-            {
-                ["finding.status"] = status.ToString(),
-                ["finding.target"] = item.TargetName,
-                ["finding.category"] = item.Category,
-                ["finding.message"] = message,
-                ["finding.tags"] = tags is null ? null : string.Join(", ", tags)
-            });
+        Trace.Finding(message, status.ToString(), item.Category, item.TargetName, tags, metadata);
         return item;
     }
 
@@ -362,19 +311,12 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     public void RecordObservation(ProtoObservation observation)
     {
         _observations.Record(observation);
-        Trace.WriteEvent(
-            "observation.record",
-            $"Observation · {observation.Kind}",
-            "ProtoTest.Core",
-            outcome: ProtoTraceOutcome.Succeeded,
-            attributes: new Dictionary<string, string?>
-            {
-                ["observation.target"] = observation.TargetName,
-                ["observation.kind"] = observation.Kind,
-                ["observation.identifier"] = observation.Identifier,
-                ["observation.data"] = ProtoTraceValueFormatter.Serialize(observation.Data),
-                ["observation.metadata"] = ProtoTraceValueFormatter.Serialize(observation.Metadata)
-            });
+        Trace.Observation(
+            observation.TargetName,
+            observation.Kind,
+            observation.Identifier,
+            ProtoTraceValueFormatter.Serialize(observation.Data),
+            ProtoTraceValueFormatter.Serialize(observation.Metadata));
     }
 
     /// <summary>Convenience overload for recording an observation.</summary>
@@ -404,7 +346,21 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         }
 
         _clients.Seal();
+        using var releaseOperation = Trace
+            .Operation("resources.release", "Release owned resources", "ProtoTest.Core")
+            .During(phase)
+            .Begin();
         var exceptions = (await _resources.ReleaseAllAsync(this, Trace, phase)).ToList();
+        if (exceptions.Count == 0)
+        {
+            releaseOperation.Succeed();
+        }
+        else
+        {
+            releaseOperation.Fail(new AggregateException(exceptions));
+        }
+
+        PublishOwnedResources();
         try
         {
             if (_scope is IAsyncDisposable asyncDisposable)
@@ -428,6 +384,22 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     }
 
     private void RegisterOwned(IProtoResource resource) => _resources.Register(resource);
+
+    /// <summary>
+    /// Publishes what this test owned, after release, so reports explain teardown. The report lists the
+    /// resources the test registered; clients are framework plumbing found in the trace and viewer, and
+    /// appear in the report only when their release failed.
+    /// </summary>
+    private void PublishOwnedResources()
+    {
+        if (TryService<ProtoResourceReportStore>() is not { } store)
+        {
+            return;
+        }
+
+        store.Add(TestName, _resources.Snapshot().Where(resource =>
+            _reportedResources.Contains(resource.Id) || resource.State == ProtoResourceState.ReleaseFailed));
+    }
 
     private static async ValueTask ReleaseClientAsync(object client, bool dispose)
     {

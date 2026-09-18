@@ -13,7 +13,7 @@ dotnet add package ProtoTest.OpenApi
 
 It builds on [`ProtoTest.Rest`](./rest/index.md) — it listens to the requests and shape assertions REST records.
 
-:::note Coverage, not validation
+:::note[Coverage, not validation]
 This package reports coverage. It doesn't validate requests or responses against the schema.
 :::
 

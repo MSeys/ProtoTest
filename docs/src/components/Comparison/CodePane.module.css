@@ -1,0 +1,64 @@
+/* A capability hangs off the line that declares it: a guide, a header that opens, and the implementation. */
+.fold {
+  margin-left: var(--space-4);
+  border-left: 2px solid var(--blueprint-line);
+}
+
+.foldHead {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font: var(--text-micro) var(--font-ui);
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--motion-ease);
+}
+
+.foldHead:hover { background: var(--hover); }
+
+.foldToggle {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-hairline);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.foldHead:hover .foldToggle { border-color: var(--blueprint); color: var(--text); }
+.foldStem { transition: opacity var(--motion-fast) var(--motion-ease); }
+.foldHead[aria-expanded='true'] .foldStem { opacity: 0; }
+
+.foldSource { color: var(--text); font: var(--text-micro) var(--font-mono); }
+
+.foldReuse {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-chip);
+  background: var(--blueprint-soft);
+  color: var(--blueprint);
+  font: var(--weight-semibold) var(--text-micro)/1.8 var(--font-mono);
+  white-space: nowrap;
+}
+
+.foldSummary { flex: 1 1 12rem; min-width: 0; }
+
+.foldBody { border-top: 1px solid var(--border); }
+
+.foldBodyHead {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font: var(--text-micro) var(--font-mono);
+}

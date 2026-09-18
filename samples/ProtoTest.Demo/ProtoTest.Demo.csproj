@@ -25,6 +25,7 @@
     <ProjectReference Include="..\..\src\ProtoTest.OpenApi\ProtoTest.OpenApi.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Reporting\ProtoTest.Reporting.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Rest\ProtoTest.Rest.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Sql\ProtoTest.Sql.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Sql.Testcontainers\ProtoTest.Sql.Testcontainers.csproj" />
   </ItemGroup>
   <ItemGroup>

@@ -86,10 +86,23 @@ public class Program
             System.IO.Path.Combine(AppContext.BaseDirectory, "openapi", "northstar.v1.json"),
             "application/json"));
         app.MapNorthstarApi();
-        app.MapNorthstarTestSupport();
+        if (IsTestSupportEnabled(builder.Configuration))
+        {
+            // Scenario provisioning can create whole tenants, so it is a development affordance:
+            // a published deployment does not expose it unless it opts in explicitly.
+            app.MapNorthstarTestSupport();
+        }
+
         app.MapGraphQL("/graphql");
 
         app.Run();
+    }
+
+    private static bool IsTestSupportEnabled(IConfiguration configuration)
+    {
+        var value = configuration["PROTOTEST_TEST_SUPPORT"];
+        return string.Equals(value, "1", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task ProblemMiddleware(HttpContext context, Func<Task> next)

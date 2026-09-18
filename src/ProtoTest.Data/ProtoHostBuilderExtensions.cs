@@ -20,11 +20,13 @@ public static class ProtoHostBuilderExtensions
         var registry = Registries.GetValue(builder, static _ => new ProtoDataRegistry());
         configure?.Invoke(new ProtoDataConfiguration(registry));
 
-        return builder.ConfigureServices(services =>
-        {
-            services.TryAddSingleton(registry);
-            services.TryAddScoped<IProtoData, ProtoDataService>();
-        });
+        return builder
+            .AddCapability(new ProtoCapabilityDescriptor("Data", ProtoCapabilityKinds.Data, "ProtoTest.Data"))
+            .ConfigureServices(services =>
+            {
+                services.TryAddSingleton(registry);
+                services.TryAddScoped<IProtoData, ProtoDataService>();
+            });
     }
 
     /// <summary>Registers the single application-specific creation route for a data type.</summary>

@@ -29,11 +29,13 @@ public static class ProtoTraceWriterExtensions
         Func<ValueTask> action,
         ProtoTracePhase phase = ProtoTracePhase.Execution,
         IReadOnlyDictionary<string, string?>? attributes = null,
-        string? parentId = null)
+        string? parentId = null,
+        string? entityKind = null,
+        string? entityId = null)
     {
         ArgumentNullException.ThrowIfNull(trace);
         ArgumentNullException.ThrowIfNull(action);
-        using var operation = trace.StartOperation(kind, name, source, phase, attributes, parentId);
+        using var operation = trace.StartOperation(kind, name, source, phase, attributes, parentId, entityKind, entityId);
         try
         {
             await action();
@@ -60,11 +62,13 @@ public static class ProtoTraceWriterExtensions
         Func<ValueTask<TResult>> action,
         ProtoTracePhase phase = ProtoTracePhase.Execution,
         IReadOnlyDictionary<string, string?>? attributes = null,
-        string? parentId = null)
+        string? parentId = null,
+        string? entityKind = null,
+        string? entityId = null)
     {
         ArgumentNullException.ThrowIfNull(trace);
         ArgumentNullException.ThrowIfNull(action);
-        using var operation = trace.StartOperation(kind, name, source, phase, attributes, parentId);
+        using var operation = trace.StartOperation(kind, name, source, phase, attributes, parentId, entityKind, entityId);
         try
         {
             var result = await action();
@@ -96,11 +100,13 @@ public static class ProtoTraceWriterExtensions
         Func<ProtoTraceOperation, ValueTask> action,
         ProtoTracePhase phase = ProtoTracePhase.Execution,
         IReadOnlyDictionary<string, string?>? attributes = null,
-        string? parentId = null)
+        string? parentId = null,
+        string? entityKind = null,
+        string? entityId = null)
     {
         ArgumentNullException.ThrowIfNull(trace);
         ArgumentNullException.ThrowIfNull(action);
-        using var operation = trace.StartOperation(kind, name, source, phase, attributes, parentId);
+        using var operation = trace.StartOperation(kind, name, source, phase, attributes, parentId, entityKind, entityId);
         try
         {
             await action(operation);
@@ -130,11 +136,13 @@ public static class ProtoTraceWriterExtensions
         Func<ProtoTraceOperation, ValueTask<TResult>> action,
         ProtoTracePhase phase = ProtoTracePhase.Execution,
         IReadOnlyDictionary<string, string?>? attributes = null,
-        string? parentId = null)
+        string? parentId = null,
+        string? entityKind = null,
+        string? entityId = null)
     {
         ArgumentNullException.ThrowIfNull(trace);
         ArgumentNullException.ThrowIfNull(action);
-        using var operation = trace.StartOperation(kind, name, source, phase, attributes, parentId);
+        using var operation = trace.StartOperation(kind, name, source, phase, attributes, parentId, entityKind, entityId);
         try
         {
             var result = await action(operation);

@@ -16,6 +16,19 @@ internal sealed class ProtoRunResourceHook(
     {
         foreach (var resource in resources.Resources)
         {
+            trace.RunWriter.SetEntityState(
+                resource.Kind,
+                resource.Id,
+                $"Resource · {resource.Id}",
+                new Dictionary<string, string?>
+                {
+                    ["resource.id"] = resource.Id,
+                    ["resource.kind"] = resource.Kind,
+                    ["resource.scope"] = "run",
+                    ["resource.description"] = resource.Description,
+                    ["resource.state"] = "registered"
+                },
+                change: "owned");
             trace.RunWriter.WriteEvent(
                 "resource.owned",
                 $"Owned · {resource.Id}",
@@ -28,7 +41,9 @@ internal sealed class ProtoRunResourceHook(
                     ["resource.kind"] = resource.Kind,
                     ["resource.description"] = resource.Description,
                     ["resource.scope"] = ProtoResourceScope.Run.ToString()
-                });
+                },
+                entityKind: resource.Kind,
+                entityId: resource.Id);
         }
 
         return Task.CompletedTask;

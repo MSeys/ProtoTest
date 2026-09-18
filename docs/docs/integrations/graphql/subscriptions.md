@@ -44,7 +44,7 @@ public async Task SubscriptionStreamsShapeMatchedEvents()
 
 The same `expected` object builds the subscription's selection set and asserts the event that arrives.
 
-:::tip Give the server a moment
+:::tip[Give the server a moment]
 `SubscribeAsync()` returns once the server acknowledges the **connection**, not the individual subscription. If you trigger the event immediately afterwards, a fast server can publish it before it has registered the subscriber. The sample suite waits briefly (`await Task.Delay(100)`) before firing the mutation.
 :::
 

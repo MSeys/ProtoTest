@@ -443,6 +443,10 @@ internal sealed class NorthstarStore(
                 CreatedAtUtc = now
             };
             organization.Projects.Add(project);
+            using var activity = NorthstarDiagnostics.Source.StartActivity("project.create");
+            activity?.SetTag("project.id", project.Id);
+            activity?.SetTag("project.name", project.Name);
+            activity?.SetTag("project.status", project.Status);
             Record(organization, "project.created", $"project:{project.Id}", actor.Email,
                 new Dictionary<string, string> { ["name"] = project.Name });
             Enqueue(organization, WebhookEventTypes.ProjectCreated, new { project = ToResponse(project) }, now);
@@ -778,6 +782,12 @@ internal sealed class NorthstarStore(
             {
                 invoice.Status = InvoiceStatuses.Paid;
                 invoice.PaidAtUtc = now;
+                using (var activity = NorthstarDiagnostics.Source.StartActivity("invoice.pay"))
+                {
+                    activity?.SetTag("invoice.number", invoice.Number);
+                    activity?.SetTag("invoice.status", invoice.Status);
+                    activity?.SetTag("invoice.total", invoice.Total.ToString("0.00"));
+                }
                 organization.Status = SubscriptionStatuses.Active;
                 Record(organization, "invoice.paid", $"invoice:{invoice.Id}", actor.Email,
                     new Dictionary<string, string> { ["method"] = method });
@@ -1093,6 +1103,12 @@ internal sealed class NorthstarStore(
             Lines = lines
         };
         organization.Invoices.Add(invoice);
+        using (var activity = NorthstarDiagnostics.Source.StartActivity("invoice.issue"))
+        {
+            activity?.SetTag("invoice.number", invoice.Number);
+            activity?.SetTag("invoice.status", invoice.Status);
+            activity?.SetTag("invoice.total", invoice.Total.ToString("0.00"));
+        }
         Record(organization, "invoice.issued", $"invoice:{invoice.Id}", "northstar",
             new Dictionary<string, string> { ["number"] = invoice.Number, ["total"] = invoice.Total.ToString("0.00") });
         Enqueue(organization, WebhookEventTypes.InvoiceIssued, new { invoice = ToResponse(invoice) }, issued);

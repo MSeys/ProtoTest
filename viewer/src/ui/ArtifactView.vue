@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import type { TraceArtifact } from "../model/trace-schema";
+import type { Artifact as TraceArtifact } from "../trace/model";
 import AppButton from "./AppButton.vue";
 import EmptyState from "./EmptyState.vue";
 
 const props = defineProps<{
   artifact: TraceArtifact;
   readArtifact?: (artifact: TraceArtifact) => Promise<Blob>;
+  /**
+   * Fill the parent's height instead of taking a fixed one. The overlay uses it so the preview is the only
+   * thing that scrolls; inline, in the inspector, the preview keeps a fixed height inside a scrolling panel.
+   */
+  fill?: boolean;
 }>();
 const artifactUrl = ref("");
 const artifactText = ref("");
@@ -64,7 +69,7 @@ onBeforeUnmount(releaseArtifactUrl);
 </script>
 
 <template>
-  <section class="artifact">
+  <section class="artifact" :class="{ fill }">
     <header>
       <div>
         <strong>{{ artifact.name }}</strong>
@@ -73,6 +78,7 @@ onBeforeUnmount(releaseArtifactUrl);
       <div class="actions">
         <AppButton :disabled="!artifactUrl" @click="openArtifact">Open</AppButton>
         <AppButton variant="primary" :disabled="!artifactUrl" @click="downloadArtifact">Download</AppButton>
+        <slot name="actions" />
       </div>
     </header>
 
@@ -100,23 +106,28 @@ header span { color: var(--muted); font-size: var(--text-meta); }
 .failure strong { display: block; color: var(--danger); }
 .failure p { margin-top: var(--space-1); color: var(--muted); }
 .image { display: block; max-width: 100%; max-height: 60vh; margin: 0 auto; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-2); }
+/* Inline, text runs its full length and the surrounding view scrolls; in the overlay (.fill) it scrolls itself. */
 .text {
-  max-height: 60vh;
-  overflow: auto;
   margin: 0;
   padding: var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   background: var(--surface-sunken);
   color: var(--text-on-sunken);
-  font: var(--text-meta)/1.6 var(--font-mono);
+  font: var(--text-meta)/var(--leading) var(--font-mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.json { white-space: pre; tab-size: 2; }
+.json { tab-size: 2; }
 .json code { padding: 0; background: transparent; color: inherit; font: inherit; }
 .media, .frame { display: block; width: 100%; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-2); }
 .media { max-height: 60vh; }
 .frame { height: min(72vh, 760px); min-height: 360px; }
 .audio { width: 100%; }
+
+/* Filling: the preview takes every pixel under the header and is the single scroller. */
+.artifact.fill { height: 100%; grid-template-rows: auto minmax(0, 1fr); align-content: stretch; }
+.fill .text, .fill .frame, .fill .media { height: 100%; min-height: 0; max-height: none; }
+.fill .text { overflow: auto; }
+.fill .image { width: 100%; height: 100%; max-height: none; object-fit: contain; }
 </style>

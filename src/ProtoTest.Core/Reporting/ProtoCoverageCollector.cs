@@ -27,7 +27,7 @@ public abstract class ProtoCoverageCollector(string targetName) : IProtoCollecto
                     TargetName,
                     Category,
                     observation.Identifier,
-                    Kind: ProtoReportItemKind.Coverage,
+                    Kind: ProtoReportItemKinds.Coverage,
                     Status: ProtoReportStatus.Neutral,
                     IsCovered: false);
             }

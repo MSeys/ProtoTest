@@ -28,7 +28,7 @@ protected override void Configure(IProtoHostBuilder builder) =>
 
 **2. A test attribute** that starts the execution context before your method body and completes it afterwards. Tests select the application with `[Application("Api")]`, and the protocol accessors (`Proto.Context.Rest()`, `Proto.Context.GraphQL()`, `Proto.Context.Web()`) then use the clients bound to it.
 
-:::note One host per process
+:::note[One host per process]
 `Host` is a static field inside each runner package — there is one host per test process. Touching `Proto.Context` before the assembly setup has run throws an `InvalidOperationException` telling you which setup class is missing.
 :::
 

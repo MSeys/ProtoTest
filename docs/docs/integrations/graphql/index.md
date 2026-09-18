@@ -88,16 +88,20 @@ Proto.Context.GraphQL("GraphQL") // explicit
 
 ## Authentication
 
-Use `[GraphQLAuth<T>]` exactly like its REST counterpart, under the same `[Application]`. One authenticator class can serve both:
+Use the same `[Auth<T>]` attribute as REST, under the same `[Application]`. One authenticator class serves every HTTP-based protocol the application exposes; narrow it with `Protocols` when you only want one:
 
 ```csharp
 [Application("ControlPlane", "Rest:Api", "GraphQL:GraphQL")]
-[RestAuth<SampleUserAuthenticator>]
-[GraphQLAuth<SampleUserAuthenticator>]
+[Auth<SampleUserAuthenticator>]
 public sealed class ControlPlaneTests
 {
     // ...
 }
+```
+
+```csharp
+// An application that carries a token header on REST but a cookie on GraphQL:
+[Auth<SampleUserAuthenticator>(Protocols = ["GraphQL"])]
 ```
 
 Per request: `.Auth(authenticator)`, `.Auth<T>(args)` and `.WithoutAuth()`. The precedence rules are the ones described under [REST authentication](../rest/authentication.md#precedence).

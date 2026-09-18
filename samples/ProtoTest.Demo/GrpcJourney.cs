@@ -56,6 +56,12 @@ public sealed class GrpcJourney
         // Assert: same identity, same state, from the other protocol.
         Assert.Multiple(() =>
         {
+            reply.ShouldMatchShape(new
+            {
+                id = project.Id,
+                name = "grpc-atlas",
+                status = ProjectStatuses.Active
+            });
             Assert.That(reply.Id, Is.EqualTo(project.Id));
             Assert.That(reply.Name, Is.EqualTo("grpc-atlas"));
             Assert.That(reply.Status, Is.EqualTo(ProjectStatuses.Active));

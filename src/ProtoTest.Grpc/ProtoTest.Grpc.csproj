@@ -15,11 +15,13 @@
 
   <ItemGroup>
     <PackageReference Include="Grpc.Net.Client" Version="2.70.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.31.1" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
     <ProjectReference Include="..\ProtoTest.Http\ProtoTest.Http.csproj" />
+    <ProjectReference Include="..\ProtoTest.Json\ProtoTest.Json.csproj" />
   </ItemGroup>
 
 </Project>

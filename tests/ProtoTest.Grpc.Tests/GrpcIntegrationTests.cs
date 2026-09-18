@@ -81,6 +81,7 @@ public sealed class GrpcIntegrationTests
         Assert.Multiple(() =>
         {
             Assert.That(reply.Message, Is.EqualTo("hello"));
+            reply.ShouldMatchShape(new { message = "hello" });
             Assert.That(EchoService.LastAuthorization, Is.EqualTo("Bearer secret"));
             var call = test.Entries.Single(entry => entry.Kind == "grpc.call");
             Assert.That(call.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));

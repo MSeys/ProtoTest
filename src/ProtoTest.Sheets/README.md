@@ -13,7 +13,7 @@ builder.AddSheets();
 public async Task TheMonthlyReport_ShouldMatch()
 {
     using var response = await Proto.Context.Rest().GetAsync("/api/v1/reports/monthly.xlsx");
-    var workbook = Proto.Context.Sheets().Open(await response.Content.ReadAsStreamAsync(), "monthly.xlsx");
+    var workbook = Proto.Context.Sheets().Open(response);   // the file name comes from the response
 
     workbook.Sheet("Summary").Cell("B1").ShouldBe(42.0);
     workbook.Sheet("Summary").Range("A4:B5").ShouldMatch(

@@ -20,11 +20,11 @@ builder.AddSheets();
 public async Task TheMonthlyReport_ShouldMatch()
 {
     using var response = await Proto.Context.Rest().GetAsync("/api/v1/reports/monthly.xlsx");
-    var workbook = Proto.Context.Sheets().Open(await response.Content.ReadAsStreamAsync(), "monthly.xlsx");
+    var workbook = Proto.Context.Sheets().Open(response);   // the file name comes from the response
 }
 ```
 
-`Open(string path)` reads from disk; `Open(Stream, name)` reads a captured attachment or response body. Hidden sheets are skipped unless `ProtoTest:Sheets:IncludeHiddenSheets` is set.
+`Open(string path)` reads from disk; `Open(Stream, name)` reads a stream; `Open(IProtoBinaryContent)` reads anything that carries named bytes - a REST response, a captured attachment - so downloading and checking a report reads as one line.
 
 ## Asserting
 

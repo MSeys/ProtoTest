@@ -270,6 +270,26 @@ public sealed class SheetsTests
         Assert.That(exception!.Message, Does.Contain("900"));
     }
 
+    [Test]
+    public async Task Open_ShouldAcceptNamedContent()
+    {
+        var (host, context) = await StartAsync("sheets content");
+        var content = new NamedContent(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            File.ReadAllBytes(_path),
+            "from-api.xlsx");
+
+        var workbook = context.Sheets().Open(content);
+
+        workbook.Sheet("Summary").Cell("B1").ShouldBe(42);
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    private sealed record NamedContent(
+        string? MediaType,
+        ReadOnlyMemory<byte> Content,
+        string? FileName) : IProtoBinaryContent;
+
     private static async Task<(ProtoHost Host, ProtoExecutionContext Context)> StartAsync(string name)
     {
         var builder = new ProtoHostBuilder();

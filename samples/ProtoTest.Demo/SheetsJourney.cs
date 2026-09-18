@@ -37,11 +37,10 @@ public sealed class SheetsJourney
             .With(request => request.Name, "report-atlas")
             .CreateAsync<ProjectResponse>();
 
-        // Act: download the generated workbook.
+        // Act: download the generated workbook; the response is content the sheet reader understands.
         using var response = await Proto.Context.Rest().GetAsync("/api/v1/reports/monthly.xlsx");
         response.ShouldHaveHttpStatus(HttpStatusCode.OK);
-        using var stream = new MemoryStream(response.ContentBytes.ToArray());
-        var report = Proto.Context.Sheets().Open(stream, "monthly.xlsx").Model<ProjectReportRow>();
+        var report = Proto.Context.Sheets().Open(response).Model<ProjectReportRow>();
 
         // Assert: the model checks the layout, and the exact values are ordinary assertions.
         report.Verify();

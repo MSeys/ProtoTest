@@ -32,4 +32,17 @@ public sealed class ProtoSheets
         using var document = SpreadsheetDocument.Open(stream, false);
         return ProtoWorkbook.Read(document, name, _context, _options);
     }
+
+    /// <summary>
+    /// Opens a workbook straight from downloaded content - a REST response, an attachment, anything
+    /// carrying named bytes - so the common test reads as one line.
+    /// </summary>
+    public ProtoWorkbook Open(IProtoBinaryContent content, string? name = null)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        var fileName = name ?? content.FileName ?? "workbook.xlsx";
+        using var stream = new MemoryStream(content.Content.ToArray());
+        using var document = SpreadsheetDocument.Open(stream, false);
+        return ProtoWorkbook.Read(document, fileName, _context, _options);
+    }
 }

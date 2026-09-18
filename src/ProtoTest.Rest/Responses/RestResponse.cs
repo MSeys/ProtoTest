@@ -11,7 +11,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
-public sealed class RestResponse : IDisposable
+public sealed class RestResponse : IDisposable, IProtoBinaryContent
 {
     private readonly ProtoExecutionContext? _context;
     private readonly string? _targetName;
@@ -58,6 +58,14 @@ public sealed class RestResponse : IDisposable
     public TimeSpan ElapsedTime { get; }
     public string Content { get; }
     public ReadOnlyMemory<byte> ContentBytes { get; }
+
+    string? IProtoBinaryContent.MediaType => ContentHeaders.ContentType?.MediaType;
+
+    ReadOnlyMemory<byte> IProtoBinaryContent.Content => ContentBytes;
+
+    string? IProtoBinaryContent.FileName => RawResponse.Content.Headers.ContentDisposition is { } disposition
+        ? (disposition.FileNameStar ?? disposition.FileName)?.Trim('"')
+        : null;
 
     /// <summary>
     /// Releases the underlying HTTP response. Callers own a returned <see cref="RestResponse"/>

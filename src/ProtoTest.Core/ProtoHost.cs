@@ -56,6 +56,19 @@ public sealed class ProtoHost : IAsyncDisposable
     public static IProtoTraceWriter? FindTraceWriter(ActivityTraceId traceId)
         => ProtoHostRegistry.FindTraceWriter(traceId);
 
+    /// <summary>
+    /// Returns whether the host is composed with a capability of the given kind (optionally a specific
+    /// name). Integrations declare capabilities when they are configured, so this answers what the host
+    /// can actually do rather than what it was asked to do.
+    /// </summary>
+    public bool HasCapability(string kind, string? name = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
+        return _rootServiceProvider.GetServices<ProtoCapabilityDescriptor>().Any(capability =>
+            string.Equals(capability.Kind, kind, StringComparison.Ordinal)
+            && (name is null || string.Equals(capability.Name, name, StringComparison.Ordinal)));
+    }
+
     public IConfiguration Configuration => _rootServiceProvider.GetRequiredService<IConfiguration>();
 
     /// <summary>Gets immutable snapshots of the current run trace.</summary>

@@ -16,6 +16,13 @@ public class ProtoTestAttribute : TestAttribute, ITestAction
     {
         var method = test.Method!.MethodInfo;
         var attributes = ProtoAttributeResolver.Resolve(method);
+        var skipReason = ProtoTestSkip.GetReason(attributes, ProtoTestAssembly.Host);
+        if (skipReason is not null)
+        {
+            // Skipping before the lifecycle starts keeps the trace honest: nothing ran, so nothing failed.
+            Assert.Ignore(skipReason);
+        }
+
         ProtoTestAssembly.Host
             .StartTestAsync(ProtoTestName.FromMethod(method), method, attributes, NUnitAttachmentPublisher.Instance)
             .GetAwaiter()

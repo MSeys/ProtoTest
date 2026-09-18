@@ -14,6 +14,21 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
     {
         var methodInfo = testMethod.MethodInfo;
         var attributes = ProtoAttributeResolver.Resolve(methodInfo);
+        var skipReason = ProtoTestSkip.GetReason(attributes, ProtoTestAssembly.Host);
+        if (skipReason is not null)
+        {
+            // This MSTest version has no dynamic skip API; a returned ignored result is what the runner
+            // reports as skipped. Skipping before the lifecycle starts keeps the trace honest.
+            return
+            [
+                new TestResult
+                {
+                    Outcome = UnitTestOutcome.Ignored,
+                    DisplayName = methodInfo.Name
+                }
+            ];
+        }
+
         var attachmentPublisher = new MSTestAttachmentPublisher();
         TestResult[]? results = null;
         var lifecycleStarted = false;

@@ -237,6 +237,14 @@ internal sealed class ProtoXunitTestRunner(
 {
     protected override async Task<decimal> InvokeTestMethodAsync(ExceptionAggregator aggregator)
     {
+        var skipReason = ProtoTestSkip.GetReason(ProtoAttributeResolver.Resolve(TestMethod), ProtoTestAssembly.Host);
+        if (skipReason is not null)
+        {
+            // Skipping before the lifecycle starts keeps the trace honest: nothing ran, so nothing failed.
+            MessageBus.QueueMessage(new TestSkipped(Test, skipReason));
+            return 0m;
+        }
+
         var host = ProtoTestAssembly.Host;
         try
         {

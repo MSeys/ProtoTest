@@ -15,6 +15,13 @@ internal static class ProtoTestLifecycleHandler
     internal static void Before(MethodInfo methodUnderTest, IXunitTest test)
     {
         var attributes = ProtoAttributeResolver.Resolve(methodUnderTest);
+        var skipReason = ProtoTestSkip.GetReason(attributes, ProtoTestAssembly.Host);
+        if (skipReason is not null)
+        {
+            // Skipping before the lifecycle starts keeps the trace honest: nothing ran, so nothing failed.
+            global::Xunit.Assert.Skip(skipReason);
+        }
+
         ProtoTestAssembly.Host
             .StartTestAsync(ProtoTestName.FromMethod(methodUnderTest), methodUnderTest, attributes, Xunit3AttachmentPublisher.Instance)
             .GetAwaiter()

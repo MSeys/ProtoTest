@@ -15,6 +15,7 @@ using ProtoTest.NUnit;
 using ProtoTest.OpenApi;
 using ProtoTest.Reporting;
 using ProtoTest.Rest;
+using ProtoTest.Sheets;
 using ProtoTest.SampleApp;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Domain;
@@ -142,6 +143,7 @@ public sealed class Setup : ProtoTestAssembly
                 }
             })
             .AddTestHook<NorthstarScenarioHook>()
+            .AddSheets()
             .AddRunGate("no error findings", context => context
                 .ItemsOfKind(ProtoReportItemKinds.Finding)
                 .Any(item => item.Status == ProtoReportStatus.Error)

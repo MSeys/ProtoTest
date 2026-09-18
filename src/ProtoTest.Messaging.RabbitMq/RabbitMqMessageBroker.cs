@@ -11,10 +11,11 @@ using ProtoTest.Messaging;
 /// to the destination exchange, drains it while waiting, and deletes it afterwards - a per-test tap
 /// that never competes with the application's own consumers and never sees another test's messages.
 /// </summary>
-public sealed class RabbitMqMessageBroker : IProtoMessageBroker, IDisposable
+public sealed class RabbitMqMessageBroker : IProtoMessageBroker, IProtoMessageBrokerSetup, IDisposable
 {
     private readonly ProtoRabbitMqOptions _options;
     private readonly object _gate = new();
+    private readonly Dictionary<string, string> _taps = new(StringComparer.Ordinal);
     private IConnection? _connection;
     private IModel? _channel;
     private long _received;
@@ -28,6 +29,36 @@ public sealed class RabbitMqMessageBroker : IProtoMessageBroker, IDisposable
     public string Name => "RabbitMQ";
 
     public long Position => Interlocked.Read(ref _received);
+
+    /// <summary>
+    /// Declares one tap queue per awaited destination and drains any backlog from earlier tests. From
+    /// here on, anything the application publishes is queued for this test, so the usual act-then-await
+    /// order works - unlike binding at await time, which would miss it.
+    /// </summary>
+    public void Prepare(IReadOnlyCollection<string> destinations)
+    {
+        ArgumentNullException.ThrowIfNull(destinations);
+        var channel = Channel();
+        lock (_gate)
+        {
+            foreach (var destination in destinations)
+            {
+                if (string.IsNullOrWhiteSpace(destination))
+                {
+                    continue;
+                }
+
+                if (!_taps.TryGetValue(destination, out var queue))
+                {
+                    queue = DeclareTap(channel, destination);
+                    _taps[destination] = queue;
+                }
+
+                // Start empty: a message this test did not cause must not satisfy its await.
+                channel.QueuePurge(queue);
+            }
+        }
+    }
 
     public ValueTask PublishAsync(ProtoMessage message, CancellationToken cancellationToken = default)
     {
@@ -61,20 +92,28 @@ public sealed class RabbitMqMessageBroker : IProtoMessageBroker, IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(destination);
         ArgumentNullException.ThrowIfNull(predicate);
         var channel = Channel();
-        var queue = channel.QueueDeclare(
-            queue: $"prototest-{Guid.NewGuid():N}",
-            durable: false,
-            exclusive: true,
-            autoDelete: true,
-            arguments: null);
-        channel.QueueBind(queue.QueueName, destination, routingKey: "#");
+        string queue;
+        var deleteAfter = false;
+        lock (_gate)
+        {
+            if (_taps.TryGetValue(destination, out var prepared))
+            {
+                queue = prepared;
+            }
+            else
+            {
+                // Not declared up front: bind just in time, which only works for messages that come later.
+                queue = DeclareTap(channel, destination);
+                deleteAfter = true;
+            }
+        }
 
         try
         {
             var deadline = DateTime.UtcNow + timeout;
             while (true)
             {
-                var result = channel.BasicGet(queue.QueueName, autoAck: true);
+                var result = channel.BasicGet(queue, autoAck: true);
                 if (result is not null)
                 {
                     var sequence = Interlocked.Increment(ref _received);
@@ -97,7 +136,10 @@ public sealed class RabbitMqMessageBroker : IProtoMessageBroker, IDisposable
         }
         finally
         {
-            channel.QueueDelete(queue.QueueName, ifUnused: false, ifEmpty: false);
+            if (deleteAfter)
+            {
+                channel.QueueDelete(queue, ifUnused: false, ifEmpty: false);
+            }
         }
     }
 
@@ -141,6 +183,18 @@ public sealed class RabbitMqMessageBroker : IProtoMessageBroker, IDisposable
                     exception);
             }
         }
+    }
+
+    private static string DeclareTap(IModel channel, string destination)
+    {
+        var queue = channel.QueueDeclare(
+            queue: $"prototest-{Guid.NewGuid():N}",
+            durable: false,
+            exclusive: true,
+            autoDelete: true,
+            arguments: null);
+        channel.QueueBind(queue.QueueName, destination, routingKey: "#");
+        return queue.QueueName;
     }
 
     private static ProtoMessage Convert(BasicGetResult result)

@@ -11,4 +11,10 @@ public sealed class ProtoMessagingOptions : IProtoConfigurableOptions
 
     /// <summary>How long <c>AwaitAsync</c> waits when the caller does not name a timeout.</summary>
     public TimeSpan DefaultTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Destinations this suite awaits, declared at test setup so an adapter can bind its tap before the
+    /// system under test publishes. Optional for brokers that keep history.
+    /// </summary>
+    public IList<string> Destinations { get; set; } = new List<string>();
 }

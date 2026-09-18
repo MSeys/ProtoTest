@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>true</IsPackable>
+    <PackageId>ProtoTest.Messaging.RabbitMq.Testcontainers</PackageId>
+    <AssemblyName>ProtoTest.Messaging.RabbitMq.Testcontainers</AssemblyName>
+    <RootNamespace>ProtoTest.Messaging.RabbitMq.Testcontainers</RootNamespace>
+    <Description>A RabbitMQ container owned as a run-scoped resource for ProtoTest.Messaging.RabbitMq.</Description>
+    <PackageTags>testing;integration-testing;messaging;rabbitmq;testcontainers;dotnet</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <PackageReference Include="Testcontainers.RabbitMq" Version="4.15.0" />
+  </ItemGroup>
+
+</Project>

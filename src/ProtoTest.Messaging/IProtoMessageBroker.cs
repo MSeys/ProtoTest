@@ -51,3 +51,14 @@ public interface IProtoMessageBroker
         long afterPosition,
         CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// Implemented by adapters whose consumers must exist before the system under test publishes: the tap
+/// queue is declared and drained of earlier tests' backlog during setup, so a message published after
+/// the test starts is never missed and never leaks between tests.
+/// </summary>
+public interface IProtoMessageBrokerSetup
+{
+    /// <summary>Prepares the destinations this test intends to await.</summary>
+    void Prepare(IReadOnlyCollection<string> destinations);
+}

@@ -16,6 +16,7 @@
     <ProjectReference Include="..\..\src\ProtoTest.Core\ProtoTest.Core.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Messaging\ProtoTest.Messaging.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Messaging.RabbitMq\ProtoTest.Messaging.RabbitMq.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Messaging.RabbitMq.Testcontainers\ProtoTest.Messaging.RabbitMq.Testcontainers.csproj" />
   </ItemGroup>
 
 </Project>

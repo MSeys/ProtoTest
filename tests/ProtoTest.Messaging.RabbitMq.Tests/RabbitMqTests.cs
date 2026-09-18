@@ -7,11 +7,21 @@ using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Messaging;
 using ProtoTest.Messaging.RabbitMq;
+using ProtoTest.Messaging.RabbitMq.Testcontainers;
 
 [TestFixture]
 public sealed class RabbitMqTests
 {
-    private const string DefaultConnection = "amqp://guest:guest@localhost:5672/";
+    private static RabbitMqBroker? _container;
+
+    [OneTimeTearDown]
+    public async Task StopContainer()
+    {
+        if (_container is not null)
+        {
+            await _container.DisposeAsync();
+        }
+    }
 
     [Test]
     public async Task UseRabbitMq_ShouldRegisterTheCapabilityAndBindConfiguration()
@@ -41,17 +51,20 @@ public sealed class RabbitMqTests
     }
 
     [Test]
-    public async Task PublishAndAwait_ShouldRoundTripAgainstAConfiguredBroker()
+    public async Task PublishAndAwait_ShouldRoundTripAgainstARealBroker()
     {
-        if (!TryConnect(DefaultConnection))
+        // A configured broker wins; otherwise the test owns a container, exactly like the demo. A
+        // machine with neither skips instead of passing against the in-memory double.
+        var connectionString = ResolveBroker();
+        if (connectionString is null)
         {
             Assert.Ignore(
-                "No RabbitMQ broker on localhost:5672. Configure " +
-                "'ProtoTest:Messaging:RabbitMq:ConnectionString' to run this against a real one.");
+                "No RabbitMQ broker is available: set ProtoTest__Messaging__RabbitMq__ConnectionString " +
+                "or start a container runtime.");
         }
 
         var exchange = $"prototest.tests.{Guid.NewGuid():N}";
-        using (var bootstrap = Connect(DefaultConnection))
+        using (var bootstrap = Connect(connectionString))
         using (var channel = bootstrap.CreateModel())
         {
             channel.ExchangeDeclare(exchange, ExchangeType.Fanout, durable: false, autoDelete: true);
@@ -60,8 +73,14 @@ public sealed class RabbitMqTests
         try
         {
             var builder = new ProtoHostBuilder();
+            builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    // The test owns the tap for this exchange; it exists before the publish below.
+                    ["ProtoTest:Messaging:Destinations:0"] = exchange
+                }));
             builder.AddMessaging(messaging => messaging.UseRabbitMq(options =>
-                options.ConnectionString = DefaultConnection));
+                options.ConnectionString = connectionString));
             await using var host = builder.Build();
             await host.StartAsync();
             var context = await host.StartTestAsync("rabbit round trip", TestMethod());
@@ -71,31 +90,33 @@ public sealed class RabbitMqTests
             var received = await messages.AwaitAsync(
                 exchange,
                 message => message.Payload == "{\"id\":1}",
-                TimeSpan.FromSeconds(10));
+                TimeSpan.FromSeconds(15));
 
             await host.CompleteTestAsync(ProtoTestResult.Passed);
             Assert.That(received.ContentType, Is.EqualTo("application/json"));
         }
         finally
         {
-            using var cleanup = Connect(DefaultConnection);
+            using var cleanup = Connect(connectionString);
             using var channel = cleanup.CreateModel();
             channel.ExchangeDelete(exchange);
         }
     }
 
-    private static bool TryConnect(string connectionString)
+    private static string? ResolveBroker()
     {
-        try
+        var configured = Environment.GetEnvironmentVariable("ProtoTest__Messaging__RabbitMq__ConnectionString");
+        if (!string.IsNullOrWhiteSpace(configured))
         {
-            using var connection = Connect(connectionString);
-            return true;
+            return configured;
         }
-        catch (Exception exception) when (exception is
-            global::RabbitMQ.Client.Exceptions.BrokerUnreachableException or UriFormatException)
+
+        if (_container is null && RabbitMqBroker.TryStart(configure: null, out var broker, out _))
         {
-            return false;
+            _container = broker;
         }
+
+        return _container?.ConnectionString;
     }
 
     private static IConnection Connect(string connectionString)

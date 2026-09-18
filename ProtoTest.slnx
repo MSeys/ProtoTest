@@ -33,6 +33,7 @@
     <Project Path="tests/ProtoTest.Http.Tests/ProtoTest.Http.Tests.csproj" />
     <Project Path="tests/ProtoTest.Json.Tests/ProtoTest.Json.Tests.csproj" />
     <Project Path="tests/ProtoTest.Messaging.Tests/ProtoTest.Messaging.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Messaging.RabbitMq.Tests/ProtoTest.Messaging.RabbitMq.Tests.csproj" />
   </Folder>
   <Folder Name="/4. Tests/Adapters/">
     <Project Path="tests/ProtoTest.MSTest.Tests/ProtoTest.MSTest.Tests.csproj" Id="46d67240-27b6-4460-a3d1-558336e41c9f" />

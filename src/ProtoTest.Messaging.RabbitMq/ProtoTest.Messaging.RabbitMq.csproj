@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>true</IsPackable>
+    <PackageId>ProtoTest.Messaging.RabbitMq</PackageId>
+    <AssemblyName>ProtoTest.Messaging.RabbitMq</AssemblyName>
+    <RootNamespace>ProtoTest.Messaging.RabbitMq</RootNamespace>
+    <Description>RabbitMQ adapter for the ProtoTest messaging capability: publish to exchanges and tap events with a per-test queue.</Description>
+    <PackageTags>testing;integration-testing;messaging;rabbitmq;dotnet</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <ProjectReference Include="..\ProtoTest.Messaging\ProtoTest.Messaging.csproj" />
+  </ItemGroup>
+
+</Project>

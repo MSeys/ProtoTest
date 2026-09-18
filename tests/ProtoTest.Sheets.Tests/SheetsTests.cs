@@ -193,6 +193,48 @@ public sealed class SheetsTests
         await host.CompleteTestAsync(ProtoTestResult.Passed);
     }
 
+    [Sheet("Sales", HeaderRows = [1, 2])]
+    public sealed record SalesRow(
+        [property: Column("Region")] string Region,
+        [property: Column("FY26", "Amount")] decimal Amount,
+        [property: Column("FY26", "Count")] int Count);
+
+    [Sheet("Sales", HeaderRows = [1, 2])]
+    public sealed record BrokenRow(
+        [property: Column("Region")] string Region,
+        [property: Column("Nope")] string Missing);
+
+    [Test]
+    public async Task Model_ShouldBindTypedRowsAndVerify()
+    {
+        var (host, context) = await StartAsync("sheets model");
+        var model = context.Sheets().Open(_path).Model<SalesRow>();
+        model.Verify();
+
+        var emea = model.Row(row => row.Region == "EMEA");
+        Assert.Multiple(() =>
+        {
+            Assert.That(emea.Amount, Is.EqualTo(1200m));
+            Assert.That(emea.Count, Is.EqualTo(12));
+            Assert.That(model.Column(row => row.Amount), Is.EqualTo(new decimal?[] { 1200m, 900m }));
+            Assert.That(model.Rows.Select(row => row.Region), Is.EqualTo(new[] { "EMEA", "APAC" }));
+        });
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
+    public async Task Model_ShouldFailWithTheMissingColumn()
+    {
+        var (host, context) = await StartAsync("sheets model failure");
+        var exception = Assert.Throws<SpreadsheetAssertionException>(() =>
+        {
+            _ = context.Sheets().Open(_path).Model<BrokenRow>();
+        });
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        Assert.That(exception!.Message, Does.Contain("Nope"));
+    }
+
     private static async Task<(ProtoHost Host, ProtoExecutionContext Context)> StartAsync(string name)
     {
         var builder = new ProtoHostBuilder();

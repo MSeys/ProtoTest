@@ -33,6 +33,13 @@ public sealed class ProtoWorkbook
                 $"The workbook '{Name}' has no sheet '{name}'. It has: {string.Join(", ", Sheets.Select(sheet => sheet.Name))}.");
     }
 
+    /// <summary>
+    /// Binds a record with <c>[Sheet]</c>/<c>[Column]</c> attributes to this workbook. The record is the
+    /// model: the layout is declared once and the tests read typed rows.
+    /// </summary>
+    public ProtoSheetModel<TRow> Model<TRow>() where TRow : notnull
+        => ProtoSheetModel<TRow>.Read(this, _context);
+
     /// <summary>Reads a workbook without a test context; used by tests of this package.</summary>
     internal static ProtoWorkbook Read(string path, ProtoSheetsOptions options)
     {

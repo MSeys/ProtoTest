@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package northstar.v1;
+
+option csharp_namespace = "ProtoTest.SampleApp.Grpc";
+
+service Projects {
+  rpc GetProject (GetProjectRequest) returns (ProjectReply);
+  rpc ListProjects (ListProjectsRequest) returns (stream ProjectReply);
+}
+
+message GetProjectRequest {
+  string project_id = 1;
+}
+
+message ListProjectsRequest {
+  int32 limit = 1;
+}
+
+message ProjectReply {
+  string id = 1;
+  string name = 2;
+  string slug = 3;
+  string status = 4;
+  int32 environment_count = 5;
+}

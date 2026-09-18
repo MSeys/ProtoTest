@@ -58,6 +58,7 @@ public class Program
             .AddMutationType<NorthstarMutation>()
             .AddSubscriptionType<NorthstarSubscription>()
             .AddInMemorySubscriptions();
+        builder.Services.AddGrpc();
 
         var app = builder.Build();
 
@@ -86,6 +87,7 @@ public class Program
             System.IO.Path.Combine(AppContext.BaseDirectory, "openapi", "northstar.v1.json"),
             "application/json"));
         app.MapNorthstarApi();
+        app.MapGrpcService<NorthstarGrpcService>();
         if (IsTestSupportEnabled(builder.Configuration))
         {
             // Scenario provisioning can create whole tenants, so it is a development affordance:

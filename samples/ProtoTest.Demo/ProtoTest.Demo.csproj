@@ -3,6 +3,9 @@
     <TargetFramework>net8.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- The client and the application both generate the same proto messages; the demo compiles against
+         its own copies on purpose. Suppress the duplicate-type warning for that standard setup. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
@@ -13,6 +16,7 @@
     </PackageReference>
     <PackageReference Include="NUnit3TestAdapter" Version="6.3.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.*" />
+    <PackageReference Include="Grpc.Tools" Version="2.70.0" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.SampleApp\ProtoTest.SampleApp.csproj" />
@@ -21,6 +25,7 @@
     <ProjectReference Include="..\..\src\ProtoTest.AspNetCore\ProtoTest.AspNetCore.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Data\ProtoTest.Data.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.GraphQL\ProtoTest.GraphQL.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Grpc\ProtoTest.Grpc.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.NUnit\ProtoTest.NUnit.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.OpenApi\ProtoTest.OpenApi.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Reporting\ProtoTest.Reporting.csproj" />
@@ -28,6 +33,10 @@
     <ProjectReference Include="..\..\src\ProtoTest.Sql\ProtoTest.Sql.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Sql.Testcontainers\ProtoTest.Sql.Testcontainers.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Protobuf Include="..\ProtoTest.SampleApp\Protos\northstar.proto" Link="Protos\northstar.proto" GrpcServices="Client" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="..\ProtoTest.SampleApp\openapi\northstar.v1.json" Link="northstar.openapi.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

@@ -10,6 +10,7 @@ using ProtoTest.AspNetCore;
 using ProtoTest.Core;
 using ProtoTest.Data;
 using ProtoTest.GraphQL;
+using ProtoTest.Grpc;
 using ProtoTest.NUnit;
 using ProtoTest.OpenApi;
 using ProtoTest.Reporting;
@@ -173,7 +174,8 @@ public sealed class Setup : ProtoTestAssembly
                         .CaptureAttachments()
                         .AddClient("GraphQL")
                         .WithSubscriptionTransport(GraphQLSubscriptionTransport.WebSocket)
-                        .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "northstar.graphql")));
+                        .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "northstar.graphql")))
+                    .AddGrpc(grpc => grpc.AddClient("Projects"));
             })
             .AddSink<JsonReportSink>(sink => sink.OutputPath = Path.Combine(
                 "TestResults", "ProtoTest.Demo", "report.json"))

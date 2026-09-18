@@ -19,6 +19,7 @@ public sealed class MessagingTests
 
         await messages.PublishAsync("invoices", "{\"id\":1}", contentType: "application/json");
         var received = await messages.AwaitAsync(
+            "invoices",
             message => message.Destination == "invoices",
             TimeSpan.FromSeconds(2));
 
@@ -45,10 +46,10 @@ public sealed class MessagingTests
         var messages = context.Messages();
 
         var timeout = Assert.ThrowsAsync<TimeoutException>(async () =>
-            await messages.AwaitAsync(_ => false, TimeSpan.FromMilliseconds(50)));
+            await messages.AwaitAsync("invoices", _ => false, TimeSpan.FromMilliseconds(50)));
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(timeout!));
-        Assert.That(timeout!.Message, Does.Contain("InMemory"));
+        Assert.That(timeout!.Message, Does.Contain("invoices"));
     }
 
     [Test]
@@ -66,11 +67,12 @@ public sealed class MessagingTests
         var second = await host.StartTestAsync("messaging second", TestMethod());
         var timeout = Assert.ThrowsAsync<TimeoutException>(async () =>
             await second.Messages().AwaitAsync(
+                "invoices",
                 message => message.Destination == "invoices",
                 TimeSpan.FromMilliseconds(50)));
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(timeout!));
-        Assert.That(timeout!.Message, Does.Contain("InMemory"));
+        Assert.That(timeout!.Message, Does.Contain("invoices"));
     }
 
     [Test]
@@ -110,6 +112,7 @@ public sealed class MessagingTests
             => ValueTask.CompletedTask;
 
         public ValueTask<ProtoMessage> AwaitAsync(
+            string destination,
             Func<ProtoMessage, bool> predicate,
             TimeSpan timeout,
             long afterPosition,
@@ -126,3 +129,4 @@ public sealed class MessagingTests
     {
     }
 }
+

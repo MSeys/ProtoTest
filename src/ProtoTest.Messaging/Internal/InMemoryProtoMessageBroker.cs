@@ -37,7 +37,9 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
             for (var index = _waiters.Count - 1; index >= 0; index--)
             {
                 var waiter = _waiters[index];
-                if (entry.Position <= waiter.AfterPosition || !waiter.Predicate(message))
+                if (entry.Position <= waiter.AfterPosition
+                    || !string.Equals(message.Destination, waiter.Destination, StringComparison.Ordinal)
+                    || !waiter.Predicate(message))
                 {
                     continue;
                 }
@@ -57,18 +59,22 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
     }
 
     public async ValueTask<ProtoMessage> AwaitAsync(
+        string destination,
         Func<ProtoMessage, bool> predicate,
         TimeSpan timeout,
         long afterPosition,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(destination);
         ArgumentNullException.ThrowIfNull(predicate);
         Task<ProtoMessage> completion;
         Waiter waiter;
         lock (_gate)
         {
             var existing = _messages
-                .Where(entry => entry.Position > afterPosition && predicate(entry.Message))
+                .Where(entry => entry.Position > afterPosition
+                    && string.Equals(entry.Message.Destination, destination, StringComparison.Ordinal)
+                    && predicate(entry.Message))
                 .Cast<Entry?>()
                 .LastOrDefault();
             if (existing is { } found)
@@ -76,7 +82,7 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
                 return found.Message;
             }
 
-            waiter = new Waiter(predicate, afterPosition);
+            waiter = new Waiter(destination, predicate, afterPosition);
             _waiters.Add(waiter);
             completion = waiter.Completion.Task;
         }
@@ -93,13 +99,15 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
         }
 
         throw new TimeoutException(
-            $"No message matching the predicate arrived on '{Name}' within {timeout.TotalSeconds:0.###}s.");
+            $"No message matching the predicate arrived on '{destination}' within {timeout.TotalSeconds:0.###}s.");
     }
 
     private readonly record struct Entry(long Position, ProtoMessage Message);
 
-    private sealed class Waiter(Func<ProtoMessage, bool> predicate, long afterPosition)
+    private sealed class Waiter(string destination, Func<ProtoMessage, bool> predicate, long afterPosition)
     {
+        public string Destination { get; } = destination;
+
         public Func<ProtoMessage, bool> Predicate { get; } = predicate;
 
         public long AfterPosition { get; } = afterPosition;

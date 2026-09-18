@@ -68,24 +68,28 @@ public sealed class ProtoMessageClient
     }
 
     /// <summary>
-    /// Waits for the first message matching <paramref name="predicate"/> within the timeout (the
-    /// configured default when none is given). Failing to arrive is a test failure, not a sleep.
+    /// Waits for the first message on <paramref name="destination"/> matching <paramref name="predicate"/>
+    /// within the timeout (the configured default when none is given). Failing to arrive is a test
+    /// failure, not a sleep.
     /// </summary>
     public async Task<ProtoMessage> AwaitAsync(
+        string destination,
         Func<ProtoMessage, bool> predicate,
         TimeSpan? timeout = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(destination);
         ArgumentNullException.ThrowIfNull(predicate);
         var effective = timeout ?? _options.DefaultTimeout;
         using var operation = _context.Trace
-            .Operation("messaging.await", $"Messaging · await on {_broker.Name}", "ProtoTest.Messaging")
+            .Operation("messaging.await", $"Messaging · await {destination}", "ProtoTest.Messaging")
             .With("messaging.system", _broker.Name)
+            .With("messaging.destination", destination)
             .With("messaging.timeout_ms", effective.TotalMilliseconds.ToString("0", CultureInfo.InvariantCulture))
             .Begin();
         try
         {
-            var message = await _broker.AwaitAsync(predicate, effective, _afterPosition, cancellationToken);
+            var message = await _broker.AwaitAsync(destination, predicate, effective, _afterPosition, cancellationToken);
             operation
                 .SetAttribute("messaging.destination", message.Destination)
                 .AddSection(new ProtoTraceSection(

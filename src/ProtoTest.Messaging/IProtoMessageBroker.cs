@@ -30,19 +30,22 @@ public interface IProtoMessageBroker
     /// <summary>Publishes one message to a destination.</summary>
     ValueTask PublishAsync(ProtoMessage message, CancellationToken cancellationToken = default);
 
-    /// <summary>Waits for the first message matching <paramref name="predicate"/> within the timeout.</summary>
+    /// <summary>Waits for the first message on a destination matching <paramref name="predicate"/> within the timeout.</summary>
     ValueTask<ProtoMessage> AwaitAsync(
+        string destination,
         Func<ProtoMessage, bool> predicate,
         TimeSpan timeout,
         CancellationToken cancellationToken = default)
-        => AwaitAsync(predicate, timeout, afterPosition: 0, cancellationToken);
+        => AwaitAsync(destination, predicate, timeout, afterPosition: 0, cancellationToken);
 
     /// <summary>
-    /// Waits for the first message matching <paramref name="predicate"/> that was published after
-    /// <paramref name="afterPosition"/>. This is the piece that makes event-driven and CQRS write sides
-    /// testable without polling sleeps: the assertion is the wait, scoped to the test's own consumer.
+    /// Waits for the first message on <paramref name="destination"/> matching <paramref name="predicate"/>
+    /// that was published after <paramref name="afterPosition"/>. The destination is what an adapter taps
+    /// (an exchange for RabbitMQ); the position scopes the wait to the test's own consumer, so a shared
+    /// deployed broker cannot leak another test's messages into this one.
     /// </summary>
     ValueTask<ProtoMessage> AwaitAsync(
+        string destination,
         Func<ProtoMessage, bool> predicate,
         TimeSpan timeout,
         long afterPosition,

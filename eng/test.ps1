@@ -24,32 +24,27 @@ if (-not $NoRestore) {
 
 Invoke-DotNet build ProtoTest.slnx --configuration $Configuration --no-restore
 
-$vstestProjects = @(
-    "tests/ProtoTest.Core.Tests/ProtoTest.Core.Tests.csproj",
-    "tests/ProtoTest.Http.Tests/ProtoTest.Http.Tests.csproj",
-    "tests/ProtoTest.Json.Tests/ProtoTest.Json.Tests.csproj",
-    "tests/ProtoTest.NUnit.Tests/ProtoTest.NUnit.Tests.csproj",
-    "tests/ProtoTest.MSTest.Tests/ProtoTest.MSTest.Tests.csproj",
-    "tests/ProtoTest.Xunit.Tests/ProtoTest.Xunit.Tests.csproj",
-    "tests/ProtoTest.Rest.Tests/ProtoTest.Rest.Tests.csproj",
-    "tests/ProtoTest.SampleApp.Domain.Tests/ProtoTest.SampleApp.Domain.Tests.csproj",
-    "tests/ProtoTest.Sql.Tests/ProtoTest.Sql.Tests.csproj",
-    "tests/ProtoTest.Data.Tests/ProtoTest.Data.Tests.csproj",
-    "tests/ProtoTest.OpenTelemetry.Tests/ProtoTest.OpenTelemetry.Tests.csproj",
-    "tests/ProtoTest.GraphQL.Tests/ProtoTest.GraphQL.Tests.csproj",
-    "tests/ProtoTest.AspNetCore.Tests/ProtoTest.AspNetCore.Tests.csproj",
-    "tests/ProtoTest.OpenApi.Tests/ProtoTest.OpenApi.Tests.csproj",
-    "tests/ProtoTest.Reporting.Tests/ProtoTest.Reporting.Tests.csproj",
-    "tests/ProtoTest.Web.Tests/ProtoTest.Web.Tests.csproj",
-    "samples/ProtoTest.Demo/ProtoTest.Demo.csproj"
+# Test projects are discovered, not listed: a new project is in the suite the moment it is a test
+# project. TUnit and xUnit.net v3 are Microsoft Testing Platform executables and run explicitly below;
+# xUnit.net v2 still uses VSTest, so the repository intentionally runs both models.
+$repository = Split-Path -Parent $PSScriptRoot
+$testsRoot = Join-Path $repository "tests"
+$mtpProjects = @(
+    "tests/ProtoTest.TUnit.Tests/ProtoTest.TUnit.Tests.csproj",
+    "tests/ProtoTest.Xunit3.Tests/ProtoTest.Xunit3.Tests.csproj"
 )
+$vstestProjects = Get-ChildItem -Path $testsRoot -Recurse -Filter *.csproj |
+    Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' } |
+    Where-Object { Select-String -Path $_.FullName -Pattern 'IsTestProject>true|Microsoft\.NET\.Test\.Sdk|MSTest\.TestAdapter|MSTest\.Sdk|Include="MSTest"|NUnit3TestAdapter|xunit\.runner\.visualstudio|TUnit' -Quiet } |
+    ForEach-Object { $_.FullName.Substring($repository.Length + 1).Replace('\', '/') } |
+    Where-Object { $_ -notin $mtpProjects } |
+    Sort-Object
+$vstestProjects += "samples/ProtoTest.Demo/ProtoTest.Demo.csproj"
 
 foreach ($project in $vstestProjects) {
     Invoke-DotNet test $project --configuration $Configuration --no-build --no-restore --verbosity minimal
 }
 
-# TUnit and xUnit.net v3 are Microsoft Testing Platform executables. xUnit.net v2
-# still uses VSTest, so the repository intentionally runs both models explicitly.
 Invoke-DotNet run --project tests/ProtoTest.TUnit.Tests/ProtoTest.TUnit.Tests.csproj `
     --configuration $Configuration --no-build --no-restore
 Invoke-DotNet run --project tests/ProtoTest.Xunit3.Tests/ProtoTest.Xunit3.Tests.csproj `

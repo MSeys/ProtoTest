@@ -146,7 +146,7 @@ function value(input: unknown): string {
       </button>
     </section>
 
-    <details v-if="attributeCount" class="attributes">
+    <details v-if="attributeCount" class="attributes" open>
       <summary>Attributes <small>{{ attributeCount }}</small></summary>
       <section v-for="[group, entries] in attributeGroups" :key="group" class="attribute-group">
         <h4>{{ group }}</h4>

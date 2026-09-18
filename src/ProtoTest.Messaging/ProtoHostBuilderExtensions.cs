@@ -74,8 +74,8 @@ public static class ProtoHostBuilderExtensions
                 });
             }
 
-            services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoClientInitializer>(
-                _ => new ProtoMessageClientInitializer("Default")));
+            services.AddSingleton<IProtoClientInitializer>(
+                _ => new ProtoMessageClientInitializer("Default"));
         });
 
         return builder.AddResource(new ProtoResource(

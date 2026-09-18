@@ -24,6 +24,7 @@ $packages = @(
     "src/ProtoTest.Sql.Testcontainers/ProtoTest.Sql.Testcontainers.csproj",
     "src/ProtoTest.GraphQL/ProtoTest.GraphQL.csproj",
     "src/ProtoTest.Grpc/ProtoTest.Grpc.csproj",
+    "src/ProtoTest.Messaging/ProtoTest.Messaging.csproj",
     "src/ProtoTest.AspNetCore/ProtoTest.AspNetCore.csproj",
     "src/ProtoTest.OpenApi/ProtoTest.OpenApi.csproj",
     "src/ProtoTest.OpenTelemetry/ProtoTest.OpenTelemetry.csproj",

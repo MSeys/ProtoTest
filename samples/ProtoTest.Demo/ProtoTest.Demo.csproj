@@ -30,6 +30,7 @@
     <ProjectReference Include="..\..\src\ProtoTest.Messaging\ProtoTest.Messaging.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Messaging.RabbitMq\ProtoTest.Messaging.RabbitMq.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Messaging.RabbitMq.Testcontainers\ProtoTest.Messaging.RabbitMq.Testcontainers.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Web.Playwright\ProtoTest.Web.Playwright.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.NUnit\ProtoTest.NUnit.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.OpenApi\ProtoTest.OpenApi.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Reporting\ProtoTest.Reporting.csproj" />
@@ -50,3 +51,4 @@
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 </Project>
+

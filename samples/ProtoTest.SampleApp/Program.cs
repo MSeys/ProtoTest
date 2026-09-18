@@ -61,7 +61,14 @@ public class Program
             eventPublisher.EnsureTopology();
             builder.Services.AddSingleton<IEventPublisher>(eventPublisher);
         }
-        builder.Services.AddHostedService<WebhookDispatcher>();
+        // A second instance serving only the UI must not dispatch webhooks the suite's instance also sends.
+        if (!string.Equals(
+                builder.Configuration["Northstar:DisableWebhookDispatcher"],
+                "true",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            builder.Services.AddHostedService<WebhookDispatcher>();
+        }
         builder.Services.AddHttpClient();
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddGraphQLServer()
@@ -98,6 +105,7 @@ public class Program
             System.IO.Path.Combine(AppContext.BaseDirectory, "openapi", "northstar.v1.json"),
             "application/json"));
         app.MapNorthstarApi();
+        app.MapNorthstarUi();
         app.MapGrpcService<NorthstarGrpcService>();
         if (IsTestSupportEnabled(builder.Configuration))
         {

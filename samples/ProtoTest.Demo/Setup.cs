@@ -25,6 +25,7 @@ using ProtoTest.SampleApp.Domain;
 using ProtoTest.SampleApp.Testing;
 using ProtoTest.Sql;
 using ProtoTest.Sql.Testcontainers;
+using ProtoTest.Web;
 using System.Data.Common;
 
 [SetUpFixture]
@@ -94,6 +95,16 @@ public sealed class Setup : ProtoTestAssembly
         var databaseProvider = usePostgres ? "postgres" : "sqlite";
         var composeDomainInTests = hostedInProcess || configuredDatabase is not null || usePostgres;
 
+        if (!usePostgres)
+        {
+            // The standalone instance the browser journeys drive; the host starts it with the run and
+            // fills the web session's base URL from it. Its capability is what lets those journeys skip
+            // when the suite cannot own the store.
+            builder.AddInfrastructure(new StandaloneSampleApp(fallbackDatabase));
+            builder.AddCapability(new ProtoCapabilityDescriptor(
+                "Northstar standalone", ProtoCapabilityKinds.Server, "Demo"));
+        }
+
         if (composeDomainInTests)
         {
             // The test's own composition of the same domain, over a connection ProtoTest owns and
@@ -156,6 +167,7 @@ public sealed class Setup : ProtoTestAssembly
             })
             .AddTestHook<NorthstarScenarioHook>()
             .AddSheets()
+            .AddWeb()
             .AddRunGate("no error findings", context => context
                 .ItemsOfKind(ProtoReportItemKinds.Finding)
                 .Any(item => item.Status == ProtoReportStatus.Error)
@@ -233,3 +245,4 @@ public sealed class Setup : ProtoTestAssembly
             ? new NpgsqlConnection(connectionString)
             : new SqliteConnection(connectionString);
 }
+

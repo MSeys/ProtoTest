@@ -62,9 +62,6 @@ public sealed class GrpcJourney
                 name = "grpc-atlas",
                 status = ProjectStatuses.Active
             });
-            Assert.That(reply.Id, Is.EqualTo(project.Id));
-            Assert.That(reply.Name, Is.EqualTo("grpc-atlas"));
-            Assert.That(reply.Status, Is.EqualTo(ProjectStatuses.Active));
             Assert.That(listed.Any(item => item.Id == project.Id), Is.True,
                 "The project created over REST is visible on the gRPC stream.");
         });

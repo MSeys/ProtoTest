@@ -18,14 +18,11 @@ public sealed class DomainAccessJourney
 {
     [ProtoTest]
     [SignedInAs]
+    // Composing the test-side domain needs the store the suite owns; without it the test skips
+    // instead of failing, so the same suite runs against an environment it cannot rearrange.
+    [RequiresCapability(ProtoCapabilityKinds.Store, Reason = "The suite does not own the store, so it cannot compose the domain.")]
     public async Task AProjectProvisionedThroughTheDomainIsVisibleToTheApplication()
     {
-        // Arrange: composing the domain needs the database the application uses.
-        if (Proto.Context.TryService<NorthstarStore>() is null)
-        {
-            Assert.Ignore("Set ConnectionStrings:Northstar so the test can compose the domain.");
-        }
-
         // Act
         var project = await Proto.Context.Data()
             .For<CreateProjectRequest>()

@@ -33,6 +33,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="northstar.graphql"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <None Update="appsettings.json"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 </Project>

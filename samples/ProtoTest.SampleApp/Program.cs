@@ -100,7 +100,7 @@ public class Program
 
     private static bool IsTestSupportEnabled(IConfiguration configuration)
     {
-        var value = configuration["PROTOTEST_TEST_SUPPORT"];
+        var value = configuration["ProtoTest:TestSupport"];
         return string.Equals(value, "1", StringComparison.OrdinalIgnoreCase)
             || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
     }

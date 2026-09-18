@@ -10,11 +10,11 @@ $project = Join-Path $repositoryRoot "samples/ProtoTest.Demo/ProtoTest.Demo.cspr
 $trace = Join-Path $repositoryRoot "samples/ProtoTest.Demo/bin/$Configuration/net8.0/TestResults/ProtoTest.Demo/prototest-demo.prototrace"
 $destinationDirectory = Join-Path $repositoryRoot "viewer/public/demos"
 $destination = Join-Path $destinationDirectory "prototest-demo.prototrace"
-$previousFailureMode = [Environment]::GetEnvironmentVariable("PROTOTEST_DEMO_INCLUDE_FAILURE", "Process")
+$previousFailureMode = [Environment]::GetEnvironmentVariable("ProtoTest__Demo__IncludeFailure", "Process")
 $runStartedAtUtc = [DateTime]::UtcNow
 
 try {
-    $env:PROTOTEST_DEMO_INCLUDE_FAILURE = "1"
+    $env:ProtoTest__Demo__IncludeFailure = "true"
     & dotnet test $project --configuration $Configuration --no-restore --logger "console;verbosity=minimal"
     $testExitCode = $LASTEXITCODE
 
@@ -124,7 +124,7 @@ try {
 }
 finally {
     [Environment]::SetEnvironmentVariable(
-        "PROTOTEST_DEMO_INCLUDE_FAILURE",
+        "ProtoTest__Demo__IncludeFailure",
         $previousFailureMode,
         "Process")
 }

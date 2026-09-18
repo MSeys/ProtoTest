@@ -27,19 +27,21 @@ public sealed class Setup : ProtoTestAssembly
 {
     protected override void Configure(IProtoHostBuilder builder)
     {
-        // Where the application runs is infrastructure, not test logic. By default it is hosted
-        // in-process; set PROTOTEST_TARGET_URL to run the same suite against a published environment
-        // or a container, with no change to the tests or the provisioners.
-        var targetUrl = System.Environment.GetEnvironmentVariable("PROTOTEST_TARGET_URL");
-        var hostedInProcess = string.IsNullOrWhiteSpace(targetUrl);
+        // Where the application runs and which store it uses are infrastructure, chosen from
+        // configuration and nothing else: ProtoTest:TargetUrl points the same suite at a published
+        // environment, ProtoTest:Database=postgres owns a container, ConnectionStrings:Northstar
+        // points at that environment's store, and the demo's opt-in failure lives under ProtoTest:Demo.
+        var demoConfiguration = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
+            .AddEnvironmentVariables()
+            .Build();
 
-        // The application and the tests agree on the database the same way they agree on the URL:
-        // through configuration. Set PROTOTEST_DATABASE=postgres for a real server in a container;
-        // otherwise the suite shares the sample's named in-memory database. Against a published
-        // environment the connection string points at that environment's database.
-        var configuredDatabase = System.Environment.GetEnvironmentVariable("ConnectionStrings__Northstar");
+        var targetUrl = demoConfiguration["ProtoTest:TargetUrl"];
+        var hostedInProcess = string.IsNullOrWhiteSpace(targetUrl);
+        var configuredDatabase = demoConfiguration.GetConnectionString("Northstar");
         var usePostgres = string.Equals(
-            System.Environment.GetEnvironmentVariable("PROTOTEST_DATABASE"),
+            demoConfiguration["ProtoTest:Database"],
             "postgres",
             StringComparison.OrdinalIgnoreCase);
 
@@ -47,7 +49,7 @@ public sealed class Setup : ProtoTestAssembly
         if (usePostgres && !PostgresDatabase.TryStart(configure: null, out postgres, out var postgresError))
         {
             throw new InvalidOperationException(
-                $"PROTOTEST_DATABASE=postgres was requested but the container did not start: {postgresError}");
+                $"ProtoTest:Database=postgres was requested but the container did not start: {postgresError}");
         }
 
         if (postgres is not null)
@@ -77,17 +79,6 @@ public sealed class Setup : ProtoTestAssembly
             ?? $"Data Source={ownedDatabasePath}";
         var databaseProvider = postgres is not null ? "postgres" : "sqlite";
         var composeDomainInTests = hostedInProcess || configuredDatabase is not null || postgres is not null;
-
-        // The application reads its configuration from the environment, exactly as it would when
-        // published, so the tests configure the database the way an operator would - and the test-side
-        // domain and the application end up on one store.
-        System.Environment.SetEnvironmentVariable("ConnectionStrings__Northstar", northstarDatabase);
-        System.Environment.SetEnvironmentVariable("Database__Provider", databaseProvider);
-        if (hostedInProcess)
-        {
-            // Scenario provisioning is a development affordance; the in-process demo enables it.
-            System.Environment.SetEnvironmentVariable("PROTOTEST_TEST_SUPPORT", "1");
-        }
 
         if (composeDomainInTests)
         {
@@ -124,6 +115,8 @@ public sealed class Setup : ProtoTestAssembly
             })
             .ConfigureAppConfiguration(configuration =>
             {
+                // Everything the demo chose above is visible to the tests through configuration.
+                configuration.AddConfiguration(demoConfiguration);
                 var settings = new Dictionary<string, string?>
                 {
                     [$"ProtoTest:Applications:{NorthstarTargets.Api}:OpenApi:Specification"] = Path.Combine(
@@ -160,7 +153,14 @@ public sealed class Setup : ProtoTestAssembly
             {
                 if (hostedInProcess)
                 {
-                    app.AddAspNetCoreServer<Program>();
+                    // The in-process application receives the same choices through host settings -
+                    // no process-wide environment variables involved.
+                    app.AddAspNetCoreServer<Program>(configureWebHost: webHost =>
+                    {
+                        webHost.UseSetting("ConnectionStrings:Northstar", northstarDatabase);
+                        webHost.UseSetting("Database:Provider", databaseProvider);
+                        webHost.UseSetting("ProtoTest:TestSupport", "true");
+                    });
                 }
 
                 app.AddRest(rest =>

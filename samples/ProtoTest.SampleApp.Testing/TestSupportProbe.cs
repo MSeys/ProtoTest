@@ -26,7 +26,7 @@ internal static class TestSupportProbe
         {
             throw new InvalidOperationException(
                 "The application does not expose /test-support, so scenario provisioning is unavailable. " +
-                "Start the application with PROTOTEST_TEST_SUPPORT=1 (a development affordance), or point " +
+                "Run it with ProtoTest:TestSupport=true (a development affordance), or point " +
                 "the suite at an environment that enables it.");
         }
 

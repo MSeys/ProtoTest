@@ -105,12 +105,11 @@ public sealed class DiagnosticsShowcase
     public async Task TheOrganizationReportsItsPlanAndProjectCount()
     {
         // Arrange
-        if (!string.Equals(
-                Environment.GetEnvironmentVariable("PROTOTEST_DEMO_INCLUDE_FAILURE"),
-                "1",
-                StringComparison.Ordinal))
+        var includeFailure = Proto.Host.Configuration["ProtoTest:Demo:IncludeFailure"];
+        if (!string.Equals(includeFailure, "true", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(includeFailure, "1", StringComparison.Ordinal))
         {
-            Assert.Ignore("Set PROTOTEST_DEMO_INCLUDE_FAILURE=1 to include the intentional viewer-demo failure.");
+            Assert.Ignore("Set ProtoTest:Demo:IncludeFailure=true to include the intentional viewer-demo failure.");
         }
 
         // Act

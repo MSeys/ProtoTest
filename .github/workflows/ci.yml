@@ -49,7 +49,7 @@ jobs:
       - name: Run the demo against a PostgreSQL container
         shell: pwsh
         env:
-          PROTOTEST_DATABASE: postgres
+          ProtoTest__Database: postgres
         run: |
           dotnet restore samples/ProtoTest.Demo/ProtoTest.Demo.csproj
           dotnet build samples/ProtoTest.Demo/ProtoTest.Demo.csproj --configuration Release --no-restore

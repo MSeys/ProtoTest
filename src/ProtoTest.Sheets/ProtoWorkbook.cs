@@ -41,12 +41,6 @@ public sealed class ProtoWorkbook
         => ProtoSheetModel<TRow>.Read(this, _context);
 
     /// <summary>Reads a workbook without a test context; used by tests of this package.</summary>
-    internal static ProtoWorkbook Read(string path, ProtoSheetsOptions options)
-    {
-        using var document = DocumentFormat.OpenXml.Packaging.SpreadsheetDocument.Open(path, false);
-        return Read(document, Path.GetFileName(path), context: null, options);
-    }
-
     internal static ProtoWorkbook Read(
         DocumentFormat.OpenXml.Packaging.SpreadsheetDocument document,
         string name,

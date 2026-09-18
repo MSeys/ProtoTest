@@ -1,15 +1,41 @@
 namespace ProtoTest.Sql;
 
+using ProtoTest.Core;
+
 /// <summary>Configures how ProtoTest owns and isolates a database connection during a test.</summary>
-public sealed class ProtoSqlOptions
+public sealed class ProtoSqlOptions : IProtoConfigurableOptions
 {
+    public const string ConfigurationSectionName = "ProtoTest:Sql";
+
     private readonly HashSet<string> _sharedWith = new(StringComparer.OrdinalIgnoreCase);
+
+    string IProtoConfigurableOptions.ConfigurationSectionName => ConfigurationSectionName;
 
     /// <summary>Gets or sets the isolation applied to each test. Defaults to <see cref="SqlIsolation.Transaction"/>.</summary>
     public SqlIsolation Isolation { get; set; } = SqlIsolation.Transaction;
 
     /// <summary>Gets the applications declared as using the test's connection.</summary>
     public IReadOnlyCollection<string> SharedWith => _sharedWith;
+
+    /// <summary>
+    /// Gets or sets the applications declared as sharing the test's connection, for configuration
+    /// binding (<c>ProtoTest:Sql:SharedWithApplications</c>). Prefer <see cref="ShareConnectionWith"/>.
+    /// </summary>
+    public List<string> SharedWithApplications
+    {
+        get => [.. _sharedWith];
+        set
+        {
+            _sharedWith.Clear();
+            foreach (var applicationName in value ?? [])
+            {
+                if (!string.IsNullOrWhiteSpace(applicationName))
+                {
+                    _sharedWith.Add(applicationName);
+                }
+            }
+        }
+    }
 
     /// <summary>
     /// Declares that an application uses the connection ProtoTest owns, so

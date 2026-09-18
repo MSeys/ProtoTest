@@ -20,7 +20,16 @@ internal sealed class SqlEnlistmentHook<TContext> : IProtoTestHook
         var session = context.Service<ProtoSqlSession>();
         if (session.Transaction is { } transaction)
         {
-            context.Service<TContext>().Database.UseTransaction(transaction);
+            var dbContext = context.Service<TContext>();
+            if (!ReferenceEquals(dbContext.Database.GetDbConnection(), session.Connection))
+            {
+                throw new InvalidOperationException(
+                    $"The DbContext '{typeof(TContext).Name}' uses its own connection, so it cannot enlist in " +
+                    "the test's transaction. Configure it with the connection ProtoTest owns, for example " +
+                    "UseNpgsql(services.GetRequiredService<DbConnection>()); see AddEntityFrameworkCore.");
+            }
+
+            dbContext.Database.UseTransaction(transaction);
         }
 
         return Task.CompletedTask;

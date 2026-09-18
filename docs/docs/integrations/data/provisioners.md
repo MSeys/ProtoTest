@@ -25,7 +25,7 @@ public interface IProtoDataProvisioner<T> : IProtoDataProvisioner<T, T>;
 public sealed record ProtoDataProvisioningResult<T>(
     T Value,
     string? Identity = null,
-    IAsyncDisposable? Ownership = null);
+    IAsyncDisposable? Cleanup = null);
 ```
 
 Input and result are often different: you build a *request*, and get back the *created resource*. From the sample app:
@@ -97,13 +97,13 @@ Exactly one provisioner must be registered for each input/result pair. None — 
 
 ## Cleaning up
 
-Return an `Ownership` and ProtoTest disposes it when the test ends:
+Return a `Cleanup` and ProtoTest disposes it when the test ends:
 
 ```csharp
 return new ProtoDataProvisioningResult<Invoice>(
     created,
     Identity: created.Id.ToString(),
-    Ownership: new DeleteOnDispose(() => repository.DeleteAsync(created.Id)));
+    Cleanup: new DeleteOnDispose(() => repository.DeleteAsync(created.Id)));
 ```
 
 ```csharp
@@ -113,10 +113,10 @@ sealed class DeleteOnDispose(Func<Task> delete) : IAsyncDisposable
 }
 ```
 
-- Ownerships are disposed in **reverse creation order**, so dependent records go before the things they depend on.
+- Cleanups are disposed in **reverse creation order**, so dependent records go before the things they depend on.
 - Each cleanup is a `data.cleanup` entry in the teardown phase of the trace.
 - If several cleanups fail, they're all attempted and the failures are reported together as an `AggregateException`.
 
-When cleanup happens at a coarser level — say, the whole tenant is deleted by an [attribute](../../foundation/attributes.md) — just leave `Ownership` null, as the sample provisioner does.
+When cleanup happens at a coarser level — say, the whole tenant is deleted by an [attribute](../../foundation/attributes.md) — just leave `Cleanup` null, as the sample provisioner does.
 
 `Identity` is optional and appears in the trace so you can find the created record in your application's logs.

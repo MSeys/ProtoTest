@@ -76,4 +76,4 @@ Each test gets its own context and its own lane in the ProtoTrace run timeline.
 
 **Attachments** go to `TestContext.AddTestAttachment(path, description)`.
 
-**Test names are fully qualified.** NUnit is the only runner where ProtoTest records `test.FullName` rather than the bare method name, so trace and report entries read `Namespace.OrderTests.Orders_endpoint_responds`.
+**Test names are fully qualified.** Every adapter except xUnit v2 records `ProtoTestName.FromMethod`, which produces `DeclaringType.FullName.MethodName`, so trace and report entries read `Namespace.OrderTests.Orders_endpoint_responds` on NUnit, MSTest, xUnit v3 and TUnit alike. xUnit v2 records xUnit's display name instead, so theory rows stay distinguishable (`…Invoices_filter_by_state(state: "open")`).

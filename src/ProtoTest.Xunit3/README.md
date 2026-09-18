@@ -15,4 +15,4 @@ Register one assembly fixture derived from `ProtoTestAssembly`, then use `[Proto
 public async Task Scenario() { }
 ```
 
-See the [adapter guide](https://github.com/matthiasseys/ProtoTest/blob/main/docs/integrations/nunit.md).
+See the [adapter guide](https://github.com/MSeys/ProtoTest/blob/main/docs/docs/runners/xunit3.md).

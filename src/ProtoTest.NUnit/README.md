@@ -20,4 +20,4 @@ public sealed class TestSetup : ProtoTestAssembly
 public async Task Scenario() { }
 ```
 
-See the [adapter guide](https://github.com/matthiasseys/ProtoTest/blob/main/docs/integrations/nunit.md).
+See the [adapter guide](https://github.com/MSeys/ProtoTest/blob/main/docs/docs/runners/nunit.md).

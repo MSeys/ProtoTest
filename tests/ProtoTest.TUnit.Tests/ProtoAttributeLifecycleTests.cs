@@ -1,6 +1,7 @@
 namespace ProtoTest.TUnit.Tests;
 
 using ProtoTest.Core;
+using global::TUnit.Assertions.Enums;
 
 /// <summary>
 /// Tests the lifecycle execution order of class-level and method-level <see cref="ProtoAttribute"/> instances in TUnit.
@@ -27,7 +28,7 @@ public class ProtoAttributeLifecycleTests
         };
 
         await Assert.That(Proto.Context.Resolve<ExecutionLogState>().Log)
-            .IsEquivalentTo(expectedBeforeSequence);
+            .IsEquivalentTo(expectedBeforeSequence, CollectionOrdering.Matching);
     }
 }
 

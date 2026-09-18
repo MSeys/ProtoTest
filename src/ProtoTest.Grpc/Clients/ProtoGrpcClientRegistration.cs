@@ -1,5 +1,6 @@
 namespace ProtoTest.Grpc.Clients;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Http;
@@ -22,23 +23,26 @@ public static class ProtoGrpcClientRegistration
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (address is not null && !Uri.TryCreate(address, UriKind.Absolute, out _))
+        if (address is not null && !ProtoHttpUri.TryCreateAbsoluteHttpUri(address, out _))
         {
             throw new ArgumentException(
-                "A gRPC client address must be an absolute URI.",
+                "A gRPC client address must be an absolute HTTP or HTTPS URI.",
                 nameof(address));
         }
 
-        var options = new ProtoGrpcClientOptions();
-        configure?.Invoke(options);
-        services.AddSingleton<IProtoClientInitializer>(
-            _ => new ProtoGrpcClientInitializer(
+        services.AddSingleton<IProtoClientInitializer>(serviceProvider =>
+        {
+            var options = new ProtoGrpcClientOptions();
+            configure?.Invoke(options);
+            options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
+            return new ProtoGrpcClientInitializer(
                 protocolName,
                 name,
                 options,
                 address,
                 allowMissingAddress: allowMissingAddress,
-                application: application));
+                application: application);
+        });
         services.AddSingleton(new ProtoApplicationTarget(name, application ?? name));
         return new ProtoGrpcTargetBuilder(name, services);
     }
@@ -56,16 +60,19 @@ public static class ProtoGrpcClientRegistration
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(addressResolver);
 
-        var options = new ProtoGrpcClientOptions();
-        configure?.Invoke(options);
-        services.AddSingleton<IProtoClientInitializer>(
-            _ => new ProtoGrpcClientInitializer(
+        services.AddSingleton<IProtoClientInitializer>(serviceProvider =>
+        {
+            var options = new ProtoGrpcClientOptions();
+            configure?.Invoke(options);
+            options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
+            return new ProtoGrpcClientInitializer(
                 protocolName,
                 name,
                 options,
                 allowMissingAddress: true,
                 application: application,
-                addressResolver: addressResolver));
+                addressResolver: addressResolver);
+        });
         services.AddSingleton(new ProtoGrpcAddressRegistration(protocolName, name, addressResolver));
         services.AddSingleton(new ProtoApplicationTarget(name, application ?? name));
         return new ProtoGrpcTargetBuilder(name, services);

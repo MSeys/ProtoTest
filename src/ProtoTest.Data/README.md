@@ -19,7 +19,7 @@ var invoice = Proto.Context.Data().For<Invoice>()
 Defaults belong in feature-local modules:
 
 ```csharp
-public sealed class InvoiceDataDefaults : IDataDefaultsModule
+public sealed class InvoiceDataDefaults : IProtoDataDefaultsModule
 {
     public void Configure(ProtoDataConfiguration data)
     {
@@ -82,4 +82,4 @@ var users = Proto.Context.Data().For<User>()
     .BuildMany(7);
 ```
 
-An `IProtoDataProvisioner<T>` may use commands, events, an API, a repository, or direct persistence. Its optional `Ownership` is cleaned up in reverse creation order when the test context is disposed. `data.create`, `data.provision`, and `data.cleanup` operations are written to ProtoTrace automatically.
+An `IProtoDataProvisioner<T>` may use commands, events, an API, a repository, or direct persistence. Its optional `Cleanup` is disposed in reverse creation order when the test context is disposed. `data.create`, `data.provision`, and `data.cleanup` operations are written to ProtoTrace automatically.

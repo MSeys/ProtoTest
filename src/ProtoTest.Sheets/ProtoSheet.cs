@@ -136,8 +136,6 @@ public sealed class ProtoSheet
         return new ProtoRange(normalized, rows, Name, _context);
     }
 
-    internal string Display() => $"{Name} ({RowCount}x{ColumnCount})";
-
     private void Record(string reference)
         => _context?.RecordObservation(new ProtoObservation("Sheets", "sheets.range", $"{Name}!{reference}"));
 }

@@ -88,6 +88,11 @@ public sealed class ProtoGrpcClient : IDisposable
             Fail(operation, method.ServiceName, method.Name, exception);
             throw;
         }
+        catch (Exception exception)
+        {
+            operation.Fail(exception);
+            throw;
+        }
     }
 
     /// <summary>Sends every request on a client-streaming method and waits for its response.</summary>
@@ -112,12 +117,17 @@ public sealed class ProtoGrpcClient : IDisposable
             .With("rpc.deadline", deadline?.ToString("O", CultureInfo.InvariantCulture))
             .Begin();
         var callMetadata = await PrepareMetadataAsync(metadata, operation, cancellationToken);
+        var requestList = requests as IReadOnlyCollection<TRequest> ?? [.. requests];
+        if (Format(requestList) is { } body)
+        {
+            operation.AddSection(new ProtoTraceSection("Request", ProtoTraceSectionKind.Code, Content: body, Language: "protobuf"));
+        }
 
         try
         {
             var call = (await GetInvokerAsync(cancellationToken))
                 .AsyncClientStreamingCall(method, null, BuildCallOptions(callMetadata, deadline));
-            foreach (var request in requests)
+            foreach (var request in requestList)
             {
                 await call.RequestStream.WriteAsync(request).ConfigureAwait(false);
             }
@@ -132,6 +142,11 @@ public sealed class ProtoGrpcClient : IDisposable
         catch (RpcException exception)
         {
             Fail(operation, method.ServiceName, method.Name, exception);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            operation.Fail(exception);
             throw;
         }
     }
@@ -180,6 +195,11 @@ public sealed class ProtoGrpcClient : IDisposable
         catch (RpcException exception)
         {
             Fail(operation, method.ServiceName, method.Name, exception);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            operation.Fail(exception);
             throw;
         }
     }

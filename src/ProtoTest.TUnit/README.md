@@ -12,4 +12,4 @@ Register the executor once for the assembly, then initialize and clean up a `Pro
 [assembly: TestExecutor<ProtoTestExecutor>()]
 ```
 
-Tests continue to use TUnit's `[Test]`; the executor surrounds each test with the shared ProtoTest lifecycle. See the [adapter guide](https://github.com/matthiasseys/ProtoTest/blob/main/docs/integrations/nunit.md).
+Tests continue to use TUnit's `[Test]`; the executor surrounds each test with the shared ProtoTest lifecycle. See the [adapter guide](https://github.com/MSeys/ProtoTest/blob/main/docs/docs/runners/tunit.md).

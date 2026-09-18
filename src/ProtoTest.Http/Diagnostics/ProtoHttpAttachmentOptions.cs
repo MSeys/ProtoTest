@@ -1,5 +1,6 @@
 namespace ProtoTest.Http;
 
+using ProtoTest.Core;
 using ProtoTest.Json;
 
 /// <summary>
@@ -29,12 +30,5 @@ public class ProtoHttpAttachmentOptions : JsonDiagnosticOptions
 
     /// <summary>Query parameter names whose values are redacted in diagnostics.</summary>
     public List<string> SensitiveQueryParameters { get; set; } =
-    [
-        "access_token",
-        "refresh_token",
-        "token",
-        "apiKey",
-        "api_key",
-        "key"
-    ];
+        [.. ProtoUriSanitizer.DefaultSensitiveQueryParameters];
 }

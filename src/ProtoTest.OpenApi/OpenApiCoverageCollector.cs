@@ -49,6 +49,10 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
         _document = document ?? throw new ArgumentNullException(nameof(document));
     }
 
+    public override bool CanCollect(ProtoObservation observation)
+        => base.CanCollect(observation)
+            && observation.Data is RestResponseData or RestShapeMatchData;
+
     public override void Collect(ProtoObservation observation)
     {
         ArgumentNullException.ThrowIfNull(observation);

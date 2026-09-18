@@ -33,6 +33,6 @@ public sealed class HtmlReportSink : FileReportSink<HtmlReportSinkOptions>
         => File.WriteAllTextAsync(
             outputPath,
             HtmlReportRenderer.Render(report, Options.Title),
-            Encoding.UTF8,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
             cancellationToken);
 }

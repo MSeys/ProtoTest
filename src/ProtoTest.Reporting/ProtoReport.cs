@@ -12,7 +12,7 @@ public sealed record ProtoReport(
         ArgumentNullException.ThrowIfNull(items);
         var roots = items.ToArray();
         var flattened = Flatten(roots).ToArray();
-        var coverageItems = flattened.Where(item => item.Kind == ProtoReportItemKinds.Coverage).ToArray();
+        var coverageItems = flattened.Where(item => IsKind(item.Kind, ProtoReportItemKinds.Coverage)).ToArray();
         var covered = coverageItems.Count(item => item.IsCovered is true);
 
         return new ProtoReport(
@@ -22,7 +22,8 @@ public sealed record ProtoReport(
                 // An occurrence is an observed fact: coverage hits and observations. A gate verdict or a
                 // finding is recorded once, not observed repeatedly, so it does not inflate the count.
                 TotalOccurrences: flattened
-                    .Where(item => item.Kind is ProtoReportItemKinds.Coverage or ProtoReportItemKinds.Observation)
+                    .Where(item => IsKind(item.Kind, ProtoReportItemKinds.Coverage)
+                        || IsKind(item.Kind, ProtoReportItemKinds.Observation))
                     .Sum(item => item.Count),
                 CoverageTotal: coverageItems.Length,
                 Covered: covered,
@@ -32,11 +33,16 @@ public sealed record ProtoReport(
                     : Math.Round(covered * 100d / coverageItems.Length, 2),
                 Warnings: flattened.Count(item => item.Status == ProtoReportStatus.Warning),
                 Errors: flattened.Count(item => item.Status == ProtoReportStatus.Error),
-                Findings: flattened.Count(item => item.Kind == ProtoReportItemKinds.Finding),
-                Gates: flattened.Count(item => item.Kind == ProtoReportItemKinds.Gate),
-                Resources: flattened.Count(item => item.Kind == ProtoReportItemKinds.Resource)),
+                Findings: flattened.Count(item => IsKind(item.Kind, ProtoReportItemKinds.Finding)),
+                Gates: flattened.Count(item => IsKind(item.Kind, ProtoReportItemKinds.Gate)),
+                Resources: flattened.Count(item => IsKind(item.Kind, ProtoReportItemKinds.Resource))),
             roots);
     }
+
+    // Kinds are open strings and integrations may capitalize them; the summary must count the same
+    // items the renderer sections, so the comparison is case-insensitive everywhere.
+    private static bool IsKind(string? kind, string expected)
+        => string.Equals(kind, expected, StringComparison.OrdinalIgnoreCase);
 
     private static IEnumerable<ProtoReportItem> Flatten(IEnumerable<ProtoReportItem> items)
     {

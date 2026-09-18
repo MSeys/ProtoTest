@@ -164,7 +164,7 @@ public sealed class GraphQLResponse : IDisposable
                 var assertionSuffix = assertionNumber == 1 ? string.Empty : $"-{assertionNumber:00}";
                 _context.AddAttachment(
                     $"{_attachmentPrefix}-expected-shape{assertionSuffix}",
-                    JsonDiagnosticSanitizer.Sanitize(JsonSerializer.Serialize(expectedShape), _attachmentOptions),
+                    expectedShapeJson,
                     "application/json",
                     _identifier);
             }

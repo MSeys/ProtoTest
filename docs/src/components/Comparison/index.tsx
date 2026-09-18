@@ -195,11 +195,11 @@ export default function Comparison({without, with: withProto, concerns}: Compari
         <p className={styles.contrast}>
           A base class can share the left-hand lines too. The difference is where the work happens: inherited
           setup runs again for every fixture against shared state, while a capability is composed onto a single
-          test on a context the framework owns.
+          test on a context the framework manages.
         </p>
 
         <div className={styles.owned}>
-          <span className={styles.ownedLabel}>Owned lifecycle</span>
+          <span className={styles.ownedLabel}>Coordinated lifecycle</span>
           <span className={styles.ownedItem}>Each test gets its own context and data</span>
           <span className={styles.ownedItem}>Cleanup runs deterministically</span>
           <span className={styles.ownedItem}>Tests can run in parallel</span>

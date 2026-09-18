@@ -1,5 +1,7 @@
 namespace ProtoTest.Data.Internal;
 
+using System.Collections;
+
 internal sealed class ProtoDataRegistry
 {
     private readonly Dictionary<Type, Registration> _typeProviders = [];
@@ -42,7 +44,35 @@ internal sealed class ProtoDataRegistry
         => _factories.TryGetValue(type, out registration!);
 
     public bool IsRedacted(Type targetType, string member, Type valueType)
-        => _redactedValueTypes.Contains(valueType) || _redactedMembers.Contains((targetType, member));
+    {
+        if (_redactedMembers.Contains((targetType, member)))
+        {
+            return true;
+        }
+
+        var type = Nullable.GetUnderlyingType(valueType) ?? valueType;
+        if (_redactedValueTypes.Contains(type))
+        {
+            return true;
+        }
+
+        // A collection member is redacted when its element type is redacted.
+        if (type != typeof(string) && typeof(IEnumerable).IsAssignableFrom(type))
+        {
+            var elementType = type.IsArray
+                ? type.GetElementType()
+                : type.GetInterfaces().Append(type)
+                    .FirstOrDefault(candidate => candidate.IsGenericType
+                        && candidate.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                    ?.GetGenericArguments()[0];
+            if (elementType is not null)
+            {
+                return _redactedValueTypes.Contains(Nullable.GetUnderlyingType(elementType) ?? elementType);
+            }
+        }
+
+        return false;
+    }
 
     public IReadOnlyList<IProtoDataValueResolver> Resolvers => _resolvers;
 

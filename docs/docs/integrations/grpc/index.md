@@ -5,7 +5,7 @@ title: gRPC
 
 # gRPC
 
-`ProtoTest.Grpc` gives each test a named gRPC client for unary and streaming calls, with metadata authentication through the shared `[Auth]` pipeline, per-call tracing, and service/method coverage. It follows the same client lifecycle as REST and GraphQL: the channel is created during setup, recorded as a client entity, and released with the test.
+`ProtoTest.Grpc` gives each test a named gRPC client for unary and streaming calls, with metadata authentication through the shared `[Auth]` pipeline, per-call tracing, and service/method coverage. It follows the same client lifecycle as REST and GraphQL: the client is created during setup and recorded as a client entity, its channel is created lazily on first use, and both are released with the test.
 
 ```bash
 dotnet add package ProtoTest.Grpc
@@ -67,9 +67,11 @@ Authenticators write HTTP headers as usual; the gRPC applier translates them to 
 
 ## Tracing and coverage
 
-Every call is a `grpc.call` operation named `Service/Method` with `rpc.*` attributes, request/response sections, call status on failure, and `auth.outcome`/`auth.type`. A `grpc.response` observation is recorded per call, so registering the collector aggregates service/method coverage:
+The async helpers — `UnaryAsync`, `ClientStreamingAsync` and `ServerStreamingAsync` — each record a `grpc.call` operation named `Service/Method` with `rpc.*` attributes, request/response sections, call status on failure, and `auth.outcome`/`auth.type`, and they apply `[Auth]` metadata. A `grpc.response` observation is recorded per call, so registering the collector aggregates service/method coverage:
 
 ```csharp
 .AddGrpc(grpc => grpc.AddClient("Api")
     .AddCollector<GrpcCoverageCollector>())
 ```
+
+The raw `ServerStreaming` and `DuplexStreaming` calls are an escape hatch: they return the call object for you to drive, and they are **not** traced and do **not** apply `[Auth]` metadata. Pass metadata explicitly if you need it.

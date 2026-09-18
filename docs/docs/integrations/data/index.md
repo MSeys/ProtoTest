@@ -109,7 +109,7 @@ Reference = Invoice.Reference-0001-00   [BuiltIn]
 
 Each entry also carries `ValueType` and a `Source` — for defaults, the name of the module that registered them.
 
-`SourceKind` is one of `Explicit`, `MemberDefault`, `TypeProvider`, `CustomResolver`, `BuiltIn` or `ConstructorDefault`. The explanation matches exactly what the next `Build()` produces.
+`SourceKind` is one of `Explicit`, `MemberDefault`, `TypeProvider`, `CustomResolver`, `BuiltIn` or `ConstructorDefault`. For types built through reflection, the explanation resolves the same plan the next `Build()` will construct. For a type registered with a [factory](./defaults.md#domain-factories), `Explain()` lists only the explicit `With(...)` values and the construction source, because the factory resolves its remaining inputs when `Build()` runs.
 
 You rarely need to call it yourself: every `Build` and `Explain` is recorded in [ProtoTrace](../../advanced/prototrace.md), with each resolved member and its source as a child entry.
 

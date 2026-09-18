@@ -183,8 +183,11 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
             catch (Exception exception) { RecordCaptureFailure("dom", exception); }
             try
             {
+                var location = Uri.TryCreate(Driver.Url, UriKind.Absolute, out var address)
+                    ? ProtoUriSanitizer.Sanitize(address, null)
+                    : Driver.Url;
                 attachments.Add(ProtoTestAttachment.FromText(
-                    $"web-{prefix}-location.txt", $"URL: {Driver.Url}{Environment.NewLine}Title: {Driver.Title}",
+                    $"web-{prefix}-location.txt", $"URL: {location}{Environment.NewLine}Title: {Driver.Title}",
                     "text/plain", "Browser location at web operation failure."));
             }
             catch (Exception exception) { RecordCaptureFailure("location", exception); }

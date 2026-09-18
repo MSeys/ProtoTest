@@ -38,7 +38,7 @@ ValueTask OpenAsync(string address, CancellationToken cancellationToken = defaul
 ValueTask OpenAsync(Uri address, CancellationToken cancellationToken = default);
 ```
 
-With Playwright, a relative address works once you've set a base URL on the browser context (`options.Context.BaseURL = "https://portal.example.test"`). Selenium's `GoToUrl` needs an absolute address.
+A relative address is resolved against the session's base URL before either backend sees it — `ProtoTest:Web:Sessions:{name}:BaseUrl`, or the targeted application's `ProtoTest:Applications:{application}:BaseUrl` (see [Sessions](./index.md#sessions)). With no base URL configured, a relative address throws instead of reaching the driver. Selenium's `GoToUrl` still receives the resolved absolute address, so its requirement is met for you.
 
 ## Components
 

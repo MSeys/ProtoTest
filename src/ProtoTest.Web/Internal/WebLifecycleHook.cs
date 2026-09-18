@@ -14,9 +14,22 @@ internal sealed class WebLifecycleHook : IProtoTestHook
 
     public async Task AfterTestAsync(ProtoExecutionContext context)
     {
+        List<Exception>? exceptions = null;
         foreach (var session in context.Service<WebSessionRegistry>().Sessions.Reverse())
         {
-            await session.CompleteAsync();
+            try
+            {
+                await session.CompleteAsync();
+            }
+            catch (Exception exception)
+            {
+                (exceptions ??= []).Add(exception);
+            }
+        }
+
+        if (exceptions is not null)
+        {
+            throw new AggregateException("One or more web sessions failed to complete.", exceptions);
         }
     }
 }

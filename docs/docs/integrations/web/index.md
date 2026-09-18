@@ -10,7 +10,7 @@ title: Overview
 - `ProtoTest.Web.Playwright` — launches and manages browsers for you.
 - `ProtoTest.Web.Selenium` — drives any `IWebDriver` you create.
 
-Your page objects and tests are identical for both.
+Your page objects and tests stay the same for both, though the backends differ underneath: Playwright resolves role locators against implicit HTML roles, Selenium maps the documented roles, and text matching follows each backend's native locator options, including case handling.
 
 ```bash
 dotnet add package ProtoTest.Web.Playwright    # brings ProtoTest.Web with it
@@ -128,7 +128,7 @@ public static IProtoHostBuilder AddWeb(
 | `CheckClickObstruction` | `true` | fail if something covers the element |
 | `DiagnosticTraceRetention` | `OnWebFailure` | `Off`, `OnWebFailure`, `Always` |
 
-The factory is called once per test that uses the browser; ProtoTest quits and disposes the driver afterwards.
+The factory is called once per session that uses the browser; ProtoTest quits and disposes the driver afterwards.
 
 Unlike Playwright, Selenium has no isolated-context-within-a-browser primitive — a driver *is* a browser instance with its own profile. Reusing one across tests would leak cookies and storage, so each session deliberately gets its own driver instead of a pooled one.
 
@@ -188,17 +188,17 @@ builder.AddWeb();   // register the backend once
 var admin = Proto.Context.Web("Admin").Page<BackOfficePage>();
 var customer = Proto.Context.Web("Customer").Page<StorefrontPage>();
 
-await admin.Orders.Row(42).ApproveAsync();
+await admin.Orders.RowNumber(42).ApproveAsync();
 
 // The customer waits until the admin's change is reflected, then verifies it.
-await customer.Orders.Row(42).Status.ShouldHaveTextAsync("Approved");
+await customer.Orders.RowNumber(42).Status.ShouldHaveTextAsync("Approved");
 ```
 
 The `Should*` methods on an element or page poll until they pass, so they double as cross-session waits. For any other condition — including one that spans sessions — use `WaitUntilAsync`; its description defaults to the predicate's source text:
 
 ```csharp
 await customer.WaitUntilAsync(async ct =>
-    await customer.Orders.Row(42).Status.TextAsync(ct) == "Approved");
+    await customer.Orders.RowNumber(42).Status.TextAsync(ct) == "Approved");
 
 await customer.WaitUntilAsync(
     async _ => await customer.Total.TextAsync() == "€0.00",

@@ -16,6 +16,11 @@ interface TabbedCodeProps {
   tabs: CodeTab[];
 }
 
+/*
+ * Snippets behind underline tabs. The tab bar scrolls sideways when there are more tabs than fit, the file name
+ * sits on its own bar above the code, and the code keeps its lines whole and scrolls inside itself - so a
+ * phone shows the snippet as written instead of rewrapping it.
+ */
 export default function TabbedCode({tabs}: TabbedCodeProps): ReactNode {
   const [activeId, setActiveId] = useState(tabs[0].id);
   const active = tabs.find((tab) => tab.id === activeId)!;
@@ -23,26 +28,24 @@ export default function TabbedCode({tabs}: TabbedCodeProps): ReactNode {
   return (
     <Frame
       head={
-        <>
-          <div className={styles.tabs} role="tablist">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                className={`${styles.tab} ${tab.id === activeId ? styles.tabActive : ''}`}
-                onClick={() => setActiveId(tab.id)}
-                aria-selected={tab.id === activeId}>
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <span className={styles.filename}>{active.filename}</span>
-        </>
+        <div className={styles.tabs} role="tablist">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              className={`${styles.tab} ${tab.id === activeId ? styles.tabActive : ''}`}
+              onClick={() => setActiveId(tab.id)}
+              aria-selected={tab.id === activeId}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
       }
       foot={active.footnote}>
-      <div className={styles.body}>
-        <CodeSnippet code={active.code} />
+      <div className={styles.body} role="tabpanel">
+        <div className={styles.filename}>{active.filename}</div>
+        <CodeSnippet code={active.code} scroll />
       </div>
     </Frame>
   );

@@ -1,5 +1,7 @@
 namespace ProtoTest.Sheets;
 
+using ProtoTest.Core;
+
 /// <summary>A table column: its header path and its data cells.</summary>
 public sealed class ProtoColumn
 {
@@ -29,23 +31,39 @@ public sealed class ProtoColumn
     {
         ArgumentNullException.ThrowIfNull(expected);
         _table.RecordRead();
-        var actual = Values;
-        if (actual.Count != expected.Count)
+        var header = string.Join(" / ", Header);
+        using var operation = _table.Context?.Trace
+            .Operation("sheets.assert", $"Sheets · column {header}", "ProtoTest.Sheets")
+            .With("sheets.header", header)
+            .With("sheets.expected", $"{expected.Count} values")
+            .Begin();
+        try
         {
-            throw new SpreadsheetAssertionException(
-                $"Expected column '{string.Join(" / ", Header)}' to have {expected.Count} values " +
-                $"but it has {actual.Count}.");
-        }
-
-        for (var index = 0; index < expected.Count; index++)
-        {
-            if (!string.Equals(actual[index], expected[index], StringComparison.Ordinal))
+            var actual = Values;
+            if (actual.Count != expected.Count)
             {
                 throw new SpreadsheetAssertionException(
-                    $"Expected column '{string.Join(" / ", Header)}' row {_table.DataStartRow + index} " +
-                    $"to be {(expected[index] is null ? "empty" : $"'{expected[index]}'")} " +
-                    $"but it was {(actual[index] is null ? "<empty>" : $"'{actual[index]}'")}.");
+                    $"Expected column '{header}' to have {expected.Count} values " +
+                    $"but it has {actual.Count}.");
             }
+
+            for (var index = 0; index < expected.Count; index++)
+            {
+                if (!string.Equals(actual[index], expected[index], StringComparison.Ordinal))
+                {
+                    throw new SpreadsheetAssertionException(
+                        $"Expected column '{header}' row {_table.DataStartRow + index} " +
+                        $"to be {(expected[index] is null ? "empty" : $"'{expected[index]}'")} " +
+                        $"but it was {(actual[index] is null ? "<empty>" : $"'{actual[index]}'")}.");
+                }
+            }
+
+            operation?.Succeed();
+        }
+        catch (SpreadsheetAssertionException exception)
+        {
+            operation?.Fail(exception);
+            throw;
         }
     }
 }

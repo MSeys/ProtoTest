@@ -8,8 +8,8 @@ using global::Testcontainers.RabbitMq;
 /// <summary>
 /// A RabbitMQ container owned by the whole run: started once for the suite and released when the host
 /// is disposed, after the run has stopped and the reports are written. Register it with
-/// <c>AddInfrastructure</c> (or <c>AddResource</c>) and hand its connection string to the application
-/// and to the tests so both work against the same broker - the same shape as the PostgreSQL container.
+/// <c>AddInfrastructure</c> and hand its connection string to the application and to the tests so both
+/// work against the same broker - the same shape as the PostgreSQL container.
 /// </summary>
 public sealed class RabbitMqBroker : ProtoContainerResource<RabbitMqContainer>
 {
@@ -63,7 +63,15 @@ public sealed class RabbitMqBroker : ProtoContainerResource<RabbitMqContainer>
         {
             broker = null;
             error = $"{exception.GetType().Name}: {exception.Message}";
-            candidate.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            try
+            {
+                candidate.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch
+            {
+                // The start failure is what the caller needs to see.
+            }
+
             return false;
         }
     }

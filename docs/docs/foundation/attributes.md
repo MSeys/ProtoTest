@@ -1,5 +1,5 @@
 ---
-sidebar_position: 5
+sidebar_position: 7
 title: Attributes
 ---
 
@@ -156,6 +156,17 @@ public override async Task BeforeTestAsync(ProtoExecutionContext context)
 
 Attribute arguments must be compile-time constants. Pass a *name* — a role, a persona, a fixture key — and look the real values up at runtime.
 
+## Skip conditions
+
+An attribute can also stop a test before the lifecycle starts. Implement `IProtoSkipCondition` on a `ProtoAttribute`, or reuse the shipped conditions:
+
+```csharp
+[RequiresCapability(ProtoCapabilityKinds.Store, Reason = "The suite does not own the store.")]
+[RequiresInProcess]
+```
+
+Conditions run before `StartTestAsync`, so a skipped test has no context and no teardown, and the reason is reported by the runner where it can be — MSTest is the one adapter that cannot carry it. [Skip conditions](./skip-conditions.md) covers evaluation, the per-runner behaviour and the limits.
+
 ## Attributes ProtoTest ships
 
 | Attribute | Kind |
@@ -164,6 +175,8 @@ Attribute arguments must be compile-time constants. Pass a *name* — a role, a 
 | [`[LoginAs<TStrategy>]`](../integrations/web/login.md) | `ProtoAttribute` — logs a browser session in |
 | [`[Auth<T>]`](../integrations/rest/authentication.md) | metadata read by the HTTP hooks — one authenticator for REST and GraphQL, narrowed with `Protocols` |
 | `[Application("Name", "Protocol:Client")]` | `ProtoAttribute` — selects the application under test and, optionally, which client each protocol uses |
+| [`[RequiresCapability(kind)]`](./skip-conditions.md) | `ProtoAttribute` — skips the test unless the host has the capability |
+| [`[RequiresInProcess]`](./skip-conditions.md) | `ProtoAttribute` — `[RequiresCapability("server")]` |
 | `[ProtoTest]`, `[ProtoTestFact]`, `[ProtoTestTheory]` | [runner](../runners/overview.md) entry points |
 
 Most of the capabilities in a real suite are ones you write — that's the point.

@@ -10,8 +10,7 @@ the same matcher API.
 builder.AddApplication("Catalog", app => app.AddGraphQL(graphQL => graphQL
     .CaptureAttachments()
     .AddClient("Catalog")
-    .WithSchemaCoverage("catalog.graphql")
-    .AddCollector<GraphQLCoverageCollector>()));
+    .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "catalog.graphql"))));
 ```
 
 As with REST, the endpoint comes from the application's

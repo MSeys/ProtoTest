@@ -15,13 +15,16 @@ public static class ProtoExecutionContextExtensions
     /// </summary>
     /// <typeparam name="TProgram">The entry point class of the ASP.NET Core application.</typeparam>
     /// <param name="context">The active test execution context.</param>
-    /// <param name="name">The registered server name. Defaults to "Default".</param>
+    /// <param name="name">
+    /// The registered server name. Defaults to the application selected for the test, or "Default".
+    /// </param>
     public static WebApplicationFactory<TProgram> ServerFactory<TProgram>(
         this ProtoExecutionContext context,
-        string name = "Default") where TProgram : class
+        string? name = null) where TProgram : class
     {
         ArgumentNullException.ThrowIfNull(context);
-        return context.Client<WebApplicationFactory<TProgram>>(AspNetCoreClientInitializer<TProgram>.FactoryName(name));
+        var key = name ?? context.TryResolve<ProtoApplicationState>()?.ApplicationName ?? "Default";
+        return context.Client<WebApplicationFactory<TProgram>>(AspNetCoreClientInitializer<TProgram>.FactoryName(key));
     }
 
     /// <summary>
@@ -30,10 +33,12 @@ public static class ProtoExecutionContextExtensions
     /// </summary>
     /// <typeparam name="TProgram">The entry point class of the ASP.NET Core application.</typeparam>
     /// <param name="context">The active test execution context.</param>
-    /// <param name="name">The registered server name. Defaults to "Default".</param>
+    /// <param name="name">
+    /// The registered server name. Defaults to the application selected for the test, or "Default".
+    /// </param>
     public static IServiceScope CreateServerScope<TProgram>(
         this ProtoExecutionContext context,
-        string name = "Default") where TProgram : class
+        string? name = null) where TProgram : class
     {
         return context.ServerFactory<TProgram>(name).Services.CreateScope();
     }

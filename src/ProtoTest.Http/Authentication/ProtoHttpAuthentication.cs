@@ -49,5 +49,10 @@ public interface IProtoHttpAuthMetadata
 
     IReadOnlyList<string> Protocols { get; }
 
+    /// <summary>Returns whether this authenticator applies to the named protocol.</summary>
+    bool AppliesTo(string protocolName)
+        => Protocols.Count == 0
+        || Protocols.Contains(protocolName, StringComparer.OrdinalIgnoreCase);
+
     IProtoHttpAuthenticator Create(ProtoExecutionContext context);
 }

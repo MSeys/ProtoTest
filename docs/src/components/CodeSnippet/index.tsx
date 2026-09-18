@@ -12,6 +12,8 @@ interface CodeSnippetProps {
   showLineNumbers?: boolean;
   /** The number to give the first line, for rendering a slice of a longer file. */
   startLine?: number;
+  /** Keep lines whole and scroll sideways instead of wrapping: for code a reader compares line by line. */
+  scroll?: boolean;
 }
 
 /**
@@ -28,13 +30,14 @@ export default function CodeSnippet({
   plumbingLines = [],
   showLineNumbers = false,
   startLine = 1,
+  scroll = false,
 }: CodeSnippetProps): ReactNode {
   const plumbing = new Set(plumbingLines);
 
   return (
     <Highlight theme={prototestPrism} code={code.trim()} language={language}>
       {({className, tokens, getTokenProps}) => (
-        <pre className={`${className} ${styles.pre}`}>
+        <pre className={`${className} ${styles.pre} ${scroll ? styles.scroll : ''}`}>
           {tokens.map((line, i) => {
             const isPlumbing = plumbing.has(i + 1);
             return (

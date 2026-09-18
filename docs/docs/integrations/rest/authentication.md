@@ -95,7 +95,7 @@ When several of these apply, this is what wins:
 3. Several `[Auth<T>]` attributes at the same level are ordered by their `Order` property and **composed**: each runs in turn on the same request.
 4. **A per-request `.Auth(...)` overrides** whatever the attributes resolved, and **`.WithoutAuth()` clears it**.
 
-An authenticator is created once per request builder and reused if that builder sends more than once. A skipped authentication shows up in the trace as `auth.skip`, an applied one as `auth.apply`.
+An authenticator is created once per request builder and reused if that builder sends more than once. Authentication is recorded on the request operation itself: `auth.outcome` is `applied` or `skipped` (with `auth.type` when applied), and a composite authenticator records each handler it runs as an `auth.handler.apply` operation.
 
 ## Writing your own
 

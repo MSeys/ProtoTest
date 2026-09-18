@@ -51,7 +51,7 @@ public sealed class RestRequestBuilder
     {
         _resolvedAuthenticator = null;
         _authenticatorFactory = null;
-        Configure(("auth.source", "request"), ("auth.outcome", "disabled"));
+        Configure(("auth.source", "request"));
         return this;
     }
 

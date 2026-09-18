@@ -1,6 +1,6 @@
 # ProtoTest.Messaging.RabbitMq
 
-RabbitMQ adapter for the ProtoTest messaging capability: publish to exchanges and tap events with a per-test queue.
+RabbitMQ adapter for the ProtoTest messaging capability: publish to exchanges and tap events through one queue per awaited destination.
 
 ```bash
 dotnet add package ProtoTest.Messaging.RabbitMq --prerelease
@@ -23,4 +23,4 @@ builder.AddMessaging(messaging => messaging.UseRabbitMq());
 ```
 
 
-Publishing sends to the exchange named like the destination, so the application's topology decides routing. Awaiting declares a fresh exclusive, auto-delete queue, binds it catch-all to the destination exchange, drains it until a match or the timeout, then deletes it - a per-test tap that never competes with the application's consumers. The connection is owned and released by the run. See the [messaging guide](https://github.com/matthiasseys/ProtoTest/blob/main/docs/integrations/messaging.md).
+Publishing sends to the exchange named like the destination, so the application's topology decides routing. Awaiting uses a run-level tap: one exclusive, auto-delete queue per awaited destination, bound catch-all to the destination exchange and prepared (purged) before the act so another test's messages cannot satisfy it. The queue stays declared for the run, and an await for a destination that was never prepared binds just in time, seeing only messages published after the await begins. A tap never competes with the application's own consumers; parallel tests should await distinct destinations. The connection is owned and released by the run. See the [messaging guide](https://github.com/MSeys/ProtoTest/blob/main/docs/docs/integrations/messaging/index.md).

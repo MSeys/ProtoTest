@@ -76,7 +76,7 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
                     && string.Equals(entry.Message.Destination, destination, StringComparison.Ordinal)
                     && predicate(entry.Message))
                 .Cast<Entry?>()
-                .LastOrDefault();
+                .FirstOrDefault();
             if (existing is { } found)
             {
                 return found.Message;
@@ -87,17 +87,23 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
             completion = waiter.Completion.Task;
         }
 
-        var timeoutTask = Task.Delay(timeout, cancellationToken);
-        if (await Task.WhenAny(completion, timeoutTask) == completion)
-        {
-            return await completion;
-        }
+        var timeoutTask = Task.Delay(timeout, CancellationToken.None);
+        var cancellation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = cancellationToken.Register(() => cancellation.TrySetResult());
+        var completed = await Task.WhenAny(completion, timeoutTask, cancellation.Task);
 
         lock (_gate)
         {
             _waiters.Remove(waiter);
         }
 
+        // A publish may have matched the waiter between WhenAny's decision and its removal.
+        if (completion.IsCompleted)
+        {
+            return await completion;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
         throw new TimeoutException(
             $"No message matching the predicate arrived on '{destination}' within {timeout.TotalSeconds:0.###}s.");
     }

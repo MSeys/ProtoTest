@@ -63,16 +63,18 @@ builder.AddAspNetCoreServer<Program>(
         services.RemoveAll<IEmailSender>();
         services.AddSingleton<IEmailSender, RecordingEmailSender>();
     }),
-    configureClient: client => client.AllowAutoRedirect = false);
+    configureClientOptions: options => options.AllowAutoRedirect = false);
 ```
 
 ## Reaching into the application
 
 ```csharp
-WebApplicationFactory<TProgram> ServerFactory<TProgram>(this ProtoExecutionContext context, string name = "Default");
-IServiceScope CreateServerScope<TProgram>(this ProtoExecutionContext context, string name = "Default");
-TService ServerService<TProgram, TService>(this ProtoExecutionContext context, string name = "Default");
+WebApplicationFactory<TProgram> ServerFactory<TProgram>(this ProtoExecutionContext context, string? name = null);
+IServiceScope CreateServerScope<TProgram>(this ProtoExecutionContext context, string? name = null);
+TService ServerService<TProgram, TService>(this ProtoExecutionContext context, string? name = null);
 ```
+
+When `name` is omitted, each method targets the application selected for the test, then falls back to `"Default"`.
 
 ```csharp
 var emails = Proto.Context.ServerService<Program, IEmailSender>("Api");

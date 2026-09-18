@@ -18,7 +18,7 @@ ProtoTest provides:
 - OpenAPI-driven REST coverage;
 - extension points for hooks, attributes, clients, and collectors;
 - automatic portable execution traces for lifecycle and integration operations.
-- optional OpenTelemetry export through `ProtoTest.OpenTelemetry`, compatible with Sentry's official OpenTelemetry bridge.
+- an OpenTelemetry bridge through `ProtoTest.OpenTelemetry`: it registers ProtoTest's `ActivitySource` so an exporter you configure (such as Sentry's official OpenTelemetry bridge) can pick up ProtoTest operations.
 
 ## Example
 
@@ -37,26 +37,26 @@ public async Task GetOrder_ReturnsExpectedOrder()
 }
 ```
 
-This is an illustrative test excerpt. The complete setup is in the [getting-started guide](docs/getting-started/first-test.md).
+This is an illustrative test excerpt. The complete setup is in the [getting-started guide](docs/docs/getting-started/first-test.md).
 
 ## Documentation
 
-Read the [ProtoTest documentation](docs/index.md), or start directly with:
+Read the [ProtoTest documentation](docs/docs/index.md), or start directly with:
 
-- [First test](docs/getting-started/first-test.md)
-- [REST integration](docs/integrations/rest.md)
-- [GraphQL integration](docs/integrations/graphql.md)
-- [Web integration](docs/integrations/web.md)
-- [ASP.NET Core integration](docs/integrations/aspnetcore.md)
-- [Hooks and lifecycle extensions](docs/extending/hooks.md)
-- [Context and state](docs/guides/context-and-state.md)
-- [Extension points](docs/reference/extension-points.md)
-- [Execution tracing](docs/reference/tracing.md)
-- [Extension guide](docs/extending/index.md)
+- [First test](docs/docs/getting-started/first-test.md)
+- [REST integration](docs/docs/integrations/rest/index.md)
+- [GraphQL integration](docs/docs/integrations/graphql/index.md)
+- [Web integration](docs/docs/integrations/web/index.md)
+- [ASP.NET Core integration](docs/docs/integrations/aspnetcore.md)
+- [Hooks and lifecycle extensions](docs/docs/foundation/hooks.md)
+- [Context and state](docs/docs/foundation/execution-context.md)
+- [Extension points](docs/docs/advanced/extending.md#building-an-integration)
+- [Execution tracing](docs/docs/advanced/prototrace.md)
+- [Extension guide](docs/docs/advanced/extending.md)
 
 ## Demo
 
-[ProtoTest.Demo](samples/ProtoTest.Demo) is the single end-to-end showcase. It runs six journeys against Northstar, a multi-tenant release/deployment control-plane SaaS, through REST, GraphQL (including a live subscription) and signed webhooks: onboarding and plan limits, preview/production delivery and rollback, usage metering, invoicing, payments and proration, the role and token-scope matrix, tenant isolation and rate limiting. It also demonstrates parallel tenant provisioning, OpenAPI/GraphQL coverage, custom hooks, clients, contexts, observations, attachments, reports, and a complete ProtoTrace.
+[ProtoTest.Demo](samples/ProtoTest.Demo) is the single end-to-end showcase. It runs ten journeys against Northstar, a multi-tenant release/deployment control-plane SaaS: onboarding and plan limits; preview/production delivery and rollback; usage metering, invoicing, payments, proration and cancellation; the role and token-scope matrix, tenant isolation and rate limiting; arranging through the domain instead of the API; the same application over gRPC; awaiting a published `invoice.paid` event through RabbitMQ; asserting the generated monthly spreadsheet; and a real browser journey. The journeys reach Northstar through REST, GraphQL (including a live subscription), signed webhooks, gRPC, messaging, spreadsheets and the browser. It also demonstrates parallel tenant provisioning, OpenAPI/GraphQL coverage, custom hooks, clients, contexts, observations, attachments, reports, and a complete ProtoTrace.
 
 ## Build and test
 
@@ -85,6 +85,12 @@ To produce the complete package set locally:
 | OpenAPI | Available |
 | GraphQL | Preview |
 | Web with Playwright and Selenium backends | Preview |
-| gRPC (`ProtoTest.Grpc`), standalone Coverage | Planned |
+| gRPC (`ProtoTest.Grpc`) | Available |
+| Messaging (`ProtoTest.Messaging`, `ProtoTest.Messaging.RabbitMq`) | Available |
+| Spreadsheets (`ProtoTest.Sheets`) | Available |
+| Test data (`ProtoTest.Data`) | Available |
+| SQL (`ProtoTest.Sql`, `ProtoTest.Sql.EntityFrameworkCore`, `ProtoTest.Sql.Testcontainers`) | Available |
+| Containers (`ProtoTest.Testcontainers`, `ProtoTest.Messaging.RabbitMq.Testcontainers`) | Available |
+| Coverage | Available |
 
-See the [integration overview](docs/integrations/overview.md) for package names and capabilities.
+See the [integration overview](docs/docs/integrations/overview.md) for package names and capabilities.

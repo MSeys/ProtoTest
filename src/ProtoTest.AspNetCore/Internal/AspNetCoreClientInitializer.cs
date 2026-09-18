@@ -1,4 +1,4 @@
-namespace ProtoTest.AspNetCore;
+namespace ProtoTest.AspNetCore.Internal;
 
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -36,12 +36,13 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
     /// <inheritdoc />
     public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
     {
-        var reused = _lifetime == AspNetCoreServerLifetime.PerRun && _sharedServer is not null;
+        var reused = false;
         AspNetCoreServer<TProgram> server;
         if (_lifetime == AspNetCoreServerLifetime.PerRun)
         {
             lock (_gate)
             {
+                reused = _sharedServer is not null;
                 server = _sharedServer ??= AspNetCoreServer<TProgram>.Start(CombinedConfigure(context));
             }
 

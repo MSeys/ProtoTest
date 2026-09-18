@@ -116,6 +116,8 @@ internal static class GraphQLShapeSelection
 
     private static bool IsLeaf(object? value, Type type)
         => value is IJsonValueMatcher or GraphQLFieldSelection
+            || typeof(IJsonValueMatcher).IsAssignableFrom(type)
+            || typeof(GraphQLFieldSelection).IsAssignableFrom(type)
             || type == typeof(object) && value is null
             || type.IsPrimitive
             || type.IsEnum

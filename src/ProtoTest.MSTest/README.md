@@ -13,4 +13,4 @@ Derive an assembly setup class from `ProtoTestAssembly`, call `InitializeAsync` 
 public static Task Cleanup() => CleanupAsync();
 ```
 
-See the [adapter guide](https://github.com/matthiasseys/ProtoTest/blob/main/docs/integrations/nunit.md).
+See the [adapter guide](https://github.com/MSeys/ProtoTest/blob/main/docs/docs/runners/mstest.md).

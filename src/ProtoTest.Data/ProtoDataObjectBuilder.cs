@@ -3,11 +3,9 @@ namespace ProtoTest.Data;
 using ProtoTest.Data.Internal;
 
 using ProtoTest.Core;
-using System.Collections;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 
 /// <summary>Builds one instance while keeping scenario-relevant values explicit.</summary>
 public sealed class ProtoDataObjectBuilder<T>

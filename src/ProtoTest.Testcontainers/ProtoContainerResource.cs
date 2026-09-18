@@ -52,15 +52,29 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
         try
         {
             var container = _build();
-            _start(container, cancellationToken).GetAwaiter().GetResult();
             _container = container;
+            _start(container, cancellationToken).GetAwaiter().GetResult();
             ConnectionString = _connectionString(container);
             return ValueTask.CompletedTask;
         }
         catch
         {
-            // A failed start can be retried or reported; the resource stays releasable.
+            // A failed start can be retried or reported; release the built container and stay releasable.
             Interlocked.Exchange(ref _started, 0);
+            var failed = _container;
+            _container = default;
+            if (failed is not null)
+            {
+                try
+                {
+                    failed.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                }
+                catch
+                {
+                    // The start failure is what the caller needs to see.
+                }
+            }
+
             throw;
         }
     }

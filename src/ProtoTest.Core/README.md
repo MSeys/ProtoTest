@@ -17,4 +17,4 @@ public sealed class EnvironmentContext(Uri baseUri) : IProtoContext
 var environment = Proto.Context.Resolve<EnvironmentContext>();
 ```
 
-See the [ProtoTest repository](https://github.com/matthiasseys/ProtoTest) for lifecycle, extension, and integration guides.
+See the [ProtoTest repository](https://github.com/MSeys/ProtoTest) for lifecycle, extension, and integration guides.

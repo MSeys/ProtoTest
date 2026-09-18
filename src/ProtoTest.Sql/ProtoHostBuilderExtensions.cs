@@ -1,6 +1,7 @@
 namespace ProtoTest.Sql;
 
 using System.Data.Common;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Sql.Internal;
@@ -19,20 +20,30 @@ public static class ProtoHostBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(connectionFactory);
-        var options = new ProtoSqlOptions();
-        configure?.Invoke(options);
 
         return builder
             .AddCapability(new ProtoCapabilityDescriptor("SQL", ProtoCapabilityKinds.Store, "ProtoTest.Sql"))
             .ConfigureServices(services =>
             {
+            if (services.Any(descriptor => descriptor.ServiceType == typeof(ProtoSqlOptions)))
+            {
+                throw new InvalidOperationException("AddSql was already called on this host.");
+            }
+
             services.AddScoped(connectionFactory);
             services.AddScoped(services =>
                 new ProtoSqlSession(services.GetRequiredService<DbConnection>()));
-            services.AddSingleton(options);
-            services.AddSingleton<IProtoTestHook>(new SqlConnectionHook(options));
+            services.AddSingleton(provider =>
+            {
+                var options = new ProtoSqlOptions();
+                configure?.Invoke(options);
+                options.BindFromConfiguration(provider.GetRequiredService<IConfiguration>());
+                return options;
+            });
+            services.AddSingleton<IProtoTestHook>(provider =>
+                new SqlConnectionHook(provider.GetRequiredService<ProtoSqlOptions>()));
             services.AddSingleton<IProtoRunHook>(provider =>
-                new SqlIsolationGuardHook(options, provider.GetServices<ProtoApplicationClients>()));
+                new SqlIsolationGuardHook(provider.GetRequiredService<ProtoSqlOptions>(), provider.GetServices<ProtoApplicationClients>()));
         });
     }
 }

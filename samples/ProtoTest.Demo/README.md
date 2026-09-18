@@ -11,7 +11,16 @@ The suite is organised as journeys rather than API probes:
 | `BillingJourney` | Deploy minutes are metered, invoiced at period close, paid or declined, and a mid-cycle upgrade is prorated. |
 | `AccessJourney` | The role matrix, API token scopes, tenant isolation and rate limiting. |
 | `PlatformJourney` | REST, GraphQL (including a live subscription) and signed, retrying webhooks describing the same platform. |
+| `DomainAccessJourney` | The test composes the application's own domain over the shared store. |
+| `SheetsJourney` | The generated monthly report is verified as an OpenXML workbook. |
+| `GrpcJourney` | The application's own gRPC service is called and its replies shape-asserted. |
+| `MessagingJourney` | The application's `invoice.paid` event is awaited over the broker. |
+| `WebJourney` | A real browser drives the application's own login and reporting UI. |
 | `DiagnosticsShowcase` | ProtoTest's own failure diagnostics, attachments and trace. |
+
+Some journeys skip, before their lifecycle starts, unless their infrastructure is present: the domain
+journey needs a composed store, the messaging journey a broker, and the web journey a standalone
+instance (`ProtoTest:TargetUrl` or the session's base URL).
 
 The application is in memory but behaves like a product: plans and entitlements, billing state machines, a per-tenant virtual clock (`POST /test-support/tenants/{tenant}/clock/advance`) so periods can be closed deterministically, a webhook outbox with HMAC-SHA256 signatures and retries, an audit trail, `Idempotency-Key` replay and per-token rate limits.
 

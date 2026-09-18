@@ -11,8 +11,14 @@ Each integration is a NuGet package that adds a client to `ProtoExecutionContext
 | --- | --- | --- |
 | [`ProtoTest.Rest`](./rest/index.md) | HTTP/REST client, shape assertions, authentication | `Proto.Context.Rest()` |
 | [`ProtoTest.GraphQL`](./graphql/index.md) | queries, mutations, subscriptions, uploads, schema coverage | `Proto.Context.GraphQL()` |
+| [`ProtoTest.Grpc`](./grpc/index.md) | unary and streaming gRPC clients, metadata authentication, service/method coverage | `Proto.Context.Grpc()` |
 | [`ProtoTest.Web`](./web/index.md) + `.Playwright` / `.Selenium` | page objects, flows, login, browser diagnostics | `Proto.Context.Web()` |
+| [`ProtoTest.Messaging`](./messaging/index.md) | publish messages and await the one that matters | `Proto.Context.Messages()` |
+| [`ProtoTest.Sheets`](./sheets/index.md) | spreadsheet assertions and range coverage | `Proto.Context.Sheets()` |
 | [`ProtoTest.Data`](./data/index.md) | deterministic test data and provisioning | `Proto.Context.Data()` |
+| [`ProtoTest.Sql`](./sql/index.md) | one database connection per test, rolled back at the end | `Proto.Context.SqlConnection()` |
+| [`ProtoTest.Sql.EntityFrameworkCore`](./sql/index.md) | Entity Framework Core over the per-test connection | `Proto.Context.Sql<TContext>()` |
+| [`ProtoTest.Sql.Testcontainers`](./sql/index.md) | a PostgreSQL container owned by the run | `builder.AddInfrastructure(...)` |
 | [`ProtoTest.AspNetCore`](./aspnetcore.md) | in-process ASP.NET Core application | `Proto.Context.ServerFactory<TProgram>()` |
 | [`ProtoTest.OpenApi`](./openapi.md) | OpenAPI contract coverage | a collector on a REST client |
 
@@ -21,8 +27,9 @@ Supporting packages come along automatically when you install one of the above:
 | Package | |
 | --- | --- |
 | `ProtoTest.Core` | the foundation itself |
-| `ProtoTest.Http` | shared HTTP clients and the authentication model used by REST and GraphQL |
+| `ProtoTest.Http` | shared HTTP clients and the authentication model used by REST, GraphQL and gRPC |
 | `ProtoTest.Json` | shape matching and `JsonValue` constraints |
+| `ProtoTest.Testcontainers` | shared plumbing for run-scoped containers |
 
 And two that you add when you want them:
 
@@ -62,12 +69,6 @@ public async Task AdministratorCanProvisionAndListSevenAdditionalUsers()
 
 Or change something through REST and check it's visible through GraphQL, in the same test, with one authenticator serving both.
 
-## On the roadmap
+## Container-backed dependencies
 
-Not available yet:
-
-- **gRPC** — a `ProtoTest.Grpc` project exists in the repository as a placeholder; it has no implementation and isn't published.
-- **Files and documents** — starting with spreadsheets, such as Excel workbooks generated with SpreadsheetGear.
-- **Messaging** — asserting on messages published to and consumed from brokers such as RabbitMQ.
-
-Real dependencies ship today for PostgreSQL: `ProtoTest.Sql.Testcontainers` owns a database container for a run, and the demo suite exercises it in CI.
+When a suite should run against a real server instead of an in-memory one, a container package owns it for the run: [`ProtoTest.Sql.Testcontainers`](./sql/index.md) starts PostgreSQL, and `ProtoTest.Messaging.RabbitMq.Testcontainers` starts RabbitMQ. Register the container with `AddInfrastructure(...)` so the host starts it before the run, fills its connection string into configuration for the application and the tests, and releases it after the reports are written. Both build on `ProtoTest.Testcontainers`.

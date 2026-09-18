@@ -1,30 +1,52 @@
-/* The viewer's underline tabs: they navigate between snippets, so they are not pills. */
-/* The tabs sit on the head's bottom rule, so the active underline replaces it. */
-.tabs { display: flex; align-self: stretch; gap: 2px; margin-bottom: calc(var(--space-2) * -1 - 1px); }
+/* The viewer's underline tabs: they navigate between snippets, so they are not pills. They sit on the head's
+   bottom rule, so the active underline replaces it; more tabs than fit scroll sideways rather than wrap. */
+.tabs {
+  display: flex;
+  align-self: stretch;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+  margin-bottom: calc(var(--space-2) * -1 - 1px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar { display: none; }
 
 .tab {
+  flex: none;
   height: 100%;
   min-height: 36px;
-  padding: 0 var(--space-4);
+  padding: 0 var(--space-3);
   border: 0;
   border-bottom: 2px solid transparent;
   border-radius: var(--radius-chip) var(--radius-chip) 0 0;
   background: transparent;
   color: var(--muted);
   font: var(--weight-medium) var(--text-meta) var(--font-ui);
+  white-space: nowrap;
   cursor: pointer;
   transition: color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease);
 }
+
 .tab:hover { background: var(--hover); color: var(--text); }
 .tabActive { border-bottom-color: var(--blueprint); color: var(--text); font-weight: var(--weight-bold); }
 
-.filename { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+/* Every snippet gets the same height, so switching tabs never makes the hero jump: a longer one scrolls inside
+   its own box, both ways. */
+.body { height: 460px; display: flex; flex-direction: column; background: var(--surface-sunken); }
+.body pre { flex: 1 1 auto; min-height: 0; overflow: auto; }
 
-/* Every snippet gets the same height, so switching tabs never makes the hero jump. */
-.body { min-height: 340px; background: var(--surface-sunken); }
+/* The file name on its own bar, the way an editor labels a buffer. */
+.filename {
+  padding: var(--space-2) var(--space-5) 0;
+  color: var(--code-comment);
+  font: var(--text-micro) var(--font-mono);
+}
 
 @media (max-width: 600px) {
-  .filename { display: none; }
-  .tab { padding: 0 var(--space-3); }
-  .body { min-height: 0; }
+  /* A box that scrolls inside a page that scrolls is a trap on a phone: the snippet takes its own length. */
+  .body { height: auto; }
+  .body pre { overflow-y: visible; }
+  .filename { padding: var(--space-2) var(--space-4) 0; }
 }

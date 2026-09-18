@@ -35,12 +35,14 @@ public static class ProtoHostBuilderExtensions
         if (!Enum.IsDefined(lifetime)) throw new ArgumentOutOfRangeException(nameof(lifetime));
 
         // Registered through a factory so the host's service provider disposes the shared server with the run.
-        return builder.ConfigureServices(services =>
+        builder.ConfigureServices(services =>
         {
             services.AddSingleton<IProtoClientInitializer>(_ =>
                 new AspNetCoreClientInitializer<TProgram>(name, configureWebHost, configureClientOptions, lifetime));
             RegisterApplicationServices<TProgram>(services, name);
         });
+        return builder.AddCapability(new ProtoCapabilityDescriptor(
+            "ASP.NET Core", ProtoCapabilityKinds.Server, "ProtoTest.AspNetCore"));
     }
 
     /// <summary>

@@ -1,0 +1,86 @@
+.context { padding: 0; background: none; border: 0; color: var(--text); font: var(--weight-semibold) var(--text-meta) var(--font-mono); }
+.meta { color: var(--muted); font-size: var(--text-micro); }
+
+/* The cross-section: one stratum per depth, each a step more solid than the one above it. */
+.depths {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  container-type: inline-size;
+}
+
+.depth {
+  position: relative;
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-6);
+  display: grid;
+  grid-template-columns: minmax(140px, 190px) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2) var(--space-4);
+  background: color-mix(in srgb, var(--blueprint) calc(var(--level) * 3.5%), transparent);
+}
+
+.depth + .depth { border-top: 1px solid var(--border); }
+
+/* The spine: one context running through every depth, a node where each depth hangs off it. */
+.depth::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--space-4);
+  width: 2px;
+  background: var(--blueprint);
+}
+
+.depth:first-child::before { top: calc(var(--space-3) + 7px); }
+.depth:last-child::before { bottom: auto; height: calc(var(--space-3) + 7px); }
+
+.label { position: relative; min-width: 0; display: grid; gap: 2px; }
+.label strong { font-size: var(--text-strong); font-weight: var(--weight-bold); line-height: var(--leading-tight); }
+.label span { color: var(--muted); font-size: var(--text-micro); }
+
+.node {
+  position: absolute;
+  top: 3px;
+  left: calc(var(--space-6) * -1 + var(--space-4) - 4px);
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--blueprint);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: var(--space-2); }
+
+.card {
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease);
+}
+
+a.card:hover { border-color: var(--blueprint); background: var(--surface-2); color: var(--text); text-decoration: none; }
+.card strong { font-size: var(--text-body); font-weight: var(--weight-semibold); }
+.does { color: var(--muted); font-size: var(--text-micro); line-height: var(--leading-tight); }
+
+.packages {
+  margin-top: 2px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: none;
+  color: var(--dim);
+  font: var(--text-micro) var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container (max-width: 480px) {
+  .depth { grid-template-columns: minmax(0, 1fr); }
+}

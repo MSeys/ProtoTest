@@ -5,8 +5,8 @@ using ProtoTest.Core;
 
 /// <summary>
 /// Resolves the ordered authenticator attributes that apply to a protocol before each test, builds a
-/// composite authenticator when more than one applies, and records a "&lt;protocol&gt;.context.configure"
-/// trace event. The client a test uses is chosen separately by <c>[Application]</c>.
+/// composite authenticator when more than one applies, and records the resolved configuration as the
+/// protocol's auth entity state. The client a test uses is chosen separately by <c>[Application]</c>.
 /// </summary>
 public abstract class ProtoHttpAuthLifecycleHook(string protocolName) : IProtoTestHook
 {
@@ -55,9 +55,7 @@ public abstract class ProtoHttpAuthLifecycleHook(string protocolName) : IProtoTe
     private IEnumerable<IProtoHttpAuthMetadata> Applicable(IEnumerable<object> attributes)
         => attributes
             .OfType<IProtoHttpAuthMetadata>()
-            .Where(metadata =>
-                metadata.Protocols.Count == 0
-                || metadata.Protocols.Contains(_protocolName, StringComparer.OrdinalIgnoreCase));
+            .Where(metadata => metadata.AppliesTo(_protocolName));
 
     private IProtoHttpAuthenticator CreateAuthenticator(
         IReadOnlyList<IProtoHttpAuthMetadata> attributes,

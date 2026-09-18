@@ -18,4 +18,4 @@ public async Task Ping()
 }
 ```
 
-The underlying application factory and application service scopes are also available from the active execution context. See the [ASP.NET Core guide](https://github.com/matthiasseys/ProtoTest/blob/main/docs/integrations/aspnetcore.md).
+The underlying application factory and application service scopes are also available from the active execution context. See the [ASP.NET Core guide](https://github.com/MSeys/ProtoTest/blob/main/docs/docs/integrations/aspnetcore.md).

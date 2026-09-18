@@ -8,8 +8,8 @@ using global::Testcontainers.PostgreSql;
 /// <summary>
 /// A PostgreSQL container owned by the whole run: started once for the suite and released when the
 /// host is disposed, after the run has stopped and the reports are written. Register it with
-/// <c>AddInfrastructure</c> (or <c>AddResource</c>) and hand its connection string to the application
-/// and to the tests so both work against the same database.
+/// <c>AddInfrastructure</c> and hand its connection string to the application and to the tests so both
+/// work against the same database.
 /// </summary>
 public sealed class PostgresDatabase : ProtoContainerResource<PostgreSqlContainer>
 {
@@ -63,7 +63,15 @@ public sealed class PostgresDatabase : ProtoContainerResource<PostgreSqlContaine
         {
             database = null;
             error = $"{exception.GetType().Name}: {exception.Message}";
-            candidate.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            try
+            {
+                candidate.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch
+            {
+                // The start failure is what the caller needs to see.
+            }
+
             return false;
         }
     }

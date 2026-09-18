@@ -220,7 +220,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     {
         _webFailure = true;
         cancellationToken.ThrowIfCancellationRequested();
-        var prefix = WebNames.SafeName(failure.Element?.Name ?? failure.Operation);
+        var prefix = $"{WebNames.SafeName(_sessionName)}-{WebNames.SafeName(failure.Element?.Name ?? failure.Operation)}";
         var attachments = new List<ProtoTestAttachment>();
         await TryCaptureAsync("screenshot", async () => attachments.Add(ProtoTestAttachment.FromBytes(
             $"web-{prefix}-failure.png",
@@ -232,8 +232,15 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
             await Page.ContentAsync(),
             "text/html",
             "DOM snapshot at web operation failure.")));
-        attachments.Add(ProtoTestAttachment.FromText(
-            $"web-{prefix}-location.txt", Page.Url, "text/plain", "URL at web operation failure."));
+        await TryCaptureAsync("location", () =>
+        {
+            attachments.Add(ProtoTestAttachment.FromText(
+                $"web-{prefix}-location.txt",
+                ProtoUriSanitizer.Sanitize(new Uri(Page.Url), null),
+                "text/plain",
+                "URL at web operation failure."));
+            return Task.CompletedTask;
+        });
         return attachments;
     }
 
@@ -292,14 +299,17 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
 
     private ILocator Text(ILocator? scope, TextWebLocator locator)
     {
-        if (!locator.IgnoreCase)
+        // A Playwright string is case-insensitive unless Exact; only the exact case-sensitive case can
+        // use a plain string, the rest need a regex with matching flags.
+        if (!locator.IgnoreCase && locator.Exact)
+        {
             return scope is null
-                ? Page.GetByText(locator.Value, new PageGetByTextOptions { Exact = locator.Exact })
-                : scope.GetByText(locator.Value, new LocatorGetByTextOptions { Exact = locator.Exact });
+                ? Page.GetByText(locator.Value, new PageGetByTextOptions { Exact = true })
+                : scope.GetByText(locator.Value, new LocatorGetByTextOptions { Exact = true });
+        }
 
         var pattern = locator.Exact ? $"^{Regex.Escape(locator.Value)}$" : Regex.Escape(locator.Value);
-        // Playwright evaluates the pattern in the browser and only accepts JavaScript-compatible flags.
-        var regex = new Regex(pattern, RegexOptions.IgnoreCase);
+        var regex = new Regex(pattern, locator.IgnoreCase ? RegexOptions.IgnoreCase : RegexOptions.None);
         return scope is null ? Page.GetByText(regex) : scope.GetByText(regex);
     }
 
@@ -308,7 +318,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         var left = Apply(scope, locator.Left);
         if (locator.Right is HasTextWebLocator text)
         {
-            if (!text.IgnoreCase && !text.Exact)
+            if (text.IgnoreCase && !text.Exact)
                 return left.Filter(new LocatorFilterOptions { HasText = text.Value });
             var pattern = text.Exact ? $"^{Regex.Escape(text.Value)}$" : Regex.Escape(text.Value);
             return left.Filter(new LocatorFilterOptions

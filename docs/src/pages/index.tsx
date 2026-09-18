@@ -8,7 +8,7 @@ import Comparison from '@site/src/components/Comparison';
 import {comparisonConcerns, withoutProtoTest, withProtoTest} from '@site/src/data/comparison';
 import CoverageMap from '@site/src/components/CoverageMap';
 import TraceView from '@site/src/components/TraceView';
-import LayerStack from '@site/src/components/LayerStack';
+import CapabilityIndex from '@site/src/components/CapabilityIndex';
 import VisibilityPanel from '@site/src/components/VisibilityPanel';
 import styles from './index.module.css';
 
@@ -22,20 +22,26 @@ public sealed class Setup : ProtoTestAssembly
 {
     protected override void Configure(IProtoHostBuilder builder)
     {
+        // The application: hosted in-process, reached over three protocols.
         builder.AddApplication(NorthstarTargets.Api, app => app
             .AddAspNetCoreServer<Program>()
             .AddRest(rest => rest.AddClient("Api")
                 .AddCollector<OpenApiCoverageCollector>())
             .AddGraphQL(graphQL => graphQL.AddClient("GraphQL")
-                .WithSchemaCoverage("northstar.graphql")));
+                .WithSchemaCoverage("northstar.graphql"))
+            .AddGrpc(grpc => grpc.AddClient("Api")));
 
-        builder.AddData(data =>
-            data.AddDefaults<NorthstarDataDefaults>());
-        builder.AddSql(_ =>
-            new SqliteConnection("Data Source=northstar.db"));
+        // In front of it, behind it, and what a scenario needs.
+        builder.AddWeb();
+        builder.AddSql(_ => new SqliteConnection("Data Source=northstar.db"));
+        builder.AddEntityFrameworkCore<BillingDbContext>((services, options) =>
+            options.UseSqlite(services.GetRequiredService<DbConnection>()));
+        builder.AddMessaging(messaging => messaging.UseRabbitMq());
+        builder.AddSheets();
+        builder.AddData(data => data.AddDefaults<NorthstarDataDefaults>());
 
-        builder.ConfigureTracing(trace =>
-            trace.OutputPath = "northstar.prototrace");
+        // What the run leaves behind.
+        builder.ConfigureTracing(trace => trace.OutputPath = "northstar.prototrace");
         builder.AddSink<HtmlReportSink>();
     }
 }`,
@@ -96,6 +102,31 @@ using var next = await subscription
       'One anonymous object does both jobs: it builds the selection set and asserts the payload.',
   },
   {
+    id: 'grpc',
+    label: 'gRPC',
+    filename: 'OrderTests.cs',
+    code: `[ProtoTest]
+public async Task A_placed_order_can_be_read_back()
+{
+    var order = await Proto.Context.Grpc().UnaryAsync(
+        Orders.GetOrder,
+        new GetOrderRequest { Id = 42 });
+
+    order.ShouldMatchShape(new
+    {
+        id = 42,
+        status = "PENDING",
+        total = JsonValue.GreaterThan(0),
+        lines = new[]
+        {
+            new { sku = "notebook", quantity = 2 }
+        }
+    });
+}`,
+    footnote:
+      'The protobuf reply is matched with the same shapes as REST and GraphQL: declare only the fields the behaviour depends on, nested and partial.',
+  },
+  {
     id: 'browser',
     label: 'Browser',
     filename: 'PortalSignInTests.cs',
@@ -140,6 +171,73 @@ response.ShouldMatchShape(new
     footnote:
       'Defaults come from your data module, provisioning from your provisioner — and it shares the test context with every other client.',
   },
+  {
+    id: 'sql',
+    label: 'SQL',
+    filename: 'InvoiceTests.cs',
+    code: `[ProtoTest]
+public async Task Paying_an_invoice_marks_it_paid()
+{
+    using var response = await Proto.Context.Rest()
+        .PostAsync("/api/invoices/42/pay");
+    response.ShouldHaveHttpStatus(HttpStatusCode.OK);
+
+    // The store the application writes to, on the
+    // connection and transaction the test owns.
+    var billing = Proto.Context.Sql<BillingDbContext>();
+    var invoice = await billing.Invoices.SingleAsync(
+        invoice => invoice.Id == 42);
+
+    Assert.That(invoice.Status, Is.EqualTo("paid"));
+}`,
+    footnote:
+      'ProtoTest opens the connection, begins the transaction and rolls it back, so a test can read and write the real store without leaving anything behind.',
+  },
+  {
+    id: 'messaging',
+    label: 'Messaging',
+    filename: 'BillingEventTests.cs',
+    code: `[ProtoTest]
+public async Task Paying_an_invoice_publishes_invoice_paid()
+{
+    using var response = await Proto.Context.Rest()
+        .PostAsync("/api/invoices/42/pay");
+    response.ShouldHaveHttpStatus(HttpStatusCode.OK);
+
+    await Proto.Context.Messages().AwaitAsync(
+        "invoice.paid",
+        message => message.Payload!.Contains("\\"id\\":42"),
+        TimeSpan.FromSeconds(15));
+}`,
+    footnote:
+      'Await the event the call should cause. The same test runs on the in-memory broker or on RabbitMQ; a timeout fails it with what did arrive.',
+  },
+  {
+    id: 'sheets',
+    label: 'Sheets',
+    filename: 'SalesReportTests.cs',
+    code: `[Sheet("Sales", HeaderRows = [1, 2])]
+public sealed record SalesRow(
+    [property: Column("Region", Pattern = "^[A-Z]+$", Unique = true)] string Region,
+    [property: Column("FY26", "Amount", Min = 0)] decimal Amount,
+    [property: Column("FY26", "Count", Min = 0)] int Count);
+
+[ProtoTest]
+public async Task The_sales_report_ranks_regions_by_amount()
+{
+    using var response = await Proto.Context.Rest()
+        .GetAsync("/api/v1/reports/sales.xlsx");
+
+    var sales = Proto.Context.Sheets().Open(response).Model<SalesRow>();
+    sales.Verify();
+
+    sales.Column(row => row.Amount).ShouldBeSortedBy(ascending: false);
+    sales.Row(row => row.Region == "EMEA")
+        .ShouldMatchShape(new { Amount = 1200m, Count = 12 });
+}`,
+    footnote:
+      'The record is the sheet: header paths bind the columns, and Verify checks every row against their rules and reports every violation at once.',
+  },
 ];
 
 
@@ -156,9 +254,9 @@ function Hero() {
             </Heading>
             <p className={styles.heroLead}>
               Pick the capabilities your tests need — REST, GraphQL, the browser, test data, SQL, an
-              in-process ASP.NET Core host — and compose them onto one execution context. ProtoTest owns the
-              lifecycle around them and traces everything they do, so a failing test shows the check that
-              failed, the values it compared and every step before it.
+              in-process ASP.NET Core host — and compose them onto one execution context. ProtoTest coordinates
+              their lifecycle and traces everything they do, so a failing test shows the check that failed,
+              the values it compared and every step before it.
             </p>
             <div className={styles.heroButtons}>
               <Link className={`${styles.btn} ${styles.btnPrimary}`} to="/docs/getting-started/installation">
@@ -227,8 +325,8 @@ function PayoffSection() {
         <div className={styles.sectionHead}>
           <Heading as="h2">Beyond pass or fail.</Heading>
           <p>
-            Because ProtoTest owns the lifecycle and understands its own integrations, it can report
-            on the run without you instrumenting anything.
+            Because ProtoTest coordinates the lifecycle and understands its own integrations, it can
+            report on the run without you instrumenting anything.
           </p>
         </div>
 
@@ -281,12 +379,15 @@ function LayersSection() {
         <div className={styles.sectionHead}>
           <Heading as="h2">One foundation. Every layer.</Heading>
           <p>
-            Each layer is a client on the same <code>ProtoExecutionContext</code>, so what you learn
-            on one carries to the next — and new layers slot in without changing how your tests are
-            written.
+            A test can stand anywhere: drive the browser at one end, read the store the application writes at
+            the other. Every capability plugs into the same <code>ProtoExecutionContext</code>, so the depth you
+            choose changes what a test sees, not how it is written, and every depth lands in the same trace.
           </p>
+          <Link className={styles.featureLink} to="/docs/integrations/overview">
+            Every integration →
+          </Link>
         </div>
-        <LayerStack />
+        <CapabilityIndex />
       </div>
     </section>
   );

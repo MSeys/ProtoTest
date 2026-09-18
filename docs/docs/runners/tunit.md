@@ -60,6 +60,6 @@ public class OrderTests
 
 ## Things to know
 
-**TUnit is the only runner that records `Cancelled`.** `ProtoTestExecutor` maps a successful run to Passed, an `OperationCanceledException` to Cancelled, and anything else to Failed — rethrowing in both failure cases so TUnit still sees the exception.
+**`Cancelled` is a first-class outcome.** `ProtoTestExecutor` maps a successful run to Passed, an `OperationCanceledException` to Cancelled, and anything else to Failed — rethrowing in both failure cases so TUnit still sees the exception. xUnit v2 with `[ProtoTestFact]` / `[ProtoTestTheory]` also records cancellation.
 
 **Attachments are per-test and parallel-safe.** The publisher is constructed with the live `TestContext` and calls `context.Output.AttachArtifact(path, name, description)`, so artifacts land on the right test even under heavy parallelism.

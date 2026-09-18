@@ -1,5 +1,6 @@
 namespace ProtoTest.Http;
 
+using ProtoTest.Core;
 using ProtoTest.Json;
 
 /// <summary>
@@ -8,7 +9,7 @@ using ProtoTest.Json;
 /// </summary>
 public static class ProtoHttpDiagnosticSanitizer
 {
-    internal const string RedactedValue = "[REDACTED]";
+    internal const string RedactedValue = ProtoUriSanitizer.RedactedValue;
 
     /// <summary>Sanitizes a body using the configured JSON redaction rules.</summary>
     public static string SanitizeBody(string content, ProtoHttpAttachmentOptions? configuredOptions)
@@ -33,7 +34,7 @@ public static class ProtoHttpDiagnosticSanitizer
                 StringComparer.OrdinalIgnoreCase);
     }
 
-    /// <summary>Returns the URI with sensitive query parameter values replaced.</summary>
+    /// <summary>Returns the URI with credentials and sensitive query parameter values removed.</summary>
     public static string? SanitizeUri(Uri? uri, ProtoHttpAttachmentOptions? configuredOptions)
     {
         if (uri is null)
@@ -42,36 +43,9 @@ public static class ProtoHttpDiagnosticSanitizer
         }
 
         var options = configuredOptions ?? new ProtoHttpAttachmentOptions();
-        if (!options.RedactSensitiveData)
-        {
-            return uri.ToString();
-        }
-
-        var original = uri.OriginalString;
-        var fragmentIndex = original.IndexOf('#');
-        var fragment = fragmentIndex < 0 ? string.Empty : original[fragmentIndex..];
-        var withoutFragment = fragmentIndex < 0 ? original : original[..fragmentIndex];
-        var queryIndex = withoutFragment.IndexOf('?');
-        if (queryIndex < 0)
-        {
-            return original;
-        }
-
-        var sensitive = new HashSet<string>(options.SensitiveQueryParameters, StringComparer.OrdinalIgnoreCase);
-        var path = withoutFragment[..queryIndex];
-        var parameters = withoutFragment[(queryIndex + 1)..]
-            .Split('&', StringSplitOptions.RemoveEmptyEntries)
-            .Select(parameter => RedactQueryParameter(parameter, sensitive));
-        return $"{path}?{string.Join('&', parameters)}{fragment}";
-    }
-
-    private static string RedactQueryParameter(string parameter, HashSet<string> sensitive)
-    {
-        var separatorIndex = parameter.IndexOf('=');
-        var encodedKey = separatorIndex < 0 ? parameter : parameter[..separatorIndex];
-        var key = Uri.UnescapeDataString(encodedKey.Replace("+", " ", StringComparison.Ordinal));
-        return sensitive.Contains(key)
-            ? $"{encodedKey}={Uri.EscapeDataString(RedactedValue)}"
-            : parameter;
+        // User-info is always removed: credentials are never traced, whatever the redaction toggle says.
+        return options.RedactSensitiveData
+            ? ProtoUriSanitizer.Sanitize(uri, options.SensitiveQueryParameters)
+            : ProtoUriSanitizer.WithoutUserInfo(uri.OriginalString);
     }
 }

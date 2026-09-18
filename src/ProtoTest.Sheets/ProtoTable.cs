@@ -75,15 +75,23 @@ public sealed class ProtoTable
 
     public void ShouldContainRow(string keyColumn, string value)
     {
+        using var operation = _context?.Trace
+            .Operation("sheets.assert", $"Sheets · {_sheet.Name}", "ProtoTest.Sheets")
+            .With("sheets.expected", $"a row where '{keyColumn}' is '{value}'")
+            .Begin();
         try
         {
             _ = RowWhere(keyColumn, value);
+            operation?.Succeed();
         }
         catch (SpreadsheetAssertionException exception)
         {
-            throw new SpreadsheetAssertionException(exception.Message);
+            operation?.Fail(exception);
+            throw;
         }
     }
+
+    internal ProtoExecutionContext? Context => _context;
 
     internal int ColumnNumber(IReadOnlyList<string> headerPath)
     {
@@ -132,6 +140,12 @@ public sealed class ProtoTable
 
     internal void RecordRead(int? row = null)
     {
+        if (_columns.Count == 0 || _sheet.RowCount == 0)
+        {
+            _context?.RecordObservation(new ProtoObservation("Sheets", "sheets.range", _sheet.Name));
+            return;
+        }
+
         var lastColumn = Internal.SheetReferences.Format(_columns.Count, _sheet.RowCount);
         var identifier = row is null
             ? $"{_sheet.Name}!A{DataStartRow}:{lastColumn}"

@@ -53,13 +53,15 @@ A few of the kinds recorded automatically:
 | `client.initialize`, `client.resolve`, `client.register` | clients |
 | `context.set`, `context.resolve` | typed state — with a snapshot of the value |
 | `observation.record`, `attachment.register` | observations and attachments |
-| `auth.apply`, `auth.skip` | HTTP authentication |
+| `auth.outcome` (`applied` / `skipped`) | HTTP authentication, recorded on the request operation itself |
+| `auth.handler.apply` | each handler of a composite authenticator |
 | `assert.json.shape` | shape assertions — expected, actual and matched properties |
 | `web.navigate`, `web.click`, `web.flow`, `web.login`, `assert.web`, … | the [browser](../integrations/web/diagnostics.md#what-the-trace-records-for-every-operation) |
-| `data.build`, `data.cleanup` | [test data](../integrations/data/index.md) |
+| `data.build`, `data.build_many`, `data.create`, `data.create_many`, `data.explain` | [building test data](../integrations/data/index.md) |
+| `data.provision`, `data.cleanup`, `data.value.resolve` | [provisioning and cleanup](../integrations/data/provisioners.md) |
 | `aspnetcore.server.initialize` | the in-process server |
 
-Sensitive values stay out: form fills are recorded by length, and headers, query parameters and JSON properties are redacted using the [same rules as attachments](../integrations/rest/attachments.md#redaction).
+Sensitive values stay out: form fills are recorded by length, headers and JSON properties are redacted using the [same rules as attachments](../integrations/rest/attachments.md#redaction), and sensitive query parameter values are redacted in HTTP request URLs and web navigation addresses.
 
 ## Trace vs. observations
 

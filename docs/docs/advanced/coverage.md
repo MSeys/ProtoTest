@@ -128,7 +128,7 @@ public sealed class InvoiceStateCoverage(string targetName) : ProtoCoverageColle
             return AllStates.Select(state => _items.TryGetValue(state, out var hit)
                 ? hit
                 : new ProtoReportItem(TargetName, Category, state,
-                    Kind: ProtoReportItemKind.Coverage,
+                    Kind: ProtoReportItemKinds.Coverage,
                     Status: ProtoReportStatus.Neutral,
                     IsCovered: false)).ToList();
         }
@@ -143,7 +143,7 @@ builder.AddApplication("Api", app => app
     .AddRest(rest => rest.AddClient("Billing").AddCollector<InvoiceStateCoverage>()));
 ```
 
-Collectors must be thread-safe; tests run in parallel. Use the base class's `Lock`.
+Collectors must be thread-safe; tests run in parallel. Use the base class's `protected readonly ProtoLock _lock`.
 
 ### Collectors not tied to a client
 
@@ -185,7 +185,9 @@ public sealed record ProtoReportItem(
     string? Message = null,
     IReadOnlyList<string>? Tags = null,
     IReadOnlyList<ProtoReportItem>? Children = null,
-    IReadOnlyDictionary<string, object>? Metadata = null);
+    IReadOnlyDictionary<string, object>? Metadata = null,
+    string? DisplayName = null,
+    string? DisplayGroup = null);
 ```
 
 Items nest through `Children`, and the kinds cover more than coverage: a `Metric` with a `Value` and `Unit`, or a `Finding` with a `Warning` status and a `Message`, show up in the same reports. A kind is an open string, so an integration can define its own; the built-in ones are named by `ProtoReportItemKinds`. The HTML report keeps the kinds in their own sections — coverage, findings, run gates, resources — and gives an unknown kind its own section titled after it, so a passed gate is never read as a finding.

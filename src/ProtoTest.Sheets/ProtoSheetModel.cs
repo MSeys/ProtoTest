@@ -244,7 +244,8 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
             return cell.Date ?? throw new FormatException(cell.Display());
         }
 
-        return cell.Display();
+        throw new FormatException(
+            $"'{cell.Display()}' at {cell.Reference} cannot be converted to {target.Name}.");
     }
 
     private static bool IsNullable(Type type)

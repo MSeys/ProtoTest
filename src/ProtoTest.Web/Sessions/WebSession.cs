@@ -90,12 +90,13 @@ public sealed class WebSession : IAsyncDisposable
     internal ValueTask NavigateAsync(Uri address, CancellationToken cancellationToken)
     {
         var target = ResolveTarget(address);
+        var safeAddress = ProtoUriSanitizer.Sanitize(target);
         return ExecuteVoidAsync(
             "web.navigate",
-            $"WEB · Navigate · {target}",
+            $"WEB · Navigate · {safeAddress}",
             WebOperationKind.Navigate,
             null,
-            new Dictionary<string, string?> { ["web.address"] = target.ToString() },
+            new Dictionary<string, string?> { ["web.address"] = safeAddress },
             (backend, ct) => backend.NavigateAsync(target, ct),
             cancellationToken);
     }

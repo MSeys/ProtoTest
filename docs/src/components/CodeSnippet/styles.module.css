@@ -34,6 +34,16 @@
   overflow-wrap: anywhere;
 }
 
+/* Scrolling: lines stay whole and the block scrolls sideways inside itself, never the page. */
+.scroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--code-text) 28%, transparent) transparent;
+}
+
+.scroll .line { width: max-content; min-width: 100%; }
+.scroll .lineContent { padding-left: 0; text-indent: 0; white-space: pre; overflow-wrap: normal; }
+
 /* Plumbing (blueprint, not solid): a dashed gutter rule and a tinted band say "supporting", while the code
    stays readable — the signal is the band, not a fade that hides what the line says. */
 .plumbing {

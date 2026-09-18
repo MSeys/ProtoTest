@@ -20,7 +20,8 @@ public static class ProtoExecutionContextExtensions
         if (client is null)
         {
             // No initialized client (for example a target resolved only at call time): back it with the
-            // application's in-process transport, the same fallback the HTTP-based protocols use.
+            // application's in-process transport, the same fallback the HTTP-based protocols use. The
+            // fallback client is registered so every call shares one channel and teardown releases it.
             var transport = ProtoApplicationResolution.ResolveTransportClient(context, application);
             if (transport is null)
             {
@@ -31,19 +32,21 @@ public static class ProtoExecutionContextExtensions
             }
 
             client = ProtoGrpcClient.ForTransport(context, resolvedName, transport);
+            context.RegisterClient(client, resolvedName);
+
+            context.Trace.WriteEvent(
+                "grpc.client.resolve",
+                $"gRPC client · {selected}",
+                "ProtoTest.Grpc",
+                outcome: ProtoTraceOutcome.Succeeded,
+                attributes: new Dictionary<string, string?>
+                {
+                    ["client.name"] = selected,
+                    ["application.name"] = application,
+                    ["client.source_name"] = resolvedName
+                });
         }
 
-        context.Trace.WriteEvent(
-            "grpc.client.resolve",
-            $"gRPC client · {selected}",
-            "ProtoTest.Grpc",
-            outcome: ProtoTraceOutcome.Succeeded,
-            attributes: new Dictionary<string, string?>
-            {
-                ["client.name"] = selected,
-                ["application.name"] = application,
-                ["client.source_name"] = resolvedName
-            });
         return client;
     }
 }

@@ -3,6 +3,7 @@ namespace ProtoTest.Grpc.Clients;
 using global::Grpc.Net.Client;
 using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
+using ProtoTest.Http;
 
 /// <summary>
 /// Initializes a named gRPC client from an explicit address, or from the application it belongs to: the
@@ -23,7 +24,6 @@ public sealed class ProtoGrpcClientInitializer(
 
     public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
     {
-        options.BindFromConfiguration(context.Configuration);
         var configured = ResolveConfiguredAddress(context.Configuration);
         if (configured is null && !allowMissingAddress)
         {
@@ -48,14 +48,20 @@ public sealed class ProtoGrpcClientInitializer(
     {
         if (!string.IsNullOrWhiteSpace(explicitAddress))
         {
-            return new Uri(explicitAddress);
+            return ParseAddress(explicitAddress);
         }
 
         var applicationName = application ?? Name;
         var configured = ProtoApplication.Section(configuration, applicationName)["Grpc:Address"]
             ?? ProtoApplication.BaseUrl(configuration, applicationName);
-        return string.IsNullOrWhiteSpace(configured) ? null : new Uri(configured);
+        return string.IsNullOrWhiteSpace(configured) ? null : ParseAddress(configured);
     }
+
+    private static Uri ParseAddress(string address)
+        => ProtoHttpUri.TryCreateAbsoluteHttpUri(address, out var uri)
+            ? uri!
+            : throw new InvalidOperationException(
+                $"The gRPC address '{address}' must be an absolute HTTP or HTTPS URI.");
 
     private static async ValueTask<GrpcChannel> CreateChannelAsync(
         ProtoExecutionContext context,
@@ -102,7 +108,7 @@ public sealed class ProtoGrpcClientInitializer(
         };
         if (address is not null)
         {
-            state["client.address"] = address.ToString();
+            state["client.address"] = ProtoUriSanitizer.WithoutUserInfo(address.ToString());
         }
 
         context.Trace.SetEntityState(

@@ -37,4 +37,4 @@ ProtoTest and this documentation are under active development. APIs may still ch
 
 ## See it in a real suite
 
-The repository contains a complete sample: "Northstar", an ASP.NET Core multi-tenant deployment control-plane application in `samples/ProtoTest.SampleApp`, and six journeys in `samples/ProtoTest.Demo` that test it through REST, GraphQL (including a live subscription), signed webhooks, test data and in-process hosting — running in parallel, with coverage, reports and a trace. Many examples in these docs are taken from it.
+The repository contains a complete sample: "Northstar", an ASP.NET Core multi-tenant deployment control-plane application in `samples/ProtoTest.SampleApp`, and ten journeys in `samples/ProtoTest.Demo` that test it through REST, GraphQL (including a live subscription), gRPC, signed webhooks, spreadsheets, messaging, a real browser and in-process hosting — running in parallel, with coverage, reports and a trace. Many examples in these docs are taken from it.

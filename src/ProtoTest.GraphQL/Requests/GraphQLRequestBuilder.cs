@@ -207,6 +207,7 @@ public sealed class GraphQLRequestBuilder
         var identifier = $"{operation.Type} {operation.Name ?? "<anonymous>"}";
         using var traceOperation = _context.Trace
             .Operation("graphql.operation", $"GraphQL · {identifier}", "ProtoTest.GraphQL")
+            .For(ProtoTraceEntityKinds.Client, $"client:{typeof(HttpClient).FullName}:{_targetName}")
             .With("client.name", _targetName)
             .With("graphql.operation.type", operation.Type)
             .With("graphql.operation.name", operation.Name)

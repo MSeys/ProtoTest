@@ -8,9 +8,9 @@ using ProtoTest.Messaging;
 public static class ProtoMessagingBuilderExtensions
 {
     /// <summary>
-    /// Uses RabbitMQ as the broker: publish to exchanges named like the destination, await with a
-    /// per-test tap queue. The connection comes from <c>ProtoTest:Messaging:RabbitMq:ConnectionString</c>,
-    /// so a deployed run only changes configuration.
+    /// Uses RabbitMQ as the broker: publish to exchanges named like the destination, await on a tap
+    /// prepared for the destination before the act. The connection comes from
+    /// <c>ProtoTest:Messaging:RabbitMq:ConnectionString</c>, so a deployed run only changes configuration.
     /// </summary>
     public static ProtoMessagingBuilder UseRabbitMq(
         this ProtoMessagingBuilder messaging,

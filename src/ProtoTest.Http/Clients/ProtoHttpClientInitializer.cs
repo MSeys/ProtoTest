@@ -105,12 +105,7 @@ public sealed class ProtoHttpClientInitializer(
     }
 
     private static string SafeAddress(Uri address)
-    {
-        if (string.IsNullOrEmpty(address.UserInfo))
-        {
-            return address.ToString();
-        }
-
-        return new UriBuilder(address) { UserName = string.Empty, Password = string.Empty }.Uri.ToString();
-    }
+        => string.IsNullOrEmpty(address.UserInfo)
+            ? address.ToString()
+            : ProtoUriSanitizer.WithoutUserInfo(address.OriginalString);
 }

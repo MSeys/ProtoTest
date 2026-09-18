@@ -255,6 +255,32 @@ public sealed class GraphQLShapeDrivenApiTests
         finally { await host.CompleteTestAsync(); }
     }
 
+    [Test]
+    public async Task Select_ShouldTreatEmptyArrayElementsByTheirDeclaredMarkerType()
+    {
+        string? document = null;
+        await using var host = CreateHost(request =>
+        {
+            document = Document(request);
+            return Json("""{"data":{"orders":{"nodes":[]}}}""");
+        });
+        await host.StartTestAsync("empty-array-shape", "9", Method());
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query("orders")
+                .Select(new { nodes = Array.Empty<MarkerRow>() })
+                .ExecuteAsync();
+            response.ShouldHaveNoErrors();
+            Assert.Multiple(() =>
+            {
+                Assert.That(document, Does.Contain("nodes {"));
+                Assert.That(document, Does.Contain("id"));
+            });
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
     private static ProtoHost CreateHost(Func<HttpRequestMessage, HttpResponseMessage> response)
     {
         var builder = new ProtoHostBuilder();
@@ -278,6 +304,7 @@ public sealed class GraphQLShapeDrivenApiTests
     private sealed record OrdersSelection(IReadOnlyList<OrderSelection> Nodes, PageInfoSelection PageInfo);
     private sealed record OrderSelection(int Id, string Product);
     private sealed record PageInfoSelection(bool HasNextPage);
+    private sealed record MarkerRow(GraphQLFieldSelection Id);
     private sealed record RenamedSelection([property: JsonPropertyName("displayName")] string Name);
     private sealed record RenamedInput(
         [property: JsonPropertyName("product")] string Name,

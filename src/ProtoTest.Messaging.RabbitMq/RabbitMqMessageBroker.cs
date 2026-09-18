@@ -3,13 +3,14 @@ namespace ProtoTest.Messaging.RabbitMq;
 using System.Text;
 using global::RabbitMQ.Client;
 using global::RabbitMQ.Client.Events;
+using ProtoTest.Core;
 using ProtoTest.Messaging;
 
 /// <summary>
 /// The RabbitMQ adapter. Publishing sends to the exchange named like the destination, so the app's
-/// topology decides routing. Awaiting declares a fresh exclusive, auto-delete queue, binds it catch-all
-/// to the destination exchange, drains it while waiting, and deletes it afterwards - a per-test tap
-/// that never competes with the application's own consumers and never sees another test's messages.
+/// topology decides routing. Awaiting consumes from a tap queue per destination, declared once for the
+/// run and purged before each test, so the application's own consumers are not disturbed. Tests that
+/// run in parallel must use distinct destinations.
 /// </summary>
 public sealed class RabbitMqMessageBroker : IProtoMessageBroker, IProtoMessageBrokerSetup, IDisposable
 {
@@ -128,9 +129,9 @@ public sealed class RabbitMqMessageBroker : IProtoMessageBroker, IProtoMessageBr
                     throw new TimeoutException(
                         $"No message matching the predicate arrived on '{destination}' within {timeout.TotalSeconds:0.###}s.");
                 }
-                else if (cancellationToken.WaitHandle.WaitOne(_options.PollInterval))
+                else
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    await Task.Delay(_options.PollInterval, cancellationToken);
                 }
             }
         }
@@ -178,7 +179,7 @@ public sealed class RabbitMqMessageBroker : IProtoMessageBroker, IProtoMessageBr
                 or global::RabbitMQ.Client.Exceptions.BrokerUnreachableException)
             {
                 throw new InvalidOperationException(
-                    $"The RabbitMQ broker at '{_options.ConnectionString}' is unreachable. Configure " +
+                    $"The RabbitMQ broker at '{ProtoUriSanitizer.WithoutUserInfo(_options.ConnectionString)}' is unreachable. Configure " +
                     "'ProtoTest:Messaging:RabbitMq:ConnectionString' for this environment.",
                     exception);
             }

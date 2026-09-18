@@ -19,5 +19,5 @@ var message = await Proto.Context.Messages().AwaitAsync(
 ```
 
 - Without an adapter the in-memory broker is used, so the API works anywhere; it registers **no** `Broker` capability, so tests that need a real broker skip through `[RequiresCapability(ProtoCapabilityKinds.Broker)]` instead of passing against the double.
-- The connection is a run-scoped resource, released with the run. Each test gets its own consumer, scoped to a position snapshot, so a shared deployed broker cannot leak another test's messages into this one.
-- Publish to the exchange named like the destination; await with a predicate on the same destination. See the [messaging guide](https://github.com/matthiasseys/ProtoTest/blob/main/docs/integrations/messaging.md).
+- The connection is a run-scoped resource, released with the run. Each test gets its own client, scoped to a position snapshot taken at setup, so a shared deployed broker cannot leak another test's messages into this one. An adapter may prepare its taps before the test acts; with RabbitMQ the tap is one queue per awaited destination for the run, prepared (and purged) per test, so parallel tests need distinct destinations.
+- Publish to the exchange named like the destination; await with a predicate on the same destination. See the [messaging guide](https://github.com/MSeys/ProtoTest/blob/main/docs/docs/integrations/messaging/index.md).

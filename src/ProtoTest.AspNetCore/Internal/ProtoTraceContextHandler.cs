@@ -1,4 +1,4 @@
-namespace ProtoTest.AspNetCore;
+namespace ProtoTest.AspNetCore.Internal;
 
 using System.Diagnostics;
 

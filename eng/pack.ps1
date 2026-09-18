@@ -8,6 +8,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$repository = Split-Path -Parent $PSScriptRoot
 $packages = @(
     "src/ProtoTest.Core/ProtoTest.Core.csproj",
     "src/ProtoTest.Testcontainers/ProtoTest.Testcontainers.csproj",
@@ -38,26 +39,32 @@ $packages = @(
     "src/ProtoTest.Web.Selenium/ProtoTest.Web.Selenium.csproj"
 )
 
-$packable = Get-ChildItem -Path "src/*/*.csproj" |
+$packable = Get-ChildItem -Path (Join-Path $repository "src/*/*.csproj") |
     Where-Object { Select-String -Path $_.FullName -Pattern "<IsPackable>true</IsPackable>" -Quiet } |
-    ForEach-Object { (Resolve-Path -Relative $_.FullName) -replace '^\.\\', '' -replace '\\', '/' }
+    ForEach-Object { $_.FullName.Substring($repository.Length + 1).Replace('\', '/') }
 
 $missing = @($packable | Where-Object { $packages -notcontains $_ })
 if ($missing.Count -gt 0) {
     throw "Packable projects missing from eng/pack.ps1: $($missing -join ', ')."
 }
 
-$unknown = @($packages | Where-Object { -not (Test-Path -LiteralPath $_) })
+$extra = @($packages | Where-Object { $packable -notcontains $_ })
+if ($extra.Count -gt 0) {
+    throw "eng/pack.ps1 lists projects that are not packable: $($extra -join ', ')."
+}
+
+$unknown = @($packages | Where-Object { -not (Test-Path -LiteralPath (Join-Path $repository $_)) })
 if ($unknown.Count -gt 0) {
     throw "eng/pack.ps1 lists projects that do not exist: $($unknown -join ', ')."
 }
 
-$packArguments = @("--configuration", $Configuration, "--output", $OutputPath)
+$output = if ([IO.Path]::IsPathRooted($OutputPath)) { $OutputPath } else { Join-Path $repository $OutputPath }
+$packArguments = @("--configuration", $Configuration, "--output", $output)
 if ($NoBuild) { $packArguments += "--no-build" }
 if ($NoRestore) { $packArguments += "--no-restore" }
 
 foreach ($project in $packages) {
-    & dotnet pack $project @packArguments
+    & dotnet pack (Join-Path $repository $project) @packArguments
     if ($LASTEXITCODE -ne 0) {
         throw "Packing '$project' failed with exit code $LASTEXITCODE."
     }

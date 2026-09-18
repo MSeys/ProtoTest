@@ -64,7 +64,7 @@ public class OrderTests
 
 **Outcomes are recorded**: all-passed maps to Passed, all-ignored to Skipped, and Failed / Error / Timeout / Aborted to Failed with the exception (or `MSTest.{outcome}` when there isn't one).
 
-**Attachments** are materialised to disk and appended to every `TestResult.ResultFiles`, so they show up in the `.trx` output.
+**Attachments** are materialised to disk and appended to the **first data-row result's** `TestResult.ResultFiles` — the lifecycle spans every data row, so attaching once avoids duplicating them — and they show up in the `.trx` output.
 
 **Parallelism** works with the usual MSTest switch:
 

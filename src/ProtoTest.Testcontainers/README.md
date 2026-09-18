@@ -1,6 +1,6 @@
 # ProtoTest.Testcontainers
 
-Shared container plumbing for ProtoTest integrations: a run-scoped container resource that starts with the host, exposes its connection string under a configuration key, and is released after the reports are written.
+Shared container plumbing for ProtoTest integrations: a run-scoped container resource registered with `AddInfrastructure` so the host starts it, exposes its connection string under a configuration key, and releases it after the reports are written. `AddResource` alone only registers the resource for ownership and release; it starts nothing and fills no key.
 
 ```bash
 dotnet add package ProtoTest.Testcontainers --prerelease

@@ -131,7 +131,7 @@ internal sealed class ProtoDataService : IProtoData
                 scope: execution.TestName);
             lock (_gate)
             {
-                _provisioned.Add(new ProvisionedObject(result.Identity, result.Value, $"{valueKind}:{valueIdentity}"));
+                _provisioned.Add(new ProvisionedObject(result.Identity, result.Value));
             }
 
             if (result.Cleanup is not null)
@@ -154,7 +154,7 @@ internal sealed class ProtoDataService : IProtoData
         }
     }
 
-    private sealed record ProvisionedObject(string? Identity, object Value, string ValueKey);
+    private sealed record ProvisionedObject(string? Identity, object Value);
 
     private void RegisterOwnedData(
         ProtoExecutionContext execution,

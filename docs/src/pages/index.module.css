@@ -94,6 +94,9 @@
   align-items: center;
 }
 
+/* Grid items may shrink below their content: a code block scrolls inside its column instead of widening it. */
+.heroInner > *, .featureRow > * { min-width: 0; }
+
 .featureRow + .featureRow { margin-top: calc(var(--space-7) * 2); }
 .featureRowReverse > *:first-child { order: 2; }
 

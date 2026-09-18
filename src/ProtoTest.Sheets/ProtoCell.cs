@@ -52,20 +52,35 @@ public sealed class ProtoCell
     public void ShouldBe(string? expected)
         => Assert(
             string.Equals(Text, expected, StringComparison.Ordinal),
-            expected is null ? "empty" : $"'{expected}'");
+            expected is null ? "be empty" : $"be '{expected}'");
 
     public void ShouldBe(double expected, double tolerance = 0.000001)
         => Assert(
             Number is { } actual && Math.Abs(actual - expected) <= tolerance,
-            expected.ToString(CultureInfo.InvariantCulture));
+            $"be {expected.ToString(CultureInfo.InvariantCulture)}");
 
     public void ShouldBe(bool expected)
-        => Assert(Boolean == expected, expected.ToString());
+        => Assert(Boolean == expected, $"be {expected}");
 
     public void ShouldBe(DateTime expected)
         => Assert(
             Date is { } actual && Math.Abs((actual - expected).TotalSeconds) < 1,
-            expected.ToString("O", CultureInfo.InvariantCulture));
+            $"be {expected.ToString("O", CultureInfo.InvariantCulture)}");
+
+    /// <summary>Asserts the cell holds text.</summary>
+    public void ShouldBeText()
+        => Assert(Text is not null, "hold text");
+
+    /// <summary>Asserts the cell is empty.</summary>
+    public void ShouldBeBlank()
+        => Assert(IsEmpty, "be blank");
+
+    /// <summary>Asserts the cell holds exactly this formula (the cached value stays in the typed values).</summary>
+    public void ShouldHaveFormula(string formula)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(formula);
+        Assert(string.Equals(Formula, formula, StringComparison.Ordinal), $"hold the formula '{formula}'");
+    }
 
     internal static ProtoCell Empty(string reference, string sheetName, ProtoExecutionContext? context)
         => new(reference, sheetName, null, null, null, null, null, context);
@@ -79,12 +94,12 @@ public sealed class ProtoCell
               ?? Date?.ToString("O", CultureInfo.InvariantCulture)
               ?? "<empty>";
 
-    private void Assert(bool passed, string expected)
+    private void Assert(bool passed, string phrase)
     {
         using var operation = _context?.Trace
             .Operation("sheets.assert", $"Sheets · {_sheetName}!{Reference}", "ProtoTest.Sheets")
             .With("sheets.cell", $"{_sheetName}!{Reference}")
-            .With("sheets.expected", expected)
+            .With("sheets.expected", phrase)
             .With("sheets.actual", Display())
             .Begin();
         if (passed)
@@ -94,7 +109,7 @@ public sealed class ProtoCell
         }
 
         var exception = new SpreadsheetAssertionException(
-            $"Expected {_sheetName}!{Reference} to be {expected} but it was {Display()}.");
+            $"Expected {_sheetName}!{Reference} to {phrase} but it was {Display()}.");
         operation?.Fail(exception);
         throw exception;
     }

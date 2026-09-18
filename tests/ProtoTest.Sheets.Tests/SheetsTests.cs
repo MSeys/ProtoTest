@@ -86,6 +86,25 @@ public sealed class SheetsTests
             new Row(Text("A4", "Region"), Text("B4", "Amount")),
             new Row(Text("A5", "EMEA"), Text("B5", "1200")));
         worksheetPart.Worksheet.Save();
+
+        // Layered headers: a merged group header over subheaders, with the region merged across rows.
+        var salesPart = workbookPart.AddNewPart<WorksheetPart>();
+        var salesData = new SheetData();
+        salesPart.Worksheet = new Worksheet(salesData);
+        workbookPart.Workbook.Sheets.Append(new Sheet
+        {
+            Id = workbookPart.GetIdOfPart(salesPart),
+            SheetId = 2,
+            Name = "Sales"
+        });
+        salesData.Append(
+            new Row(Text("A1", "Region"), Text("B1", "FY26")),
+            new Row(Text("B2", "Amount"), Text("C2", "Count")),
+            new Row(Text("A3", "EMEA"), Number("B3", 1200), Number("C3", 12)),
+            new Row(Text("A4", "APAC"), Number("B4", 900), Number("C4", 9)));
+        salesPart.Worksheet.Append(
+            new MergeCells(new MergeCell { Reference = "A1:A2" }, new MergeCell { Reference = "B1:C1" }));
+        salesPart.Worksheet.Save();
     }
 
     [OneTimeTearDown]
@@ -147,6 +166,31 @@ public sealed class SheetsTests
             Assert.That(coverage.Any(item => item.Identifier == "Summary!A4:B5"), Is.True);
             Assert.That(coverage.All(item => item.Category == "Sheets"), Is.True);
         });
+    }
+
+    [Test]
+    public async Task Table_ShouldHandleLayeredHeadersAndMergedGroups()
+    {
+        var (host, context) = await StartAsync("sheets table");
+        var table = context.Sheets().Open(_path).Sheet("Sales").Table(1, 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(table.Headers[1], Is.EqualTo(new[] { "FY26", "Amount" }));
+            Assert.That(table.Headers[2], Is.EqualTo(new[] { "FY26", "Count" }));
+        });
+
+        table.RowWhere("Region", "EMEA")["FY26", "Amount"].ShouldBe(1200.0);
+        table.RowWhere("Region", "APAC")["Amount"].ShouldBe(900.0);
+        table.Column("Amount").ShouldBe(["1200", "900"]);
+        table.Column("FY26", "Count").ShouldBe(["12", "9"]);
+        table.ShouldContainRow("Region", "APAC");
+        Assert.Throws<SpreadsheetAssertionException>(() =>
+        {
+            _ = table.Column("Missing");
+        });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
     }
 
     private static async Task<(ProtoHost Host, ProtoExecutionContext Context)> StartAsync(string name)

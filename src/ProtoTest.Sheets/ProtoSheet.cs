@@ -60,9 +60,53 @@ public sealed class ProtoSheet
         ArgumentException.ThrowIfNullOrWhiteSpace(reference);
         var normalized = reference.ToUpperInvariant();
         Record(normalized);
-        return _cells.TryGetValue(normalized, out var cell)
+        return CellByNumber(
+            SheetReferences.Parse(normalized).Row,
+            SheetReferences.Parse(normalized).Column);
+    }
+
+    /// <summary>Reads a cell by coordinates; row and column are 1-based.</summary>
+    public ProtoCell Cell(int row, int column)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(row, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(column, 1);
+        var reference = SheetReferences.Format(column, row);
+        Record(reference);
+        return CellByNumber(row, column);
+    }
+
+    /// <summary>
+    /// Header-aware view of the sheet. Pass one or more header rows; a merged group header spanning
+    /// columns plus the subheaders under it become one header path per column.
+    /// </summary>
+    public ProtoTable Table(params int[] headerRows)
+    {
+        int[] rows = headerRows.Length == 0 ? [1] : [.. headerRows.Order()];
+        foreach (var row in rows)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(row, 1);
+        }
+
+        var columns = new List<IReadOnlyList<string>>();
+        for (var column = 1; column <= ColumnCount; column++)
+        {
+            columns.Add([.. rows
+                .Select(row => CellByNumber(row, column).Text)
+                .Where(text => !string.IsNullOrWhiteSpace(text))
+                .Select(text => text!)]);
+        }
+
+        var table = new ProtoTable(this, rows, columns, rows[^1] + 1, _context);
+        table.RecordRead();
+        return table;
+    }
+
+    internal ProtoCell CellByNumber(int row, int column)
+    {
+        var reference = SheetReferences.Format(column, row);
+        return _cells.TryGetValue(reference, out var cell)
             ? cell
-            : ProtoCell.Empty(normalized, Name, _context);
+            : ProtoCell.Empty(reference, Name, _context);
     }
 
     /// <summary>Reads a range like <c>A1:C10</c>, row by row.</summary>

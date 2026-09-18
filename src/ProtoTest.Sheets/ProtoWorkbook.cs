@@ -114,8 +114,7 @@ public sealed class ProtoWorkbook
     {
         var cells = new List<CellData>();
         foreach (var cell in part.Worksheet.Descendants<Cell>())
-        {
-            var reference = cell.CellReference?.Value;
+        {            var reference = cell.CellReference?.Value;
             if (string.IsNullOrWhiteSpace(reference))
             {
                 continue;
@@ -166,7 +165,44 @@ public sealed class ProtoWorkbook
             cells.Add(new CellData(reference.ToUpperInvariant(), text, number, boolean, date, cell.CellFormula?.Text));
         }
 
-        return cells;
+        // Merged cells store their value in the top-left cell only; propagating it right and down is what
+        // makes a group header spanning columns, and the subheaders under it, read as one table.
+        var byReference = cells.ToDictionary(cell => cell.Reference, StringComparer.OrdinalIgnoreCase);
+        foreach (var merge in part.Worksheet.Elements<MergeCells>().SelectMany(merges => merges.Elements<MergeCell>()))
+        {
+            var range = merge.Reference?.Value;
+            if (string.IsNullOrWhiteSpace(range))
+            {
+                continue;
+            }
+
+            var parts = range.Split(':', 2);
+            if (parts.Length != 2)
+            {
+                continue;
+            }
+
+            var (startColumn, startRow) = SheetReferences.Parse(parts[0]);
+            var (endColumn, endRow) = SheetReferences.Parse(parts[1]);
+            if (!byReference.TryGetValue(SheetReferences.Format(startColumn, startRow), out var source))
+            {
+                continue;
+            }
+
+            for (var row = startRow; row <= endRow; row++)
+            {
+                for (var column = startColumn; column <= endColumn; column++)
+                {
+                    var reference = SheetReferences.Format(column, row);
+                    if (!byReference.ContainsKey(reference))
+                    {
+                        byReference[reference] = source with { Reference = reference };
+                    }
+                }
+            }
+        }
+
+        return [.. byReference.Values];
     }
 
     /// <summary>Dates are numeric cells with a date number format; built-in ids plus a format-code check.</summary>

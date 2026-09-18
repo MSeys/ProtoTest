@@ -9,13 +9,18 @@
     <Project Path="src/ProtoTest.Data/ProtoTest.Data.csproj" />
     <Project Path="src/ProtoTest.GraphQL/ProtoTest.GraphQL.csproj" Id="81af1d3a-d24c-465e-b1a0-ee742ca6bf6e" />
     <Project Path="src/ProtoTest.Grpc/ProtoTest.Grpc.csproj" Id="f13ed54f-e401-4cd6-ba89-efebd1861e89" />
+    <Project Path="src/ProtoTest.Messaging/ProtoTest.Messaging.csproj" />
+    <Project Path="src/ProtoTest.Messaging.RabbitMq/ProtoTest.Messaging.RabbitMq.csproj" />
+    <Project Path="src/ProtoTest.Messaging.RabbitMq.Testcontainers/ProtoTest.Messaging.RabbitMq.Testcontainers.csproj" />
     <Project Path="src/ProtoTest.OpenApi/ProtoTest.OpenApi.csproj" Id="23cb63d4-b36b-4e43-a2c9-c53533307d85" />
     <Project Path="src/ProtoTest.OpenTelemetry/ProtoTest.OpenTelemetry.csproj" />
     <Project Path="src/ProtoTest.Reporting/ProtoTest.Reporting.csproj" Id="1ad73a64-19cd-4807-a0d4-283da87581f6" />
     <Project Path="src/ProtoTest.Rest/ProtoTest.Rest.csproj" Id="0161cd20-8be1-40f2-a3c0-76335a74ccd2" />
+    <Project Path="src/ProtoTest.Sheets/ProtoTest.Sheets.csproj" />
     <Project Path="src/ProtoTest.Sql/ProtoTest.Sql.csproj" />
     <Project Path="src/ProtoTest.Sql.EntityFrameworkCore/ProtoTest.Sql.EntityFrameworkCore.csproj" />
     <Project Path="src/ProtoTest.Sql.Testcontainers/ProtoTest.Sql.Testcontainers.csproj" />
+    <Project Path="src/ProtoTest.Testcontainers/ProtoTest.Testcontainers.csproj" />
     <Project Path="src/ProtoTest.Web/ProtoTest.Web.csproj" />
     <Project Path="src/ProtoTest.Web.Playwright/ProtoTest.Web.Playwright.csproj" />
     <Project Path="src/ProtoTest.Web.Selenium/ProtoTest.Web.Selenium.csproj" />

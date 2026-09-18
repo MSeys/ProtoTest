@@ -1,6 +1,6 @@
 namespace ProtoTest.Messaging.RabbitMq.Testcontainers;
 
-using ProtoTest.Core;
+using ProtoTest.Testcontainers;
 
 // global:: because this assembly's own namespace ends in Testcontainers.
 using global::Testcontainers.RabbitMq;
@@ -8,32 +8,35 @@ using global::Testcontainers.RabbitMq;
 /// <summary>
 /// A RabbitMQ container owned by the whole run: started once for the suite and released when the host
 /// is disposed, after the run has stopped and the reports are written. Register it with
-/// <c>AddResource</c> and hand its connection string to the application and to the tests so both work
-/// against the same broker - the same shape as the PostgreSQL container.
+/// <c>AddInfrastructure</c> (or <c>AddResource</c>) and hand its connection string to the application
+/// and to the tests so both work against the same broker - the same shape as the PostgreSQL container.
 /// </summary>
-public sealed class RabbitMqBroker : IProtoResource
+public sealed class RabbitMqBroker : ProtoContainerResource<RabbitMqContainer>
 {
-    private readonly RabbitMqContainer _container;
-    private int _released;
-
-    private RabbitMqBroker(RabbitMqContainer container, string connectionString)
+    private RabbitMqBroker(Action<RabbitMqBuilder>? configure)
+        : base(
+            () =>
+            {
+                var builder = new RabbitMqBuilder("rabbitmq:3");
+                configure?.Invoke(builder);
+                return builder.Build();
+            },
+            (container, cancellationToken) => container.StartAsync(cancellationToken),
+            container => container.GetConnectionString())
     {
-        _container = container;
-        ConnectionString = connectionString;
     }
 
-    public string Id => "broker:rabbitmq";
+    public override string Id => "broker:rabbitmq";
 
-    public string Kind => "broker";
+    public override string Kind => "broker";
 
-    public string Description => "RabbitMQ container";
+    public override string Description => "RabbitMQ container";
 
-    public ProtoResourceScope Scope => ProtoResourceScope.Run;
+    /// <summary>Creates the resource without starting it; the host starts it with the run.</summary>
+    public static RabbitMqBroker Container(Action<RabbitMqBuilder>? configure = null)
+        => new(configure);
 
-    /// <summary>Gets the connection string of the started container.</summary>
-    public string ConnectionString { get; }
-
-    /// <summary>Starts a container, or throws with the reason it could not start.</summary>
+    /// <summary>Starts a container now, or throws with the reason it could not start.</summary>
     public static RabbitMqBroker Start(Action<RabbitMqBuilder>? configure = null)
         => TryStart(configure, out var broker, out var error)
             ? broker!
@@ -48,17 +51,11 @@ public sealed class RabbitMqBroker : IProtoResource
         out RabbitMqBroker? broker,
         out string? error)
     {
-        var builder = new RabbitMqBuilder("rabbitmq:3");
-        configure?.Invoke(builder);
-
-        RabbitMqContainer? container = null;
+        var candidate = Container(configure);
         try
         {
-            container = builder.Build();
-
-            // Setup is synchronous: an assembly fixture configures the host before any test runs.
-            container.StartAsync().GetAwaiter().GetResult();
-            broker = new RabbitMqBroker(container, container.GetConnectionString());
+            candidate.StartAsync().GetAwaiter().GetResult();
+            broker = candidate;
             error = null;
             return true;
         }
@@ -66,31 +63,8 @@ public sealed class RabbitMqBroker : IProtoResource
         {
             broker = null;
             error = $"{exception.GetType().Name}: {exception.Message}";
-            if (container is not null)
-            {
-                try
-                {
-                    container.DisposeAsync().AsTask().GetAwaiter().GetResult();
-                }
-                catch (Exception)
-                {
-                    // The original start failure is what the caller needs to see.
-                }
-            }
-
+            candidate.DisposeAsync().AsTask().GetAwaiter().GetResult();
             return false;
         }
-    }
-
-    public ValueTask ReleaseAsync(ProtoResourceReleaseContext context) => DisposeAsync();
-
-    public async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref _released, 1) != 0)
-        {
-            return;
-        }
-
-        await _container.DisposeAsync();
     }
 }

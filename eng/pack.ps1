@@ -10,6 +10,7 @@ param(
 $ErrorActionPreference = "Stop"
 $packages = @(
     "src/ProtoTest.Core/ProtoTest.Core.csproj",
+    "src/ProtoTest.Testcontainers/ProtoTest.Testcontainers.csproj",
     "src/ProtoTest.Http/ProtoTest.Http.csproj",
     "src/ProtoTest.Json/ProtoTest.Json.csproj",
     "src/ProtoTest.Data/ProtoTest.Data.csproj",

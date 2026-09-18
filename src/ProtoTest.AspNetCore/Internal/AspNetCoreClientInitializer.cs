@@ -15,7 +15,8 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
     private readonly Action<IWebHostBuilder>? _configureWebHost;
     private readonly Action<WebApplicationFactoryClientOptions>? _configureClientOptions;
     private readonly AspNetCoreServerLifetime _lifetime;
-    private readonly Lazy<AspNetCoreServer<TProgram>> _sharedServer;
+    private readonly ProtoLock _gate = new();
+    private AspNetCoreServer<TProgram>? _sharedServer;
 
     public AspNetCoreClientInitializer(
         string name,
@@ -27,9 +28,6 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
         _configureWebHost = configureWebHost;
         _configureClientOptions = configureClientOptions;
         _lifetime = lifetime;
-        _sharedServer = new Lazy<AspNetCoreServer<TProgram>>(
-            () => AspNetCoreServer<TProgram>.Start(_configureWebHost),
-            LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     /// <inheritdoc />
@@ -38,16 +36,20 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
     /// <inheritdoc />
     public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
     {
-        var reused = _lifetime == AspNetCoreServerLifetime.PerRun && _sharedServer.IsValueCreated;
+        var reused = _lifetime == AspNetCoreServerLifetime.PerRun && _sharedServer is not null;
         AspNetCoreServer<TProgram> server;
         if (_lifetime == AspNetCoreServerLifetime.PerRun)
         {
-            server = _sharedServer.Value;
+            lock (_gate)
+            {
+                server = _sharedServer ??= AspNetCoreServer<TProgram>.Start(CombinedConfigure(context));
+            }
+
             context.RegisterClient(server.Factory, FactoryName(Name), disposeWithContext: false);
         }
         else
         {
-            server = AspNetCoreServer<TProgram>.Start(_configureWebHost);
+            server = AspNetCoreServer<TProgram>.Start(CombinedConfigure(context));
             context.RegisterClient(server, FactoryName(Name));
             context.RegisterClient(server.Factory, FactoryName(Name), disposeWithContext: false);
         }
@@ -87,7 +89,31 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
     }
 
     public ValueTask DisposeAsync()
-        => _sharedServer.IsValueCreated ? _sharedServer.Value.DisposeAsync() : ValueTask.CompletedTask;
+        => _sharedServer is not null ? _sharedServer.DisposeAsync() : ValueTask.CompletedTask;
+
+    /// <summary>
+    /// Started infrastructure provides its connection strings as host settings, so an in-process
+    /// application reads the same values the tests do; explicit user configuration still wins because
+    /// it is applied afterwards.
+    /// </summary>
+    private Action<IWebHostBuilder>? CombinedConfigure(ProtoExecutionContext context)
+    {
+        var settings = context.TryService<ProtoInfrastructureSettings>()?.Values;
+        if (settings is null || settings.Count == 0)
+        {
+            return _configureWebHost;
+        }
+
+        return webHost =>
+        {
+            foreach (var (key, value) in settings)
+            {
+                webHost.UseSetting(key, value);
+            }
+
+            _configureWebHost?.Invoke(webHost);
+        };
+    }
 
     /// <summary>
     /// Mirrors <see cref="WebApplicationFactoryClientOptions"/>'s internal handler list so the client keeps

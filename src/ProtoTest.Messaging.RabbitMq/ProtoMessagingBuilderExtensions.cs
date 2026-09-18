@@ -21,7 +21,22 @@ public static class ProtoMessagingBuilderExtensions
         {
             var options = new ProtoRabbitMqOptions();
             configure?.Invoke(options);
-            options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
+            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+            options.BindFromConfiguration(configuration);
+
+            // Precedence: an explicitly configured connection string wins, then a started broker
+            // container, then whatever the registration or the defaults chose.
+            var configured = configuration[ProtoRabbitMqOptions.ConnectionStringSetting];
+            if (!string.IsNullOrWhiteSpace(configured))
+            {
+                options.ConnectionString = configured;
+            }
+            else if (serviceProvider.GetService<ProtoInfrastructureSettings>() is { } settings
+                && settings.Values.TryGetValue(ProtoRabbitMqOptions.ConnectionStringSetting, out var provided))
+            {
+                options.ConnectionString = provided;
+            }
+
             return options;
         });
         return messaging.UseBroker(serviceProvider =>

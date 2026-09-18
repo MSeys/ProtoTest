@@ -7,6 +7,9 @@ public sealed class ProtoRabbitMqOptions : IProtoConfigurableOptions
 {
     public const string ConfigurationSectionName = "ProtoTest:Messaging:RabbitMq";
 
+    /// <summary>The configuration key a started broker container fills.</summary>
+    public const string ConnectionStringSetting = ConfigurationSectionName + ":ConnectionString";
+
     string IProtoConfigurableOptions.ConfigurationSectionName => ConfigurationSectionName;
 
     /// <summary>AMQP connection string of the broker, for example the deployed environment's.</summary>

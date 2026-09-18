@@ -97,6 +97,36 @@ public sealed class ProtoHost : IAsyncDisposable
                 change: "activated");
         }
 
+        // Infrastructure starts before any test: the run owns it, records it, and lets an in-process
+        // application receive the connection strings as host settings. Hosts built without the builder
+        // (tests, embedded use) simply have none.
+        var settings = _rootServiceProvider.GetService<ProtoInfrastructureSettings>() ?? new ProtoInfrastructureSettings();
+        foreach (var registration in _rootServiceProvider.GetServices<ProtoInfrastructureRegistration>())
+        {
+            var infrastructure = registration.Infrastructure;
+            await infrastructure.StartAsync(cancellationToken);
+            var state = new Dictionary<string, string?>
+            {
+                ["infrastructure.kind"] = infrastructure.Kind,
+                ["infrastructure.settings"] = string.Join(", ", registration.Settings)
+            };
+            if (infrastructure is IProtoConnectionInfrastructure connection)
+            {
+                foreach (var key in registration.Settings)
+                {
+                    settings.Set(key, connection.ConnectionString);
+                }
+            }
+
+            _trace.RunWriter.SetEntityState(
+                infrastructure.Kind,
+                infrastructure.Id,
+                infrastructure.Description,
+                state,
+                scope: "run",
+                change: "started");
+        }
+
         _trace.StartListening();
     }
 

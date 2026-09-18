@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>true</IsPackable>
+    <PackageId>ProtoTest.Testcontainers</PackageId>
+    <AssemblyName>ProtoTest.Testcontainers</AssemblyName>
+    <RootNamespace>ProtoTest.Testcontainers</RootNamespace>
+    <Description>Shared container plumbing for ProtoTest integrations: run-scoped containers that start with the host and expose their connection string.</Description>
+    <PackageTags>testing;integration-testing;testcontainers;dotnet</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+  </ItemGroup>
+
+</Project>

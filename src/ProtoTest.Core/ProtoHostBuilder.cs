@@ -97,6 +97,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
         // Build and register IConfiguration
         IConfiguration configuration = _configurationBuilder.Build();
         _services.AddSingleton(configuration);
+        _services.AddSingleton(new ProtoInfrastructureSettings());
         _services.TryAddSingleton<IProtoTestIdGenerator>(
             _ => new NumericProtoTestIdGenerator(_testIdOptions));
         _services.TryAddSingleton(_traceOptions);

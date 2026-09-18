@@ -195,9 +195,14 @@ public sealed class SheetsTests
 
     [Sheet("Sales", HeaderRows = [1, 2])]
     public sealed record SalesRow(
+        [property: Column("Region", Pattern = "^[A-Z]+$", Unique = true)] string Region,
+        [property: Column("FY26", "Amount", Min = 0)] decimal Amount,
+        [property: Column("FY26", "Count", Min = 0)] int Count);
+
+    [Sheet("Sales", HeaderRows = [1, 2])]
+    public sealed record StrictSalesRow(
         [property: Column("Region")] string Region,
-        [property: Column("FY26", "Amount")] decimal Amount,
-        [property: Column("FY26", "Count")] int Count);
+        [property: Column("FY26", "Amount", Min = 1000)] decimal Amount);
 
     [Sheet("Sales", HeaderRows = [1, 2])]
     public sealed record BrokenRow(
@@ -236,6 +241,33 @@ public sealed class SheetsTests
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
         Assert.That(exception!.Message, Does.Contain("Nope"));
+    }
+
+    [Test]
+    public async Task Model_ShouldMatchRowShape()
+    {
+        var (host, context) = await StartAsync("sheets shape");
+        var model = context.Sheets().Open(_path).Model<SalesRow>();
+        var emea = model.Row(row => row.Region == "EMEA");
+
+        emea.ShouldMatchShape(new { Region = "EMEA", Amount = 1200m, Count = 12 });
+        var mismatch = Assert.Throws<SpreadsheetAssertionException>(() =>
+            emea.ShouldMatchShape(new { Region = "Nope" }));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(mismatch!));
+        Assert.That(mismatch!.Message, Does.Contain("Region"));
+    }
+
+    [Test]
+    public async Task Verify_ShouldReportConstraintViolations()
+    {
+        var (host, context) = await StartAsync("sheets constraints");
+        var model = context.Sheets().Open(_path).Model<StrictSalesRow>();
+
+        var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Verify());
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        Assert.That(exception!.Message, Does.Contain("900"));
     }
 
     private static async Task<(ProtoHost Host, ProtoExecutionContext Context)> StartAsync(string name)

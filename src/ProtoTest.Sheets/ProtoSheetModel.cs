@@ -67,7 +67,9 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
         var failures = new List<string>();
         foreach (var (property, number) in _columns)
         {
-            var optional = property.GetCustomAttribute<ColumnAttribute>()?.Optional ?? false;
+            var column = property.GetCustomAttribute<ColumnAttribute>()!;
+            var optional = column.Optional;
+            var seen = column.Unique ? new Dictionary<string, string>(StringComparer.Ordinal) : null;
             for (var row = _table.DataStartRow; row < _table.DataStartRow + Math.Max(0, _table.RowCount); row++)
             {
                 var cell = _table.Cell(row, number);
@@ -84,6 +86,43 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
                 if (!TryConvert(property.PropertyType, cell))
                 {
                     failures.Add($"'{property.Name}' is not a {property.PropertyType.Name} at {cell.Reference} (was {cell.Display()})");
+                    continue;
+                }
+
+                if (!double.IsNaN(column.Min) && cell.Number is { } below && below < column.Min)
+                {
+                    failures.Add($"'{property.Name}' is {below} at {cell.Reference}, below the minimum {column.Min}");
+                }
+
+                if (!double.IsNaN(column.Max) && cell.Number is { } above && above > column.Max)
+                {
+                    failures.Add($"'{property.Name}' is {above} at {cell.Reference}, above the maximum {column.Max}");
+                }
+
+                if (column.Pattern is { } pattern
+                    && cell.Text is { } text
+                    && !System.Text.RegularExpressions.Regex.IsMatch(text, pattern))
+                {
+                    failures.Add($"'{property.Name}' is '{text}' at {cell.Reference}, which does not match '{pattern}'");
+                }
+
+                if (column.OneOf is { Length: > 0 } allowed
+                    && cell.Text is { } candidate
+                    && !allowed.Contains(candidate, StringComparer.Ordinal))
+                {
+                    failures.Add($"'{property.Name}' is '{candidate}' at {cell.Reference}, not one of {string.Join(", ", allowed)}");
+                }
+
+                if (seen is not null && cell.Text is { } uniqueValue)
+                {
+                    if (seen.TryGetValue(uniqueValue, out var firstReference))
+                    {
+                        failures.Add($"'{property.Name}' repeats '{uniqueValue}' at {cell.Reference} (first at {firstReference})");
+                    }
+                    else
+                    {
+                        seen[uniqueValue] = cell.Reference;
+                    }
                 }
             }
         }

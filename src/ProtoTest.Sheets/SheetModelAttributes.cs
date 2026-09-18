@@ -18,4 +18,19 @@ public sealed class ColumnAttribute(params string[] path) : Attribute
 
     /// <summary>When true an empty cell is fine; the property then needs a nullable type.</summary>
     public bool Optional { get; init; }
+
+    /// <summary>Smallest allowed number; the default means no minimum.</summary>
+    public double Min { get; init; } = double.NaN;
+
+    /// <summary>Largest allowed number; the default means no maximum.</summary>
+    public double Max { get; init; } = double.NaN;
+
+    /// <summary>Regular expression every text value must match.</summary>
+    public string? Pattern { get; init; }
+
+    /// <summary>The only text values allowed.</summary>
+    public string[]? OneOf { get; init; }
+
+    /// <summary>Every value in the column must be distinct.</summary>
+    public bool Unique { get; init; }
 }

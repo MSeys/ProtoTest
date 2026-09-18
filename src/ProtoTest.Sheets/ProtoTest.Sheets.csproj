@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <ProjectReference Include="..\ProtoTest.Json\ProtoTest.Json.csproj" />
   </ItemGroup>
 
 </Project>

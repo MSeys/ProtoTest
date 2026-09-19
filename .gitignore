@@ -482,5 +482,6 @@ FodyWeavers.xsd
 *.msp
 
 /assets/internal
+/eng/internal/
 .openchamber/
 .opencode/

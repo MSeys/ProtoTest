@@ -35,5 +35,5 @@ The assembly runs testcases and fixtures concurrently with eight NUnit workers. 
 Regenerate the viewer's bundled trace with all successful scenarios and that intentional failure in one parallel run:
 
 ```powershell
-./eng/update-viewer-demo.ps1
+./eng/internal/update-viewer-demo.ps1
 ```

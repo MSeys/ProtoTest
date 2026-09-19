@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Pack and print the release plan without pushing to NuGet
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Restore, build, and test every runner
+        shell: pwsh
+        run: ./eng/test.ps1 -Configuration Release
+
+      - name: Pack
+        shell: pwsh
+        run: ./eng/pack.ps1 -Configuration Release
+
+      - name: Publish to NuGet
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if ('${{ inputs.dry_run }}' -eq 'true') {
+            ./eng/release.ps1 -Configuration Release -DryRun
+          } else {
+            ./eng/release.ps1 -Configuration Release
+          }
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag' && inputs.dry_run != true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $version = $tag -replace '^v', ''
+          $notes = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+          if (Test-Path -LiteralPath CHANGELOG.md) {
+            $text = Get-Content -LiteralPath CHANGELOG.md -Raw
+            $pattern = "(?ms)^##\s+\[?$([regex]::Escape($version))\]?[^\r\n]*\r?\n.*?(?=^##\s|\z)"
+            $section = [regex]::Match($text, $pattern)
+            if ($section.Success) {
+              $section.Value.Trim() | Set-Content -LiteralPath $notes -Encoding utf8
+            }
+          }
+          if (Test-Path -LiteralPath $notes) {
+            gh release create $tag --verify-tag --title "ProtoTest $version" --notes-file $notes
+          } else {
+            gh release create $tag --verify-tag --title "ProtoTest $version" --generate-notes
+          }

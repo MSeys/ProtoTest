@@ -15,11 +15,11 @@ Tests are grouped by fixture/file with compact method names. Per-test tabs separ
 
 The empty state can open the bundled `public/demos/prototest-demo.prototrace`. It is a real, complete parallel run of the unified SaaS demo: successful scenarios, partial diagnostic scenarios, one intentional shape-mismatch failure, and the run's own gate verdict. The number of scenarios grows with the demo, so the regeneration script checks a floor and the single intentional failure rather than exact totals. It uses the same archive reader as a user-selected trace.
 
-Regenerate it with `./eng/update-viewer-demo.ps1`. Set `ProtoTest:Database=postgres` (or `ProtoTest__Database=postgres`) to add a database container to the run's activity (that needs a container runtime).
+Regenerate it with the owner-only `./eng/internal/update-viewer-demo.ps1`. Set `ProtoTest:Database=postgres` (or `ProtoTest__Database=postgres`) to add a database container to the run's activity (that needs a container runtime).
 
 The Cloudflare Pages security headers allow `connect-src 'self'` solely so the viewer can fetch that same-origin static demo archive. User-selected traces are still read directly from browser memory and never uploaded.
 
-Regenerate it from the repository root with `./eng/update-viewer-demo.ps1`.
+Regenerate it from the repository root with the owner-only `./eng/internal/update-viewer-demo.ps1`.
 
 ```bash
 npm install

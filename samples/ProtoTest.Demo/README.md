@@ -32,8 +32,4 @@ The assembly runs testcases and fixtures concurrently with eight NUnit workers. 
 
 `DiagnosticsShowcase.TheOrganizationReportsItsPlanAndProjectCount` is skipped unless `ProtoTest:Demo:IncludeFailure=true` (or `ProtoTest__Demo__IncludeFailure=true`) is set, so CI stays green while the run still contains deliberately failed child operations that the tests inspect.
 
-Regenerate the viewer's bundled trace with all successful scenarios and that intentional failure in one parallel run:
-
-```powershell
-./eng/internal/update-viewer-demo.ps1
-```
+The viewer's bundled trace is produced from a full demo run that includes that intentional failure.

@@ -1,13 +1,14 @@
 namespace ProtoTest.Demo;
 
+using Northstar.ProtoTest;
 using ProtoTest.Core;
+using ProtoTest.Data;
 using ProtoTest.GraphQL;
 using ProtoTest.Http;
 using ProtoTest.Json;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
-using ProtoTest.SampleApp.Testing;
 using System.Net;
 
 /// <summary>REST, GraphQL and webhooks describing the same platform.</summary>
@@ -21,7 +22,7 @@ public sealed class PlatformJourney
     public async Task RestWritesAreVisibleThroughGraphQL()
     {
         // Arrange
-        await DemoSupport.CreateProjectAsync("atlas");
+        await Proto.Context.Data().CreateProjectAsync("atlas");
 
         // Act
         using var projects = await Proto.Context.GraphQL()
@@ -41,8 +42,8 @@ public sealed class PlatformJourney
     public async Task DeploymentStatusChangesStreamOverTheSubscription()
     {
         // Arrange
-        var project = await DemoSupport.CreateProjectAsync("livewire");
-        var preview = await DemoSupport.CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
+        var project = await Proto.Context.Data().CreateProjectAsync("livewire");
+        var preview = await Proto.Context.Data().CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
         var expected = new { id = JsonValue.NotNull(), status = DeploymentStatuses.Succeeded };
         await using var subscription = await Proto.Context.GraphQL()
             .Subscription("deploymentStatusChanged")
@@ -84,11 +85,11 @@ public sealed class PlatformJourney
     public async Task GraphQLConnectionsPageFilterAndCountDeployments()
     {
         // Arrange
-        var project = await DemoSupport.CreateProjectAsync("paged");
-        var preview = await DemoSupport.CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
-        await DemoSupport.DeployAsync(preview.Id, "1.0.0", "aaa1111");
-        await DemoSupport.DeployAsync(preview.Id, "1.1.0", "bbb2222");
-        await DemoSupport.DeployAsync(preview.Id, "1.2.0", "ccc3333");
+        var project = await Proto.Context.Data().CreateProjectAsync("paged");
+        var preview = await Proto.Context.Data().CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
+        await Proto.Context.Data().DeployAsync(preview.Id, "1.0.0", "aaa1111");
+        await Proto.Context.Data().DeployAsync(preview.Id, "1.1.0", "bbb2222");
+        await Proto.Context.Data().DeployAsync(preview.Id, "1.2.0", "ccc3333");
 
         // Act
         using var page = await Proto.Context.GraphQL()

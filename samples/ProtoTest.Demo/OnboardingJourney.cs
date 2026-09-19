@@ -1,5 +1,6 @@
 namespace ProtoTest.Demo;
 
+using Northstar.ProtoTest;
 using ProtoTest.Core;
 using ProtoTest.Data;
 using ProtoTest.Http;
@@ -7,7 +8,6 @@ using ProtoTest.Json;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
-using ProtoTest.SampleApp.Testing;
 using System.Net;
 
 /// <summary>A new customer signs up, is constrained by the free plan, and upgrades to grow.</summary>
@@ -121,7 +121,7 @@ public sealed class OnboardingJourney
     public async Task UpgradingToStarterAllowsASecondProject()
     {
         // Arrange
-        await DemoSupport.CreateProjectAsync("atlas");
+        await Proto.Context.Data().CreateProjectAsync("atlas");
         using var upgraded = await Proto.Context.Rest()
             .Body(new ChangePlanRequest(PlanIds.Starter, null))
             .PostAsync("/api/v1/subscription");

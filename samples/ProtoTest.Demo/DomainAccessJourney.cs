@@ -1,6 +1,7 @@
 namespace ProtoTest.Demo;
 
 using System.Net;
+using Northstar.ProtoTest;
 using ProtoTest.Core;
 using ProtoTest.Data;
 using ProtoTest.Http;
@@ -8,7 +9,6 @@ using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Domain;
-using ProtoTest.SampleApp.Testing;
 
 /// <summary>Arranging through the domain instead of the API, over the same database.</summary>
 [Application(NorthstarTargets.Api)]

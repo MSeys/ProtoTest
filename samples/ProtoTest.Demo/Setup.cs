@@ -6,9 +6,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Northstar.ProtoTest;
 using ProtoTest.AspNetCore;
 using ProtoTest.Core;
-using ProtoTest.Data;
 using ProtoTest.GraphQL;
 using ProtoTest.Grpc;
 using ProtoTest.Messaging;
@@ -20,9 +20,7 @@ using ProtoTest.Reporting;
 using ProtoTest.Rest;
 using ProtoTest.Sheets;
 using ProtoTest.SampleApp;
-using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Domain;
-using ProtoTest.SampleApp.Testing;
 using ProtoTest.Sql;
 using ProtoTest.Sql.Testcontainers;
 using ProtoTest.Web;
@@ -179,26 +177,19 @@ public sealed class Setup : ProtoTestAssembly
 
                 configuration.AddInMemoryCollection(settings);
             })
-            .ConfigureServices(services =>
-            {
-                services.AddSingleton<IProtoClientInitializer, ScenarioProbeInitializer>();
-                if (hostedInProcess)
-                {
-                    // In-process subscriptions ride the test server's own WebSocket client.
-                    services.AddSingleton<IGraphQLWebSocketFactory, NorthstarGraphQLWebSocketFactory>();
-                }
-            })
-            .AddTestHook<NorthstarScenarioHook>()
             .AddSheets()
             .AddWeb()
+            .AddNorthstarTestSupport(support =>
+                // In-process subscriptions ride the test server's own WebSocket client.
+                support.UseInProcessGraphQLWebSockets = hostedInProcess)
+            .AddNorthstarData(data =>
+                // Without a reachable store the same fixtures are provisioned over the public API.
+                data.UseDomainProvisioners = composeDomainInTests)
             .AddRunGate("no error findings", context => context
                 .ItemsOfKind(ProtoReportItemKinds.Finding)
                 .Any(item => item.Status == ProtoReportStatus.Error)
                 ? ProtoRunGateResult.Failed("The run recorded error findings.")
                 : ProtoRunGateResult.Passed("No error findings were recorded."))
-            .AddData(data => data.AddDefaults<NorthstarDataDefaults>())
-            .AddDataProvisioner<InviteMemberRequest, MembershipResponse, NorthstarMemberProvisioner>()
-            .AddDataProvisioner<CreateProjectRequest, ProjectResponse, NorthstarDomainProjectProvisioner>()
             .AddApplication(NorthstarTargets.Api, app =>
             {
                 if (hostedInProcess)

@@ -25,6 +25,18 @@ journey needs a composed store, the messaging journey a broker, and the console 
 instance (`ProtoTest:TargetUrl` or the session's base URL) with a built SPA under
 `samples/ProtoTest.SampleApp/Ui/dist`.
 
+## Supporting projects
+
+`samples/Northstar.ProtoTest` is the application-specific test integration the journeys build on: the
+`[NorthstarTenant]` and `[SignedInAs]` attributes with their contexts, `NorthstarAuthenticator`, the
+data defaults and provisioners, and the typed console page objects the browser journeys drive.
+
+Fixtures are requested through Data and provisioned through the application's own domain over the
+shared store whenever it is reachable — in-process and container runs. A published run
+(`ProtoTest:TargetUrl`) falls back to the portable API provisioners, and only what the application
+alone can do — advance the tenant clock, dispatch a webhook — goes through test-support endpoints.
+Tests that only make sense with the composed store are gated by the store capability.
+
 The application is in memory but behaves like a product: plans and entitlements, billing state machines, a per-tenant virtual clock (`POST /test-support/tenants/{tenant}/clock/advance`) so periods can be closed deterministically, a webhook outbox with HMAC-SHA256 signatures and retries, an audit trail, `Idempotency-Key` replay and per-token rate limits.
 
 ```powershell

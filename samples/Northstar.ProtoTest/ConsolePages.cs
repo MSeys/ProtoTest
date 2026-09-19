@@ -235,6 +235,19 @@ public sealed class ReportsPage : ConsolePage
     public WebElement HtmlLink => Element(By.TestId("report-html-link"));
 
     public WebElement Status => Element(By.TestId("report-status"));
+
+    /// <summary>
+    /// Runs the screen's download action and captures the workbook the browser saves, so the test
+    /// verifies the artifact a user would actually receive.
+    /// </summary>
+    public ValueTask<WebDownload> DownloadReportAsync(
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+        => DownloadAsync(
+            async ct => await Download.ClickAsync(ct),
+            name: "monthly.xlsx",
+            timeout: timeout,
+            cancellationToken: cancellationToken);
 }
 
 public sealed class NotFoundPage : ConsolePage

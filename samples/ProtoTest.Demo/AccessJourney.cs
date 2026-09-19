@@ -1,11 +1,12 @@
 namespace ProtoTest.Demo;
 
+using Northstar.ProtoTest;
 using ProtoTest.Core;
+using ProtoTest.Data;
 using ProtoTest.Http;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
-using ProtoTest.SampleApp.Testing;
 using System.Net;
 
 /// <summary>Who may do what: the role matrix, token scopes, tenant isolation and rate limits.</summary>
@@ -19,8 +20,8 @@ public sealed class AccessJourney
     public async Task DevelopersAndBillingContactsCannotCreateProjects()
     {
         // Arrange
-        var developer = await DemoSupport.TokenForAsync(MemberRoles.Developer);
-        var billing = await DemoSupport.TokenForAsync(MemberRoles.Billing);
+        var developer = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Developer);
+        var billing = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Billing);
 
         // Act
         using var developerAttempt = await DemoSupport.As(developer)
@@ -41,7 +42,7 @@ public sealed class AccessJourney
     public async Task AdministratorsCanCreateProjects()
     {
         // Arrange
-        var owner = await DemoSupport.TokenForAsync(MemberRoles.Owner);
+        var owner = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Owner);
 
         // Act
         using var project = await DemoSupport.As(owner)
@@ -57,11 +58,11 @@ public sealed class AccessJourney
     public async Task DevelopersMayDeployToPreviewButOnlyAdministratorsToProduction()
     {
         // Arrange
-        var owner = await DemoSupport.TokenForAsync(MemberRoles.Owner);
-        var developer = await DemoSupport.TokenForAsync(MemberRoles.Developer);
-        var project = await DemoSupport.CreateProjectAsync("matrix");
-        var preview = await DemoSupport.CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
-        var production = await DemoSupport.CreateEnvironmentAsync(project.Id, "production", EnvironmentKinds.Production);
+        var owner = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Owner);
+        var developer = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Developer);
+        var project = await Proto.Context.Data().CreateProjectAsync("matrix");
+        var preview = await Proto.Context.Data().CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
+        var production = await Proto.Context.Data().CreateEnvironmentAsync(project.Id, "production", EnvironmentKinds.Production);
 
         // Act
         using var previewDeploy = await DemoSupport.As(developer)
@@ -86,7 +87,7 @@ public sealed class AccessJourney
     public async Task ViewersCannotReadTheAuditLog()
     {
         // Arrange
-        var viewer = await DemoSupport.TokenForAsync(MemberRoles.Viewer);
+        var viewer = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Viewer);
 
         // Act
         using var audit = await DemoSupport.As(viewer).GetAsync("/api/v1/audit");
@@ -100,7 +101,7 @@ public sealed class AccessJourney
     public async Task BillingContactsCanReadTheAuditLog()
     {
         // Arrange
-        var billing = await DemoSupport.TokenForAsync(MemberRoles.Billing);
+        var billing = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Billing);
 
         // Act
         using var audit = await DemoSupport.As(billing).GetAsync("/api/v1/audit");
@@ -113,14 +114,14 @@ public sealed class AccessJourney
     public async Task ReadOnlyApiTokensCannotDeployEvenForAnOwner()
     {
         // Arrange
-        var owner = await DemoSupport.TokenForAsync(MemberRoles.Owner);
+        var owner = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Owner);
         using var createdToken = await DemoSupport.As(owner)
             .Body(new CreateApiTokenRequest("ci-readonly", [TokenScopes.Read]))
             .PostAsync("/api/v1/tokens");
         createdToken.Should.HaveHttpStatus(HttpStatusCode.Created);
         var readOnly = createdToken.ReadAsJson<ApiTokenSecretResponse>()!.Secret;
-        var project = await DemoSupport.CreateProjectAsync("scoped");
-        var preview = await DemoSupport.CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
+        var project = await Proto.Context.Data().CreateProjectAsync("scoped");
+        var preview = await Proto.Context.Data().CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
 
         // Act
         using var deployment = await DemoSupport.As(readOnly)
@@ -136,13 +137,12 @@ public sealed class AccessJourney
     public async Task OneOrganizationsTokenCannotReadAnotherOrganizationsResources()
     {
         // Arrange
-        var owner = await DemoSupport.TokenForAsync(MemberRoles.Owner);
-        using var secondTenant = await Proto.Context.Rest()
-            .WithoutAuth()
-            .Body(new ProvisionTenantRequest($"northstar-intruder-{Proto.Context.TestId}"))
-            .PostAsync("/test-support/tenants");
-        secondTenant.Should.HaveHttpStatus(HttpStatusCode.Created);
-        var intruder = secondTenant.ReadAsJson<TenantResponse>()!;
+        var owner = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Owner);
+        var intruder = await Proto.Context.Data()
+            .For<ProvisionTenantRequest>()
+            .With(request => request.Name, $"northstar-intruder-{Proto.Context.TestId}")
+            .With(request => request.PlanId, PlanIds.Free)
+            .CreateAsync<TenantResponse>();
         using var secret = await DemoSupport.As(intruder.OwnerToken)
             .Body(new CreateProjectRequest("secret"))
             .PostAsync("/api/v1/projects");
@@ -162,7 +162,7 @@ public sealed class AccessJourney
     public async Task ExceedingTheTokenRateLimitReturnsTooManyRequests()
     {
         // Arrange
-        var owner = await DemoSupport.TokenForAsync(MemberRoles.Owner);
+        var owner = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Owner);
 
         // Act
         for (var request = 0; request < 60; request++)

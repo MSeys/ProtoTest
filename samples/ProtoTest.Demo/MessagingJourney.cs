@@ -3,14 +3,15 @@ namespace ProtoTest.Demo;
 using System.Globalization;
 using System.Net;
 using global::NUnit.Framework;
+using Northstar.ProtoTest;
 using ProtoTest.Core;
+using ProtoTest.Data;
 using ProtoTest.Http;
 using ProtoTest.Messaging;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Domain;
-using ProtoTest.SampleApp.Testing;
 using ProtoTest.Web;
 
 /// <summary>
@@ -31,7 +32,7 @@ public sealed class MessagingJourney
     public async Task PayingAnInvoicePublishesAnInvoicePaidEvent()
     {
         // Arrange: an open invoice.
-        var invoice = await DemoSupport.IssueInvoiceAsync();
+        var invoice = await Proto.Context.Data().IssueInvoiceAsync();
 
         // Act: pay it over the API.
         using var paid = await Proto.Context.Rest()
@@ -66,15 +67,15 @@ public sealed class MessagingJourney
     public async Task PayingInTheConsolePublishesAnInvoicePaidEvent()
     {
         // Arrange: an open invoice the console can pay.
-        var invoice = await DemoSupport.IssueInvoiceAsync();
+        var invoice = await Proto.Context.Data().IssueInvoiceAsync();
 
         // Act: pay it on the console's billing screen.
         var billing = Proto.Context.Web().Page<BillingPage>();
         await billing.OpenAsync("/console/billing");
         var row = billing.Invoice(invoice.Number);
-        await row.Status.Should.HaveTextAsync("Open", DemoSupport.ConsoleWait);
+        await row.Status.Should.HaveTextAsync("Open", NorthstarConsole.Wait);
         await row.Pay.ClickAsync();
-        await row.Status.Should.HaveTextAsync("Paid", DemoSupport.ConsoleWait);
+        await row.Status.Should.HaveTextAsync("Paid", NorthstarConsole.Wait);
 
         // Assert: the browser payment published the event the test awaits on the broker.
         var message = await Proto.Context.Messaging().AwaitAsync(

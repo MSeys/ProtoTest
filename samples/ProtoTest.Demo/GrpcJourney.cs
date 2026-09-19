@@ -3,6 +3,7 @@ namespace ProtoTest.Demo;
 using global::Grpc.Core;
 using global::NUnit.Framework;
 using Google.Protobuf;
+using Northstar.ProtoTest;
 using ProtoTest.Core;
 using ProtoTest.Data;
 using ProtoTest.Grpc;
@@ -11,7 +12,6 @@ using ProtoTest.NUnit;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Domain;
 using ProtoTest.SampleApp.Grpc;
-using ProtoTest.SampleApp.Testing;
 
 /// <summary>
 /// The same application over gRPC: the shared <c>[Auth]</c> bearer token travels as metadata, the call

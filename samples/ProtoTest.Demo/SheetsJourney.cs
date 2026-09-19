@@ -2,6 +2,7 @@ namespace ProtoTest.Demo;
 
 using System.Net;
 using global::NUnit.Framework;
+using Northstar.ProtoTest;
 using ProtoTest.Core;
 using ProtoTest.Data;
 using ProtoTest.Http;
@@ -9,7 +10,6 @@ using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Domain;
-using ProtoTest.SampleApp.Testing;
 using ProtoTest.Sheets;
 
 /// <summary>

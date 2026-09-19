@@ -21,7 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.SampleApp\ProtoTest.SampleApp.csproj" />
     <ProjectReference Include="..\ProtoTest.SampleApp.Contracts\ProtoTest.SampleApp.Contracts.csproj" />
-    <ProjectReference Include="..\ProtoTest.SampleApp.Testing\ProtoTest.SampleApp.Testing.csproj" />
+    <ProjectReference Include="..\Northstar.ProtoTest\Northstar.ProtoTest.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.AspNetCore\ProtoTest.AspNetCore.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Data\ProtoTest.Data.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.GraphQL\ProtoTest.GraphQL.csproj" />

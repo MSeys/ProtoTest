@@ -1,12 +1,13 @@
 namespace ProtoTest.Demo;
 
+using Northstar.ProtoTest;
 using ProtoTest.Core;
+using ProtoTest.Data;
 using ProtoTest.Http;
 using ProtoTest.Json;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
-using ProtoTest.SampleApp.Testing;
 using System.Net;
 
 /// <summary>Usage becomes an invoice, the invoice is paid (or declines), and the plan is changed.</summary>
@@ -50,7 +51,7 @@ public sealed class BillingJourney
         recorded.Should.HaveHttpStatus(HttpStatusCode.Created);
 
         // Act
-        await DemoSupport.AdvanceClockAsync(31);
+        await Proto.Context.Data().AdvanceClockAsync(31);
 
         // Assert
         using var invoices = await Proto.Context.Rest()
@@ -86,7 +87,7 @@ public sealed class BillingJourney
             .PostAsync("/api/v1/webhooks");
         webhook.Should.HaveHttpStatus(HttpStatusCode.Created);
         var endpoint = webhook.ReadAsJson<WebhookEndpointResponse>()!;
-        var invoice = await DemoSupport.IssueInvoiceAsync();
+        var invoice = await Proto.Context.Data().IssueInvoiceAsync();
 
         // Act
         using var paid = await Proto.Context.Rest()
@@ -114,7 +115,7 @@ public sealed class BillingJourney
     public async Task ADeclinedPaymentLeavesTheInvoiceOpenAndFailsThePayment()
     {
         // Arrange
-        var invoice = await DemoSupport.IssueInvoiceAsync();
+        var invoice = await Proto.Context.Data().IssueInvoiceAsync();
 
         // Act
         using var declined = await Proto.Context.Rest()
@@ -138,7 +139,7 @@ public sealed class BillingJourney
     public async Task APastDueSubscriptionBlocksNewProjects()
     {
         // Arrange
-        var invoice = await DemoSupport.IssueInvoiceAsync();
+        var invoice = await Proto.Context.Data().IssueInvoiceAsync();
         using var declined = await Proto.Context.Rest()
             .Body(new PayInvoiceRequest(PaymentMethods.Declined))
             .PostAsync("/api/v1/invoices/{invoiceId}/pay", new { invoiceId = invoice.Id });
@@ -162,7 +163,7 @@ public sealed class BillingJourney
     public async Task PayingAfterADeclineRestoresAccess()
     {
         // Arrange
-        var invoice = await DemoSupport.IssueInvoiceAsync();
+        var invoice = await Proto.Context.Data().IssueInvoiceAsync();
         using var declined = await Proto.Context.Rest()
             .Body(new PayInvoiceRequest(PaymentMethods.Declined))
             .PostAsync("/api/v1/invoices/{invoiceId}/pay", new { invoiceId = invoice.Id });
@@ -187,7 +188,7 @@ public sealed class BillingJourney
     public async Task UpgradingMidCycleChangesThePlanImmediately()
     {
         // Arrange
-        await DemoSupport.AdvanceClockAsync(15);
+        await Proto.Context.Data().AdvanceClockAsync(15);
 
         // Act
         using var upgraded = await Proto.Context.Rest()
@@ -208,14 +209,14 @@ public sealed class BillingJourney
     public async Task TheNextInvoiceCreditsTheUnusedPortionOfThePreviousPlan()
     {
         // Arrange
-        await DemoSupport.AdvanceClockAsync(15);
+        await Proto.Context.Data().AdvanceClockAsync(15);
         using var upgraded = await Proto.Context.Rest()
             .Body(new ChangePlanRequest(PlanIds.Enterprise, 10))
             .PostAsync("/api/v1/subscription");
         upgraded.Should.HaveHttpStatus(HttpStatusCode.OK);
 
         // Act
-        await DemoSupport.AdvanceClockAsync(16);
+        await Proto.Context.Data().AdvanceClockAsync(16);
 
         // Assert
         using var invoices = await Proto.Context.Rest().GetAsync("/api/v1/invoices");
@@ -246,7 +247,7 @@ public sealed class BillingJourney
         // Arrange
         using var canceled = await Proto.Context.Rest().PostAsync("/api/v1/subscription/cancel");
         canceled.Should.HaveHttpStatus(HttpStatusCode.OK);
-        await DemoSupport.AdvanceClockAsync(31);
+        await Proto.Context.Data().AdvanceClockAsync(31);
 
         // Act
         using var project = await Proto.Context.Rest()

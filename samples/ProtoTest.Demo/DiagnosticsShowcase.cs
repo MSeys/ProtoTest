@@ -1,12 +1,13 @@
 namespace ProtoTest.Demo;
 
+using Northstar.ProtoTest;
 using ProtoTest.Core;
+using ProtoTest.Data;
 using ProtoTest.Http;
 using ProtoTest.Json;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
-using ProtoTest.SampleApp.Testing;
 using System.Net;
 
 /// <summary>
@@ -81,11 +82,11 @@ public sealed class DiagnosticsShowcase
     public async Task FindingsReachTheReportWithoutFailingTheRun()
     {
         // Arrange
-        var project = await DemoSupport.CreateProjectAsync("ledger");
-        var production = await DemoSupport.CreateEnvironmentAsync(project.Id, "production", EnvironmentKinds.Production);
+        var project = await Proto.Context.Data().CreateProjectAsync("ledger");
+        var production = await Proto.Context.Data().CreateEnvironmentAsync(project.Id, "production", EnvironmentKinds.Production);
 
         // Act
-        var deployment = await DemoSupport.DeployAsync(production.Id, "1.0.0", "abc1234");
+        var deployment = await Proto.Context.Data().DeployAsync(production.Id, "1.0.0", "abc1234");
 
         // Assert: a finding is evidence, not a failure - the test still passes and the report shows it.
         Proto.Context.AddFinding(

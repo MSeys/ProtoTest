@@ -2,14 +2,15 @@ namespace ProtoTest.Demo;
 
 using System.Net;
 using global::NUnit.Framework;
+using Northstar.ProtoTest;
 using ProtoTest.Core;
+using ProtoTest.Data;
 using ProtoTest.GraphQL;
 using ProtoTest.Http;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Domain;
-using ProtoTest.SampleApp.Testing;
 using ProtoTest.Web;
 
 /// <summary>
@@ -36,15 +37,15 @@ public sealed class ApiThenBrowserJourney
         // The console shows an empty organization before the API write.
         var projects = Proto.Context.Web().Page<ProjectsPage>();
         await projects.OpenAsync("/console/projects");
-        await projects.Empty.Should.BeVisibleAsync(DemoSupport.ConsoleWait);
+        await projects.Empty.Should.BeVisibleAsync(NorthstarConsole.Wait);
 
-        var project = await DemoSupport.CreateProjectAsync(ProjectName);
+        var project = await Proto.Context.Data().CreateProjectAsync(ProjectName);
 
         // Refresh: the console re-reads the list the API just changed.
         await projects.OpenAsync("/console/projects");
         var row = projects.Project(ProjectName);
-        await row.Link.Should.HaveTextAsync(project.Name, DemoSupport.ConsoleWait);
-        await row.Status.Should.HaveTextAsync("Active", DemoSupport.ConsoleWait);
+        await row.Link.Should.HaveTextAsync(project.Name, NorthstarConsole.Wait);
+        await row.Status.Should.HaveTextAsync("Active", NorthstarConsole.Wait);
     }
 }
 
@@ -75,7 +76,7 @@ public sealed class BrowserThenApiJourney
         await projects.NewProject.ClickAsync();
         await projects.NameInput.FillAsync(ProjectName);
         await projects.Create.ClickAsync();
-        await projects.Project(ProjectName).Status.Should.HaveTextAsync("Active", DemoSupport.ConsoleWait);
+        await projects.Project(ProjectName).Status.Should.HaveTextAsync("Active", NorthstarConsole.Wait);
 
         // REST sees the console's write.
         using var response = await Proto.Context.Rest().GetAsync("/api/v1/projects");

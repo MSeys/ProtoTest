@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("ProtoTest.SampleApp")]
-[assembly: InternalsVisibleTo("ProtoTest.SampleApp.Testing")]
+[assembly: InternalsVisibleTo("Northstar.ProtoTest")]
 [assembly: InternalsVisibleTo("ProtoTest.Demo")]
 [assembly: InternalsVisibleTo("ProtoTest.SampleApp.Domain.Tests")]

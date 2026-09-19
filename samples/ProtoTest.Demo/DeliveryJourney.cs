@@ -1,12 +1,13 @@
 namespace ProtoTest.Demo;
 
+using Northstar.ProtoTest;
 using ProtoTest.Core;
+using ProtoTest.Data;
 using ProtoTest.Http;
 using ProtoTest.Json;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
-using ProtoTest.SampleApp.Testing;
 using System.Net;
 
 /// <summary>A team ships a release through preview, promotes it, then rolls it back.</summary>
@@ -20,8 +21,8 @@ public sealed class DeliveryJourney
     public async Task DeployingToThePreviewEnvironmentPublishesTheVersion()
     {
         // Arrange
-        var project = await DemoSupport.CreateProjectAsync("orion");
-        var preview = await DemoSupport.CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
+        var project = await Proto.Context.Data().CreateProjectAsync("orion");
+        var preview = await Proto.Context.Data().CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
 
         // Act
         using var deployment = await Proto.Context.Rest()
@@ -52,10 +53,10 @@ public sealed class DeliveryJourney
     public async Task TheSameReleaseCanBePromotedToProduction()
     {
         // Arrange
-        var project = await DemoSupport.CreateProjectAsync("orion");
-        var preview = await DemoSupport.CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
-        var production = await DemoSupport.CreateEnvironmentAsync(project.Id, "production", EnvironmentKinds.Production);
-        await DemoSupport.DeployAsync(preview.Id, "2026.09.1", "a1b2c3d");
+        var project = await Proto.Context.Data().CreateProjectAsync("orion");
+        var preview = await Proto.Context.Data().CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
+        var production = await Proto.Context.Data().CreateEnvironmentAsync(project.Id, "production", EnvironmentKinds.Production);
+        await Proto.Context.Data().DeployAsync(preview.Id, "2026.09.1", "a1b2c3d");
 
         // Act
         using var promoted = await Proto.Context.Rest()
@@ -79,8 +80,8 @@ public sealed class DeliveryJourney
     public async Task AFailedBuildIsRecordedButNeverBecomesTheCurrentVersion()
     {
         // Arrange
-        var project = await DemoSupport.CreateProjectAsync("vega");
-        var preview = await DemoSupport.CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
+        var project = await Proto.Context.Data().CreateProjectAsync("vega");
+        var preview = await Proto.Context.Data().CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
 
         // Act
         using var failed = await Proto.Context.Rest()
@@ -104,10 +105,10 @@ public sealed class DeliveryJourney
     public async Task RollingBackTheCurrentReleaseRestoresThePreviousVersion()
     {
         // Arrange
-        var project = await DemoSupport.CreateProjectAsync("lyra");
-        var preview = await DemoSupport.CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
-        await DemoSupport.DeployAsync(preview.Id, "1.0.0", "aaaa111");
-        var current = await DemoSupport.DeployAsync(preview.Id, "1.1.0", "bbbb222");
+        var project = await Proto.Context.Data().CreateProjectAsync("lyra");
+        var preview = await Proto.Context.Data().CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
+        await Proto.Context.Data().DeployAsync(preview.Id, "1.0.0", "aaaa111");
+        var current = await Proto.Context.Data().DeployAsync(preview.Id, "1.1.0", "bbbb222");
 
         // Act
         using var rolledBack = await Proto.Context.Rest()

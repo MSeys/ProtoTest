@@ -64,9 +64,94 @@ $packArguments = @("--configuration", $Configuration, "--output", $output)
 if ($NoBuild) { $packArguments += "--no-build" }
 if ($NoRestore) { $packArguments += "--no-restore" }
 
+# Pack into a clean folder: dotnet pack skips packages whose inputs it considers unchanged, and the
+# verification below reads every package this run produced.
+New-Item -ItemType Directory -Path $output -Force | Out-Null
+Remove-Item -Path (Join-Path $output "*.nupkg"), (Join-Path $output "*.snupkg") -Force -ErrorAction SilentlyContinue
+
+$packStarted = Get-Date
+
 foreach ($project in $packages) {
     & dotnet pack (Join-Path $repository $project) @packArguments
     if ($LASTEXITCODE -ne 0) {
         throw "Packing '$project' failed with exit code $LASTEXITCODE."
     }
 }
+
+# Every package has to agree with the rest of the family: same version, a README, and ProtoTest
+# dependencies that point at a package in this set, at exactly this version.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+$expectedVersion = ([xml](Get-Content -LiteralPath (Join-Path $repository "Directory.Build.props") -Raw)).Project.PropertyGroup.Version | ForEach-Object { $_.Trim() } | Where-Object { $_ } | Select-Object -First 1
+if ([string]::IsNullOrWhiteSpace($expectedVersion)) {
+    throw "Directory.Build.props does not declare a <Version>."
+}
+$produced = @(Get-ChildItem -LiteralPath $output -Filter "*.nupkg" -File |
+    Where-Object { $_.LastWriteTime -ge $packStarted })
+if ($produced.Count -ne $packages.Count) {
+    throw "Expected $($packages.Count) packages in '$output', found $($produced.Count) written by this run."
+}
+
+$packagesById = @{}
+$dependencies = @()
+
+foreach ($file in $produced) {
+    $archive = [IO.Compression.ZipFile]::OpenRead($file.FullName)
+    try {
+        $entries = @($archive.Entries | Where-Object { $_.FullName -like '*.nuspec' })
+        if ($entries.Count -ne 1) {
+            throw "'$($file.Name)' contains $($entries.Count) nuspec files, expected one."
+        }
+        $stream = $entries[0].Open()
+        $reader = New-Object System.IO.StreamReader -ArgumentList $stream
+        try {
+            [xml]$nuspec = $reader.ReadToEnd()
+        }
+        finally {
+            $reader.Dispose()
+        }
+    }
+    finally {
+        $archive.Dispose()
+    }
+
+    $metadata = $nuspec.package.metadata
+    $id = $metadata.id
+    if ($metadata.version -ne $expectedVersion) {
+        throw "'$($file.Name)' is version '$($metadata.version)'; this release packs '$expectedVersion'."
+    }
+    if ([string]::IsNullOrWhiteSpace($metadata.readme)) {
+        throw "'$($file.Name)' has no README entry."
+    }
+    if ($packagesById.ContainsKey($id)) {
+        throw "'$($file.Name)' repeats package id '$id'."
+    }
+    $packagesById[$id] = $metadata.version
+
+    $groups = @($metadata.dependencies.group) + @(@{ dependency = $metadata.dependencies.dependency })
+    foreach ($group in $groups) {
+        foreach ($dependency in @($group.dependency)) {
+            if ($null -ne $dependency -and $dependency.id -like 'ProtoTest.*') {
+                $dependencies += [pscustomobject] @{
+                    Package = $id
+                    Id = $dependency.id
+                    Version = ([string]$dependency.version).Trim()
+                }
+            }
+        }
+    }
+}
+
+$verified = 0
+foreach ($dependency in $dependencies) {
+    if (-not $packagesById.ContainsKey($dependency.Id)) {
+        throw "'$($dependency.Package)' depends on '$($dependency.Id)', which is not one of the packed packages."
+    }
+    $declared = (($dependency.Version -replace '^[\[\(]', '') -replace '[\]\)]$', '').Split(',')[0].Trim()
+    if ($declared -ne $packagesById[$dependency.Id]) {
+        throw "'$($dependency.Package)' depends on '$($dependency.Id)' $($dependency.Version); packed version is $($packagesById[$dependency.Id])."
+    }
+    $verified++
+}
+
+Write-Host "Packed $($packagesById.Count) packages and verified $verified ProtoTest dependency references at version $expectedVersion."

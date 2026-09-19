@@ -5,11 +5,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
 
-    <Version>0.1.0-alpha</Version>
+    <Version>1.0.0</Version>
     <Authors>Matthias Seys</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/MSeys/ProtoTest</PackageProjectUrl>
     <RepositoryUrl>https://github.com/MSeys/ProtoTest</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -18,6 +21,11 @@
   <!-- Marks every ProtoTest package, so a trace can tell the suite's own frames from ProtoTest's. -->
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
     <AssemblyMetadata Include="ProtoTest.Framework" Value="true" />
+  </ItemGroup>
+
+  <!-- Source stepping: SourceLink points the PDBs at this repository, untracked sources ride along. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.401" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- One mark for the whole family: on nuget.org every ProtoTest package reads as part of the same set. -->

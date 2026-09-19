@@ -1,0 +1,224 @@
+name: Verify
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      # The browser binaries plus the operating-system libraries they need on a clean image. The
+      # in-code InstallBrowsers option covers machines that skip this step.
+      - name: Install the Chromium browser for the web tests and demo
+        shell: pwsh
+        run: |
+          dotnet restore tests/ProtoTest.Web.Tests/ProtoTest.Web.Tests.csproj
+          dotnet build tests/ProtoTest.Web.Tests/ProtoTest.Web.Tests.csproj --configuration Release --no-restore
+          pwsh tests/ProtoTest.Web.Tests/bin/Release/net8.0/playwright.ps1 install --with-deps chromium
+
+      - name: Restore, build, and test every runner
+        shell: pwsh
+        run: ./eng/test.ps1 -Configuration Release
+
+      - name: Validate NuGet packages
+        shell: pwsh
+        run: ./eng/pack.ps1 -Configuration Release -NoBuild -NoRestore
+
+      # The template is packed with every run; this proves the package actually installs, generates a
+      # project against the just-packed packages, and builds and tests it.
+      - name: Smoke-test the starter template
+        shell: pwsh
+        run: |
+          $package = Get-ChildItem artifacts/packages/ProtoTest.Templates.*.nupkg |
+            Where-Object { $_.Name -notlike '*.snupkg' } |
+            Select-Object -First 1
+          if (-not $package) { throw "The packed ProtoTest.Templates package was not found." }
+          dotnet new install $package.FullName
+          if ($LASTEXITCODE -ne 0) { throw "dotnet new install failed." }
+
+          $starter = Join-Path $env:RUNNER_TEMP "prototest-starter-smoke"
+          if (Test-Path -LiteralPath $starter) { Remove-Item -LiteralPath $starter -Recurse -Force }
+          dotnet new prototest --no-restore -n Starter -o $starter
+          if ($LASTEXITCODE -ne 0) { throw "dotnet new prototest failed." }
+
+          # The starter resolves the packages this run just packed, and falls back to nuget.org for
+          # everything else.
+          $packages = (Resolve-Path artifacts/packages).Path
+          @"
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="local" value="$packages" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+          </configuration>
+          "@ | Set-Content -Path (Join-Path $starter "NuGet.config")
+
+          dotnet restore (Join-Path $starter "Starter.slnx")
+          dotnet build (Join-Path $starter "Starter.slnx") --configuration Release --no-restore
+          dotnet test (Join-Path $starter "Starter.Tests/Starter.Tests.csproj") --configuration Release --no-build --no-restore
+
+  postgres-demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      # The container path only runs where a container runtime exists, which is why it is its own job.
+      - name: Run the demo against a PostgreSQL container
+        shell: pwsh
+        env:
+          ProtoTest__Database: postgres
+        run: |
+          dotnet restore samples/ProtoTest.Demo/ProtoTest.Demo.csproj
+          dotnet build samples/ProtoTest.Demo/ProtoTest.Demo.csproj --configuration Release --no-restore
+          dotnet test samples/ProtoTest.Demo/ProtoTest.Demo.csproj --configuration Release --no-build --no-restore --verbosity minimal
+
+  rabbitmq-demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      rabbitmq:
+        image: rabbitmq:3
+        ports:
+          - 5672:5672
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      # The broker path: the adapter's round trips and the demo's event journey only run here. The
+      # adapter tests use the job's own service; the demo still owns a container as infrastructure.
+      - name: Run the messaging adapter against the RabbitMQ service
+        shell: pwsh
+        env:
+          ProtoTest__Messaging__RabbitMq__ConnectionString: amqp://guest:guest@localhost:5672
+        run: |
+          dotnet restore tests/ProtoTest.Messaging.RabbitMq.Tests/ProtoTest.Messaging.RabbitMq.Tests.csproj
+          dotnet build tests/ProtoTest.Messaging.RabbitMq.Tests/ProtoTest.Messaging.RabbitMq.Tests.csproj --configuration Release --no-restore
+          dotnet test tests/ProtoTest.Messaging.RabbitMq.Tests/ProtoTest.Messaging.RabbitMq.Tests.csproj --configuration Release --no-build --no-restore --verbosity minimal
+
+      - name: Run the demo against a RabbitMQ container
+        shell: pwsh
+        env:
+          ProtoTest__Messaging__Broker: container
+        run: |
+          dotnet restore samples/ProtoTest.Demo/ProtoTest.Demo.csproj
+          dotnet build samples/ProtoTest.Demo/ProtoTest.Demo.csproj --configuration Release --no-restore
+          dotnet test samples/ProtoTest.Demo/ProtoTest.Demo.csproj --configuration Release --no-build --no-restore --verbosity minimal
+
+  docs-and-viewer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            docs/package-lock.json
+            viewer/package-lock.json
+
+      # The content checks run before the builds: they catch removed symbols, drifted configuration
+      # keys and dead sample links without depending on a Docusaurus build.
+      - name: Check the documentation content
+        shell: pwsh
+        run: ./eng/check-docs.ps1
+
+      # Both builds run stylelint, type checks and link checks; they are not part of the dotnet build,
+      # so without this job a broken page or type error would only surface after merge.
+      - name: Build the docs site
+        working-directory: docs
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
+      - name: Build the viewer
+        working-directory: viewer
+        run: |
+          npm ci
+          npm run build
+
+  windows-build-test:
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      # The scripts are Windows-authored; this job proves the build and a representative test slice on
+      # the same shell the scripts use, so Windows-only path and process behaviour cannot regress unseen.
+      - name: Restore and build
+        shell: pwsh
+        run: |
+          dotnet restore ProtoTest.slnx
+          dotnet build ProtoTest.slnx --configuration Release --no-restore
+
+      - name: Run a representative test slice
+        shell: pwsh
+        run: |
+          $projects = @(
+            "tests/ProtoTest.Sheets.Tests/ProtoTest.Sheets.Tests.csproj",
+            "tests/ProtoTest.Data.Tests/ProtoTest.Data.Tests.csproj",
+            "tests/ProtoTest.Sql.Tests/ProtoTest.Sql.Tests.csproj",
+            "tests/ProtoTest.Reporting.Tests/ProtoTest.Reporting.Tests.csproj"
+          )
+          foreach ($project in $projects) {
+            dotnet test $project --configuration Release --no-build --no-restore --verbosity minimal
+            if ($LASTEXITCODE -ne 0) { throw "$project failed with exit code $LASTEXITCODE." }
+          }

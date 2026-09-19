@@ -15,7 +15,11 @@ permissions:
   contents: read
 
 jobs:
+  verify:
+    uses: ./.github/workflows/verify.yml
+
   release:
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -32,10 +36,6 @@ jobs:
             8.0.x
             9.0.x
             10.0.x
-
-      - name: Restore, build, and test every runner
-        shell: pwsh
-        run: ./eng/test.ps1 -Configuration Release
 
       - name: Pack
         shell: pwsh

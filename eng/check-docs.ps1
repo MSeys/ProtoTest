@@ -18,7 +18,7 @@ $generatedFolders = '[\\/](build|\.docusaurus|node_modules|obj|bin)[\\/]'
 $docsContentFiles = @(Get-ChildItem -LiteralPath $docsContentRoot -Recurse -File |
     Where-Object { $_.Extension -in '.md', '.mdx' -and $_.FullName -notmatch $generatedFolders })
 $docsSourceFiles = @(Get-ChildItem -LiteralPath $docsSourceRoot -Recurse -File |
-    Where-Object { $_.Extension -in '.ts', '.tsx' -and $_.FullName -notmatch $generatedFolders })
+    Where-Object { $_.Extension -in '.ts', '.tsx', '.md', '.mdx' -and $_.FullName -notmatch $generatedFolders })
 
 # The fact sheets are internal and gitignored; a fresh CI checkout has none. The key cross-check
 # runs where they exist and reports itself as skipped where they do not.
@@ -57,7 +57,9 @@ $forbiddenSymbols = @(
     'auth.apply',
     'auth.skip',
     'matthiasseys',
-    '[Fact, ProtoTest]'
+    '[Fact, ProtoTest]',
+    '--prerelease',
+    '0.1.0-alpha'
 )
 
 foreach ($file in @($docsContentFiles + $docsSourceFiles)) {

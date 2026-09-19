@@ -9,7 +9,7 @@ description: "A per-test HTTP client on IHttpClientFactory, with JSON shape asse
 `ProtoTest.Rest` gives each test a named HTTP client built on `IHttpClientFactory`, with JSON shape assertions, the shared [authentication model](./authentication.md), optional request/response capture and endpoint coverage. It brings `ProtoTest.Http` and `ProtoTest.Json` with it.
 
 ```bash
-dotnet add package ProtoTest.Rest --prerelease
+dotnet add package ProtoTest.Rest
 ```
 
 ProtoTest targets **.NET 8, 9 and 10**. The template defaults to `net10.0` unless you pass `-f net8.0` (or `net9.0`) to `dotnet new`.

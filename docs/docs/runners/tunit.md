@@ -11,7 +11,7 @@ TUnit is wired differently from the other four: **there is no ProtoTest test att
 ## Install
 
 ```bash
-dotnet add package ProtoTest.TUnit --prerelease
+dotnet add package ProtoTest.TUnit
 ```
 
 ProtoTest targets **.NET 8, 9 and 10**. The `dotnet new prototest` template defaults to `net10.0`; pass `-f net8.0` or `-f net9.0` for an older runtime.

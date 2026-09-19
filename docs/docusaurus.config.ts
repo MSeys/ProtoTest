@@ -100,9 +100,9 @@ export default async function createConfig(): Promise<Config> {
       respectPrefersColorScheme: true,
     },
     announcementBar: {
-      id: 'wip-notice',
+      id: 'release-1.0',
       content:
-        '<span class="announcement-preview">Preview</span> ProtoTest and this documentation site are under active development. Some pages are incomplete and APIs may still change. &nbsp; <a target="_blank" rel="noopener noreferrer" href="https://github.com/MSeys/ProtoTest">Follow progress on GitHub</a>',
+        '<span class="announcement-preview">1.0</span> ProtoTest 1.0 is released: packages are stable on NuGet and this documentation matches the release. &nbsp; <a target="_blank" rel="noopener noreferrer" href="https://www.nuget.org/packages?q=ProtoTest">Install from NuGet</a>',
       isCloseable: true,
     },
     navbar: {

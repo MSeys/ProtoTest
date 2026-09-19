@@ -9,7 +9,7 @@ description: "Export ProtoTest operations to OpenTelemetry, so test runs land in
 Every ProtoTrace operation is also a .NET `Activity` on the `ActivitySource` named **`ProtoTest`**. `ProtoTest.OpenTelemetry` is a one-line bridge that subscribes an OpenTelemetry tracer to it, so test runs can land in the same backend as your application's telemetry.
 
 ```bash
-dotnet add package ProtoTest.OpenTelemetry --prerelease
+dotnet add package ProtoTest.OpenTelemetry
 dotnet add package OpenTelemetry.Exporter.OpenTelemetryProtocol
 ```
 

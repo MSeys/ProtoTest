@@ -1,45 +1,15 @@
-<img width="1600" height="600" alt="ProtoTest blueprint logo banner" src="assets/brand/prototest-banner.svg" />
+<p align="center">
+  <img width="1200" alt="ProtoTest" src="assets/brand/prototest-banner.svg" />
+</p>
 
-> Integration testing made as simple, readable, and frictionless as prototyping.
-
-ProtoTest is short for **prototype testing**: not testing software prototypes, but bringing the simplicity, speed, and readability of prototyping back to integration testing. It is a .NET toolkit with a shared test lifecycle, a scoped `Proto.Context`, named clients, reusable hooks, and integration-specific assertions.
-
-## Why ProtoTest?
-
-Prototype testing is about trying an idea quickly and seeing the result clearly. ProtoTest applies that same feeling to integration tests: keep the test readable and focused on behavior while the framework manages the repeatable infrastructure around it.
-
-ProtoTest provides:
-
-- one lifecycle across NUnit, xUnit, xUnit v3, MSTest, and TUnit;
-- per-test services, clients, typed state, and coverage hits;
-- REST, GraphQL, ASP.NET Core, and component-based Web integrations;
-- shared JSON shape matching through `ProtoTest.Json`;
-- shared HTTP integration foundations through `ProtoTest.Http`;
-- OpenAPI-driven REST coverage;
-- extension points for hooks, attributes, clients, and collectors;
-- automatic portable execution traces for lifecycle and integration operations.
-- an OpenTelemetry bridge through `ProtoTest.OpenTelemetry`: it registers ProtoTest's `ActivitySource` so an exporter you configure (such as Sentry's official OpenTelemetry bridge) can pick up ProtoTest operations.
-
-## Example
-
-```csharp
-[ProtoTest]
-[Application("Orders")]
-[Auth<BearerTokenAuthenticator>("orders-token")]
-public async Task GetOrder_ReturnsExpectedOrder()
-{
-	var response = await Proto.Context.Rest()
-		.GetAsync("/orders/{id}", new { id = 42 });
-
-	response
-		.ShouldHaveHttpStatus(HttpStatusCode.OK)
-		.ShouldMatchShape(new { id = 42, status = "confirmed" });
-}
-```
-
-This is an illustrative test excerpt. The complete setup is in the [getting-started guide](docs/docs/getting-started/first-test.md).
+**ProtoTest** is a composable integration-testing foundation for .NET 8, 9 and 10. Keep the test runner you already
+use — NUnit, xUnit v2, xUnit v3, MSTest or TUnit — and let ProtoTest own the execution around each test: one host,
+one execution context, one lifecycle, one trace. REST, GraphQL, gRPC, messaging, SQL, browsers, spreadsheets and
+in-process ASP.NET Core all attach to that context, so a test describes behaviour and the infrastructure is written once.
 
 ## Quick start
+
+### From the template
 
 ```bash
 dotnet new install ProtoTest.Templates
@@ -48,63 +18,102 @@ cd Shop
 dotnet test
 ```
 
-That creates a small ASP.NET Core API and a suite for it that is already composed, traced and reported. See [Installation](docs/docs/getting-started/installation.md) to add ProtoTest to a project of your own.
+The template creates a small ASP.NET Core API and a suite for it that is already composed, traced and reported.
+The run leaves `TestResults/Shop.prototrace` and `TestResults/Shop.html` in the test project's output folder.
 
-## Documentation
+### Into your own project
 
-Read the [ProtoTest documentation](docs/docs/index.md), or start directly with:
+Add `ProtoTest.Core`, one runner package and one package per integration you use:
 
-- [First test](docs/docs/getting-started/first-test.md)
-- [Recipes](docs/docs/recipes/overview.md) — several capabilities in one test
-- [Troubleshooting](docs/docs/getting-started/troubleshooting.md)
-- [REST integration](docs/docs/integrations/rest/index.md)
-- [GraphQL integration](docs/docs/integrations/graphql/index.md)
-- [Web integration](docs/docs/integrations/web/index.md)
-- [ASP.NET Core integration](docs/docs/integrations/aspnetcore.md)
-- [Hooks and lifecycle extensions](docs/docs/foundation/hooks.md)
-- [Context and state](docs/docs/foundation/execution-context.md)
-- [Extension points](docs/docs/advanced/extending.md#building-an-integration)
-- [Execution tracing](docs/docs/observability/prototrace.md)
-- [Extension guide](docs/docs/advanced/extending.md)
-
-## Demo
-
-[ProtoTest.Demo](samples/ProtoTest.Demo) is the single end-to-end showcase. It runs ten journeys against Northstar, a multi-tenant release/deployment control-plane SaaS: onboarding and plan limits; preview/production delivery and rollback; usage metering, invoicing, payments, proration and cancellation; the role and token-scope matrix, tenant isolation and rate limiting; arranging through the domain instead of the API; the same application over gRPC; awaiting a published `invoice.paid` event through RabbitMQ; asserting the generated monthly spreadsheet; and a real browser journey. The journeys reach Northstar through REST, GraphQL (including a live subscription), signed webhooks, gRPC, messaging, spreadsheets and the browser. It also demonstrates parallel tenant provisioning, OpenAPI/GraphQL coverage, custom hooks, clients, contexts, observations, attachments, reports, and a complete ProtoTrace.
-
-## Build and test
-
-The repository contains VSTest projects as well as Microsoft Testing Platform projects. Run the checked-in entrypoint so every adapter and demo is included:
-
-```powershell
-./eng/test.ps1
+```bash
+dotnet add package ProtoTest.Core
+dotnet add package ProtoTest.NUnit
+dotnet add package ProtoTest.Rest
+dotnet add package ProtoTest.AspNetCore
+dotnet add package ProtoTest.Reporting
 ```
 
-CI uses the same command and validates every packable NuGet project afterwards.
+Full instructions: [Installation](https://prototest.dev/docs/getting-started/installation).
 
-To produce the complete package set locally:
+## Packages
 
-```powershell
-./eng/pack.ps1
+Every package is stable on NuGet and installs the same way: `dotnet add package <id>`.
+
+### Capabilities
+
+| Package | What it adds | Install id |
+| --- | --- | --- |
+| `ProtoTest.Rest` | HTTP/REST client, `[Auth<T>]`, status and shape assertions, REST coverage | `ProtoTest.Rest` |
+| `ProtoTest.GraphQL` | queries, mutations, subscriptions, uploads, schema coverage | `ProtoTest.GraphQL` |
+| `ProtoTest.Grpc` | unary and streaming clients, metadata auth, method coverage | `ProtoTest.Grpc` |
+| `ProtoTest.Messaging` | publish and await messages, with an in-memory default broker | `ProtoTest.Messaging` |
+| `ProtoTest.Messaging.RabbitMq` | RabbitMQ adapter for the messaging client | `ProtoTest.Messaging.RabbitMq` |
+| `ProtoTest.Sql` | one database connection per test, optional transaction isolation | `ProtoTest.Sql` |
+| `ProtoTest.Sql.EntityFrameworkCore` | EF Core context over the per-test connection | `ProtoTest.Sql.EntityFrameworkCore` |
+| `ProtoTest.Data` | deterministic data, provisioners and the `Ref<T>` identity map | `ProtoTest.Data` |
+| `ProtoTest.AspNetCore` | in-process ASP.NET Core application and server DI access | `ProtoTest.AspNetCore` |
+| `ProtoTest.Web` | browser sessions, page objects, flows and page coverage | `ProtoTest.Web` |
+| `ProtoTest.Web.Playwright` | Playwright backend and browser pool | `ProtoTest.Web.Playwright` |
+| `ProtoTest.Web.Selenium` | Selenium backend | `ProtoTest.Web.Selenium` |
+| `ProtoTest.Sheets` | `.xlsx` cell, column, range, table and typed-model assertions | `ProtoTest.Sheets` |
+| `ProtoTest.OpenApi` | OpenAPI contract coverage over REST observations | `ProtoTest.OpenApi` |
+
+### Foundation and observability
+
+| Package | What it adds | Install id |
+| --- | --- | --- |
+| `ProtoTest.Core` | host, execution context, lifecycle, hooks, attributes, resources and trace | `ProtoTest.Core` |
+| `ProtoTest.Http` | shared HTTP client and `[Auth<T>]` plumbing behind REST, GraphQL and gRPC | `ProtoTest.Http` |
+| `ProtoTest.Json` | partial JSON shape matching and `JsonValue` constraints | `ProtoTest.Json` |
+| `ProtoTest.Testcontainers` | run-scoped container base class | `ProtoTest.Testcontainers` |
+| `ProtoTest.Sql.Testcontainers` | a PostgreSQL container owned by the run | `ProtoTest.Sql.Testcontainers` |
+| `ProtoTest.Messaging.RabbitMq.Testcontainers` | a RabbitMQ container owned by the run | `ProtoTest.Messaging.RabbitMq.Testcontainers` |
+| `ProtoTest.Reporting` | JSON and HTML report sinks | `ProtoTest.Reporting` |
+| `ProtoTest.OpenTelemetry` | export ProtoTest operations as OpenTelemetry spans | `ProtoTest.OpenTelemetry` |
+| `ProtoTest.Templates` | the `prototest` starter solution | `ProtoTest.Templates` |
+
+## Architecture
+
+```text
+test runners      NUnit · xUnit v2 · xUnit v3 · MSTest · TUnit
+                        │  wraps every test in the same lifecycle
+host              ProtoHost — one per process: DI, run hooks, gates, infrastructure
+                        │
+execution         ProtoExecutionContext — one per test
+                        │
+     ┌──────────────────┼───────────────────┐
+capabilities       foundations        observability
+REST · GraphQL     Http · Json        ProtoTrace · coverage
+gRPC · Messaging   Testcontainers     JSON/HTML reports
+Sql · Data                            OpenTelemetry
+Web · Sheets
+AspNetCore · OpenAPI
 ```
 
-## Status
+A test is Setup → Execution → Rollback → Teardown: clients, state, resources, attachments and findings live on
+the execution context, while run-scoped infrastructure starts with the run and is released after the reports.
 
-| Area | Status |
-| --- | --- |
-| Core lifecycle and context | Available |
-| NUnit, xUnit, xUnit v3, MSTest, TUnit | Available |
-| REST | Available |
-| ASP.NET Core | Available |
-| OpenAPI | Available |
-| GraphQL | Preview |
-| Web with Playwright and Selenium backends | Preview |
-| gRPC (`ProtoTest.Grpc`) | Available |
-| Messaging (`ProtoTest.Messaging`, `ProtoTest.Messaging.RabbitMq`) | Available |
-| Spreadsheets (`ProtoTest.Sheets`) | Available |
-| Test data (`ProtoTest.Data`) | Available |
-| SQL (`ProtoTest.Sql`, `ProtoTest.Sql.EntityFrameworkCore`, `ProtoTest.Sql.Testcontainers`) | Available |
-| Containers (`ProtoTest.Testcontainers`, `ProtoTest.Messaging.RabbitMq.Testcontainers`) | Available |
-| Coverage | Available |
-| Templates (`ProtoTest.Templates`) | Available |
+## Test frameworks
 
-See the [integration overview](docs/docs/integrations/overview.md) for package names and capabilities.
+| Runner | Package | Test attribute |
+| --- | --- | --- |
+| NUnit | `ProtoTest.NUnit` | `[ProtoTest]` |
+| xUnit v2 | `ProtoTest.Xunit` | `[ProtoTestFact]`, `[ProtoTestTheory]` |
+| xUnit v3 | `ProtoTest.Xunit3` | `[ProtoTestFact]`, `[ProtoTestTheory]` |
+| MSTest | `ProtoTest.MSTest` | `[ProtoTest]` |
+| TUnit | `ProtoTest.TUnit` | `[Test]` with the ProtoTest executor |
+
+Every adapter runs the same lifecycle and reports the same outcomes, attachments and skip reasons to the runner's
+own output.
+
+## Documentation and demo
+
+- [Documentation](https://prototest.dev/docs/) — installation, first test, recipes, foundation, integrations,
+  observability and extending.
+- [Demo](samples/ProtoTest.Demo) — ten journeys against Northstar, a multi-tenant SaaS sample app, through REST,
+  GraphQL, gRPC, RabbitMQ, spreadsheets and a real browser, with coverage, reports and a full ProtoTrace.
+- [Trace viewer](https://trace.prototest.dev) — open a `.prototrace` bundle.
+
+## License
+
+[MIT](LICENSE) © 2026 Matthias Seys.

@@ -22,7 +22,7 @@ A reader sees immediately that this test cares about an overdue invoice of 125. 
 ## Install
 
 ```bash
-dotnet add package ProtoTest.Data --prerelease
+dotnet add package ProtoTest.Data
 ```
 
 ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `-f` is passed. `ProtoTest.Data` depends only on `ProtoTest.Core`.

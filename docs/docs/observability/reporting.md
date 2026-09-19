@@ -11,7 +11,7 @@ Report sinks write out what [collectors](./coverage.md) gathered, once, when the
 ## Install
 
 ```bash
-dotnet add package ProtoTest.Reporting --prerelease
+dotnet add package ProtoTest.Reporting
 ```
 
 The package targets .NET 8, 9 and 10 (the project template defaults to `net10.0`; pass `-f net8.0` or `net9.0` for an older runtime) and depends on `ProtoTest.Core` only.

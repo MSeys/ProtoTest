@@ -11,9 +11,9 @@ description: "Publish a message, then await the one that matters with a predicat
 ## Install
 
 ```bash
-dotnet add package ProtoTest.Messaging --prerelease
-dotnet add package ProtoTest.Messaging.RabbitMq --prerelease
-dotnet add package ProtoTest.Messaging.RabbitMq.Testcontainers --prerelease
+dotnet add package ProtoTest.Messaging
+dotnet add package ProtoTest.Messaging.RabbitMq
+dotnet add package ProtoTest.Messaging.RabbitMq.Testcontainers
 ```
 
 The packages target .NET 8, 9 and 10 (the project template defaults to `net10.0`; pass `-f net8.0` or `net9.0` for an older runtime). The first is the capability. The other two are optional: add the RabbitMQ adapter to talk to a real broker, and the container package when the run should start one. `ProtoTest.Messaging.RabbitMq` brings `ProtoTest.Messaging` with it.

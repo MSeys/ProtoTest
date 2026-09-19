@@ -9,7 +9,7 @@ description: "A per-test GraphQL client for queries, mutations and subscriptions
 `ProtoTest.GraphQL` gives each test a GraphQL client for queries, mutations and subscriptions (WebSocket or SSE), with file uploads, shape assertions and schema coverage. It shares its HTTP plumbing, [authentication model](../rest/authentication.md) and capture options with REST.
 
 ```bash
-dotnet add package ProtoTest.GraphQL --prerelease
+dotnet add package ProtoTest.GraphQL
 ```
 
 ProtoTest targets **.NET 8, 9 and 10**. The template defaults to `net10.0` unless you pass `-f net8.0` (or `net9.0`) to `dotnet new`.

@@ -9,7 +9,7 @@ description: "Run your ASP.NET Core application in-process with WebApplicationFa
 `ProtoTest.AspNetCore` runs your ASP.NET Core application in-process with `WebApplicationFactory`, and hands its `HttpClient` to the REST and GraphQL clients. No deployed environment, no ports.
 
 ```bash
-dotnet add package ProtoTest.AspNetCore --prerelease
+dotnet add package ProtoTest.AspNetCore
 ```
 
 The package targets `net8.0`, `net9.0` and `net10.0`; the project templates default to `net10.0`, so pass `-f net8.0` or `-f net9.0` when a suite targets an older baseline.

@@ -461,7 +461,7 @@ function CtaSection() {
         <div className={styles.ctaBanner}>
           <Heading as="h2">Start with one test.</Heading>
           <p>
-            ProtoTest is under active development, built in the open. The foundation is real — and
+            ProtoTest 1.0 is stable, built in the open. The foundation is real — and
             the sample app in the repository runs every layer shown here.
           </p>
           <div className={`${styles.heroButtons} ${styles.heroButtonsCenter}`}>

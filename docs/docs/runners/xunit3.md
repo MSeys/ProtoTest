@@ -11,7 +11,7 @@ description: "Set up ProtoTest with xUnit v3: the assembly fixture, [ProtoTestFa
 ## Install
 
 ```bash
-dotnet add package ProtoTest.Xunit3 --prerelease
+dotnet add package ProtoTest.Xunit3
 ```
 
 ProtoTest targets **.NET 8, 9 and 10**. The `dotnet new prototest` template defaults to `net10.0`; pass `-f net8.0` or `-f net9.0` for an older runtime.

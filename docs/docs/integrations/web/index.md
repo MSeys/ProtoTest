@@ -16,9 +16,9 @@ Your page objects and tests stay the same for both. The backends differ undernea
 ## Install
 
 ```bash
-dotnet add package ProtoTest.Web.Playwright --prerelease
+dotnet add package ProtoTest.Web.Playwright
 # or
-dotnet add package ProtoTest.Web.Selenium --prerelease
+dotnet add package ProtoTest.Web.Selenium
 ```
 
 Either backend brings `ProtoTest.Web` with it. The packages target `net8.0`, `net9.0` and `net10.0`; the project templates default to `net10.0`, so pass `-f net8.0` or `-f net9.0` when a suite targets an older baseline.

@@ -9,9 +9,9 @@ description: "A database connection each test owns, optionally wrapped in a tran
 `ProtoTest.Sql` gives each test a database connection it owns: opened before the test, optionally wrapped in a transaction that is rolled back when the test ends, and disposed with the test. `ProtoTest.Sql.EntityFrameworkCore` builds Entity Framework Core contexts on that same connection, and `ProtoTest.Sql.Testcontainers` owns a PostgreSQL server for the run. Use it when tests write to a store they control and should leave no trace behind; when the store belongs to a deployed environment you cannot roll back, test through the application's APIs instead.
 
 ```bash
-dotnet add package ProtoTest.Sql --prerelease
-dotnet add package ProtoTest.Sql.EntityFrameworkCore --prerelease
-dotnet add package ProtoTest.Sql.Testcontainers --prerelease
+dotnet add package ProtoTest.Sql
+dotnet add package ProtoTest.Sql.EntityFrameworkCore
+dotnet add package ProtoTest.Sql.Testcontainers
 ```
 
 Only `ProtoTest.Sql` is required. Add the Entity Framework Core adapter when tests use a `DbContext`, and the container package when the run should start its own PostgreSQL. ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `-f` is passed.

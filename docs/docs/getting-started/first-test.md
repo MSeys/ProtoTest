@@ -18,10 +18,10 @@ This tutorial builds a small suite against an ASP.NET Core API, one step at a ti
 dotnet new nunit -n Orders.Tests
 cd Orders.Tests
 dotnet add reference ../Orders.Api/Orders.Api.csproj
-dotnet add package ProtoTest.NUnit --prerelease
-dotnet add package ProtoTest.Rest --prerelease
-dotnet add package ProtoTest.AspNetCore --prerelease
-dotnet add package ProtoTest.Reporting --prerelease
+dotnet add package ProtoTest.NUnit
+dotnet add package ProtoTest.Rest
+dotnet add package ProtoTest.AspNetCore
+dotnet add package ProtoTest.Reporting
 ```
 
 For a minimal-API application, make its entry point visible to the tests by adding this to `Orders.Api`:

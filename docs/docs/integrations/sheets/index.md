@@ -22,7 +22,7 @@ workbook.Sheet("Summary").Cell("B1").Should.Be(42.0);
 ## Install
 
 ```bash
-dotnet add package ProtoTest.Sheets --prerelease
+dotnet add package ProtoTest.Sheets
 ```
 
 ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `-f` is passed. The package builds on OpenXML and brings `ProtoTest.Json` with it for row shape matching.

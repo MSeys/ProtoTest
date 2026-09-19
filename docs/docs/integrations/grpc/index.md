@@ -11,7 +11,7 @@ description: "A named gRPC client per test for unary and streaming calls, with m
 ## Install
 
 ```bash
-dotnet add package ProtoTest.Grpc --prerelease
+dotnet add package ProtoTest.Grpc
 ```
 
 The package targets .NET 8, 9 and 10 (the project template defaults to `net10.0`; pass `-f net8.0` or `net9.0` for an older runtime), and brings `ProtoTest.Http` and `ProtoTest.Json` with it.

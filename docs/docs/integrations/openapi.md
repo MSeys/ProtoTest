@@ -15,7 +15,7 @@ This package reports coverage. It doesn't validate requests or responses against
 ## Install
 
 ```bash
-dotnet add package ProtoTest.OpenApi --prerelease
+dotnet add package ProtoTest.OpenApi
 ```
 
 ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `-f` is passed. The package resolves its document with `Microsoft.OpenApi.Readers` and depends on `ProtoTest.Rest`.

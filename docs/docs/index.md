@@ -10,10 +10,10 @@ description: "ProtoTest is a composable integration-testing foundation for .NET:
 
 ProtoTest is a composable integration-testing foundation for .NET 8, 9 and 10. REST, GraphQL, browser automation, test data and in-process ASP.NET Core all attach to **one host, one execution context and one lifecycle** — so a test describes behaviour, and the infrastructure around it is written once and reused.
 
-Packages ship as prereleases (`0.1.0-alpha`), so installs use `--prerelease`; the template targets `net10.0` unless `--framework net8.0` or `net9.0` is passed.
+ProtoTest 1.0 targets **.NET 8, 9 and 10**. Packages are stable on NuGet, so `dotnet add package <id>` installs them directly; the template targets `net10.0` unless `--framework net8.0` or `net9.0` is passed.
 
-:::caution[Work in progress]
-ProtoTest and this documentation are under active development. APIs may still change before a first stable release, and some pages are still being written. If something looks wrong or missing, [open an issue](https://github.com/MSeys/ProtoTest/issues).
+:::note[ProtoTest 1.0 is released]
+ProtoTest 1.0 and this documentation ship together: the packages are stable on NuGet, the API is documented as released, and the examples track it. If something looks wrong or missing, [open an issue](https://github.com/MSeys/ProtoTest/issues).
 :::
 
 ## What it gives you

@@ -8,7 +8,7 @@ description: "ProtoTest plugs into the test runner you already use — NUnit, xU
 
 ProtoTest doesn't replace your test runner. It plugs into the one you already use and wraps each test in a `ProtoExecutionContext`, so everything in [Foundation](../foundation/overview.md) works identically no matter which runner you pick.
 
-ProtoTest targets **.NET 8, 9 and 10**, and every adapter package is prerelease: install it with `dotnet add package <id> --prerelease`.
+ProtoTest targets **.NET 8, 9 and 10**, and every adapter package is stable on NuGet: install it with `dotnet add package <id>`.
 
 | Runner | Package | Test attribute | Assembly setup |
 | --- | --- | --- | --- |

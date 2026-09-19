@@ -8,7 +8,7 @@
     <Version>1.0.0</Version>
     <Authors>Matthias Seys</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/MSeys/ProtoTest</PackageProjectUrl>
+    <PackageProjectUrl>https://prototest.dev/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/MSeys/ProtoTest</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>

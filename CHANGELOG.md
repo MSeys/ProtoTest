@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2026-09-19
 
-ProtoTest is a composable integration-testing foundation for .NET 8, 9 and 10. It keeps the test runner you
-already use and owns the execution around each test: one host, one execution context and one explicit
-lifecycle, with every client, resource, observation and trace attached to that lifecycle. This is the first
-stable release; all packages share one version and ship together.
+**ProtoTest 1.0 is here.** What began as a stubborn idea — that an integration test should read like the
+scenario it describes while the framework quietly owns everything around it — is now a stable foundation
+for .NET 8, 9 and 10. One host, one execution context and one explicit lifecycle; the test runner you
+already use; and every integration sharing the same assertions, evidence and coverage, all the way down to
+a portable trace you can open and read. Every package ships together at 1.0.0, documented, tested, and
+ready for production suites. Thank you to everyone who pushed on the preview builds, reported the sharp
+edges and helped make this release worth the name.
+
+ProtoTest is a composable integration-testing foundation: compose capabilities onto a host, and each test
+runs through a recorded lifecycle of phases, operations, state changes, checks and findings.
 
 ### Added
 
@@ -54,5 +60,8 @@ stable release; all packages share one version and ship together.
   set of outcomes.
 - `ProtoTest.Templates`: `dotnet new prototest` creates an API and a suite for it, already composed, traced and
   reported.
+
+**Welcome to 1.0.** Install a package, compose the capabilities your system actually has, and run the same
+suite in-process, in containers, or against a published environment. The trace will tell you the rest.
 
 [1.0.0]: https://github.com/MSeys/ProtoTest/releases/tag/v1.0.0

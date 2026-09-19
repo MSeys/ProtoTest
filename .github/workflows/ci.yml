@@ -145,6 +145,12 @@ jobs:
             docs/package-lock.json
             viewer/package-lock.json
 
+      # The content checks run before the builds: they catch removed symbols, drifted configuration
+      # keys and dead sample links without depending on a Docusaurus build.
+      - name: Check the documentation content
+        shell: pwsh
+        run: ./eng/check-docs.ps1
+
       # Both builds run stylelint, type checks and link checks; they are not part of the dotnet build,
       # so without this job a broken page or type error would only surface after merge.
       - name: Build the docs site

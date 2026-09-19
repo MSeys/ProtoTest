@@ -70,5 +70,5 @@ public sealed class RequiresInProcessAttribute : RequiresCapabilityAttribute
     }
 
     protected override string DefaultReason
-        => Reason ?? "This test requires an in-process application server; the suite is running against a published environment.";
+        => "This test requires an in-process application server; the suite is running against a published environment.";
 }

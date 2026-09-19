@@ -291,8 +291,19 @@ internal sealed class ProtoTestLifecycle
 
         if (exceptions.Count > exceptionCountBeforeTeardown)
         {
+            // The teardown exception is evidence, not a replacement for the result the test reported:
+            // the original outcome stands, so a failed assertion is not hidden by a cleanup error. The
+            // failing teardown operation and the findings below carry the teardown error instead.
             lifecycleOperation.Fail(exceptions[^1]);
-            result = ProtoTestResult.Failed(exceptions[^1]);
+            foreach (var failure in exceptions.Skip(exceptionCountBeforeTeardown))
+            {
+                context.Trace.Finding(
+                    $"Teardown failed: {failure.Message}",
+                    ProtoReportStatus.Error.ToString(),
+                    "Teardown",
+                    targetName: context.TestName,
+                    tags: [failure.GetType().Name]);
+            }
         }
         else
         {
@@ -302,7 +313,18 @@ internal sealed class ProtoTestLifecycle
 
         if (context.Trace is ProtoTestTraceRecorder recorder)
         {
-            await recorder.CaptureArtifactsAsync(context.Attachments);
+            try
+            {
+                await recorder.CaptureArtifactsAsync(context.Attachments);
+            }
+            catch (Exception exception)
+            {
+                // Capturing artifacts is one teardown step among several: its failure is reported like
+                // any other, but it must not skip completing the test and clearing the ambient context.
+                exceptions.Add(exception);
+                result = ProtoTestResult.Failed(exception);
+            }
+
             recorder.CompleteTest(result);
         }
 

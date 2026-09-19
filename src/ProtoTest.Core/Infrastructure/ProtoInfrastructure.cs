@@ -63,4 +63,16 @@ public sealed class ProtoInfrastructureSettings
             _values[key] = value;
         }
     }
+
+    /// <summary>
+    /// Forgets every value. Called when the infrastructure that filled them is released, so a retry or
+    /// an in-process application cannot keep reading a released instance's connection string.
+    /// </summary>
+    internal void Clear()
+    {
+        lock (_gate)
+        {
+            _values.Clear();
+        }
+    }
 }

@@ -14,25 +14,31 @@ public sealed class ProtoRunGateContext
     /// <summary>Gets every item the run collected.</summary>
     public IReadOnlyList<ProtoReportItem> Items { get; }
 
-    /// <summary>Returns the items of one kind; <see cref="ProtoReportItemKinds"/> names the core kinds.</summary>
+    /// <summary>
+    /// Returns the items of one kind, including nested items; <see cref="ProtoReportItemKinds"/> names
+    /// the core kinds. Items are flattened exactly as coverage summaries flatten them.
+    /// </summary>
     public IEnumerable<ProtoReportItem> ItemsOfKind(string kind)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(kind);
-        return Items.Where(item => string.Equals(item.Kind, kind, StringComparison.OrdinalIgnoreCase));
+        return Items.Flatten().Where(item => string.Equals(item.Kind, kind, StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>Returns the items in one category, including nested items.</summary>
     public IEnumerable<ProtoReportItem> InCategory(string category)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(category);
-        return Items.Where(item => string.Equals(item.Category, category, StringComparison.OrdinalIgnoreCase));
+        return Items.Flatten().Where(item => string.Equals(item.Category, category, StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>Returns the items of one target, including nested items.</summary>
     public IEnumerable<ProtoReportItem> ForTarget(string targetName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetName);
-        return Items.Where(item => string.Equals(item.TargetName, targetName, StringComparison.OrdinalIgnoreCase));
+        return Items.Flatten().Where(item => string.Equals(item.TargetName, targetName, StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>Returns the items with one status, including nested items.</summary>
     public IEnumerable<ProtoReportItem> WithStatus(ProtoReportStatus status)
-        => Items.Where(item => item.Status == status);
+        => Items.Flatten().Where(item => item.Status == status);
 }

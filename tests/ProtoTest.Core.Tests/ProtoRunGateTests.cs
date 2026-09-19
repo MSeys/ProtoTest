@@ -209,6 +209,79 @@ public class ProtoRunGateTests
     }
 
     [Test]
+    public void Context_ShouldSeeCoverageUnitsNestedUnderCoverageRoots()
+    {
+        // Arrange: GraphQL reports a type as an aggregate root (no verdict) with covered fields beneath it.
+        var items = new[]
+        {
+            new ProtoReportItem(
+                "api",
+                "GraphQL type",
+                "Query",
+                Kind: ProtoReportItemKinds.Coverage,
+                IsCovered: null,
+                Children:
+                [
+                    new ProtoReportItem(
+                        "api",
+                        "GraphQL field",
+                        "Query.orders",
+                        Kind: ProtoReportItemKinds.Coverage,
+                        IsCovered: true),
+                    new ProtoReportItem(
+                        "api",
+                        "GraphQL field",
+                        "Query.customers",
+                        Kind: ProtoReportItemKinds.Coverage,
+                        IsCovered: false)
+                ])
+        };
+
+        // Act
+        var context = new ProtoRunGateContext(items);
+        var coverage = context.CoverageFor("api");
+
+        // Assert: the gate summary counts child units, exactly as the report summary flattens first.
+        Assert.That(coverage, Is.Not.Null);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(context.CoverageSummaries(), Has.Count.EqualTo(1));
+            Assert.That(coverage!.Covered, Is.EqualTo(1));
+            Assert.That(coverage.Total, Is.EqualTo(2));
+        }
+    }
+
+    [Test]
+    public void Context_ShouldAggregateAllCategoriesWhenAskingForOneTarget()
+    {
+        // Arrange: one target reports coverage under two categories.
+        var items = new[]
+        {
+            new ProtoReportItem("api", "Endpoints", "GET /a", Kind: ProtoReportItemKinds.Coverage, IsCovered: true),
+            new ProtoReportItem("api", "Endpoints", "GET /b", Kind: ProtoReportItemKinds.Coverage, IsCovered: false),
+            new ProtoReportItem("api", "Fields", "Order.id", Kind: ProtoReportItemKinds.Coverage, IsCovered: true)
+        };
+
+        // Act
+        var context = new ProtoRunGateContext(items);
+        var aggregate = context.CoverageFor("api");
+        var endpoints = context.CoverageFor("api", "Endpoints");
+
+        // Assert: a gate asking for the target sees every category, not whichever came first.
+        Assert.Multiple(() =>
+        {
+            Assert.That(context.CoverageSummaries(), Has.Count.EqualTo(2));
+            Assert.That(aggregate, Is.Not.Null);
+            Assert.That(aggregate!.Covered, Is.EqualTo(2));
+            Assert.That(aggregate.Total, Is.EqualTo(3));
+            Assert.That(aggregate.Percentage, Is.EqualTo(new ProtoCoverageTotals(3, 2).Percentage));
+            Assert.That(endpoints, Is.Not.Null);
+            Assert.That(endpoints!.Covered, Is.EqualTo(1));
+            Assert.That(endpoints.Total, Is.EqualTo(2));
+        });
+    }
+
+    [Test]
     public void Context_ShouldExposeAnyCollectedEvidenceNotJustCoverage()
     {
         // Arrange: a collector reporting findings and metrics, with no coverage at all.
@@ -231,6 +304,67 @@ public class ProtoRunGateTests
             Assert.That(latency.Value, Is.EqualTo(812d));
             Assert.That(context.ForTarget("billing"), Has.Exactly(2).Items);
             Assert.That(context.CoverageSummaries(), Is.Empty);
+        }
+    }
+
+    [Test]
+    public void Context_ShouldGroupCoverageIgnoringTargetAndCategoryCase()
+    {
+        var items = new[]
+        {
+            new ProtoReportItem("API", "Endpoints", "GET /a", Kind: ProtoReportItemKinds.Coverage, IsCovered: true),
+            new ProtoReportItem("api", "endpoints", "GET /b", Kind: ProtoReportItemKinds.Coverage, IsCovered: false)
+        };
+
+        var context = new ProtoRunGateContext(items);
+
+        // The lookups ignore case, so the grouping must too: one row, both units.
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(context.CoverageSummaries(), Has.Count.EqualTo(1));
+            var coverage = context.CoverageFor("Api");
+            Assert.That(coverage, Is.Not.Null);
+            Assert.That(coverage!.Covered, Is.EqualTo(1));
+            Assert.That(coverage.Total, Is.EqualTo(2));
+        }
+    }
+
+    [Test]
+    public void Context_ShouldFlattenNestedItemsForTheQueryHelpers()
+    {
+        // A GraphQL-style tree: the type is an aggregate root, the fields beneath it carry the verdicts.
+        var items = new[]
+        {
+            new ProtoReportItem(
+                "api",
+                "GraphQL type",
+                "Query",
+                Kind: ProtoReportItemKinds.Coverage,
+                IsCovered: null,
+                Children:
+                [
+                    new ProtoReportItem("api", "GraphQL field", "Query.orders", Kind: ProtoReportItemKinds.Coverage, IsCovered: true),
+                    new ProtoReportItem(
+                        "api",
+                        "GraphQL field",
+                        "Query.customers",
+                        Kind: ProtoReportItemKinds.Coverage,
+                        Status: ProtoReportStatus.Warning,
+                        IsCovered: false)
+                ])
+        };
+
+        var context = new ProtoRunGateContext(items);
+
+        // Coverage summaries flatten, so every query helper flattens by the same rule.
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(context.ItemsOfKind(ProtoReportItemKinds.Coverage), Has.Exactly(3).Items);
+            Assert.That(context.ForTarget("api"), Has.Exactly(3).Items);
+            Assert.That(context.InCategory("GraphQL field"), Has.Exactly(2).Items);
+            var warnings = context.WithStatus(ProtoReportStatus.Warning).ToArray();
+            Assert.That(warnings, Has.Exactly(1).Items);
+            Assert.That(warnings[0].Identifier, Is.EqualTo("Query.customers"));
         }
     }
 

@@ -14,6 +14,7 @@ public static class ProtoCapabilityKinds
 {
     public const string Server = "server";
     public const string Protocol = "protocol";
+    public const string Browser = "browser";
     public const string Store = "store";
     public const string Broker = "broker";
     public const string Data = "data";
@@ -30,7 +31,7 @@ public static class ProtoCapabilityExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(capability);
-        return builder.ConfigureServices(services => services.AddSingleton(capability));
+        return builder.ConfigureServices(services => AddCapability(services, capability));
     }
 
     /// <summary>Records a capability or adapter one application is composed of.</summary>
@@ -40,7 +41,22 @@ public static class ProtoCapabilityExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(capability);
-        builder.Services.AddSingleton(capability);
+        AddCapability(builder.Services, capability);
         return builder;
+    }
+
+    // Descriptors are metadata by value: registering the same one twice - a helper called twice, two
+    // integrations declaring the same adapter - must report one capability, while distinct descriptors
+    // of the same CLR type still each register.
+    private static void AddCapability(IServiceCollection services, ProtoCapabilityDescriptor capability)
+    {
+        if (services.Any(descriptor =>
+                descriptor.ServiceType == typeof(ProtoCapabilityDescriptor)
+                && Equals(descriptor.ImplementationInstance, capability)))
+        {
+            return;
+        }
+
+        services.AddSingleton(capability);
     }
 }

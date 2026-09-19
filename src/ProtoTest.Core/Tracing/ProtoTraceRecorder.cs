@@ -23,6 +23,7 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
     private readonly ProtoTraceOptions _options;
     private ActivityListener? _activityListener;
     private int _listening;
+    private int _runArtifactSequence;
 
     public ProtoTraceSession(ProtoTraceOptions? options = null)
     {
@@ -93,7 +94,8 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
 
     public ProtoTestTraceRecorder StartTest(string name, ProtoTestId testId, MethodInfo method)
     {
-        var recorder = new ProtoTestTraceRecorder(testId.Value, name, method, _options, RegisterTrace);
+        var recorder = new ProtoTestTraceRecorder(
+            testId.Value, name, method, _options, RegisterTrace, _converter.Forget);
         if (!_tests.TryAdd(testId.Value, recorder))
         {
             throw new InvalidOperationException($"A trace already exists for test ID '{testId.Value}'.");
@@ -103,6 +105,9 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
 
     /// <summary>Gets the writer for operations that belong to the run rather than to one test.</summary>
     public IProtoTraceWriter RunWriter => _runWriter;
+
+    /// <summary>Gets how many completed or active tests still hold observed converter state; used by tests.</summary>
+    internal int TrackedWriterCount => _converter.TrackedWriterCount;
 
     public void CompleteRun() => _completedAtUtc ??= DateTimeOffset.UtcNow;
 
@@ -186,7 +191,7 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
     {
         foreach (var attachment in attachments)
         {
-            var sequence = _runArtifacts.Count + 1;
+            var sequence = Interlocked.Increment(ref _runArtifactSequence);
             var id = $"run-artifact-{sequence}";
             var archivePath = $"resources/run/{ProtoPathSanitizer.FileName(sourceName, "artifact")}/{id}/{ProtoPathSanitizer.FileName(attachment.Name, "artifact")}";
             var artifact = new ProtoTraceArtifact(id, attachment.Name, attachment.MediaType, attachment.Description, archivePath);
@@ -229,6 +234,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
     private TimeSpan _duration;
     private readonly ProtoTraceOptions _options;
     private readonly Action<ActivityTraceId, ProtoTestTraceRecorder>? _onTraceStarted;
+    private readonly Action<ProtoTestTraceRecorder>? _onCompleted;
     private readonly ProtoItemStore _items = new();
     private readonly ProtoLock _orphanGate = new();
     private readonly List<ProtoTraceObservationRecord> _orphanObservations = [];
@@ -243,7 +249,8 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         string name,
         MethodInfo method,
         ProtoTraceOptions? options = null,
-        Action<ActivityTraceId, ProtoTestTraceRecorder>? onTraceStarted = null)
+        Action<ActivityTraceId, ProtoTestTraceRecorder>? onTraceStarted = null,
+        Action<ProtoTestTraceRecorder>? onCompleted = null)
     {
         TestId = testId;
         Name = name;
@@ -251,6 +258,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         _methodName = method.Name;
         _options = options ?? new ProtoTraceOptions();
         _onTraceStarted = onTraceStarted;
+        _onCompleted = onCompleted;
     }
 
     public string TestId { get; }
@@ -332,10 +340,12 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
 
         // Identical error-free events under the same parent are one fact, not N rows: the recorder keeps
         // the first occurrence and counts the rest. Producers stay plain and third-party noise collapses too.
+        // The event's name, source and resolved phase are part of the identity, so differently named events
+        // - or the same event in a different phase - never merge.
         if (exception is null)
         {
             var group = _eventGroups.GetOrAdd(
-                CoalesceKey(resolvedParentId, kind, entityKind, entityId, outcome, attributes),
+                CoalesceKey(resolvedParentId, kind, name, source, resolvedPhase, entityKind, entityId, outcome, attributes),
                 _ => new EventGroup(() => CreateEventEntry(
                     resolvedParentId, kind, name, source, resolvedPhase, attributes, outcome, entityKind, entityId)));
             group.Occur();
@@ -383,6 +393,9 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
     private static string CoalesceKey(
         string? parentId,
         string kind,
+        string name,
+        string source,
+        ProtoTracePhase phase,
         string? entityKind,
         string? entityId,
         ProtoTraceOutcome outcome,
@@ -390,6 +403,8 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
     {
         var builder = new StringBuilder();
         builder.Append(parentId).Append('\u001f').Append(kind).Append('\u001f')
+            .Append(name).Append('\u001f').Append(source).Append('\u001f')
+            .Append((int)phase).Append('\u001f')
             .Append(entityKind).Append('\u001f').Append(entityId).Append('\u001f').Append((int)outcome);
         if (attributes is { Count: > 0 })
         {
@@ -409,7 +424,9 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         IReadOnlyDictionary<string, string?>? state = null,
         string? scope = null,
         string? change = null)
-        => _items.SetState(kind, id, name, state, scope, change, _current.Value?.Id);
+        => _items.SetState(
+            kind, id, name, state, scope, change,
+            _current.Value?.Id ?? Volatile.Read(ref _defaultParentId));
 
     public void Value(
         string kind,
@@ -424,8 +441,10 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
     {
         Validate(kind, name, "ProtoTest.Core");
         if (!_options.Enabled) return;
-        var operation = _current.Value;
-        _items.AddValue(kind, id, name, change, operationId ?? operation?.Id, state, source, inferred, scope);
+        var linkedOperationId = operationId
+            ?? _current.Value?.Id
+            ?? Volatile.Read(ref _defaultParentId);
+        _items.AddValue(kind, id, name, change, linkedOperationId, state, source, inferred, scope);
     }
 
     public void Observation(
@@ -525,7 +544,11 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         };
         foreach (var tag in activity.TagObjects)
         {
-            attributes[tag.Key] = tag.Value?.ToString();
+            // Application tags follow the same cap as the OpenTelemetry export: an oversized value
+            // would otherwise grow the archive without ever leaving it as an exported attribute.
+            var value = tag.Value?.ToString();
+            if (value is { Length: > MaxTagValueLength }) continue;
+            attributes[tag.Key] = value;
         }
 
         var failed = activity.Status == ActivityStatusCode.Error;
@@ -579,6 +602,10 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
             entry.CompleteIfOpen(ProtoTraceOutcome.Unknown);
         }
         _current.Value = null;
+
+        // The converter's per-writer state exists only while the writer can produce values; a completed
+        // recorder never observes another span, so releasing it stops the map growing with every run.
+        _onCompleted?.Invoke(this);
     }
 
     internal async Task CaptureArtifactsAsync(
@@ -586,6 +613,9 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         CancellationToken cancellationToken = default)
     {
         var artifacts = new List<ProtoTraceArtifactSource>(attachments.Count);
+        // The snapshot list is published before any record is patched: an attachment record must never
+        // point at an artifact that a later capture failure would leave out of the snapshot.
+        _artifacts = artifacts;
         for (var index = 0; index < attachments.Count; index++)
         {
             var attachment = attachments[index];
@@ -611,8 +641,6 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
             artifacts.Add(new ProtoTraceArtifactSource(artifact, content));
             PatchAttachment(attachment.Name, id, archivePath, content.Length, artifact.Error);
         }
-
-        _artifacts = artifacts;
     }
 
     internal IReadOnlyList<ProtoTraceArtifactSource> SnapshotArtifactSources() => _artifacts;
@@ -827,9 +855,12 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
             if (ShouldExportTag(key, value)) activity.SetTag(key, value);
     }
 
+    /// <summary>The longest tag value kept in the trace or exported; a longer value is dropped by both.</summary>
+    internal const int MaxTagValueLength = 2048;
+
     private static bool ShouldExportTag(string key, string? value)
         => value is not null
-           && value.Length <= 2048
+           && value.Length <= MaxTagValueLength
            && key is not "context.value" and not "observation.data" and not "observation.metadata"
            && key is not "shape.expected" and not "shape.actual" and not "shape.matches" and not "shape.mismatches";
 

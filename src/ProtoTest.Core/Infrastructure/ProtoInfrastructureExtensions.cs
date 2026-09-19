@@ -31,8 +31,32 @@ public static class ProtoInfrastructureExtensions
                 nameof(settings));
         }
 
+        // Validate and reserve the resource before touching the service collection: a conflicting
+        // instance must fail the whole registration without leaving half-applied settings behind.
+        builder.AddResource(infrastructure);
+
         builder.ConfigureServices(services =>
-            services.AddSingleton(new ProtoInfrastructureRegistration(infrastructure, [.. keys])));
-        return builder.AddResource(infrastructure);
+        {
+            // Adding the same infrastructure twice is one lifecycle, but every call's keys count: the
+            // repeated registration merges its settings into the existing one so both roots get filled.
+            for (var index = 0; index < services.Count; index++)
+            {
+                if (services[index] is not
+                    { ServiceType: var serviceType, ImplementationInstance: ProtoInfrastructureRegistration existing }
+                    || serviceType != typeof(ProtoInfrastructureRegistration)
+                    || !string.Equals(existing.Infrastructure.Id, infrastructure.Id, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var merged = existing.Settings.Concat(keys).Distinct(StringComparer.Ordinal).ToArray();
+                services[index] = ServiceDescriptor.Singleton(
+                    new ProtoInfrastructureRegistration(existing.Infrastructure, merged));
+                return;
+            }
+
+            services.AddSingleton(new ProtoInfrastructureRegistration(infrastructure, [.. keys]));
+        });
+        return builder;
     }
 }

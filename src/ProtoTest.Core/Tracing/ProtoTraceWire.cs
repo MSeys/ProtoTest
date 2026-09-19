@@ -38,7 +38,9 @@ internal static class ProtoTraceWire
 
     public static object State(ProtoTraceRun run) => new
     {
-        formatVersion = "1.0",
+        // 1.1: tracked values carry the generic kind "value" with the domain type in the id
+        // (`{type}:{identity}`); 1.0 wrote the domain type as the kind.
+        formatVersion = "1.1",
         run = new { items = Items(run.Entities, run.Values) },
         tests = run.Tests.Select(test => new
         {
@@ -169,6 +171,8 @@ internal static class ProtoTraceWire
         source = entry.Source,
         outcome = Lower(entry.Outcome),
         error = entry.Error is null ? null : new { type = entry.Error.Type, message = entry.Error.Message },
+        entityKind = entry.EntityKind,
+        entityId = entry.EntityId,
         attributes = entry.Attributes,
         sections = entry.Sections
     };

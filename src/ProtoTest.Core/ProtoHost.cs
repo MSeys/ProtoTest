@@ -12,10 +12,17 @@ using System.Reflection;
 /// </summary>
 public sealed class ProtoHost : IAsyncDisposable
 {
+    private const int StartCreated = 0;
+    private const int StartInProgress = 1;
+    private const int StartCompleted = 2;
+    private const int StopInProgress = 3;
+
     private readonly IServiceProvider _rootServiceProvider;
     private readonly ProtoRunLifecycle _runLifecycle;
     private readonly ProtoTestLifecycle _testLifecycle;
     private readonly ProtoTraceSession _trace;
+    private readonly ProtoLock _startGate = new();
+    private int _startState;
 
     public ProtoHost(IServiceProvider rootServiceProvider)
     {
@@ -71,85 +78,196 @@ public sealed class ProtoHost : IAsyncDisposable
 
     public IConfiguration Configuration => _rootServiceProvider.GetRequiredService<IConfiguration>();
 
+    // A disposed provider throws on lookup, and disposal is exactly when the settings must be cleared:
+    // the host's own teardown paths treat "already gone" as "nothing left to clear".
+    private ProtoInfrastructureSettings? InfrastructureSettings
+    {
+        get
+        {
+            try
+            {
+                return _rootServiceProvider.GetService<ProtoInfrastructureSettings>();
+            }
+            catch (ObjectDisposedException)
+            {
+                return null;
+            }
+        }
+    }
+
     /// <summary>Gets immutable snapshots of the current run trace.</summary>
     public IProtoTraceSource Trace => _trace;
 
     /// <summary>
     /// Executes all suite-level BeforeRun hooks in ascending order, then records the capabilities the
-    /// host is composed of as run entities.
+    /// host is composed of as run entities. The whole start path runs once: a repeat call after a
+    /// successful start is a no-op, and a call while a start is in flight is rejected rather than
+    /// recording or starting anything twice.
     /// </summary>
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
-        await _runLifecycle.StartAsync(cancellationToken);
-        foreach (var capability in _rootServiceProvider.GetServices<ProtoCapabilityDescriptor>())
+        lock (_startGate)
         {
-            _trace.RunWriter.SetEntityState(
-                ProtoTraceEntityKinds.Capability,
-                $"{capability.Kind}:{capability.Name}",
-                capability.Name,
-                new Dictionary<string, string?>
-                {
-                    ["capability.name"] = capability.Name,
-                    ["capability.kind"] = capability.Kind,
-                    ["capability.source"] = capability.Source
-                },
-                scope: "run",
-                change: "activated");
-        }
-
-        // Infrastructure starts before any test: the run owns it, records it, and lets an in-process
-        // application receive the connection strings as host settings. Hosts built without the builder
-        // (tests, embedded use) simply have none.
-        var settings = _rootServiceProvider.GetService<ProtoInfrastructureSettings>() ?? new ProtoInfrastructureSettings();
-        foreach (var registration in _rootServiceProvider.GetServices<ProtoInfrastructureRegistration>())
-        {
-            var infrastructure = registration.Infrastructure;
-            await infrastructure.StartAsync(cancellationToken);
-            var state = new Dictionary<string, string?>
+            if (_startState == StartCompleted)
             {
-                ["infrastructure.kind"] = infrastructure.Kind,
-                ["infrastructure.settings"] = string.Join(", ", registration.Settings)
-            };
-            if (infrastructure is IProtoConnectionInfrastructure connection)
-            {
-                foreach (var key in registration.Settings)
-                {
-                    settings.Set(key, connection.ConnectionString);
-                }
+                return;
             }
 
-            if (infrastructure is IProtoSettingsInfrastructure sourced)
+            if (_startState == StartInProgress)
             {
-                foreach (var (key, value) in sourced.Settings)
-                {
-                    settings.Set(key, value);
-                }
+                throw new InvalidOperationException("ProtoHost startup is already in progress.");
             }
 
-            _trace.RunWriter.SetEntityState(
-                infrastructure.Kind,
-                infrastructure.Id,
-                infrastructure.Description,
-                state,
-                scope: "run",
-                change: "started");
+            if (_startState == StopInProgress)
+            {
+                throw new InvalidOperationException(
+                    "ProtoHost shutdown is in progress; start it after the stop completes.");
+            }
+
+            _startState = StartInProgress;
         }
 
-        _trace.StartListening();
+        try
+        {
+            await _runLifecycle.StartAsync(cancellationToken);
+
+            // A retry after a failed start re-owns the run-scoped resources the rollback released.
+            if (_rootServiceProvider.GetService<ProtoRunResourceStore>() is { } runResources)
+            {
+                runResources.ResetForRestart();
+            }
+
+            foreach (var capability in _rootServiceProvider.GetServices<ProtoCapabilityDescriptor>())
+            {
+                _trace.RunWriter.SetEntityState(
+                    ProtoTraceEntityKinds.Capability,
+                    $"{capability.Kind}:{capability.Name}",
+                    capability.Name,
+                    new Dictionary<string, string?>
+                    {
+                        ["capability.name"] = capability.Name,
+                        ["capability.kind"] = capability.Kind,
+                        ["capability.source"] = capability.Source
+                    },
+                    scope: "run",
+                    change: "activated");
+            }
+
+            // Infrastructure starts before any test: the run owns it, records it, and lets an in-process
+            // application receive the connection strings as host settings. Hosts built without the builder
+            // (tests, embedded use) simply have none.
+            var settings = _rootServiceProvider.GetService<ProtoInfrastructureSettings>() ?? new ProtoInfrastructureSettings();
+            foreach (var registration in _rootServiceProvider.GetServices<ProtoInfrastructureRegistration>())
+            {
+                var infrastructure = registration.Infrastructure;
+                await infrastructure.StartAsync(cancellationToken);
+                var state = new Dictionary<string, string?>
+                {
+                    ["infrastructure.kind"] = infrastructure.Kind,
+                    ["infrastructure.settings"] = string.Join(", ", registration.Settings)
+                };
+                if (infrastructure is IProtoConnectionInfrastructure connection)
+                {
+                    foreach (var key in registration.Settings)
+                    {
+                        settings.Set(key, connection.ConnectionString);
+                    }
+                }
+
+                if (infrastructure is IProtoSettingsInfrastructure sourced)
+                {
+                    foreach (var (key, value) in sourced.Settings)
+                    {
+                        settings.Set(key, value);
+                    }
+                }
+
+                _trace.RunWriter.SetEntityState(
+                    infrastructure.Kind,
+                    infrastructure.Id,
+                    infrastructure.Description,
+                    state,
+                    scope: "run",
+                    change: "started");
+            }
+
+            _trace.StartListening();
+            lock (_startGate)
+            {
+                _startState = StartCompleted;
+            }
+        }
+        catch (Exception exception)
+        {
+            // Nothing that did start may leak: the run hooks run in reverse, which releases the run's
+            // resources (the infrastructure started so far) in reverse registration order, and the
+            // lifecycle returns to Created so a retry is possible.
+            var failures = new List<Exception> { exception };
+            await _runLifecycle.RollbackStartAsync(failures, cancellationToken);
+            lock (_startGate)
+            {
+                _startState = StartCreated;
+            }
+
+            // The released infrastructure's connection strings must not survive into a retry or outlive
+            // the run: clear the keys they filled while they were alive.
+            if (InfrastructureSettings is { } settings)
+            {
+                settings.Clear();
+            }
+
+            LifecycleExceptionHelper.ThrowIfAny(
+                "ProtoHost startup failed and the run's started resources were released.", failures);
+        }
     }
 
     /// <summary>
-    /// Executes all suite-level AfterRun hooks in descending order.
+    /// Executes all suite-level AfterRun hooks in descending order. A stop rejected because a start is
+    /// in flight changes nothing; a stop that ran and failed is remembered and rethrown on retry.
     /// </summary>
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
+        int? previousStartState = null;
+        lock (_startGate)
+        {
+            // A stop rejected by the lifecycle (start in flight, or a second stop) must not touch the
+            // start state it did not change.
+            if (_startState is not (StartInProgress or StopInProgress))
+            {
+                previousStartState = _startState;
+                _startState = StopInProgress;
+            }
+        }
+
         try
         {
             await _runLifecycle.StopAsync(cancellationToken);
         }
         finally
         {
-            _trace.CompleteRun();
+            if (_runLifecycle.IsStopped)
+            {
+                lock (_startGate)
+                {
+                    _startState = StartCreated;
+                }
+
+                // The infrastructure those keys pointed at is gone; a retry or an in-process application
+                // must not keep reading a released instance's connection string.
+                if (InfrastructureSettings is { } settings)
+                {
+                    settings.Clear();
+                }
+
+                _trace.CompleteRun();
+            }
+            else if (previousStartState is { } restored)
+            {
+                lock (_startGate)
+                {
+                    _startState = restored;
+                }
+            }
         }
     }
 
@@ -184,9 +302,27 @@ public sealed class ProtoHost : IAsyncDisposable
     /// <summary>
     /// Completes the active test using the exact lifecycle components that completed setup.
     /// </summary>
-    public Task CompleteTestAsync() => _testLifecycle.CompleteAsync(ProtoTestResult.Unknown);
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when no test is active on the current async flow, so a missing or leaked context is
+    /// reported instead of being silently ignored.
+    /// </exception>
+    public Task CompleteTestAsync()
+    {
+        if (ProtoTestLifecycle.TryGetCurrentContext is null)
+        {
+            throw new InvalidOperationException(
+                "No ProtoTest test is active on this async flow. CompleteTestAsync requires a test " +
+                "started by StartTestAsync on the same flow.");
+        }
 
-    /// <summary>Completes the active test and records the result reported by its framework adapter.</summary>
+        return _testLifecycle.CompleteAsync(ProtoTestResult.Unknown);
+    }
+
+    /// <summary>
+    /// Completes the active test and records the result reported by its framework adapter. Unlike the
+    /// parameterless overload this stays a no-op when no test is active: adapters call it from
+    /// teardown even when their framework skipped the test before the lifecycle started.
+    /// </summary>
     public Task CompleteTestAsync(ProtoTestResult result)
         => _testLifecycle.CompleteAsync(result ?? throw new ArgumentNullException(nameof(result)));
 
@@ -216,6 +352,13 @@ public sealed class ProtoHost : IAsyncDisposable
             return;
         }
 
+        // The host is finished: a later StartAsync must reach the lifecycle and be rejected there
+        // rather than reading StartCompleted and reporting a start that cannot happen.
+        lock (_startGate)
+        {
+            _startState = StartCreated;
+        }
+
         // Run-scoped resources outlive the run itself, so they are released once the reports are
         // written and before the provider they may depend on is disposed.
         try
@@ -228,6 +371,13 @@ public sealed class ProtoHost : IAsyncDisposable
         catch (Exception exception)
         {
             exceptions.Add(exception);
+        }
+
+        // Whichever path ran the teardown, the infrastructure is gone by now: its connection strings
+        // must not remain readable through the settings object.
+        if (InfrastructureSettings is { } infrastructureSettings)
+        {
+            infrastructureSettings.Clear();
         }
 
         try

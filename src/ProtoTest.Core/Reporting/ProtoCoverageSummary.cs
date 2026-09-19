@@ -5,5 +5,6 @@ public sealed record ProtoCoverageSummary(string TargetName, string Category, in
 {
     public double Ratio => Total == 0 ? 0d : (double)Covered / Total;
 
-    public double Percentage => Ratio * 100d;
+    /// <summary>The covered share, rounded to two decimals exactly as <see cref="ProtoCoverageTotals"/> prints it.</summary>
+    public double Percentage => Math.Round(Ratio * 100d, 2);
 }

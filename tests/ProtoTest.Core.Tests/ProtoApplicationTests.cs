@@ -49,6 +49,19 @@ public sealed class ProtoApplicationTests
     }
 
     [Test]
+    public void Application_ShouldRejectWhitespaceProtocolsAndClients()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.Throws<ArgumentException>(() => new ApplicationAttribute("ControlPlane", "Rest:   "));
+            Assert.Throws<ArgumentException>(() => new ApplicationAttribute("ControlPlane", "   :Billing"));
+        });
+
+        var attribute = new ApplicationAttribute("ControlPlane", "  Rest  :  Billing  ");
+        Assert.That(attribute.Bindings, Is.EqualTo(new Dictionary<string, string> { ["Rest"] = "Billing" }));
+    }
+
+    [Test]
     public async Task Resolution_ShouldFailWhenTheApplicationHasNoSuchProtocol()
     {
         var builder = new ProtoHostBuilder();

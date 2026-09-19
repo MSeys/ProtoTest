@@ -88,6 +88,18 @@ public sealed class ProtoHostLifecycleTests
             Task.Run(() => RunTestAsync("Second", "00002")));
     }
 
+    [Test]
+    public async Task CompleteTest_ShouldThrowWhenNoTestIsActive()
+    {
+        await using var host = CreateHost();
+
+        // The parameterless overload is the suite's own call: a missing context is a leak, not a no-op.
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await host.CompleteTestAsync());
+
+        // The result overload stays a no-op because adapters call it after a pre-lifecycle skip.
+        Assert.DoesNotThrowAsync(async () => await host.CompleteTestAsync(ProtoTestResult.Skipped));
+    }
+
     private static ProtoHost CreateHost()
         => new(new ServiceCollection().BuildServiceProvider());
 

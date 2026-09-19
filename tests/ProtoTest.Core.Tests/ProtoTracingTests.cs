@@ -189,7 +189,7 @@ public sealed class ProtoTracingTests
     public async Task Observations_ShouldRemainSeparateFromTraceEntries()
     {
         var builder = new ProtoHostBuilder();
-        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureTracing(options => options.OutputPath = TemporaryTracePath());
         await using var host = builder.Build();
 
         await host.StartAsync();
@@ -198,10 +198,71 @@ public sealed class ProtoTracingTests
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
 
+        var test = host.Trace.Snapshot().Tests.Single();
         Assert.Multiple(() =>
         {
             Assert.That(context.RecordedObservations, Has.Count.EqualTo(1));
-            Assert.That(host.Trace.Snapshot().Tests.Single().Entries, Is.Empty);
+            var observation = test.Record!.Observations!.Single();
+            Assert.That(observation.TargetName, Is.EqualTo("Orders"));
+            Assert.That(observation.Identifier, Is.EqualTo("42"));
+            Assert.That(
+                test.Entries,
+                Has.None.Matches<ProtoTraceEntry>(entry => entry.Kind == "observation"),
+                "an observation is a record, not a timeline entry");
+        });
+    }
+
+    [Test]
+    public async Task Events_ShouldCoalesceOnlyWhenTheirNameAndSourceMatch()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = TemporaryTracePath());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("coalescing", TestMethod());
+
+        var attributes = new Dictionary<string, string?> { ["probe.key"] = "same" };
+        context.Trace.WriteEvent(
+            "probe", "A", "ProtoTest.Core.Tests", outcome: ProtoTraceOutcome.Succeeded, attributes: attributes);
+        context.Trace.WriteEvent(
+            "probe", "B", "ProtoTest.Core.Tests", outcome: ProtoTraceOutcome.Succeeded, attributes: attributes);
+        context.Trace.WriteEvent(
+            "probe", "A", "ProtoTest.Core.Tests", outcome: ProtoTraceOutcome.Succeeded, attributes: attributes);
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        var rows = host.Trace.Snapshot().Tests.Single().Entries
+            .Where(entry => entry.Kind == "probe")
+            .OrderBy(entry => entry.Name, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(rows.Select(row => row.Name), Is.EqualTo(new[] { "A", "B" }));
+            Assert.That(rows[0].Count, Is.EqualTo(2), "the repeated event still coalesces");
+            Assert.That(rows[1].Count, Is.EqualTo(1), "a differently named event is its own row");
+        });
+    }
+
+    [Test]
+    public async Task EntityAndValueVersions_ShouldLinkToTheExecutionOperation()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = TemporaryTracePath());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("operation link", TestMethod());
+
+        context.Trace.SetEntityState("entity", "order:1", "Order", change: "created");
+        context.Trace.Value("value", "order:1", "Order 1", "created");
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        var test = host.Trace.Snapshot().Tests.Single();
+        var executionId = test.Entries.Single(entry => entry.Kind == "test.execution").Id;
+        Assert.Multiple(() =>
+        {
+            Assert.That(test.Entities!.Single().Versions!.Single().OperationId, Is.EqualTo(executionId));
+            Assert.That(test.Values!.Single().Versions!.Single().OperationId, Is.EqualTo(executionId));
         });
     }
 
@@ -513,6 +574,117 @@ public sealed class ProtoTracingTests
             Assert.That(entry.ParentId, Is.EqualTo(execution.Id));
             Assert.That(entry.Attributes["sample.key"], Is.EqualTo("sample-value"));
         });
+    }
+
+    [Test]
+    public void Events_ShouldNotCoalesceAcrossPhases()
+    {
+        var recorder = new ProtoTestTraceRecorder(
+            "00001", "phase coalescing", TestMethod(), new ProtoTraceOptions { Enabled = true });
+
+        // Same name, source and (absent) parent; only the resolved phase differs, so they are two facts.
+        recorder.WriteEvent("probe.phase", "Phase probe", "ProtoTest.Core.Tests", phase: ProtoTracePhase.Setup);
+        recorder.WriteEvent("probe.phase", "Phase probe", "ProtoTest.Core.Tests", phase: ProtoTracePhase.Teardown);
+        recorder.CompleteTest(ProtoTestResult.Passed);
+
+        var rows = recorder.Snapshot().Entries
+            .Where(entry => entry.Kind == "probe.phase")
+            .OrderBy(entry => entry.Phase)
+            .ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(rows, Has.Length.EqualTo(2));
+            Assert.That(rows[0].Phase, Is.EqualTo(ProtoTracePhase.Setup));
+            Assert.That(rows[1].Phase, Is.EqualTo(ProtoTracePhase.Teardown));
+            Assert.That(rows.Select(row => row.Count), Is.EqualTo(new[] { 1, 1 }));
+        });
+    }
+
+    [Test]
+    public async Task RunArtifacts_ShouldReceiveUniqueIdsUnderConcurrentCapture()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        await using var host = builder.Build();
+        var session = (ProtoTraceSession)host.Trace;
+        var attachments = Enumerable.Range(1, 4)
+            .Select(_ => ProtoTestAttachment.FromText("capture.txt", "content"))
+            .ToArray();
+
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(async () =>
+        {
+            for (var index = 0; index < 50; index++)
+            {
+                await session.CaptureRunArtifactsAsync(attachments, "probe", CancellationToken.None);
+            }
+        })));
+
+        var ids = session.SnapshotArtifactSources().Select(source => source.Artifact.Id).ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(ids, Has.Length.EqualTo(1600));
+            Assert.That(ids.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(ids.Length));
+        });
+    }
+
+    [Test]
+    public async Task TimelineEvents_ShouldCarryTheirEntityReference()
+    {
+        var path = TemporaryTracePath();
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = path);
+        await using var host = builder.Build();
+
+        await host.StartAsync();
+        var context = await host.StartTestAsync("entity event", TestMethod());
+        using (var operation = context.Trace.Operation("sample.parent", "Parent", "ProtoTest.Core.Tests").Begin())
+        {
+            context.Trace.WriteEvent(
+                "entity.ping",
+                "Ping",
+                "ProtoTest.Core.Tests",
+                outcome: ProtoTraceOutcome.Succeeded,
+                entityKind: "order",
+                entityId: "order:1");
+            operation.Succeed();
+        }
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        using var archive = ZipFile.OpenRead(path);
+        using var reader = new StreamReader(archive.GetEntry("spans.json")!.Open());
+        using var spans = JsonDocument.Parse(await reader.ReadToEndAsync());
+        var timelineEvent = spans.RootElement.GetProperty("resourceSpans").EnumerateArray()
+            .SelectMany(group => group.GetProperty("scopeSpans").EnumerateArray())
+            .SelectMany(scope => scope.GetProperty("spans").EnumerateArray())
+            .SelectMany(span => span.GetProperty("events").EnumerateArray())
+            .Single(item => item.TryGetProperty("kind", out var kind) && kind.GetString() == "entity.ping");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(timelineEvent.GetProperty("entityKind").GetString(), Is.EqualTo("order"));
+            Assert.That(timelineEvent.GetProperty("entityId").GetString(), Is.EqualTo("order:1"));
+        });
+    }
+
+    [Test]
+    public async Task StateDocument_ShouldCarryTheCurrentFormatVersion()
+    {
+        var path = TemporaryTracePath();
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = path);
+        await using var host = builder.Build();
+
+        await host.StartAsync();
+        var context = await host.StartTestAsync("state version", TestMethod());
+        context.Trace.Value("value", "invoice:1", "Invoice 1", "created");
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        using var archive = ZipFile.OpenRead(path);
+        using var reader = new StreamReader(archive.GetEntry("state.json")!.Open());
+        using var state = JsonDocument.Parse(await reader.ReadToEndAsync());
+        Assert.That(state.RootElement.GetProperty("formatVersion").GetString(), Is.EqualTo("1.1"));
     }
 
     private static MethodInfo TestMethod()

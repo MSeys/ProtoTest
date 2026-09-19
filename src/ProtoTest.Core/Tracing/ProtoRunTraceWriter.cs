@@ -7,8 +7,8 @@ using System.Diagnostics;
 
 /// <summary>
 /// Records operations and events that belong to the run rather than to one test - run-scoped resources
-/// being the first of them. Entries are written when they complete, so a release that is still running
-/// when the trace is archived appears as an unfinished operation rather than disappearing.
+/// being the first of them. Operations are written when they complete: a release still running while the
+/// trace is archived is not yet part of it.
 /// </summary>
 internal sealed class ProtoRunTraceWriter : IProtoTraceWriter
 {
@@ -121,7 +121,10 @@ internal sealed class ProtoRunTraceWriter : IProtoTraceWriter
         };
         foreach (var tag in activity.TagObjects)
         {
-            attributes[tag.Key] = tag.Value?.ToString();
+            // The same cap the test recorder and the OpenTelemetry export apply to tag values.
+            var value = tag.Value?.ToString();
+            if (value is { Length: > ProtoTestTraceRecorder.MaxTagValueLength }) continue;
+            attributes[tag.Key] = value;
         }
 
         var failed = activity.Status == ActivityStatusCode.Error;

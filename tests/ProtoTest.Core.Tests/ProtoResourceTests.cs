@@ -75,6 +75,41 @@ public class ProtoResourceTests
     }
 
     [Test]
+    public async Task ReleaseResourceAsync_ConcurrentCalls_ShouldRunTheCallbackOnce()
+    {
+        // Arrange
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releases = 0;
+        var context = CreateContext();
+        context.RegisterResource(new ProtoResource(
+            "blocking",
+            "test",
+            "Blocks while releasing",
+            async _ =>
+            {
+                Interlocked.Increment(ref releases);
+                entered.TrySetResult();
+                await release.Task;
+            }));
+
+        // Act: the second call must lose the race while the first is still inside the callback.
+        var first = context.ReleaseResourceAsync("blocking").AsTask();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var second = await context.ReleaseResourceAsync("blocking");
+        release.SetResult();
+        var firstResult = await first;
+
+        // Assert
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstResult, Is.True);
+            Assert.That(second, Is.False);
+            Assert.That(Volatile.Read(ref releases), Is.EqualTo(1));
+        });
+    }
+
+    [Test]
     public async Task ReleaseAll_ShouldContinueAfterAFailedReleaseAndReportIt()
     {
         // Arrange

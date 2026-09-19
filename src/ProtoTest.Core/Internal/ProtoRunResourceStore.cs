@@ -15,8 +15,30 @@ internal sealed class ProtoRunResourceStore : IProtoReportSource
                 nameof(resource));
         }
 
+        // Re-adding the identical instance is a no-op: repeated integration registration must be safe,
+        // and the first registration owns the resource's lifecycle. A different instance under the same
+        // id is a conflict and must stay one.
+        var existing = _resources.Resources.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, resource.Id, StringComparison.Ordinal));
+        if (existing is not null)
+        {
+            if (ReferenceEquals(existing, resource))
+            {
+                return;
+            }
+
+            throw new InvalidOperationException(
+                $"A resource with id '{resource.Id}' is already owned by the run.");
+        }
+
         _resources.Register(resource);
     }
+
+    /// <summary>
+    /// Re-owns the run's resources after a failed start released them, so a retried start can release
+    /// them again when the run actually ends.
+    /// </summary>
+    public void ResetForRestart() => _resources.ResetForRestart();
 
     public IReadOnlyList<ProtoResourceSnapshot> Snapshot() => _resources.Snapshot();
 

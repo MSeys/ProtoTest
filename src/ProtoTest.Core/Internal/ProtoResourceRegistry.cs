@@ -61,7 +61,7 @@ internal sealed class ProtoResourceRegistry
         Entry? entry;
         lock (_gate)
         {
-            if (!_byId.TryGetValue(id, out entry) || entry.State != ProtoResourceState.Registered)
+            if (!_byId.TryGetValue(id, out entry) || !entry.TryBeginRelease())
             {
                 return false;
             }
@@ -76,21 +76,24 @@ internal sealed class ProtoResourceRegistry
         IProtoTraceWriter trace,
         ProtoTracePhase phase)
     {
-        if (Interlocked.Exchange(ref _releaseStarted, 1) != 0)
-        {
-            return [];
-        }
-
         List<Entry> entries;
         lock (_gate)
         {
+            if (_releaseStarted != 0)
+            {
+                return [];
+            }
+
+            // Flipping the gate and taking the snapshot under the same lock means a racing Register
+            // either sees the gate closed or lands in the snapshot, never in neither.
+            _releaseStarted = 1;
             entries = [.. _registrationOrder.AsEnumerable().Reverse().Select(id => _byId[id])];
         }
 
         var exceptions = new List<Exception>();
         foreach (var entry in entries)
         {
-            if (entry.State != ProtoResourceState.Registered)
+            if (!entry.TryBeginRelease())
             {
                 continue;
             }
@@ -103,6 +106,19 @@ internal sealed class ProtoResourceRegistry
         }
 
         return exceptions;
+    }
+
+    /// <summary>
+    /// Reopens the one-shot release gate after a failed run start released what had started, so a retry
+    /// can attempt the release that belongs to the run's real end. Entries that were already released or
+    /// failed keep their state: a resource is released at most once, and a retry must not release it again.
+    /// </summary>
+    public void ResetForRestart()
+    {
+        lock (_gate)
+        {
+            _releaseStarted = 0;
+        }
     }
 
     private static async Task<Exception?> ReleaseEntryAsync(
@@ -184,25 +200,68 @@ internal sealed class ProtoResourceRegistry
 
     private sealed class Entry(IProtoResource resource)
     {
+        private readonly ProtoLock _releaseGate = new();
+        private ProtoResourceState _state = ProtoResourceState.Registered;
+        private TimeSpan? _releaseDuration;
+        private string? _error;
+        private bool _releasing;
+
         public IProtoResource Resource { get; } = resource;
-        public ProtoResourceState State { get; private set; } = ProtoResourceState.Registered;
-        public TimeSpan? ReleaseDuration { get; private set; }
-        public string? Error { get; private set; }
+
+        public ProtoResourceState State
+        {
+            get
+            {
+                lock (_releaseGate)
+                {
+                    return _state;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Claims the one release this entry permits. The transition happens under the entry's lock, so
+        /// two concurrent callers cannot both run the resource's release callback.
+        /// </summary>
+        public bool TryBeginRelease()
+        {
+            lock (_releaseGate)
+            {
+                if (_state != ProtoResourceState.Registered || _releasing)
+                {
+                    return false;
+                }
+
+                _releasing = true;
+                return true;
+            }
+        }
 
         public void MarkReleased(TimeSpan duration)
         {
-            State = ProtoResourceState.Released;
-            ReleaseDuration = duration;
+            lock (_releaseGate)
+            {
+                _state = ProtoResourceState.Released;
+                _releaseDuration = duration;
+            }
         }
 
         public void MarkFailed(TimeSpan duration, Exception exception)
         {
-            State = ProtoResourceState.ReleaseFailed;
-            ReleaseDuration = duration;
-            Error = exception.Message;
+            lock (_releaseGate)
+            {
+                _state = ProtoResourceState.ReleaseFailed;
+                _releaseDuration = duration;
+                _error = exception.Message;
+            }
         }
 
         public ProtoResourceSnapshot ToSnapshot()
-            => new(Resource.Id, Resource.Kind, Resource.Description, State, ReleaseDuration, Error);
+        {
+            lock (_releaseGate)
+            {
+                return new ProtoResourceSnapshot(Resource.Id, Resource.Kind, Resource.Description, _state, _releaseDuration, _error);
+            }
+        }
     }
 }

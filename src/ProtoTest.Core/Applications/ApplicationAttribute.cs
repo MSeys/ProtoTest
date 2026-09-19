@@ -42,7 +42,16 @@ public sealed class ApplicationAttribute : ProtoAttribute
                     nameof(clients));
             }
 
-            bindings[entry[..separator].Trim()] = entry[(separator + 1)..].Trim();
+            var protocol = entry[..separator].Trim();
+            var client = entry[(separator + 1)..].Trim();
+            if (protocol.Length == 0 || client.Length == 0)
+            {
+                throw new ArgumentException(
+                    $"Application client binding '{entry}' is invalid. Use 'Protocol:Client', for example 'Rest:Billing'.",
+                    nameof(clients));
+            }
+
+            bindings[protocol] = client;
         }
 
         return bindings;

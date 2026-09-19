@@ -158,4 +158,67 @@ public class ProtoRunResourceTests
             new ProtoResource("container", "database", "Container", _ => default, ProtoResourceScope.Run)));
         Assert.That(exception!.Message, Does.Contain("AddResource"));
     }
+
+    [Test]
+    public async Task DisposeAsync_ShouldRunAfterRunHooksBeforeReleasingRunResourcesAndCompleteTheTraceLast()
+    {
+        // The trace's completion has no callback a test can attach to, so it is sampled through
+        // Snapshot().CompletedAtUtc: the run is still open while the hook and the release run, and
+        // completed once `await using` returns. The ordering decision under test is hook -> release.
+        var events = new List<string>();
+        IProtoTraceSource? trace = null;
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<IProtoRunHook>(new OrderRecordingRunHook(events, () => trace));
+            services.AddSingleton<IProtoReportSource>(new OrderRecordingReportSource(events));
+        });
+        builder.AddRunGate("order probe", _ => ProtoRunGateResult.Passed());
+        builder.AddResource(new ProtoResource(
+            "order-probe",
+            "probe",
+            "Records when run-scoped resources are released",
+            _ =>
+            {
+                events.Add($"resource:release (trace completed: {trace!.Snapshot().CompletedAtUtc is not null})");
+                return ValueTask.CompletedTask;
+            },
+            ProtoResourceScope.Run));
+
+        await using (var host = builder.Build())
+        {
+            trace = host.Trace;
+            await host.StartAsync();
+        }
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(events, Is.EqualTo(new[]
+            {
+                "hook:after (trace completed: False)",
+                "report:collect",
+                "resource:release (trace completed: False)"
+            }));
+            Assert.That(trace!.Snapshot().CompletedAtUtc, Is.Not.Null);
+        });
+    }
+
+    private sealed class OrderRecordingRunHook(List<string> events, Func<IProtoTraceSource?> trace) : IProtoRunHook
+    {
+        public Task AfterRunAsync(CancellationToken cancellationToken = default)
+        {
+            var completed = trace()?.Snapshot().CompletedAtUtc is not null;
+            events.Add($"hook:after (trace completed: {completed})");
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class OrderRecordingReportSource(List<string> events) : IProtoReportSource
+    {
+        public IEnumerable<ProtoReportItem> GetReportItems()
+        {
+            events.Add("report:collect");
+            return [];
+        }
+    }
 }

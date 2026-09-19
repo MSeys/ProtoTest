@@ -28,6 +28,15 @@ internal sealed class ProtoSpanConverter
 
     private readonly ConcurrentDictionary<IProtoTraceWriter, ConcurrentDictionary<string, string>> _states = new();
 
+    /// <summary>Gets the number of writers whose observed state is still tracked; used by tests.</summary>
+    internal int TrackedWriterCount => _states.Count;
+
+    /// <summary>
+    /// Forgets a writer's observed state when its recorder completes, so the map cannot grow with every
+    /// test a long-lived host runs. A completed recorder never observes another span.
+    /// </summary>
+    public void Forget(IProtoTraceWriter writer) => _states.TryRemove(writer, out _);
+
     public void Observe(IProtoTraceWriter writer, Activity activity, string? operationId)
     {
         foreach (var identity in Identities(activity))
@@ -48,8 +57,8 @@ internal sealed class ProtoSpanConverter
             }
 
             writer.Value(
-                Title(identity.Prefix),
-                identity.Value,
+                "value",
+                $"{identity.Prefix}:{identity.Value}",
                 $"{Title(identity.Prefix)} {identity.Value}",
                 change,
                 state,

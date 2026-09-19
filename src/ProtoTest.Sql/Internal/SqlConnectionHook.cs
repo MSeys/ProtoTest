@@ -7,19 +7,17 @@ using ProtoTest.Core;
 /// Opens the test's connection, starts its transaction when the isolation strategy needs one, and owns
 /// both as a resource released before the test's clients are disposed.
 /// </summary>
-internal sealed class SqlConnectionHook(ProtoSqlOptions options) : IProtoTestHook
+internal sealed class SqlConnectionHook(SqlOptions options) : IProtoTestHook
 {
     public int Order => -1_000;
 
     public async Task BeforeTestAsync(ProtoExecutionContext context)
     {
         var session = context.Service<ProtoSqlSession>();
-        await session.Connection.OpenAsync();
-        if (options.Isolation == SqlIsolation.Transaction)
-        {
-            session.Transaction = await session.Connection.BeginTransactionAsync();
-        }
 
+        // The resource is registered before the connection is opened: an open or begin failure must
+        // still own what it created, so a started transaction is rolled back and the connection is
+        // disposed during teardown instead of escaping the test's ownership.
         var sharing = options.SharedWith.Count == 0
             ? string.Empty
             : $" · shared with {string.Join(", ", options.SharedWith)}";
@@ -28,19 +26,65 @@ internal sealed class SqlConnectionHook(ProtoSqlOptions options) : IProtoTestHoo
             "database",
             $"{session.Connection.GetType().Name} · {options.Isolation}{sharing}",
             release => ReleaseAsync(session, release)));
+
+        using var open = context.Trace
+            .Operation("sql.connection.open", $"SQL · open {session.Connection.GetType().Name}", "ProtoTest.Sql")
+            .During(ProtoTracePhase.Setup)
+            .With("sql.connection.type", session.Connection.GetType().FullName)
+            .Begin();
+        try
+        {
+            await session.Connection.OpenAsync();
+            if (options.Isolation == SqlIsolation.Transaction)
+            {
+                await context.Trace
+                    .Operation("sql.transaction.begin", "SQL · begin transaction", "ProtoTest.Sql")
+                    .During(ProtoTracePhase.Setup)
+                    .With("sql.isolation", options.Isolation.ToString())
+                    .RunAsync(async () => session.Transaction = await session.Connection.BeginTransactionAsync());
+            }
+
+            open.Succeed();
+        }
+        catch (Exception exception)
+        {
+            open.Fail(exception);
+            throw;
+        }
     }
 
     public Task AfterTestAsync(ProtoExecutionContext context) => Task.CompletedTask;
 
-    private static async ValueTask ReleaseAsync(ProtoSqlSession session, ProtoResourceReleaseContext release)
+    private async ValueTask ReleaseAsync(ProtoSqlSession session, ProtoResourceReleaseContext release)
     {
-        if (session.Transaction is { } transaction)
+        var transaction = session.Transaction;
+        try
         {
-            await transaction.RollbackAsync(release.CancellationToken);
-            await transaction.DisposeAsync();
-            session.Transaction = null;
+            if (transaction is not null)
+            {
+                await release.Trace
+                    .Operation("sql.transaction.rollback", "SQL · rollback transaction", "ProtoTest.Sql")
+                    .During(release.Phase)
+                    .With("sql.isolation", options.Isolation.ToString())
+                    .RunAsync(async () => await transaction.RollbackAsync(release.CancellationToken));
+            }
         }
-
-        await session.Connection.DisposeAsync();
+        finally
+        {
+            // Teardown must release both even when rollback fails: the transaction first, then the
+            // connection, each in its own finally.
+            session.Transaction = null;
+            try
+            {
+                if (transaction is not null)
+                {
+                    await transaction.DisposeAsync();
+                }
+            }
+            finally
+            {
+                await session.Connection.DisposeAsync();
+            }
+        }
     }
 }

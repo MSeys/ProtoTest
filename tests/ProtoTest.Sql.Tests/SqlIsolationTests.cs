@@ -2,9 +2,11 @@ namespace ProtoTest.Sql.Tests;
 
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Sql.EntityFrameworkCore;
+using System.Data;
 using System.Data.Common;
 using System.Reflection;
 
@@ -103,6 +105,91 @@ public sealed class SqlIsolationTests
     }
 
     [Test]
+    public async Task Sql_ShouldTraceOpenBeginAndRollback()
+    {
+        // Arrange
+        await using var host = CreateHost();
+        await host.StartAsync();
+        await host.StartTestAsync("sql traced lifecycle", TestMethod());
+
+        // Act
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        // Assert
+        var entries = host.Trace.Snapshot().Tests.Single().Entries;
+        var open = entries.Single(entry => entry.Kind == "sql.connection.open");
+        var begin = entries.Single(entry => entry.Kind == "sql.transaction.begin");
+        var rollback = entries.Single(entry => entry.Kind == "sql.transaction.rollback");
+        var release = entries.Single(entry => entry.Kind == "resource.release");
+        Assert.Multiple(() =>
+        {
+            Assert.That(open.Phase, Is.EqualTo(ProtoTracePhase.Setup));
+            Assert.That(open.Source, Is.EqualTo("ProtoTest.Sql"));
+            Assert.That(open.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
+            Assert.That(open.Attributes["sql.connection.type"], Is.EqualTo(typeof(SqliteConnection).FullName));
+
+            Assert.That(begin.Phase, Is.EqualTo(ProtoTracePhase.Setup));
+            Assert.That(begin.ParentId, Is.EqualTo(open.Id));
+            Assert.That(begin.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
+            Assert.That(begin.Attributes["sql.isolation"], Is.EqualTo(nameof(SqlIsolation.Transaction)));
+
+            Assert.That(rollback.Phase, Is.EqualTo(ProtoTracePhase.Teardown));
+            Assert.That(rollback.ParentId, Is.EqualTo(release.Id));
+            Assert.That(rollback.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
+        });
+
+        await host.StopAsync();
+    }
+
+    [Test]
+    public async Task EntityFrameworkCore_ShouldTraceEnlistment()
+    {
+        // Arrange
+        await using var host = CreateHost();
+        await host.StartAsync();
+        await host.StartTestAsync("ef traced enlistment", TestMethod());
+
+        // Act
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        // Assert
+        var enlist = host.Trace.Snapshot().Tests.Single().Entries
+            .Single(entry => entry.Kind == "sql.enlist");
+        Assert.Multiple(() =>
+        {
+            Assert.That(enlist.Phase, Is.EqualTo(ProtoTracePhase.Setup));
+            Assert.That(enlist.Source, Is.EqualTo("ProtoTest.Sql.EntityFrameworkCore"));
+            Assert.That(enlist.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
+            Assert.That(enlist.Attributes["db.context"], Is.EqualTo(typeof(WidgetDbContext).FullName));
+        });
+
+        await host.StopAsync();
+    }
+
+    [Test]
+    public async Task IsolationNone_ShouldTraceTheOpenWithoutATransaction()
+    {
+        // Arrange
+        await using var host = CreateHost(SqlIsolation.None);
+        await host.StartAsync();
+        await host.StartTestAsync("no transaction trace", TestMethod());
+
+        // Act
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        // Assert
+        var kinds = host.Trace.Snapshot().Tests.Single().Entries.Select(entry => entry.Kind).ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(kinds, Does.Contain("sql.connection.open"));
+            Assert.That(kinds, Does.Not.Contain("sql.transaction.begin"));
+            Assert.That(kinds, Does.Not.Contain("sql.transaction.rollback"));
+        });
+
+        await host.StopAsync();
+    }
+
+    [Test]
     public async Task IsolationNone_ShouldPersistWrites()
     {
         // Arrange
@@ -159,6 +246,108 @@ public sealed class SqlIsolationTests
         await host.StopAsync();
     }
 
+    [Test]
+    public async Task SqlSession_ShouldOwnTheConnectionAndExposeTheTransaction()
+    {
+        // Arrange
+        await using var host = CreateHost();
+        await host.StartAsync();
+        await host.StartTestAsync("session accessors", TestMethod());
+
+        // Act
+        var session = Proto.Context.SqlSession();
+        var connection = Proto.Context.SqlConnection();
+        var transaction = Proto.Context.SqlTransaction();
+
+        // Assert
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Connection, Is.SameAs(connection));
+            Assert.That(transaction, Is.Not.Null);
+            Assert.That(session.Transaction, Is.SameAs(transaction));
+            Assert.That(transaction!.Connection, Is.SameAs(connection));
+        });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        // The connection is the run-owned one: the test's release disposed it.
+        Assert.That(connection.State, Is.EqualTo(ConnectionState.Closed));
+        await host.StopAsync();
+    }
+
+    [Test]
+    public async Task SqlTransaction_ShouldBeNullUnderIsolationNone()
+    {
+        // Arrange
+        await using var host = CreateHost(SqlIsolation.None);
+        await host.StartAsync();
+        await host.StartTestAsync("no transaction", TestMethod());
+
+        // Act and assert
+        Assert.Multiple(() =>
+        {
+            Assert.That(Proto.Context.SqlTransaction(), Is.Null);
+            Assert.That(Proto.Context.SqlSession().Transaction, Is.Null);
+        });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
+
+    [Test]
+    public async Task Configuration_ShouldBindIsolationAndSharedApplications()
+    {
+        // Arrange
+        await using var host = new ProtoHostBuilder()
+            .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["ProtoTest:Sql:Isolation"] = "None",
+                    ["ProtoTest:Sql:SharedWithApplications:0"] = "Api"
+                }))
+            .AddApplication("Api", _ => { })
+            .AddSql(_ => new SqliteConnection(ConnectionString))
+            .Build();
+
+        // Act: the isolation guard passes because the named application is declared as sharing.
+        await host.StartAsync();
+        await host.StartTestAsync("configured sql", TestMethod());
+
+        var options = Proto.Context.Service<SqlOptions>();
+
+        // Assert
+        Assert.Multiple(() =>
+        {
+            Assert.That(options.Isolation, Is.EqualTo(SqlIsolation.None));
+            Assert.That(options.SharedWith, Is.EquivalentTo(new[] { "Api" }));
+            Assert.That(options.SharesConnectionWith("Api"), Is.True);
+        });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
+
+    [Test]
+    public async Task RollbackFailure_ShouldStillDisposeTheTransactionAndConnection()
+    {
+        var connection = new FailingRollbackConnection();
+        await using var host = new ProtoHostBuilder().AddSql(_ => connection).Build();
+        await host.StartAsync();
+        await host.StartTestAsync("rollback failure", TestMethod());
+
+        var exception = Assert.ThrowsAsync<AggregateException>(
+            async () => await host.CompleteTestAsync(ProtoTestResult.Passed));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.InnerExceptions.Any(item => item.Message.Contains("rollback failed")), Is.True);
+            Assert.That(connection.Transaction, Is.Not.Null);
+            Assert.That(connection.Transaction!.Disposed, Is.True, "The transaction must be disposed even when rollback fails.");
+            Assert.That(connection.IsDisposed, Is.True, "The connection must be disposed even when rollback fails.");
+        });
+        await host.StopAsync();
+    }
+
     private static ProtoHost CreateHost(SqlIsolation isolation = SqlIsolation.Transaction)
         => new ProtoHostBuilder()
             .AddSql(_ => new SqliteConnection(ConnectionString), sql => sql.Isolation = isolation)
@@ -198,4 +387,67 @@ public sealed class Widget
     public int Id { get; set; }
 
     public string Name { get; set; } = string.Empty;
+}
+
+internal sealed class FailingRollbackConnection : DbConnection
+{
+    private ConnectionState _state = ConnectionState.Closed;
+
+    public FailingRollbackTransaction? Transaction { get; private set; }
+
+    public bool IsDisposed { get; private set; }
+
+    [System.Diagnostics.CodeAnalysis.AllowNull]
+    public override string ConnectionString { get; set; } = string.Empty;
+
+    public override string Database => "fake";
+
+    public override string DataSource => "fake";
+
+    public override string ServerVersion => "1";
+
+    public override ConnectionState State => _state;
+
+    public override void ChangeDatabase(string databaseName)
+    {
+    }
+
+    public override void Close() => _state = ConnectionState.Closed;
+
+    public override void Open() => _state = ConnectionState.Open;
+
+    protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel)
+    {
+        Transaction = new FailingRollbackTransaction(this);
+        return Transaction;
+    }
+
+    protected override DbCommand CreateDbCommand() => throw new NotSupportedException();
+
+    protected override void Dispose(bool disposing)
+    {
+        IsDisposed = true;
+        base.Dispose(disposing);
+    }
+}
+
+internal sealed class FailingRollbackTransaction(DbConnection connection) : DbTransaction
+{
+    public bool Disposed { get; private set; }
+
+    public override IsolationLevel IsolationLevel => IsolationLevel.ReadCommitted;
+
+    protected override DbConnection DbConnection { get; } = connection;
+
+    public override void Rollback() => throw new InvalidOperationException("rollback failed");
+
+    public override void Commit()
+    {
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        Disposed = true;
+        base.Dispose(disposing);
+    }
 }

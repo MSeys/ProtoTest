@@ -30,70 +30,9 @@ public sealed class ProtoRange
 
     public ProtoCell this[int row, int column] => Rows[row][column];
 
-    public void ShouldHaveDimensions(int rows, int columns)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegative(rows);
-        ArgumentOutOfRangeException.ThrowIfNegative(columns);
-        using var operation = _context?.Trace
-            .Operation("sheets.assert", $"Sheets · {_sheetName}!{Reference}", "ProtoTest.Sheets")
-            .With("sheets.range", Reference)
-            .With("sheets.expected", $"{rows}x{columns}")
-            .With("sheets.actual", $"{RowCount}x{ColumnCount}")
-            .Begin();
-        if (RowCount == rows && ColumnCount == columns)
-        {
-            operation?.Succeed();
-            return;
-        }
+    /// <summary>The positive assertions of this range, for example <c>Should.Match([...])</c>.</summary>
+    public ProtoRangeAssertions Should => new(this, _sheetName, _context, negated: false);
 
-        var exception = new SpreadsheetAssertionException(
-            $"Expected {_sheetName}!{Reference} to have dimensions {rows}x{columns} but it was {RowCount}x{ColumnCount}.");
-        operation?.Fail(exception);
-        throw exception;
-    }
-
-    /// <summary>Compares the range's text values to an expected table, row by row.</summary>
-    public void ShouldMatch(IReadOnlyList<IReadOnlyList<string?>> expected)
-    {
-        ArgumentNullException.ThrowIfNull(expected);
-        var expectedRows = expected.Count;
-        var expectedColumns = expected.Count == 0 ? 0 : expected[0].Count;
-        using var operation = _context?.Trace
-            .Operation("sheets.assert", $"Sheets · {_sheetName}!{Reference}", "ProtoTest.Sheets")
-            .With("sheets.range", Reference)
-            .With("sheets.expected", $"{expectedRows}x{expectedColumns}")
-            .With("sheets.actual", $"{RowCount}x{ColumnCount}")
-            .Begin();
-        try
-        {
-            if (RowCount != expectedRows || ColumnCount != expectedColumns)
-            {
-                throw new SpreadsheetAssertionException(
-                    $"Expected {_sheetName}!{Reference} to have dimensions {expectedRows}x{expectedColumns} " +
-                    $"but it was {RowCount}x{ColumnCount}.");
-            }
-
-            for (var row = 0; row < expectedRows; row++)
-            {
-                for (var column = 0; column < expectedColumns; column++)
-                {
-                    var cell = Rows[row][column];
-                    var wanted = expected[row][column];
-                    if (!string.Equals(cell.Text, wanted, StringComparison.Ordinal))
-                    {
-                        throw new SpreadsheetAssertionException(
-                            $"Expected {_sheetName}!{cell.Reference} to be " +
-                            $"{(wanted is null ? "empty" : $"'{wanted}'")} but it was {cell.Display()}.");
-                    }
-                }
-            }
-
-            operation?.Succeed();
-        }
-        catch (SpreadsheetAssertionException exception)
-        {
-            operation?.Fail(exception);
-            throw;
-        }
-    }
+    /// <summary>The negated assertions of this range, for example <c>ShouldNot.HaveDimensions(3, 3)</c>.</summary>
+    public ProtoRangeAssertions ShouldNot => new(this, _sheetName, _context, negated: true);
 }

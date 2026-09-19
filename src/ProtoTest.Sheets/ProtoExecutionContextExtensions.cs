@@ -8,7 +8,7 @@ public static class ProtoExecutionContextExtensions
     public static ProtoSheets Sheets(this ProtoExecutionContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var options = context.TryService<ProtoSheetsOptions>()
+        var options = context.TryService<SheetsOptions>()
             ?? throw new InvalidOperationException(
                 "Sheets is not composed for this host. Call AddSheets on the host builder.");
         return new ProtoSheets(context, options);

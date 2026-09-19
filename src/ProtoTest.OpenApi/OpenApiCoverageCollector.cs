@@ -76,16 +76,27 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
         if (matchedRoute == null) return;
 
         var method = hit.Method.ToUpperInvariant();
+        // Only a method the spec describes becomes an endpoint hit; the report enumerates spec
+        // operations, so counting an unmatched method here would record a hit nobody can see.
+        if (!TryGetOperation(method, matchedRoute, out var operation))
+        {
+            return;
+        }
+
         var epKey = (method, matchedRoute);
         _endpointHits[epKey] = _endpointHits.GetValueOrDefault(epKey, 0) + 1;
 
-        if (TryGetOperation(method, matchedRoute, out var operation)
-            && FindResponseKey(operation, hit.StatusCode) is { } responseKey)
+        if (FindResponseKey(operation, hit.StatusCode) is { } responseKey)
         {
             var statusKey = (method, matchedRoute, responseKey);
             _responseHits[statusKey] = _responseHits.GetValueOrDefault(statusKey, 0) + 1;
         }
     }
+
+    /// <summary>The endpoint hits recorded so far, keyed by method and matched route. A snapshot: mutating
+    /// the returned dictionary must not change what the collector reports.</summary>
+    internal IReadOnlyDictionary<(string Method, string Route), int> EndpointHits
+        => new Dictionary<(string Method, string Route), int>(_endpointHits);
 
     private void RecordShapeMatchHit(RestShapeMatchData hit)
     {
@@ -104,7 +115,9 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
 
         foreach (var prop in hit.MatchedProperties)
         {
-            var propKey = (method, matchedRoute, responseKey, NormalizePropertyPath(prop));
+            // The path is stored case-insensitively: schema extraction is ignore-case, so a match
+            // reported as "$.Id" must land on the "$.id" baseline row.
+            var propKey = (method, matchedRoute, responseKey, PropertyKey(prop));
             _propertyHits[propKey] = _propertyHits.GetValueOrDefault(propKey, 0) + 1;
         }
     }
@@ -137,7 +150,7 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
                             .Select(propertyPath =>
                             {
                                 var propertyHits = _propertyHits.GetValueOrDefault(
-                                    (method, pathKey, responseKey, propertyPath), 0);
+                                    (method, pathKey, responseKey, PropertyKey(propertyPath)), 0);
                                 return new ProtoReportItem(
                                     TargetName: TargetName,
                                     Category: "OpenAPI Property",
@@ -238,6 +251,14 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
 
             if (IsRouteParameter(contractSegments[index]))
             {
+                // A constrained parameter such as {id:int} only matches a value the constraint
+                // accepts, so /users/abc must not cover /users/{id:int}.
+                if (!IsRouteParameter(requestSegments[index])
+                    && !MatchesConstraints(requestSegments[index], contractSegments[index]))
+                {
+                    return -1;
+                }
+
                 continue;
             }
 
@@ -255,6 +276,47 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
 
     private static bool IsRouteParameter(string segment)
         => segment.Length > 2 && segment[0] == '{' && segment[^1] == '}';
+
+    /// <summary>Checks a request segment against the constraints of a contract segment like <c>{id:int}</c>.</summary>
+    private static bool MatchesConstraints(string value, string contractSegment)
+    {
+        var inner = contractSegment[1..^1];
+        var parts = inner.Split(':', StringSplitOptions.RemoveEmptyEntries);
+        for (var index = 1; index < parts.Length; index++)
+        {
+            var constraint = parts[index];
+            var argument = string.Empty;
+            var open = constraint.IndexOf('(');
+            if (open >= 0 && constraint.EndsWith(')'))
+            {
+                argument = constraint[(open + 1)..^1];
+                constraint = constraint[..open];
+            }
+
+            var matches = constraint.ToLowerInvariant() switch
+            {
+                "int" => int.TryParse(value, System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out _),
+                "long" => long.TryParse(value, System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out _),
+                "decimal" or "double" or "float" => decimal.TryParse(value,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out _),
+                "guid" => Guid.TryParse(value, out _),
+                "bool" => bool.TryParse(value, out _),
+                "minlength" => int.TryParse(argument, out var minimum) && value.Length >= minimum,
+                "maxlength" => int.TryParse(argument, out var maximum) && value.Length <= maximum,
+                // An unknown constraint is not evidence the route does not match.
+                _ => true
+            };
+            if (!matches)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static string NormalizeRoute(string route)
     {
@@ -277,4 +339,8 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
 
     private static string NormalizePropertyPath(string path)
         => System.Text.RegularExpressions.Regex.Replace(path, @"\[\d+\]", "[]");
+
+    /// <summary>The case-insensitive dictionary key for a matched property path.</summary>
+    private static string PropertyKey(string path)
+        => NormalizePropertyPath(path).ToLowerInvariant();
 }

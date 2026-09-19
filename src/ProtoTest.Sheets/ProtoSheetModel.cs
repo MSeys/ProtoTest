@@ -32,7 +32,13 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
 
     /// <summary>The data rows, projected onto the record.</summary>
     public IReadOnlyList<TRow> Rows
-        => [.. Enumerable.Range(_table.DataStartRow, _table.RowCount).Select(Project)];
+    {
+        get
+        {
+            _table.RecordRead(_table.DataRange);
+            return [.. Enumerable.Range(_table.DataStartRow, _table.RowCount).Select(Project)];
+        }
+    }
 
     /// <summary>Finds the first row matching the predicate; no match fails the test.</summary>
     public TRow Row(Func<TRow, bool> predicate)
@@ -54,16 +60,29 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
     public ProtoModelColumn<TValue> Column<TValue>(Expression<Func<TRow, TValue>> property)
     {
         var info = PropertyOf(property);
-        var number = _columns[info];
-        var values = Enumerable.Range(_table.DataStartRow, _table.RowCount)
-            .Select(row => (TValue?)ConvertValue(typeof(TValue), _table.Cell(row, number)))
-            .ToArray();
+        if (!_columns.TryGetValue(info, out var number))
+        {
+            throw new SpreadsheetAssertionException(
+                $"'{typeof(TRow).Name}.{info.Name}' is not mapped to a column; mark it with a [Column(\"...\")] attribute.");
+        }
+
+        var optional = info.GetCustomAttribute<ColumnAttribute>()?.Optional == true;
+        _table.RecordRead(_table.ColumnRange(number));
+        var values = new TValue?[_table.RowCount];
+        for (var index = 0; index < values.Length; index++)
+        {
+            var cell = _table.Cell(_table.DataStartRow + index, number);
+            GuardEmpty(info, cell, optional);
+            values[index] = (TValue?)ConvertValue(typeof(TValue), cell);
+        }
+
         return new ProtoModelColumn<TValue>(Sheet.Name, info.Name, values, _table.DataStartRow, _context);
     }
 
     /// <summary>Checks every declared column against the record's shape; all violations are reported.</summary>
     public void Verify()
     {
+        _table.RecordRead(_table.DataRange);
         var failures = new List<string>();
         foreach (var (property, number) in _columns)
         {
@@ -89,39 +108,44 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
                     continue;
                 }
 
-                if (!double.IsNaN(column.Min) && cell.Number is { } below && below < column.Min)
+                // Constraints compare the typed value: a date cell has no Number, and a numeric cell
+                // has no Text, so validating only those would silently skip the constraint.
+                if (!double.IsNaN(column.Min) && TypedNumber(cell) is { } below && below < column.Min)
                 {
-                    failures.Add($"'{property.Name}' is {below} at {cell.Reference}, below the minimum {column.Min}");
+                    failures.Add($"'{property.Name}' is {cell.Display()} at {cell.Reference}, below the minimum {column.Min}");
                 }
 
-                if (!double.IsNaN(column.Max) && cell.Number is { } above && above > column.Max)
+                if (!double.IsNaN(column.Max) && TypedNumber(cell) is { } above && above > column.Max)
                 {
-                    failures.Add($"'{property.Name}' is {above} at {cell.Reference}, above the maximum {column.Max}");
+                    failures.Add($"'{property.Name}' is {cell.Display()} at {cell.Reference}, above the maximum {column.Max}");
                 }
 
                 if (column.Pattern is { } pattern
-                    && cell.Text is { } text
-                    && !System.Text.RegularExpressions.Regex.IsMatch(text, pattern))
+                    && cell.RenderedValue is { } rendered
+                    && !System.Text.RegularExpressions.Regex.IsMatch(rendered, pattern))
                 {
-                    failures.Add($"'{property.Name}' is '{text}' at {cell.Reference}, which does not match '{pattern}'");
+                    failures.Add($"'{property.Name}' is '{rendered}' at {cell.Reference}, which does not match '{pattern}'");
                 }
 
                 if (column.OneOf is { Length: > 0 } allowed
-                    && cell.Text is { } candidate
+                    && cell.RenderedValue is { } candidate
                     && !allowed.Contains(candidate, StringComparer.Ordinal))
                 {
                     failures.Add($"'{property.Name}' is '{candidate}' at {cell.Reference}, not one of {string.Join(", ", allowed)}");
                 }
 
-                if (seen is not null && cell.Text is { } uniqueValue)
+                if (seen is not null)
                 {
-                    if (seen.TryGetValue(uniqueValue, out var firstReference))
+                    // The key carries the kind: text "1200" and the number 1200 are different values
+                    // even though both render as "1200".
+                    var uniqueKey = UniqueKey(cell);
+                    if (seen.TryGetValue(uniqueKey, out var firstReference))
                     {
-                        failures.Add($"'{property.Name}' repeats '{uniqueValue}' at {cell.Reference} (first at {firstReference})");
+                        failures.Add($"'{property.Name}' repeats '{cell.Display()}' at {cell.Reference} (first at {firstReference})");
                     }
                     else
                     {
-                        seen[uniqueValue] = cell.Reference;
+                        seen[uniqueKey] = cell.Reference;
                     }
                 }
             }
@@ -158,6 +182,14 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
         {
             if (property.GetCustomAttribute<ColumnAttribute>() is { } column)
             {
+                if (column.Optional && !IsNullable(property.PropertyType))
+                {
+                    throw new SpreadsheetAssertionException(
+                        $"'{property.Name}' on {typeof(TRow).Name} is marked Optional, but " +
+                        $"{property.PropertyType.Name} cannot hold an empty cell. Use a nullable type " +
+                        $"such as {property.PropertyType.Name}?.");
+                }
+
                 columns[property] = table.ColumnNumber(column.Path);
             }
         }
@@ -178,11 +210,37 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
         var instance = (TRow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(TRow));
         foreach (var (property, number) in _columns)
         {
-            property.SetValue(instance, ConvertValue(property.PropertyType, _table.Cell(row, number)));
+            var cell = _table.Cell(row, number);
+            var optional = property.GetCustomAttribute<ColumnAttribute>()?.Optional == true;
+            // The projection must fail the same way Column does; ConvertValue returns null for an
+            // empty cell, and assigning null to a non-nullable value type throws a raw reflection error.
+            GuardEmpty(property, cell, optional);
+            property.SetValue(instance, ConvertValue(property.PropertyType, cell));
         }
 
         return instance;
     }
+
+    private void GuardEmpty(PropertyInfo property, ProtoCell cell, bool optional)
+    {
+        if (cell.IsEmpty && !IsNullable(property.PropertyType) && !optional)
+        {
+            throw new SpreadsheetAssertionException(
+                $"'{property.Name}' is empty at {cell.Reference}, so '{Sheet.Name}' has no " +
+                $"{property.PropertyType.Name} value for it. Mark the column Optional to allow empty cells.");
+        }
+    }
+
+    /// <summary>The numeric value a constraint compares: a number, or a date as its serial value.</summary>
+    private static double? TypedNumber(ProtoCell cell)
+        => cell.Number ?? cell.Date?.ToOADate();
+
+    /// <summary>A uniqueness key that keeps text, numbers, booleans and dates apart.</summary>
+    private static string UniqueKey(ProtoCell cell)
+        => cell.Text is { } text ? $"text:{text}"
+            : cell.Number is { } number ? $"number:{number.ToString("R", CultureInfo.InvariantCulture)}"
+            : cell.Boolean is { } boolean ? $"boolean:{boolean}"
+            : $"date:{cell.Date!.Value.ToString("O", CultureInfo.InvariantCulture)}";
 
     private static PropertyInfo PropertyOf<TValue>(Expression<Func<TRow, TValue>> property)
         => property.Body is MemberExpression { Member: PropertyInfo info }

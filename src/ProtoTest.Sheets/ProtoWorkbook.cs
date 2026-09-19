@@ -10,6 +10,12 @@ using ProtoTest.Sheets.Internal;
 /// </summary>
 public sealed class ProtoWorkbook
 {
+    /// <summary>The day offset between the 1900 and 1904 date systems.</summary>
+    private const int Date1904Offset = 1462;
+
+    /// <summary>The largest area a single merged cell may propagate; beyond it the file is corrupt.</summary>
+    private const long MaximumMergeCells = 1_000_000;
+
     private readonly ProtoExecutionContext? _context;
 
     private ProtoWorkbook(string name, IReadOnlyList<ProtoSheet> sheets, ProtoExecutionContext? context)
@@ -22,6 +28,11 @@ public sealed class ProtoWorkbook
     /// <summary>The file name the workbook was opened from.</summary>
     public string Name { get; }
 
+    /// <summary>
+    /// The sheets that were read. Hidden sheets are omitted unless
+    /// <see cref="SheetsOptions.IncludeHiddenSheets"/> is set, so the count reflects visible sheets by
+    /// default; each sheet still carries its position in the workbook in <see cref="ProtoSheet.Index"/>.
+    /// </summary>
     public IReadOnlyList<ProtoSheet> Sheets { get; }
 
     /// <summary>Finds a sheet by name; the failure lists the sheets that do exist.</summary>
@@ -45,7 +56,7 @@ public sealed class ProtoWorkbook
         DocumentFormat.OpenXml.Packaging.SpreadsheetDocument document,
         string name,
         ProtoExecutionContext? context,
-        ProtoSheetsOptions options)
+        SheetsOptions options)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(options);
@@ -62,6 +73,7 @@ public sealed class ProtoWorkbook
                 .Select(item => item.InnerText)
                 .ToArray() ?? [];
             var isDateStyle = DateStyles(workbookPart.WorkbookStylesPart?.Stylesheet);
+            var date1904 = workbookPart.Workbook.WorkbookProperties?.Date1904?.Value ?? false;
 
             var sheets = new List<ProtoSheet>();
             var index = 0;
@@ -72,7 +84,7 @@ public sealed class ProtoWorkbook
                 if (!hidden || options.IncludeHiddenSheets)
                 {
                     var part = (DocumentFormat.OpenXml.Packaging.WorksheetPart)workbookPart.GetPartById(sheet.Id!.Value!);
-                    var cells = ReadCells(part, sharedStrings, isDateStyle);
+                    var cells = ReadCells(part, sharedStrings, isDateStyle, date1904);
                     sheets.Add(new ProtoSheet(
                         sheetName,
                         index,
@@ -111,13 +123,16 @@ public sealed class ProtoWorkbook
     private static List<CellData> ReadCells(
         DocumentFormat.OpenXml.Packaging.WorksheetPart part,
         IReadOnlyList<string> sharedStrings,
-        Func<uint?, bool> isDateStyle)
+        Func<uint?, bool> isDateStyle,
+        bool date1904)
     {
         var cells = new List<CellData>();
         foreach (var cell in part.Worksheet.Descendants<Cell>())
-        {            var reference = cell.CellReference?.Value;
-            if (string.IsNullOrWhiteSpace(reference))
+        {
+            var reference = cell.CellReference?.Value;
+            if (!SheetReferences.TryParse(reference, out _, out _))
             {
+                // A malformed reference is file corruption; skipping it keeps the rest readable.
                 continue;
             }
 
@@ -151,7 +166,8 @@ public sealed class ProtoWorkbook
             {
                 if (isDateStyle(cell.StyleIndex?.Value))
                 {
-                    date = DateTime.FromOADate(value);
+                    // The 1904 date system counts from 1904-01-01, 1462 days after the 1900 epoch.
+                    date = DateTime.FromOADate(date1904 ? value + Date1904Offset : value);
                 }
                 else
                 {
@@ -167,8 +183,14 @@ public sealed class ProtoWorkbook
         }
 
         // Merged cells store their value in the top-left cell only; propagating it right and down is what
-        // makes a group header spanning columns, and the subheaders under it, read as one table.
-        var byReference = cells.ToDictionary(cell => cell.Reference, StringComparer.OrdinalIgnoreCase);
+        // makes a group header spanning columns, and the subheaders under it, read as one table. A corrupt
+        // file can repeat a reference; the first definition wins instead of throwing.
+        var byReference = new Dictionary<string, CellData>(StringComparer.OrdinalIgnoreCase);
+        foreach (var cell in cells)
+        {
+            byReference.TryAdd(cell.Reference, cell);
+        }
+
         foreach (var merge in part.Worksheet.Elements<MergeCells>().SelectMany(merges => merges.Elements<MergeCell>()))
         {
             var range = merge.Reference?.Value;
@@ -178,13 +200,26 @@ public sealed class ProtoWorkbook
             }
 
             var parts = range.Split(':', 2);
-            if (parts.Length != 2)
+            if (parts.Length != 2
+                || !SheetReferences.TryParse(parts[0], out var startColumn, out var startRow)
+                || !SheetReferences.TryParse(parts[1], out var endColumn, out var endRow))
             {
                 continue;
             }
 
-            var (startColumn, startRow) = SheetReferences.Parse(parts[0]);
-            var (endColumn, endRow) = SheetReferences.Parse(parts[1]);
+            if (endColumn < startColumn || endRow < startRow)
+            {
+                continue;
+            }
+
+            var area = (long)(endColumn - startColumn + 1) * (endRow - startRow + 1);
+            if (area > MaximumMergeCells)
+            {
+                // A merged area this large is file corruption, not layout; expanding it would
+                // materialise millions of cells and exhaust memory.
+                continue;
+            }
+
             if (!byReference.TryGetValue(SheetReferences.Format(startColumn, startRow), out var source))
             {
                 continue;
@@ -227,7 +262,9 @@ public sealed class ProtoWorkbook
             }
 
             var formatId = formats[(int)styleIndex.Value].NumberFormatId?.Value ?? 0;
-            if (formatId is >= 14 and <= 22 or >= 45 and <= 47)
+            // Built-in date and time ids: 14-22 (dates/times), 27-36 (East Asian dates),
+            // 45-47 (times) and 50-58 (East Asian dates/times).
+            if (formatId is >= 14 and <= 22 or >= 27 and <= 36 or >= 45 and <= 47 or >= 50 and <= 58)
             {
                 return true;
             }
@@ -237,9 +274,79 @@ public sealed class ProtoWorkbook
                 return false;
             }
 
-            return code.Contains('y', StringComparison.OrdinalIgnoreCase)
-                || code.Contains('d', StringComparison.OrdinalIgnoreCase)
-                || code.Contains('h', StringComparison.OrdinalIgnoreCase);
+            return HasDateToken(code);
         };
+    }
+
+    /// <summary>
+    /// A format code is a date format when it carries a y, d or h token after literals are removed.
+    /// Quoted text, bracketed sections (colors, conditions, locale ids) and escaped characters are
+    /// literals, so a currency suffix like <c>#,##0.00 "USD"</c> must not read as a date. A bracketed
+    /// elapsed-hours token like <c>[h]</c> is a time value, not a literal.
+    /// </summary>
+    private static bool HasDateToken(string code)
+    {
+        var remaining = StripLiterals(code);
+        return remaining.Contains('y', StringComparison.OrdinalIgnoreCase)
+            || remaining.Contains('d', StringComparison.OrdinalIgnoreCase)
+            || remaining.Contains('h', StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string StripLiterals(string code)
+    {
+        var tokens = new System.Text.StringBuilder(code.Length);
+        for (var index = 0; index < code.Length; index++)
+        {
+            var current = code[index];
+            if (current == '"')
+            {
+                // Quoted literals end at the next quote; "" inside one displays a single quote.
+                for (index++; index < code.Length; index++)
+                {
+                    if (code[index] != '"')
+                    {
+                        continue;
+                    }
+
+                    if (index + 1 < code.Length && code[index + 1] == '"')
+                    {
+                        index++;
+                        continue;
+                    }
+
+                    break;
+                }
+
+                continue;
+            }
+
+            if (current == '[')
+            {
+                var start = index + 1;
+                while (index < code.Length && code[index] != ']')
+                {
+                    index++;
+                }
+
+                var content = code[start..Math.Min(index, code.Length)];
+                if (content.Length is > 0 and <= 2 && content.All(token => token is 'h' or 'H'))
+                {
+                    // An elapsed-hours token ([h] or [hh]) is a time value, not a bracketed literal.
+                    tokens.Append('h');
+                }
+
+                continue;
+            }
+
+            if (current is '\\' or '_' or '*')
+            {
+                index++;
+                continue;
+            }
+
+            tokens.Append(current);
+        }
+
+        return tokens.ToString();
     }
 }

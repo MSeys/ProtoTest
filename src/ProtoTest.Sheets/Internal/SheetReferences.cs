@@ -6,7 +6,24 @@ internal static class SheetReferences
     public static (int Column, int Row) Parse(string reference)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reference);
-        var column = 0;
+        if (!TryParse(reference, out var column, out var row))
+        {
+            throw new FormatException($"'{reference}' is not an A1-style cell reference.");
+        }
+
+        return (column, row);
+    }
+
+    /// <summary>Tries to parse an A1-style reference; file data may be malformed and must not throw.</summary>
+    public static bool TryParse(string? reference, out int column, out int row)
+    {
+        column = 0;
+        row = 0;
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return false;
+        }
+
         var index = 0;
         while (index < reference.Length && char.IsLetter(reference[index]))
         {
@@ -14,19 +31,15 @@ internal static class SheetReferences
             index++;
         }
 
-        var row = 0;
         while (index < reference.Length && char.IsDigit(reference[index]))
         {
             row = (row * 10) + (reference[index] - '0');
             index++;
         }
 
-        if (column == 0 || row == 0 || index != reference.Length)
-        {
-            throw new FormatException($"'{reference}' is not an A1-style cell reference.");
-        }
-
-        return (column, row);
+        // The workbook format's own limits; they also keep a corrupt reference from overflowing.
+        return column != 0 && row != 0 && index == reference.Length
+            && column <= 16_384 && row <= 1_048_576;
     }
 
     public static string Format(int column, int row)

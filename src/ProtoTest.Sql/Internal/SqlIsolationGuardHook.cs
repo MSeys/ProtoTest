@@ -9,7 +9,7 @@ using ProtoTest.Core;
 /// Applications hosted without being declared through <c>AddApplication</c> cannot be detected here.
 /// </summary>
 internal sealed class SqlIsolationGuardHook(
-    ProtoSqlOptions options,
+    SqlOptions options,
     IEnumerable<ProtoApplicationClients> applications) : IProtoRunHook
 {
     public int Order => -500;

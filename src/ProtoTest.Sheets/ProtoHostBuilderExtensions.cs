@@ -14,14 +14,14 @@ public static class ProtoHostBuilderExtensions
     /// </summary>
     public static IProtoHostBuilder AddSheets(
         this IProtoHostBuilder builder,
-        Action<ProtoSheetsOptions>? configure = null)
+        Action<SheetsOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.ConfigureServices(services =>
         {
             services.TryAddSingleton(serviceProvider =>
             {
-                var options = new ProtoSheetsOptions();
+                var options = new SheetsOptions();
                 configure?.Invoke(options);
                 options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
                 return options;

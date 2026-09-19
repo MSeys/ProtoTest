@@ -7,9 +7,9 @@ using ProtoTest.Core;
 public sealed class ProtoSheets
 {
     private readonly ProtoExecutionContext _context;
-    private readonly ProtoSheetsOptions _options;
+    private readonly SheetsOptions _options;
 
-    internal ProtoSheets(ProtoExecutionContext context, ProtoSheetsOptions options)
+    internal ProtoSheets(ProtoExecutionContext context, SheetsOptions options)
     {
         _context = context;
         _options = options;

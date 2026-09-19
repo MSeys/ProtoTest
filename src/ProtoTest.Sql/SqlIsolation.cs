@@ -8,7 +8,7 @@ public enum SqlIsolation
     /// so everything written through that connection never persists. Writes made through a different
     /// connection - for example by an application that owns its own - are not covered, so when the host
     /// registers applications, each one must be declared with
-    /// <see cref="ProtoSqlOptions.ShareConnectionWith(string[])"/> (or this strategy is rejected at run start).
+    /// <see cref="SqlOptions.ShareConnectionWith(string[])"/> (or this strategy is rejected at run start).
     /// </summary>
     Transaction,
 

@@ -1,7 +1,5 @@
 namespace ProtoTest.Sheets;
 
-using ProtoTest.Core;
-
 /// <summary>A table column: its header path and its data cells.</summary>
 public sealed class ProtoColumn
 {
@@ -21,49 +19,11 @@ public sealed class ProtoColumn
             .Select(row => _table.Cell(row, _columnNumber))];
 
     public IReadOnlyList<string?> Values
-        => [.. Cells.Select(cell => cell.Text
-            ?? cell.Number?.ToString(System.Globalization.CultureInfo.InvariantCulture)
-            ?? cell.Boolean?.ToString()
-            ?? cell.Date?.ToString("O", System.Globalization.CultureInfo.InvariantCulture))];
+        => [.. Cells.Select(cell => cell.RenderedValue)];
 
-    /// <summary>Compares the column's values against the expected sequence, top to bottom.</summary>
-    public void ShouldBe(IReadOnlyList<string?> expected)
-    {
-        ArgumentNullException.ThrowIfNull(expected);
-        _table.RecordRead();
-        var header = string.Join(" / ", Header);
-        using var operation = _table.Context?.Trace
-            .Operation("sheets.assert", $"Sheets · column {header}", "ProtoTest.Sheets")
-            .With("sheets.header", header)
-            .With("sheets.expected", $"{expected.Count} values")
-            .Begin();
-        try
-        {
-            var actual = Values;
-            if (actual.Count != expected.Count)
-            {
-                throw new SpreadsheetAssertionException(
-                    $"Expected column '{header}' to have {expected.Count} values " +
-                    $"but it has {actual.Count}.");
-            }
+    /// <summary>The positive assertions of this column, for example <c>Should.Be(["1200", "900"])</c>.</summary>
+    public ProtoColumnAssertions Should => new(this, _table, negated: false);
 
-            for (var index = 0; index < expected.Count; index++)
-            {
-                if (!string.Equals(actual[index], expected[index], StringComparison.Ordinal))
-                {
-                    throw new SpreadsheetAssertionException(
-                        $"Expected column '{header}' row {_table.DataStartRow + index} " +
-                        $"to be {(expected[index] is null ? "empty" : $"'{expected[index]}'")} " +
-                        $"but it was {(actual[index] is null ? "<empty>" : $"'{actual[index]}'")}.");
-                }
-            }
-
-            operation?.Succeed();
-        }
-        catch (SpreadsheetAssertionException exception)
-        {
-            operation?.Fail(exception);
-            throw;
-        }
-    }
+    /// <summary>The negated assertions of this column, for example <c>ShouldNot.Be([...])</c>.</summary>
+    public ProtoColumnAssertions ShouldNot => new(this, _table, negated: true);
 }

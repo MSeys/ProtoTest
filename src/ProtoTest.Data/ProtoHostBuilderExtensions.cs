@@ -35,7 +35,7 @@ public static class ProtoHostBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         return builder.ConfigureServices(services =>
-            services.AddScoped<IProtoDataProvisioner<T, T>, TProvisioner>());
+            services.TryAddEnumerable(ServiceDescriptor.Scoped<IProtoDataProvisioner<T, T>, TProvisioner>()));
     }
 
     /// <summary>Registers a creation route whose application result differs from its input data.</summary>
@@ -44,6 +44,6 @@ public static class ProtoHostBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         return builder.ConfigureServices(services =>
-            services.AddScoped<IProtoDataProvisioner<TInput, TResult>, TProvisioner>());
+            services.TryAddEnumerable(ServiceDescriptor.Scoped<IProtoDataProvisioner<TInput, TResult>, TProvisioner>()));
     }
 }

@@ -1,6 +1,7 @@
 namespace ProtoTest.Sheets;
 
 using ProtoTest.Core;
+using ProtoTest.Sheets.Internal;
 
 /// <summary>A typed model column with property-style assertions over its values.</summary>
 public sealed class ProtoModelColumn<TValue>
@@ -27,87 +28,52 @@ public sealed class ProtoModelColumn<TValue>
 
     public IReadOnlyList<TValue?> Values { get; }
 
-    /// <summary>Compares the column's values against the expected sequence, top to bottom.</summary>
-    public void ShouldBe(IReadOnlyList<TValue?> expected)
-    {
-        ArgumentNullException.ThrowIfNull(expected);
-        if (Values.Count != expected.Count)
-        {
-            Fail($"have {expected.Count} values", $"it has {Values.Count}");
-            return;
-        }
+    /// <summary>The positive assertions of this column, for example <c>Should.Be([1200m, 900m])</c>.</summary>
+    public ProtoModelColumnAssertions<TValue> Should
+        => new(this, _sheetName, _dataStartRow, _context, negated: false);
 
-        for (var index = 0; index < expected.Count; index++)
-        {
-            if (!EqualityComparer<TValue?>.Default.Equals(Values[index], expected[index]))
-            {
-                Fail(
-                    $"have {Display(expected[index])} at row {_dataStartRow + index}",
-                    $"it was {Display(Values[index])}");
-                return;
-            }
-        }
-
-        Pass();
-    }
+    /// <summary>The negated assertions of this column, for example <c>ShouldNot.BeSortedBy()</c>.</summary>
+    public ProtoModelColumnAssertions<TValue> ShouldNot
+        => new(this, _sheetName, _dataStartRow, _context, negated: true);
 
     /// <summary>Checks every value against a property, for example every amount above zero.</summary>
     public void ShouldAll(Func<TValue?, bool> predicate)
     {
         ArgumentNullException.ThrowIfNull(predicate);
-        for (var index = 0; index < Values.Count; index++)
-        {
-            if (!predicate(Values[index]))
+        string? actual = null;
+        SheetAssertion.Run(
+            _context,
+            Title,
+            ColumnAttributes,
+            negated: false,
+            () =>
             {
-                Fail($"hold only matching values", $"row {_dataStartRow + index} was {Display(Values[index])}");
-                return;
-            }
-        }
+                for (var index = 0; index < Values.Count; index++)
+                {
+                    if (!predicate(Values[index]))
+                    {
+                        actual = $"row {_dataStartRow + index} was {Display(Values[index])}";
+                        return false;
+                    }
+                }
 
-        Pass();
+                return true;
+            },
+            () => new SheetAssertionFailure(
+                $"{SheetAssertion.Describe($"column '{_sheetName}.{Header}'", "hold only matching values", false)} " +
+                $"but {actual}.",
+                new Dictionary<string, string?>
+                {
+                    ["sheets.expected"] = "hold only matching values",
+                    ["sheets.actual"] = actual
+                }));
     }
 
-    /// <summary>Checks the values are ordered.</summary>
-    public void ShouldBeSortedBy(bool ascending = true)
-    {
-        for (var index = 1; index < Values.Count; index++)
-        {
-            var comparison = Comparer<TValue?>.Default.Compare(Values[index - 1], Values[index]);
-            if (ascending ? comparison > 0 : comparison < 0)
-            {
-                Fail(
-                    $"be sorted {(ascending ? "ascending" : "descending")}",
-                    $"row {_dataStartRow + index} was {Display(Values[index])}");
-                return;
-            }
-        }
+    internal string Title => $"Sheets · {_sheetName}.{Header}";
 
-        Pass();
-    }
+    internal IReadOnlyDictionary<string, string?> ColumnAttributes
+        => new Dictionary<string, string?> { ["sheets.column"] = $"{_sheetName}.{Header}" };
 
-    private void Pass()
-    {
-        using var operation = _context?.Trace
-            .Operation("sheets.assert", $"Sheets · {_sheetName}.{Header}", "ProtoTest.Sheets")
-            .With("sheets.column", $"{_sheetName}.{Header}")
-            .Begin();
-        operation?.Succeed();
-    }
-
-    private void Fail(string expected, string actual)
-    {
-        using var operation = _context?.Trace
-            .Operation("sheets.assert", $"Sheets · {_sheetName}.{Header}", "ProtoTest.Sheets")
-            .With("sheets.column", $"{_sheetName}.{Header}")
-            .With("sheets.expected", expected)
-            .With("sheets.actual", actual)
-            .Begin();
-        var exception = new SpreadsheetAssertionException(
-            $"Expected column '{_sheetName}.{Header}' to {expected} but {actual}.");
-        operation?.Fail(exception);
-        throw exception;
-    }
-
-    private static string Display(TValue? value)
+    internal static string Display(TValue? value)
         => value?.ToString() ?? "<empty>";
 }

@@ -3,7 +3,7 @@ namespace ProtoTest.Sql;
 using ProtoTest.Core;
 
 /// <summary>Configures how ProtoTest owns and isolates a database connection during a test.</summary>
-public sealed class ProtoSqlOptions : IProtoConfigurableOptions
+public sealed class SqlOptions : IProtoConfigurableOptions
 {
     public const string ConfigurationSectionName = "ProtoTest:Sql";
 
@@ -42,7 +42,7 @@ public sealed class ProtoSqlOptions : IProtoConfigurableOptions
     /// <see cref="SqlIsolation.Transaction"/> rolls back the application's writes too. When the host
     /// registers applications, every one of them must be declared for the transaction strategy to run.
     /// </summary>
-    public ProtoSqlOptions ShareConnectionWith(params string[] applicationNames)
+    public SqlOptions ShareConnectionWith(params string[] applicationNames)
     {
         ArgumentNullException.ThrowIfNull(applicationNames);
         foreach (var applicationName in applicationNames)

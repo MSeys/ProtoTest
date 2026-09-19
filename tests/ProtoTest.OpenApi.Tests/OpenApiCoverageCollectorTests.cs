@@ -2,6 +2,7 @@
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.OpenApi.Readers;
 using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Rest;
@@ -11,6 +12,80 @@ using ProtoTest.OpenApi;
 public class OpenApiCoverageCollectorTests
 {
     private class DummyPayload { }
+
+    [Test]
+    public void Constructor_ShouldAcceptAPrebuiltOpenApiDocument()
+    {
+        var document = new OpenApiStringReader().Read(OpenApiTestHelper.SampleJsonSpec, out _);
+
+        var collector = new OpenApiCoverageCollector("TestApi", document);
+
+        var root = collector.GetReportItems().Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(root.Identifier, Is.EqualTo("GET /users/{id}"));
+            Assert.That(root.Children!.Single(child => child.Identifier == "200")
+                .Children!.Any(child => child.Identifier == "$.id"), Is.True);
+        }
+    }
+
+    [Test]
+    public void Collect_ShouldNormalizeIndexedPropertyPathsToArrayItems()
+    {
+        const string specification = """
+        {
+          "openapi": "3.0.1",
+          "info": { "title": "Lines", "version": "1" },
+          "paths": {
+            "/lines": {
+              "get": {
+                "responses": {
+                  "200": {
+                    "description": "ok",
+                    "content": {
+                      "application/json": {
+                        "schema": {
+                          "type": "object",
+                          "properties": {
+                            "lines": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": { "sku": { "type": "string" } }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """;
+        var collector = new OpenApiCoverageCollector("Lines", specification);
+
+        collector.Collect(new ProtoObservation(
+            "Lines",
+            "http.contract.shape",
+            "GET /lines",
+            new RestShapeMatchData("GET /lines", ["$.lines[0]", "$.lines[0].sku"], typeof(DummyPayload), StatusCode: 200)));
+
+        var properties = collector.GetReportItems().Single().Children!
+            .Single(child => child.Identifier == "200").Children!;
+        var line = properties.Single(item => item.Identifier == "$.lines[]");
+        var sku = properties.Single(item => item.Identifier == "$.lines[].sku");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(line.IsCovered, Is.True);
+            Assert.That(line.DisplayName, Is.EqualTo("lines › item"));
+            Assert.That(sku.IsCovered, Is.True);
+            Assert.That(sku.DisplayName, Is.EqualTo("lines › item › sku"));
+            Assert.That(properties.Any(item => item.Identifier == "$.lines[0]"), Is.False);
+        }
+    }
 
     [Test]
     public void GetReportItems_ShouldIncludeFullBaseline_WhenNoHitsRecorded()
@@ -224,7 +299,7 @@ public class OpenApiCoverageCollectorTests
         {
             // Act
             using var response = await Proto.Context.Rest().GetAsync("/users/{id}", new { id = 42 });
-            response.ShouldHaveHttpStatus(System.Net.HttpStatusCode.OK)
+            response.Should.HaveHttpStatus(System.Net.HttpStatusCode.OK)
                 .ShouldMatchShape(new { id = "42", name = "Ada" });
 
             // Assert
@@ -248,6 +323,136 @@ public class OpenApiCoverageCollectorTests
         {
             await host.CompleteTestAsync();
         }
+    }
+
+    [Test]
+    public void Collect_ShouldEnforceRouteParameterConstraints()
+    {
+        const string specification = """
+        {
+          "openapi": "3.0.1",
+          "info": { "title": "Users", "version": "1" },
+          "paths": {
+            "/users/{id:int}": {
+              "get": {
+                "responses": { "200": { "description": "ok" } }
+              }
+            }
+          }
+        }
+        """;
+        var collector = new OpenApiCoverageCollector("Users", specification);
+        var headers = new Dictionary<string, string>();
+
+        collector.Collect(new ProtoObservation(
+            "Users", "http.response", "GET /users/abc",
+            new RestResponseData("GET", "/users/abc", 200, "{}", headers)));
+        collector.Collect(new ProtoObservation(
+            "Users", "http.response", "GET /users/42",
+            new RestResponseData("GET", "/users/42", 200, "{}", headers)));
+
+        var endpoint = collector.GetReportItems().Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(endpoint.Identifier, Is.EqualTo("GET /users/{id:int}"));
+            Assert.That(endpoint.Count, Is.EqualTo(1), "Only a numeric id covers an {id:int} route.");
+        });
+    }
+
+    [Test]
+    public void Collect_ShouldCoverTheRootWholeBodyPath()
+    {
+        const string specification = """
+        {
+          "openapi": "3.0.1",
+          "info": { "title": "Health", "version": "1" },
+          "paths": {
+            "/health": {
+              "get": {
+                "responses": {
+                  "200": {
+                    "description": "ok",
+                    "content": { "application/json": { "schema": { "type": "string" } } }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """;
+        var collector = new OpenApiCoverageCollector("Health", specification);
+
+        collector.Collect(new ProtoObservation(
+            "Health",
+            "http.contract.shape",
+            "GET /health",
+            new RestShapeMatchData("GET /health", ["$"], typeof(DummyPayload), StatusCode: 200)));
+
+        var root = collector.GetReportItems().Single().Children!
+            .Single(child => child.Identifier == "200").Children!
+            .Single(child => child.Identifier == "$");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(root.DisplayName, Is.EqualTo("Response body"));
+            Assert.That(root.IsCovered, Is.True, "A whole-body match must land on the $ baseline row.");
+            Assert.That(root.Count, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void Collect_ShouldMatchPropertyPathsCaseInsensitively()
+    {
+        var collector = new OpenApiCoverageCollector("TestApi", OpenApiTestHelper.SampleJsonSpec);
+
+        collector.Collect(new ProtoObservation(
+            "TestApi",
+            "http.contract.shape",
+            "GET /users/{id}",
+            new RestShapeMatchData(
+                "GET /users/{id}",
+                ["$.ID"],
+                typeof(DummyPayload),
+                StatusCode: 200)));
+
+        var id = collector.GetReportItems().Single().Children!
+            .Single(child => child.Identifier == "200").Children!
+            .Single(child => child.Identifier == "$.id");
+        Assert.That(id.IsCovered, Is.True,
+            "Schema extraction is ignore-case, so a hit reported as $.ID must land on $.id.");
+    }
+
+    [Test]
+    public void EndpointHits_ShouldBeASnapshot()
+    {
+        var collector = new OpenApiCoverageCollector("TestApi", OpenApiTestHelper.SampleJsonSpec);
+        collector.Collect(new ProtoObservation(
+            "TestApi", "http.response", "GET /users/{id}",
+            new RestResponseData("GET", "/users/{id}", 200, "{}", new Dictionary<string, string>())));
+
+        var snapshot = collector.EndpointHits;
+        ((Dictionary<(string, string), int>)snapshot)[("GET", "/users/{id}")] = 99;
+
+        Assert.That(collector.EndpointHits[("GET", "/users/{id}")], Is.EqualTo(1),
+            "Mutating a snapshot must not change the collector's hits.");
+    }
+
+    [Test]
+    public void Collect_ShouldIgnoreMethodsTheSpecDoesNotDescribe()
+    {
+        var collector = new OpenApiCoverageCollector("TestApi", OpenApiTestHelper.SampleJsonSpec);
+        var headers = new Dictionary<string, string>();
+
+        collector.Collect(new ProtoObservation(
+            "TestApi", "http.response", "DELETE /users/{id}",
+            new RestResponseData("DELETE", "/users/{id}", 200, "{}", headers)));
+        collector.Collect(new ProtoObservation(
+            "TestApi", "http.response", "GET /users/{id}",
+            new RestResponseData("GET", "/users/{id}", 200, "{}", headers)));
+
+        Assert.That(collector.EndpointHits, Has.Count.EqualTo(1),
+            "Only the method the spec describes becomes an endpoint hit.");
+        var endpoint = collector.GetReportItems().Single();
+        Assert.That(endpoint.Count, Is.EqualTo(1));
     }
 
     private static System.Reflection.MethodInfo TestMethod()

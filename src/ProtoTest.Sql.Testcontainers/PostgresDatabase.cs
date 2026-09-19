@@ -52,27 +52,13 @@ public sealed class PostgresDatabase : ProtoContainerResource<PostgreSqlContaine
         out string? error)
     {
         var candidate = Container(configure);
-        try
+        if (TryStartContainer(candidate, out error))
         {
-            candidate.StartAsync().GetAwaiter().GetResult();
             database = candidate;
-            error = null;
             return true;
         }
-        catch (Exception exception)
-        {
-            database = null;
-            error = $"{exception.GetType().Name}: {exception.Message}";
-            try
-            {
-                candidate.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            }
-            catch
-            {
-                // The start failure is what the caller needs to see.
-            }
 
-            return false;
-        }
+        database = null;
+        return false;
     }
 }

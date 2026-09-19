@@ -659,7 +659,21 @@ public sealed class ProtoDataObjectBuilder<T>
     {
         foreach (var value in values)
         {
-            var redacted = _registry.IsRedacted(typeof(T), value.MemberName, value.ValueType);
+            var redacted = _registry.IsRedacted(
+                typeof(T), value.MemberName, value.ValueType, value.Value?.GetType());
+            string? serialized;
+            if (redacted)
+            {
+                serialized = "[REDACTED]";
+            }
+            else
+            {
+                // The declared and runtime types are not enough: a List<object> or a nested graph can
+                // hold a redacted value the top-level check cannot see, so the graph is walked too.
+                (serialized, var nestedRedacted) = _registry.RedactGraph(value.Value);
+                redacted = nestedRedacted;
+            }
+
             context.Trace.WriteEvent(
                 "data.value.resolve",
                 $"Resolve · {typeof(T).Name}.{value.MemberName}",
@@ -670,7 +684,7 @@ public sealed class ProtoDataObjectBuilder<T>
                     ["data.type"] = typeof(T).FullName,
                     ["data.member"] = value.MemberName,
                     ["data.value_type"] = value.ValueType.FullName,
-                    ["data.value"] = redacted ? "[REDACTED]" : ProtoTraceValueFormatter.Serialize(value.Value),
+                    ["data.value"] = serialized,
                     ["data.redacted"] = redacted.ToString().ToLowerInvariant(),
                     ["data.source_kind"] = value.SourceKind,
                     ["data.source"] = value.Source

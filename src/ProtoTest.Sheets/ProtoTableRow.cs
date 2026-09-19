@@ -19,7 +19,7 @@ public sealed class ProtoTableRow
         get
         {
             var cell = _table.Cell(RowNumber, _table.ColumnNumber(headerPath));
-            _table.RecordRead(RowNumber);
+            _table.RecordRead(_table.RowRange(RowNumber));
             return cell;
         }
     }

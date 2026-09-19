@@ -14,17 +14,20 @@ public sealed class ProtoDataConfiguration
     {
         _registry = registry;
         Values = new ProtoDataValueConfiguration(registry, () => _source);
-        Tracing = new ProtoDataTracingConfiguration(registry);
     }
 
-    /// <summary>Configures defaults that apply to a CLR type wherever it occurs.</summary>
+    /// <summary>Configures providers that supply a value for every member of a CLR type.</summary>
     public ProtoDataValueConfiguration Values { get; }
-
-    /// <summary>Configures how resolved values appear in ProtoTrace.</summary>
-    public ProtoDataTracingConfiguration Tracing { get; }
 
     /// <summary>Configures defaults for individual members of <typeparamref name="T"/>.</summary>
     public ProtoDataTypeConfiguration<T> For<T>() => new(_registry, () => _source);
+
+    /// <summary>Redacts every resolved value having the specified CLR type in ProtoTrace.</summary>
+    public ProtoDataConfiguration RedactValueType<TValue>()
+    {
+        _registry.RedactValueType(typeof(TValue));
+        return this;
+    }
 
     /// <summary>Adds a convention-based resolver after exact member and type providers.</summary>
     public ProtoDataConfiguration AddValueResolver(IProtoDataValueResolver resolver)

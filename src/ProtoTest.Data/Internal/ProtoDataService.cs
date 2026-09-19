@@ -43,9 +43,11 @@ internal sealed class ProtoDataService : IProtoData
 
         if (matches.Length > 1)
         {
-            throw new ProtoDataException(
-                $"Several '{typeof(T).Name}' values have been provisioned in this test. " +
-                $"Pass an identity to Ref<{typeof(T).Name}>(...) to choose one.");
+            throw new ProtoDataException(identity is null
+                ? $"Several '{typeof(T).Name}' values have been provisioned in this test. " +
+                  $"Pass an identity to Ref<{typeof(T).Name}>(...) to choose one."
+                : $"Several '{typeof(T).Name}' values were provisioned with the identity '{identity}', " +
+                  $"so it does not choose one. Pass an identity unique to the value you mean to Ref<{typeof(T).Name}>(...).");
         }
 
         return (T)matches[0].Value;
@@ -109,16 +111,17 @@ internal sealed class ProtoDataService : IProtoData
             operation.SetAttribute("data.identity", result.Identity);
             operation.SetAttribute("data.owned", (result.Cleanup is not null).ToString().ToLowerInvariant());
             var valueKind = typeof(TResult).Name;
+            var valueTypeSegment = ValueTypeSegment(typeof(TResult));
             var valueIdentity = result.Identity is { Length: > 0 } identity
                 ? identity
                 : $"#{Interlocked.Increment(ref _valueSequence)}";
-            operation.SetAttribute("data.value_id", $"{valueKind}:{valueIdentity}");
+            operation.SetAttribute("data.value_id", $"value:{valueTypeSegment}:{valueIdentity}");
             var valueName = result.Identity is { Length: > 0 }
                 ? $"Value · {valueKind} '{result.Identity}'"
                 : $"Value · {valueKind}";
             execution.Trace.Value(
-                valueKind,
-                valueIdentity,
+                "value",
+                $"{valueTypeSegment}:{valueIdentity}",
                 valueName,
                 "created",
                 new Dictionary<string, string?>
@@ -152,6 +155,17 @@ internal sealed class ProtoDataService : IProtoData
             operation.Fail(exception);
             throw;
         }
+    }
+
+    /// <summary>
+    /// The value-id segment for a result type. Generic arity is dropped so a <c>List&lt;T&gt;</c> reads
+    /// as <c>list</c> instead of leaking the CLR backtick name into the trace id.
+    /// </summary>
+    private static string ValueTypeSegment(Type type)
+    {
+        var name = type.Name;
+        var arity = name.IndexOf('`');
+        return ProtoTraceItemKeys.TypeSegment(arity >= 0 ? name[..arity] : name);
     }
 
     private sealed record ProvisionedObject(string? Identity, object Value);

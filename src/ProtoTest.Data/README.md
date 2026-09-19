@@ -23,8 +23,7 @@ public sealed class InvoiceDataDefaults : IProtoDataDefaultsModule
 {
     public void Configure(ProtoDataConfiguration data)
     {
-        data.Values.For<InvoiceId>()
-            .Use(context => InvoiceId.From(context.NextGuid()));
+        data.Values.Use<InvoiceId>(context => InvoiceId.From(context.NextGuid()));
 
         data.For<Invoice>()
             .Default(x => x.Currency, Currency.EUR);
@@ -49,7 +48,7 @@ Sensitive trace values can be redacted per member or value type:
 
 ```csharp
 data.For<User>().Redact(x => x.AccessToken);
-data.Tracing.RedactValues<Password>();
+data.RedactValueType<Password>();
 ```
 
 Cross-cutting conventions can extend the value pipeline through `IProtoDataValueResolver`. They run after exact member and type providers and before safe built-in generation.
@@ -83,3 +82,5 @@ var users = Proto.Context.Data().For<User>()
 ```
 
 An `IProtoDataProvisioner<T>` may use commands, events, an API, a repository, or direct persistence. Its optional `Cleanup` is disposed in reverse creation order when the test context is disposed. `data.create`, `data.provision`, and `data.cleanup` operations are written to ProtoTrace automatically.
+
+Provisioned values are tracked as `value:{type}:{identity}`, with the result CLR type in snake_case — `InvoiceLine` becomes `invoice_line` — so an application identity attribute with the same prefix (`invoice_line.number`) correlates with the test-side value.

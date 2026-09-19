@@ -9,6 +9,8 @@ using ProtoTest.Sheets.Internal;
 /// </summary>
 public sealed class ProtoSheet
 {
+    private const int MaximumRangeCells = 1_000_000;
+
     private readonly Dictionary<string, ProtoCell> _cells;
     private readonly ProtoExecutionContext? _context;
 
@@ -59,10 +61,10 @@ public sealed class ProtoSheet
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reference);
         var normalized = reference.ToUpperInvariant();
+        var (column, row) = SheetReferences.Parse(normalized);
+        // Coverage is recorded only for a reference that parsed: an invalid read never happened.
         Record(normalized);
-        return CellByNumber(
-            SheetReferences.Parse(normalized).Row,
-            SheetReferences.Parse(normalized).Column);
+        return CellByNumber(row, column);
     }
 
     /// <summary>Reads a cell by coordinates; row and column are 1-based.</summary>
@@ -91,13 +93,13 @@ public sealed class ProtoSheet
         for (var column = 1; column <= ColumnCount; column++)
         {
             columns.Add([.. rows
-                .Select(row => CellByNumber(row, column).Text)
-                .Where(text => !string.IsNullOrWhiteSpace(text))
-                .Select(text => text!)]);
+                .Select(row => CellByNumber(row, column))
+                .Where(cell => !cell.IsEmpty)
+                .Select(cell => cell.Display())
+                .Where(text => !string.IsNullOrWhiteSpace(text))]);
         }
 
         var table = new ProtoTable(this, rows, columns, rows[^1] + 1, _context);
-        table.RecordRead();
         return table;
     }
 
@@ -117,6 +119,20 @@ public sealed class ProtoSheet
         var parts = normalized.Split(':', 2);
         var (startColumn, startRow) = SheetReferences.Parse(parts[0]);
         var (endColumn, endRow) = parts.Length == 2 ? SheetReferences.Parse(parts[1]) : (startColumn, startRow);
+        if (endRow < startRow || endColumn < startColumn)
+        {
+            throw new SpreadsheetAssertionException(
+                $"The range '{normalized}' is reversed; a range runs from its top-left to its bottom-right cell.");
+        }
+
+        var cellCount = (long)(endRow - startRow + 1) * (endColumn - startColumn + 1);
+        if (cellCount > MaximumRangeCells)
+        {
+            throw new SpreadsheetAssertionException(
+                $"The range '{normalized}' covers {cellCount} cells, which exceeds the supported maximum of " +
+                $"{MaximumRangeCells}. Read a smaller range.");
+        }
+
         var rows = new List<IReadOnlyList<ProtoCell>>();
         for (var row = startRow; row <= endRow; row++)
         {

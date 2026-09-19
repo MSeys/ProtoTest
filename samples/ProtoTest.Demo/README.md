@@ -14,13 +14,16 @@ The suite is organised as journeys rather than API probes:
 | `DomainAccessJourney` | The test composes the application's own domain over the shared store. |
 | `SheetsJourney` | The generated monthly report is verified as an OpenXML workbook. |
 | `GrpcJourney` | The application's own gRPC service is called and its replies shape-asserted. |
-| `MessagingJourney` | The application's `invoice.paid` event is awaited over the broker. |
-| `WebJourney` | A real browser drives the application's own login and reporting UI. |
+| `MessagingJourney` | The application's `invoice.paid` event is awaited over the broker, whether the invoice was paid over REST or on the console's billing screen. |
+| `WebJourney` | The Northstar console end to end in one session: sign-in, dashboard, project and environment creation, a deployment's status, an invoice paid in billing, and the monthly report verified with Sheets. |
+| `ApiThenBrowserJourney` | A project created through REST appears in the console after it refreshes. |
+| `BrowserThenApiJourney` | A project created on the console's form is asserted back through REST and GraphQL. |
 | `DiagnosticsShowcase` | ProtoTest's own failure diagnostics, attachments and trace. |
 
 Some journeys skip, before their lifecycle starts, unless their infrastructure is present: the domain
-journey needs a composed store, the messaging journey a broker, and the web journey a standalone
-instance (`ProtoTest:TargetUrl` or the session's base URL).
+journey needs a composed store, the messaging journey a broker, and the console journeys a standalone
+instance (`ProtoTest:TargetUrl` or the session's base URL) with a built SPA under
+`samples/ProtoTest.SampleApp/Ui/dist`.
 
 The application is in memory but behaves like a product: plans and entitlements, billing state machines, a per-tenant virtual clock (`POST /test-support/tenants/{tenant}/clock/advance`) so periods can be closed deterministically, a webhook outbox with HMAC-SHA256 signatures and retries, an audit trail, `Idempotency-Key` replay and per-token rate limits.
 

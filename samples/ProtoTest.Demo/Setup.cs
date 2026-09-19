@@ -62,10 +62,13 @@ public sealed class Setup : ProtoTestAssembly
             demoConfiguration["ProtoTest:Messaging:Broker"],
             "container",
             StringComparison.OrdinalIgnoreCase);
+        IProtoConnectionInfrastructure? messagingBroker = null;
         if (useMessagingContainer)
         {
+            // Held so the standalone application can be handed the same broker the tests await on.
+            messagingBroker = RabbitMqBroker.Container();
             builder.AddInfrastructure(
-                RabbitMqBroker.Container(),
+                messagingBroker,
                 RabbitMqOptions.ConnectionStringSetting,
                 "Messaging:RabbitMq:ConnectionString");
         }
@@ -105,9 +108,19 @@ public sealed class Setup : ProtoTestAssembly
             // fills the web session's base URL from it. Its capability is what lets those journeys skip
             // when the suite cannot own the store. A published run (TargetUrl set) drives the published
             // application instead, so starting a local copy would point the journeys at the wrong store.
-            builder.AddInfrastructure(new StandaloneSampleApp(fallbackDatabase, databaseProvider));
+            builder.AddInfrastructure(new StandaloneSampleApp(
+                fallbackDatabase,
+                databaseProvider,
+                () => messagingBroker?.ConnectionString ?? configuredMessaging));
             builder.AddCapability(new ProtoCapabilityDescriptor(
                 "Northstar standalone", ProtoCapabilityKinds.Server, "Demo"));
+        }
+
+        if (hostedInProcess)
+        {
+            // The console build path reaches the in-process application as a host setting: the ASP.NET
+            // Core initializer forwards every started infrastructure setting to the web host.
+            builder.AddInfrastructure(new NorthstarConsoleBuild());
         }
 
         if (composeDomainInTests)
@@ -151,7 +164,12 @@ public sealed class Setup : ProtoTestAssembly
                 {
                     [$"ProtoTest:Applications:{NorthstarTargets.Api}:OpenApi:Specification"] = Path.Combine(
                         AppContext.BaseDirectory, "northstar.openapi.json"),
-                    [$"ProtoTest:Applications:{NorthstarTargets.Api}:Endpoints:GraphQL"] = "/graphql"
+                    [$"ProtoTest:Applications:{NorthstarTargets.Api}:Endpoints:GraphQL"] = "/graphql",
+                    // Page coverage: the console's Vue sources are inventoried from disk, and the session
+                    // also asks the running router for its routes - source scan and runtime discovery.
+                    ["ProtoTest:Web:Pages:Source"] = ConsoleBuild.SourceFolder,
+                    ["ProtoTest:Web:Pages:Framework"] = "vue",
+                    ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
                 };
 
                 if (!hostedInProcess)

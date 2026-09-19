@@ -4,15 +4,16 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using ProtoTest.Core;
-using ProtoTest.SampleApp.Testing;
-using ProtoTest.Web;
 
 /// <summary>
 /// Starts the sample application as a standalone process over the suite's store, so browser tests have a
 /// real address. It is run-scoped infrastructure: the host starts it, exposes its address as the web
 /// session's base URL, and releases it with the run - the journey file only contains the journey.
 /// </summary>
-internal sealed class StandaloneSampleApp(string connectionString, string databaseProvider = "sqlite") : IProtoSettingsInfrastructure
+internal sealed class StandaloneSampleApp(
+    string connectionString,
+    string databaseProvider = "sqlite",
+    Func<string?>? messagingConnection = null) : IProtoSettingsInfrastructure
 {
     private Process? _process;
     private string _baseUrl = string.Empty;
@@ -49,6 +50,19 @@ internal sealed class StandaloneSampleApp(string connectionString, string databa
         start.Environment["ProtoTest__TestSupport"] = "true";
         // The UI instance reads the store; the suite's in-process instance owns webhook dispatch.
         start.Environment["Northstar__DisableWebhookDispatcher"] = "true";
+        // The built console lives in the repository, not in the test output, so the absolute path is
+        // passed as process environment: the standalone app serves the same build the in-process one does.
+        if (ConsoleBuild.DistFolder is { } dist)
+        {
+            start.Environment["Northstar__Ui__Path"] = dist;
+        }
+
+        // Paying an invoice in the browser publishes through the same broker the tests await on.
+        if (messagingConnection?.Invoke() is { Length: > 0 } broker)
+        {
+            start.Environment["Messaging__RabbitMq__ConnectionString"] = broker;
+        }
+
         _process = Process.Start(start)!;
         // Redirected pipes fill up and block the child once nobody drains them, so a chatty application
         // would deadlock the run. The handlers keep both streams flowing; the output is diagnostic only.
@@ -94,25 +108,5 @@ internal sealed class StandaloneSampleApp(string connectionString, string databa
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         listener.Stop();
         return port;
-    }
-}
-
-/// <summary>Logs the browser in through the application's own login page with the tenant's token.</summary>
-public sealed class NorthstarUiLogin : IWebLoginStrategy
-{
-    public async ValueTask LoginAsync(WebLoginContext context, CancellationToken cancellationToken = default)
-    {
-        var organization = context.Execution.Resolve<NorthstarOrganizationContext>();
-        var page = context.Web.Page<LoginPage>();
-        await page.OpenAsync("/login");
-        await page.Token.FillAsync(organization.OwnerToken);
-        await page.Submit.ClickAsync();
-    }
-
-    public sealed class LoginPage : WebPage
-    {
-        public WebElement Token => Element(By.TestId("token"));
-
-        public WebElement Submit => Element(By.TestId("login"));
     }
 }

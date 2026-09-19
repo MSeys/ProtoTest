@@ -11,6 +11,12 @@ using ProtoTest.SampleApp.Testing;
 /// <summary>Small helpers shared by the journeys so each test reads as the story it tells.</summary>
 internal static class DemoSupport
 {
+    /// <summary>The bounded wait console journeys give a screen or fact to settle.</summary>
+    public static readonly TimeSpan ConsoleWait = TimeSpan.FromSeconds(15);
+
+    /// <summary>The bounded wait for a live update to reach a console screen.</summary>
+    public static readonly TimeSpan LiveUpdateWait = TimeSpan.FromSeconds(20);
+
     public static RestRequestBuilder As(string token)
         => Proto.Context.Rest().WithoutAuth().Header("Authorization", $"Bearer {token}");
 

@@ -60,6 +60,7 @@
     <Project Path="tests/ProtoTest.Rest.Tests/ProtoTest.Rest.Tests.csproj" Id="da8c0737-a839-4f92-a4c2-f9bdecd6c96b" />
     <Project Path="tests/ProtoTest.SampleApp.Domain.Tests/ProtoTest.SampleApp.Domain.Tests.csproj" />
     <Project Path="tests/ProtoTest.Sql.Tests/ProtoTest.Sql.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Testcontainers.Tests/ProtoTest.Testcontainers.Tests.csproj" />
     <Project Path="tests/ProtoTest.Web.Tests/ProtoTest.Web.Tests.csproj" />
   </Folder>
   <Folder Name="/5. Demo/">

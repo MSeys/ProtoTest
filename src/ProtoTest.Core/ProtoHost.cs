@@ -230,9 +230,17 @@ public sealed class ProtoHost : IAsyncDisposable
         int? previousStartState = null;
         lock (_startGate)
         {
-            // A stop rejected by the lifecycle (start in flight, or a second stop) must not touch the
-            // start state it did not change.
-            if (_startState is not (StartInProgress or StopInProgress))
+            // The start path is not finished until it records StartCompleted, including the infrastructure
+            // it starts after the run hooks: stopping here would tear down the run mid-start.
+            if (_startState == StartInProgress)
+            {
+                throw new InvalidOperationException(
+                    "ProtoHost startup is still in progress; stop it after startup completes.");
+            }
+
+            // A stop rejected by the lifecycle (or a second stop) must not touch the start state it did
+            // not change.
+            if (_startState is not StopInProgress)
             {
                 previousStartState = _startState;
                 _startState = StopInProgress;
@@ -329,6 +337,17 @@ public sealed class ProtoHost : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         var exceptions = new List<Exception>();
+
+        // The start path runs to StartCompleted: disposing mid-start would stop a run whose infrastructure
+        // is still coming up and then let the start record itself as completed on a disposed host.
+        lock (_startGate)
+        {
+            if (_startState == StartInProgress)
+            {
+                throw new InvalidOperationException(
+                    "ProtoHost startup is still in progress; dispose it after startup completes.");
+            }
+        }
 
         // Completing the run here means `await using var host = ...` alone still runs AfterRun
         // hooks (report sinks, trace export). StopAsync is idempotent, so an explicit stop first

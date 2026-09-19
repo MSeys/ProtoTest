@@ -36,11 +36,16 @@ public static class ProtoHostBuilderSinkExtensions
             var directIndex = FindDirectSink(services, typeof(TSink));
             if (directIndex >= 0)
             {
+                // The direct registration stays the one sink: wrap it once and record the registration so
+                // a repeated call appends its callback to the same list instead of adding a second sink.
+                var directRegistration = new SinkRegistration(typeof(TSink));
                 if (configure is not null)
                 {
-                    WrapDirectSink(services, directIndex, AddConfigure<TSink>(configure));
+                    directRegistration.Configures.Add(AddConfigure<TSink>(configure));
                 }
 
+                services.AddSingleton(directRegistration);
+                WrapDirectSink(services, directIndex, sink => ApplyConfigures(sink, directRegistration.Configures));
                 return;
             }
 
@@ -122,7 +127,9 @@ public static class ProtoHostBuilderSinkExtensions
         for (var index = 0; index < services.Count; index++)
         {
             var descriptor = services[index];
-            if (descriptor.ServiceType != typeof(IProtoSink))
+            // Keyed registrations are resolved under another name and are not the sinks the report uses;
+            // wrapping one as an unkeyed factory would move it into the unkeyed lookup.
+            if (descriptor.ServiceType != typeof(IProtoSink) || descriptor.IsKeyedService)
             {
                 continue;
             }

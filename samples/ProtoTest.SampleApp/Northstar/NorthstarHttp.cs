@@ -10,14 +10,7 @@ internal static class NorthstarHttp
         => context.RequestServices.GetRequiredService<NorthstarStore>();
 
     public static NorthstarPrincipal Principal(HttpContext context)
-    {
-        var header = context.Request.Headers.Authorization.ToString();
-        const string prefix = "Bearer ";
-        var secret = header.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
-            ? header[prefix.Length..].Trim()
-            : null;
-        return Store(context).Authenticate(secret);
-    }
+        => Store(context).Authenticate(NorthstarAuth.Token(context));
 
     public static IResult Problem(NorthstarException exception) => Results.Json(
         new ProblemResponse(exception.Code, exception.Message, exception.Details),

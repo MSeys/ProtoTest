@@ -7,12 +7,14 @@ using ProtoTest.SampleApp.Domain;
 /// <summary>
 /// A tiny server-rendered UI over the same store, so browser tests drive the real application: the
 /// login form exchanges the tenant's bearer token for a cookie, and the projects page renders what the
-/// API created.
+/// API created. It also serves the JSON sign-in/sign-out the bundled console uses: the same token, the
+/// same cookie, but a JSON response instead of a redirect.
 /// </summary>
 internal static class NorthstarUi
 {
-    private const string TokenCookie = "northstar_token";
     private const string Html = "text/html; charset=utf-8";
+
+    public sealed record LoginRequest(string? Token);
 
     public static void MapNorthstarUi(this WebApplication app)
     {
@@ -33,17 +35,34 @@ internal static class NorthstarUi
                     statusCode: StatusCodes.Status401Unauthorized);
             }
 
-            http.Response.Cookies.Append(TokenCookie, token, new CookieOptions
-            {
-                HttpOnly = true,
-                SameSite = SameSiteMode.Lax
-            });
+            NorthstarAuth.SetCookie(http, token);
             return Results.Redirect("/projects");
+        });
+
+        app.MapPost("/api/auth/login", (HttpContext http, LoginRequest body) =>
+        {
+            try
+            {
+                _ = NorthstarHttp.Store(http).Authenticate(body.Token);
+            }
+            catch (NorthstarException exception)
+            {
+                return NorthstarHttp.Problem(exception);
+            }
+
+            NorthstarAuth.SetCookie(http, body.Token!);
+            return Results.Ok(new { authenticated = true });
+        });
+
+        app.MapPost("/api/auth/logout", (HttpContext http) =>
+        {
+            NorthstarAuth.ClearCookie(http);
+            return Results.NoContent();
         });
 
         app.MapGet("/projects", (HttpContext http) =>
         {
-            var token = http.Request.Cookies[TokenCookie];
+            var token = NorthstarAuth.CookieToken(http);
             NorthstarPrincipal principal;
             try
             {

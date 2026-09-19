@@ -115,6 +115,7 @@ public class Program
         }
 
         app.MapGraphQL("/graphql");
+        app.UseNorthstarConsole();
 
         app.Run();
     }

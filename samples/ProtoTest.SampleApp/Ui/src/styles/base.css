@@ -1,0 +1,395 @@
+/* Northstar Console primitives. Components own their own layout; this file holds tokens, the reset and
+   the few controls that every screen shares. */
+
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/manrope-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/manrope-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/manrope-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/space-grotesk-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/jetbrains-mono-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/jetbrains-mono-500.woff2") format("woff2");
+}
+
+:root {
+  --ns-ink: #17232c;
+  --ns-ink-deep: #101b23;
+  --ns-muted: #5c7080;
+  --ns-faint: #8298a4;
+  --ns-paper: #eef2f1;
+  --ns-surface: #ffffff;
+  --ns-line: #d8e2e0;
+  --ns-line-soft: #e8efed;
+  --ns-accent: #3d4ed0;
+  --ns-accent-strong: #303cb4;
+  --ns-accent-soft: #eceffe;
+  --ns-success: #1e8a5e;
+  --ns-success-soft: #e6f4ee;
+  --ns-danger: #b5432f;
+  --ns-danger-soft: #fbeae6;
+  --ns-warning: #96650f;
+  --ns-warning-soft: #f9f0dc;
+  --ns-info: #2b6cb0;
+  --ns-info-soft: #e8f0fa;
+  --ns-neutral: #64748b;
+  --ns-neutral-soft: #eef1f4;
+  --ns-radius-panel: 12px;
+  --ns-radius-control: 8px;
+  --ns-shadow-panel: 0 1px 2px rgb(16 27 35 / 5%);
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-ui: "Manrope", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--ns-paper);
+  color: var(--ns-ink);
+  font: 15px/1.55 var(--font-ui);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+h1 {
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+h3 {
+  font-size: 15px;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--ns-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ns-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+button {
+  font: inherit;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--ns-muted);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------------------------------------------------------------- controls */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--ns-line);
+  border-radius: var(--ns-radius-control);
+  background: var(--ns-surface);
+  color: var(--ns-ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--ns-faint);
+  background: #f6f9f8;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.button--primary {
+  border-color: var(--ns-accent);
+  background: var(--ns-accent);
+  color: #fff;
+}
+
+.button--primary:hover:not(:disabled) {
+  border-color: var(--ns-accent-strong);
+  background: var(--ns-accent-strong);
+}
+
+.button--quiet {
+  border-color: transparent;
+  background: transparent;
+  padding: 0 8px;
+}
+
+.button--quiet:hover:not(:disabled) {
+  border-color: var(--ns-line);
+  background: #f6f9f8;
+}
+
+.button--small {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+}
+
+.field > label {
+  color: var(--ns-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.input,
+.select {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--ns-line);
+  border-radius: var(--ns-radius-control);
+  background: var(--ns-surface);
+  color: var(--ns-ink);
+  font: inherit;
+}
+
+.input:focus,
+.select:focus {
+  border-color: var(--ns-accent);
+}
+
+/* ---------------------------------------------------------------- surfaces */
+
+.panel {
+  border: 1px solid var(--ns-line);
+  border-radius: var(--ns-radius-panel);
+  background: var(--ns-surface);
+  box-shadow: var(--ns-shadow-panel);
+}
+
+.panel__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--ns-line-soft);
+}
+
+.panel__body {
+  padding: 18px;
+}
+
+.source-tag {
+  border: 1px solid var(--ns-line);
+  border-radius: 999px;
+  padding: 1px 8px;
+  color: var(--ns-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- table */
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 540px;
+  border-collapse: collapse;
+}
+
+.table th {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--ns-line);
+  color: var(--ns-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--ns-line-soft);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover {
+  background: #f7faf9;
+}
+
+/* ---------------------------------------------------------------- badge */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge[data-tone="success"] {
+  background: var(--ns-success-soft);
+  color: var(--ns-success);
+}
+
+.badge[data-tone="danger"] {
+  background: var(--ns-danger-soft);
+  color: var(--ns-danger);
+}
+
+.badge[data-tone="warning"] {
+  background: var(--ns-warning-soft);
+  color: var(--ns-warning);
+}
+
+.badge[data-tone="info"] {
+  background: var(--ns-info-soft);
+  color: var(--ns-info);
+}
+
+.badge[data-tone="accent"] {
+  background: var(--ns-accent-soft);
+  color: var(--ns-accent);
+}
+
+.badge[data-tone="neutral"] {
+  background: var(--ns-neutral-soft);
+  color: var(--ns-neutral);
+}
+
+/* ---------------------------------------------------------------- notices */
+
+.notice {
+  border: 1px solid var(--ns-line);
+  border-radius: var(--ns-radius-control);
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.notice[data-tone="success"] {
+  border-color: var(--ns-success);
+  background: var(--ns-success-soft);
+  color: var(--ns-success);
+}
+
+.notice[data-tone="danger"] {
+  border-color: var(--ns-danger);
+  background: var(--ns-danger-soft);
+  color: var(--ns-danger);
+}
+
+.notice[data-tone="warning"] {
+  border-color: var(--ns-warning);
+  background: var(--ns-warning-soft);
+  color: var(--ns-warning);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

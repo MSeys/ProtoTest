@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { Change, Item, Span, TestTrace } from "../trace/model";
-import { formatOffset, itemTitle, sourceLabels } from "../trace/format";
+import { formatOffset, itemKindLabel, itemTitle, sourceLabels } from "../trace/format";
 import EmptyState from "../ui/EmptyState.vue";
 import Panel from "../ui/Panel.vue";
 
@@ -68,7 +68,7 @@ function isSelected(item: Item) {
       <div class="scale" aria-hidden="true"><span>start</span><span>{{ formatOffset(test.duration) }}</span></div>
       <div v-for="item in group.items" :key="item.key" class="item" :class="{ active: isSelected(item) }">
         <button type="button" class="name" :title="item.id" @click="emit('selectItem', item)">
-          <span class="kind">{{ item.kind }}</span>
+          <span class="kind">{{ itemKindLabel(item).label }}</span>
           <strong>{{ itemTitle(item) }}</strong>
           <small>{{ summary(item) }}</small>
         </button>

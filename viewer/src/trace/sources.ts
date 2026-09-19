@@ -38,5 +38,5 @@ export function sourceLocation(attributes: Record<string, unknown>): SourceLocat
 }
 
 export function fileName(path: string): string {
-  return path.split(/[\/]/).pop() ?? path;
+  return path.split(/[\\/]/).pop() ?? path;
 }

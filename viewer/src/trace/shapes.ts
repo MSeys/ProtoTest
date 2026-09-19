@@ -64,7 +64,9 @@ export function buildShapeTree(matches: string[], mismatches: ShapeMismatch[], e
     return node.status = "branch";
   };
   root.children.forEach(complete);
-  return root.children;
+  // A verdict recorded at the path root (JsonShapeMatcher reports "$") belongs to the document
+  // itself, so it is the tree; returning only the children would silently drop the mismatch.
+  return root.status === "branch" ? root.children : [root];
 }
 
 /** A shape check's tree, from the attributes ProtoTest.Json records on the span; null when it recorded none. */

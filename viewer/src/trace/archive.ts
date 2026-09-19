@@ -49,6 +49,10 @@ export async function openTraceArchive(buffer: ArrayBuffer): Promise<TraceArchiv
   const state = await readJson<WireState>(bytes, view, entries, manifest.stateEntry);
   if (!Array.isArray(spans.resourceSpans)) throw new TraceOpenError("corrupt", "spans.json has no resource groups.");
   if (!spans.formatVersion?.startsWith("2.")) throw new TraceOpenError("unsupported", `Span format ${spans.formatVersion} is not supported.`);
+  // The state document carries its own version, and only the viewer knows what it can read: accept the
+  // current 1.x wire and the 2.x bump that adds entity fields, reject anything else loudly.
+  if (!state.formatVersion?.startsWith("1.") && !state.formatVersion?.startsWith("2."))
+    throw new TraceOpenError("unsupported", `State format ${state.formatVersion} is not supported.`);
   // Only what the trace declares as an artifact can be opened; the rest of the ZIP stays closed.
   const declared = new Set(spans.resourceSpans.flatMap(group => (group.artifacts ?? []).map(artifact => artifact.archivePath)));
   return {
@@ -115,6 +119,34 @@ async function readEntry(bytes: Uint8Array, view: DataView, entries: Map<string,
   if (entry.method === 0) return compressed;
   if (entry.method !== 8 || typeof DecompressionStream === "undefined")
     throw new TraceOpenError("unsupported", "This trace uses a ZIP compression this browser cannot read.");
-  const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+
+  // Stream the inflation so a header that understates the size cannot decompress past the cap, and
+  // turn any decompression failure into the designed corrupt state instead of a raw runtime error.
+  const reader = new Blob([compressed]).stream()
+    .pipeThrough(new DecompressionStream("deflate-raw"))
+    .getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_ARCHIVE_BYTES) {
+        await reader.cancel();
+        throw new TraceOpenError("unsupported", `${name} is too large to read.`);
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    if (error instanceof TraceOpenError) throw error;
+    throw new TraceOpenError("corrupt", `${name} could not be decompressed.`);
+  }
+  const decompressed = new Uint8Array(total);
+  let written = 0;
+  for (const chunk of chunks) {
+    decompressed.set(chunk, written);
+    written += chunk.byteLength;
+  }
+  return decompressed;
 }

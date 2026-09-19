@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import type { Span, TestTrace } from "../trace/model";
 import type { StoryRow } from "../trace/story";
-import { formatDuration, kindLabel, spanFacts, tone } from "../trace/format";
+import { formatDuration, itemKindLabel, kindLabel, spanFacts, tone } from "../trace/format";
 import KindChip from "./KindChip.vue";
 
 const props = defineProps<{
@@ -49,7 +49,7 @@ const facts = computed(() => {
   const change = props.row.span.changes[0];
   if (!change) return "";
   const more = props.row.span.changes.length - 1;
-  return `${change.item.kind} ${change.change}${more ? `, and ${more} more` : ""}`;
+  return `${itemKindLabel(change.item).label} ${change.change}${more ? `, and ${more} more` : ""}`;
 });
 
 function countChanges(span: Span): number {

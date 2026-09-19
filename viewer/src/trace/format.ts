@@ -48,6 +48,11 @@ export const sourceLabels: Record<ChangeSource, string> = {
 /** Acronyms and product names that stay whole and keep their casing when a name is split into words. */
 const keptWords = ["GraphQL", "OpenAPI", "OAuth", "WebSocket", "JSON", "HTTPS", "HTTP", "REST", "API", "SQL", "URL", "UI", "ID", "CSV", "XML"];
 
+/** A placeholder that cannot occur in a test name; a digit token must never be read as a kept-word index. */
+const keptMark = "\u0000";
+const keptPattern = new RegExp(`${keptMark}(\\d+)${keptMark}`, "g");
+const keptToken = new RegExp(`^${keptMark}(\\d+)${keptMark}$`);
+
 /**
  * Turns a code name into words a person reads: `AFailedOperationRecordsItsDiagnostics` becomes
  * "A failed operation records its diagnostics". Acronyms keep their casing; a parameter suffix is kept as written.
@@ -57,16 +62,18 @@ export function humanize(name: string): string {
   const base = suffixAt >= 0 ? name.slice(0, suffixAt) : name;
   const suffix = suffixAt >= 0 ? ` ${name.slice(suffixAt)}` : "";
   let text = base;
-  keptWords.forEach((word, index) => { text = text.split(word).join(` ${index} `); });
+  keptWords.forEach((word, index) => { text = text.split(word).join(`${keptMark}${index}${keptMark}`); });
   const words = text
+    // A protected word can sit next to a digit or another word (`GraphQL1`); the marks isolate it.
+    .replace(keptPattern, ` ${keptMark}$1${keptMark} `)
     .replace(/_/g, " ")
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2")
     .split(/\s+/)
     .filter(Boolean)
     .map(word => {
-      const kept = /^(\d+)$/.exec(word);
-      if (kept && keptWords[Number(kept[1])]) return keptWords[Number(kept[1])];
+      const kept = keptToken.exec(word);
+      if (kept) return keptWords[Number(kept[1])];
       const canonical = keptWords.find(candidate => candidate.toLocaleLowerCase() === word.toLocaleLowerCase());
       if (canonical) return canonical;
       return /^[A-Z0-9]{2,}$/.test(word) ? word : word.toLocaleLowerCase();
@@ -172,6 +179,10 @@ export function itemTitle(item: Item): string {
 /** A tracked item's kind as a chip: the framework's own kinds keep their family, a domain object reads as data. */
 export function itemKindLabel(item: Item): KindLabel {
   const families: Record<string, string> = { client: "client", context: "context", auth: "auth", server: "ownership", database: "ownership", capability: "extension" };
+  // A value's kind is the generic "value"; its id carries the domain type (`invoice:INV-1`).
+  if (item.kind === "value" && item.id.includes(":")) {
+    return { id: "data", label: humanize(item.id.split(":")[0]) };
+  }
   const label = item.kind.charAt(0).toLocaleUpperCase() + item.kind.slice(1);
   return { id: families[item.kind.toLocaleLowerCase()] ?? "data", label };
 }

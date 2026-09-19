@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import type { Artifact, Item, Span, TestTrace } from "../trace/model";
 import { shapeMismatches } from "../trace/model";
-import { formatBytes, formatDuration, formatOffset, isCheck, itemTitle, shortType, sourceLabels, tone } from "../trace/format";
+import { formatBytes, formatDuration, formatOffset, isCheck, itemKindLabel, itemTitle, shortType, sourceLabels, tone } from "../trace/format";
 import { shapeTreeOf } from "../trace/shapes";
 import SectionView from "./SectionView.vue";
 import ShapeResultTree from "./ShapeResultTree.vue";
@@ -101,7 +101,7 @@ function value(input: unknown): string {
       <h3>What this changed</h3>
       <button v-for="(change, index) in span.changes" :key="index" type="button" class="link-row" @click="emit('item', change.item)">
         <span class="change">{{ change.change }}</span>
-        <span>{{ change.item.kind }} {{ itemTitle(change.item) }}</span>
+        <span>{{ itemKindLabel(change.item).label }} {{ itemTitle(change.item) }}</span>
         <small :class="change.source">{{ sourceLabels[change.source] }}</small>
       </button>
     </section>
@@ -109,7 +109,7 @@ function value(input: unknown): string {
     <section v-else-if="span.item" class="block">
       <h3>Acted on</h3>
       <button type="button" class="link-row" @click="span.item && emit('item', span.item)">
-        <span class="change">{{ span.item.kind }}</span>
+        <span class="change">{{ span.item ? itemKindLabel(span.item).label : "" }}</span>
         <span>{{ itemTitle(span.item) }}</span>
       </button>
     </section>

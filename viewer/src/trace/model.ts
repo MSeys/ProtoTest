@@ -281,8 +281,10 @@ interface Built {
 
 function buildSpans(group: WireResourceGroup, test: TestTrace | null): Built {
   const artifactsById = artifacts(group);
-  const scope = group.scopeSpans[0];
-  const wireSpans = scope?.spans ?? [];
+  // A resource may carry more than one instrumentation scope; every scope's spans and events belong
+  // to the same test, so they are flattened instead of reading only the first scope.
+  const scopes = group.scopeSpans ?? [];
+  const wireSpans = scopes.flatMap(scope => scope.spans ?? []);
   const byId = new Map<string, Span>();
   const spans: Span[] = wireSpans.map(wire => {
     const start = time(wire.startedAtUtc);
@@ -307,7 +309,9 @@ function buildSpans(group: WireResourceGroup, test: TestTrace | null): Built {
   roots.forEach(root => setDepth(root, 0));
   const moments: Moment[] = [];
   const evidence: Evidence[] = [];
-  for (const event of scope?.events ?? []) readEvent(event, null, artifactsById, moments, evidence);
+  for (const scope of scopes) {
+    for (const event of scope.events ?? []) readEvent(event, null, artifactsById, moments, evidence);
+  }
   return { spans, roots, byId, moments, evidence, artifacts: artifactsById };
 }
 

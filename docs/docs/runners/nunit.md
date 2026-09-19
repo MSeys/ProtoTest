@@ -1,6 +1,7 @@
 ---
 sidebar_position: 4
 title: NUnit
+description: "Set up ProtoTest with NUnit: the SetUpFixture, [ProtoTest] tests, parallel execution, outcomes and attachments."
 ---
 
 # NUnit

@@ -1,6 +1,7 @@
 ---
 sidebar_position: 3
 title: Provisioners
+description: "A provisioner creates a built object in the system under test, returns what the system gave back, and cleans it up afterwards."
 ---
 
 # Provisioners

@@ -1,6 +1,7 @@
 ---
 sidebar_position: 6
 title: Logging in
+description: "Log in once per test the way your application does — a login page, SSO, an API token or saved storage state — as a reusable capability."
 ---
 
 # Logging in

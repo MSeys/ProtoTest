@@ -1,11 +1,12 @@
 ---
-sidebar_position: 9
+sidebar_position: 8
 title: Attachments
+description: "Files a test produces reach your runner, so they show up next to the result in your IDE or CI, and land in the trace."
 ---
 
 # Attachments
 
-An attachment is a file a test produced: a response body, a screenshot, a Playwright trace, a report you generated. ProtoTest hands attachments to your runner — so they show up next to the test result in your IDE or CI — and bundles them into the [`.prototrace` archive](../advanced/prototrace.md).
+An attachment is a file a test produced: a response body, a screenshot, a Playwright trace, a report you generated. ProtoTest hands attachments to your runner — so they show up next to the test result in your IDE or CI — and bundles them into the [`.prototrace` archive](../observability/prototrace.md).
 
 Integrations add attachments on their own ([REST](../integrations/rest/attachments.md), [GraphQL](../integrations/graphql/index.md#builder-options), [Web](../integrations/web/diagnostics.md)). You can add your own from tests, hooks and attributes.
 
@@ -55,7 +56,7 @@ In-memory attachments are written to `%TEMP%/ProtoTest/attachments/` when a runn
 
 ## In the trace
 
-Every attachment is recorded as an `attachment.register` entry. After the test, its content is copied into the archive under `resources/{testId}/…`, and the entry is updated with its archive path and size — so the [viewer](../advanced/prototrace.md#viewing-a-trace) can open it right from the step that produced it.
+Every attachment is recorded as an `attachment.register` entry. After the test, its content is copied into the archive under `resources/{testId}/…`, and the entry is updated with its archive path and size — so the [viewer](../observability/prototrace.md#viewing-a-trace) can open it right from the step that produced it.
 
 ## Writing a runner integration
 

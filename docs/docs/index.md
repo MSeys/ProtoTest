@@ -3,6 +3,7 @@ id: index
 slug: /
 sidebar_position: 0
 title: Introduction
+description: "ProtoTest is a composable integration-testing foundation for .NET: REST, GraphQL, gRPC, browsers, data, SQL and messaging on one host, one context and one lifecycle."
 ---
 
 # ProtoTest
@@ -31,8 +32,8 @@ ProtoTest and this documentation are under active development. APIs may still ch
 | test an API | [REST](./integrations/rest/index.md), [GraphQL](./integrations/graphql/index.md) |
 | test a UI | [Web](./integrations/web/index.md) |
 | stop hand-writing test data | [Data](./integrations/data/index.md) |
-| know what your suite misses | [Coverage](./advanced/coverage.md) |
-| debug a failure from CI | [ProtoTrace](./advanced/prototrace.md) |
+| know what your suite misses | [Coverage](./observability/coverage.md) |
+| debug a failure from CI | [ProtoTrace](./observability/prototrace.md) |
 | add your own integration | [Extending ProtoTest](./advanced/extending.md) |
 
 ## See it in a real suite

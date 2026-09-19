@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="6.3.0" />
+    <PackageReference Include="ProtoTest.NUnit" Version="PROTOTEST_VERSION" />
+    <PackageReference Include="ProtoTest.AspNetCore" Version="PROTOTEST_VERSION" />
+    <PackageReference Include="ProtoTest.Rest" Version="PROTOTEST_VERSION" />
+    <PackageReference Include="ProtoTest.Reporting" Version="PROTOTEST_VERSION" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Starter.Api\Starter.Api.csproj" />
+  </ItemGroup>
+
+</Project>

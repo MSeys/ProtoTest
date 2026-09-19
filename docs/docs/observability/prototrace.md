@@ -1,11 +1,12 @@
 ---
 sidebar_position: 1
 title: ProtoTrace
+description: "ProtoTrace records every hook, client, request, check and state change of a run into one portable file, readable in the browser-based viewer."
 ---
 
 # ProtoTrace
 
-ProtoTrace is ProtoTest's execution trace. Because ProtoTest owns the lifecycle and understands its integrations, it can record what happened in every test — hooks, attributes, clients, state, requests, browser actions, assertions, attachments, cleanup — **without a single logging line in your tests**. At the end of the run, everything is written to one portable `.prototrace` file.
+ProtoTrace is ProtoTest's execution trace. Because ProtoTest coordinates the lifecycle and understands its integrations, it can record what happened in every test — hooks, attributes, clients, state, requests, browser actions, assertions, attachments, cleanup — **without a single logging line in your tests**. At the end of the run, everything is written to one portable `.prototrace` file.
 
 When a test fails in CI, you download that file and open it in the [ProtoTrace viewer](https://trace.prototest.dev). You see the failing assertion *in context*: which user was set up, what the request looked like, what came back, what the browser showed.
 
@@ -23,9 +24,10 @@ With `Enabled = false`, nothing is recorded and no file is written. Observations
 
 ## What a trace contains
 
-A run contains tests; a test contains a **tree of entries**.
+A run contains tests, and a trace records two things about each of them:
 
-Each entry is either an **operation** (it has a duration and an outcome — a request, a flow, a hook) or an **event** (a moment — a state change, a console message). Operations nest: a `web.flow` contains its clicks, a test's execution contains everything the test body did.
+- **What ran** — a tree of **operations** (spans): each has a duration and an outcome — a request, a flow, a hook. Operations nest: a `web.flow` contains its clicks, a test's execution contains everything the test body did. Moments inside an operation — a server starting, a subscription message — are **events** on it, and so are the observations, attachments and findings it produced.
+- **What existed and changed** — the **state**: every client, context, resource and tracked value, with its state at the end and a trail of changes. Each change names the operation that caused it, and where the value came from: the test itself, a response it observed, or the application's own instrumentation.
 
 Every entry belongs to a **phase**:
 
@@ -74,13 +76,14 @@ They share correlation, but they're kept separate: observations feed reports, th
 
 ## Viewing a trace
 
-The [ProtoTrace viewer](https://trace.prototest.dev) is a static web app. Trace files are read **entirely in your browser** and never uploaded.
+The [ProtoTrace viewer](https://trace.prototest.dev) is a static web app. Trace files are read **entirely in your browser** and never uploaded. To look around before you have a trace of your own, [open the sample trace](https://trace.prototest.dev/?demo=1): a run of the demo suite, with a failing test and two partial ones.
 
-- Tests are grouped by class, with pass/fail/partial at a glance.
-- Each test has tabs for its overview, lifecycle, the full operation tree, network traffic, assertions, observations, artifacts and errors.
-- Parallel tests appear as separate lanes on the run timeline, so overlap is visible.
-- The inspector walks ancestors and descendants — from a failed assertion up to the request that produced it and the setup that preceded it.
-- Shape mismatches and JSON payloads render as expandable structured data.
+- **The run** opens with its verdict, what needs attention — failing and partial tests with the check that decided them, findings, gates — and what the run could see: where the application ran, which capabilities were composed, and which sources of values were present.
+- **A failing test** leads with its failure: the check that failed, expected against actual for every property, and the call it judged.
+- **Story** tells the test phase by phase: each call carries its checks, and the framework's own steps fold away until you open them.
+- **State** shows every tracked item with its lifeline and changes; select a change to jump to the operation that made it.
+- **Spans** is the complete, searchable tree.
+- **The inspector** shows everything one operation recorded — request and response, JSON as a collapsible tree, the shape a check validated, what it changed — and every item's change trail. The address holds the selection, so a link opens the same place.
 
 The viewer's source is in the repository under [`viewer/`](https://github.com/MSeys/ProtoTest/tree/main/viewer) if you'd rather host it yourself.
 
@@ -90,15 +93,20 @@ A `.prototrace` file is a ZIP archive:
 
 ```
 run.prototrace
-├── manifest.json            { "formatVersion": "1.2", "runEntry": "run.json" }
-├── run.json                 the whole run: tests, entries, artifacts, environment
+├── manifest.json            { "formatVersion": "2.0", "spansEntry": "spans.json", "stateEntry": "state.json" }
+├── spans.json               what ran: one resource group per test and one for the run
+├── state.json               what existed and changed: tracked items with their changes
 └── resources/
     ├── {testId}/artifact-1/rest-01-response.json
     ├── {testId}/artifact-2/playwright-default-trace.zip
     └── run/HtmlReportSink/run-artifact-1/report.html
 ```
 
-Entries are stored **uncompressed**, so a browser can read the archive without a decompression library. `run.json` uses camelCase property names and string enums, and records the runtime, OS and architectures in `environment`.
+- **`spans.json`** holds a resource group per test — its id, name, class, method, outcome and duration — with its operations, their events, and the artifacts the test declared. The run's own group carries its id, start and end, and the environment it ran in (`environment.runtime`, `environment.os`, …); run-level events such as gate verdicts sit on it too.
+- **`state.json`** holds the run's tracked items and each test's: kind, id, name, scope, first and last seen, the state at the end and every change, with the operation that caused it.
+- Each artifact is declared once, with its media type, size and path in the archive; an attachment event refers to it by id.
+
+Entries are stored **uncompressed**, so a browser can read the archive without a decompression library. Property names are camelCase. Traces written before format 2.0 had a single `run.json` instead; the current viewer says so and asks for a trace from a current ProtoTest.
 
 Test artifacts — every [attachment](../foundation/attachments.md) — live under the test's id. Run-level artifacts, such as the reports written by [sinks](./reporting.md), live under `resources/run/`.
 
@@ -112,4 +120,4 @@ var click = run.Tests.Single().Entries.Single(entry => entry.Kind == "web.click"
 Assert.That(click.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
 ```
 
-To add your own entries, see [Extending ProtoTest](./extending.md#adding-to-the-trace). To forward operations to an observability backend, see [OpenTelemetry](./opentelemetry.md).
+To add your own entries, see [Extending ProtoTest](../advanced/extending.md#adding-to-the-trace). To forward operations to an observability backend, see [OpenTelemetry](./opentelemetry.md).

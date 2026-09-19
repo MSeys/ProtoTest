@@ -1,6 +1,7 @@
 ---
 sidebar_position: 3
 title: Locators
+description: "Find elements by role, label and text rather than CSS; each backend translates a WebLocator into its native query."
 ---
 
 # Locators

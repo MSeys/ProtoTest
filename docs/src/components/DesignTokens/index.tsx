@@ -23,16 +23,30 @@ export function Swatches({tokens}: {tokens: string[]}): ReactNode {
 
 const phases = ['Setup', 'Execution', 'Rollback', 'Teardown'];
 
+/*
+ * The execution vocabulary is drawn where ProtoTest draws executions — on the blueprint surface of the
+ * viewer and the report — so each sample sits on that surface whatever the page theme.
+ */
+function Stage({children}: {children: ReactNode}): ReactNode {
+  return (
+    <div data-surface="blueprint" className={styles.stage}>
+      {children}
+    </div>
+  );
+}
+
 export function Phases(): ReactNode {
   return (
-    <div className={styles.phases}>
+    <Stage>
+      <div className={styles.phases}>
       {phases.map((phase) => (
         <span key={phase}>
           <i style={{background: `var(--phase-${phase.toLowerCase()})`}} />
           {phase}
         </span>
       ))}
-    </div>
+      </div>
+    </Stage>
   );
 }
 
@@ -45,7 +59,8 @@ const families: {family: string; token: string; means: string; kinds: string[]}[
 
 export function TypeFamilies(): ReactNode {
   return (
-    <div className={styles.families}>
+    <Stage>
+      <div className={styles.families}>
       {families.map((item) => (
         <div key={item.family} className={styles.family} style={{['--node' as string]: `var(${item.token})`}}>
           <strong>{item.family}</strong>
@@ -57,7 +72,8 @@ export function TypeFamilies(): ReactNode {
           </div>
         </div>
       ))}
-    </div>
+      </div>
+    </Stage>
   );
 }
 
@@ -71,14 +87,16 @@ const outcomes = [
 
 export function Outcomes(): ReactNode {
   return (
-    <div className={styles.phases}>
+    <Stage>
+      <div className={styles.phases}>
       {outcomes.map((outcome) => (
         <span key={outcome.name} style={{color: `var(${outcome.token})`}}>
           <b className={styles.dot} style={{background: `var(${outcome.token})`}} />
           {outcome.name}
         </span>
       ))}
-    </div>
+      </div>
+    </Stage>
   );
 }
 

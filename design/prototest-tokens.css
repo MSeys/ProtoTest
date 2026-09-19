@@ -108,8 +108,10 @@
   --hover: #eaf4f8;
 
   --text: #183f5b;
-  --muted: #657f91;
-  --dim: #8299a8;
+  /* Secondary and tertiary text both read at 4.5:1 or better on the paper and on white (WCAG AA);
+     dim stays a step lighter than muted. */
+  --muted: #4d6576;
+  --dim: #5c7383;
   --border: rgba(18, 59, 88, 0.14);
   --border-strong: rgba(18, 59, 88, 0.28);
 
@@ -119,9 +121,9 @@
   --success: #17835a;
   --success-soft: rgba(23, 131, 90, 0.09);
   --success-line: rgba(23, 131, 90, 0.34);
-  --warning: #9a6c14;
-  --warning-soft: rgba(154, 108, 20, 0.1);
-  --warning-line: rgba(154, 108, 20, 0.34);
+  --warning: #8a600f;
+  --warning-soft: rgba(138, 96, 15, 0.1);
+  --warning-line: rgba(138, 96, 15, 0.34);
   --danger: #c1444b;
   --danger-soft: rgba(193, 68, 75, 0.09);
   --danger-line: rgba(193, 68, 75, 0.34);
@@ -150,11 +152,14 @@
 
   --text: #dceaf3;
   --muted: #90aec2;
-  --dim: #6f93a8;
+  /* Tertiary text keeps 4.5:1 on selected and tinted rows too, not only on the bare surface. */
+  --dim: #7a9cb0;
   --border: rgba(255, 255, 255, 0.11);
   --border-strong: rgba(255, 255, 255, 0.22);
 
-  --blueprint: var(--pt-blue-bright);
+  /* The bright blue lifted so it reads as text on every blueprint surface (4.5:1 or better on
+     --surface-2); --pt-blue-bright stays the brand colour for marks and tints. */
+  --blueprint: #3a9fd6;
   --blueprint-soft: rgba(22, 136, 191, 0.14);
   --blueprint-line: rgba(22, 136, 191, 0.42);
   --success: var(--pt-green);
@@ -163,7 +168,8 @@
   --warning: var(--pt-amber);
   --warning-soft: rgba(215, 168, 75, 0.13);
   --warning-line: rgba(215, 168, 75, 0.42);
-  --danger: var(--pt-red);
+  /* Lifted from --pt-red so a danger label reads at 4.5:1 on its own soft tint. */
+  --danger: #e07a7a;
   --danger-soft: rgba(216, 106, 106, 0.13);
   --danger-line: rgba(216, 106, 106, 0.42);
   --violet: #b29ae1;
@@ -226,16 +232,19 @@
   --accent-soft: var(--blueprint-soft);
 
   /* Code sits on the sunken surface on both surfaces, so one syntax palette serves both themes.
-     Blueprint cyan for structure, paper-green for literals, amber for numbers, a dimmed navy-grey for
-     comments — the handoff's code swatches. */
+     Each role gets its own hue so a C# block does not read as one blue wash: violet keywords, cyan types,
+     blue calls, paper-green literals, amber numbers and attributes (the composition a ProtoTest reader
+     looks for), and namespaces and punctuation stepped back into the navy-grey of comments. */
   --code-text: var(--pt-code-text);
   --code-comment: #6f8ea3;
-  --code-keyword: #71bfd3;
+  --code-keyword: #b8a4e6;
   --code-type: #8fd3e0;
   --code-function: #9ec9f5;
   --code-string: #91d4b3;
   --code-number: #e2c07d;
   --code-attribute: #b8a4e6;
+  --code-annotation: #e2c07d;
+  --code-namespace: #90aec2;
   --code-punctuation: #90aec2;
   --code-highlight: rgba(113, 191, 211, 0.12);
 }

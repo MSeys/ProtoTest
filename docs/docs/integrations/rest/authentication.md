@@ -1,6 +1,7 @@
 ---
 sidebar_position: 4
 title: Authentication
+description: "One authentication model for REST, GraphQL and gRPC: an authenticator adds what the API needs just before each request is sent."
 ---
 
 # Authentication

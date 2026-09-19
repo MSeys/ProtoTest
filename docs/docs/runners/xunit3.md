@@ -1,6 +1,7 @@
 ---
 sidebar_position: 3
 title: xUnit v3
+description: "Set up ProtoTest with xUnit v3: the assembly fixture, [ProtoTest] tests, outcomes and native attachments."
 ---
 
 # xUnit v3

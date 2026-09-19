@@ -1,6 +1,7 @@
 ---
 sidebar_position: 2
 title: xUnit v2
+description: "Set up ProtoTest with xUnit v2: the collection fixture, [ProtoTest] tests, theories and outcomes."
 ---
 
 # xUnit v2

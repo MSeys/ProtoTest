@@ -1,6 +1,7 @@
 ---
 sidebar_position: 3
 title: Responses and assertions
+description: "Assert on a RestResponse: status, headers, JSON shapes and typed bodies, with the body buffered so it can be read any number of times."
 ---
 
 # Responses and assertions
@@ -55,9 +56,9 @@ Shape mismatch failed with 2 error(s):
   • [$.status]: Values did not match. (Expected: "pending", Actual: "cancelled")
 ```
 
-The full rules and every available matcher are on the [Shape matching](../../advanced/json-shapes.md) page.
+The full rules and every available matcher are on the [Shape matching](../../foundation/shape-matching.md) page.
 
-Shape assertions also do double duty: the property paths they match are what [OpenAPI coverage](../../advanced/coverage.md) uses to report which response fields your suite actually checked.
+Shape assertions also do double duty: the property paths they match are what [OpenAPI coverage](../../observability/coverage.md) uses to report which response fields your suite actually checked.
 
 :::tip[Shape a whole array]
 Because arrays are positional, a list assertion is precise:

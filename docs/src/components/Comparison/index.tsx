@@ -99,12 +99,7 @@ export default function Comparison({without, with: withProto, concerns}: Compari
       head={
         <>
           <strong className={styles.title}>The same scenario, written twice.</strong>
-          <span className={styles.delta}>
-            plumbing per fixture{' '}
-            <strong>
-              {withoutLedger.plumbing} → {withLedger.plumbing}
-            </strong>
-          </span>
+          <span className={styles.delta}>{withoutTest.filename}, both ways</span>
         </>
       }
       foot={
@@ -114,26 +109,18 @@ export default function Comparison({without, with: withProto, concerns}: Compari
           contract coverage and the report.
         </span>
       }>
-      <div className={styles.ledger}>
+      {/* The point of the comparison, stated once and large: the plumbing each new fixture pays for. */}
+      <div className={styles.score}>
         {groups.map((group) => (
-          <div key={group.id} className={styles.row}>
-            <div className={styles.rowHead}>
-              <span className={styles.side}>{group.label}</span>
-              <span className={styles.file}>
-                {group.files.find((file) => file.scope === 'test')!.filename}
-              </span>
-              <span className={styles.stats}>
-                <strong>{group.ledger.total} lines</strong>
-                <span>
-                  <i className={styles.swatchPlumbing} />
-                  {group.ledger.plumbing} plumbing
-                </span>
-                <span>
-                  <i className={styles.swatchScenario} />
-                  {group.ledger.scenario} scenario
-                </span>
-              </span>
-            </div>
+          <div key={group.id} className={`${styles.side} ${group.id === 'with' ? styles.sideWith : ''}`}>
+            <span className={styles.sideLabel}>{group.label}</span>
+            <span className={styles.figure}>
+              <strong>{group.ledger.plumbing}</strong>
+              <span>lines of plumbing</span>
+            </span>
+            <span className={styles.context}>
+              in a {group.ledger.meaningful}-line fixture, {group.ledger.scenario} of them the scenario
+            </span>
             <Bar value={group.ledger} max={max} />
           </div>
         ))}

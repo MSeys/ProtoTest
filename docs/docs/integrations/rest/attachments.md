@@ -1,6 +1,7 @@
 ---
 sidebar_position: 5
 title: Attachments and coverage
+description: "Capture REST requests and responses as attachments, and record which endpoints and properties your suite asserted."
 ---
 
 # Attachments and coverage
@@ -28,7 +29,7 @@ builder.AddApplication("Api", app => app.AddRest(rest =>
 
 Without `CaptureAttachments()`, nothing is attached — requests are still traced and observed.
 
-Each test then gets numbered attachments, which your [runner](../../runners/overview.md) shows alongside the result and which are bundled into the [ProtoTrace archive](../../advanced/prototrace.md):
+Each test then gets numbered attachments, which your [runner](../../runners/overview.md) shows alongside the result and which are bundled into the [ProtoTrace archive](../../observability/prototrace.md):
 
 | Attachment | Contains |
 | --- | --- |
@@ -91,4 +92,4 @@ builder.AddApplication("Api", app => app
 
 `RestCoverageCollector` reports every endpoint your suite **called**, with a hit count. It can only list what it saw — to find endpoints you **never** called, and response fields you never asserted, use [`OpenApiCoverageCollector`](../openapi.md), which walks your whole specification.
 
-Both write into the same reports; see [Coverage](../../advanced/coverage.md).
+Both write into the same reports; see [Coverage](../../observability/coverage.md).

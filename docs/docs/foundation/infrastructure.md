@@ -1,6 +1,7 @@
 ---
-sidebar_position: 6
+sidebar_position: 10
 title: Infrastructure
+description: "Declare a database, broker or emulator on the host; it starts once before any test, fills configuration, and is released with the run."
 ---
 
 # Infrastructure

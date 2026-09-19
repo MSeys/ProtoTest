@@ -1,0 +1,39 @@
+.page {
+  max-width: 720px;
+  padding-block: var(--space-7) calc(var(--space-7) * 2);
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  text-align: center;
+}
+
+.mark { width: 64px; height: 64px; margin-bottom: var(--space-3); }
+
+.title { margin: 0; font-size: clamp(1.8rem, 3vw, 2.4rem); letter-spacing: var(--tracking-display); }
+
+.lead { max-width: 52ch; margin: 0; color: var(--muted); line-height: var(--leading); }
+
+.links {
+  width: 100%;
+  margin-top: var(--space-5);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-3);
+  text-align: left;
+}
+
+.link {
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease);
+}
+
+.link:hover { border-color: var(--blueprint); background: var(--surface-2); color: var(--text); text-decoration: none; }
+.link strong { font-weight: var(--weight-semibold); }
+.link span { color: var(--muted); font-size: var(--text-meta); }

@@ -68,6 +68,25 @@
   --ifm-heading-color: var(--pt-white);
 }
 
+/* Infima's variables resolve where they are declared, on the root, so a data-surface panel would keep the
+   page theme's text colours. Re-resolve the ones text reads on every opted-in surface. */
+[data-surface] {
+  --ifm-font-color-base: var(--text);
+  --ifm-font-color-secondary: var(--muted);
+}
+[data-surface='paper'] {
+  --ifm-color-primary: var(--blueprint);
+  --ifm-heading-color: var(--pt-navy);
+}
+[data-surface='blueprint'] {
+  --ifm-color-primary: var(--pt-cyan);
+  --ifm-heading-color: var(--pt-white);
+}
+
+/* ── Focus ──────────────────────────────────────────────────────────────────────────────────
+   One visible ring for everything a keyboard can reach, in the accent of the surface it sits on. */
+:focus-visible { outline: 2px solid var(--blueprint); outline-offset: 2px; }
+
 /* ── Type ─────────────────────────────────────────────────────────────────────────────────── */
 h1, h2, h3, h4 { letter-spacing: -0.02em; }
 .markdown h2 { margin-top: calc(var(--space-7) + var(--space-3)); }
@@ -95,7 +114,7 @@ h1, h2, h3, h4 { letter-spacing: -0.02em; }
 }
 
 .navbar__search-input::placeholder { color: var(--muted); }
-.navbar__search-input:focus { border-color: var(--blueprint); outline: none; box-shadow: none; }
+.navbar__search-input:focus { border-color: var(--blueprint); outline: none; box-shadow: 0 0 0 1px var(--blueprint); }
 
 [class*='toggleButton'] {
   border: 1px solid transparent;
@@ -119,6 +138,62 @@ kbd[class*='searchHint'] {
   box-shadow: none;
   font: var(--text-micro) var(--font-mono);
 }
+
+/* The results dropdown: a token panel with quiet rows. The plugin paints the active row in the primary colour
+   and forces its text white with !important, and uses one variable for both that fill and the matched words,
+   so the active row is re-dressed directly: the site's own selection, a soft blueprint band with a left rule. */
+:root {
+  --search-local-modal-background: var(--surface);
+  --search-local-modal-shadow: var(--elevation-overlay);
+  --search-local-hit-background: transparent;
+  --search-local-hit-shadow: none;
+  --search-local-hit-color: var(--text);
+  --search-local-muted-color: var(--muted);
+  --search-local-highlight-color: var(--blueprint);
+  --search-local-hit-height: 52px;
+  --search-local-input-active-border-color: var(--blueprint);
+}
+
+html [class*='dropdownMenu'] {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-overlay);
+}
+
+html [class*='dropdownMenu'] [class*='suggestion'] {
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  transition: background var(--motion-fast) var(--motion-ease);
+}
+
+html [class*='dropdownMenu'] [class*='suggestion'][class*='cursor'] {
+  border-color: var(--blueprint-line);
+  background: var(--blueprint-soft) !important;
+  box-shadow: inset 2px 0 0 var(--blueprint);
+}
+
+html [class*='dropdownMenu'] [class*='suggestion'][class*='cursor'],
+html [class*='dropdownMenu'] [class*='suggestion'][class*='cursor'] [class*='hitTitle'] {
+  color: var(--text) !important;
+}
+
+html [class*='dropdownMenu'] [class*='suggestion'][class*='cursor'] [class*='hitIcon'],
+html [class*='dropdownMenu'] [class*='suggestion'][class*='cursor'] [class*='hitTree'],
+html [class*='dropdownMenu'] [class*='suggestion'][class*='cursor'] [class*='hitPath'] {
+  color: var(--muted) !important;
+}
+
+/* Matched words: the blueprint colour, never a filled highlight, in every row including the active one. */
+html [class*='dropdownMenu'] mark,
+html [class*='dropdownMenu'] [class*='suggestion'][class*='cursor'] mark {
+  background: none;
+  color: var(--blueprint) !important;
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+}
+
+html [class*='dropdownMenu'] [class*='hitTitle'] { font-size: var(--text-body); font-weight: var(--weight-semibold); }
+html [class*='dropdownMenu'] [class*='hitPath'] { font-size: var(--text-micro); }
+html [class*='dropdownMenu'] [class*='hitFooter'] a { color: var(--blueprint); font-size: var(--text-meta); }
 
 /* The blur lives on a layer behind the navbar, not on the navbar itself: a backdrop-filter makes its element
    the containing block for fixed-position descendants, which clipped the mobile sidebar to the navbar's own
@@ -169,6 +244,11 @@ div[class*='codeBlockTitle'] {
   font: var(--text-meta) var(--font-mono);
 }
 .theme-code-block button { color: var(--code-punctuation); }
+
+/* A C# attribute is tokenised as `attribute class-name`, and prism-react-renderer lets the last type win, so the
+   theme alone would draw [ProtoTest] as a type. Attributes are how a suite composes, so they get their own colour;
+   the inline style can only be overridden here. */
+.token.attribute.class-name { color: var(--code-annotation) !important; }
 /* Reference code keeps its lines and scrolls; the scrollbar belongs to the code surface, not the page. */
 .theme-code-block pre { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--code-text) 28%, transparent) transparent; }
 
@@ -179,14 +259,21 @@ div[class*='codeBlockTitle'] {
 }
 
 /* ── Tables: a panel with a header row, not zebra stripes ────────────────────────────────── */
+/* The panel is the scroller the MDX table component wraps every table in: a wide table scrolls inside it
+   instead of widening the page, and a narrow one still fills the column. */
+.markdown .table-scroll {
+  margin-bottom: var(--ifm-spacing-vertical);
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
 .markdown table {
   display: table;
   width: 100%;
+  margin: 0;
   border-collapse: separate;
   border-spacing: 0;
-  overflow: clip;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
+  border: 0;
   font-size: 0.94em;
 }
 .markdown table thead tr { border-bottom: 0; }
@@ -220,7 +307,8 @@ div[class*='codeBlockTitle'] {
 .theme-admonition.alert--warning { --admonition-color: var(--warning); --admonition-soft: var(--warning-soft); }
 .theme-admonition.alert--danger { --admonition-color: var(--danger); --admonition-soft: var(--danger-soft); }
 .theme-admonition div[class*='admonitionHeading'] {
-  color: var(--admonition-color);
+  /* Pulled toward the text colour so the label reads on its own tint in both themes. */
+  color: color-mix(in srgb, var(--admonition-color) 45%, var(--text));
   font: var(--weight-semibold) var(--text-meta) var(--font-mono);
   letter-spacing: 0.08em;
 }
@@ -235,6 +323,8 @@ div[class*='codeBlockTitle'] {
 }
 .table-of-contents__link--active { font-weight: var(--weight-semibold); }
 .breadcrumbs__link { border-radius: var(--radius-chip); }
+/* The current page reads as text on its tint, like the active sidebar entry. */
+.breadcrumbs__item--active .breadcrumbs__link { color: var(--text); }
 .pagination-nav__link {
   border: 1px solid var(--border);
   border-radius: var(--radius-control);

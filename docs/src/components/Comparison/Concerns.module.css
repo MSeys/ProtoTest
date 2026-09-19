@@ -9,24 +9,25 @@
   padding: 0 var(--space-4);
 }
 
+/* Column headings in the reading face, quiet: they label, they do not shout. */
 .columns {
   padding-block: var(--space-2);
   border-bottom: 1px solid var(--border);
-  color: var(--dim);
-  font: var(--weight-semibold) var(--text-micro) var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  color: var(--muted);
+  font-size: var(--text-meta);
+  font-weight: var(--weight-semibold);
 }
 
 .concern + .concern { border-top: 1px solid var(--border); }
 
 .row {
   width: 100%;
-  padding-block: var(--space-3);
+  padding-block: var(--space-4);
   align-items: start;
   border: 0;
   background: transparent;
   color: inherit;
+  font: inherit;
   text-align: left;
   cursor: pointer;
   transition: background var(--motion-fast) var(--motion-ease);
@@ -40,45 +41,32 @@
   align-items: baseline;
   gap: var(--space-2);
   color: var(--text);
-  font-size: var(--text-body);
+  font-size: var(--text-strong);
   font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
 }
 
-/* The viewer's expand box: a plus in a hairline square that loses its stem when open. */
-.expand {
-  flex: 0 0 auto;
-  width: 10px;
-  height: 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-hairline);
-  background:
-    linear-gradient(var(--muted), var(--muted)) center / 6px 1px no-repeat,
-    linear-gradient(var(--muted), var(--muted)) center / 1px 6px no-repeat;
-}
-
-.open .expand { background: linear-gradient(var(--muted), var(--muted)) center / 6px 1px no-repeat; }
+/* The chevron the JSON viewer and the trace use: it turns when the row opens. */
+.chevron { flex: none; color: var(--muted); transition: transform var(--motion-fast) var(--motion-ease); }
+.open .chevron { transform: rotate(90deg); color: var(--blueprint); }
 
 .side { display: grid; gap: var(--space-1); justify-items: start; min-width: 0; }
 
 /* Only needed once the columns stack; on a wide row the column headings say it. */
-.sideLabel { display: none; color: var(--dim); font: var(--weight-semibold) var(--text-micro) var(--font-mono); font-style: normal; letter-spacing: 0.08em; text-transform: uppercase; }
+.sideLabel { display: none; color: var(--muted); font-size: var(--text-micro); font-style: normal; font-weight: var(--weight-semibold); }
 
-.cost { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); color: var(--muted); font: var(--text-micro) var(--font-mono); }
-.cost strong { color: var(--text); font-weight: var(--weight-bold); }
+/* What a side costs: a number and its unit, then what is written once, in the same face as the rest. */
+.cost { display: grid; gap: 2px; color: var(--muted); font-size: var(--text-meta); }
+.cost strong { color: var(--text); font-size: var(--text-strong); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }
 .cost strong.zero { color: var(--success); }
-.cost strong.absent { color: var(--dim); font-weight: var(--weight-regular); font-style: italic; }
-.once { color: var(--dim); }
+.once { color: var(--dim); font-size: var(--text-micro); }
+.once code { padding: 0; border: 0; background: none; color: inherit; font-size: inherit; }
+.absent { color: var(--dim); font-size: var(--text-meta); font-style: italic; }
 
-/* Where the work went, in the viewer's chip grammar. */
-.home {
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-chip);
-  background: var(--blueprint-soft);
-  color: var(--blueprint);
-  font: var(--weight-semibold) var(--text-micro)/1.8 var(--font-mono);
-}
+/* Where the work went: a word in the blueprint colour, the one accent on the ProtoTest side. */
+.home { color: var(--blueprint); font-size: var(--text-micro); font-weight: var(--weight-bold); letter-spacing: 0.02em; }
 
-.summary { color: var(--muted); font-size: var(--text-meta); line-height: 1.5; }
+.summary { color: var(--muted); font-size: var(--text-meta); line-height: var(--leading); }
 
 .code {
   display: grid;

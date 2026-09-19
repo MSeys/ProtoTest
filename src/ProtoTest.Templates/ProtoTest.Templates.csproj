@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IsPackable>true</IsPackable>
+    <PackageType>Template</PackageType>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <!-- The template's own .template.config folder starts with a dot; NuGet would drop it otherwise. -->
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <IncludeSymbols>false</IncludeSymbols>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>ProtoTest.Templates</PackageId>
+    <Description>dotnet new templates for ProtoTest: a small ASP.NET Core API with a test project that is already composed, traced and reported.</Description>
+    <PackageTags>testing;integration-testing;dotnet-new;templates;dotnet</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="templates/**" />
+    <None Remove="templates/**" />
+    <Content Include="templates/**" Exclude="templates/**/bin/**;templates/**/obj/**;templates/**/TestResults/**;templates/prototest-starter/.template.config/template.json" />
+  </ItemGroup>
+
+  <!--
+    The template's packages have to match the ProtoTest version it ships with. template.json holds a
+    $PROTOTEST_VERSION$ marker; the packed copy carries this build's version instead.
+  -->
+  <Target Name="StampTemplateVersion" BeforeTargets="_GetPackageFiles">
+    <PropertyGroup>
+      <_TemplateManifestPath>$(MSBuildProjectDirectory)/templates/prototest-starter/.template.config/template.json</_TemplateManifestPath>
+      <_StampedManifest>$(IntermediateOutputPath)template.json</_StampedManifest>
+      <_StampedText>$([System.IO.File]::ReadAllText('$(_TemplateManifestPath)').Replace('$PROTOTEST_VERSION$', '$(Version)'))</_StampedText>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_StampedManifest)" Lines="$([MSBuild]::Escape('$(_StampedText)'))" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <Content Include="$(_StampedManifest)" Pack="true" PackagePath="content/templates/prototest-starter/.template.config/template.json" />
+    </ItemGroup>
+  </Target>
+
+</Project>

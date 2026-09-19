@@ -1,6 +1,7 @@
 ---
-sidebar_position: 4
+sidebar_position: 5
 title: gRPC
+description: "A named gRPC client per test for unary and streaming calls, with metadata authentication, shape assertions, per-call tracing and method coverage."
 ---
 
 # gRPC
@@ -49,6 +50,29 @@ public sealed class OrderTests
 var replies = await Proto.Context.Grpc()
     .ServerStreamingAsync(Orders.Watch, new WatchRequest());
 ```
+
+## Asserting on replies
+
+A reply is a protobuf message, and `ShouldMatchShape` matches it with the same [shapes](../../foundation/shape-matching.md) as REST and GraphQL: declare only the fields the behaviour depends on, nested and partial, with `JsonValue` constraints where an exact value would be brittle.
+
+```csharp
+var order = await Proto.Context.Grpc().UnaryAsync(
+    Orders.GetOrder,
+    new GetOrderRequest { Id = 42 });
+
+order.ShouldMatchShape(new
+{
+    id = 42,
+    status = "PENDING",
+    total = JsonValue.GreaterThan(0),
+    lines = new[]
+    {
+        new { sku = "notebook", quantity = 2 }
+    }
+});
+```
+
+The reply is compared through its JSON form: field names are camelCase, enums are their names, and fields left at their default value are still present, so `quantity = 0` can be asserted. Every mismatch is reported at once, the same way a REST shape reports them.
 
 ## Authentication
 

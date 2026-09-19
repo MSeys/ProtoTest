@@ -1,6 +1,7 @@
 ---
 sidebar_position: 2
 title: Defaults
+description: "Keep test-data defaults in small modules, one per feature area, next to the tests that use them."
 ---
 
 # Defaults

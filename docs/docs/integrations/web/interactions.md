@@ -1,6 +1,7 @@
 ---
 sidebar_position: 4
 title: Actions and assertions
+description: "Click, type, select and assert on a WebElement; every action waits until the element is ready to take it."
 ---
 
 # Actions and assertions

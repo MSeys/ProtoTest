@@ -1,6 +1,7 @@
 ---
-sidebar_position: 6
+sidebar_position: 7
 title: ASP.NET Core
+description: "Run your ASP.NET Core application in-process with WebApplicationFactory and hand its HttpClient to REST and GraphQL: no deployment, no ports."
 ---
 
 # ASP.NET Core

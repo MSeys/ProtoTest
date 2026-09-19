@@ -1,6 +1,7 @@
 ---
-sidebar_position: 7
+sidebar_position: 4
 title: Attributes
+description: "Turn setup into a named, reusable capability with a ProtoTest attribute, and compose it onto any test that needs it."
 ---
 
 # Attributes

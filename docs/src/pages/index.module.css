@@ -113,6 +113,8 @@
 .featureCopy p { margin-bottom: var(--space-3); color: var(--muted); line-height: 1.65; }
 
 .featureLink { display: inline-block; margin-top: var(--space-2); font-weight: var(--weight-semibold); }
+.featureLinks { display: flex; flex-wrap: wrap; column-gap: var(--space-5); }
+.sectionHead .featureLinks { justify-content: center; }
 
 /* The closing CTA is a quiet panel: the hero spent the boldness. */
 .ctaBanner {

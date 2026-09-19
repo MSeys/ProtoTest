@@ -1,6 +1,7 @@
 ---
-sidebar_position: 4
+sidebar_position: 3
 title: Reporting
+description: "Write collected observations and coverage out once per run, as JSON or as a self-contained HTML report."
 ---
 
 # Reporting

@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
 title: Overview
+description: "Build test objects with deterministic defaults, so a test only states the values it is about, and create them in the system under test."
 ---
 
 # Data
@@ -111,7 +112,7 @@ Each entry also carries `ValueType` and a `Source` — for defaults, the name of
 
 `SourceKind` is one of `Explicit`, `MemberDefault`, `TypeProvider`, `CustomResolver`, `BuiltIn` or `ConstructorDefault`. For types built through reflection, the explanation resolves the same plan the next `Build()` will construct. For a type registered with a [factory](./defaults.md#domain-factories), `Explain()` lists only the explicit `With(...)` values and the construction source, because the factory resolves its remaining inputs when `Build()` runs.
 
-You rarely need to call it yourself: every `Build` and `Explain` is recorded in [ProtoTrace](../../advanced/prototrace.md), with each resolved member and its source as a child entry.
+You rarely need to call it yourself: every `Build` and `Explain` is recorded in [ProtoTrace](../../observability/prototrace.md), with each resolved member and its source as a child entry.
 
 ## Next
 

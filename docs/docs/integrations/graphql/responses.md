@@ -1,6 +1,7 @@
 ---
 sidebar_position: 3
 title: Responses
+description: "Assert on GraphQL responses — data shapes and errors — with the same shape matcher REST uses."
 ---
 
 # Responses
@@ -31,7 +32,7 @@ using var response = await Proto.Context.GraphQL()
 response.ShouldHaveErrors().ShouldHaveError("UNAUTHORIZED");
 ```
 
-`ShouldMatchData` uses the same rules as REST's `ShouldMatchShape` — partial objects, exact arrays, `JsonValue` constraints — see [Shape matching](../../advanced/json-shapes.md). For shape-driven operations it compares against the root field's value; for fluent and raw operations, against the whole `data` object.
+`ShouldMatchData` uses the same rules as REST's `ShouldMatchShape` — partial objects, exact arrays, `JsonValue` constraints — see [Shape matching](../../foundation/shape-matching.md). For shape-driven operations it compares against the root field's value; for fluent and raw operations, against the whole `data` object.
 
 Assertion failures throw `GraphQLAssertionException`; shape failures throw `JsonShapeMismatchException` with every mismatch listed.
 

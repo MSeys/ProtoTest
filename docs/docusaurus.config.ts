@@ -82,6 +82,8 @@ export default async function createConfig(): Promise<Config> {
           sidebarPath: './sidebars.ts',
           routeBasePath: '/docs',
           editUrl: 'https://github.com/MSeys/ProtoTest/tree/main/docs/',
+          // Read from git: a page says when it last changed, which matters while the docs move with the code.
+          showLastUpdateTime: true,
         },
         blog: false,
         theme: {
@@ -117,11 +119,6 @@ export default async function createConfig(): Promise<Config> {
           position: 'left',
           label: 'Docs',
         },
-        // Placed explicitly so the theme toggle ends the row, as in the viewer and the report.
-        {
-          type: 'search',
-          position: 'right',
-        },
         {
           type: 'custom-github',
           position: 'right',
@@ -148,17 +145,22 @@ export default async function createConfig(): Promise<Config> {
             {label: 'Getting started', to: '/docs/getting-started/installation'},
             {label: 'Foundation', to: '/docs/foundation/overview'},
             {label: 'Integrations', to: '/docs/integrations/overview'},
+            {label: 'Recipes', to: '/docs/recipes/overview'},
+            {label: 'Observability', to: '/docs/observability/prototrace'},
           ],
         },
         {
           title: 'Project',
           items: [
             {label: 'GitHub', href: 'https://github.com/MSeys/ProtoTest'},
+            {label: 'NuGet', href: 'https://www.nuget.org/packages?q=ProtoTest'},
+            {label: 'Trace viewer', href: 'https://trace.prototest.dev'},
             {label: 'Issues', href: 'https://github.com/MSeys/ProtoTest/issues'},
+            {label: 'Changelog', to: '/changelog'},
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} ProtoTest. This site is a work in progress.`,
+      copyright: `Copyright © ${new Date().getFullYear()} ProtoTest.`,
     },
     // Mermaid draws on its neutral base theme; custom.css recolours it from the tokens for both surfaces.
     mermaid: {

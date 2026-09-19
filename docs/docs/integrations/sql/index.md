@@ -1,6 +1,7 @@
 ---
 sidebar_position: 9
 title: SQL
+description: "A database connection each test owns, optionally wrapped in a transaction that is rolled back at the end, with Entity Framework Core on top."
 ---
 
 # SQL

@@ -1,6 +1,7 @@
 ---
-sidebar_position: 3
+sidebar_position: 2
 title: Execution context
+description: "ProtoExecutionContext lives for exactly one test and holds its clients, state, services, attachments and observations."
 ---
 
 # Execution context
@@ -58,7 +59,7 @@ T? TryResolve<T>() where T : class, IProtoContext;
 - `IProtoContext` is an empty marker interface.
 - State is keyed by the **exact type** you pass. Setting the same type again replaces it, and you must read it back with the same type — not a base class or interface.
 - A missing `Resolve<T>()` throws *"No context of type 'X' registered."* Use `TryResolve` in teardown code, where setup may not have got that far.
-- Every set and read is traced — including a snapshot of the value — so the [trace viewer](../advanced/prototrace.md) shows what state each step saw.
+- Every set and read is traced — including a snapshot of the value — so the [trace viewer](../observability/prototrace.md) shows what state each step saw.
 
 ## Services
 
@@ -109,7 +110,7 @@ void RecordObservation(ProtoObservation observation);
 IReadOnlyCollection<ProtoObservation> RecordedObservations { get; }
 ```
 
-See [Coverage and observations](../advanced/coverage.md).
+See [Coverage and observations](../observability/coverage.md).
 
 ## Trace
 

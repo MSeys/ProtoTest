@@ -1,6 +1,7 @@
 ---
 sidebar_position: 5
 title: MSTest
+description: "Set up ProtoTest with MSTest: the assembly initialize and cleanup hooks, [ProtoTest] tests, outcomes and attachments."
 ---
 
 # MSTest

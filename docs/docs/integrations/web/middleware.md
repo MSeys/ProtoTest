@@ -1,6 +1,7 @@
 ---
 sidebar_position: 7
 title: Waits and middleware
+description: "Register your application's notion of ready — spinners, in-flight requests, animations — once, instead of sleeping in tests."
 ---
 
 # Waits and middleware

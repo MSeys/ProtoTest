@@ -1,6 +1,7 @@
 ---
-sidebar_position: 7
+sidebar_position: 6
 title: OpenAPI
+description: "Compare what your REST tests did against your OpenAPI document, and find the endpoints, responses and properties no test has checked."
 ---
 
 # OpenAPI
@@ -77,4 +78,4 @@ OpenAPI            DELETE /api/orders/{id}      0 hits   ○
 - **Responses** match the exact status code first, then a range like `4XX`, then `default`.
 - **Properties** count only when a [`ShouldMatchShape`](./rest/responses.md#shouldmatchshape) assertion actually matched them. Receiving a field doesn't count; asserting it does. Array indices are normalised, so `$.lines[0].total` and `$.lines[3].total` both count toward `$.lines[].total`.
 
-Uncovered items are reported with a neutral status, covered ones as successful with their hit count. Register a [report sink](../advanced/reporting.md) to see them, and read [Coverage](../advanced/coverage.md) for how to use them.
+Uncovered items are reported with a neutral status, covered ones as successful with their hit count. Register a [report sink](../observability/reporting.md) to see them, and read [Coverage](../observability/coverage.md) for how to use them.

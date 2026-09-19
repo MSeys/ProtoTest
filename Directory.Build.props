@@ -8,7 +8,7 @@
     <Version>0.1.0-alpha</Version>
     <Authors>Matthias Seys</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/matthiasseys/ProtoTest</RepositoryUrl>
+    <RepositoryUrl>https://github.com/MSeys/ProtoTest</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>

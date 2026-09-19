@@ -3,6 +3,16 @@
 .swatch i { width: 32px; height: 22px; border: 1px solid var(--border-strong); border-radius: var(--radius-chip); }
 .swatch code { font-size: var(--text-meta); }
 
+.stage {
+  margin: var(--space-3) 0 var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--bg);
+  color: var(--text);
+}
+.stage > * { margin: 0; }
+
 .phases { margin: var(--space-3) 0 var(--space-5); display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); font-size: var(--text-strong); }
 .phases span { display: inline-flex; align-items: center; gap: var(--space-2); }
 .phases i { width: 18px; height: 5px; border-radius: var(--radius-hairline); }

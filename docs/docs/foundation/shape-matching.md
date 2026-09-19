@@ -1,6 +1,7 @@
 ---
-sidebar_position: 3
+sidebar_position: 6
 title: Shape matching
+description: "Describe the JSON you expect with an anonymous object: partial, nested, with value constraints, and every mismatch reported at once with its path."
 ---
 
 # Shape matching
@@ -171,4 +172,4 @@ IReadOnlyList<string> matched = JsonShapeMatcher.AssertMatch(json, expectedShape
 IReadOnlyList<string> matched = JsonShapeMatcher.AssertMatch(jsonElement, expectedShape, options);
 ```
 
-It returns the JSON paths that matched — the same list [OpenAPI coverage](./coverage.md) uses.
+It returns the JSON paths that matched — the same list [OpenAPI coverage](../observability/coverage.md) uses.

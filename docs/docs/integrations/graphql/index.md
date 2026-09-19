@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
 title: Overview
+description: "A per-test GraphQL client for queries, mutations and subscriptions over WebSocket or SSE, with uploads, shape assertions and schema coverage."
 ---
 
 # GraphQL

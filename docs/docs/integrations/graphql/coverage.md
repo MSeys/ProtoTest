@@ -1,6 +1,7 @@
 ---
 sidebar_position: 5
 title: Schema coverage
+description: "Point ProtoTest at your GraphQL schema to see which types, fields, arguments and input fields your suite exercised."
 ---
 
 # Schema coverage
@@ -61,4 +62,4 @@ GraphQL input type    CreateOrderInput
 
 Each item carries `IsCovered` and a hit count, and fields carry `returnType` and `deprecated` metadata — so the report also tells you whether you're still exercising deprecated fields.
 
-The report is written by whichever [sinks](../../advanced/reporting.md) you register. See [Coverage](../../advanced/coverage.md) for the bigger picture.
+The report is written by whichever [sinks](../../observability/reporting.md) you register. See [Coverage](../../observability/coverage.md) for the bigger picture.

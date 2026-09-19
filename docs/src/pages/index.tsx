@@ -166,7 +166,7 @@ using var response = await Proto.Context.Rest()
 response.ShouldMatchShape(new
 {
     tenant = admin.Tenant,
-    users = JsonValue.NotNull()
+    memberCount = members.Count + 1   // the seven, and the admin
 });`,
     footnote:
       'Defaults come from your data module, provisioning from your provisioner — and it shares the test context with every other client.',
@@ -290,9 +290,14 @@ function TraceSection() {
               the check that failed and the values it compared, then shows every step around it — the tenant
               the attribute created, the call, the cleanup.
             </p>
-            <Link className={styles.featureLink} to="/docs/advanced/prototrace">
-              How ProtoTrace works →
-            </Link>
+            <div className={styles.featureLinks}>
+              <Link className={styles.featureLink} href="https://trace.prototest.dev/?demo=1">
+                Open a sample trace ↗
+              </Link>
+              <Link className={styles.featureLink} to="/docs/observability/prototrace">
+                How ProtoTrace works →
+              </Link>
+            </div>
           </div>
           <TraceView />
         </div>
@@ -342,7 +347,7 @@ function PayoffSection() {
               Not "how many lines executed". Which parts of your API's surface no test has ever
               looked at.
             </p>
-            <Link className={styles.featureLink} to="/docs/advanced/coverage">
+            <Link className={styles.featureLink} to="/docs/observability/coverage">
               How coverage works →
             </Link>
           </div>
@@ -361,7 +366,7 @@ function PayoffSection() {
               The trace also says what it could not see: whether the application ran in-process, which
               capabilities were composed, and whether the application reported its own values.
             </p>
-            <Link className={styles.featureLink} to="/docs/advanced/prototrace">
+            <Link className={styles.featureLink} to="/docs/observability/prototrace">
               What a trace file holds →
             </Link>
           </div>
@@ -383,9 +388,14 @@ function LayersSection() {
             the other. Every capability plugs into the same <code>ProtoExecutionContext</code>, so the depth you
             choose changes what a test sees, not how it is written, and every depth lands in the same trace.
           </p>
-          <Link className={styles.featureLink} to="/docs/integrations/overview">
-            Every integration →
-          </Link>
+          <div className={styles.featureLinks}>
+            <Link className={styles.featureLink} to="/docs/integrations/overview">
+              Every integration →
+            </Link>
+            <Link className={styles.featureLink} to="/docs/recipes/overview">
+              Combined in one test →
+            </Link>
+          </div>
         </div>
         <CapabilityIndex />
       </div>

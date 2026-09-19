@@ -82,25 +82,20 @@ function SliceCode({files, slices}: {files: ComparisonFile[]; slices: Comparison
   );
 }
 
-function CostLine({value, home}: {value: Cost; home?: string}): ReactNode {
+function CostLine({value}: {value: Cost}): ReactNode {
   // No code at all means the side does not do it, which is not the same as doing it for free.
   if (!value.fixture && !value.once.length) {
-    return (
-      <span className={styles.cost}>
-        <strong className={styles.absent}>not covered</strong>
-      </span>
-    );
+    return <span className={styles.absent}>Not covered</span>;
   }
   return (
     <span className={styles.cost}>
-      {home && <span className={styles.home}>{home}</span>}
-      <strong className={value.fixture ? '' : styles.zero}>
-        {value.fixture} {value.fixture === 1 ? 'line' : 'lines'}
-      </strong>
-      <span> in the fixture</span>
+      <span>
+        <strong className={value.fixture ? '' : styles.zero}>{value.fixture}</strong>{' '}
+        {value.fixture === 1 ? 'line' : 'lines'} in the fixture
+      </span>
       {value.once.map((part) => (
         <span key={part.file} className={styles.once}>
-          + {part.lines} once, in {part.file}
+          plus {part.lines} written once in <code>{part.file}</code>
         </span>
       ))}
     </span>
@@ -126,7 +121,7 @@ export default function Concerns({concerns, without, with: withProto}: ConcernsP
   return (
     <div className={styles.table}>
       <div className={styles.columns} aria-hidden="true">
-        <span>Every fixture needs to…</span>
+        <span>What every fixture needs</span>
         <span>Without ProtoTest</span>
         <span>With ProtoTest</span>
       </div>
@@ -136,7 +131,9 @@ export default function Concerns({concerns, without, with: withProto}: ConcernsP
           <div key={concern.id} className={`${styles.concern} ${isOpen ? styles.open : ''}`}>
             <button type="button" className={styles.row} aria-expanded={isOpen} onClick={() => toggle(concern.id)}>
               <span className={styles.task}>
-                <i className={styles.expand} aria-hidden="true" />
+                <svg className={styles.chevron} viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">
+                  <path d="M3 1.8 7 5 3 8.2" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
                 {concern.task}
               </span>
               <span className={styles.side}>
@@ -146,7 +143,8 @@ export default function Concerns({concerns, without, with: withProto}: ConcernsP
               </span>
               <span className={styles.side}>
                 <em className={styles.sideLabel}>With ProtoTest</em>
-                <CostLine value={cost(withProto, concern.with.slices)} home={concern.with.home} />
+                <span className={styles.home}>{concern.with.home.charAt(0).toUpperCase() + concern.with.home.slice(1)}</span>
+                <CostLine value={cost(withProto, concern.with.slices)} />
                 <span className={styles.summary}>{concern.with.summary}</span>
               </span>
             </button>

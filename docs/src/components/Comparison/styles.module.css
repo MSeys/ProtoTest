@@ -1,69 +1,37 @@
 .title { font-size: var(--text-strong); font-weight: var(--weight-semibold); }
 
-.delta { color: var(--muted); font: var(--text-micro) var(--font-mono); }
-.delta strong { color: var(--text); font-weight: var(--weight-bold); }
+.delta { color: var(--muted); font-size: var(--text-micro); }
 
 .once { color: var(--muted); }
 .once strong { color: var(--text); }
 
-.ledger { display: grid; }
-
-.row { padding: var(--space-3) var(--space-4); }
-.row + .row { border-top: 1px solid var(--border); }
-
-.rowHead {
-  container-type: inline-size;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-2) var(--space-4);
-  margin-bottom: var(--space-3);
+/* The scoreboard: the plumbing each fixture carries, as a figure, the two sides on one scale. */
+.score {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  border-bottom: 1px solid var(--border);
 }
 
-.side { font-size: var(--text-body); font-weight: var(--weight-semibold); }
-.file { color: var(--muted); font: var(--text-micro) var(--font-mono); }
+.side { min-width: 0; padding: var(--space-5); display: grid; gap: var(--space-1); align-content: start; }
+.side + .side { border-left: 1px solid var(--border); }
+.sideLabel { color: var(--muted); font-size: var(--text-meta); font-weight: var(--weight-semibold); }
 
-.stats {
-  margin-left: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  color: var(--muted);
-  font: var(--text-micro) var(--font-mono);
+.figure { display: flex; align-items: baseline; gap: var(--space-2); }
+.figure strong {
+  color: var(--text);
+  font: var(--weight-bold) clamp(28px, 3.4vw, 40px) / 1 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  font-variant-numeric: tabular-nums;
 }
+.figure span { color: var(--muted); font-size: var(--text-body); }
+.sideWith .figure strong { color: var(--blueprint); }
+.context { margin-bottom: var(--space-3); color: var(--dim); font-size: var(--text-meta); }
 
-.stats strong { color: var(--text); font-weight: var(--weight-bold); }
-.stats span { display: inline-flex; align-items: center; gap: var(--space-1); }
-
-/* Narrow: the numbers read as a quiet second line under the label instead of hugging the right edge. */
-@container (max-width: 32rem) {
-  .stats { margin-left: 0; }
-}
-
-/* The ledger: hatched plumbing, solid scenario, both sides on one scale. The empty tail on the with-bar
-   is the plumbing that stops being written per fixture. */
-.track {
-  display: flex;
-  height: 10px;
-  overflow: clip;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-hairline);
-  background: var(--surface-2);
-}
-
-.plumbing { background: repeating-linear-gradient(to right, var(--dim) 0 4px, transparent 4px 8px); }
+/* Hatched plumbing, solid scenario, one scale for both: the empty tail on the ProtoTest side is what stops
+   being written. */
+.track { display: flex; height: 6px; overflow: clip; border-radius: var(--radius-pill); background: var(--surface-2); }
+.plumbing { background: repeating-linear-gradient(135deg, var(--dim) 0 2px, transparent 2px 5px); }
 .scenario { background: var(--blueprint); }
-
-.swatchPlumbing,
-.swatchScenario {
-  display: inline-block;
-  width: 12px;
-  height: 4px;
-  border-radius: var(--radius-hairline);
-}
-
-.swatchPlumbing { background: repeating-linear-gradient(to right, var(--dim) 0 3px, transparent 3px 6px); }
-.swatchScenario { background: var(--blueprint); }
 
 /* The two test files side by side: the same scenario, with every capability hanging off the line that uses it. */
 .preview {
@@ -99,9 +67,9 @@
   border-radius: var(--radius-chip);
   background: var(--surface);
   color: var(--muted);
-  font: var(--weight-semibold) var(--text-micro)/1.8 var(--font-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: var(--text-micro);
+  font-weight: var(--weight-semibold);
+  line-height: 1.8;
 }
 
 /* A file is the proof, not the argument: the pane shows its top and opens on request. Opening a capability
@@ -132,7 +100,7 @@
   border-top: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--muted);
-  font: var(--text-micro) var(--font-mono);
+  font-size: var(--text-meta);
   cursor: pointer;
   transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
@@ -148,7 +116,8 @@
   border-top: 1px solid var(--border);
   background: transparent;
   color: var(--blueprint);
-  font: var(--weight-semibold) var(--text-micro) var(--font-mono);
+  font-size: var(--text-meta);
+  font-weight: var(--weight-semibold);
   text-align: left;
   cursor: pointer;
 }
@@ -162,16 +131,11 @@
   border-top: 1px solid var(--border);
 }
 
-.contrast { color: var(--muted); font-size: var(--text-meta); line-height: 1.6; }
+.contrast { color: var(--muted); font-size: var(--text-meta); line-height: var(--leading); }
 
 .owned { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
 
-.ownedLabel {
-  color: var(--muted);
-  font: var(--weight-semibold) var(--text-micro) var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
+.ownedLabel { color: var(--muted); font-size: var(--text-meta); font-weight: var(--weight-semibold); }
 
 .ownedItem { color: var(--text); font-size: var(--text-meta); }
 .ownedItem + .ownedItem { padding-left: var(--space-4); border-left: 1px solid var(--border); }

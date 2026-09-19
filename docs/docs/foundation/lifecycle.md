@@ -1,6 +1,7 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 title: Host and lifecycle
+description: "How the ProtoTest host is built, started and stopped, and the order in which a test's hooks, attributes and clients run."
 ---
 
 # Host and lifecycle

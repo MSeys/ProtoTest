@@ -8,6 +8,12 @@
       "port": 3100
     },
     {
+      "name": "docs-build",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "docs", "run", "serve", "--", "--port", "3101", "--no-open"],
+      "port": 3101
+    },
+    {
       "name": "viewer",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "viewer", "run", "dev", "--", "--port", "5273"],

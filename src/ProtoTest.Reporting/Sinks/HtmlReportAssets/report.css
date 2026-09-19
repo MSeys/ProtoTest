@@ -212,23 +212,25 @@ main { width: min(1240px, 100% - var(--space-7)); margin: 0 auto var(--space-7);
 .item-heading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-body); font-weight: var(--weight-semibold); }
 .item-context { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); font-size: var(--text-micro); }
 .item-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-1); }
-/* Badges are the viewer's chips: mono, square-cornered, tinted by what they say. */
+/* Badges are the viewer's chips: mono, square-cornered, tinted by what they say. A variant sets --chip; the
+   label is pulled toward the text colour so it reads at 4.5:1 on its own tint. */
 .badge, .tag {
+  --chip: var(--muted);
   padding: 0 var(--space-2);
   display: inline-flex;
   align-items: center;
   border-radius: var(--radius-chip);
-  background: color-mix(in srgb, var(--muted) 14%, transparent);
-  color: var(--muted);
+  background: color-mix(in srgb, var(--chip) 14%, transparent);
+  color: color-mix(in srgb, var(--chip) 70%, var(--text));
   font: var(--weight-semibold) var(--text-micro)/1.8 var(--font-mono);
   white-space: nowrap;
 }
-.covered > summary .coverage-badge, .covered > .item-summary .coverage-badge { background: var(--success-soft); color: var(--success); }
-.partial > summary .coverage-badge, .partial > .item-summary .coverage-badge { background: var(--warning-soft); color: var(--warning); }
-.uncovered > summary .coverage-badge, .uncovered > .item-summary .coverage-badge { background: var(--danger-soft); color: var(--danger); }
-.status-success > summary .status-badge, .status-success > .item-summary .status-badge { background: var(--success-soft); color: var(--success); }
-.status-warning > summary .status-badge, .status-warning > .item-summary .status-badge { background: var(--warning-soft); color: var(--warning); }
-.status-error > summary .status-badge, .status-error > .item-summary .status-badge { background: var(--danger-soft); color: var(--danger); }
+.covered > summary .coverage-badge, .covered > .item-summary .coverage-badge { --chip: var(--success); background: var(--success-soft); }
+.partial > summary .coverage-badge, .partial > .item-summary .coverage-badge { --chip: var(--warning); background: var(--warning-soft); }
+.uncovered > summary .coverage-badge, .uncovered > .item-summary .coverage-badge { --chip: var(--danger); background: var(--danger-soft); }
+.status-success > summary .status-badge, .status-success > .item-summary .status-badge { --chip: var(--success); background: var(--success-soft); }
+.status-warning > summary .status-badge, .status-warning > .item-summary .status-badge { --chip: var(--warning); background: var(--warning-soft); }
+.status-error > summary .status-badge, .status-error > .item-summary .status-badge { --chip: var(--danger); background: var(--danger-soft); }
 /* On a coverage row, "Covered" already says it went well; a second "Success" chip is noise. */
 .status-success > summary .coverage-badge + .status-badge, .status-success > .item-summary .coverage-badge + .status-badge { display: none; }
 .item-body { padding: 0 var(--space-3) var(--space-3) calc(var(--space-2) + 14px + var(--space-3)); display: grid; gap: var(--space-3); }
@@ -240,7 +242,7 @@ main { width: min(1240px, 100% - var(--space-7)); margin: 0 auto var(--space-7);
 .measured-value strong { font: var(--weight-bold) var(--text-heading) var(--font-mono); }
 .measured-value span { color: var(--muted); font-size: var(--text-meta); }
 .tags { display: flex; flex-wrap: wrap; gap: var(--space-1); }
-.tag { background: var(--blueprint-soft); color: var(--blueprint); }
+.tag { --chip: var(--blueprint); background: var(--blueprint-soft); }
 .metadata > summary { width: max-content; color: var(--muted); font-size: var(--text-micro); cursor: pointer; }
 .metadata pre {
   max-height: 320px;

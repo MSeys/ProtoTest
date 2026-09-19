@@ -1,6 +1,7 @@
 ---
-sidebar_position: 8
+sidebar_position: 10
 title: Messaging
+description: "Publish a message, then await the one that matters with a predicate and a timeout, on RabbitMQ or your own broker adapter."
 ---
 
 # Messaging
@@ -145,8 +146,8 @@ The container is run-scoped: started once with the host and released after the r
 Every publish and await is recorded:
 
 - Operations `messaging.publish` and `messaging.await` with `messaging.system` (the broker name), `messaging.destination`, and `messaging.timeout_ms` on the await. The payload is recorded as a `Message` code section.
-- Observations `messaging.publish` and `messaging.receive` — target is the broker name (`InMemory` or `RabbitMQ`), identifier is the destination, metadata carries `messaging.system`. The package ships no collector for them; register one if you want destinations aggregated into a report (see [coverage](../../advanced/coverage.md)).
-- Resources: the run-scoped `messaging:broker` resource, plus `broker:rabbitmq` when the container is registered. Both appear in [ProtoTrace](../../advanced/prototrace.md) and the run's resources.
+- Observations `messaging.publish` and `messaging.receive` — target is the broker name (`InMemory` or `RabbitMQ`), identifier is the destination, metadata carries `messaging.system`. The package ships no collector for them; register one if you want destinations aggregated into a report (see [coverage](../../observability/coverage.md)).
+- Resources: the run-scoped `messaging:broker` resource, plus `broker:rabbitmq` when the container is registered. Both appear in [ProtoTrace](../../observability/prototrace.md) and the run's resources.
 
 ## Limits
 

@@ -39,11 +39,24 @@ public async Task GetOrder_ReturnsExpectedOrder()
 
 This is an illustrative test excerpt. The complete setup is in the [getting-started guide](docs/docs/getting-started/first-test.md).
 
+## Quick start
+
+```bash
+dotnet new install ProtoTest.Templates
+dotnet new prototest -n Shop
+cd Shop
+dotnet test
+```
+
+That creates a small ASP.NET Core API and a suite for it that is already composed, traced and reported. See [Installation](docs/docs/getting-started/installation.md) to add ProtoTest to a project of your own.
+
 ## Documentation
 
 Read the [ProtoTest documentation](docs/docs/index.md), or start directly with:
 
 - [First test](docs/docs/getting-started/first-test.md)
+- [Recipes](docs/docs/recipes/overview.md) — several capabilities in one test
+- [Troubleshooting](docs/docs/getting-started/troubleshooting.md)
 - [REST integration](docs/docs/integrations/rest/index.md)
 - [GraphQL integration](docs/docs/integrations/graphql/index.md)
 - [Web integration](docs/docs/integrations/web/index.md)
@@ -51,7 +64,7 @@ Read the [ProtoTest documentation](docs/docs/index.md), or start directly with:
 - [Hooks and lifecycle extensions](docs/docs/foundation/hooks.md)
 - [Context and state](docs/docs/foundation/execution-context.md)
 - [Extension points](docs/docs/advanced/extending.md#building-an-integration)
-- [Execution tracing](docs/docs/advanced/prototrace.md)
+- [Execution tracing](docs/docs/observability/prototrace.md)
 - [Extension guide](docs/docs/advanced/extending.md)
 
 ## Demo
@@ -92,5 +105,6 @@ To produce the complete package set locally:
 | SQL (`ProtoTest.Sql`, `ProtoTest.Sql.EntityFrameworkCore`, `ProtoTest.Sql.Testcontainers`) | Available |
 | Containers (`ProtoTest.Testcontainers`, `ProtoTest.Messaging.RabbitMq.Testcontainers`) | Available |
 | Coverage | Available |
+| Templates (`ProtoTest.Templates`) | Available |
 
 See the [integration overview](docs/docs/integrations/overview.md) for package names and capabilities.

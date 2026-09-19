@@ -1,6 +1,7 @@
 ---
 sidebar_position: 2
 title: Your first test
+description: "Build a small ProtoTest suite against an ASP.NET Core API step by step: a request, a shape assertion, a reusable capability, the trace and coverage."
 ---
 
 # Your first test
@@ -8,6 +9,10 @@ title: Your first test
 This tutorial builds a small suite against an ASP.NET Core API, one step at a time: a first request, a shape assertion, a reusable capability, and finally the trace and coverage report. It uses **NUnit** — the other runners differ only in the setup ceremony, covered in [Test Runners](../runners/overview.md).
 
 ## 1. Create the project
+
+:::tip[Rather start from a working solution?]
+`dotnet new install ProtoTest.Templates`, then `dotnet new prototest -n Orders` creates an API and a suite for it that is already composed, traced and reported — steps 1 to 4 and 6 of this tutorial, ready to run. See [Installation](./installation.md#start-from-the-template).
+:::
 
 ```bash
 dotnet new nunit -n Orders.Tests
@@ -102,7 +107,7 @@ response
     });
 ```
 
-Add `using ProtoTest.Json;` for `JsonValue`. The shape is **partial** — properties you don't list are ignored — and every mismatch is reported at once with its JSON path. See [Shape matching](../advanced/json-shapes.md).
+Add `using ProtoTest.Json;` for `JsonValue`. The shape is **partial** — properties you don't list are ignored — and every mismatch is reported at once with its JSON path. See [Shape matching](../foundation/shape-matching.md).
 
 ## 5. Turn setup into a capability
 
@@ -200,6 +205,7 @@ Tracing is on even without `ConfigureTracing`; the setting only chooses where th
 ## Where to next
 
 - [Configuration](./configuration.md) — run the same suite against a deployed environment.
+- [Troubleshooting](./troubleshooting.md) — when the host, a client or a container does not come up.
 - [Foundation](../foundation/overview.md) — how the lifecycle, context and attributes fit together.
-- [Coverage](../advanced/coverage.md) — add `OpenApiCoverageCollector` to find what your suite *doesn't* test.
+- [Coverage](../observability/coverage.md) — add `OpenApiCoverageCollector` to find what your suite *doesn't* test.
 - Browser tests with [Web](../integrations/web/index.md), GraphQL with [GraphQL](../integrations/graphql/index.md), test data with [Data](../integrations/data/index.md).

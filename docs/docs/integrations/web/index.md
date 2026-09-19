@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
 title: Overview
+description: "A driver-independent browser-testing model — pages, components, flows and login — run by Playwright or Selenium underneath."
 ---
 
 # Web
@@ -94,6 +95,7 @@ public static IProtoHostBuilder AddWeb(
 | `Headless` | `true` | |
 | `SlowMo` | `null` | milliseconds between actions, for watching a run |
 | `Channel` | `null` | e.g. `"msedge"` or `"chrome"` to use an installed browser |
+| `InstallBrowsers` | `false` | download the selected browser before the first launch when it is missing |
 | `Context` | `new()` | Playwright's `BrowserNewContextOptions` — viewport, locale, base URL, storage state… |
 | `TraceRetention` | `OnWebFailure` | keep Playwright's own trace: `Off`, `OnWebFailure`, `Always` |
 | `CorrelateTraceGroups` | `true` | group Playwright trace actions under ProtoTest operations |
@@ -101,7 +103,7 @@ public static IProtoHostBuilder AddWeb(
 | `CapturePageErrors` | `true` | uncaught page exceptions |
 | `CaptureRequestFailures` | `true` | failed network requests |
 
-Playwright needs its browsers installed once per machine — the standard `playwright.ps1 install` script from the Microsoft.Playwright package. Using `Channel = "msedge"` or `"chrome"` avoids that by driving a browser that's already installed.
+Playwright needs its browser on the machine: set `InstallBrowsers` to download it before the first launch, run the standard `playwright.ps1 install` script from the Microsoft.Playwright package yourself, or set `Channel = "msedge"` or `"chrome"` to drive a browser that's already installed. See [Browsers](#browsers).
 
 Within a test, sessions registered with identical launch options (`Browser`, `Headless`, `SlowMo`, `Channel`) share one browser process, each with its own isolated browser context. The browser is disposed when the test finishes, which contains browser-level failures and cleans up any native contexts the test opens directly.
 

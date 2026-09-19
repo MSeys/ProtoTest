@@ -1,6 +1,7 @@
 ---
 sidebar_position: 5
 title: Flows
+description: "Group steps on one component into a named flow that reads as one operation in the trace, with its steps nested beneath."
 ---
 
 # Flows

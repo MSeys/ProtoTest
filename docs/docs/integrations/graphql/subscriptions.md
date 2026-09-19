@@ -1,6 +1,7 @@
 ---
 sidebar_position: 4
 title: Subscriptions
+description: "Test GraphQL subscriptions over WebSocket (graphql-transport-ws) or Server-Sent Events, awaiting the next result with a shape and a timeout."
 ---
 
 # Subscriptions

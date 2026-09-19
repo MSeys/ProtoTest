@@ -13,7 +13,8 @@ const prototestPrism: PrismTheme = {
   styles: [
     {types: ['comment', 'prolog', 'doctype', 'cdata'], style: {color: 'var(--code-comment)', fontStyle: 'italic'}},
     {types: ['keyword', 'builtin', 'important', 'atrule'], style: {color: 'var(--code-keyword)'}},
-    {types: ['class-name', 'maybe-class-name', 'namespace', 'type-definition'], style: {color: 'var(--code-type)'}},
+    {types: ['class-name', 'maybe-class-name', 'type-definition'], style: {color: 'var(--code-type)'}},
+    {types: ['namespace'], style: {color: 'var(--code-namespace)'}},
     {types: ['function', 'method'], style: {color: 'var(--code-function)'}},
     {types: ['string', 'char', 'regex', 'url', 'inserted'], style: {color: 'var(--code-string)'}},
     {types: ['number', 'boolean', 'constant', 'symbol'], style: {color: 'var(--code-number)'}},

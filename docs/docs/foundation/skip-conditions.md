@@ -1,6 +1,7 @@
 ---
-sidebar_position: 5
+sidebar_position: 9
 title: Skip conditions
+description: "Skip a test before its lifecycle starts, with a reason, when the environment cannot run it, so it reads as skipped instead of failed."
 ---
 
 # Skip conditions

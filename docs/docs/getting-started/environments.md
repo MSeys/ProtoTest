@@ -1,6 +1,7 @@
 ---
 sidebar_position: 4
 title: Environments
+description: "Run the same suite in-process, container-backed or against a published environment, changing only the host's setup and configuration."
 ---
 
 # One suite, three environments

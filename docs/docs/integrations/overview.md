@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
 title: Overview
+description: "Every ProtoTest integration adds a client to the same execution context, so several in one test share one lifecycle, one trace and one set of attributes."
 ---
 
 # Integrations overview
@@ -35,8 +36,8 @@ And two that you add when you want them:
 
 | Package | |
 | --- | --- |
-| [`ProtoTest.Reporting`](../advanced/reporting.md) | JSON and HTML report sinks |
-| [`ProtoTest.OpenTelemetry`](../advanced/opentelemetry.md) | export ProtoTest operations to OpenTelemetry |
+| [`ProtoTest.Reporting`](../observability/reporting.md) | JSON and HTML report sinks |
+| [`ProtoTest.OpenTelemetry`](../observability/opentelemetry.md) | export ProtoTest operations to OpenTelemetry |
 
 ## Mixing integrations in one test
 
@@ -67,7 +68,7 @@ public async Task AdministratorCanProvisionAndListSevenAdditionalUsers()
 }
 ```
 
-Or change something through REST and check it's visible through GraphQL, in the same test, with one authenticator serving both.
+Or change something through REST and check it's visible through GraphQL, in the same test, with one authenticator serving both. The [recipes](../recipes/overview.md) walk through scenarios like these end to end: an API call and its event, a write and its row, an API and a browser.
 
 ## Container-backed dependencies
 

@@ -1,5 +1,5 @@
 ---
-sidebar_position: 7
+sidebar_position: 2
 title: Design system
 description: The one visual language ProtoTrace, the HTML report and these docs share, and how to use it in your own sinks and entry kinds.
 ---
@@ -8,8 +8,8 @@ import {BrandMarks, Outcomes, Phases, Swatches, TypeFamilies, TypeScale} from '@
 
 # Design system
 
-ProtoTest has three surfaces people read: the [ProtoTrace viewer](./prototrace.md), the
-[HTML report](./reporting.md) and these docs. They share **one** stylesheet of design tokens,
+ProtoTest has three surfaces people read: the [ProtoTrace viewer](../observability/prototrace.md), the
+[HTML report](../observability/reporting.md) and these docs. They share **one** stylesheet of design tokens,
 `design/prototest-tokens.css` at the root of the repository. There are no copies:
 
 | Surface | How it gets the tokens |
@@ -39,7 +39,8 @@ Colour carries meaning and nothing else:
 ## The execution vocabulary
 
 These tokens describe a test run rather than a page. Anything that draws a ProtoTest execution uses
-them, so a phase, an outcome or an entry kind looks the same everywhere.
+them, so a phase, an outcome or an entry kind looks the same everywhere. The samples below sit on the
+blueprint surface, where the viewer and the report draw them.
 
 ### Phases
 
@@ -106,7 +107,7 @@ their own `prefers-color-scheme` rule and follow the operating system instead.
 
 ## Using the tokens yourself
 
-If you write your own [report sink](./reporting.md) or render trace data somewhere else, start from the
+If you write your own [report sink](../observability/reporting.md) or render trace data somewhere else, start from the
 same file rather than copying colours out of it:
 
 ```html

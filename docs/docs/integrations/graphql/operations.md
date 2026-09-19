@@ -1,6 +1,7 @@
 ---
 sidebar_position: 2
 title: Queries and mutations
+description: "Three ways to describe a GraphQL query or mutation — shape-driven, fluent or a raw document — all ending in the same ExecuteAsync()."
 ---
 
 # Queries and mutations

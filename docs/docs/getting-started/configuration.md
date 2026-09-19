@@ -1,6 +1,7 @@
 ---
 sidebar_position: 3
 title: Configuration
+description: "Set ProtoTest options in code, in configuration, or both, so one suite runs in-process on a laptop and against a deployed environment in CI."
 ---
 
 # Configuration
@@ -102,7 +103,7 @@ The one exception is a base address: a URL passed directly to `AddClient("Api", 
 | `ProtoTest:Rest:*` | [REST attachments](../integrations/rest/attachments.md), [request limits](../integrations/rest/requests.md#response-size-limit) |
 | `ProtoTest:GraphQL:*` | [GraphQL](../integrations/graphql/index.md#builder-options) |
 | `ProtoTest:Web:*` | [Web](../integrations/web/index.md#from-configuration) |
-| `ProtoTest:Reporting:*` | [Reporting](../advanced/reporting.md#configuring-from-files) |
+| `ProtoTest:Reporting:*` | [Reporting](../observability/reporting.md#configuring-from-files) |
 
 Configured only in code:
 

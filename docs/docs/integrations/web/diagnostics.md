@@ -1,11 +1,12 @@
 ---
 sidebar_position: 8
 title: Diagnostics and artifacts
+description: "Screenshots, console output, page errors, failed requests and Playwright traces are captured automatically and attached to the failing test."
 ---
 
 # Diagnostics and artifacts
 
-A failing browser test is only useful if you can see what the browser saw. ProtoTest captures that automatically and attaches it to the test, where your [runner](../../runners/overview.md) and the [ProtoTrace viewer](../../advanced/prototrace.md) both show it.
+A failing browser test is only useful if you can see what the browser saw. ProtoTest captures that automatically and attaches it to the test, where your [runner](../../runners/overview.md) and the [ProtoTrace viewer](../../observability/prototrace.md) both show it.
 
 ## On any failed operation
 

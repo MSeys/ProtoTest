@@ -1,6 +1,7 @@
 ---
 sidebar_position: 2
 title: Coverage and observations
+description: "Coverage of your API's surface rather than its lines: which endpoints, responses, fields and methods your suite actually asserted."
 ---
 
 # Coverage and observations

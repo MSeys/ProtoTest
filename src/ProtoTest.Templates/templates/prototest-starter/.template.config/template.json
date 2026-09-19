@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "ProtoTest",
+  "classifications": ["Test", "Web", "ProtoTest"],
+  "identity": "ProtoTest.Starter",
+  "groupIdentity": "ProtoTest.Starter",
+  "name": "ProtoTest starter",
+  "description": "A small ASP.NET Core API and a ProtoTest suite for it: composed, traced and reported, ready for dotnet test.",
+  "shortName": "prototest",
+  "sourceName": "Starter",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "symbols": {
+    "Framework": {
+      "type": "parameter",
+      "description": "The target framework for both projects.",
+      "datatype": "choice",
+      "choices": [
+        { "choice": "net10.0", "description": ".NET 10" },
+        { "choice": "net9.0", "description": ".NET 9" },
+        { "choice": "net8.0", "description": ".NET 8" }
+      ],
+      "defaultValue": "net10.0",
+      "replaces": "net10.0"
+    },
+    "skipRestore": {
+      "type": "parameter",
+      "datatype": "bool",
+      "description": "Skip the restore after the solution is created.",
+      "defaultValue": "false"
+    },
+    "ProtoTestVersion": {
+      "type": "generated",
+      "generator": "constant",
+      "parameters": { "value": "$PROTOTEST_VERSION$" },
+      "replaces": "PROTOTEST_VERSION"
+    }
+  },
+  "primaryOutputs": [
+    { "path": "Starter.slnx" }
+  ],
+  "postActions": [
+    {
+      "condition": "(!skipRestore)",
+      "description": "Restore the solution.",
+      "manualInstructions": [{ "text": "Run 'dotnet restore'" }],
+      "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+      "continueOnError": true
+    }
+  ]
+}

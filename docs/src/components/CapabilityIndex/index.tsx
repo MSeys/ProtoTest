@@ -46,7 +46,7 @@ const depths: Depth[] = [
     note: 'The application itself',
     capabilities: [
       {name: 'In-process host', does: 'No deployed environment', packages: 'AspNetCore', to: '/docs/integrations/aspnetcore'},
-      {name: 'Its own telemetry', does: 'Values the app reports', packages: 'OpenTelemetry', to: '/docs/advanced/opentelemetry'},
+      {name: 'Its own telemetry', does: 'Values the app reports', packages: 'OpenTelemetry', to: '/docs/observability/opentelemetry'},
     ],
   },
   {
@@ -63,7 +63,7 @@ const depths: Depth[] = [
     note: 'What the run brings',
     capabilities: [
       {name: 'Test data', does: 'Provisioned, with defaults', packages: 'Data', to: '/docs/integrations/data'},
-      {name: 'Infrastructure', does: 'Containers owned by the run', packages: 'Testcontainers'},
+      {name: 'Infrastructure', does: 'Containers owned by the run', packages: 'Testcontainers', to: '/docs/foundation/infrastructure'},
     ],
   },
 ];

@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
 title: Overview
+description: "The handful of ProtoTest.Core concepts every integration builds on: the host, the execution context, attributes, clients, hooks and the trace."
 ---
 
 # Foundation overview
@@ -37,8 +38,8 @@ flowchart TB
 
 Two things build on top and have their own sections:
 
-- **[ProtoTrace](../advanced/prototrace.md)** records every operation, automatically.
-- **[Observations and coverage](../advanced/coverage.md)** turn what tests did into reports.
+- **[ProtoTrace](../observability/prototrace.md)** records every operation, automatically.
+- **[Observations and coverage](../observability/coverage.md)** turn what tests did into reports.
 
 ## A test, end to end
 

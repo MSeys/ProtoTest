@@ -1,6 +1,7 @@
 ---
-sidebar_position: 6
+sidebar_position: 1
 title: Extending ProtoTest
+description: "The public extension points behind every built-in integration, for writing your own capability that feels native to ProtoTest."
 ---
 
 # Extending ProtoTest
@@ -17,8 +18,8 @@ Everything the built-in integrations do is built on public extension points. Thi
 | log a browser in | an [`IWebLoginStrategy`](../integrations/web/login.md) |
 | wait for app-specific readiness | an [`IWebWaitCondition`](../integrations/web/middleware.md) |
 | create data in your system | an [`IProtoDataProvisioner`](../integrations/data/provisioners.md) |
-| report on what tests did | observations + a [collector](./coverage.md#writing-a-collector) |
-| write reports somewhere | an [`IProtoSink`](./reporting.md#writing-a-sink) |
+| report on what tests did | observations + a [collector](../observability/coverage.md#writing-a-collector) |
+| write reports somewhere | an [`IProtoSink`](../observability/reporting.md#writing-a-sink) |
 | show up in the trace viewer | the trace writer — below |
 | support another test runner | `ProtoHost` + `IProtoTestAttachmentPublisher` — below |
 

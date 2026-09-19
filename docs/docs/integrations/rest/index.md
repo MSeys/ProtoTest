@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
 title: Overview
+description: "A per-test HTTP client built on IHttpClientFactory, with response-shape assertions, shared authentication and automatic request and response capture."
 ---
 
 # REST
@@ -85,8 +86,8 @@ var response = await Proto.Context.Rest("Api").GetAsync("/api/orders");
 
 ## What you get automatically
 
-- Every request and response is recorded in [ProtoTrace](../../advanced/prototrace.md).
-- An `http.response` observation feeds [coverage collectors](../../advanced/coverage.md).
+- Every request and response is recorded in [ProtoTrace](../../observability/prototrace.md).
+- An `http.response` observation feeds [coverage collectors](../../observability/coverage.md).
 - With `CaptureAttachments()`, request and response bodies are [attached to the test](./attachments.md) with sensitive values redacted.
 
 ## Next

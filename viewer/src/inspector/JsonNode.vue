@@ -95,11 +95,11 @@ const childPath = (name: string | number) => typeof name === "number" ? `${props
 .punct { color: var(--code-punctuation); }
 .scalar.string { color: var(--code-string); white-space: pre-wrap; }
 .scalar.number { color: var(--code-number); }
-.scalar.boolean, .scalar.null { color: var(--code-keyword); }
+.scalar.boolean, .scalar.null { color: var(--code-number); }
 .summary { margin: 0 var(--space-1); padding: 0 var(--space-1); border: 0; border-radius: var(--radius-hairline); background: var(--code-highlight); color: var(--code-comment); font: inherit; }
 .summary:hover { color: var(--code-text); }
 .badge { margin-left: var(--space-2); padding: 0 var(--space-1); border-radius: var(--radius-hairline); background: var(--code-highlight); color: var(--code-comment); font-family: var(--font-ui); font-size: var(--text-micro); }
-.more { margin-left: var(--space-2); padding: 0; border: 0; background: transparent; color: var(--code-keyword); font-family: var(--font-ui); font-size: var(--text-micro); }
+.more { margin-left: var(--space-2); padding: 0; border: 0; background: transparent; color: var(--code-type); font-family: var(--font-ui); font-size: var(--text-micro); }
 .more:hover { text-decoration: underline; }
 /* Nesting hangs off the same guide line the story and the shape tree use. */
 .children { margin-left: var(--space-2); padding-left: var(--space-3); border-left: 1px solid color-mix(in srgb, var(--code-punctuation) 25%, transparent); }

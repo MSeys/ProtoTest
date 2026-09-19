@@ -1,6 +1,7 @@
 ---
 sidebar_position: 2
 title: Building requests
+description: "Build a REST request fluently — route parameters, body, headers, authentication — and send it with a verb method."
 ---
 
 # Building requests

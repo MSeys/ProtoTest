@@ -71,4 +71,7 @@
     <Project Path="samples/ProtoTest.SampleApp.Testing/ProtoTest.SampleApp.Testing.csproj" />
     <Project Path="samples/ProtoTest.SampleApp/ProtoTest.SampleApp.csproj" />
   </Folder>
+  <Folder Name="/6. Templates/">
+    <Project Path="src/ProtoTest.Templates/ProtoTest.Templates.csproj" />
+  </Folder>
 </Solution>

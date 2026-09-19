@@ -147,9 +147,9 @@ if ($DryRun) {
     Write-Host "Dry run: nothing will be pushed. Commands:"
     foreach ($id in $ordered) {
         $package = $packages[$id]
-        Write-Host "dotnet nuget push `"$($package.PackagePath)`" --api-key $keyDisplay --source `"$Source`""
+        Write-Host "dotnet nuget push `"$($package.PackagePath)`" --api-key $keyDisplay --source `"$Source`" --no-symbols --skip-duplicate"
         if ($package.SymbolsExpected) {
-            Write-Host "dotnet nuget push `"$($package.SymbolPath)`" --api-key $keyDisplay --source `"$Source`""
+            Write-Host "dotnet nuget push `"$($package.SymbolPath)`" --api-key $keyDisplay --source `"$Source`" --skip-duplicate"
         }
     }
     return
@@ -168,7 +168,16 @@ foreach ($id in $ordered) {
 
     foreach ($path in $paths) {
         Write-Host "Pushing $path"
-        & dotnet nuget push $path --api-key $ApiKey --source $Source
+        # The CLI pushes an adjacent .snupkg on its own, and symbols are pushed explicitly below, so the
+        # package push stays symbols-free: every file reaches nuget.org exactly once. --skip-duplicate
+        # makes a resumed release idempotent - packages that are already published, or whose symbols are
+        # still validating, are skipped instead of failing the push.
+        $arguments = @('nuget', 'push', $path, '--api-key', $ApiKey, '--source', $Source, '--skip-duplicate')
+        if (-not $path.EndsWith('.snupkg', [StringComparison]::OrdinalIgnoreCase)) {
+            $arguments += '--no-symbols'
+        }
+
+        & dotnet @arguments
         if ($LASTEXITCODE -ne 0) {
             throw "dotnet nuget push '$path' failed with exit code $LASTEXITCODE."
         }

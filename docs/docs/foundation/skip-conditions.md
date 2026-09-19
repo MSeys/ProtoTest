@@ -144,7 +144,7 @@ Because nothing starts, a skipped test has no context, no trace record and no re
 The demo gates each environment-dependent journey with a condition:
 
 - `DomainAccessJourney` requires `ProtoCapabilityKinds.Store`, because composing the test-side domain needs a store the suite can connect to;
-- `WebJourney` requires the named `"Northstar standalone"` server, because only the standalone instance gives browser tests an address;
+- the console journeys — `WebJourney`, `ApiThenBrowserJourney` and `BrowserThenApiJourney` — require the named `"Northstar standalone"` server, because only the standalone instance gives browser tests an address, and the demo's `RequiresConsoleBuild` skips them when the Vue SPA has not been built;
 - `MessagingJourney` requires `ProtoCapabilityKinds.Broker`, and the broker capability only exists when a real broker adapter is configured.
 
 `[RequiresInProcess]` itself is exercised by the repository's own NUnit tests (`tests/ProtoTest.NUnit.Tests/SkipConditionTests.cs`).

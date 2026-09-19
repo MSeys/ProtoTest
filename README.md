@@ -110,8 +110,9 @@ own output.
 
 - [Documentation](https://prototest.dev/docs/) — installation, first test, recipes, foundation, integrations,
   observability and extending.
-- [Demo](samples/ProtoTest.Demo) — ten journeys against Northstar, a multi-tenant SaaS sample app, through REST,
-  GraphQL, gRPC, RabbitMQ, spreadsheets and a real browser, with coverage, reports and a full ProtoTrace.
+- [Demo](samples/ProtoTest.Demo) — twelve journeys against Northstar, a multi-tenant SaaS sample app, through REST,
+  GraphQL, gRPC, RabbitMQ, spreadsheets and a real browser, with coverage, reports and a full ProtoTrace. The
+  browser journeys drive Northstar Console, the application's real Vue 3 SPA, end to end.
 - [Trace viewer](https://trace.prototest.dev) — open a `.prototrace` bundle.
 
 ## License

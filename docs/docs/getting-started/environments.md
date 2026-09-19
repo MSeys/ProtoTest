@@ -61,7 +61,7 @@ builder.AddInfrastructure(
 builder.AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar");
 ```
 
-The started connection strings reach the tests through `ProtoInfrastructureSettings` and the in-process application through its web host settings, so both work against the same database or broker. With PostgreSQL owned by the run, no standalone application is started, so the browser journey's `[RequiresCapability("server", CapabilityName = "Northstar standalone")]` skips it — a broker container alone does not stop the standalone app from starting. A web session can be pointed at a published address through `ProtoTest:Web:Sessions:{name}:BaseUrl`, but the demo registers its `"Northstar standalone"` capability only when it starts that process itself, so a published run skips the browser journey too.
+The started connection strings reach the tests through `ProtoInfrastructureSettings` and the in-process application through its web host settings, so both work against the same database or broker. With PostgreSQL owned by the run, no standalone application is started, so the console journeys skip (their `[RequiresCapability("server", CapabilityName = "Northstar standalone")]` is not met); a broker container alone does not stop the standalone app from starting. A web session can be pointed at a published address through `ProtoTest:Web:Sessions:{name}:BaseUrl`, but the demo registers its `"Northstar standalone"` capability only when it starts that process itself, so a published run skips the browser journey too.
 
 ## Published
 

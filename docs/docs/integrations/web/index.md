@@ -423,6 +423,8 @@ For Vue 3 and Vue 2 applications, opt in per session and ProtoTest reads the rou
 
 It evaluates Vue 3's `[data-v-app].__vue_app__.config.globalProperties.$router.getRoutes()` first, then Vue 2's `#app.__vue__.$router.options.routes`, records each absolute path as `web.page.available`, and answers nothing when Vue or its router is absent. Vue 2 relative child paths resolve against their parent (`{ path: '/orders', children: [{ path: 'new' }] }` records `/orders/new`); a top-level relative path is not a page. Discovery runs once per session, only on backends that support JavaScript evaluation, and only after it actually read a route table: an evaluation that fails or a page without Vue stays unlatched and is retried on a later navigation, with the failure traced as `web.page.discovery.failed`.
 
+The demo combines both: its Northstar Console is a real Vue 3 SPA, so page coverage comes from the console's source folder (`samples/ProtoTest.SampleApp/Ui`) plus Vue Router discovery from the running router.
+
 ### React and Next.js
 
 React has no generic runtime route table to read, and ProtoTest deliberately does not guess at one. Next.js, Nuxt and Remix are inventoried from the frontend source folder, and Vue Router / React Router route literals are read from their definitions. For everything the scanner cannot see — routes built at runtime, aliased imports, relative child paths — publish the route list instead: a small build step that emits the application's routes as a JSON array loaded into `ProtoTest:Web:Pages`. The pages then show as uncovered until a test visits and verifies them, exactly like the explicit inventory.

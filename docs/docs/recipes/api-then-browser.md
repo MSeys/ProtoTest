@@ -8,7 +8,7 @@ description: Arrange a project through the API with a data builder, log a browse
 
 A browser test that clicks through a form to create its own data is slow, and it fails for reasons that have nothing to do with the page under test. Arrange through the API instead, and let the browser do only what the test is about: showing the result.
 
-The same journey runs in the demo — [WebJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/WebJourney.cs) (test) and [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs) (host). The full API surface is in [Web](../integrations/web/index.md); arranging is covered by [Data](../integrations/data/index.md).
+The same journey runs in the demo — `ApiThenBrowserJourney` in [CrossLayerJourneys.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/CrossLayerJourneys.cs) (test) and [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs) (host). The full API surface is in [Web](../integrations/web/index.md); arranging is covered by [Data](../integrations/data/index.md).
 
 ## Compose
 

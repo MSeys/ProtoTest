@@ -19,7 +19,7 @@ public sealed class OrderTests
 
         // A shape is partial: it names what the behaviour depends on and ignores the rest.
         response
-            .ShouldHaveHttpStatus(HttpStatusCode.Created)
+            .Should.HaveHttpStatus(HttpStatusCode.Created)
             .ShouldMatchShape(new
             {
                 id = JsonValue.GreaterThan(0),
@@ -35,12 +35,12 @@ public sealed class OrderTests
         using var created = await Proto.Context.Rest()
             .Body(new { product = "pencil", quantity = 12 })
             .PostAsync("/api/orders");
-        var id = created.ShouldHaveHttpStatus(HttpStatusCode.Created).ReadAsJson<OrderId>()!.Id;
+        var id = created.Should.HaveHttpStatus(HttpStatusCode.Created).ReadAsJson<OrderId>()!.Id;
 
         using var response = await Proto.Context.Rest().GetAsync($"/api/orders/{id}");
 
         response
-            .ShouldHaveHttpStatus(HttpStatusCode.OK)
+            .Should.HaveHttpStatus(HttpStatusCode.OK)
             .ShouldMatchShape(new { id, product = "pencil", quantity = 12 });
     }
 
@@ -52,7 +52,7 @@ public sealed class OrderTests
             .PostAsync("/api/orders");
 
         response
-            .ShouldHaveHttpStatus(HttpStatusCode.BadRequest)
+            .Should.HaveHttpStatus(HttpStatusCode.BadRequest)
             .ShouldMatchShape(new { errors = new { quantity = new[] { "Order at least one." } } });
     }
 
@@ -61,7 +61,7 @@ public sealed class OrderTests
     {
         using var response = await Proto.Context.Rest().GetAsync("/api/orders/999999");
 
-        response.ShouldHaveHttpStatus(HttpStatusCode.NotFound);
+        response.Should.HaveHttpStatus(HttpStatusCode.NotFound);
     }
 
     private sealed record OrderId(int Id);

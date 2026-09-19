@@ -56,6 +56,13 @@ public abstract class FileReportSink<TOptions> : IProtoSink, IProtoSinkArtifactS
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(items);
+        if (string.IsNullOrWhiteSpace(Options.OutputPath))
+        {
+            throw new InvalidOperationException(
+                $"{GetType().Name} has no output path. Set OutputPath in code or in the " +
+                $"'{_configurationSectionName}' configuration section before the run exports its report.");
+        }
+
         var report = ProtoReport.Create(items);
         var outputPath = Path.GetFullPath(Options.OutputPath);
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);

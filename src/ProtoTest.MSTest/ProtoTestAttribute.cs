@@ -17,14 +17,17 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
         var skipReason = ProtoTestSkip.GetReason(attributes, ProtoTestAssembly.Host);
         if (skipReason is not null)
         {
-            // This MSTest version has no dynamic skip API; a returned ignored result is what the runner
-            // reports as skipped. Skipping before the lifecycle starts keeps the trace honest.
+            // MSTest.TestFramework 4.4 has no public dynamic-skip API: an ignored result is what the
+            // runner reports as skipped. Its IgnoreReason is internal, so the reason travels on the
+            // public LogOutput and is prefixed to the display name. Skipping before the lifecycle
+            // starts keeps the trace honest.
             return
             [
                 new TestResult
                 {
                     Outcome = UnitTestOutcome.Ignored,
-                    DisplayName = methodInfo.Name
+                    DisplayName = $"{methodInfo.Name} (skipped: {skipReason})",
+                    LogOutput = skipReason
                 }
             ];
         }
@@ -63,11 +66,18 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
         }
     }
 
-    private static ProtoTestResult ToProtoTestResult(IReadOnlyList<TestResult>? results)
+    internal static ProtoTestResult ToProtoTestResult(IReadOnlyList<TestResult>? results)
     {
         if (results is null || results.Count == 0) return ProtoTestResult.Unknown;
         if (results.All(result => result.Outcome == UnitTestOutcome.Passed)) return ProtoTestResult.Passed;
-        if (results.All(result => result.Outcome == UnitTestOutcome.Ignored)) return ProtoTestResult.Skipped;
+        if (results.All(result => result.Outcome is UnitTestOutcome.Ignored or UnitTestOutcome.Inconclusive))
+            return ProtoTestResult.Skipped;
+        if (results.All(result => result.Outcome is UnitTestOutcome.Passed or UnitTestOutcome.Ignored or UnitTestOutcome.Inconclusive))
+        {
+            // Some data rows ran while others were skipped: Partial keeps both facts visible, where
+            // Passed would hide the skip and Skipped would hide the rows that ran.
+            return new ProtoTestResult(ProtoTraceOutcome.Partial);
+        }
 
         var failed = results.FirstOrDefault(result => result.Outcome is
             UnitTestOutcome.Failed or UnitTestOutcome.Error or UnitTestOutcome.Timeout or UnitTestOutcome.Aborted);

@@ -38,6 +38,12 @@ public class ProtoTestExecutor : ITestExecutor
             await action();
             result = ProtoTestResult.Passed;
         }
+        catch (global::TUnit.Core.Exceptions.SkipTestException exception)
+        {
+            // A test that skips itself from its body is reported as skipped, not failed.
+            result = ProtoTestResult.Skipped;
+            failure = exception;
+        }
         catch (OperationCanceledException exception)
         {
             result = ProtoTestResult.Cancelled(exception);

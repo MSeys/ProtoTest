@@ -212,39 +212,41 @@ internal sealed class ProtoXunitTheoryTestCaseRunner(
 /// <summary>
 /// Wraps the test method invocation so the ProtoTest context spans the test and sees xUnit's recorded failure.
 /// </summary>
-internal sealed class ProtoXunitTestRunner(
-    ITest test,
-    IMessageBus messageBus,
-    Type testClass,
-    object[] constructorArguments,
-    MethodInfo testMethod,
-    object[] testMethodArguments,
-    string skipReason,
-    IReadOnlyList<BeforeAfterTestAttribute> beforeAfterAttributes,
-    ExceptionAggregator aggregator,
-    CancellationTokenSource cancellationTokenSource)
-    : XunitTestRunner(
-        test,
-        messageBus,
-        testClass,
-        constructorArguments,
-        testMethod,
-        testMethodArguments,
-        skipReason,
-        beforeAfterAttributes,
-        aggregator,
-        cancellationTokenSource)
+internal sealed class ProtoXunitTestRunner : XunitTestRunner
 {
+    public ProtoXunitTestRunner(
+        ITest test,
+        IMessageBus messageBus,
+        Type testClass,
+        object[] constructorArguments,
+        MethodInfo testMethod,
+        object[] testMethodArguments,
+        string skipReason,
+        IReadOnlyList<BeforeAfterTestAttribute> beforeAfterAttributes,
+        ExceptionAggregator aggregator,
+        CancellationTokenSource cancellationTokenSource)
+        : base(
+            test,
+            messageBus,
+            testClass,
+            constructorArguments,
+            testMethod,
+            testMethodArguments,
+            skipReason,
+            beforeAfterAttributes,
+            aggregator,
+            cancellationTokenSource)
+    {
+        // xUnit v2 has no dynamic skip API and its non-virtual RunAsync decides pass/fail from the
+        // invoker's aggregator, so a TestSkipped queued from InvokeTestMethodAsync would still be
+        // counted and announced as TestPassed. RunAsync checks SkipReason before invoking anything,
+        // so the dynamic skip belongs there: skipping before the lifecycle starts keeps the trace
+        // honest - nothing ran, so nothing failed.
+        SkipReason ??= ProtoTestSkip.GetReason(ProtoAttributeResolver.Resolve(testMethod), ProtoTestAssembly.Host);
+    }
+
     protected override async Task<decimal> InvokeTestMethodAsync(ExceptionAggregator aggregator)
     {
-        var skipReason = ProtoTestSkip.GetReason(ProtoAttributeResolver.Resolve(TestMethod), ProtoTestAssembly.Host);
-        if (skipReason is not null)
-        {
-            // Skipping before the lifecycle starts keeps the trace honest: nothing ran, so nothing failed.
-            MessageBus.QueueMessage(new TestSkipped(Test, skipReason));
-            return 0m;
-        }
-
         var host = ProtoTestAssembly.Host;
         try
         {

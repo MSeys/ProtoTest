@@ -108,6 +108,36 @@ public sealed class ReportSinkTests
     }
 
     [Test]
+    public async Task HtmlSink_ShouldTreatKindsCaseInsensitively()
+    {
+        var directory = CreateTempDirectory();
+        var path = Path.Combine(directory, "report.html");
+        try
+        {
+            var items = new[]
+            {
+                new ProtoReportItem("Orders", "OpenAPI", "GET /orders",
+                    "Coverage", ProtoReportStatus.Success, Count: 1, IsCovered: true),
+                new ProtoReportItem("Run gates", "Gate", "no error findings",
+                    "Gate", ProtoReportStatus.Success, Count: 1, Message: "No errors found.")
+            };
+            var sink = new HtmlReportSink(new HtmlReportSinkOptions { OutputPath = path });
+
+            await sink.ExportAsync(items);
+
+            var html = await File.ReadAllTextAsync(path);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(html, Does.Contain("data-report-section data-kind=\"coverage\""));
+                Assert.That(html, Does.Contain("1 occurrence</span>"), "A capitalized Coverage kind keeps its occurrence badge.");
+                Assert.That(html, Does.Contain("status-badge\">Passed</span>"), "A capitalized Gate kind is labelled like a gate.");
+                Assert.That(html, Does.Contain(">Run gate</span>"));
+            }
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
     public async Task HtmlSink_ShouldGiveAnUnknownKindItsOwnSection()
     {
         var directory = CreateTempDirectory();
@@ -170,6 +200,9 @@ public sealed class ReportSinkTests
             Assert.That(html, Does.Contain("fill: var(--brand-mark-check)"));
             // The viewer's expander rather than a rotating glyph.
             Assert.That(html, Does.Contain("<path class=\"stem\""));
+            // Every section kind, resources included, gets the viewer's token-based tint.
+            Assert.That(html, Does.Contain("[data-kind=coverage] .section-head i { background: var(--type-evidence); }"));
+            Assert.That(html, Does.Contain("[data-kind=resource] .section-head i { background: var(--type-ownership); }"));
             // The empty state is shown by clearing its hidden attribute; its own display must not override that.
             Assert.That(html, Does.Contain(".empty-state[hidden] { display: none; }"));
             Assert.That(html, Does.Contain("class=\"report-item partial status-warning root\""));
@@ -275,7 +308,7 @@ public sealed class ReportSinkTests
     public async Task ExportHook_ShouldAttemptEverySinkAndAggregateFailures()
     {
         var first = new ThrowingSink();
-        var second = new ThrowingSink();
+        var second = new OtherThrowingSink();
         var builder = new ProtoHostBuilder();
         builder.AddSink(first);
         builder.AddSink(second);
@@ -287,6 +320,30 @@ public sealed class ReportSinkTests
         Assert.That(exception!.InnerExceptions, Has.Count.EqualTo(2));
         Assert.That(first.CallCount, Is.EqualTo(1));
         Assert.That(second.CallCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void AddSink_MixingOverloadsForTheSameSinkType_ShouldRegisterOneSink()
+    {
+        var builder = new ProtoHostBuilder();
+        IServiceCollection? services = null;
+        builder.ConfigureServices(collection => services = collection);
+        builder.AddSink<CapturingSink>();
+        builder.AddSink(new CapturingSink());
+
+        Assert.That(services!.Count(descriptor => descriptor.ServiceType == typeof(IProtoSink)), Is.EqualTo(1));
+    }
+
+    [Test]
+    public void AddSink_MixingOverloadsInstanceFirst_ShouldRegisterOneSink()
+    {
+        var builder = new ProtoHostBuilder();
+        IServiceCollection? services = null;
+        builder.ConfigureServices(collection => services = collection);
+        builder.AddSink(new CapturingSink());
+        builder.AddSink<CapturingSink>();
+
+        Assert.That(services!.Count(descriptor => descriptor.ServiceType == typeof(IProtoSink)), Is.EqualTo(1));
     }
 
     [Test]
@@ -313,6 +370,86 @@ public sealed class ReportSinkTests
             Assert.That(File.Exists(configuredPath), Is.True);
             Assert.That(File.Exists(codePath), Is.False);
             Assert.That(await File.ReadAllTextAsync(configuredPath), Does.Not.Contain(Environment.NewLine));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public async Task SinkInstance_ShouldKeepItsOwnValuesEvenWhenASectionExists()
+    {
+        var directory = CreateTempDirectory();
+        var instancePath = Path.Combine(directory, "instance.json");
+        var configuredPath = Path.Combine(directory, "configured.json");
+        try
+        {
+            // An instance sink is registered as-is: the section for its options must not be bound onto it.
+            var sink = new JsonReportSink(new JsonReportSinkOptions { OutputPath = instancePath, Indented = true });
+            var builder = new ProtoHostBuilder();
+            builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["ProtoTest:Reporting:Json:OutputPath"] = configuredPath,
+                    ["ProtoTest:Reporting:Json:Indented"] = "false"
+                }));
+            builder.ConfigureServices(services =>
+                services.AddSingleton<IProtoReportSource>(new StubReportSource(SampleItems())));
+            builder.AddSink(sink);
+            await using var host = builder.Build();
+
+            await host.StartAsync();
+            await host.StopAsync();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(File.Exists(instancePath), Is.True);
+                Assert.That(File.Exists(configuredPath), Is.False);
+                Assert.That(await File.ReadAllTextAsync(instancePath), Does.Contain("  \"GeneratedAtUtc\":"));
+                Assert.That(sink.Indented, Is.True);
+            }
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public void Export_ShouldFailWithAClearMessageWhenTheOutputPathIsEmpty()
+    {
+        var sink = new JsonReportSink(new JsonReportSinkOptions { OutputPath = "" });
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            () => sink.ExportAsync(SampleItems()));
+
+        Assert.That(exception!.Message, Does.Contain("no output path"));
+        Assert.That(exception.Message, Does.Contain("ProtoTest:Reporting:Json"));
+    }
+
+    [Test]
+    public async Task HtmlSink_ShouldBindTitleFromConfiguration()
+    {
+        var directory = CreateTempDirectory();
+        var path = Path.Combine(directory, "configured.html");
+        try
+        {
+            var builder = new ProtoHostBuilder();
+            builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["ProtoTest:Reporting:Html:OutputPath"] = path,
+                    ["ProtoTest:Reporting:Html:Title"] = "Nightly <suite>"
+                }));
+            builder.ConfigureServices(services =>
+                services.AddSingleton<IProtoReportSource>(new StubReportSource(SampleItems())));
+            builder.AddSink<HtmlReportSink>();
+            await using var host = builder.Build();
+
+            await host.StartAsync();
+            await host.StopAsync();
+
+            var html = await File.ReadAllTextAsync(path);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(html, Does.Contain("<title>Nightly &lt;suite&gt;</title>"));
+                Assert.That(html, Does.Contain("<h1>Nightly &lt;suite&gt;</h1>"));
+            }
         }
         finally { Directory.Delete(directory, recursive: true); }
     }
@@ -408,6 +545,17 @@ public sealed class ReportSinkTests
     }
 
     private sealed class ThrowingSink : IProtoSink
+    {
+        public int CallCount { get; private set; }
+
+        public Task ExportAsync(IEnumerable<ProtoReportItem> items, CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Task.FromException(new InvalidOperationException("Export failed."));
+        }
+    }
+
+    private sealed class OtherThrowingSink : IProtoSink
     {
         public int CallCount { get; private set; }
 

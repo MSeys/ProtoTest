@@ -52,6 +52,30 @@ public sealed class ProtoTestFactOutcomeTests
     }
 
     [Fact]
+    public async Task SkippedFact_ShouldReportSkippedToTheRunnerInsteadOfPassed()
+    {
+        var testCase = new ProtoXunitTestCase(
+            new NullMessageSink(),
+            TestMethodDisplay.ClassAndMethod,
+            TestMethodDisplayOptions.None,
+            TestMethod(nameof(Subjects.RequiresCapability)));
+        var bus = new RecordingMessageBus();
+
+        var summary = await testCase.RunAsync(
+            new NullMessageSink(), bus, [], new ExceptionAggregator(), new CancellationTokenSource());
+
+        Assert.Equal(1, summary.Total);
+        Assert.Equal(1, summary.Skipped);
+        Assert.Equal(0, summary.Failed);
+        Assert.Contains(bus.Messages, message => message is ITestSkipped);
+        Assert.DoesNotContain(bus.Messages, message => message is ITestPassed);
+        // The skip happens before the lifecycle starts, so no trace was opened for it.
+        Assert.DoesNotContain(
+            ProtoTestAssembly.Host.Trace.Snapshot().Tests,
+            test => test.Name.Contains(nameof(Subjects.RequiresCapability), StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task TheoryRows_ShouldEachRecordTheirOwnOutcome()
     {
         var method = TestMethod(nameof(Subjects.EvenOnly));
@@ -121,6 +145,11 @@ public sealed class ProtoTestFactOutcomeTests
         [InlineData(2)]
         [InlineData(3)]
         public void EvenOnly(int value) => Assert.Equal(0, value % 2);
+
+        [ProtoTestFact]
+        [RequiresCapability("not-composed", Reason = "the adapter proves the skip path")]
+        public void RequiresCapability()
+            => throw new InvalidOperationException("A skipped test must not run its body.");
     }
 
 #pragma warning restore xUnit1000

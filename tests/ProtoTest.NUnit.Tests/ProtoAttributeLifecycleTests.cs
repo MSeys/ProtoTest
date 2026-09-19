@@ -7,7 +7,6 @@ using ProtoTest.Core;
 public class ProtoAttributeLifecycleTests
 {
 
-    [Test]
     [ProtoTest]
     [Tracking("MethodLevel", Order = 2)]
     public void ProtoTest_ShouldExecuteClassAndMethodAttributesInOrder()

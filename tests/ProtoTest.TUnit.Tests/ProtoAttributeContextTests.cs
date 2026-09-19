@@ -17,7 +17,7 @@ public class ProtoAttributeContextTests
     }
 }
 
-// Custom ProtoAttribute die context instelt vóór de test draait
+// Custom ProtoAttribute that sets context before the test runs
 [AttributeUsage(AttributeTargets.Method)]
 public class SetContextUserAttribute(string username) : ProtoAttribute
 {

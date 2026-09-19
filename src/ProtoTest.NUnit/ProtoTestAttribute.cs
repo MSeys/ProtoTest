@@ -42,6 +42,10 @@ public class ProtoTestAttribute : TestAttribute, ITestAction
                     : nunitResult.Message,
                 nunitResult.StackTrace)),
             TestStatus.Skipped => ProtoTestResult.Skipped,
+            TestStatus.Inconclusive => ProtoTestResult.Skipped,
+            // NUnit's Warning means the test ran and passed with warnings attached; Partial is the
+            // outcome that keeps the warning visible instead of reading it as an unknown state.
+            TestStatus.Warning => new ProtoTestResult(ProtoTraceOutcome.Partial),
             _ => ProtoTestResult.Unknown
         };
 

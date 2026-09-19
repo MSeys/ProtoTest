@@ -13,12 +13,12 @@ public class ProtoTestTheoryAttribute : TheoryAttribute, IBeforeAfterTestAttribu
     /// <inheritdoc />
     public void Before(MethodInfo methodUnderTest, IXunitTest test)
     {
-        ProtoTestLifecycleHandler.Before(methodUnderTest, test);
+        ProtoTestLifecycleHandler.Before(methodUnderTest);
     }
 
     /// <inheritdoc />
     public void After(MethodInfo methodUnderTest, IXunitTest test)
     {
-        ProtoTestLifecycleHandler.After(methodUnderTest, test);
+        ProtoTestLifecycleHandler.After(methodUnderTest);
     }
 }

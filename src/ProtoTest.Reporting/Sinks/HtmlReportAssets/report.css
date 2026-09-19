@@ -176,6 +176,8 @@ main { width: min(1240px, 100% - var(--space-7)); margin: 0 auto var(--space-7);
 .report-section[data-kind=coverage] .section-head i { background: var(--type-evidence); }
 .report-section[data-kind=finding] .section-head i { background: var(--type-finding); }
 .report-section[data-kind=gate] .section-head i { background: var(--type-gate); }
+/* Resources are owned, not proven: the ownership family, as the viewer colours them. */
+.report-section[data-kind=resource] .section-head i { background: var(--type-ownership); }
 .report-section[data-kind=metric] .section-head i { background: var(--type-data); }
 .report-section[data-kind=observation] .section-head i { background: var(--type-observation); }
 .report-section > .report-item.root:first-of-type { margin-top: var(--space-2); }

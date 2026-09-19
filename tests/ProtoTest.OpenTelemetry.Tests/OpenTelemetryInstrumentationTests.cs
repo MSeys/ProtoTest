@@ -103,6 +103,39 @@ public sealed class OpenTelemetryInstrumentationTests
     }
 
     [Test]
+    public async Task CapturedApplicationSpans_ShouldCapOversizedTagsLikeTheExportDoes()
+    {
+        const string sourceName = "ProtoTest.OpenTelemetry.Tests.App";
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.ActivitySources.Add(sourceName));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("tag cap test", TestMethod());
+
+        using (var source = new ActivitySource(sourceName))
+        using (var activity = source.StartActivity("app.operation"))
+        {
+            Assert.That(activity, Is.Not.Null);
+            activity!.SetTag("small.tag", "kept");
+            activity.SetTag("large.tag", new string('x', 4096));
+        }
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        var snapshot = host.Trace.Snapshot();
+        var entry = snapshot.Tests.SelectMany(test => test.Entries)
+            .Concat(snapshot.Entries ?? [])
+            .Single(item => item.Name == "app.operation");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(entry.Attributes["small.tag"], Is.EqualTo("kept"));
+            Assert.That(entry.Attributes.ContainsKey("large.tag"), Is.False,
+                "A tag longer than the 2048-character export limit must not reach the archive either.");
+        }
+    }
+
+    [Test]
     public async Task WithoutInstrumentation_ShouldNotExportProtoTestSpans()
     {
         var exported = new List<Activity>();

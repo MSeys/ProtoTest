@@ -12,7 +12,7 @@ internal static class ProtoTestLifecycleHandler
     /// <summary>
     /// Starts the test context and executes before-test hooks.
     /// </summary>
-    internal static void Before(MethodInfo methodUnderTest, IXunitTest test)
+    internal static void Before(MethodInfo methodUnderTest)
     {
         var attributes = ProtoAttributeResolver.Resolve(methodUnderTest);
         var skipReason = ProtoTestSkip.GetReason(attributes, ProtoTestAssembly.Host);
@@ -29,12 +29,28 @@ internal static class ProtoTestLifecycleHandler
     }
 
     /// <summary>
-    /// Executes after-test hooks and cleans up the active <see cref="ProtoExecutionContext"/>.
+    /// Executes after-test hooks and cleans up the active <see cref="ProtoExecutionContext"/> using the
+    /// state xUnit recorded for the test that just finished.
     /// </summary>
-    internal static void After(MethodInfo methodUnderTest, IXunitTest test)
+    internal static void After(MethodInfo methodUnderTest)
+        => Complete(methodUnderTest, global::Xunit.TestContext.Current.TestState);
+
+    /// <summary>
+    /// Completes the active lifecycle with the outcome mapped from an xUnit test result state. xUnit owns
+    /// the ambient state, so this overload exists so the mapping can be exercised directly.
+    /// </summary>
+    internal static void Complete(MethodInfo methodUnderTest, global::Xunit.TestResultState? state)
     {
-        var state = global::Xunit.TestContext.Current.TestState;
-        var result = state?.Result switch
+        var result = MapResult(state);
+        ProtoTestAssembly.Host
+            .CompleteTestAsync(result)
+            .GetAwaiter()
+            .GetResult();
+    }
+
+    /// <summary>Maps an xUnit test result state onto the outcome ProtoTest records.</summary>
+    internal static ProtoTestResult MapResult(global::Xunit.TestResultState? state)
+        => state?.Result switch
         {
             global::Xunit.TestResult.Passed => ProtoTestResult.Passed,
             global::Xunit.TestResult.Skipped or global::Xunit.TestResult.NotRun => ProtoTestResult.Skipped,
@@ -44,10 +60,4 @@ internal static class ProtoTestLifecycleHandler
                 state.ExceptionStackTraces?.FirstOrDefault())),
             _ => ProtoTestResult.Unknown
         };
-        ProtoTestAssembly.Host
-            .CompleteTestAsync(result)
-            .GetAwaiter()
-            .GetResult();
-    }
-
 }

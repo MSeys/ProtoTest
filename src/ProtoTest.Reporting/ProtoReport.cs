@@ -11,9 +11,9 @@ public sealed record ProtoReport(
     {
         ArgumentNullException.ThrowIfNull(items);
         var roots = items.ToArray();
-        var flattened = Flatten(roots).ToArray();
-        var coverageItems = flattened.Where(item => IsKind(item.Kind, ProtoReportItemKinds.Coverage)).ToArray();
-        var covered = coverageItems.Count(item => item.IsCovered is true);
+        var flattened = roots.Flatten().ToArray();
+        // Coverage totals count units only; an IsCovered-null item is an aggregate, not a unit.
+        var coverage = flattened.CoverageTotals();
 
         return new ProtoReport(
             DateTimeOffset.UtcNow,
@@ -21,40 +21,49 @@ public sealed record ProtoReport(
                 Total: flattened.Length,
                 // An occurrence is an observed fact: coverage hits and observations. A gate verdict or a
                 // finding is recorded once, not observed repeatedly, so it does not inflate the count.
-                TotalOccurrences: flattened
-                    .Where(item => IsKind(item.Kind, ProtoReportItemKinds.Coverage)
-                        || IsKind(item.Kind, ProtoReportItemKinds.Observation))
-                    .Sum(item => item.Count),
-                CoverageTotal: coverageItems.Length,
-                Covered: covered,
-                Uncovered: coverageItems.Length - covered,
-                CoveragePercentage: coverageItems.Length == 0
-                    ? 0
-                    : Math.Round(covered * 100d / coverageItems.Length, 2),
+                // Hierarchical coverage contributes its top unit once; nested units are that unit's
+                // breakdown, so one call is not counted at the endpoint, response and property levels.
+                TotalOccurrences: CoverageOccurrences(roots)
+                    + flattened
+                        .Where(item => item.IsKind(ProtoReportItemKinds.Observation))
+                        .Sum(item => item.Count),
+                CoverageTotal: coverage.Total,
+                Covered: coverage.Covered,
+                Uncovered: coverage.Uncovered,
+                CoveragePercentage: coverage.Percentage,
                 Warnings: flattened.Count(item => item.Status == ProtoReportStatus.Warning),
                 Errors: flattened.Count(item => item.Status == ProtoReportStatus.Error),
-                Findings: flattened.Count(item => IsKind(item.Kind, ProtoReportItemKinds.Finding)),
-                Gates: flattened.Count(item => IsKind(item.Kind, ProtoReportItemKinds.Gate)),
-                Resources: flattened.Count(item => IsKind(item.Kind, ProtoReportItemKinds.Resource))),
+                Findings: flattened.Count(item => item.IsKind(ProtoReportItemKinds.Finding)),
+                Gates: flattened.Count(item => item.IsKind(ProtoReportItemKinds.Gate)),
+                Resources: flattened.Count(item => item.IsKind(ProtoReportItemKinds.Resource))),
             roots);
     }
 
-    // Kinds are open strings and integrations may capitalize them; the summary must count the same
-    // items the renderer sections, so the comparison is case-insensitive everywhere.
-    private static bool IsKind(string? kind, string expected)
-        => string.Equals(kind, expected, StringComparison.OrdinalIgnoreCase);
-
-    private static IEnumerable<ProtoReportItem> Flatten(IEnumerable<ProtoReportItem> items)
+    /// <summary>
+    /// The observed coverage occurrences in a tree: each top-level coverage unit contributes its hit
+    /// count once. Units nested under another unit are that unit's breakdown - an OpenAPI response and
+    /// its properties describe the same calls the endpoint already counted - so they add nothing.
+    /// Aggregate rows (a null <see cref="ProtoReportItem.IsCovered"/>) contribute nothing themselves
+    /// and do not hide the units below them.
+    /// </summary>
+    private static int CoverageOccurrences(IEnumerable<ProtoReportItem> items)
     {
+        var total = 0;
         foreach (var item in items)
         {
-            yield return item;
-            if (item.Children is not null)
+            Add(item, hasUnitAncestor: false);
+        }
+
+        return total;
+
+        void Add(ProtoReportItem item, bool hasUnitAncestor)
+        {
+            var unit = item.IsKind(ProtoReportItemKinds.Coverage) && item.IsCovered is not null;
+            if (unit && !hasUnitAncestor) total += item.Count;
+            if (item.Children is null) return;
+            foreach (var child in item.Children)
             {
-                foreach (var child in Flatten(item.Children))
-                {
-                    yield return child;
-                }
+                Add(child, hasUnitAncestor || unit);
             }
         }
     }

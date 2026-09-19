@@ -129,7 +129,7 @@ internal static class HtmlReportRenderer
         int depth)
     {
         var statusClass = item.Status.ToString().ToLowerInvariant();
-        var descendantItems = Flatten(item).ToArray();
+        var descendantItems = item.Flatten().ToArray();
         var coverageState = GetCoverageState(descendantItems);
         var coverageClass = coverageState switch
         {
@@ -138,7 +138,7 @@ internal static class HtmlReportRenderer
             CoverageState.Uncovered => "uncovered",
             _ => "not-applicable"
         };
-        var filterTokens = GetFilterTokens(descendantItems);
+        var filterTokens = GetFilterTokens(descendantItems, coverageState);
         var searchableText = string.Join(' ', descendantItems.SelectMany(entry => new[]
         {
             entry.Identifier,
@@ -184,11 +184,11 @@ internal static class HtmlReportRenderer
             html.Append("<span class=\"badge coverage-badge\">")
                 .Append(coverageState).Append("</span>");
         }
-        if (item.Kind == ProtoReportItemKinds.Gate || item.Status != ProtoReportStatus.Neutral)
+        if (item.IsKind(ProtoReportItemKinds.Gate) || item.Status != ProtoReportStatus.Neutral)
         {
             html.Append("<span class=\"badge status-badge\">").Append(Encode(GetStatusLabel(item))).Append("</span>");
         }
-        if (item.Count > 0 && item.Kind is ProtoReportItemKinds.Coverage or ProtoReportItemKinds.Observation)
+        if (item.Count > 0 && (item.IsKind(ProtoReportItemKinds.Coverage) || item.IsKind(ProtoReportItemKinds.Observation)))
         {
             html.Append("<span class=\"badge\">").Append(item.Count.ToString(CultureInfo.InvariantCulture))
                 .Append(" occurrence").Append(PluralSuffix(item.Count)).Append("</span>");
@@ -252,7 +252,7 @@ internal static class HtmlReportRenderer
     /// Gates speak their own language: a gate does not succeed or error, it passes, advises or fails.
     /// </summary>
     private static string GetStatusLabel(ProtoReportItem item)
-        => item.Kind != ProtoReportItemKinds.Gate
+        => !item.IsKind(ProtoReportItemKinds.Gate)
             ? item.Status.ToString()
             : item.Status switch
             {
@@ -265,12 +265,12 @@ internal static class HtmlReportRenderer
 
     private static string GetContextLabel(ProtoReportItem item, bool isRoot)
     {
-        if (item.Kind == ProtoReportItemKinds.Gate)
+        if (item.IsKind(ProtoReportItemKinds.Gate))
         {
             return "Run gate";
         }
 
-        if (item.Kind == ProtoReportItemKinds.Finding)
+        if (item.IsKind(ProtoReportItemKinds.Finding))
         {
             return item.DisplayGroup is { Length: > 0 }
                 ? $"{item.Category} · {item.DisplayGroup}"
@@ -344,22 +344,21 @@ internal static class HtmlReportRenderer
 
     private static string GateTone(IEnumerable<ProtoReportItem> items)
     {
-        var gates = items.SelectMany(Flatten).Where(item => item.Kind == ProtoReportItemKinds.Gate).ToArray();
+        var gates = items.Flatten().Where(item => item.IsKind(ProtoReportItemKinds.Gate)).ToArray();
         if (gates.Length == 0) return "neutral";
         if (gates.Any(item => item.Status == ProtoReportStatus.Error)) return "danger";
         if (gates.Any(item => item.Status == ProtoReportStatus.Warning)) return "warning";
         return "success";
     }
 
-    private static string GetFilterTokens(IEnumerable<ProtoReportItem> items)
+    private static string GetFilterTokens(IEnumerable<ProtoReportItem> items, CoverageState coverageState)
     {
-        var materializedItems = items.ToArray();
         var tokens = new HashSet<string>(StringComparer.Ordinal);
-        if (GetCoverageState(materializedItems) == CoverageState.Partial)
+        if (coverageState == CoverageState.Partial)
         {
             tokens.Add("partial");
         }
-        foreach (var item in materializedItems)
+        foreach (var item in items)
         {
             if (item.IsCovered is true) tokens.Add("covered");
             if (item.IsCovered is false) tokens.Add("uncovered");
@@ -372,28 +371,13 @@ internal static class HtmlReportRenderer
 
     private static CoverageState GetCoverageState(IEnumerable<ProtoReportItem> items)
     {
-        var hasCovered = false;
-        var hasUncovered = false;
-        foreach (var item in items.Where(item => item.Kind == ProtoReportItemKinds.Coverage))
-        {
-            hasCovered |= item.IsCovered is true;
-            hasUncovered |= item.IsCovered is false;
-        }
-
-        if (hasCovered && hasUncovered) return CoverageState.Partial;
-        if (hasCovered) return CoverageState.Covered;
-        if (hasUncovered) return CoverageState.Uncovered;
+        // The shared coverage arithmetic decides what a unit is, so the renderer cannot disagree
+        // with the report summary and the run gates.
+        var totals = items.CoverageTotals();
+        if (totals.Covered > 0 && totals.Uncovered > 0) return CoverageState.Partial;
+        if (totals.Covered > 0) return CoverageState.Covered;
+        if (totals.Uncovered > 0) return CoverageState.Uncovered;
         return CoverageState.NotApplicable;
-    }
-
-    private static IEnumerable<ProtoReportItem> Flatten(ProtoReportItem item)
-    {
-        yield return item;
-        if (item.Children is null) yield break;
-        foreach (var child in item.Children)
-        {
-            foreach (var descendant in Flatten(child)) yield return descendant;
-        }
     }
 
     private static void SummaryCard(

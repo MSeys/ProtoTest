@@ -1,118 +1,68 @@
 # ProtoTest.GraphQL
 
-Runner-independent GraphQL testing with named clients, a fluent operation builder,
-GraphQL-aware assertions, observations, and SDL-driven field coverage.
+Queries, mutations and subscriptions over named clients, with a fluent and a shape-driven builder, GraphQL-aware assertions and SDL-driven schema coverage.
 
 ```bash
-dotnet add package ProtoTest.GraphQL --prerelease
+dotnet add package ProtoTest.GraphQL
 ```
 
-The examples use `JsonValue` from `ProtoTest.Json`; GraphQL and REST intentionally use
-the same matcher API.
+## Quick start
 
 ```csharp
-builder.AddApplication("Catalog", app => app.AddGraphQL(graphQL => graphQL
+builder.AddApplication("Api", app => app.AddGraphQL(graphQL => graphQL
     .CaptureAttachments()
-    .AddClient("Catalog")
-    .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "catalog.graphql"))));
-```
+    .AddClient("GraphQL")));
 
-As with REST, the endpoint comes from the application's
-`ProtoTest:Applications:Catalog:BaseUrl`, joined with `Endpoints:GraphQL` when configured. For an
-endpoint created per test, pass a `Func<ProtoExecutionContext, Uri>` to `AddClient`. Response
-buffering is bounded by `ConfigureResponses(options => options.MaxResponseBodyBytes = ...)`.
-
-When another integration already owns the transport, such as an in-process
-`ProtoTest.AspNetCore` server, reuse that client without opening a network connection:
-
-```csharp
-builder.AddApplication("SampleApp", app => app
-    .AddAspNetCoreServer<Program>()
-    .AddGraphQL(graphQL => graphQL.AddClient("GraphQL")));   // reuses the server; set Endpoints:GraphQL for the path
-```
-
-```csharp
-[Application("Catalog")]
-public async Task FindsProducts()
+[Application("Api")]
+public sealed class CatalogTests
 {
-    using var response = await Proto.Context.GraphQL()
-        .Query("products", new
-        {
-            first = 10,
-            where = new { name = new { contains = "note" } },
-            order = new[] { new { name = Gql.Enum("ASC") } }
-        })
-        .ExpectAsync(new
-        {
-            nodes = new[]
+    [ProtoTest]
+    public async Task FindsProducts()
+    {
+        using var response = await Proto.Context.GraphQL()
+            .Query("products", new { first = 10 })
+            .ExpectAsync(new
             {
-                new
+                nodes = new[]
                 {
-                    id = JsonValue.NotNull(),
-                    name = JsonValue.StringContaining("note"),
-                    price = JsonValue.LessThan(100m)
-                }
-            },
-            pageInfo = new { hasNextPage = false }
-        });
+                    new { id = JsonValue.NotNull(), name = JsonValue.StringContaining("note") }
+                },
+                pageInfo = new { hasNextPage = false }
+            });
 
-    response.ShouldHaveNoErrors();
+        response.ShouldHaveNoErrors();
+    }
 }
 ```
 
-Anonymous objects or test-owned contract types drive the selection, while arguments
-remain ordinary objects. Use `Gql.Variable("InputType!", value)` for safe typed variables.
-Direct file uploads stay compact:
+## What it adds
 
-```csharp
-using var response = await Proto.Context.GraphQL()
-    .Mutation("uploadDocument", new
-    {
-        file = Gql.Upload(bytes, "example.txt", "text/plain")
-    })
-    .ExpectAsync(new { fileName = "example.txt", length = JsonValue.GreaterThan(0) });
-```
+- **Operations** — `Proto.Context.GraphQL(name?)` with fluent `Query`/`Mutation`/`Subscription(name, configure)`, shape-driven `Query(rootField, arguments)` + `ExpectAsync(shape)`, and `Request(document)` as the raw escape hatch.
+- **Assertions** — `ShouldHaveNoErrors()`, `ShouldHaveErrors()`, `ShouldHaveError(code)`, `Should.HaveHttpStatus(...)`, `ShouldMatchShape(...)` and `ReadDataAs<T>()`.
+- **Subscriptions** — `SubscribeAsync()` over `graphql-transport-ws` WebSocket or SSE, selected per target with `WithSubscriptionTransport(...)` or `ProtoTest:Applications:{app}:GraphQL:SubscriptionTransport`; each event is a normal `GraphQLResponse`.
+- **Uploads** — `Gql.Upload(...)` in shape arguments and variables builds the multipart request and preflight header automatically.
+- **Coverage** — `GraphQLCoverageCollector` counts operations; `WithSchemaCoverage()` walks the SDL (inline, file or URL) and reports types, fields, arguments and input fields.
+- **Tracing** — `graphql.operation` with document and variables, `graphql.response` observations, redacted request/response attachments and subscription events.
 
-ProtoTest creates the multipart map and preflight header automatically. Uploads also
-work inside explicitly typed variables and with raw documents. Use the detailed
-`Field`, `Argument`, connection and variable builders for advanced operations.
-`Request` accepts a raw GraphQL document as the final escape hatch.
+## Configuration
 
-Subscriptions use `graphql-transport-ws` by default and return a separately owned stream:
+Under `ProtoTest:GraphQL:Responses` and `ProtoTest:GraphQL:Attachments`; the option types are shared with REST, each protocol owns a keyed instance.
 
-```csharp
-await using var subscription = await Proto.Context.GraphQL()
-    .Subscription("orderCreated")
-    .Select(new { id = Gql.Field, status = Gql.Field })
-    .SubscribeAsync();
+| Key | Type | Default |
+| --- | --- | --- |
+| `MaxResponseBodyBytes` | `int` | `10485760` (10 MiB) |
+| `MaxDiagnosticBodyLength` | `int` | `65536` |
+| `CaptureRequestBodies` | `bool` | `true` |
+| `CaptureResponses` | `bool` | `true` |
+| `CaptureExpectedShapes` | `bool` | `true` |
+| `RedactSensitiveData` | `bool` | `true` |
+| `SensitiveHeaders` | `List<string>` | `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` |
+| `SensitiveQueryParameters` | `List<string>` | `access_token`, `refresh_token`, `token`, `apiKey`, `api_key`, `key` |
+| `SensitiveJsonProperties` | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key` |
 
-using var message = await subscription.ExpectNextAsync(expected, cancellationToken);
-message.ShouldHaveNoErrors();
-```
+There is no batching, persisted operations or incremental `@defer` support; subscriptions speak only `graphql-transport-ws`, and a fluent `.Argument("file", Gql.Upload(...))` is not routed through multipart normalization.
 
-`GraphQLSubscription` also supports `ExpectNextAsync` and `await foreach`. Each event is
-a normal `GraphQLResponse` and contributes its own observations, shape assertions,
-attachments, and schema coverage. Select
-`GraphQLSubscriptionTransport.Sse` with `WithSubscriptionTransport(...)` for HTTP-based
-streams. The appsettings equivalent is
-`ProtoTest:Applications:{name}:GraphQL:SubscriptionTransport`. Custom in-process hosts can
-provide `IGraphQLWebSocketFactory`, and `ConnectionPayload(...)` configures optional
-`connection_init` metadata. Batching, persisted operations, and incremental responses
-remain separate future features.
+## Learn more
 
-Schema coverage parses SDL and reports every object/interface field, including fields
-that were not selected. Aliases are resolved to their schema field, and fragments and
-inline fragments participate in coverage. Field arguments and nested input properties
-are tracked for both inline values and variables.
-The schema source accepts inline SDL, a file, or a URL. The parameterless
-`WithSchemaCoverage()` reads `ProtoTest:Applications:{name}:GraphQL:Schema`.
-
-Shape matching — `ShouldMatchShape`, `ExpectAsync` and `ExpectNextAsync` — is powered by
-`ProtoTest.Json`, the protocol-independent matcher shared with `ProtoTest.Rest`,
-`ProtoTest.Grpc` and `ProtoTest.Messaging`.
-
-Recorded documents and request/response attachments redact string literals assigned to
-sensitive argument and input-field names (`password: "hunter2"` is recorded as
-`password: "[REDACTED]"`), reusing `SensitiveJsonProperties`. `$variable` references stay
-variables and their values are redacted in the recorded JSON. Redaction only affects what
-is recorded; the request actually sent never changes.
+- [GraphQL guide](https://prototest.dev/docs/integrations/graphql/)
+- [PlatformJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/PlatformJourney.cs)

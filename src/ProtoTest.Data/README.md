@@ -1,86 +1,48 @@
 # ProtoTest.Data
 
-ProtoTest.Data constructs deterministic test data while keeping scenario-relevant values visible in Arrange code.
+Deterministic test data with member defaults, provisioners and an identity map — without ever guessing a semantic value.
 
-```csharp
-builder.AddData(data =>
-{
-    data.AddDefaultsFromAssembly(typeof(TestAssembly).Assembly);
-});
+```bash
+dotnet add package ProtoTest.Data
 ```
 
 ```csharp
+builder.AddData(data => data.AddDefaultsFromAssembly(typeof(NorthstarDataDefaults).Assembly));
+```
+
+## Quick start
+
+```csharp
+// Explicit values win over defaults, which win over providers and safe built-ins.
 var invoice = Proto.Context.Data().For<Invoice>()
     .With(x => x.Total, 125m)
     .With(x => x.Status, InvoiceStatus.Overdue)
     .Build();
-```
 
-Defaults belong in feature-local modules:
-
-```csharp
-public sealed class InvoiceDataDefaults : IProtoDataDefaultsModule
-{
-    public void Configure(ProtoDataConfiguration data)
-    {
-        data.Values.Use<InvoiceId>(context => InvoiceId.From(context.NextGuid()));
-
-        data.For<Invoice>()
-            .Default(x => x.Currency, Currency.EUR);
-    }
-}
-```
-
-Explicit values win over member defaults, which win over type providers and safe built-in values. Missing semantic values cause a `ProtoDataException` rather than being guessed.
-
-DDD types can retain their invariants by registering a domain factory:
-
-```csharp
-data.For<Invoice>()
-    .ConstructUsing(context => Invoice.Create(
-        context.Value<InvoiceId>(nameof(Invoice.Id)),
-        context.Value<Money>(nameof(Invoice.Total))));
-```
-
-Multiple `AddData(...)` calls compose on the same host. Numeric, enum, date and other potentially semantic values are never guessed; register a default or keep them explicit in the test.
-
-Sensitive trace values can be redacted per member or value type:
-
-```csharp
-data.For<User>().Redact(x => x.AccessToken);
-data.RedactValueType<Password>();
-```
-
-Cross-cutting conventions can extend the value pipeline through `IProtoDataValueResolver`. They run after exact member and type providers and before safe built-in generation.
-
-Every `Build()` and `Explain()` operation is recorded in ProtoTrace. Each resolved member is a child trace event containing its value source.
-
-## Provisioning
-
-Register one application-specific route for a data type:
-
-```csharp
+// A provisioner creates through the application; the result enters the identity map.
 builder
     .AddData()
     .AddDataProvisioner<Invoice, InvoiceProvisioner>();
-```
 
-The test remains focused on relevant state:
-
-```csharp
-var invoice = await Proto.Context.Data().For<Invoice>()
+var created = await Proto.Context.Data().For<Invoice>()
     .With(x => x.Total, Money.EUR(125m))
     .CreateAsync();
+
+var again = Proto.Context.Data().Ref<Invoice>(created.Number);
 ```
 
-Bulk construction keeps fixed scenario values while resolving a fresh deterministic sequence for every item:
+## What it adds
 
-```csharp
-var users = Proto.Context.Data().For<User>()
-    .With(x => x.Role, Roles.Member)
-    .BuildMany(7);
-```
+- **Construction** — `Proto.Context.Data()` exposes `For<T>()` (a `ProtoDataObjectBuilder<T>`) and `Ref<T>(identity?)`; build with `With`, `Build`, `CreateAsync`, `BuildMany` or `CreateManyAsync`.
+- **Precedence per member** — explicit `With`, member default, exact type provider, registered `IProtoDataValueResolver`s, safe built-ins, then the constructor default; anything unresolved throws a `ProtoDataException` naming the member.
+- **Configuration** — `AddData(data => …)`: `Values.Use<T>(...)`, `For<T>().Default(...)`, `ConstructUsing(...)`, `Redact(...)`, `RedactValueType<T>()`, `AddDefaults<TModule>()` and `AddDefaultsFromAssembly(assembly)`.
+- **Provisioners** — `AddDataProvisioner<T, TProvisioner>()` (or the input/result overload); an optional `Cleanup` is released in reverse creation order during teardown.
+- **Identity map** — per-test `Ref<T>(identity)` matches `CreateAsync` results case-sensitively; `data.provision` records the identity and a `value:{type}:{identity}` tracked item.
+- **Tracing** — `data.build`/`data.explain`/`data.create`/`data.build_many`/`data.create_many`, `data.provision`, `data.cleanup` and per-member `data.value.resolve` events with their source.
 
-An `IProtoDataProvisioner<T>` may use commands, events, an API, a repository, or direct persistence. Its optional `Cleanup` is disposed in reverse creation order when the test context is disposed. `data.create`, `data.provision`, and `data.cleanup` operations are written to ProtoTrace automatically.
+Values are never invented, `Build()` results never enter the identity map, and redaction protects only the ProtoTrace graph.
 
-Provisioned values are tracked as `value:{type}:{identity}`, with the result CLR type in snake_case — `InvoiceLine` becomes `invoice_line` — so an application identity attribute with the same prefix (`invoice_line.number`) correlates with the test-side value.
+## Learn more
+
+- [Data guide](https://prototest.dev/docs/integrations/data/)
+- [NorthstarData.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.SampleApp.Testing/NorthstarData.cs)

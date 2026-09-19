@@ -1,23 +1,47 @@
 # ProtoTest.Web.Selenium
 
-Selenium execution backend for `ProtoTest.Web`.
+The Selenium execution backend for `ProtoTest.Web`, with its own bounded actionability loop.
 
-```csharp
-var host = new ProtoHostBuilder()
-    .AddWeb(
-        () => new ChromeDriver(),
-        options => options.ActionTimeout = TimeSpan.FromSeconds(8))
-    .Build();
+```bash
+dotnet add package ProtoTest.Web.Selenium
 ```
 
-Each interactive operation uses a bounded actionability loop. Selenium re-resolves component scopes and the target after missing or stale elements, waits for visible and enabled state, checks readonly state for editing, waits for stable bounds before click/check, checks click-point obstruction when JavaScript is available, and retries intercepted or temporarily non-interactable actions. These are backend actionability checks; application waits remain named `ProtoTest.Web` conditions.
+## Quick start
 
-The adapter resolves lazy references afresh for each operation, retries stale references, and waits for the named element to exist, be visible, and be enabled. Semantic roles resolve the implicit HTML element where the platform defines one (for example `tr` for `Row`, `table` for `Table`, `li` for `ListItem`, `select` for `Combobox`), so plain markup works the same as in Playwright; an explicit `role` attribute always matches too. Failure capture adds the screenshot (when supported), page source, URL, and title through Core attachments.
+```csharp
+builder.AddWeb(
+    () => new ChromeDriver(),
+    options => options.ActionTimeout = TimeSpan.FromSeconds(8));
 
-`DiagnosticTraceRetention` defaults to `OnWebFailure`. The retained `selenium-diagnostics.json` records the actionability timeline and is a regular Core attachment inside the `.prototrace`; it is deliberately not a second trace/reporting system. Use `Always` while investigating flaky tests or `Off` when no backend diagnostics should be retained.
+// The driver comes from your factory, so skip the test yourself when it may be missing.
+[RequiresCapability(ProtoCapabilityKinds.Browser, CapabilityName = "Selenium")]
+[ProtoTest]
+public async Task Projects_render() { }
+```
 
-Use `web.GetBackend<SeleniumWebBackend>().Driver` as an explicit native escape hatch.
+## What it adds
 
-The backend reports the page's current address (`Driver.Url`), so page coverage attributes a navigation to the page it actually landed on after redirects. See [Page coverage](../../docs/docs/integrations/web/index.md#page-coverage).
+- **Backend** — `AddWeb(createDriver, options?)` on the host builder or an application registers the Selenium backend, the `Selenium` browser capability and the `"Web"`/`"Default"` client; `createDriver` runs once per session that creates a backend.
+- **Native escape hatch** — `web.GetBackendAsync<SeleniumWebBackend>()` exposes the live `IWebDriver`.
+- **Actionability** — each interactive operation re-resolves scope and target, waits for visible, enabled and (for editing) writable state, scrolls clicks into view, waits for stable bounds and checks click obstruction when JavaScript is available, retrying stale or intercepted elements.
+- **Locator translation** — semantic roles resolve the implicit HTML element where the platform defines one (`tr` for `Row`, `table` for `Table`, `li` for `ListItem`, `select` for `Combobox`, …).
+- **Diagnostics** — on failure a screenshot (when supported), page source, URL and title; `DiagnosticTraceRetention` controls the `selenium-{session}-diagnostics.json` attachment with the actionability timeline.
 
-Selenium has no framework-level browser probe — the driver comes from your `createDriver` factory — so there is no `[RequiresPlaywrightBrowser]` equivalent. `AddWeb` registers the `browser` capability named `Selenium`, so `[RequiresCapability(ProtoCapabilityKinds.Browser, CapabilityName = "Selenium")]` proves the backend is composed; combine it with a try/catch around the first session that calls your runner's skip mechanism, as the [skip conditions](../../docs/docs/foundation/skip-conditions.md#requiring-a-playwright-browser) page shows.
+## Configuration
+
+Under `ProtoTest:Web:Selenium`, and per session under `ProtoTest:Web:Sessions:{name}` (session wins).
+
+| Key | Type | Default |
+| --- | --- | --- |
+| `ActionTimeout` | `TimeSpan` | `00:00:05` |
+| `PollInterval` | `TimeSpan` | `00:00:00.050` |
+| `WaitForStableBounds` | `bool` | `true` |
+| `CheckClickObstruction` | `bool` | `true` |
+| `DiagnosticTraceRetention` | `SeleniumDiagnosticTraceRetention` (`Off`, `OnWebFailure`, `Always`) | `OnWebFailure` |
+
+One driver per session with no pooling, so sessions do not share cookies or storage. There is no framework browser probe — `[RequiresCapability(ProtoCapabilityKinds.Browser, CapabilityName = "Selenium")]` proves only composition.
+
+## Learn more
+
+- [Web guide](https://prototest.dev/docs/integrations/web/)
+- [Selenium conformance tests](https://github.com/MSeys/ProtoTest/blob/main/tests/ProtoTest.Web.Tests/SeleniumConformanceTests.cs)

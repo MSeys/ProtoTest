@@ -1,31 +1,56 @@
 # ProtoTest.Web.Playwright
 
-Playwright execution backend for `ProtoTest.Web`.
+The Playwright execution backend for `ProtoTest.Web`, with a per-test browser pool and an opt-in install probe.
 
-```csharp
-var host = new ProtoHostBuilder()
-    .AddWeb(options =>
-    {
-        options.Browser = PlaywrightBrowser.Chromium;   // the default, runs on Windows, Linux and macOS
-        options.InstallBrowsers = true;                 // download it when missing (clean machines, CI)
-        options.TraceRetention = PlaywrightTraceRetention.OnWebFailure;
-    })
-    .Build();
+```bash
+dotnet add package ProtoTest.Web.Playwright
 ```
 
-`InstallBrowsers` downloads the selected browser through the Playwright driver before the first launch, so a clean machine or CI runner needs no separate `playwright install` step; it is ignored when `Channel` names a system browser (`msedge`, `chrome`). On a clean Linux image the operating-system libraries still come from `playwright.ps1 install --with-deps chromium`.
-
-When even an installed browser may be absent, gate browser tests with the opt-in skip condition instead of hand-rolling `Assert.Ignore`:
+## Quick start
 
 ```csharp
-[RequiresPlaywrightBrowser]                      // the browser from configuration
-[RequiresPlaywrightBrowser(channel: "msedge")]
-[RequiresPlaywrightBrowser(Session = "Admin")]   // the Admin session's options
-public async Task ...() { ... }
+builder.AddWeb(options =>
+{
+    options.Browser = PlaywrightBrowser.Chromium;   // the default
+    options.InstallBrowsers = true;                 // download it when missing (clean machines, CI)
+    options.TraceRetention = PlaywrightTraceRetention.OnWebFailure;
+});
+
+// Gate browser tests when the machine may not have the browser installed.
+[RequiresPlaywrightBrowser]
+[ProtoTest]
+public async Task Projects_render() { }
 ```
 
-It probes the configured browser before setup without launching one — through the driver's `BrowserType.ExecutablePath` for bundled browsers, and through Playwright's own dry-run channel check for channels — and skips with a reason naming the missing browser and the install options. `InstallBrowsers = true` (in code or configuration) means never skip, because the browser is downloaded on demand. Set `Session` when the test drives a named session: the probe then merges `ProtoTest:Web:Sessions:{name}` over `ProtoTest:Web:Playwright`, exactly like the backend binds. This is the stronger gate than `[RequiresCapability(ProtoCapabilityKinds.Browser, CapabilityName = "Playwright")]`, which only proves `AddWeb` registered the backend.
+## What it adds
 
-Within a test, sessions with identical launch options share one browser process while each gets its own isolated browser context; the browser is disposed with the test. Playwright's native locator and actionability behavior is preserved. ProtoTest adds semantic operations and best-effort screenshot, DOM, location, and native trace attachments when a Web operation fails. Use `web.GetBackend<PlaywrightWebBackend>().Page` as an explicit native escape hatch.
+- **Backend** — `AddWeb(options?)` on the host builder or an application registers the Playwright backend, the browser pool and the `Playwright` browser capability.
+- **Native escape hatch** — `web.GetBackendAsync<PlaywrightWebBackend>()` exposes `Page` and `BrowserContext`; the synchronous `GetBackend<PlaywrightWebBackend>()` works only after initialization.
+- **Skip probe** — `[RequiresPlaywrightBrowser]`, `[RequiresPlaywrightBrowser(channel: "msedge")]` and `[RequiresPlaywrightBrowser(Session = "Admin")]` probe without launching a browser; `InstallBrowsers = true` never skips.
+- **Diagnostics** — console, page-error and request-failure events; on failure a full-page screenshot, DOM, location and (per retention) a native `playwright-{session}-trace.zip`.
+- **Page coverage** — `CurrentAddress` is `Page.Url`, so a navigation is attributed to the page it landed on after redirects.
 
-The backend reports the page's current address (`Page.Url`), so page coverage attributes a navigation to the page it actually landed on after redirects. See [Page coverage](../../docs/docs/integrations/web/index.md#page-coverage).
+## Configuration
+
+Under `ProtoTest:Web:Playwright`, and per session under `ProtoTest:Web:Sessions:{name}` (session wins).
+
+| Key | Type | Default |
+| --- | --- | --- |
+| `Browser` | `PlaywrightBrowser` (`Chromium`, `Firefox`, `Webkit`) | `Chromium` |
+| `Headless` | `bool` | `true` |
+| `SlowMo` | `float?` (ms) | `null` |
+| `Channel` | `string?` (`msedge`, `chrome`, …) | `null` |
+| `InstallBrowsers` | `bool` | `false` |
+| `Context` | `BrowserNewContextOptions` (nested keys bind) | `new()` |
+| `TraceRetention` | `PlaywrightTraceRetention` (`Off`, `OnWebFailure`, `Always`) | `OnWebFailure` |
+| `CorrelateTraceGroups` | `bool` | `true` |
+| `ConsoleCapture` | `PlaywrightConsoleCapture` (`Off`, `Errors`, `WarningsAndErrors`, `All`) | `WarningsAndErrors` |
+| `CapturePageErrors` | `bool` | `true` |
+| `CaptureRequestFailures` | `bool` | `true` |
+
+The browser pool is scoped to one test: sessions of a test share a process only when their launch options match. `InstallBrowsers` is ignored when `Channel` is set, and only a real launch can prove a channel works.
+
+## Learn more
+
+- [Web guide](https://prototest.dev/docs/integrations/web/)
+- [Playwright conformance tests](https://github.com/MSeys/ProtoTest/blob/main/tests/ProtoTest.Web.Tests/PlaywrightConformanceTests.cs)

@@ -1,10 +1,12 @@
 # ProtoTest.OpenApi
 
-Maps ProtoTest REST observations to an OpenAPI contract and reports endpoint, response, and response-property coverage.
+Maps ProtoTest REST observations to an OpenAPI contract and reports endpoint, response and response-property coverage.
 
 ```bash
-dotnet add package ProtoTest.OpenApi --prerelease
+dotnet add package ProtoTest.OpenApi
 ```
+
+## Quick start
 
 ```csharp
 builder
@@ -19,4 +21,24 @@ builder
         .AddCollector<OpenApiCoverageCollector>()));
 ```
 
-Specifications can come from configuration, a file, a URL, raw JSON/YAML, or an `OpenApiDocument`. The collector reads `ProtoTest:Applications:{application}:OpenApi:Specification` and throws when that key is missing, so pass a source string or a document directly to `AddCollector` when you don't use configuration. Add `ProtoTest.Reporting` to export the collected coverage. See the [OpenAPI guide](https://github.com/MSeys/ProtoTest/blob/main/docs/docs/integrations/openapi.md).
+## What it adds
+
+- **Collector** — `OpenApiCoverageCollector` registers on a REST target with `AddCollector<OpenApiCoverageCollector>()`; a repeat for the same target is a no-op.
+- **Sources** — the configuration key `ProtoTest:Applications:{application}:OpenApi:Specification`, a source string (file, inline JSON/YAML or URL), or a prebuilt `OpenApiDocument`; a required `BaseUrl` resolves relative specification URLs.
+- **Coverage items** — endpoints (`"OpenAPI"`, `{METHOD} {path}`), responses (`"OpenAPI Response"`, exact status, `4XX` wildcard or `default`) and body properties (`"OpenAPI Property"`) consumed from `RestResponseData` and `RestShapeMatchData`.
+- **Report integration** — items are coverage report entries; add `ProtoTest.Reporting` to export them.
+
+## Configuration
+
+| Key | Type | Default |
+| --- | --- | --- |
+| `ProtoTest:Applications:{application}:OpenApi:Specification` | `string` | required by the configuration constructor |
+| `ProtoTest:Applications:{application}:BaseUrl` | `string` | unset; only needed to resolve a relative specification URL |
+| `ProtoTest:Applications:{scope}:Application` | `string` | the target name |
+
+The collector reports coverage, never validation: a route outside the specification is ignored, a property counts only when a shape assertion matched it, and there are no trace operations of its own — it reads REST observations.
+
+## Learn more
+
+- [OpenAPI guide](https://prototest.dev/docs/integrations/openapi)
+- [Demo collector registration](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs)

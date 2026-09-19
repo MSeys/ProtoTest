@@ -173,7 +173,7 @@ export default async function createConfig(): Promise<Config> {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} ProtoTest.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Matthias Seys. Built with Docusaurus.`,
     },
     // Mermaid draws on its neutral base theme; custom.css recolours it from the tokens for both surfaces.
     mermaid: {

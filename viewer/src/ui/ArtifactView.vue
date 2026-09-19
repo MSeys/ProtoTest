@@ -19,6 +19,9 @@ const artifactUrl = ref("");
 const artifactBlob = ref<Blob>();
 const handoff = ref<"idle" | "opening" | "blocked" | "failed">("idle");
 const traceFrame = ref<HTMLIFrameElement>();
+// Playwright's viewer is the only thing this application ever loads from elsewhere, so it loads when asked
+// for and not before: until then the viewer has made no request outside the file you opened.
+const embedViewer = ref(false);
 const artifactText = ref("");
 const artifactError = ref("");
 const artifactLoading = ref(false);
@@ -104,6 +107,10 @@ watch(artifactBlob, blob => {
   if (blob && isPlaywrightTrace.value) send(traceFrame.value?.contentWindow);
 });
 
+function showEmbeddedViewer() {
+  embedViewer.value = true;
+}
+
 function openInPlaywright() {
   const target = window.open(TRACE_VIEWER, "_blank");
   if (!target) {
@@ -146,10 +153,22 @@ onBeforeUnmount(releaseArtifactUrl);
     <iframe v-else-if="artifactUrl && artifact.mediaType === 'text/html'" :src="artifactUrl" :title="artifact.name" class="frame" sandbox="allow-scripts" />
     <pre v-else-if="formattedJson" class="text json"><code>{{ formattedJson }}</code></pre>
     <pre v-else-if="artifactText" class="text">{{ artifactText }}</pre>
-    <!-- Playwright's viewer, embedded: it reads the trace in this browser and never uploads it. -->
-    <div v-else-if="isPlaywrightTrace" class="playwright">
-      <iframe ref="traceFrame" :src="TRACE_VIEWER" title="Playwright trace viewer" class="frame" @load="send(traceFrame?.contentWindow)" />
-      <small class="source">Rendered by trace.playwright.dev inside this browser; the file is not uploaded.</small>
+    <!-- Playwright's viewer: it reads the trace in this browser, and only once you ask for it. -->
+    <div v-else-if="isPlaywrightTrace" class="playwright" :class="{ embedded: embedViewer }">
+      <iframe v-if="embedViewer" ref="traceFrame" :src="TRACE_VIEWER" title="Playwright trace viewer" class="frame"
+              @load="send(traceFrame?.contentWindow)" />
+      <div v-else class="offer">
+        <strong>A Playwright trace</strong>
+        <p>
+          Every browser action with its DOM snapshots, network traffic and console. Playwright's own viewer reads
+          it; this trace is handed to that page inside this browser and is not uploaded.
+        </p>
+        <AppButton variant="primary" :disabled="!artifactBlob" @click="showEmbeddedViewer">Show it here</AppButton>
+      </div>
+      <small class="source">
+        {{ embedViewer ? "Rendered by trace.playwright.dev inside this browser; the file is not uploaded."
+                       : "Showing it loads trace.playwright.dev — the only page this viewer fetches from elsewhere." }}
+      </small>
       <p v-if="handoff === 'blocked'" class="warn">The tab did not open. Allow pop-ups for this page, or use the embedded viewer above.</p>
       <p v-else-if="handoff === 'failed'" class="warn">
         The tab did not answer. Download the trace and drop it onto trace.playwright.dev.
@@ -183,7 +202,10 @@ header span { color: var(--muted); font-size: var(--text-meta); }
   overflow-wrap: anywhere;
 }
 .json { tab-size: 2; }
-.playwright { min-width: 0; min-height: 0; display: grid; gap: var(--space-2); align-content: stretch; grid-template-rows: minmax(0, 1fr) auto; }
+.playwright { min-width: 0; min-height: 0; display: grid; gap: var(--space-2); align-content: start; }
+.playwright.embedded { align-content: stretch; grid-template-rows: minmax(0, 1fr) auto; }
+.offer { padding: var(--space-4); display: grid; gap: var(--space-3); justify-items: start; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-2); }
+.offer p { margin: 0; color: var(--muted); font-size: var(--text-meta); }
 .playwright p { margin: 0; color: var(--warning); font-size: var(--text-meta); }
 .playwright .source { color: var(--dim); font-size: var(--text-micro); }
 .fill .playwright { height: 100%; }

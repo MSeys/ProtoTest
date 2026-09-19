@@ -17,6 +17,7 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
     private readonly AspNetCoreServerLifetime _lifetime;
     private readonly ProtoLock _gate = new();
     private AspNetCoreServer<TProgram>? _sharedServer;
+    private int _pageInventoryRecorded;
 
     public AspNetCoreClientInitializer(
         string name,
@@ -62,17 +63,18 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
             .ToArray();
         var client = server.Factory.CreateDefaultClient(clientOptions.BaseAddress, handlers);
         context.RegisterClient(client, Name);
+        var entityId = $"server:{typeof(TProgram).FullName}";
         var serverState = new Dictionary<string, string?>
         {
-            ["application.type"] = typeof(TProgram).FullName,
-            ["server.lifetime"] = _lifetime.ToString(),
-            ["server.reused"] = reused ? "true" : "false",
-            ["web_host.customized"] = (_configureWebHost is not null).ToString().ToLowerInvariant(),
-            ["client.customized"] = (_configureClientOptions is not null).ToString().ToLowerInvariant()
+            ["aspnetcore.application.type"] = typeof(TProgram).FullName,
+            ["aspnetcore.server.lifetime"] = _lifetime.ToString(),
+            ["aspnetcore.server.reused"] = reused ? "true" : "false",
+            ["aspnetcore.web_host.customized"] = (_configureWebHost is not null).ToString().ToLowerInvariant(),
+            ["aspnetcore.client.customized"] = (_configureClientOptions is not null).ToString().ToLowerInvariant()
         };
         context.Trace.SetEntityState(
             ProtoTraceEntityKinds.Server,
-            typeof(TProgram).FullName!,
+            entityId,
             $"Server · {typeof(TProgram).Name}",
             serverState,
             scope: context.TestName,
@@ -85,8 +87,54 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
             ProtoTraceOutcome.Succeeded,
             serverState,
             entityKind: ProtoTraceEntityKinds.Server,
-            entityId: typeof(TProgram).FullName);
+            entityId: entityId);
+        RecordPageInventory(context, server);
         return Task.FromResult(true);
+    }
+
+    /// <summary>
+    /// Records the application's page-like routes as <c>web.page.available</c> observations once per run,
+    /// so the web coverage report can show pages that exist but were never visited. Published applications
+    /// never start in-process, so their inventory comes from <c>ProtoTest:Web:Pages</c> instead. An empty
+    /// discovery does not latch: endpoints that appear later (a route added after the first test) still
+    /// get inventoried.
+    /// </summary>
+    private void RecordPageInventory(ProtoExecutionContext context, AspNetCoreServer<TProgram> server)
+    {
+        if (Volatile.Read(ref _pageInventoryRecorded) != 0) return;
+        try
+        {
+            var discovered = false;
+            foreach (var path in AspNetCorePageInventory.Discover(server.Factory.Services, context.Configuration, Name))
+            {
+                discovered = true;
+                context.RecordObservation(new ProtoObservation(
+                    "Web",
+                    "web.page.available",
+                    path,
+                    Metadata: new Dictionary<string, object>
+                    {
+                        ["web.application"] = Name,
+                        ["web.page.source"] = "aspnetcore"
+                    }));
+            }
+
+            if (discovered)
+            {
+                Interlocked.Exchange(ref _pageInventoryRecorded, 1);
+            }
+        }
+        catch (Exception exception)
+        {
+            // A failed inventory stays unrecorded, so a later test can still contribute it.
+            Interlocked.Exchange(ref _pageInventoryRecorded, 0);
+            context.Trace.WriteEvent(
+                "web.page.inventory.failed",
+                "ASP.NET Core page inventory failed",
+                "ProtoTest.AspNetCore",
+                outcome: ProtoTraceOutcome.Unknown,
+                exception: exception);
+        }
     }
 
     public ValueTask DisposeAsync()

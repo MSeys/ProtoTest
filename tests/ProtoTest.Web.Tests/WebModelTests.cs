@@ -1,7 +1,10 @@
 namespace ProtoTest.Web.Tests;
 
 using System.Reflection;
+using System.Xml.Linq;
+using System.Xml.XPath;
 using ProtoTest.Core;
+using ProtoTest.Web.Internal;
 using ProtoTest.Web.Selenium;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,6 +37,67 @@ public sealed class WebModelTests
             Assert.That(selector, Does.Contain("@role='row'"));
             Assert.That(selector, Does.Contain("normalize-space(.)='INV-123'"));
         });
+    }
+
+    [Test]
+    public void SeleniumTranslator_ShouldResolveImplicitHtmlRoles()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.Row)),
+                Does.Contain("self::tr").And.Contain("@role='row'"));
+            Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.Table)),
+                Does.Contain("self::table").And.Contain("@role='table'"));
+            Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.Grid)),
+                Does.Contain("self::table").And.Contain("@role='grid'"));
+            Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.List)),
+                Does.Contain("self::ul").And.Contain("self::ol").And.Contain("@role='list'"));
+            Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.ListItem)),
+                Does.Contain("self::li").And.Contain("@role='listitem'"));
+            Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.Option)),
+                Does.Contain("self::option").And.Contain("@role='option'"));
+            Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.Combobox)),
+                Does.Contain("self::select").And.Contain("@role='combobox'"));
+            Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.RowGroup)),
+                Does.Contain("self::tbody").And.Contain("self::thead").And.Contain("self::tfoot")
+                    .And.Contain("@role='rowgroup'"));
+        });
+    }
+
+    [Test]
+    public void SeleniumTranslator_ShouldMatchImplicitHtmlRolesAgainstPlainHtml()
+    {
+        var document = XDocument.Parse(
+            """
+            <html><body>
+              <table><tbody><tr><td>INV-1</td></tr></tbody></table>
+              <div role="table"><div role="row">ARIA</div></div>
+              <ul><li>alpha</li></ul>
+              <select><option>en</option></select>
+            </body></html>
+            """);
+
+        var rows = document.XPathSelectElements(XPath(By.Role(WebRole.Row)));
+        var tables = document.XPathSelectElements(XPath(By.Role(WebRole.Table)));
+        var lists = document.XPathSelectElements(XPath(By.Role(WebRole.List)));
+        var options = document.XPathSelectElements(XPath(By.Role(WebRole.Option)));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(rows.Select(element => element.Name.LocalName), Is.EqualTo(new[] { "tr", "div" }),
+                "the plain <tr> and the explicit ARIA row both match");
+            Assert.That(tables.Select(element => element.Name.LocalName), Is.EqualTo(new[] { "table", "div" }));
+            Assert.That(lists.Select(element => element.Name.LocalName), Is.EqualTo(new[] { "ul" }));
+            Assert.That(options.Select(element => element.Value), Is.EqualTo(new[] { "en" }));
+        });
+    }
+
+    private static string XPath(WebLocator locator)
+    {
+        const string prefix = "By.XPath: ";
+        var selector = SeleniumLocatorTranslator.DiagnosticSelector(locator);
+        Assert.That(selector, Does.StartWith(prefix));
+        return selector[prefix.Length..];
     }
 
     [Test]
@@ -124,6 +188,67 @@ public sealed class WebModelTests
     }
 
     [Test]
+    public async Task WaitUntil_ShouldScopeNestingByOperationLineage()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web nesting scope", TestMethod());
+        var session = context.Web();
+        var page = session.Page<InvoicesPage>();
+        var predicateEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        ValueTask<string>? fireAndForget = null;
+        var entered = false;
+
+        var wait = session.WaitUntilAsync(
+            async ct =>
+            {
+                if (!entered)
+                {
+                    entered = true;
+                    // Fire-and-forget: started inside the wait scope, never awaited there.
+                    fireAndForget = page.Table.Invoice("INV-1").Open.TextAsync(ct);
+                    await page.Table.Invoice("INV-1").Open.Should.BeVisibleAsync(TimeSpan.FromSeconds(1), ct);
+                    predicateEntered.TrySetResult();
+                    await release.Task;
+                }
+
+                return true;
+            },
+            TimeSpan.FromSeconds(5));
+
+        await predicateEntered.Task;
+        // A second top-level operation started synchronously while the wait is still in flight.
+        await page.Table.Invoice("INV-2").Open.TextAsync();
+        release.TrySetResult();
+        await wait;
+        await fireAndForget!.Value;
+        // Nothing is left behind: a later top-level operation is still top-level.
+        await page.Table.Invoice("INV-3").Open.TextAsync();
+
+        var waitOperation = host.Trace.Snapshot().Tests.Single().Entries.Single(entry => entry.Kind == "web.wait.until");
+        var operations = factory.Backend.BegunOperations;
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(operations.Any(operation =>
+                    operation.Kind == WebOperationKind.ReadText
+                    && operation.ParentCorrelationId == waitOperation.Id),
+                Is.True, "the fire-and-forget read is nested under the wait by lineage");
+            Assert.That(operations.Any(operation =>
+                    operation.Kind == WebOperationKind.Assert
+                    && operation.ParentCorrelationId == waitOperation.Id),
+                Is.True, "the assertion inside the predicate is nested under the wait");
+            Assert.That(operations.Count(operation =>
+                    operation.Kind == WebOperationKind.ReadText && operation.ParentCorrelationId is null),
+                Is.EqualTo(2), "the second top-level read and the later read stay top-level");
+        });
+    }
+
+    [Test]
     public async Task CollectionsAndTables_ShouldSupportLazyZeroAndOneBasedAddressing()
     {
         var factory = new FakeBackendFactory();
@@ -164,6 +289,30 @@ public sealed class WebModelTests
     }
 
     [Test]
+    public async Task SeleniumTableCellAt_ShouldSearchTheDocumentWhenTheScopeIsTheDriver()
+    {
+        var driver = new StubWebDriver();
+        var host = new ProtoHostBuilder().AddWeb(() => driver).Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web driver scoped cell", TestMethod());
+        var backend = await context.Web().GetBackendAsync<SeleniumWebBackend>();
+
+        await backend.CountAsync(new WebElementReference([], "Page", "Table", By.TestId("invoices")));
+        await backend.CountAsync(new WebElementReference([], "Page", "Cell", By.TableCellAt(0)));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(driver.FindAllQueries[0].ToString(),
+                Is.EqualTo("By.XPath: .//*[@data-testid='invoices']"));
+            Assert.That(driver.FindAllQueries[1].ToString(),
+                Does.StartWith("By.XPath: (//*[self::th or self::td])[1]"),
+                "a driver-rooted cell lookup cannot use ./* and widens to the document");
+        });
+    }
+
+    [Test]
     public async Task FormOperations_ShouldUseTheSharedOperationPipeline()
     {
         var factory = new FakeBackendFactory();
@@ -198,8 +347,8 @@ public sealed class WebModelTests
         var context = await host.StartTestAsync("web test", TestMethod());
         var form = context.Web().Page<LoginPage>().Form;
 
-        await form.Status.ShouldHaveTextAsync("ready", TimeSpan.FromSeconds(1));
-        await form.Password.ShouldHaveValueAsync("super-secret", TimeSpan.FromSeconds(1));
+        await form.Status.Should.HaveTextAsync("ready", TimeSpan.FromSeconds(1));
+        await form.Password.Should.HaveValueAsync("super-secret", TimeSpan.FromSeconds(1));
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
         var serializedTrace = System.Text.Json.JsonSerializer.Serialize(host.Trace.Snapshot());
@@ -208,6 +357,237 @@ public sealed class WebModelTests
             Assert.That(factory.Backend.Operations.Count(item => item.Kind == "text"), Is.EqualTo(2));
             Assert.That(serializedTrace, Does.Not.Contain("super-secret"));
             Assert.That(host.Trace.Snapshot().Tests.Single().Entries.Count(item => item.Kind == "assert.web"), Is.EqualTo(2));
+        });
+    }
+
+    [Test]
+    public async Task NegatedAssertions_ShouldPassWhenTheCheckDoesNotHold()
+    {
+        var factory = new FakeBackendFactory();
+        factory.Backend.VisibleResult = false;
+        factory.Backend.EnabledResult = false;
+        factory.Backend.CheckedResult = false;
+        factory.Backend.TextResults.Enqueue("draft");
+        factory.Backend.ValueResult = "old";
+        factory.Backend.CurrentAddress = "https://example.test/login";
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web negated assertions", TestMethod());
+        var form = context.Web().Page<LoginPage>().Form;
+
+        await form.Status.ShouldNot.BeVisibleAsync(TimeSpan.FromSeconds(1));
+        await form.Submit.ShouldNot.BeEnabledAsync(TimeSpan.FromSeconds(1));
+        await form.RememberMe.ShouldNot.BeCheckedAsync(TimeSpan.FromSeconds(1));
+        await form.Status.ShouldNot.HaveTextAsync("ready", TimeSpan.FromSeconds(1));
+        await form.Password.ShouldNot.HaveValueAsync("new", TimeSpan.FromSeconds(1));
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        var assertions = host.Trace.Snapshot().Tests.Single().Entries
+            .Where(item => item.Kind == "assert.web")
+            .ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(assertions, Has.Length.EqualTo(5), "one assertion entry per negated assertion");
+            Assert.That(assertions.Select(item => item.Attributes["web.assert.negated"]), Is.All.EqualTo("true"));
+            Assert.That(assertions.Select(item => item.Attributes["web.expectation"]), Is.EqualTo(new[]
+            {
+                "not be visible",
+                "not be enabled",
+                "not be checked",
+                "not have text \"ready\"",
+                "not have the expected value"
+            }));
+            Assert.That(context.RecordedObservations.Count(item => item.Kind == "web.page.verified"),
+                Is.EqualTo(5), "a passing negated assertion still verifies the page");
+        });
+    }
+
+    [Test]
+    public async Task NegatedAssertion_ShouldFailWhenTheCheckKeepsHolding()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web negated timeout", TestMethod());
+        var form = context.Web().Page<LoginPage>().Form;
+
+        var exception = Assert.ThrowsAsync<WebAssertionException>(async () =>
+            await form.Status.ShouldNot.BeVisibleAsync(TimeSpan.FromMilliseconds(150)));
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+
+        var assertion = host.Trace.Snapshot().Tests.Single().Entries.Single(item => item.Kind == "assert.web");
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("should not be visible"));
+            Assert.That(exception.Message, Does.Contain("within 00:00:00.1500000"),
+                "the negated assertion honours its timeout");
+            Assert.That(exception.Message, Does.Contain("Last observed: visible"));
+            Assert.That(assertion.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(assertion.Attributes["web.assert.negated"], Is.EqualTo("true"));
+            Assert.That(assertion.Attributes["web.expectation"], Is.EqualTo("not be visible"));
+        });
+    }
+
+    [Test]
+    public async Task NegatedTextAssertion_ShouldFailWhenTheTextMatches()
+    {
+        var factory = new FakeBackendFactory();
+        for (var i = 0; i < 100; i++) factory.Backend.TextResults.Enqueue("ready");
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web negated text", TestMethod());
+        var form = context.Web().Page<LoginPage>().Form;
+
+        var exception = Assert.ThrowsAsync<WebAssertionException>(async () =>
+            await form.Status.ShouldNot.HaveTextAsync("ready", TimeSpan.FromMilliseconds(150)));
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("should not have text \"ready\""));
+            Assert.That(exception.Message, Does.Contain("text was \"ready\""));
+        });
+    }
+
+    [Test]
+    public async Task Navigate_ShouldRecordTheVisitedPagePathAfterRedirects()
+    {
+        var factory = new FakeBackendFactory();
+        factory.Backend.NavigateAddressOverride = "https://example.test/dashboard?tab=orders#top";
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web page visited", TestMethod());
+
+        await context.Web().Page<LoginPage>().OpenAsync("https://example.test/login?token=secret#form");
+
+        var visited = context.RecordedObservations.Where(item => item.Kind == "web.page.visited").ToArray();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(visited.Select(item => item.Identifier), Is.EqualTo(new[] { "/dashboard" }),
+                "the final address wins and only the path is recorded");
+            Assert.That(visited.Single().TargetName, Is.EqualTo("Web"));
+            Assert.That(visited.Single().Metadata!["web.session"], Is.EqualTo("Default"));
+        });
+    }
+
+    [Test]
+    public async Task Assertion_ShouldRecordTheVerifiedPagePath()
+    {
+        var factory = new FakeBackendFactory();
+        factory.Backend.TextResults.Enqueue("ready");
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web page verified", TestMethod());
+        var page = context.Web().Page<LoginPage>();
+
+        await page.OpenAsync("https://example.test/login");
+        await page.Form.Status.Should.HaveTextAsync("ready", TimeSpan.FromSeconds(1));
+
+        var verified = context.RecordedObservations.Where(item => item.Kind == "web.page.verified").ToArray();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(verified.Select(item => item.Identifier), Is.EqualTo(new[] { "/login" }));
+            Assert.That(context.RecordedObservations.Any(item => item.Kind == "web.page.visited"), Is.True);
+        });
+    }
+
+    [Test]
+    public async Task WebCoverage_ShouldReportVisitedVerifiedAndInventoriedPages()
+    {
+        var factory = new FakeBackendFactory();
+        factory.Backend.TextResults.Enqueue("ready");
+        var host = CreateHost(factory, builder => builder.ConfigureAppConfiguration(configuration =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Web:Pages:0"] = "/inventory",
+                ["ProtoTest:Web:Pages:1"] = "dashboard"
+            })));
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web coverage", TestMethod());
+        var session = context.Web();
+
+        await session.Page<LoginPage>().OpenAsync("https://example.test/login");
+        factory.Backend.CurrentAddress = "https://example.test/dashboard";
+        await session.Page<LoginPage>().Form.Status.Should.HaveTextAsync("ready", TimeSpan.FromSeconds(1));
+        context.RecordObservation("Web", "web.page.available", "/new-page");
+
+        var items = context.Services.GetServices<IProtoCollector>()
+            .OfType<WebCoverageCollector>()
+            .Single()
+            .GetReportItems()
+            .ToDictionary(item => item.Identifier, StringComparer.Ordinal);
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(items.Keys, Is.EquivalentTo(new[] { "/login", "/dashboard", "/new-page", "/inventory" }));
+            Assert.That(items["/dashboard"].IsCovered, Is.True, "a verified page is covered");
+            Assert.That(items["/dashboard"].Count, Is.EqualTo(1), "count is the number of verifications");
+            Assert.That(items["/dashboard"].DisplayName, Is.EqualTo("/dashboard"));
+            Assert.That(items["/login"].IsCovered, Is.False, "a visited-only page is uncovered");
+            Assert.That(items["/new-page"].IsCovered, Is.False, "a discovered-only page is uncovered");
+            Assert.That(items["/inventory"].IsCovered, Is.False, "an inventoried-only page is uncovered");
+            Assert.That(items.Values.All(item =>
+                item.Category == "Web" && item.Kind == ProtoReportItemKinds.Coverage), Is.True);
+        });
+    }
+
+    [Test]
+    public async Task RouteDiscovery_ShouldRecordVueRoutesWhenTheRouterAnswers()
+    {
+        var factory = new FakeBackendFactory();
+        factory.Backend.JsonResult = """["/orders","/orders/new"]""";
+        var host = CreateHost(factory, builder => builder.ConfigureAppConfiguration(configuration =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
+            })));
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("vue discovery", TestMethod());
+
+        await context.Web().Page<LoginPage>().OpenAsync("https://example.test/orders");
+
+        var available = context.RecordedObservations
+            .Where(item => item.Kind == "web.page.available")
+            .Select(item => item.Identifier)
+            .ToArray();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(available, Is.EquivalentTo(new[] { "/orders", "/orders/new" }));
+            Assert.That(factory.Backend.EvaluatedScripts, Has.Some.Contains("__vue_app__"));
+        });
+    }
+
+    [Test]
+    public async Task RouteDiscovery_ShouldBeANoOpWithoutAVueRouter()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory, builder => builder.ConfigureAppConfiguration(configuration =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
+            })));
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("vue absent", TestMethod());
+
+        await context.Web().Page<LoginPage>().OpenAsync("https://example.test/login");
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(context.RecordedObservations.Any(item => item.Kind == "web.page.available"), Is.False);
+            Assert.That(context.RecordedObservations.Any(item => item.Kind == "web.page.visited"), Is.True);
+            Assert.That(factory.Backend.EvaluatedScripts, Has.Some.Contains("__vue_app__"));
         });
     }
 
@@ -347,6 +727,265 @@ public sealed class WebModelTests
             Assert.That(publisher.Attachments.Select(item => item.Name), Has.Some.EndsWith("selenium-default-diagnostics.json"));
             Assert.That(driver.QuitCalled, Is.True);
         });
+    }
+
+    [Test]
+    public async Task SeleniumDiagnostics_ShouldReportAFinalizationFailureWithoutFailingTeardown()
+    {
+        var driver = new StubWebDriver();
+        var host = new ProtoHostBuilder()
+            .AddWeb(
+                () => driver,
+                options => options.DiagnosticTraceRetention = SeleniumDiagnosticTraceRetention.Always)
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web test", TestMethod());
+        await context.Web().GetBackendAsync<ProtoTest.Web.Selenium.SeleniumWebBackend>();
+        driver.ThrowOnUrl = true;
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(context.Attachments.Select(item => item.Name),
+                Has.None.EndsWith("selenium-default-diagnostics.json"));
+            Assert.That(host.Trace.Snapshot().Tests.Single().Entries,
+                Has.Some.Matches<ProtoTraceEntry>(entry =>
+                    entry.Kind == "web.diagnostics.artifact_failed" &&
+                    entry.Outcome == ProtoTraceOutcome.Failed));
+        });
+    }
+
+    [Test]
+    public async Task PageObservations_ShouldIgnorePagesOnAnotherOriginWhenTheSessionHasABaseUrl()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory, builder => builder.ConfigureAppConfiguration(configuration =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Applications:Default:BaseUrl"] = "https://app.test"
+            })));
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web origin", TestMethod());
+        var session = context.Web();
+
+        // The navigation was redirected to the identity provider: not this application's page.
+        factory.Backend.NavigateAddressOverride = "https://idp.example.com/login";
+        await session.Page<InvoicesPage>().OpenAsync("/home");
+
+        // Back on this application, a passing assertion is coverage.
+        factory.Backend.CurrentAddress = "https://app.test/home";
+        await session.Page<InvoicesPage>().Table.Invoice("INV-1").Open.Should.BeVisibleAsync(TimeSpan.FromSeconds(1));
+
+        // An assertion on the payment provider's page is not this application's coverage.
+        factory.Backend.CurrentAddress = "https://pay.example.com/checkout";
+        await session.Page<InvoicesPage>().Table.Invoice("INV-1").Open.Should.BeVisibleAsync(TimeSpan.FromSeconds(1));
+
+        var observations = context.RecordedObservations
+            .Where(observation => observation.Kind is "web.page.visited" or "web.page.verified")
+            .Select(observation => (observation.Kind, observation.Identifier))
+            .ToArray();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(observations.Any(item => item.Kind == "web.page.visited" && item.Identifier == "/home"),
+                Is.False,
+                "a redirected visit stays on the external origin and is not recorded as this application's page");
+            Assert.That(observations.Any(item => item.Kind == "web.page.verified" && item.Identifier == "/home"),
+                Is.True);
+            Assert.That(observations.Length, Is.EqualTo(1),
+                "neither the identity provider's nor the payment page's path contributes coverage");
+        });
+    }
+
+    [Test]
+    public async Task VueRouteDiscovery_ShouldRetryAfterAFailedEvaluation()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory, builder => builder.ConfigureAppConfiguration(configuration =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
+            })));
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("vue discovery retry", TestMethod());
+        var session = context.Web();
+
+        factory.Backend.JsonFailure = new InvalidOperationException("the router is not ready yet");
+        await session.Page<InvoicesPage>().OpenAsync("https://example.test/one");
+        factory.Backend.JsonResult = """["/orders"]""";
+        await session.Page<InvoicesPage>().OpenAsync("https://example.test/two");
+
+        var available = context.RecordedObservations
+            .Where(observation => observation.Kind == "web.page.available")
+            .Select(observation => observation.Identifier)
+            .ToArray();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(available, Is.EqualTo(new[] { "/orders" }),
+                "a failed first discovery does not latch, so the next navigation retries it");
+            Assert.That(
+                host.Trace.Snapshot().Tests.Single().Entries.Any(entry => entry.Kind == "web.page.discovery.failed"),
+                Is.True);
+        });
+    }
+
+    [Test]
+    public async Task SeleniumFailureCapture_ShouldKeepEveryArtifactOfARepeatedFailure()
+    {
+        var driver = new StubWebDriver();
+        var host = new ProtoHostBuilder().AddWeb(() => driver).Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web repeated failure", TestMethod());
+        var backend = await context.Web().GetBackendAsync<SeleniumWebBackend>();
+        driver.Url = "https://example.test/checkout";
+        var failure = new WebFailureContext(
+            "Click",
+            new WebElementReference([], "LoginPage.Form", "Submit", By.Role(WebRole.Button, "Sign in")),
+            new InvalidOperationException("boom"));
+
+        var first = await ((IWebBackendDiagnostics)backend).CaptureFailureAsync(failure);
+        var second = await ((IWebBackendDiagnostics)backend).CaptureFailureAsync(failure);
+
+        var names = first.Concat(second).Select(item => item.Name).ToArray();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(names, Has.Length.EqualTo(6), "both failures' artifacts survive");
+            Assert.That(names.Distinct(StringComparer.OrdinalIgnoreCase).Count(), Is.EqualTo(6),
+                "the per-failure sequence keeps the repeated failure's names distinct");
+            Assert.That(names, Has.Some.EqualTo("web-default-submit-1-failure.png"));
+            Assert.That(names, Has.Some.EqualTo("web-default-submit-2-failure.png"));
+        });
+    }
+
+    [Test]
+    public async Task WebFailureCapture_ShouldKeepTheRemainingArtifactsWhenOneFailsToRegister()
+    {
+        var driver = new StubWebDriver();
+        var host = new ProtoHostBuilder()
+            .AddWeb(() => driver, options => options.ActionTimeout = TimeSpan.FromMilliseconds(150))
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web isolated artifacts", TestMethod());
+        // Occupy one artifact name so registering it fails during the failure capture.
+        context.AddAttachment("web-default-submit-1-page.html", "occupied");
+
+        var failure = Assert.ThrowsAsync<WebActionabilityException>(async () =>
+            await context.Web().Page<LoginPage>().Form.Submit.ClickAsync());
+
+        var names = context.Attachments.Select(item => item.Name).ToArray();
+        await host.CompleteTestAsync(ProtoTestResult.Failed(failure!));
+
+        var shortNames = names.Select(name => name.Split('-', 2)[1]).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(shortNames, Is.EqualTo(new[]
+            {
+                "web-default-submit-1-failure.png",
+                "web-default-submit-1-location.txt",
+                "web-default-submit-1-page.html"
+            }), "the screenshot and location registered even though the occupied page.html did not");
+            Assert.That(
+                host.Trace.Snapshot().Tests.Single().Entries.Any(entry =>
+                    entry.Kind == "web.diagnostics.artifact_failed" && entry.Outcome == ProtoTraceOutcome.Failed),
+                Is.True);
+        });
+    }
+
+    [Test]
+    public async Task SeleniumFailureCapture_ShouldFallBackToTheRawAddressWhenSanitizingDoesNotApply()
+    {
+        var driver = new StubWebDriver();
+        var host = new ProtoHostBuilder().AddWeb(() => driver).Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web location fallback", TestMethod());
+        var backend = await context.Web().GetBackendAsync<SeleniumWebBackend>();
+        driver.Url = "about:blank";
+        var failure = new WebFailureContext("Click", null, new InvalidOperationException("boom"));
+
+        var attachments = await ((IWebBackendDiagnostics)backend).CaptureFailureAsync(failure);
+        var location = attachments.Single(item => item.Name.EndsWith("location.txt"));
+        var content = System.Text.Encoding.UTF8.GetString(await location.ReadAllBytesAsync());
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.That(content, Does.Contain("about:blank"));
+    }
+
+    [Test]
+    public void WebKeyMap_ShouldMapEveryKeyForBothBackends()
+    {
+        var seleniumKeys = new Dictionary<WebKey, string>
+        {
+            [WebKey.Enter] = OpenQA.Selenium.Keys.Enter,
+            [WebKey.Tab] = OpenQA.Selenium.Keys.Tab,
+            [WebKey.Escape] = OpenQA.Selenium.Keys.Escape,
+            [WebKey.Space] = OpenQA.Selenium.Keys.Space,
+            [WebKey.Backspace] = OpenQA.Selenium.Keys.Backspace,
+            [WebKey.Delete] = OpenQA.Selenium.Keys.Delete,
+            [WebKey.ArrowUp] = OpenQA.Selenium.Keys.ArrowUp,
+            [WebKey.ArrowDown] = OpenQA.Selenium.Keys.ArrowDown,
+            [WebKey.ArrowLeft] = OpenQA.Selenium.Keys.ArrowLeft,
+            [WebKey.ArrowRight] = OpenQA.Selenium.Keys.ArrowRight,
+            [WebKey.Home] = OpenQA.Selenium.Keys.Home,
+            [WebKey.End] = OpenQA.Selenium.Keys.End,
+            [WebKey.PageUp] = OpenQA.Selenium.Keys.PageUp,
+            [WebKey.PageDown] = OpenQA.Selenium.Keys.PageDown
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(seleniumKeys.Keys, Is.EquivalentTo(Enum.GetValues<WebKey>()), "every semantic key is covered");
+            foreach (var (key, selenium) in seleniumKeys)
+            {
+                var value = WebKeyMap.Get(key);
+                Assert.That(value.Playwright, Is.Not.Empty, $"{key} has a Playwright value");
+                Assert.That(value.Selenium, Is.EqualTo(selenium), $"{key} keeps its Selenium value");
+            }
+
+            Assert.That(WebKeyMap.Get(WebKey.Enter).Playwright, Is.EqualTo("Enter"));
+            Assert.That(WebKeyMap.Get(WebKey.Space).Playwright, Is.EqualTo(" "));
+        });
+    }
+
+    [Test]
+    public async Task SeleniumFailureCapture_ShouldNameArtifactsFromTheSessionAndElement()
+    {
+        var driver = new StubWebDriver();
+        var host = new ProtoHostBuilder().AddWeb(() => driver).Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web test", TestMethod());
+        var backend = await context.Web().GetBackendAsync<SeleniumWebBackend>();
+        var failure = new WebFailureContext(
+            "Click",
+            new WebElementReference([], "LoginPage.Form", "Submit", By.Role(WebRole.Button, "Sign in")),
+            new InvalidOperationException("boom"));
+
+        var attachments = await ((IWebBackendDiagnostics)backend).CaptureFailureAsync(failure);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(attachments.Select(item => item.Name), Is.EqualTo(new[]
+            {
+                "web-default-submit-1-failure.png",
+                "web-default-submit-1-page.html",
+                "web-default-submit-1-location.txt"
+            }));
+            Assert.That(attachments.Single(item => item.Name.EndsWith("location.txt")).Description,
+                Is.EqualTo("Browser location at web operation failure."));
+        });
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
     }
 
     [Test]
@@ -508,6 +1147,80 @@ public sealed class WebModelTests
                 [new WebSessionAttribute("Admin") { Open = "/back-office" }]));
 
         Assert.That(exception!.Message, Does.Contain("BaseUrl"));
+    }
+
+    [Test]
+    public async Task WebSession_ShouldPreferAnOpenUrlFromStartedInfrastructure()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory, builder =>
+        {
+            builder.AddInfrastructure(new FakeSettingsInfrastructure(new Dictionary<string, string>
+            {
+                ["ProtoTest:Web:Sessions:Admin:Open"] = "http://standalone.test:8080/from-infrastructure"
+            }));
+            builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["ProtoTest:Web:Sessions:Admin:Open"] = "https://env.test/from-config"
+                }));
+        });
+        await using var ownedHost = host;
+        await host.StartAsync();
+
+        await host.StartTestAsync(
+            "web session",
+            TestMethod(),
+            [new WebSessionAttribute("Admin") { Open = "https://code.test/from-code" }]);
+
+        Assert.That(factory.Backend.Operations.Single().Value,
+            Is.EqualTo("http://standalone.test:8080/from-infrastructure"));
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
+    public async Task Options_ShouldPreferInfrastructureSettingsOverConfiguration()
+    {
+        var host = new ProtoHostBuilder()
+            .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["ProtoTest:Web:Selenium:ActionTimeout"] = "00:00:07",
+                    ["ProtoTest:Web:Selenium:PollInterval"] = "00:00:00.250"
+                }))
+            .AddInfrastructure(new FakeSettingsInfrastructure(new Dictionary<string, string>
+            {
+                ["ProtoTest:Web:Selenium:ActionTimeout"] = "00:00:09"
+            }))
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web options", TestMethod());
+
+        var settings = context.TryService<ProtoInfrastructureSettings>();
+        var options = WebBackendOptions.Resolve<SeleniumWebOptions>(context, "Default");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(settings, Is.Not.Null);
+            Assert.That(options.ActionTimeout, Is.EqualTo(TimeSpan.FromSeconds(9)),
+                "started infrastructure overrides the static configuration for the keys it provides");
+            Assert.That(options.PollInterval, Is.EqualTo(TimeSpan.FromMilliseconds(250)),
+                "keys the infrastructure does not provide still come from configuration");
+        });
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    private sealed class FakeSettingsInfrastructure(IReadOnlyDictionary<string, string> settings)
+        : IProtoSettingsInfrastructure
+    {
+        public string Id => "application:test";
+        public string Kind => "application";
+        public string Description => "Test settings infrastructure";
+        public ProtoResourceScope Scope => ProtoResourceScope.Run;
+        public IReadOnlyDictionary<string, string> Settings { get; } = settings;
+        public ValueTask StartAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+        public ValueTask ReleaseAsync(ProtoResourceReleaseContext context) => ValueTask.CompletedTask;
     }
 
     // Compile-time guard: [WebSession] must resolve to WebSessionAttribute even though WebSession is a type.
@@ -789,32 +1502,36 @@ public sealed class WebModelTests
     }
 
     [Test]
-    public void OptionsBinder_ShouldApplyCodeThenBackendThenSessionConfiguration()
+    public async Task Options_ShouldApplyCodeThenBackendThenSessionConfiguration()
     {
-        var options = new ProtoTest.Web.Playwright.PlaywrightWebOptions
-        {
-            Headless = false,
-            Channel = "chrome",
-            SlowMo = 10
-        };
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["ProtoTest:Web:Playwright:Browser"] = "Firefox",
-            ["ProtoTest:Web:Playwright:Channel"] = "msedge",
-            ["ProtoTest:Web:Playwright:Context:Locale"] = "nl-BE",
-            ["ProtoTest:Web:Playwright:Context:ViewportSize:Width"] = "1280",
-            ["ProtoTest:Web:Playwright:Context:ViewportSize:Height"] = "720",
-            ["ProtoTest:Web:Sessions:Admin:Channel"] = "chrome-beta",
-            ["ProtoTest:Web:Sessions:Admin:TraceRetention"] = "Always"
-        }).Build();
-        var binder = new WebBackendOptionsBinder<ProtoTest.Web.Playwright.PlaywrightWebOptions>(
-            options, "Admin");
+        var host = new ProtoHostBuilder()
+            .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Web:Playwright:Browser"] = "Firefox",
+                ["ProtoTest:Web:Playwright:Channel"] = "msedge",
+                ["ProtoTest:Web:Playwright:Context:Locale"] = "nl-BE",
+                ["ProtoTest:Web:Playwright:Context:ViewportSize:Width"] = "1280",
+                ["ProtoTest:Web:Playwright:Context:ViewportSize:Height"] = "720",
+                ["ProtoTest:Web:Sessions:Admin:Channel"] = "chrome-beta",
+                ["ProtoTest:Web:Sessions:Admin:TraceRetention"] = "Always"
+            }))
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web options", TestMethod());
 
-        var resolved = binder.Resolve(configuration);
+        var resolved = WebBackendOptions.Resolve<ProtoTest.Web.Playwright.PlaywrightWebOptions>(
+            context,
+            "Admin",
+            options =>
+            {
+                options.Headless = false;
+                options.Channel = "chrome";
+                options.SlowMo = 10;
+            });
 
         Assert.Multiple(() =>
         {
-            Assert.That(resolved, Is.SameAs(options));
             Assert.That(resolved.Headless, Is.False, "code value without configuration is kept");
             Assert.That(resolved.SlowMo, Is.EqualTo(10));
             Assert.That(resolved.Browser, Is.EqualTo(ProtoTest.Web.Playwright.PlaywrightBrowser.Firefox));
@@ -824,37 +1541,36 @@ public sealed class WebModelTests
             Assert.That(resolved.Context.ViewportSize?.Width, Is.EqualTo(1280));
             Assert.That(resolved.Context.ViewportSize?.Height, Is.EqualTo(720));
         });
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
     }
 
     [Test]
-    public void OptionsBinder_ShouldBindOnceAndValidateTheBoundResult()
+    public async Task Options_ShouldValidateTheBoundResult()
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        var host = new ProtoHostBuilder()
+            .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Web:Selenium:ActionTimeout"] = "00:00:00"
+            }))
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web options", TestMethod());
+
+        Assert.Multiple(() =>
         {
-            ["ProtoTest:Web:Selenium:ActionTimeout"] = "00:00:00"
-        }).Build();
-        var invalid = new WebBackendOptionsBinder<SeleniumWebOptions>(
-            new SeleniumWebOptions(), "Default", SeleniumWebOptions.Validate);
-
-        Assert.Throws<ArgumentOutOfRangeException>(() => invalid.Resolve(configuration));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new WebBackendOptionsBinder<SeleniumWebOptions>(
-            new SeleniumWebOptions { PollInterval = TimeSpan.Zero }, "Default", SeleniumWebOptions.Validate));
-
-        var options = new SeleniumWebOptions();
-        var binder = new WebBackendOptionsBinder<SeleniumWebOptions>(options, "Default");
-        var first = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["ProtoTest:Web:Selenium:ActionTimeout"] = "00:00:07"
-        }).Build();
-        var second = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["ProtoTest:Web:Selenium:ActionTimeout"] = "00:00:09"
-        }).Build();
-
-        binder.Resolve(first);
-        binder.Resolve(second);
-
-        Assert.That(options.ActionTimeout, Is.EqualTo(TimeSpan.FromSeconds(7)));
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                WebBackendOptions.Resolve<SeleniumWebOptions>(context, "Default", validate: SeleniumWebOptions.Validate),
+                "the bound result is validated");
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                WebBackendOptions.Resolve<SeleniumWebOptions>(
+                    context,
+                    "Default",
+                    configure: options => options.PollInterval = TimeSpan.Zero,
+                    validate: SeleniumWebOptions.Validate),
+                "code configuration that survives binding is validated");
+        });
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
     }
 
     private sealed class RecordingLoginStrategy : IWebLoginStrategy
@@ -939,17 +1655,34 @@ public sealed class WebModelTests
     {
         public string Name => "Fake";
         public List<(string Kind, WebElementReference? Element, string? Value)> Operations { get; } = [];
+        public List<WebBackendOperationContext> BegunOperations { get; } = [];
         public Exception? Failure { get; set; }
         public ProtoExecutionContext? Context { get; set; }
         public bool AddAttachmentOnComplete { get; set; }
         public int CountResult { get; set; }
         public Queue<string> TextResults { get; } = new();
         public string? ValueResult { get; set; }
+        public bool VisibleResult { get; set; } = true;
+        public bool EnabledResult { get; set; } = true;
+        public bool CheckedResult { get; set; } = true;
         public bool Disposed { get; private set; }
+
+        /// <summary>Simulates the browser's final address; a test sets it to model a redirect.</summary>
+        public string? NavigateAddressOverride { get; set; }
+        public string? CurrentAddress { get; set; }
 
         public ValueTask NavigateAsync(Uri address, CancellationToken cancellationToken = default)
         {
             Operations.Add(("navigate", null, address.ToString()));
+            CurrentAddress = NavigateAddressOverride ?? address.ToString();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask BeginOperationAsync(
+            WebBackendOperationContext operation,
+            CancellationToken cancellationToken = default)
+        {
+            BegunOperations.Add(operation);
             return ValueTask.CompletedTask;
         }
 
@@ -1004,21 +1737,35 @@ public sealed class WebModelTests
         }
 
         public ValueTask<bool> IsVisibleAsync(WebElementReference element, CancellationToken cancellationToken = default)
-            => ValueTask.FromResult(true);
+            => ValueTask.FromResult(VisibleResult);
 
         public ValueTask<bool> IsEnabledAsync(WebElementReference element, CancellationToken cancellationToken = default)
-            => ValueTask.FromResult(true);
+            => ValueTask.FromResult(EnabledResult);
 
         public ValueTask<bool> IsCheckedAsync(WebElementReference element, CancellationToken cancellationToken = default)
-            => ValueTask.FromResult(true);
+            => ValueTask.FromResult(CheckedResult);
 
         public Queue<bool> EvaluateResults { get; } = new();
         public List<string> EvaluatedScripts { get; } = [];
+        public string? JsonResult { get; set; }
+        public Exception? JsonFailure { get; set; }
 
         public ValueTask<bool> EvaluateBooleanAsync(string script, CancellationToken cancellationToken = default)
         {
             EvaluatedScripts.Add(script);
             return ValueTask.FromResult(EvaluateResults.Count == 0 || EvaluateResults.Dequeue());
+        }
+
+        public ValueTask<string?> EvaluateJsonAsync(string script, CancellationToken cancellationToken = default)
+        {
+            EvaluatedScripts.Add(script);
+            if (JsonFailure is { } failure)
+            {
+                JsonFailure = null;
+                throw failure;
+            }
+
+            return ValueTask.FromResult(JsonResult);
         }
 
         public ValueTask<IReadOnlyList<ProtoTestAttachment>> CaptureFailureAsync(WebFailureContext failure, CancellationToken cancellationToken = default)
@@ -1087,18 +1834,32 @@ public sealed class WebModelTests
         }
     }
 
-    private sealed class StubWebDriver : OpenQA.Selenium.IWebDriver
+    private sealed class StubWebDriver : OpenQA.Selenium.IWebDriver, OpenQA.Selenium.ITakesScreenshot
     {
+        private string _url = "https://example.test/";
+
         public bool QuitCalled { get; private set; }
-        public string Url { get; set; } = "https://example.test/";
+        public bool ThrowOnUrl { get; set; }
+        public List<OpenQA.Selenium.By> FindAllQueries { get; } = [];
+        public string Url
+        {
+            get => ThrowOnUrl ? throw new InvalidOperationException("url unavailable") : _url;
+            set => _url = value;
+        }
+
         public string Title => "Stub browser";
         public string PageSource => "<html></html>";
+        public OpenQA.Selenium.Screenshot GetScreenshot() => new(Convert.ToBase64String([1, 2, 3]));
         public string CurrentWindowHandle => "window";
         public System.Collections.ObjectModel.ReadOnlyCollection<string> WindowHandles => new([CurrentWindowHandle]);
         public void Close() { }
         public void Quit() => QuitCalled = true;
         public OpenQA.Selenium.IWebElement FindElement(OpenQA.Selenium.By by) => throw new OpenQA.Selenium.NoSuchElementException();
-        public System.Collections.ObjectModel.ReadOnlyCollection<OpenQA.Selenium.IWebElement> FindElements(OpenQA.Selenium.By by) => new([]);
+        public System.Collections.ObjectModel.ReadOnlyCollection<OpenQA.Selenium.IWebElement> FindElements(OpenQA.Selenium.By by)
+        {
+            FindAllQueries.Add(by);
+            return new([]);
+        }
         public OpenQA.Selenium.IOptions Manage() => throw new NotSupportedException();
         public OpenQA.Selenium.INavigation Navigate() => new StubNavigation(this);
         public OpenQA.Selenium.ITargetLocator SwitchTo() => throw new NotSupportedException();

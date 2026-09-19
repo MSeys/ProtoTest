@@ -1,8 +1,10 @@
 namespace ProtoTest.Web.Playwright;
 
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using ProtoTest.Core;
+using ProtoTest.Web.Internal;
 
 public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics
 {
@@ -11,8 +13,10 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     private readonly PlaywrightWebOptions _options;
     private readonly string _sessionName;
     private readonly SemaphoreSlim _traceGroupGate = new(1, 1);
-    private readonly HashSet<string> _openTraceGroups = new(StringComparer.Ordinal);
-    private readonly AsyncLocal<string?> _activeCorrelation = new();
+    private readonly ConcurrentDictionary<string, byte> _openTraceGroups = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, byte> _openOperations = new(StringComparer.Ordinal);
+    private string? _activeCorrelation;
+    private int _failureSequence;
     private bool _webFailure;
     private int _completeStarted;
     private int _disposeStarted;
@@ -36,30 +40,44 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     public IPage Page { get; }
     public IBrowserContext BrowserContext => _browserContext;
 
-    public ValueTask<IPage> GetPageAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(Page);
-    }
+    public string? CurrentAddress => Page.Url;
 
-    public ValueTask<IBrowserContext> GetBrowserContextAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(BrowserContext);
-    }
-
-    public async ValueTask BeginOperationAsync(
+    /// <summary>
+    /// Starts native trace correlation for a semantic operation. Grouping follows operation lineage: an
+    /// operation joins the trace group of its explicit nesting scope (a <c>WaitUntilAsync</c> condition)
+    /// instead of waiting on the gate that scope still holds. A second top-level operation started while
+    /// another is in flight is not nested, and a fire-and-forget operation cannot leave a stale
+    /// correlation behind because nothing is stored per flow.
+    /// </summary>
+    public ValueTask BeginOperationAsync(
         WebBackendOperationContext operation,
         CancellationToken cancellationToken = default)
     {
-        _activeCorrelation.Value = operation.CorrelationId;
-        if (_options.TraceRetention == PlaywrightTraceRetention.Off || !_options.CorrelateTraceGroups) return;
+        if (operation.ParentCorrelationId is { } parent && _openOperations.ContainsKey(parent))
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        _openOperations[operation.CorrelationId] = 0;
+        Volatile.Write(ref _activeCorrelation, operation.CorrelationId);
+        if (_options.TraceRetention == PlaywrightTraceRetention.Off || !_options.CorrelateTraceGroups)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        return BeginTraceGroupAsync(operation, cancellationToken);
+    }
+
+    private async ValueTask BeginTraceGroupAsync(
+        WebBackendOperationContext operation,
+        CancellationToken cancellationToken)
+    {
         await _traceGroupGate.WaitAsync(cancellationToken);
         try
         {
             await _browserContext.Tracing.GroupAsync(
                 $"[{operation.CorrelationId}] [{operation.SessionName}] {operation.Name}");
-            _openTraceGroups.Add(operation.CorrelationId);
+            _openTraceGroups[operation.CorrelationId] = 0;
         }
         catch (Exception exception)
         {
@@ -68,14 +86,25 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         }
     }
 
-    public async ValueTask EndOperationAsync(
+    public ValueTask EndOperationAsync(
         WebBackendOperationContext operation,
         ProtoTraceOutcome outcome,
         Exception? exception = null,
         CancellationToken cancellationToken = default)
     {
-        _activeCorrelation.Value = null;
-        if (!_openTraceGroups.Remove(operation.CorrelationId)) return;
+        _openOperations.TryRemove(operation.CorrelationId, out _);
+        if (string.Equals(Volatile.Read(ref _activeCorrelation), operation.CorrelationId, StringComparison.Ordinal))
+        {
+            Volatile.Write(ref _activeCorrelation, null);
+        }
+
+        // Only the operation that opened the group ends it.
+        if (!_openTraceGroups.TryRemove(operation.CorrelationId, out _)) return ValueTask.CompletedTask;
+        return EndTraceGroupAsync(operation);
+    }
+
+    private async ValueTask EndTraceGroupAsync(WebBackendOperationContext operation)
+    {
         try
         {
             await _browserContext.Tracing.GroupEndAsync();
@@ -89,6 +118,9 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
             _traceGroupGate.Release();
         }
     }
+
+    /// <summary>The most recently opened operation on this session, used to parent native diagnostics.</summary>
+    private string? ActiveCorrelation => Volatile.Read(ref _activeCorrelation);
 
     internal static async ValueTask<PlaywrightWebBackend> CreateAsync(
         ProtoExecutionContext context,
@@ -132,33 +164,31 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     public async ValueTask ClickAsync(WebElementReference element, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await Resolve(element).ClickAsync();
+        await ExecuteResolvedAsync(element, locator => locator.ClickAsync());
     }
 
     public async ValueTask FillAsync(WebElementReference element, string value, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await Resolve(element).FillAsync(value);
+        await ExecuteResolvedAsync(element, locator => locator.FillAsync(value));
     }
 
     public async ValueTask CheckAsync(WebElementReference element, bool isChecked, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var locator = Resolve(element);
-        if (isChecked) await locator.CheckAsync();
-        else await locator.UncheckAsync();
+        await ExecuteResolvedAsync(element, locator => isChecked ? locator.CheckAsync() : locator.UncheckAsync());
     }
 
     public async ValueTask SelectOptionAsync(WebElementReference element, string value, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await Resolve(element).SelectOptionAsync(value);
+        await ExecuteResolvedAsync(element, locator => locator.SelectOptionAsync(value));
     }
 
     public async ValueTask PressAsync(WebElementReference element, WebKey key, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await Resolve(element).PressAsync(MapKey(key));
+        await ExecuteResolvedAsync(element, locator => locator.PressAsync(MapKey(key)));
     }
 
     public async ValueTask<int> CountAsync(WebElementReference elements, CancellationToken cancellationToken = default)
@@ -170,13 +200,13 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     public async ValueTask<string> ReadTextAsync(WebElementReference element, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return await Resolve(element).InnerTextAsync();
+        return await ReadResolvedAsync(element, locator => locator.InnerTextAsync());
     }
 
     public async ValueTask<string?> ReadValueAsync(WebElementReference element, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return await Resolve(element).InputValueAsync();
+        return await ReadResolvedAsync(element, locator => locator.InputValueAsync());
     }
 
     public async ValueTask<bool> IsVisibleAsync(WebElementReference element, CancellationToken cancellationToken = default)
@@ -214,35 +244,87 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         return await Page.EvaluateAsync<bool>(script);
     }
 
+    public async ValueTask<string?> EvaluateJsonAsync(string script, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return await Page.EvaluateAsync<string?>(script);
+    }
+
     public async ValueTask<IReadOnlyList<ProtoTestAttachment>> CaptureFailureAsync(
         WebFailureContext failure,
         CancellationToken cancellationToken = default)
     {
         _webFailure = true;
         cancellationToken.ThrowIfCancellationRequested();
-        var prefix = $"{WebNames.SafeName(_sessionName)}-{WebNames.SafeName(failure.Element?.Name ?? failure.Operation)}";
-        var attachments = new List<ProtoTestAttachment>();
-        await TryCaptureAsync("screenshot", async () => attachments.Add(ProtoTestAttachment.FromBytes(
-            $"web-{prefix}-failure.png",
-            await Page.ScreenshotAsync(new PageScreenshotOptions { FullPage = true }),
-            "image/png",
-            "Playwright page at web operation failure.")));
-        await TryCaptureAsync("dom", async () => attachments.Add(ProtoTestAttachment.FromText(
-            $"web-{prefix}-page.html",
-            await Page.ContentAsync(),
-            "text/html",
-            "DOM snapshot at web operation failure.")));
-        await TryCaptureAsync("location", () =>
-        {
-            attachments.Add(ProtoTestAttachment.FromText(
+        return await WebFailureArtifacts.CaptureAsync(
+            _context,
+            "ProtoTest.Web.Playwright",
+            "Playwright",
+            _sessionName,
+            failure,
+            Interlocked.Increment(ref _failureSequence),
+            async prefix => ProtoTestAttachment.FromBytes(
+                $"web-{prefix}-failure.png",
+                await Page.ScreenshotAsync(new PageScreenshotOptions { FullPage = true }),
+                "image/png",
+                "Playwright page at web operation failure."),
+            async prefix => ProtoTestAttachment.FromText(
+                $"web-{prefix}-page.html",
+                await Page.ContentAsync(),
+                "text/html",
+                "DOM snapshot at web operation failure."),
+            prefix => ValueTask.FromResult<ProtoTestAttachment?>(ProtoTestAttachment.FromText(
                 $"web-{prefix}-location.txt",
-                ProtoUriSanitizer.Sanitize(new Uri(Page.Url), null),
+                CurrentLocation(),
                 "text/plain",
-                "URL at web operation failure."));
-            return Task.CompletedTask;
-        });
-        return attachments;
+                "URL at web operation failure.")));
     }
+
+    /// <summary>
+    /// The sanitized current address, falling back to the raw address when sanitizing produces nothing
+    /// (for example <c>about:blank</c>), so the location artifact is never dropped.
+    /// </summary>
+    private string CurrentLocation()
+    {
+        var address = Page.Url;
+        if (!Uri.TryCreate(address, UriKind.Absolute, out var uri)) return address;
+        return ProtoUriSanitizer.Sanitize(uri, null) ?? address;
+    }
+
+    /// <summary>
+    /// Runs one action against the resolved locator, translating Playwright's strict-mode violation into
+    /// the same <see cref="WebElementResolutionException"/> Selenium raises for multiple matches. Without
+    /// the translation, polling assertions would see a raw <c>PlaywrightException</c> instead of the
+    /// documented resolution failure.
+    /// </summary>
+    private async ValueTask ExecuteResolvedAsync(WebElementReference element, Func<ILocator, Task> action)
+    {
+        var locator = Resolve(element);
+        try
+        {
+            await action(locator);
+        }
+        catch (PlaywrightException exception) when (IsStrictViolation(exception))
+        {
+            throw MultipleMatch(element);
+        }
+    }
+
+    private async ValueTask<T> ReadResolvedAsync<T>(WebElementReference element, Func<ILocator, Task<T>> read)
+    {
+        var locator = Resolve(element);
+        try
+        {
+            return await read(locator);
+        }
+        catch (PlaywrightException exception) when (IsStrictViolation(exception))
+        {
+            throw MultipleMatch(element);
+        }
+    }
+
+    private static bool IsStrictViolation(PlaywrightException exception)
+        => exception.Message.Contains("strict mode violation", StringComparison.OrdinalIgnoreCase);
 
     private ILocator Resolve(WebElementReference element)
     {
@@ -369,31 +451,18 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         _ => throw new WebBackendCapabilityException($"Playwright role mapping is not available for '{role}'.")
     };
 
-    private static string MapKey(WebKey key) => key switch
-    {
-        WebKey.Enter => "Enter",
-        WebKey.Tab => "Tab",
-        WebKey.Escape => "Escape",
-        WebKey.Space => " ",
-        WebKey.Backspace => "Backspace",
-        WebKey.Delete => "Delete",
-        WebKey.ArrowUp => "ArrowUp",
-        WebKey.ArrowDown => "ArrowDown",
-        WebKey.ArrowLeft => "ArrowLeft",
-        WebKey.ArrowRight => "ArrowRight",
-        WebKey.Home => "Home",
-        WebKey.End => "End",
-        WebKey.PageUp => "PageUp",
-        WebKey.PageDown => "PageDown",
-        _ => throw new ArgumentOutOfRangeException(nameof(key))
-    };
+    private static string MapKey(WebKey key) => WebKeyMap.Get(key).Playwright;
 
     private static WebElementResolutionException MultipleMatch(WebElementReference element, int count)
         => new($"Expected at most one element for {element.Locator.Describe()} in {element.ComponentPath}, but found {count}.");
 
+    private static WebElementResolutionException MultipleMatch(WebElementReference element)
+        => new($"Expected at most one element for {element.Locator.Describe()} in {element.ComponentPath}, but Playwright reported a strict mode violation (more than one element matched).");
+
     private static string CssIdentifier(string value)
     {
-        if (value.All(character => char.IsLetterOrDigit(character) || character is '-' or '_')) return value;
+        if (value.All(character => char.IsLetterOrDigit(character) || character is '-' or '_' or ':'))
+            return value.Replace(":", "\\:");
         throw new WebBackendCapabilityException($"Attribute name '{value}' cannot be represented safely as a CSS identifier.");
     }
 
@@ -414,11 +483,11 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
                     attributes: new Dictionary<string, string?>
                     {
                         ["web.session"] = _sessionName,
-                        ["web.correlation_id"] = _activeCorrelation.Value,
+                        ["web.correlation_id"] = ActiveCorrelation,
                         ["browser.console.type"] = message.Type,
                         ["browser.console.text"] = Truncate(message.Text)
                     },
-                    parentId: _activeCorrelation.Value);
+                    parentId: ActiveCorrelation);
             };
         }
 
@@ -432,10 +501,10 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
                 attributes: new Dictionary<string, string?>
                 {
                     ["web.session"] = _sessionName,
-                    ["web.correlation_id"] = _activeCorrelation.Value,
+                    ["web.correlation_id"] = ActiveCorrelation,
                     ["browser.error.message"] = Truncate(message)
                 },
-                parentId: _activeCorrelation.Value);
+                parentId: ActiveCorrelation);
         }
 
         if (_options.CaptureRequestFailures)
@@ -448,12 +517,12 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
                 attributes: new Dictionary<string, string?>
                 {
                     ["web.session"] = _sessionName,
-                    ["web.correlation_id"] = _activeCorrelation.Value,
+                    ["web.correlation_id"] = ActiveCorrelation,
                     ["http.method"] = request.Method,
                     ["http.url"] = SafeUrl(request.Url),
                     ["browser.request.failure"] = Truncate(request.Failure)
                 },
-                parentId: _activeCorrelation.Value);
+                parentId: ActiveCorrelation);
         }
     }
 
@@ -492,24 +561,6 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
 
     private static string? Truncate(string? value)
         => value is null || value.Length <= 4096 ? value : value[..4096] + "…";
-
-    private async Task TryCaptureAsync(string artifact, Func<Task> capture)
-    {
-        try
-        {
-            await capture();
-        }
-        catch (Exception exception)
-        {
-            _context.Trace.WriteEvent(
-                "web.diagnostics.artifact_failed",
-                $"Playwright diagnostic failed · {artifact}",
-                "ProtoTest.Web.Playwright",
-                outcome: ProtoTraceOutcome.Failed,
-                attributes: new Dictionary<string, string?> { ["web.artifact"] = artifact },
-                exception: exception);
-        }
-    }
 
     public async ValueTask CompleteAsync(CancellationToken cancellationToken = default)
     {
@@ -576,13 +627,11 @@ internal sealed class PlaywrightWebBackendFactory(Action<PlaywrightWebOptions>? 
         string sessionName,
         CancellationToken cancellationToken = default)
     {
-        var options = new PlaywrightWebOptions();
-        configure?.Invoke(options);
-        var binder = new WebBackendOptionsBinder<PlaywrightWebOptions>(options, sessionName);
+        var options = WebBackendOptions.Resolve(context, sessionName, configure);
         return await PlaywrightWebBackend.CreateAsync(
             context,
             context.Service<PlaywrightBrowserPool>(),
-            binder.Resolve(context.Configuration),
+            options,
             sessionName,
             cancellationToken);
     }

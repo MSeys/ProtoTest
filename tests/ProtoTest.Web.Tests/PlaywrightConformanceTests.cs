@@ -25,16 +25,16 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("Playwright conformance", TestMethod());
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync(Html);
+        await backend.Page.SetContentAsync(ConformanceMarkup.Html);
         var page = web.Page<ConformancePage>();
 
         await page.Name.FillAsync("Matthias");
         await page.Remember.CheckAsync();
         await page.Language.SelectOptionAsync("nl");
-        await page.Save.ShouldBeEnabledAsync(TimeSpan.FromSeconds(2));
+        await page.Save.Should.BeEnabledAsync(TimeSpan.FromSeconds(2));
         await page.Save.ClickAsync();
-        await page.Status.ShouldHaveTextAsync("saved", TimeSpan.FromSeconds(1));
-        await page.Invoices.RowNumber(2).Cell("Total").ShouldHaveTextAsync("€ 10");
+        await page.Status.Should.HaveTextAsync("saved", TimeSpan.FromSeconds(1));
+        await page.Invoices.RowNumber(2).Cell("Total").Should.HaveTextAsync("€ 10");
 
         var name = await page.Name.ValueAsync();
         var remembered = await page.Remember.IsCheckedAsync();
@@ -69,7 +69,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("Playwright escape hatches", TestMethod());
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync(EscapeHatchHtml);
+        await backend.Page.SetContentAsync(ConformanceMarkup.EscapeHatchHtml);
         var page = web.Page<EscapeHatchPage>();
 
         await page.Search.FillAsync("invoice");
@@ -77,14 +77,14 @@ public sealed class PlaywrightConformanceTests
             .Check(p => p.Newsletter)
             .Click(p => p.Primary)
             .RunAsync();
-        await page.Newsletter.ShouldBeCheckedAsync();
-        await page.Banner.ShouldBeVisibleAsync();
-        await page.Banner.ShouldContainTextAsync("Subscribed");
-        await page.ShoutedBanner.ShouldBeVisibleAsync();
-        await page.Invoices.RowMatching(By.HasText("INV-2")).CellAt(1).ShouldHaveTextAsync("€ 20");
-        await page.Invoices.RowAt(1).Cell("Total").ShouldHaveTextAsync("€ 10");
-        await page.Tags.First().ShouldHaveTextAsync("alpha");
-        await page.Tags.Matching(By.HasText("gamma")).ShouldBeVisibleAsync();
+        await page.Newsletter.Should.BeCheckedAsync();
+        await page.Banner.Should.BeVisibleAsync();
+        await page.Banner.Should.ContainTextAsync("Subscribed");
+        await page.ShoutedBanner.Should.BeVisibleAsync();
+        await page.Invoices.RowMatching(By.HasText("INV-2")).CellAt(1).Should.HaveTextAsync("€ 20");
+        await page.Invoices.RowAt(1).Cell("Total").Should.HaveTextAsync("€ 10");
+        await page.Tags.First().HaveTextAsync("alpha");
+        await page.Tags.Matching(By.HasText("gamma")).BeVisibleAsync();
 
         var status = await page.Open.TextAsync();
         var hiddenVisible = await page.Hidden.IsVisibleAsync();
@@ -98,6 +98,330 @@ public sealed class PlaywrightConformanceTests
             Assert.That(locale, Is.EqualTo("nl-BE"));
             Assert.That(host.Trace.Snapshot().Tests.Single().Entries,
                 Has.Some.Matches<ProtoTraceEntry>(entry => entry.Kind == "web.flow" && entry.Outcome == ProtoTraceOutcome.Succeeded));
+        });
+    }
+
+    [Test]
+    public async Task NamespacedAttributeLocator_ShouldRunAgainstARealBrowser()
+    {
+        var host = new ProtoHostBuilder()
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Off;
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("Playwright namespaced attribute", TestMethod());
+        var web = context.Web();
+        var backend = await OpenBrowserAsync(web);
+        await backend.Page.SetContentAsync(ConformanceMarkup.NamespacedAttributeHtml);
+        var page = web.Page<NamespacedAttributePage>();
+
+        await page.Greeting.Should.HaveTextAsync("Hello");
+
+        var text = await page.Greeting.TextAsync();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        Assert.That(text, Is.EqualTo("Hello"));
+    }
+
+    [Test]
+    public async Task MultipleMatchRead_ShouldThrowTheResolutionExceptionInsteadOfRawPlaywrightFailure()
+    {
+        var host = new ProtoHostBuilder()
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Off;
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("playwright strict read", TestMethod());
+        var web = context.Web();
+        var backend = await OpenBrowserAsync(web);
+        await backend.Page.SetContentAsync(
+            "<!doctype html><html><body><p class=\"dup\">one</p><p class=\"dup\">two</p></body></html>");
+        var page = web.Page<DuplicatePage>();
+
+        var exception = Assert.ThrowsAsync<WebElementResolutionException>(async () =>
+            await page.Duplicate.TextAsync());
+
+        // Polling assertions retry on a resolution failure, so a multiple match ends as the documented
+        // assertion timeout instead of a raw PlaywrightException.
+        var assertion = Assert.ThrowsAsync<WebAssertionException>(async () =>
+            await page.Duplicate.Should.HaveTextAsync("one", TimeSpan.FromMilliseconds(200)));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("at most one"));
+            Assert.That(assertion!.Message, Does.Contain("Last observed").And.Contain("at most one"));
+        });
+    }
+
+    [Test]
+    public async Task VueRouteDiscovery_ShouldReadRoutesFromARealPage()
+    {
+        var host = new ProtoHostBuilder()
+            .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
+                }))
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Off;
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("vue discovery conformance", TestMethod());
+        var web = context.Web();
+        var backend = await OpenBrowserAsync(web);
+        await backend.Page.RouteAsync("**/*", route => route.FulfillAsync(new RouteFulfillOptions
+        {
+            Body = ConformanceMarkup.VueDiscoveryHtml,
+            ContentType = "text/html"
+        }));
+
+        await web.Page<ConformancePage>().OpenAsync("https://example.test/vue");
+
+        var available = context.RecordedObservations
+            .Where(observation => observation.Kind == "web.page.available")
+            .Select(observation => observation.Identifier)
+            .ToArray();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        Assert.That(available, Is.EquivalentTo(new[] { "/orders", "/orders/{id}" }),
+            "the injected $router.getRoutes table is read and its dynamic segment normalized");
+    }
+
+    [Test]
+    [CancelAfter(30_000)]
+    public async Task WaitUntil_WithAReadOnTheSameSession_ShouldNotDeadlock()
+    {
+        var host = new ProtoHostBuilder()
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Always;
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("playwright nested wait", TestMethod());
+        var web = context.Web();
+        var backend = await OpenBrowserAsync(web);
+        await backend.Page.SetContentAsync("""
+            <!doctype html>
+            <html><body>
+              <div role="status">pending</div>
+              <script>setTimeout(() => document.querySelector('[role=status]').textContent = 'ready', 150);</script>
+            </body></html>
+            """);
+        var page = web.Page<ConformancePage>();
+
+        // The documented WaitUntil-plus-read pattern: the predicate reads an element through the same
+        // session whose wait operation is still open.
+        await web.WaitUntilAsync(
+            async ct => await page.Status.TextAsync(ct) == "ready",
+            TimeSpan.FromSeconds(5));
+
+        var text = await page.Status.TextAsync();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(text, Is.EqualTo("ready"));
+            var entries = host.Trace.Snapshot().Tests.Single().Entries;
+            Assert.That(entries.Any(entry => entry.Kind == "web.wait.until"
+                && entry.Outcome == ProtoTraceOutcome.Succeeded), Is.True);
+            Assert.That(entries.Count(entry => entry.Kind == "web.read_text"), Is.GreaterThanOrEqualTo(1),
+                "the nested read ran inside the wait");
+        });
+    }
+
+    [Test]
+    [CancelAfter(30_000)]
+    public async Task WaitUntil_WithANegatedAssertionOnTheSameSession_ShouldNotDeadlock()
+    {
+        var host = new ProtoHostBuilder()
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Off;
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("playwright negated nested wait", TestMethod());
+        var web = context.Web();
+        var backend = await OpenBrowserAsync(web);
+        await backend.Page.SetContentAsync("""
+            <!doctype html>
+            <html><body>
+              <div role="status">pending</div>
+              <script>setTimeout(() => document.querySelector('[role=status]').textContent = 'ready', 150);</script>
+            </body></html>
+            """);
+        var page = web.Page<ConformancePage>();
+
+        // The documented nested pattern with a negated assertion: ShouldNot polls through the same
+        // session whose wait operation is still open, and passes once the text changes.
+        await web.WaitUntilAsync(
+            async ct =>
+            {
+                try
+                {
+                    await page.Status.ShouldNot.HaveTextAsync("pending", TimeSpan.FromMilliseconds(500), ct);
+                    return true;
+                }
+                catch (WebAssertionException)
+                {
+                    return false;
+                }
+            },
+            TimeSpan.FromSeconds(5));
+
+        await page.Status.Should.HaveTextAsync("ready");
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        var entries = host.Trace.Snapshot().Tests.Single().Entries;
+        var wait = entries.Single(entry => entry.Kind == "web.wait.until");
+        var negated = entries.Single(entry => entry.Kind == "assert.web"
+            && entry.Attributes["web.assert.negated"] == "true"
+            && entry.Outcome == ProtoTraceOutcome.Succeeded);
+        var ancestors = new HashSet<string>();
+        for (var current = negated; current.ParentId is { } parentId;)
+        {
+            ancestors.Add(parentId);
+            current = entries.Single(entry => entry.Id == parentId);
+        }
+
+        Assert.That(ancestors, Does.Contain(wait.Id),
+            "the negated assertion ran nested inside the wait without deadlocking");
+    }
+
+    [Test]
+    public async Task FailureCapture_ShouldKeepTheLocationArtifactForAboutBlank()
+    {
+        var host = new ProtoHostBuilder()
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Off;
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("playwright blank location", TestMethod());
+        var web = context.Web();
+        var backend = await OpenBrowserAsync(web);
+        var failure = new WebFailureContext("Click", null, new InvalidOperationException("boom"));
+
+        var attachments = await ((IWebBackendDiagnostics)backend).CaptureFailureAsync(failure);
+        var location = attachments.Single(item => item.Name.EndsWith("location.txt", StringComparison.Ordinal));
+        var content = System.Text.Encoding.UTF8.GetString(await location.ReadAllBytesAsync());
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(attachments, Has.Count.EqualTo(3));
+            Assert.That(content, Does.Contain("about:blank"),
+                "the raw address is the fallback when sanitizing does not produce a value");
+        });
+    }
+
+    [Test]
+    public async Task VueRouteDiscovery_ShouldResolveRelativeChildRoutesFromTheVueTwoTable()
+    {
+        var host = new ProtoHostBuilder()
+            .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
+                }))
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Off;
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("vue child routes", TestMethod());
+        var web = context.Web();
+        var backend = await OpenBrowserAsync(web);
+        await backend.Page.RouteAsync("**/*", route => route.FulfillAsync(new RouteFulfillOptions
+        {
+            Body = ConformanceMarkup.VueTwoChildRoutesHtml,
+            ContentType = "text/html"
+        }));
+
+        await web.Page<ConformancePage>().OpenAsync("https://example.test/vue2");
+
+        var available = context.RecordedObservations
+            .Where(observation => observation.Kind == "web.page.available")
+            .Select(observation => observation.Identifier)
+            .OrderBy(identifier => identifier, StringComparer.Ordinal)
+            .ToArray();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        Assert.That(available, Is.EqualTo(new[] { "/orders", "/orders/new", "/orders/summary", "/orders/{id}" }),
+            "children resolve against their parent, an empty-path default child recurses into its children, " +
+            "and a top-level relative path is not a page");
+    }
+
+    [Test]
+    public async Task VueRouteDiscovery_ShouldBeANoOpOnAPageWithoutAVueApp()
+    {
+        var host = new ProtoHostBuilder()
+            .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
+                }))
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Off;
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("vue discovery absent", TestMethod());
+        var web = context.Web();
+        var backend = await OpenBrowserAsync(web);
+        await backend.Page.RouteAsync("**/*", route => route.FulfillAsync(new RouteFulfillOptions
+        {
+            Body = "<!doctype html><html><body><h1>Plain</h1></body></html>",
+            ContentType = "text/html"
+        }));
+
+        await web.Page<ConformancePage>().OpenAsync("https://example.test/plain");
+
+        var available = context.RecordedObservations
+            .Where(observation => observation.Kind == "web.page.available")
+            .ToArray();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(available, Is.Empty, "a page without a Vue app answers with nothing");
+            Assert.That(context.RecordedObservations.Any(observation => observation.Kind == "web.page.visited"),
+                Is.True, "the navigation still records its visited page");
         });
     }
 
@@ -151,42 +475,18 @@ public sealed class PlaywrightConformanceTests
 
     public sealed class Tag : WebComponent
     {
-        public ValueTask ShouldHaveTextAsync(string text) => Element(By.Css(":scope")).ShouldHaveTextAsync(text);
-        public ValueTask ShouldBeVisibleAsync() => Element(By.Css(":scope")).ShouldBeVisibleAsync();
+        public ValueTask HaveTextAsync(string text) => Element(By.Css(":scope")).Should.HaveTextAsync(text);
+        public ValueTask BeVisibleAsync() => Element(By.Css(":scope")).Should.BeVisibleAsync();
     }
 
-    private const string EscapeHatchHtml = """
-        <!doctype html>
-        <html><body>
-          <input placeholder="Search invoices">
-          <form onsubmit="return false">
-            <input type="checkbox" data-field="newsletter" aria-label="Newsletter">
-            <button class="primary" onclick="document.getElementById('banner').hidden=false">Go</button>
-          </form>
-          <p id="banner" hidden>Subscribed to updates</p>
-          <a href="#details">Open</a>
-          <span data-testid="hidden" style="display:none">secret</span>
-          <ul><li class="tag">alpha</li><li class="tag">beta</li><li class="tag">gamma</li></ul>
-          <table data-testid="invoices">
-            <thead><tr><th>Invoice</th><th>Total</th></tr></thead>
-            <tbody><tr><td>INV-1</td><td>€ 10</td></tr><tr><td>INV-2</td><td>€ 20</td></tr></tbody>
-          </table>
-        </body></html>
-        """;
+    public sealed class NamespacedAttributePage : WebPage
+    {
+        public WebElement Greeting => Element(By.Attribute("xml:lang", "en"));
+    }
 
-    private const string Html = """
-        <!doctype html>
-        <html><body>
-          <label for="name">Name</label><input id="name">
-          <label for="remember">Remember me</label><input id="remember" type="checkbox">
-          <label for="language">Language</label><select id="language"><option value="en">English</option><option value="nl">Nederlands</option></select>
-          <button disabled onclick="document.querySelector('[role=status]').textContent='saved'">Save</button>
-          <div role="status">idle</div>
-          <table data-testid="invoices">
-            <thead><tr><th>Invoice</th><th>Total</th></tr></thead>
-            <tbody><tr><td>INV-1</td><td>€ 10</td></tr></tbody>
-          </table>
-          <script>setTimeout(() => document.querySelector('button').disabled = false, 100);</script>
-        </body></html>
-        """;
+    public sealed class DuplicatePage : WebPage
+    {
+        public WebElement Duplicate => Element(By.Css("p.dup"));
+    }
+
 }

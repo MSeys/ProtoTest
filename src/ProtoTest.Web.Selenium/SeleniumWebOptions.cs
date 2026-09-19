@@ -17,7 +17,9 @@ public sealed class SeleniumWebOptions : IProtoConfigurableOptions
 {
     public const string BackendName = "Selenium";
 
-    string IProtoConfigurableOptions.ConfigurationSectionName => $"ProtoTest:Web:{BackendName}";
+    public const string ConfigurationSectionName = "ProtoTest:Web:Selenium";
+
+    string IProtoConfigurableOptions.ConfigurationSectionName => ConfigurationSectionName;
 
     public TimeSpan ActionTimeout { get; set; } = TimeSpan.FromSeconds(5);
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(50);

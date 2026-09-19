@@ -64,6 +64,8 @@ public static class ProtoHostBuilderExtensions
         services.TryAddScoped<WebSessionRegistry>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, WebLifecycleHook>());
         services.TryAddSingleton<IWebBackendFactory>(factory);
+        // Every backend gets page coverage: Playwright and Selenium both register through this method.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoCollector, WebCoverageCollector>());
         return services;
     }
 }

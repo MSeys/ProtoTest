@@ -16,6 +16,14 @@ public sealed class WebElement
     public string ComponentPath => Reference.ComponentPath;
     public WebLocator Locator => Reference.Locator;
 
+    /// <summary>The positive assertions for this element.</summary>
+    public WebAssertions Should => new(this, negated: false);
+
+    /// <summary>The negated assertions for this element: they pass when the underlying check does not hold.</summary>
+    public WebAssertions ShouldNot => new(this, negated: true);
+
+    internal WebSession Session => _session;
+
     public ValueTask ClickAsync(CancellationToken cancellationToken = default)
         => _session.ClickAsync(Reference, cancellationToken);
 
@@ -54,31 +62,4 @@ public sealed class WebElement
 
     public ValueTask PressAsync(WebKey key, CancellationToken cancellationToken = default)
         => _session.PressAsync(Reference, key, cancellationToken);
-
-    public ValueTask ShouldBeVisibleAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
-        => _session.ShouldBeVisibleAsync(Reference, timeout, cancellationToken);
-
-    public ValueTask ShouldBeEnabledAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
-        => _session.ShouldBeEnabledAsync(Reference, timeout, cancellationToken);
-
-    public ValueTask ShouldBeCheckedAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
-        => _session.ShouldBeCheckedAsync(Reference, timeout, cancellationToken);
-
-    public ValueTask ShouldHaveTextAsync(string expected, TimeSpan? timeout = null, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(expected);
-        return _session.ShouldHaveTextAsync(Reference, expected, contains: false, timeout, cancellationToken);
-    }
-
-    public ValueTask ShouldContainTextAsync(string expected, TimeSpan? timeout = null, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(expected);
-        return _session.ShouldHaveTextAsync(Reference, expected, contains: true, timeout, cancellationToken);
-    }
-
-    public ValueTask ShouldHaveValueAsync(string expected, TimeSpan? timeout = null, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(expected);
-        return _session.ShouldHaveValueAsync(Reference, expected, timeout, cancellationToken);
-    }
 }

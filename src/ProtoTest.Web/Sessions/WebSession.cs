@@ -16,9 +16,11 @@ public sealed class WebSession : IAsyncDisposable
     private readonly ProtoLock _backendGate = new();
     private readonly ProtoLock _pageGate = new();
     private readonly Dictionary<Type, WebPage> _pages = [];
+    private readonly AsyncLocal<string?> _activeNestingScope = new();
     private Task<IWebBackend>? _backendTask;
     private int _completeStarted;
     private int _disposeStarted;
+    private int _routeDiscoveryStarted;
 
     internal WebSession(
         ProtoExecutionContext context,
@@ -87,11 +89,11 @@ public sealed class WebSession : IAsyncDisposable
             $"The active web backend is '{backend.Name}', not '{typeof(TBackend).FullName}'.");
     }
 
-    internal ValueTask NavigateAsync(Uri address, CancellationToken cancellationToken)
+    internal async ValueTask NavigateAsync(Uri address, CancellationToken cancellationToken)
     {
         var target = ResolveTarget(address);
         var safeAddress = ProtoUriSanitizer.Sanitize(target);
-        return ExecuteVoidAsync(
+        await ExecuteVoidAsync(
             "web.navigate",
             $"WEB · Navigate · {safeAddress}",
             WebOperationKind.Navigate,
@@ -99,6 +101,17 @@ public sealed class WebSession : IAsyncDisposable
             new Dictionary<string, string?> { ["web.address"] = safeAddress },
             (backend, ct) => backend.NavigateAsync(target, ct),
             cancellationToken);
+
+        var backend = await GetOrCreateBackendAsync(cancellationToken);
+        // A redirect lands on a different page, so the backend's final address wins over the target. The
+        // target is only the fallback when the backend cannot report an address at all; a reported
+        // external origin is deliberately not replaced by the target.
+        var currentAddress = TryCurrentAddress(backend);
+        RecordPageObservation(
+            "web.page.visited",
+            currentAddress is null ? PagePathFrom(target.ToString()) : PagePathFrom(currentAddress),
+            "navigate");
+        await DiscoverRoutesAsync(backend, cancellationToken);
     }
 
     private Uri ResolveTarget(Uri address)
@@ -270,10 +283,12 @@ public sealed class WebSession : IAsyncDisposable
 
     internal ValueTask ShouldBeVisibleAsync(
         WebElementReference element,
+        bool negated,
         TimeSpan? timeout,
         CancellationToken cancellationToken)
         => AssertUntilAsync(
             element,
+            negated,
             "be visible",
             timeout,
             async (backend, ct) => await backend.IsVisibleAsync(element, ct)
@@ -283,10 +298,12 @@ public sealed class WebSession : IAsyncDisposable
 
     internal ValueTask ShouldBeEnabledAsync(
         WebElementReference element,
+        bool negated,
         TimeSpan? timeout,
         CancellationToken cancellationToken)
         => AssertUntilAsync(
             element,
+            negated,
             "be enabled",
             timeout,
             async (backend, ct) => await backend.IsEnabledAsync(element, ct)
@@ -296,10 +313,12 @@ public sealed class WebSession : IAsyncDisposable
 
     internal ValueTask ShouldBeCheckedAsync(
         WebElementReference element,
+        bool negated,
         TimeSpan? timeout,
         CancellationToken cancellationToken)
         => AssertUntilAsync(
             element,
+            negated,
             "be checked",
             timeout,
             async (backend, ct) => await backend.IsCheckedAsync(element, ct)
@@ -311,29 +330,38 @@ public sealed class WebSession : IAsyncDisposable
         WebElementReference element,
         string expected,
         bool contains,
+        bool negated,
         TimeSpan? timeout,
         CancellationToken cancellationToken)
-        => AssertUntilAsync(
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        return AssertUntilAsync(
             element,
+            negated,
             contains ? $"contain text \"{expected}\"" : $"have text \"{expected}\"",
             timeout,
             async (backend, ct) =>
             {
                 var actual = await backend.ReadTextAsync(element, ct);
-                var matches = contains
+                var holds = contains
                     ? actual.Contains(expected, StringComparison.Ordinal)
                     : string.Equals(actual, expected, StringComparison.Ordinal);
-                return (matches, $"text was \"{actual}\"");
+                return (holds, $"text was \"{actual}\"");
             },
             cancellationToken);
+    }
 
     internal ValueTask ShouldHaveValueAsync(
         WebElementReference element,
         string expected,
+        bool negated,
         TimeSpan? timeout,
         CancellationToken cancellationToken)
-        => AssertUntilAsync(
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        return AssertUntilAsync(
             element,
+            negated,
             "have the expected value",
             timeout,
             async (backend, ct) =>
@@ -343,6 +371,7 @@ public sealed class WebSession : IAsyncDisposable
                     $"value length was {actual?.Length ?? 0} (value redacted)");
             },
             cancellationToken);
+    }
 
     /// <summary>
     /// Polls <paramref name="condition"/> until it holds or <paramref name="timeout"/> elapses. Use it to
@@ -404,27 +433,31 @@ public sealed class WebSession : IAsyncDisposable
                         $"Expected {expectation} within {waitTimeout}, but it did not hold.");
                 }
             },
-            cancellationToken);
+            cancellationToken,
+            opensNestingScope: true);
     }
 
     private static string Shorten(string value)
         => value.Length <= 80 ? value : $"{value[..77]}...";
 
-    private ValueTask AssertUntilAsync(
+    private async ValueTask AssertUntilAsync(
         WebElementReference element,
+        bool negated,
         string expectation,
         TimeSpan? timeout,
-        Func<IWebBackend, CancellationToken, ValueTask<(bool Matches, string Observation)>> inspect,
+        Func<IWebBackend, CancellationToken, ValueTask<(bool Holds, string Observation)>> inspect,
         CancellationToken cancellationToken)
     {
         var assertionTimeout = timeout ?? TimeSpan.FromSeconds(5);
         if (assertionTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout));
+        var describedExpectation = ProtoAssertion.Describe(expectation, negated);
         var attributes = ElementAttributes(element);
-        attributes["web.expectation"] = expectation;
+        attributes["web.expectation"] = describedExpectation;
+        attributes["web.assert.negated"] = negated ? "true" : "false";
         attributes["web.assert.timeout"] = assertionTimeout.ToString();
-        return ExecuteVoidAsync(
+        await ExecuteVoidAsync(
             "assert.web",
-            $"Assert · {element.Name} should {expectation}",
+            $"Assert · {element.Name} should {describedExpectation}",
             WebOperationKind.Assert,
             element,
             attributes,
@@ -439,14 +472,14 @@ public sealed class WebSession : IAsyncDisposable
                         }
                         catch (WebElementResolutionException exception)
                         {
-                            return (Matches: false, Observation: exception.Message);
+                            return (Holds: false, Observation: exception.Message);
                         }
                         catch (WebActionabilityException exception)
                         {
-                            return (Matches: false, Observation: exception.Message);
+                            return (Holds: false, Observation: exception.Message);
                         }
                     },
-                    observation => observation.Matches,
+                    observation => ProtoAssertion.IsSatisfied(observation.Holds, negated),
                     assertionTimeout,
                     WebPolling.DefaultInterval,
                     ct);
@@ -454,12 +487,38 @@ public sealed class WebSession : IAsyncDisposable
                 if (!result.Satisfied)
                 {
                     throw new WebAssertionException(
-                        $"Element '{element.ComponentPath}.{element.Name}' should {expectation} within {assertionTimeout}. " +
+                        $"Element '{element.ComponentPath}.{element.Name}' should {describedExpectation} within {assertionTimeout}. " +
                         $"Last observed: {result.Value.Observation ?? "no observation"}.");
                 }
             },
             cancellationToken);
+
+        // A passing assertion is what makes a page covered; the address is the page it was checked on.
+        var backend = await GetOrCreateBackendAsync(cancellationToken);
+        RecordPageObservation("web.page.verified", PagePathFrom(TryCurrentAddress(backend)), "assert");
     }
+
+    /// <summary>
+    /// The coverage path of an observed address. When the session targets an application (it has a
+    /// <see cref="BaseUrl"/>), a page on another origin — an identity provider, a payment gateway — is
+    /// not this application's page, so it contributes nothing to its coverage.
+    /// </summary>
+    private string? PagePathFrom(string? address)
+    {
+        if (address is null) return null;
+        if (BaseUrl is null || !Uri.TryCreate(address, UriKind.Absolute, out var uri))
+        {
+            return WebPagePath.FromAddress(address);
+        }
+
+        if (!uri.IsAbsoluteUri || !IsSameOrigin(BaseUrl, uri)) return null;
+        return WebPagePath.FromUri(uri);
+    }
+
+    private static bool IsSameOrigin(Uri left, Uri right)
+        => string.Equals(left.Scheme, right.Scheme, StringComparison.OrdinalIgnoreCase)
+           && string.Equals(left.IdnHost, right.IdnHost, StringComparison.OrdinalIgnoreCase)
+           && left.Port == right.Port;
 
     private async ValueTask ExecuteVoidAsync(
         string kind,
@@ -468,7 +527,8 @@ public sealed class WebSession : IAsyncDisposable
         WebElementReference? element,
         Dictionary<string, string?> attributes,
         Func<IWebBackend, CancellationToken, ValueTask> execute,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool opensNestingScope = false)
         => await ExecuteAsync<object?>(
             kind,
             name,
@@ -480,7 +540,8 @@ public sealed class WebSession : IAsyncDisposable
                 await execute(backend, ct);
                 return null;
             },
-            cancellationToken);
+            cancellationToken,
+            opensNestingScope);
 
     private async ValueTask<TResult> ExecuteAsync<TResult>(
         string kind,
@@ -489,7 +550,8 @@ public sealed class WebSession : IAsyncDisposable
         WebElementReference? element,
         Dictionary<string, string?> attributes,
         Func<IWebBackend, CancellationToken, ValueTask<TResult>> execute,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool opensNestingScope = false)
     {
         var backend = await GetOrCreateBackendAsync(cancellationToken);
         attributes["web.backend"] = backend.Name;
@@ -499,7 +561,14 @@ public sealed class WebSession : IAsyncDisposable
             .With(attributes)
             .Begin();
         var backendContext = new WebBackendOperationContext(
-            operation.Id, Name, operationKind, OperationName(name), element);
+            operation.Id, Name, operationKind, OperationName(name), element, _activeNestingScope.Value);
+        // An explicit nesting scope is the only way an operation becomes nested: a second top-level
+        // operation started while another one is still in flight is never misclassified, and a
+        // fire-and-forget operation cannot leave a stale correlation behind because the scope is
+        // restored when this operation returns.
+        using var nesting = opensNestingScope
+            ? new NestingScope(this, operation.Id)
+            : null;
         var webOperation = new WebOperationContext(
             _context, operationKind, OperationName(name), backend.Name, Name, operation.Id, element, backend);
         try
@@ -576,11 +645,10 @@ public sealed class WebSession : IAsyncDisposable
             return;
         }
 
+        IReadOnlyList<ProtoTestAttachment> attachments;
         try
         {
-            var attachments = await diagnostics.CaptureFailureAsync(failure);
-            foreach (var attachment in attachments)
-                _context.AddAttachment(attachment);
+            attachments = await diagnostics.CaptureFailureAsync(failure);
         }
         catch (Exception captureException)
         {
@@ -591,6 +659,28 @@ public sealed class WebSession : IAsyncDisposable
                 outcome: ProtoTraceOutcome.Failed,
                 exception: captureException,
                 parentId: parentId);
+            return;
+        }
+
+        // Each artifact registers on its own: one failing attachment (for example a collision) must not
+        // drop the rest of the failure evidence.
+        foreach (var attachment in attachments)
+        {
+            try
+            {
+                _context.AddAttachment(attachment);
+            }
+            catch (Exception attachmentException)
+            {
+                _context.Trace.WriteEvent(
+                    "web.diagnostics.artifact_failed",
+                    $"Web diagnostic failed · {attachment.Name}",
+                    TraceSource,
+                    outcome: ProtoTraceOutcome.Failed,
+                    attributes: new Dictionary<string, string?> { ["web.artifact"] = attachment.Name },
+                    exception: attachmentException,
+                    parentId: parentId);
+            }
         }
     }
 
@@ -602,6 +692,83 @@ public sealed class WebSession : IAsyncDisposable
             ["web.locator"] = element.Locator.Describe(),
             ["web.component.roots"] = string.Join(" > ", element.ComponentRoots.Select(root => root.Describe()))
         };
+
+    private void RecordPageObservation(string kind, string? path, string source)
+    {
+        if (path is null) return;
+        _context.RecordObservation(new ProtoObservation(
+            "Web",
+            kind,
+            path,
+            Metadata: new Dictionary<string, object>
+            {
+                ["web.session"] = Name,
+                ["web.page.source"] = source
+            }));
+    }
+
+    private static string? TryCurrentAddress(IWebBackend backend)
+    {
+        try
+        {
+            return backend.CurrentAddress;
+        }
+        catch (Exception)
+        {
+            // Reading the address is best-effort; a backend that cannot report one still passes the test.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Opt-in Vue Router discovery (<c>ProtoTest:Web:Sessions:{name}:DiscoverRoutes</c>). It runs once per
+    /// session after a navigation, answers with nothing when Vue or its router is absent, and never fails
+    /// the test; a genuine backend failure is recorded on the trace instead.
+    /// </summary>
+    private async ValueTask DiscoverRoutesAsync(IWebBackend backend, CancellationToken cancellationToken)
+    {
+        if (Volatile.Read(ref _routeDiscoveryStarted) != 0) return;
+        if (!RouteDiscoveryEnabled()) return;
+        if (backend is not IWebBackendJavaScript javascript) return;
+        try
+        {
+            var json = await javascript.EvaluateJsonAsync(VueRouteDiscovery.Script, cancellationToken);
+            if (json is null) return;
+            Interlocked.Exchange(ref _routeDiscoveryStarted, 1);
+            foreach (var path in VueRouteDiscovery.Parse(json))
+            {
+                RecordPageObservation("web.page.available", path, "vue-router");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            // Discovery stays unlatched, so a later navigation can try again; the failure is traced.
+            _context.Trace.WriteEvent(
+                "web.page.discovery.failed",
+                "Vue route discovery failed",
+                TraceSource,
+                outcome: ProtoTraceOutcome.Unknown,
+                exception: exception);
+        }
+    }
+
+    private bool RouteDiscoveryEnabled()
+    {
+        var key = $"ProtoTest:Web:Sessions:{Name}:DiscoverRoutes";
+        string? configured = null;
+        if (_context.TryService<ProtoInfrastructureSettings>() is { } settings
+            && settings.Values.TryGetValue(key, out var provided))
+        {
+            configured = provided;
+        }
+
+        configured ??= _context.Configuration[key];
+        return bool.TryParse(configured, out var enabled) && enabled;
+    }
 
     internal async ValueTask RunFlowAsync(
         string name,
@@ -694,5 +861,24 @@ public sealed class WebSession : IAsyncDisposable
         await CompleteAsync();
         if (_backendTask is { } backendTask)
             await (await backendTask).DisposeAsync();
+    }
+
+    /// <summary>
+    /// Sets the correlation id nested operations resolve while the scope is open and restores the
+    /// previous value on dispose, so no flow-local state outlives the operation that owns it.
+    /// </summary>
+    private sealed class NestingScope : IDisposable
+    {
+        private readonly WebSession _session;
+        private readonly string? _previous;
+
+        public NestingScope(WebSession session, string correlationId)
+        {
+            _session = session;
+            _previous = session._activeNestingScope.Value;
+            session._activeNestingScope.Value = correlationId;
+        }
+
+        public void Dispose() => _session._activeNestingScope.Value = _previous;
     }
 }

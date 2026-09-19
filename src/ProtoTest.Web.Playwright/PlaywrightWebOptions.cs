@@ -33,7 +33,9 @@ public sealed class PlaywrightWebOptions : IProtoConfigurableOptions
 {
     public const string BackendName = "Playwright";
 
-    string IProtoConfigurableOptions.ConfigurationSectionName => $"ProtoTest:Web:{BackendName}";
+    public const string ConfigurationSectionName = "ProtoTest:Web:Playwright";
+
+    string IProtoConfigurableOptions.ConfigurationSectionName => ConfigurationSectionName;
 
     public PlaywrightBrowser Browser { get; set; } = PlaywrightBrowser.Chromium;
     public bool Headless { get; set; } = true;

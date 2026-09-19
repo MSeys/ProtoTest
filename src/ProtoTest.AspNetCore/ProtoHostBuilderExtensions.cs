@@ -3,14 +3,20 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.AspNetCore.Internal;
 using ProtoTest.Core;
+using System.Runtime.CompilerServices;
 
 /// <summary>
 /// Provides extension methods for <see cref="IProtoHostBuilder"/> to configure ASP.NET Core test hosts.
 /// </summary>
 public static class ProtoHostBuilderExtensions
 {
+    // First registration wins per server name: a helper invoked twice cannot start the same server twice,
+    // while a different name still composes. The marker is added only after the registration succeeded.
+    private static readonly ConditionalWeakTable<IProtoHostBuilder, HashSet<string>> RegisteredServers = new();
+
     /// <summary>
     /// Registers an ASP.NET Core application under test into the ProtoTest execution pipeline.
     /// </summary>
@@ -34,6 +40,12 @@ public static class ProtoHostBuilderExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (!Enum.IsDefined(lifetime)) throw new ArgumentOutOfRangeException(nameof(lifetime));
 
+        var serverNames = RegisteredServers.GetValue(builder, static _ => new HashSet<string>(StringComparer.Ordinal));
+        if (serverNames.Contains(name))
+        {
+            return builder;
+        }
+
         // Registered through a factory so the host's service provider disposes the shared server with the run.
         builder.ConfigureServices(services =>
         {
@@ -41,6 +53,8 @@ public static class ProtoHostBuilderExtensions
                 new AspNetCoreClientInitializer<TProgram>(name, configureWebHost, configureClientOptions, lifetime));
             RegisterApplicationServices<TProgram>(services, name);
         });
+        // The name is claimed only once the registration succeeded, so a failed call leaves no guard.
+        serverNames.Add(name);
         return builder.AddCapability(new ProtoCapabilityDescriptor(
             "ASP.NET Core", ProtoCapabilityKinds.Server, "ProtoTest.AspNetCore"));
     }
@@ -50,6 +64,12 @@ public static class ProtoHostBuilderExtensions
     /// name so the application's HTTP clients can reuse its transport (for example
     /// <c>rest.AddClientFrom("Api", app.Name)</c>).
     /// </summary>
+    /// <remarks>
+    /// Repeating the call registers each server and lets the client initializer hook pick the first that
+    /// initializes, exactly like re-registering a REST client name; the transport, keyed application
+    /// services and capability stay registered once. There is no whole-call guard, so nothing survives a
+    /// failure.
+    /// </remarks>
     public static IProtoApplicationBuilder AddAspNetCoreServer<TProgram>(
         this IProtoApplicationBuilder application,
         Action<IWebHostBuilder>? configureWebHost = null,
@@ -57,11 +77,13 @@ public static class ProtoHostBuilderExtensions
         AspNetCoreServerLifetime lifetime = AspNetCoreServerLifetime.PerRun) where TProgram : class
     {
         ArgumentNullException.ThrowIfNull(application);
+        if (!Enum.IsDefined(lifetime)) throw new ArgumentOutOfRangeException(nameof(lifetime));
+
         var name = application.ApplicationName;
         application.Services.AddSingleton<IProtoClientInitializer>(_ =>
             new AspNetCoreClientInitializer<TProgram>(name, configureWebHost, configureClientOptions, lifetime));
         // The application's HTTP clients with no configured base reuse this transport.
-        application.Services.AddSingleton(new ProtoApplicationTransport(name, name));
+        application.Services.TryAddSingleton(new ProtoApplicationTransport(name, name));
         RegisterApplicationServices<TProgram>(application.Services, name);
         return application.AddCapability(new ProtoCapabilityDescriptor(
             "ASP.NET Core", ProtoCapabilityKinds.Server, "ProtoTest.AspNetCore"));
@@ -73,7 +95,7 @@ public static class ProtoHostBuilderExtensions
     /// </summary>
     private static void RegisterApplicationServices<TProgram>(IServiceCollection services, string name)
         where TProgram : class
-        => services.AddKeyedScoped(
+        => services.TryAddKeyedScoped(
             name,
             (_, key) => ApplicationServicesScope<TProgram>.Create(Proto.Context, (string)key!));
 }

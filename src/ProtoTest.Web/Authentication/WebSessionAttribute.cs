@@ -45,8 +45,18 @@ public sealed class WebSessionAttribute : ProtoAttribute
 
         // The whole URL can come from configuration, so code can stay environment-agnostic:
         // ProtoTest:Web:Sessions:{name}:Open overrides the attribute; a relative value resolves
-        // against the session's BaseUrl (ProtoTest:Applications:{application}:BaseUrl).
-        var open = context.Configuration[$"ProtoTest:Web:Sessions:{Name}:Open"];
+        // against the session's BaseUrl (ProtoTest:Applications:{application}:BaseUrl). Settings
+        // provided by started infrastructure win over the static configuration, like the session's
+        // BaseUrl resolution.
+        var key = $"ProtoTest:Web:Sessions:{Name}:Open";
+        string? open = null;
+        if (context.TryService<ProtoInfrastructureSettings>() is { } settings
+            && settings.Values.TryGetValue(key, out var provided))
+        {
+            open = provided;
+        }
+
+        open ??= context.Configuration[key];
         if (string.IsNullOrWhiteSpace(open))
         {
             open = Open;

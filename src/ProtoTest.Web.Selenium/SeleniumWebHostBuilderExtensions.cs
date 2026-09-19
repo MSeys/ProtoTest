@@ -3,6 +3,7 @@ namespace ProtoTest.Web;
 using OpenQA.Selenium;
 using ProtoTest.Core;
 using ProtoTest.Web.Selenium;
+using System.Runtime.CompilerServices;
 
 /// <summary>
 /// Selenium registration for <see cref="IProtoHostBuilder"/>. Reference the ProtoTest.Web.Selenium
@@ -11,6 +12,11 @@ using ProtoTest.Web.Selenium;
 /// </summary>
 public static class SeleniumWebHostBuilderExtensions
 {
+    // The host overload is already first-wins through AddWebBackend; the application overload also
+    // registers the application's default client, so it guards the whole repeated call.
+    private static readonly ConditionalWeakTable<IProtoApplicationBuilder, object> RegisteredApplications = new();
+    private static readonly object Registration = new();
+
     /// <summary>Adds a Selenium-backed web host.</summary>
     /// <param name="builder">The host builder.</param>
     /// <param name="createDriver">Creates the WebDriver for each session.</param>
@@ -24,7 +30,7 @@ public static class SeleniumWebHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(createDriver);
         return builder
             .AddCapability(new ProtoCapabilityDescriptor(
-                "Selenium", ProtoCapabilityKinds.Protocol, "ProtoTest.Web.Selenium"))
+                "Selenium", ProtoCapabilityKinds.Browser, "ProtoTest.Web.Selenium"))
             .AddWebBackend(new SeleniumWebBackendFactory(createDriver, configure));
     }
 
@@ -36,9 +42,14 @@ public static class SeleniumWebHostBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(createDriver);
+        if (!RegisteredApplications.TryAdd(application, Registration))
+        {
+            return application;
+        }
+
         application.Services.AddWebBackend(new SeleniumWebBackendFactory(createDriver, configure));
         application.RegisterClient("Web", "Default");
         return application.AddCapability(new ProtoCapabilityDescriptor(
-            "Selenium", ProtoCapabilityKinds.Protocol, "ProtoTest.Web.Selenium"));
+            "Selenium", ProtoCapabilityKinds.Browser, "ProtoTest.Web.Selenium"));
     }
 }

@@ -9,17 +9,32 @@ public sealed record WebElementReference(
     string Name,
     WebLocator Locator);
 
+/// <summary>
+/// One semantic operation as the backend sees it. <c>ParentCorrelationId</c> is set only when the
+/// operation was started inside another operation's explicit nesting scope (a <c>WaitUntilAsync</c>
+/// condition), which lets a backend group native diagnostics by operation lineage instead of guessing
+/// from flow-local state.
+/// </summary>
 public sealed record WebBackendOperationContext(
     string CorrelationId,
     string SessionName,
     WebOperationKind Kind,
     string Name,
-    WebElementReference? Element);
+    WebElementReference? Element,
+    string? ParentCorrelationId = null);
 
 /// <summary>Executes ProtoTest web concepts using a concrete browser technology.</summary>
 public interface IWebBackend : IAsyncDisposable
 {
     string Name { get; }
+
+    /// <summary>
+    /// The address the browser is on now, or <see langword="null"/> when the backend cannot report one.
+    /// Page coverage reads it after a navigation (so a redirect is attributed to its final page) and
+    /// after a passing assertion.
+    /// </summary>
+    string? CurrentAddress => null;
+
     ValueTask NavigateAsync(Uri address, CancellationToken cancellationToken = default);
     ValueTask ClickAsync(WebElementReference element, CancellationToken cancellationToken = default);
     ValueTask FillAsync(WebElementReference element, string value, CancellationToken cancellationToken = default);
@@ -49,10 +64,18 @@ public interface IWebBackend : IAsyncDisposable
     ValueTask CompleteAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 }
 
-/// <summary>Optional backend capability: evaluates a boolean JavaScript expression in the page.</summary>
+/// <summary>Optional backend capability: evaluates JavaScript in the page.</summary>
 public interface IWebBackendJavaScript
 {
     ValueTask<bool> EvaluateBooleanAsync(string script, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Evaluates a JavaScript expression that answers with a JSON string (or <see langword="null"/>)
+    /// and returns that string. The default answers <see langword="null"/>, so a backend that only
+    /// speaks booleans stays usable; callers treat the result as best-effort.
+    /// </summary>
+    ValueTask<string?> EvaluateJsonAsync(string script, CancellationToken cancellationToken = default)
+        => ValueTask.FromResult<string?>(null);
 }
 
 /// <summary>Optional backend capability: captures best-effort diagnostics for a failed operation.</summary>

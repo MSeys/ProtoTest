@@ -5,15 +5,16 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using OpenQA.Selenium;
 using ProtoTest.Core;
+using ProtoTest.Web.Internal;
 
 public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics
 {
     private readonly ProtoExecutionContext _context;
     private readonly SeleniumWebOptions _options;
     private readonly string _sessionName;
-    private readonly AsyncLocal<string?> _activeCorrelation = new();
     private readonly ConcurrentQueue<SeleniumDiagnosticEntry> _diagnostics = new();
     private readonly DateTimeOffset _startedAtUtc = DateTimeOffset.UtcNow;
+    private int _failureSequence;
     private bool _webFailure;
     private int _completeStarted;
     private int _disposeStarted;
@@ -33,24 +34,7 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
     public string Name => "Selenium";
     public IWebDriver Driver { get; }
 
-    public ValueTask BeginOperationAsync(
-        WebBackendOperationContext operation,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        _activeCorrelation.Value = operation.CorrelationId;
-        return ValueTask.CompletedTask;
-    }
-
-    public ValueTask EndOperationAsync(
-        WebBackendOperationContext operation,
-        ProtoTraceOutcome outcome,
-        Exception? exception = null,
-        CancellationToken cancellationToken = default)
-    {
-        _activeCorrelation.Value = null;
-        return ValueTask.CompletedTask;
-    }
+    public string? CurrentAddress => Driver.Url;
 
     public ValueTask NavigateAsync(Uri address, CancellationToken cancellationToken = default)
         => Background(() => Driver.Navigate().GoToUrl(address), cancellationToken);
@@ -106,12 +90,13 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
         {
             cancellationToken.ThrowIfCancellationRequested();
             var scope = ResolveScope(elements);
+            var documentScoped = scope is IWebDriver;
             if (elements.Locator is NthWebLocator nth)
             {
-                var matches = scope.FindElements(SeleniumLocatorTranslator.Translate(nth.Source));
+                var matches = scope.FindElements(SeleniumLocatorTranslator.Translate(nth.Source, documentScoped));
                 return matches.Count > nth.Index ? 1 : 0;
             }
-            return scope.FindElements(SeleniumLocatorTranslator.Translate(elements.Locator)).Count;
+            return scope.FindElements(SeleniumLocatorTranslator.Translate(elements.Locator, documentScoped)).Count;
         }, cancellationToken);
 
     public async ValueTask<string> ReadTextAsync(WebElementReference element, CancellationToken cancellationToken = default)
@@ -155,45 +140,53 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
             return Convert.ToBoolean(javascript.ExecuteScript($"return Boolean({script});"));
         }, cancellationToken);
 
+    public async ValueTask<string?> EvaluateJsonAsync(string script, CancellationToken cancellationToken = default)
+        => await Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Driver is not IJavaScriptExecutor javascript)
+                throw new WebBackendCapabilityException(
+                    $"Selenium driver '{Driver.GetType().FullName}' does not support JavaScript execution.");
+            return javascript.ExecuteScript($"return ({script});")?.ToString();
+        }, cancellationToken);
+
     public async ValueTask<IReadOnlyList<ProtoTestAttachment>> CaptureFailureAsync(
         WebFailureContext failure,
         CancellationToken cancellationToken = default)
     {
         _webFailure = true;
-        return await Task.Run<IReadOnlyList<ProtoTestAttachment>>(() =>
-        {
-            var attachments = new List<ProtoTestAttachment>();
-            var prefix = $"{WebNames.SafeName(_sessionName)}-{WebNames.SafeName(failure.Element?.Name ?? failure.Operation)}";
-            try
-            {
-                if (Driver is ITakesScreenshot screenshots)
-                {
-                    attachments.Add(ProtoTestAttachment.FromBytes(
-                        $"web-{prefix}-failure.png", screenshots.GetScreenshot().AsByteArray,
-                        "image/png", "Selenium page at web operation failure."));
-                }
-            }
-            catch (Exception exception) { RecordCaptureFailure("screenshot", exception); }
-            try
-            {
-                attachments.Add(ProtoTestAttachment.FromText(
-                    $"web-{prefix}-page.html", Driver.PageSource,
-                    "text/html", "DOM snapshot at web operation failure."));
-            }
-            catch (Exception exception) { RecordCaptureFailure("dom", exception); }
-            try
-            {
-                var location = Uri.TryCreate(Driver.Url, UriKind.Absolute, out var address)
-                    ? ProtoUriSanitizer.Sanitize(address, null)
-                    : Driver.Url;
-                attachments.Add(ProtoTestAttachment.FromText(
-                    $"web-{prefix}-location.txt", $"URL: {location}{Environment.NewLine}Title: {Driver.Title}",
-                    "text/plain", "Browser location at web operation failure."));
-            }
-            catch (Exception exception) { RecordCaptureFailure("location", exception); }
-            return attachments;
-        }, cancellationToken);
+        return await Task.Run(
+            async () => await WebFailureArtifacts.CaptureAsync(
+                _context,
+                "ProtoTest.Web.Selenium",
+                "Selenium",
+                _sessionName,
+                failure,
+                Interlocked.Increment(ref _failureSequence),
+                prefix => Driver is ITakesScreenshot screenshots
+                    ? ValueTask.FromResult<ProtoTestAttachment?>(ProtoTestAttachment.FromBytes(
+                        $"web-{prefix}-failure.png",
+                        screenshots.GetScreenshot().AsByteArray,
+                        "image/png",
+                        "Selenium page at web operation failure."))
+                    : ValueTask.FromResult<ProtoTestAttachment?>(null),
+                prefix => ValueTask.FromResult<ProtoTestAttachment?>(ProtoTestAttachment.FromText(
+                    $"web-{prefix}-page.html",
+                    Driver.PageSource,
+                    "text/html",
+                    "DOM snapshot at web operation failure.")),
+                prefix => ValueTask.FromResult<ProtoTestAttachment?>(ProtoTestAttachment.FromText(
+                    $"web-{prefix}-location.txt",
+                    $"URL: {Location()}{Environment.NewLine}Title: {Driver.Title}",
+                    "text/plain",
+                    "Browser location at web operation failure."))),
+            cancellationToken);
     }
+
+    private string? Location()
+        => Uri.TryCreate(Driver.Url, UriKind.Absolute, out var address)
+            ? ProtoUriSanitizer.Sanitize(address, null)
+            : Driver.Url;
 
     private void ExecuteActionable(
         WebElementReference reference,
@@ -329,16 +322,17 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
 
     private static IWebElement ResolveSingle(ISearchContext scope, WebLocator locator, string componentPath)
     {
+        var documentScoped = scope is IWebDriver;
         if (locator is NthWebLocator nth)
         {
-            var indexedMatches = scope.FindElements(SeleniumLocatorTranslator.Translate(nth.Source));
+            var indexedMatches = scope.FindElements(SeleniumLocatorTranslator.Translate(nth.Source, documentScoped));
             if (indexedMatches.Count <= nth.Index)
                 throw new NoSuchElementException(
                     $"No element exists at zero-based index {nth.Index} for {nth.Source.Describe()} in {componentPath}; found {indexedMatches.Count}.");
             return indexedMatches[nth.Index];
         }
 
-        var seleniumBy = SeleniumLocatorTranslator.Translate(locator);
+        var seleniumBy = SeleniumLocatorTranslator.Translate(locator, documentScoped);
         var matches = scope.FindElements(seleniumBy);
         return matches.Count switch
         {
@@ -403,24 +397,7 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
 
     private readonly record struct ElementBounds(int X, int Y, int Width, int Height);
 
-    private static string MapKey(WebKey key) => key switch
-    {
-        WebKey.Enter => Keys.Enter,
-        WebKey.Tab => Keys.Tab,
-        WebKey.Escape => Keys.Escape,
-        WebKey.Space => Keys.Space,
-        WebKey.Backspace => Keys.Backspace,
-        WebKey.Delete => Keys.Delete,
-        WebKey.ArrowUp => Keys.ArrowUp,
-        WebKey.ArrowDown => Keys.ArrowDown,
-        WebKey.ArrowLeft => Keys.ArrowLeft,
-        WebKey.ArrowRight => Keys.ArrowRight,
-        WebKey.Home => Keys.Home,
-        WebKey.End => Keys.End,
-        WebKey.PageUp => Keys.PageUp,
-        WebKey.PageDown => Keys.PageDown,
-        _ => throw new ArgumentOutOfRangeException(nameof(key))
-    };
+    private static string MapKey(WebKey key) => WebKeyMap.Get(key).Selenium;
 
     private void Record(
         WebOperationKind operation,
@@ -460,30 +437,37 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
                      (_options.DiagnosticTraceRetention == SeleniumDiagnosticTraceRetention.OnWebFailure && _webFailure);
         if (retain)
         {
-            string? url = null;
-            string? title = null;
             try
             {
-                url = Driver.Url;
-                title = Driver.Title;
-            }
-            catch (WebDriverException) { }
+                string? url = null;
+                string? title = null;
+                try
+                {
+                    url = Driver.Url;
+                    title = Driver.Title;
+                }
+                catch (WebDriverException) { }
 
-            var payload = new
+                var payload = new
+                {
+                    format = "prototest.selenium.diagnostics.v1",
+                    startedAtUtc = _startedAtUtc,
+                    completedAtUtc = DateTimeOffset.UtcNow,
+                    driverType = Driver.GetType().FullName,
+                    url,
+                    title,
+                    entries = _diagnostics.ToArray()
+                };
+                _context.AddAttachment(
+                    $"selenium-{WebNames.SafeName(_sessionName)}-diagnostics.json",
+                    JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }),
+                    "application/json",
+                    "Selenium backend diagnostic timeline embedded in ProtoTrace.");
+            }
+            catch (Exception exception)
             {
-                format = "prototest.selenium.diagnostics.v1",
-                startedAtUtc = _startedAtUtc,
-                completedAtUtc = DateTimeOffset.UtcNow,
-                driverType = Driver.GetType().FullName,
-                url,
-                title,
-                entries = _diagnostics.ToArray()
-            };
-            _context.AddAttachment(
-                $"selenium-{WebNames.SafeName(_sessionName)}-diagnostics.json",
-                JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }),
-                "application/json",
-                "Selenium backend diagnostic timeline embedded in ProtoTrace.");
+                RecordCaptureFailure("selenium-diagnostics", exception);
+            }
         }
         return ValueTask.CompletedTask;
     }
@@ -522,10 +506,8 @@ internal sealed class SeleniumWebBackendFactory(
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var options = new SeleniumWebOptions();
-        configure?.Invoke(options);
-        var binder = new WebBackendOptionsBinder<SeleniumWebOptions>(options, sessionName, SeleniumWebOptions.Validate);
+        var options = WebBackendOptions.Resolve(context, sessionName, configure, SeleniumWebOptions.Validate);
         return ValueTask.FromResult<IWebBackend>(
-            new SeleniumWebBackend(context, createDriver(), binder.Resolve(context.Configuration), sessionName));
+            new SeleniumWebBackend(context, createDriver(), options, sessionName));
     }
 }

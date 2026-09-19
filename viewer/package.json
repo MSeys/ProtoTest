@@ -10,9 +10,11 @@
     "lint:css": "stylelint \"src/**/*.{css,vue}\""
   },
   "dependencies": {
+    "prismjs": "^1.30.0",
     "vue": "^3.5.42"
   },
   "devDependencies": {
+    "@types/prismjs": "^1.26.6",
     "@vitejs/plugin-vue": "^6.0.8",
     "postcss-html": "^1.8.1",
     "stylelint": "^16.26.1",

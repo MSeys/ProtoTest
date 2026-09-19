@@ -20,6 +20,15 @@
     <AssemblyMetadata Include="ProtoTest.Framework" Value="true" />
   </ItemGroup>
 
+  <!-- One mark for the whole family: on nuget.org every ProtoTest package reads as part of the same set. -->
+  <!-- Read only when packing; a project's own IsPackable is not known yet here, so no condition. -->
+  <PropertyGroup>
+    <PackageIcon>prototest-package-icon.png</PackageIcon>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)assets/brand/prototest-package-icon.png" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
   <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)\README.md')">
     <None Include="README.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>

@@ -112,6 +112,22 @@
 
 .featureCopy p { margin-bottom: var(--space-3); color: var(--muted); line-height: 1.65; }
 
+/* What an in-house foundation tends to become, struck through, and what ProtoTest does instead. */
+.inHouse { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: var(--space-4); }
+.inHouseCard {
+  padding: var(--space-5);
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--bg);
+}
+.inHouseCard h3 { margin: 0; font-size: var(--text-title); }
+.inHouseCard p { margin: 0; color: var(--muted); font-size: var(--text-meta); line-height: 1.6; }
+.inHouseBefore { color: var(--muted); font: var(--text-micro) var(--font-mono); }
+.inHouseBefore s { text-decoration-color: var(--danger); }
+
 .featureLink { display: inline-block; margin-top: var(--space-2); font-weight: var(--weight-semibold); }
 .featureLinks { display: flex; flex-wrap: wrap; column-gap: var(--space-5); }
 .sectionHead .featureLinks { justify-content: center; }

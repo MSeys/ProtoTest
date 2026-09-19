@@ -274,6 +274,57 @@ function Hero() {
   );
 }
 
+/*
+ * The positioning: most teams with a serious suite end up building this themselves, privately and for one
+ * application. Each card pairs what that in-house foundation tends to become with what ProtoTest does instead.
+ */
+const inHouse = [
+  {
+    before: 'Built for one application',
+    after: 'Generic by design',
+    text: 'Capabilities are composed per suite. Your domain — tenants, sign-in, test data — lives in attributes and builders you write on top, not inside the framework.',
+  },
+  {
+    before: 'Understood by one person',
+    after: 'Documented in the open',
+    text: 'Every capability has a page, the recipes show them combined, and a failing test explains itself through its trace to whoever opens it.',
+  },
+  {
+    before: 'Rebuilt for the next project',
+    after: 'The same packages everywhere',
+    text: 'A second service, a second team, a second repository: the same NuGet packages, the same patterns and the same trace format, from the first test.',
+  },
+];
+
+function InHouseSection() {
+  return (
+    <section className={`${styles.section} ${styles.sectionAlt}`}>
+      <div className="container">
+        <div className={styles.sectionHead}>
+          <Heading as="h2">The framework your team was going to build anyway.</Heading>
+          <p>
+            Every .NET team with a serious integration suite ends up with one: a fixture that boots the
+            application, helpers that sign users in, builders for test data, cleanup that mostly works, and
+            logging for the day CI fails. It usually stays internal. ProtoTest is that foundation, public and
+            generic, so you start from it instead of growing your own.
+          </p>
+        </div>
+        <div className={styles.inHouse}>
+          {inHouse.map((item) => (
+            <div key={item.after} className={styles.inHouseCard}>
+              <span className={styles.inHouseBefore}>
+                <s>{item.before}</s>
+              </span>
+              <Heading as="h3">{item.after}</Heading>
+              <p>{item.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function TraceSection() {
   return (
     <section className={styles.section}>
@@ -434,6 +485,7 @@ export default function Home(): ReactNode {
       description="ProtoTest is a composable integration-testing foundation for .NET: compose REST, GraphQL, browser, data and SQL capabilities onto one execution context, and get a trace of everything they do.">
       <Hero />
       <main>
+        <InHouseSection />
         <TraceSection />
         <ComparisonSection />
         <PayoffSection />

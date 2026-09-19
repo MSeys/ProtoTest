@@ -113,12 +113,15 @@ export default async function createConfig(): Promise<Config> {
         srcDark: 'img/brand/prototest-mark-white.svg',
       },
       items: [
+        // The navbar holds what a reader reaches for most; the footer repeats every one of these, grouped.
         {
           type: 'docSidebar',
           sidebarId: 'docsSidebar',
           position: 'left',
           label: 'Docs',
         },
+        {to: '/docs/recipes/overview', label: 'Recipes', position: 'left'},
+        {href: 'https://trace.prototest.dev', label: 'Trace viewer', position: 'left'},
         {
           type: 'custom-github',
           position: 'right',
@@ -138,25 +141,35 @@ export default async function createConfig(): Promise<Config> {
         height: 40,
         href: '/',
       },
+      // Three groups: learning it, looking something up, and the project around it.
       links: [
         {
-          title: 'Docs',
+          title: 'Learn',
           items: [
-            {label: 'Getting started', to: '/docs/getting-started/installation'},
+            {label: 'Installation', to: '/docs/getting-started/installation'},
+            {label: 'Your first test', to: '/docs/getting-started/first-test'},
+            {label: 'Recipes', to: '/docs/recipes/overview'},
+            {label: 'Troubleshooting', to: '/docs/getting-started/troubleshooting'},
+          ],
+        },
+        {
+          title: 'Reference',
+          items: [
             {label: 'Foundation', to: '/docs/foundation/overview'},
             {label: 'Integrations', to: '/docs/integrations/overview'},
-            {label: 'Recipes', to: '/docs/recipes/overview'},
             {label: 'Observability', to: '/docs/observability/prototrace'},
+            {label: 'Test runners', to: '/docs/runners/overview'},
+            {label: 'Extending', to: '/docs/advanced/extending'},
           ],
         },
         {
           title: 'Project',
           items: [
+            {label: 'Trace viewer', href: 'https://trace.prototest.dev'},
+            {label: 'Changelog', to: '/changelog'},
             {label: 'GitHub', href: 'https://github.com/MSeys/ProtoTest'},
             {label: 'NuGet', href: 'https://www.nuget.org/packages?q=ProtoTest'},
-            {label: 'Trace viewer', href: 'https://trace.prototest.dev'},
             {label: 'Issues', href: 'https://github.com/MSeys/ProtoTest/issues'},
-            {label: 'Changelog', to: '/changelog'},
           ],
         },
       ],

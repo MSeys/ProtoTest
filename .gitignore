@@ -485,3 +485,7 @@ FodyWeavers.xsd
 /eng/internal/
 .openchamber/
 .opencode/
+
+# Sample app UI (Vite): installed packages and build output
+samples/ProtoTest.SampleApp/Ui/node_modules/
+samples/ProtoTest.SampleApp/Ui/dist/

@@ -132,19 +132,116 @@ public static class JsonDiagnosticSanitizer
         }
     }
 
-    // The value runs to the next multipart boundary (or the end of the body), so multi-line values are
-    // replaced whole. The name may be wrapped in either quote style.
-    private static readonly Regex MultipartPartPattern = new(
-        "(?is)(Content-Disposition:[^\\r\\n]*?name=(?<quote>[\"'])(?<name>[^\"']+)\\k<quote>[^\\r\\n]*(?:\\r?\\n(?!\\r?\\n)[^\\r\\n]*)*\\r?\\n\\r?\\n)(?<value>[\\s\\S]*?)(?=\\r?\\n--|\\z)");
+    // The multipart scanner is deliberately not a regex: a hostile body full of unmatched quotes made
+    // the previous pattern backtrack exponentially, and a value line that merely starts with "--" cut a
+    // redacted value short. Lines are scanned once, a boundary is only believed when the line is a
+    // terminator or the next line starts a part, and the value is replaced whole.
+    private static string RedactMultipart(string content, HashSet<string> sensitive)
+    {
+        var lines = SplitMultipartLines(content);
+        StringBuilder? builder = null;
+        var copied = 0;
+        for (var index = 0; index < lines.Count; index++)
+        {
+            if (!HasSensitiveDispositionName(content, lines[index], sensitive)) continue;
+
+            // The part's value begins after the blank line that ends its headers.
+            var headerEnd = index + 1;
+            while (headerEnd < lines.Count && !IsBlankLine(content, lines[headerEnd])) headerEnd++;
+            if (headerEnd >= lines.Count) break;
+            var valueStart = headerEnd + 1;
+            if (valueStart >= lines.Count) continue;
+
+            var valueEnd = valueStart;
+            while (valueEnd < lines.Count && !IsMultipartBoundary(content, lines, valueEnd)) valueEnd++;
+            if (valueEnd == valueStart) continue;
+
+            builder ??= new StringBuilder(content.Length);
+            var last = lines[valueEnd - 1];
+            builder.Append(content, copied, lines[valueStart].Start - copied);
+            builder.Append(ProtoUriSanitizer.RedactedValue);
+            copied = last.Start + last.ContentLength;
+            index = valueEnd - 1;
+        }
+
+        if (builder is null) return content;
+        builder.Append(content, copied, content.Length - copied);
+        return builder.ToString();
+    }
+
+    private readonly record struct MultipartLine(int Start, int ContentLength);
+
+    private static List<MultipartLine> SplitMultipartLines(string content)
+    {
+        var lines = new List<MultipartLine>();
+        var start = 0;
+        for (var index = 0; index < content.Length; index++)
+        {
+            if (content[index] != '\n') continue;
+            var length = index - start;
+            if (length > 0 && content[index - 1] == '\r') length--;
+            lines.Add(new MultipartLine(start, length));
+            start = index + 1;
+        }
+
+        if (start < content.Length) lines.Add(new MultipartLine(start, content.Length - start));
+        return lines;
+    }
+
+    private static string LineText(string content, MultipartLine line)
+        => content.Substring(line.Start, line.ContentLength);
+
+    private static bool IsBlankLine(string content, MultipartLine line)
+        => LineText(content, line).AsSpan().Trim().Length == 0;
+
+    private static bool HasSensitiveDispositionName(string content, MultipartLine line, HashSet<string> sensitive)
+    {
+        var text = LineText(content, line);
+        if (!text.TrimStart().StartsWith("Content-Disposition", StringComparison.OrdinalIgnoreCase)) return false;
+
+        var index = 0;
+        while ((index = text.IndexOf("name=", index, StringComparison.OrdinalIgnoreCase)) >= 0)
+        {
+            var valueStart = index + "name=".Length;
+            if (valueStart < text.Length && text[valueStart] is '"' or '\'')
+            {
+                var quote = text[valueStart];
+                var valueEnd = text.IndexOf(quote, valueStart + 1);
+                if (valueEnd > valueStart && sensitive.Contains(text[(valueStart + 1)..valueEnd])) return true;
+                index = valueEnd > valueStart ? valueEnd : valueStart + 1;
+                continue;
+            }
+
+            index = valueStart;
+        }
+
+        return false;
+    }
+
+    private static bool IsMultipartBoundary(string content, List<MultipartLine> lines, int index)
+    {
+        var text = LineText(content, lines[index]).TrimStart();
+        if (!text.StartsWith("--", StringComparison.Ordinal)) return false;
+        var boundary = text[2..].TrimEnd();
+        // A terminator ends with "--"; the final line of the body is a boundary by definition.
+        if (boundary.Length == 0 || boundary.EndsWith("--", StringComparison.Ordinal)) return true;
+        if (index + 1 >= lines.Count) return true;
+
+        // A line that merely starts with "--" is multipart data unless a part follows it.
+        var next = LineText(content, lines[index + 1]).TrimStart();
+        return next.Length == 0
+            || next.StartsWith("Content-Disposition", StringComparison.OrdinalIgnoreCase)
+            || next.StartsWith("Content-Type", StringComparison.OrdinalIgnoreCase)
+            || next.StartsWith("Content-Transfer-Encoding", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string RedactKeyValues(string content, HashSet<string> sensitive)
     {
         if (content.Length == 0 || sensitive.Count == 0) return content;
         var trimmed = content.TrimStart();
         if (trimmed.StartsWith('<')) return RedactXml(content, sensitive);
         if (content.Contains("Content-Disposition", StringComparison.OrdinalIgnoreCase))
-            return MultipartPartPattern.Replace(content, match => sensitive.Contains(match.Groups["name"].Value)
-                ? $"{match.Groups[1].Value}{ProtoUriSanitizer.RedactedValue}"
-                : match.Value);
+            return RedactMultipart(content, sensitive);
         if (!LooksLikeForm(content)) return content;
 
         var segments = content.Split('&');

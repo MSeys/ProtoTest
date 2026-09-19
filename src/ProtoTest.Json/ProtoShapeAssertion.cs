@@ -126,12 +126,25 @@ public static class ProtoShapeAssertion
     private const int MaxDescriptionDepth = 16;
 
     /// <summary>
+    /// The maximum number of containers expanded in one description. The depth cap alone cannot bound a
+    /// cyclic or diamond shape: an object with four self-references still expands 4^depth times, so the
+    /// whole description gets a budget and stops with the same depth-limit placeholder.
+    /// </summary>
+    private const int MaxDescriptionNodes = 4096;
+
+    /// <summary>
     /// Expands a shape into a serializable value: value constraints become their description, and nested
     /// objects and arrays are expanded so the trace records the shape the test actually declared.
-    /// Dictionaries are described as objects and the depth is capped, so cyclic or pathologically deep
-    /// shapes cannot exhaust the stack while the description is built.
+    /// Dictionaries are described as objects, the depth is capped, and the total number of expanded
+    /// containers is capped, so cyclic or pathologically deep shapes cannot exhaust the stack or hang.
     /// </summary>
-    private static object? DescribeExpectedValue(object? expected, int depth = 0)
+    private static object? DescribeExpectedValue(object? expected)
+    {
+        var budget = MaxDescriptionNodes;
+        return DescribeExpectedValue(expected, depth: 0, ref budget);
+    }
+
+    private static object? DescribeExpectedValue(object? expected, int depth, ref int budget)
     {
         if (expected is null)
         {
@@ -154,6 +167,11 @@ public static class ProtoShapeAssertion
             return expected;
         }
 
+        if (budget-- <= 0)
+        {
+            return $"<{type.Name} at depth limit>";
+        }
+
         // A dictionary is an object shape, not a sequence of its key/value pairs. Keys are stringified,
         // matching the matcher: JSON object names are always strings.
         if (expected is IDictionary dictionary)
@@ -161,7 +179,7 @@ public static class ProtoShapeAssertion
             var described = new Dictionary<string, object?>(StringComparer.Ordinal);
             foreach (DictionaryEntry entry in dictionary)
             {
-                described[Convert.ToString(entry.Key, CultureInfo.InvariantCulture) ?? string.Empty] = DescribeExpectedValue(entry.Value, depth + 1);
+                described[Convert.ToString(entry.Key, CultureInfo.InvariantCulture) ?? string.Empty] = DescribeExpectedValue(entry.Value, depth + 1, ref budget);
             }
 
             return described;
@@ -169,13 +187,21 @@ public static class ProtoShapeAssertion
 
         if (expected is IEnumerable values)
         {
-            return values.Cast<object?>().Select(item => DescribeExpectedValue(item, depth + 1)).ToArray();
+            var described = new List<object?>();
+            foreach (var item in values)
+            {
+                described.Add(DescribeExpectedValue(item, depth + 1, ref budget));
+            }
+
+            return described.ToArray();
         }
 
-        return type.GetProperties()
-            .Where(property => property.GetIndexParameters().Length == 0)
-            .ToDictionary(
-                property => property.Name,
-                property => DescribeExpectedValue(property.GetValue(expected), depth + 1));
+        var describedProperties = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var property in type.GetProperties().Where(property => property.GetIndexParameters().Length == 0))
+        {
+            describedProperties[property.Name] = DescribeExpectedValue(property.GetValue(expected), depth + 1, ref budget);
+        }
+
+        return describedProperties;
     }
 }

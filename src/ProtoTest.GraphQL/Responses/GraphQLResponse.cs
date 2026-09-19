@@ -184,7 +184,7 @@ public sealed class GraphQLResponse : IDisposable
     public GraphQLResponse ShouldMatchShape(object expectedShape, JsonSerializerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
-        if (!SelectedData.HasValue)
+        if (SelectedData is not { } selected || selected.ValueKind == JsonValueKind.Null)
         {
             // A data-less response (errors-only, or "data": null) has nothing to match against; record
             // the failed assertion the same way a mismatch is recorded, then keep the GraphQL-specific

@@ -23,7 +23,7 @@ public class RestRequestBuilderTests
 
         var services = new ServiceCollection();
         services.AddTransient<TestDummyAuthenticator>();
-        services.AddSingleton(new RestAttachmentOptions());
+        services.AddKeyedSingleton(ProtoRestBuilder.ProtocolName, new ProtoHttpAttachmentOptions());
         _context = new ProtoExecutionContext("", services.BuildServiceProvider().CreateScope(), "00000", (MethodInfo)MethodInfo.GetCurrentMethod()!);
     }
 
@@ -59,7 +59,7 @@ public class RestRequestBuilderTests
         Assert.That(_handler.LastRequest.Headers.GetValues("User-Agent").Single(), Is.EqualTo("ProtoTest-Runner"));
 
         // Assert - Response Verification via RestResponse Helpers
-        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        response.Should.HaveHttpStatus(HttpStatusCode.OK);
 
         var body = response.ReadAsAnonymous(new { status = "" });
         Assert.That(body, Is.Not.Null);
@@ -134,7 +134,7 @@ public class RestRequestBuilderTests
 
         // Assert - Response Verification & Shape Hit Recording
         response
-            .ShouldHaveHttpStatus(HttpStatusCode.Created)
+            .Should.HaveHttpStatus(HttpStatusCode.Created)
             .ShouldMatchShape(new { id = JsonValue.GreaterThan(0), created = true });
 
         var shapeHit = _context.RecordedObservations.FirstOrDefault(h => h.Data is RestShapeMatchData);
@@ -177,7 +177,7 @@ public class RestRequestBuilderTests
         Assert.That(_handler.LastRequest!.Content!.Headers.ContentType?.MediaType, Is.EqualTo("application/xml"));
         Assert.That(_handler.LastRequestBody, Is.EqualTo("<xml><user>Matthias</user></xml>"));
 
-        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        response.Should.HaveHttpStatus(HttpStatusCode.OK);
         Assert.That(response.Content, Is.EqualTo("<response>ok</response>"));
     }
 
@@ -197,7 +197,7 @@ public class RestRequestBuilderTests
         // Assert
         Assert.That(_handler.LastRequest!.Headers.Authorization?.ToString(), Is.EqualTo("Bearer custom-token-123"));
 
-        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        response.Should.HaveHttpStatus(HttpStatusCode.OK);
         Assert.That(response.IsSuccessStatusCode, Is.True);
     }
 
@@ -216,7 +216,7 @@ public class RestRequestBuilderTests
         // Assert
         Assert.That(_handler.LastRequest!.Headers.Authorization?.ToString(), Is.EqualTo("Bearer di-token-456"));
 
-        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        response.Should.HaveHttpStatus(HttpStatusCode.OK);
         Assert.That(response.IsSuccessStatusCode, Is.True);
     }
 

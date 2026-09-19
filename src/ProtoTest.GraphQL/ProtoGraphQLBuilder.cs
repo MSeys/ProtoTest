@@ -1,13 +1,20 @@
 namespace ProtoTest.GraphQL;
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
 using ProtoTest.Http;
 
 public sealed class ProtoGraphQLBuilder
 {
+    /// <summary>Stable protocol key GraphQL options are registered and resolved under.</summary>
+    public const string ProtocolName = "GraphQL";
+
+    /// <summary>Configuration section backing <see cref="ConfigureResponses"/>.</summary>
+    public const string ResponsesConfigurationSectionName = "ProtoTest:GraphQL:Responses";
+
+    /// <summary>Configuration section backing <see cref="CaptureAttachments"/>.</summary>
+    public const string AttachmentsConfigurationSectionName = "ProtoTest:GraphQL:Attachments";
+
     private readonly IProtoApplicationBuilder? _application;
 
     internal ProtoGraphQLBuilder(IServiceCollection services, IProtoApplicationBuilder? application = null)
@@ -30,12 +37,12 @@ public sealed class ProtoGraphQLBuilder
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var applicationName = _application?.ApplicationName;
-        var registeredName = Qualify(name, applicationName);
-        _application?.RegisterClient("GraphQL", name);
+        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
+        _application?.RegisterClient(ProtocolName, name);
 
         return ProtoHttpClientRegistration.AddClient(
             Services,
-            "GraphQL",
+            ProtocolName,
             "GraphQL",
             registeredName,
             baseUrl,
@@ -52,10 +59,10 @@ public sealed class ProtoGraphQLBuilder
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var applicationName = _application?.ApplicationName;
-        var registeredName = Qualify(name, applicationName);
-        _application?.RegisterClient("GraphQL", name);
+        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
+        _application?.RegisterClient(ProtocolName, name);
         return ProtoHttpClientRegistration.AddClient(
-            Services, "GraphQL", registeredName, baseAddressResolver, configure, applicationName);
+            Services, ProtocolName, registeredName, baseAddressResolver, configure, applicationName);
     }
 
     public IProtoTargetBuilder AddClient(
@@ -79,49 +86,30 @@ public sealed class ProtoGraphQLBuilder
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceClientName);
         ArgumentException.ThrowIfNullOrWhiteSpace(endpointPath);
         var applicationName = _application?.ApplicationName;
-        var registeredName = Qualify(name, applicationName);
-        _application?.RegisterClient("GraphQL", name);
-        Services.AddSingleton(new ProtoApplicationTarget(registeredName, applicationName ?? registeredName));
-        Services.AddSingleton(new ProtoHttpClientAliasRegistration(
-            "GraphQL",
-            registeredName,
-            sourceClientName,
-            (context, _) =>
-            {
-                var baseAddress = context.Client<HttpClient>(sourceClientName).BaseAddress
-                    ?? throw new InvalidOperationException($"HTTP client '{sourceClientName}' has no base address.");
-                return ValueTask.FromResult(new Uri(baseAddress, endpointPath));
-            }));
-        return new ProtoHttpTargetBuilder(registeredName, Services);
+        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
+        _application?.RegisterClient(ProtocolName, name);
+        return ProtoHttpClientRegistration.AddClientFrom(
+            Services, ProtocolName, registeredName, sourceClientName, endpointPath, applicationName);
     }
 
-    public ProtoGraphQLBuilder CaptureAttachments(Action<GraphQLAttachmentOptions>? configure = null)
+    public ProtoGraphQLBuilder CaptureAttachments(Action<ProtoHttpAttachmentOptions>? configure = null)
     {
-        Services.RemoveAll<GraphQLAttachmentOptions>();
-        Services.AddSingleton(sp =>
-        {
-            var options = new GraphQLAttachmentOptions();
-            configure?.Invoke(options);
-            options.BindFromConfiguration(sp.GetRequiredService<IConfiguration>());
-            return options;
-        });
+        ProtoHttpOptionsRegistration.ConfigureAttachmentOptions(
+            Services,
+            ProtocolName,
+            AttachmentsConfigurationSectionName,
+            configure);
         return this;
     }
 
-    public ProtoGraphQLBuilder ConfigureResponses(Action<GraphQLResponseOptions> configure)
+    public ProtoGraphQLBuilder ConfigureResponses(Action<ProtoHttpResponseOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
-        Services.RemoveAll<GraphQLResponseOptions>();
-        Services.AddSingleton(sp =>
-        {
-            var options = new GraphQLResponseOptions();
-            configure(options);
-            options.BindFromConfiguration(sp.GetRequiredService<IConfiguration>());
-            return options;
-        });
+        ProtoHttpOptionsRegistration.ConfigureResponseOptions(
+            Services,
+            ProtocolName,
+            ResponsesConfigurationSectionName,
+            configure);
         return this;
     }
-
-    private static string Qualify(string name, string? applicationName)
-        => applicationName is null ? name : $"{applicationName}:{name}";
 }

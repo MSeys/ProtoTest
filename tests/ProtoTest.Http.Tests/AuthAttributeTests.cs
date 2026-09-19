@@ -69,6 +69,40 @@ public class AuthAttributeTests
         Assert.That(authenticator, Is.TypeOf<RecordingAuthenticator>());
     }
 
+    [Test]
+    public async Task BeforeTestAsync_ShouldApplyClassLevelAuthToInheritedTestMethods()
+    {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var hook = new CaptureHook("Rest");
+        // The method is declared in the base class; the [Auth] lives on the derived class that runs it.
+        var method = typeof(DerivedAuthCases).GetMethod(nameof(DerivedAuthCases.InheritedTest))!;
+        var context = new ProtoExecutionContext("Test", scope, "00002", method);
+
+        await hook.BeforeTestAsync(context);
+
+        Assert.That(hook.Factory, Is.Not.Null);
+        var authenticator = hook.Factory!(context);
+        Assert.That(authenticator, Is.TypeOf<RecordingAuthenticator>());
+    }
+
+    [Test]
+    public async Task BeforeTestAsync_ShouldFindClassLevelAuthDeclaredOnABaseTestClass()
+    {
+        using var provider = new ServiceCollection().BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var hook = new CaptureHook("Rest");
+        // The [Auth] is on the base class; the derived class inherits the test method and the attribute.
+        var method = typeof(DerivedNoAuthCases).GetMethod(nameof(BaseWithAuthCases.InheritedTest))!;
+        var context = new ProtoExecutionContext("Test", scope, "00003", method);
+
+        await hook.BeforeTestAsync(context);
+
+        Assert.That(hook.Factory, Is.Not.Null);
+        var authenticator = hook.Factory!(context);
+        Assert.That(authenticator, Is.TypeOf<RecordingAuthenticator>());
+    }
+
     private static MethodInfo Method(string name, Type? declaring = null)
         => (declaring ?? typeof(AuthAttributeTests))
             .GetMethod(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
@@ -91,6 +125,31 @@ public class AuthAttributeTests
         public void EveryProtocol()
         {
         }
+    }
+
+    private class BaseAuthCases
+    {
+        public void InheritedTest()
+        {
+        }
+    }
+
+    // The attribute is on the class that runs the test; the method is declared in the base class.
+    [Auth<RecordingAuthenticator>]
+    private sealed class DerivedAuthCases : BaseAuthCases
+    {
+    }
+
+    [Auth<RecordingAuthenticator>]
+    private class BaseWithAuthCases
+    {
+        public void InheritedTest()
+        {
+        }
+    }
+
+    private sealed class DerivedNoAuthCases : BaseWithAuthCases
+    {
     }
 
     private sealed class CaptureHook(string protocolName) : ProtoHttpAuthLifecycleHook(protocolName)

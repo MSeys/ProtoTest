@@ -138,4 +138,18 @@ public class RestUriBuilderTests
 
         Assert.That(result, Is.EqualTo("/items/42?view=full"));
     }
+
+    [Test]
+    public async Task BuildRequestUri_ShouldTreatAColonRouteAsRelativeRatherThanAScheme()
+    {
+        var result = await RestUriBuilder.BuildRequestUriAsync(
+            "orders:search",
+            null,
+            new Uri("https://example.test/api/"),
+            null,
+            null!,
+            CancellationToken.None);
+
+        Assert.That(result, Is.EqualTo(new Uri("https://example.test/api/orders:search")));
+    }
 }

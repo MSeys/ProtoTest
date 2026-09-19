@@ -109,6 +109,49 @@ public sealed class GraphQLFluentAndProtocolTests
     }
 
     [Test]
+    public async Task ShouldMatchShape_WithoutData_ShouldThrowTheGraphQlAssertion()
+    {
+        await using var host = CreateHost(_ => Json("""{"errors":[{"message":"boom"}]}"""));
+        await host.StartTestAsync("shape-no-data", "10", Method());
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            var exception = Assert.Throws<GraphQLAssertionException>(() =>
+                response.ShouldMatchShape(new { value = 1 }));
+            Assert.That(exception!.Message, Does.Contain("Expected GraphQL data"));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task ShouldMatchShape_WithoutData_ShouldRecordTheFailedAssertionInTheTrace()
+    {
+        await using var host = CreateHost(_ => Json("""{"errors":[{"message":"boom"}]}"""));
+        await host.StartTestAsync("shape-no-data trace", "13", Method());
+        using var response = await Proto.Context.GraphQL()
+            .Query(null, query => query.Field("value"))
+            .ExecuteAsync();
+
+        var exception = Assert.Throws<GraphQLAssertionException>(() =>
+            response.ShouldMatchShape(new { value = 1 }));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        var operation = host.Trace.Snapshot().Tests.Single().Entries
+            .Single(entry => entry.Kind == "assert.json.shape");
+        Assert.Multiple(() =>
+        {
+            Assert.That(operation.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(operation.Attributes["graphql.operation"], Is.EqualTo("query <anonymous>"));
+            Assert.That(operation.Attributes["shape.result"], Is.EqualTo("mismatched"));
+            Assert.That(operation.Sections![0].Kind, Is.EqualTo(ProtoTraceSectionKind.Checks));
+            Assert.That(operation.Sections![0].Items![0].Tone, Is.EqualTo(ProtoTraceSectionTone.Error));
+        });
+    }
+
+    [Test]
     public async Task Response_ShouldExposeHttpStatusDataAndExtensions()
     {
         await using var host = CreateHost(_ => new HttpResponseMessage(HttpStatusCode.Accepted)
@@ -121,7 +164,7 @@ public sealed class GraphQLFluentAndProtocolTests
             using var response = await Proto.Context.GraphQL()
                 .Query(null, query => query.Field("value"))
                 .ExecuteAsync();
-            response.ShouldHaveHttpStatus(HttpStatusCode.Accepted).ShouldHaveNoErrors();
+            response.Should.HaveHttpStatus(HttpStatusCode.Accepted).ShouldHaveNoErrors();
             Assert.Multiple(() =>
             {
                 Assert.That(response.HasData, Is.True);
@@ -130,6 +173,56 @@ public sealed class GraphQLFluentAndProtocolTests
             });
         }
         finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task ShouldNot_HaveHttpStatus_Should_Pass_When_Status_Differs()
+    {
+        await using var host = CreateHost(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"data":{"value":1}}""")
+        });
+        await host.StartTestAsync("negated status pass", "11", Method());
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            response.ShouldNot.HaveHttpStatus(HttpStatusCode.Accepted);
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task ShouldNot_HaveHttpStatus_Should_Fail_With_Negated_Message_And_Record_The_Check()
+    {
+        await using var host = CreateHost(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"data":{"value":1}}""")
+        });
+        await host.StartTestAsync("negated status fail", "12", Method());
+        using var response = await Proto.Context.GraphQL()
+            .Query(null, query => query.Field("value"))
+            .ExecuteAsync();
+
+        var exception = Assert.Throws<GraphQLAssertionException>(
+            () => response.ShouldNot.HaveHttpStatus(HttpStatusCode.OK));
+
+        Assert.That(exception!.Message, Does.Contain("Expected GraphQL HTTP status not 200 (OK), but received 200 (OK)"));
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception));
+        var operation = host.Trace.Snapshot().Tests.Single().Entries
+            .Single(entry => entry.Kind == "assert.http.status");
+        Assert.Multiple(() =>
+        {
+            Assert.That(operation.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(operation.Attributes["expected.status_code"], Is.EqualTo("200"));
+            Assert.That(operation.Attributes["actual.status_code"], Is.EqualTo("200"));
+            Assert.That(operation.Attributes["assertion.negated"], Is.EqualTo("true"));
+            Assert.That(operation.Sections![0].Kind, Is.EqualTo(ProtoTraceSectionKind.Checks));
+            Assert.That(operation.Sections![0].Items![0].Tone, Is.EqualTo(ProtoTraceSectionTone.Error));
+            Assert.That(operation.Sections![0].Items![0].Detail, Does.Contain("not"));
+        });
     }
 
     [Test]
@@ -197,7 +290,7 @@ public sealed class GraphQLFluentAndProtocolTests
                 .SubscribeAsync();
 
             using var message = await subscription.NextAsync();
-            message!.ShouldHaveNoErrors().ShouldMatchData(new { id = 42, status = "pending" });
+            message!.ShouldHaveNoErrors().ShouldMatchShape(new { id = 42, status = "pending" });
             Assert.That(await subscription.NextAsync(), Is.Null);
 
             Assert.Multiple(() =>
@@ -226,6 +319,23 @@ public sealed class GraphQLFluentAndProtocolTests
                 .Select(new { id = Gql.Field })
                 .ExecuteAsync());
             Assert.That(exception!.Message, Does.Contain("SubscribeAsync"));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task Header_WithAnInvalidName_ShouldThrowInsteadOfBeingSilentlyDropped()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"value":1}}"""));
+        await host.StartTestAsync("invalid header", "10", Method());
+        try
+        {
+            var exception = Assert.ThrowsAsync<InvalidOperationException>(() => Proto.Context.GraphQL()
+                .Header("Bad Header", "value")
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync());
+
+            Assert.That(exception!.Message, Does.Contain("Bad Header"));
         }
         finally { await host.CompleteTestAsync(); }
     }

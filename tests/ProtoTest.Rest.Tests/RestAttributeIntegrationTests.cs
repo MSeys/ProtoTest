@@ -31,7 +31,7 @@ public sealed class RestAttributeIntegrationTests
         try
         {
             using var response = await Proto.Context.Rest().GetAsync("/resource");
-            response.ShouldHaveHttpStatus(HttpStatusCode.OK);
+            response.Should.HaveHttpStatus(HttpStatusCode.OK);
 
             Assert.That(requests, Has.Count.EqualTo(1));
             Assert.Multiple(() =>

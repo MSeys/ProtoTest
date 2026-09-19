@@ -52,7 +52,19 @@ internal static partial class RestUriBuilder
                 "A REST base address must be an absolute HTTP or HTTPS URI.");
         }
 
-        return new Uri(baseAddress, target);
+        return new Uri(baseAddress, MakeRelativeTarget(target));
+    }
+
+    /// <summary>
+    /// The route target relative to a base address, with a colon-containing first segment kept
+    /// relative as RFC 3986 requires: Uri would otherwise read "orders:search" as a scheme.
+    /// Exposed for testing.
+    /// </summary>
+    internal static string MakeRelativeTarget(string target)
+    {
+        var pathEnd = target.IndexOfAny(['?', '#']);
+        var path = pathEnd < 0 ? target : target[..pathEnd];
+        return !path.StartsWith('/') && path.Contains(':') ? $"./{target}" : target;
     }
 
     public static string BuildTarget(string template, object? routeAndQueryParams)

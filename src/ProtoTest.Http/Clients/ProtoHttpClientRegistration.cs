@@ -9,6 +9,10 @@ using ProtoTest.Core;
 /// </summary>
 public static class ProtoHttpClientRegistration
 {
+    /// <summary>Qualifies a client name with its application, so per-application clients never collide.</summary>
+    public static string Qualify(string name, string? applicationName)
+        => applicationName is null ? name : $"{applicationName}:{name}";
+
     /// <summary>Registers a named HTTP client with an explicit or application-resolved base URL.</summary>
     public static IProtoTargetBuilder AddClient(
         IServiceCollection services,
@@ -40,9 +44,10 @@ public static class ProtoHttpClientRegistration
                 allowMissingBaseUrl: allowMissingBaseUrl,
                 application: application,
                 endpoint: endpoint));
+        services.AddSingleton(new ProtoHttpClientEndpointRegistration(name, endpoint));
         services.AddSingleton(new ProtoApplicationTarget(name, application ?? name));
 
-        return new ProtoHttpTargetBuilder(name, services);
+        return new ProtoTargetBuilder(name, services);
     }
 
     /// <summary>Registers a named HTTP client whose absolute base address is resolved from per-test context.</summary>
@@ -65,6 +70,48 @@ public static class ProtoHttpClientRegistration
         services.AddSingleton(new ProtoHttpBaseAddressRegistration(protocolName, name, baseAddressResolver));
         services.AddSingleton(new ProtoApplicationTarget(name, application ?? name));
 
-        return new ProtoHttpTargetBuilder(name, services);
+        return new ProtoTargetBuilder(name, services);
+    }
+
+    /// <summary>
+    /// Registers a target whose transport comes from another HTTP client, such as one registered by
+    /// an in-process ASP.NET Core server, optionally rooted at a path. Every HTTP-based protocol's
+    /// <c>AddClientFrom</c> overload uses this so aliasing behaves identically.
+    /// </summary>
+    public static IProtoTargetBuilder AddClientFrom(
+        IServiceCollection services,
+        string protocolName,
+        string name,
+        string sourceClientName,
+        string? basePath = null,
+        string? application = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(protocolName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceClientName);
+
+        // Application clients register in the test context under their qualified name, so an alias
+        // inside AddApplication resolves the source as {application}:{source} first and falls back to
+        // the raw name for a source registered directly.
+        var qualifiedSourceName = Qualify(sourceClientName, application);
+        services.AddSingleton(new ProtoApplicationTarget(name, application ?? name));
+        services.AddSingleton(new ProtoHttpClientAliasRegistration(
+            protocolName,
+            name,
+            qualifiedSourceName,
+            (context, _) =>
+            {
+                var source = context.TryClient<HttpClient>(qualifiedSourceName)
+                    ?? (string.Equals(qualifiedSourceName, sourceClientName, StringComparison.Ordinal)
+                        ? null
+                        : context.TryClient<HttpClient>(sourceClientName))
+                    ?? context.Client<HttpClient>(sourceClientName);
+                var baseAddress = source.BaseAddress
+                    ?? throw new InvalidOperationException($"HTTP client '{sourceClientName}' has no base address.");
+                return ValueTask.FromResult(
+                    string.IsNullOrWhiteSpace(basePath) ? baseAddress : new Uri(baseAddress, basePath));
+            }));
+        return new ProtoTargetBuilder(name, services);
     }
 }

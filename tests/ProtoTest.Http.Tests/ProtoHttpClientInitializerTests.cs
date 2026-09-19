@@ -16,8 +16,16 @@ public sealed class ProtoHttpClientInitializerTests
     [TestCase("/graphql")]
     [TestCase("ftp://example.test")]
     [TestCase("")]
+    [TestCase("orders:search")]
     public void TryCreateAbsoluteHttpUri_ShouldRejectUnsupportedEndpoints(string value)
         => Assert.That(ProtoHttpUri.TryCreateAbsoluteHttpUri(value, out _), Is.False);
+
+    [TestCase("orders:search", false)]
+    [TestCase("/orders:search", false)]
+    [TestCase("https://example.test", true)]
+    [TestCase("custom+http://example.test", true)]
+    public void HasExplicitScheme_ShouldRequireTheSchemeSeparator(string value, bool expected)
+        => Assert.That(ProtoHttpUri.HasExplicitScheme(value), Is.EqualTo(expected));
 
     [Test]
     public async Task Initializer_ShouldPreferExplicitBaseUrlOverConfiguration()

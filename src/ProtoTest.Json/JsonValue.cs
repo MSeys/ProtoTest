@@ -60,9 +60,28 @@ public static class JsonValue
     private static bool ScalarEquals<T>(object? actual, T expected)
     {
         if (Equals(actual, expected)) return true;
-        try { return Equals(Convert.ChangeType(actual, typeof(T), CultureInfo.InvariantCulture), expected); }
-        catch { return false; }
+        if (actual is null || expected is null) return false;
+        var expectedType = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
+        var actualType = Nullable.GetUnderlyingType(actual.GetType()) ?? actual.GetType();
+        // OneOf is a scalar constraint: numeric types may differ because JSON numbers surface as
+        // decimal, but everything else must be type-compatible, so the string "2" never matches 2.
+        if (!IsNumeric(actualType) || !IsNumeric(expectedType)) return false;
+        try
+        {
+            // decimal is exact for both integral and decimal values, so 2.0m and 2 compare equal while
+            // no precision is lost to a double round-trip.
+            return Convert.ToDecimal(actual, CultureInfo.InvariantCulture)
+                == Convert.ToDecimal(expected, CultureInfo.InvariantCulture);
+        }
+        catch (OverflowException) { return false; }
+        catch (InvalidCastException) { return false; }
     }
+
+    private static bool IsNumeric(Type type)
+        => Type.GetTypeCode(type) is TypeCode.Byte or TypeCode.SByte
+            or TypeCode.UInt16 or TypeCode.UInt32 or TypeCode.UInt64
+            or TypeCode.Int16 or TypeCode.Int32 or TypeCode.Int64
+            or TypeCode.Decimal or TypeCode.Double or TypeCode.Single;
 
     private static IJsonValueMatcher Match(string description, Predicate<object?> predicate)
         => new PredicateMatcher(description, predicate);

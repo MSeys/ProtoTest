@@ -24,8 +24,14 @@ public abstract class ProtoHttpAuthLifecycleHook(string protocolName) : IProtoTe
     public Task BeforeTestAsync(ProtoExecutionContext context)
     {
         var method = context.TestMethod;
-        var classType = method.DeclaringType;
         var methodAuth = Applicable(method.GetCustomAttributes(inherit: true)).ToArray();
+        // A test method inherited from a base class is reflected on the test class that runs it, so the
+        // class-level [Auth] attributes are read from the reflected type; inherit:true walks the base
+        // hierarchy, so attributes declared on a base test class are found too.
+        var classType = method.ReflectedType is { } reflected
+            && (method.DeclaringType is null || method.DeclaringType.IsAssignableFrom(reflected))
+                ? reflected
+                : method.DeclaringType;
         var classAuth = classType is null ? [] : Applicable(classType.GetCustomAttributes(inherit: true)).ToArray();
         var auth = methodAuth.Length > 0 ? methodAuth : classAuth;
         var orderedAuth = auth.OrderBy(attribute => attribute.Order).ToArray();

@@ -14,6 +14,7 @@ public sealed class RestRequestBuilder
     private readonly ProtoExecutionContext _context;
     private readonly string _targetName;
     private readonly Dictionary<string, string> _headers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _tracedHeaders = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string?> _requestAttributes = new(StringComparer.Ordinal);
     private Func<HttpContent>? _contentFactory;
     private Func<ProtoExecutionContext, IProtoHttpAuthenticator>? _authenticatorFactory;
@@ -147,7 +148,7 @@ public sealed class RestRequestBuilder
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(method);
-        var attachmentOptions = _context.TryService<RestAttachmentOptions>();
+        var attachmentOptions = _context.ResolveAttachmentOptions(ProtoRestBuilder.ProtocolName);
         using var traceOperation = _context.Trace
             .Operation("http.request", $"REST · {method.Method.ToUpperInvariant()} {routeTemplate}", "ProtoTest.Rest")
             .For(ProtoTraceEntityKinds.Client, $"client:{typeof(HttpClient).FullName}:{_targetName}")
@@ -156,6 +157,7 @@ public sealed class RestRequestBuilder
             .With("http.route", routeTemplate)
             .With(_requestAttributes)
             .Begin();
+        TraceConfiguredHeaders(traceOperation);
         var stopwatch = Stopwatch.StartNew();
         Uri requestUri;
         try
@@ -269,7 +271,7 @@ public sealed class RestRequestBuilder
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
                 ct);
-            var responseOptions = _context.TryService<RestResponseOptions>() ?? new RestResponseOptions();
+            var responseOptions = _context.ResolveResponseOptions(ProtoRestBuilder.ProtocolName);
             var bodyBytes = await ProtoHttpResponseBuffer.BufferAsync(
                 responseMessage,
                 responseOptions.MaxResponseBodyBytes,
@@ -299,7 +301,7 @@ public sealed class RestRequestBuilder
                 traceOperation.AddSection(new ProtoTraceSection(
                     "Body",
                     ProtoTraceSectionKind.Code,
-                    Content: Preview(diagnosticBody),
+                    Content: ProtoTraceContent.Preview(diagnosticBody),
                     Language: "json"));
             }
 
@@ -367,27 +369,32 @@ public sealed class RestRequestBuilder
         }
     }
 
+    private void TraceConfiguredHeaders(ProtoTraceOperation operation)
+    {
+        // One event per distinct header per builder, matching GraphQL: a reused builder must not
+        // duplicate the configure events on every send.
+        foreach (var name in _headers.Keys)
+        {
+            if (!_tracedHeaders.Add(name)) continue;
+            _context.Trace.WriteEvent(
+                "http.header.configure",
+                $"Header · {name}",
+                "ProtoTest.Rest",
+                outcome: ProtoTraceOutcome.Succeeded,
+                attributes: new Dictionary<string, string?>
+                {
+                    ["http.header.name"] = name,
+                    ["http.header.value_recorded"] = "false"
+                },
+                parentId: operation.Id);
+        }
+    }
+
     private void Configure(params (string Key, string? Value)[] attributes)
     {
         foreach (var (key, value) in attributes)
         {
             _requestAttributes[key] = value;
-        }
-    }
-
-    /// <summary>Pretty-prints a JSON body for the trace, capped so the artifact stays a trace and not a dump.</summary>
-    private static string Preview(string body)
-    {
-        const int limit = 8000;
-        try
-        {
-            using var document = JsonDocument.Parse(body);
-            var pretty = JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions { WriteIndented = true });
-            return pretty.Length > limit ? $"{pretty[..limit]}\n…" : pretty;
-        }
-        catch (JsonException)
-        {
-            return body.Length > limit ? $"{body[..limit]}…" : body;
         }
     }
 
@@ -398,7 +405,7 @@ public sealed class RestRequestBuilder
         TimeSpan duration,
         Exception exception,
         CancellationToken cancellationToken,
-        RestAttachmentOptions? attachmentOptions)
+        ProtoHttpAttachmentOptions? attachmentOptions)
     {
         try
         {

@@ -1,5 +1,7 @@
 namespace ProtoTest.Http;
 
+using System.Net;
+
 public static class ProtoHttpResponseBuffer
 {
     public static async Task<byte[]> BufferAsync(
@@ -11,7 +13,9 @@ public static class ProtoHttpResponseBuffer
         if (maximumBytes < 0) throw new InvalidOperationException("MaxResponseBodyBytes cannot be negative.");
 
         var original = response.Content;
-        if (original.Headers.ContentLength is > 0 && original.Headers.ContentLength > maximumBytes)
+        // HEAD, 204, 304 and 1xx responses never carry a body, so a large Content-Length describes
+        // what a GET would return and must not fail the request before reading.
+        if (!CannotHaveBody(response) && original.Headers.ContentLength is > 0 && original.Headers.ContentLength > maximumBytes)
             throw new ProtoResponseTooLargeException(maximumBytes, original.Headers.ContentLength.Value);
 
         await using var source = await original.ReadAsStreamAsync(cancellationToken);
@@ -34,4 +38,9 @@ public static class ProtoHttpResponseBuffer
         original.Dispose();
         return bytes;
     }
+
+    private static bool CannotHaveBody(HttpResponseMessage response)
+        => response.RequestMessage?.Method == HttpMethod.Head
+            || response.StatusCode is HttpStatusCode.NoContent or HttpStatusCode.NotModified
+            || (int)response.StatusCode is >= 100 and < 200;
 }

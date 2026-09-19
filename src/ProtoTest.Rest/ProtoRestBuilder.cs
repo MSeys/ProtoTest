@@ -1,13 +1,20 @@
 namespace ProtoTest.Rest;
 
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
 using ProtoTest.Http;
 
 public sealed class ProtoRestBuilder
 {
+    /// <summary>Stable protocol key REST options are registered and resolved under.</summary>
+    public const string ProtocolName = "Rest";
+
+    /// <summary>Configuration section backing <see cref="ConfigureResponses"/>.</summary>
+    public const string ResponsesConfigurationSectionName = "ProtoTest:Rest:Responses";
+
+    /// <summary>Configuration section backing <see cref="CaptureAttachments"/>.</summary>
+    public const string AttachmentsConfigurationSectionName = "ProtoTest:Rest:Attachments";
+
     private readonly IProtoApplicationBuilder? _application;
 
     internal ProtoRestBuilder(IServiceCollection services, IProtoApplicationBuilder? application = null)
@@ -31,12 +38,12 @@ public sealed class ProtoRestBuilder
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var applicationName = _application?.ApplicationName;
-        var registeredName = Qualify(name, applicationName);
-        _application?.RegisterClient("Rest", name);
+        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
+        _application?.RegisterClient(ProtocolName, name);
 
         return ProtoHttpClientRegistration.AddClient(
             Services,
-            "Rest",
+            ProtocolName,
             "REST",
             registeredName,
             baseUrl,
@@ -56,10 +63,10 @@ public sealed class ProtoRestBuilder
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var applicationName = _application?.ApplicationName;
-        var registeredName = Qualify(name, applicationName);
-        _application?.RegisterClient("Rest", name);
+        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
+        _application?.RegisterClient(ProtocolName, name);
         return ProtoHttpClientRegistration.AddClient(
-            Services, "Rest", registeredName, baseAddressResolver, configure, applicationName);
+            Services, ProtocolName, registeredName, baseAddressResolver, configure, applicationName);
     }
 
     /// <summary>Adds a client whose absolute base address is read from per-test context.</summary>
@@ -84,51 +91,31 @@ public sealed class ProtoRestBuilder
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceClientName);
         var applicationName = _application?.ApplicationName;
-        var registeredName = Qualify(name, applicationName);
-        _application?.RegisterClient("Rest", name);
-        Services.AddSingleton(new ProtoApplicationTarget(registeredName, applicationName ?? registeredName));
-        Services.AddSingleton(new ProtoHttpClientAliasRegistration(
-            "Rest",
-            registeredName,
-            sourceClientName,
-            (context, _) =>
-            {
-                var baseAddress = context.Client<HttpClient>(sourceClientName).BaseAddress
-                    ?? throw new InvalidOperationException($"HTTP client '{sourceClientName}' has no base address.");
-                return ValueTask.FromResult(
-                    string.IsNullOrWhiteSpace(basePath) ? baseAddress : new Uri(baseAddress, basePath));
-            }));
-        return new ProtoHttpTargetBuilder(registeredName, Services);
+        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
+        _application?.RegisterClient(ProtocolName, name);
+        return ProtoHttpClientRegistration.AddClientFrom(
+            Services, ProtocolName, registeredName, sourceClientName, basePath, applicationName);
     }
 
     /// <summary>Enables automatic request, response, and expected-shape test attachments.</summary>
-    public ProtoRestBuilder CaptureAttachments(Action<RestAttachmentOptions>? configure = null)
+    public ProtoRestBuilder CaptureAttachments(Action<ProtoHttpAttachmentOptions>? configure = null)
     {
-        Services.RemoveAll<RestAttachmentOptions>();
-        Services.AddSingleton(serviceProvider =>
-        {
-            var options = new RestAttachmentOptions();
-            configure?.Invoke(options);
-            options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
-            return options;
-        });
+        ProtoHttpOptionsRegistration.ConfigureAttachmentOptions(
+            Services,
+            ProtocolName,
+            AttachmentsConfigurationSectionName,
+            configure);
         return this;
     }
 
-    public ProtoRestBuilder ConfigureResponses(Action<RestResponseOptions> configure)
+    public ProtoRestBuilder ConfigureResponses(Action<ProtoHttpResponseOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
-        Services.RemoveAll<RestResponseOptions>();
-        Services.AddSingleton(serviceProvider =>
-        {
-            var options = new RestResponseOptions();
-            configure(options);
-            options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
-            return options;
-        });
+        ProtoHttpOptionsRegistration.ConfigureResponseOptions(
+            Services,
+            ProtocolName,
+            ResponsesConfigurationSectionName,
+            configure);
         return this;
     }
-
-    private static string Qualify(string name, string? applicationName)
-        => applicationName is null ? name : $"{applicationName}:{name}";
 }

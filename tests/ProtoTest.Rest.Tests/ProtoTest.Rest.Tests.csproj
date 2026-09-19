@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ProtoTest.Rest\ProtoTest.Rest.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.GraphQL\ProtoTest.GraphQL.csproj" />
   </ItemGroup>
 
   <ItemGroup>

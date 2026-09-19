@@ -58,6 +58,26 @@ public sealed class GraphQLSchemaCoverageAdvancedTests
         });
     }
 
+    [Test]
+    public void Collector_ShouldCountAFragmentSpreadReachedFromTwoSiblingsOnce()
+    {
+        var collector = new GraphQLSchemaCoverageCollector("Catalog", Schema);
+        collector.Collect(Observation("""
+            query Search {
+              first: node(id: "1") { ...Details }
+              second: node(id: "2") { ...Details }
+            }
+            fragment Details on Node { id }
+            """, "Search", "{}"));
+
+        var items = Flatten(collector.GetReportItems()).ToDictionary(item => item.Identifier);
+        Assert.Multiple(() =>
+        {
+            Assert.That(items["RootQuery.node"].Count, Is.EqualTo(2));
+            Assert.That(items["Node.id"].Count, Is.EqualTo(1));
+        });
+    }
+
     private static ProtoObservation Observation(string document, string operation, string variables)
         => new("Catalog", "graphql.response", operation,
             new GraphQLResponseData("query", operation, document, 200, 0, [], TimeSpan.Zero, variables));

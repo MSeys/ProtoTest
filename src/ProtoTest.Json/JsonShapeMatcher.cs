@@ -41,9 +41,8 @@ public sealed class JsonDocumentAssertionException : ProtoAssertionException
 
 public static class JsonShapeMatcher
 {
-    public static IReadOnlyList<string> AssertMatch(string content, object expected, JsonSerializerOptions? options = null)
+    public static IReadOnlyList<string> AssertMatch(string content, object? expected, JsonSerializerOptions? options = null)
     {
-        ArgumentNullException.ThrowIfNull(expected);
         if (string.IsNullOrWhiteSpace(content))
             throw new JsonDocumentAssertionException("Expected JSON, but the content was empty.", content ?? string.Empty);
         try
@@ -57,9 +56,8 @@ public static class JsonShapeMatcher
         }
     }
 
-    public static IReadOnlyList<string> AssertMatch(JsonElement actual, object expected, JsonSerializerOptions? options = null)
+    public static IReadOnlyList<string> AssertMatch(JsonElement actual, object? expected, JsonSerializerOptions? options = null)
     {
-        ArgumentNullException.ThrowIfNull(expected);
         var mismatches = new List<JsonShapeMismatch>();
         var matched = new List<string>();
         Match(actual, expected, "$", mismatches, matched, options);
@@ -120,8 +118,10 @@ public static class JsonShapeMatcher
             var entries = new List<KeyValuePair<string, object?>>();
             foreach (DictionaryEntry entry in dictionary)
             {
-                if (entry.Key is not string key) { properties = []; return false; }
-                entries.Add(new(key, entry.Value));
+                if (entry.Key is null) { properties = []; return false; }
+                // JSON object names are strings, so a non-string key is compared through its
+                // invariant string form, mirroring how the expected shape is described in the trace.
+                entries.Add(new(Convert.ToString(entry.Key, CultureInfo.InvariantCulture) ?? string.Empty, entry.Value));
             }
             properties = entries;
             return true;
@@ -130,7 +130,10 @@ public static class JsonShapeMatcher
         if (type.IsPrimitive || type.IsEnum || value is string or decimal or DateTime or DateTimeOffset or DateOnly or TimeOnly or Guid or Uri)
         { properties = []; return false; }
         properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Where(p => p.GetIndexParameters().Length == 0)
+            // [JsonIgnore] is honored the same way GraphQL selection honors it: the property is not
+            // part of the expected shape, so JSON that omits it still matches.
+            .Where(p => p.GetIndexParameters().Length == 0
+                && p.GetCustomAttribute<JsonIgnoreAttribute>() is null)
             .Select(p => new KeyValuePair<string, object?>(
                 p.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name ?? options?.PropertyNamingPolicy?.ConvertName(p.Name) ?? p.Name,
                 p.GetValue(value))).ToArray();
@@ -160,8 +163,7 @@ public static class JsonShapeMatcher
                 ? Enum.TryParse(expectedType, actual.GetString(), true, out var parsed) && Equals(parsed, expected)
                 : actual.ValueKind == JsonValueKind.Number && actual.TryGetInt64(out var enumValue) && enumValue == Convert.ToInt64(expected, CultureInfo.InvariantCulture);
         if (IsNumeric(expectedType))
-            return actual.ValueKind == JsonValueKind.Number && actual.TryGetDecimal(out var number) &&
-                   number == Convert.ToDecimal(expected, CultureInfo.InvariantCulture);
+            return actual.ValueKind == JsonValueKind.Number && NumbersEqual(actual, expected);
         if (expectedType == typeof(Guid))
             return actual.ValueKind == JsonValueKind.String && Guid.TryParse(actual.GetString(), out var guid) && guid == (Guid)expected;
         if (expectedType == typeof(DateTime))
@@ -181,13 +183,61 @@ public static class JsonShapeMatcher
             or TypeCode.Int16 or TypeCode.Int32 or TypeCode.Int64
             or TypeCode.Decimal or TypeCode.Double or TypeCode.Single;
 
+    /// <summary>
+    /// Compares a JSON number against an expected numeric value without ever throwing: decimal first
+    /// for exactness, then double for numbers outside the decimal range, then no match.
+    /// </summary>
+    private static bool NumbersEqual(JsonElement actual, object expected)
+    {
+        if (actual.TryGetDecimal(out var actualDecimal) && TryToDecimal(expected, out var expectedDecimal))
+            return actualDecimal == expectedDecimal;
+        if (actual.TryGetDouble(out var actualDouble) && TryToDouble(expected, out var expectedDouble))
+            return actualDouble == expectedDouble;
+        return false;
+    }
+
+    private static bool TryToDecimal(object value, out decimal result)
+    {
+        try
+        {
+            result = Convert.ToDecimal(value, CultureInfo.InvariantCulture);
+            return true;
+        }
+        catch
+        {
+            result = default;
+            return false;
+        }
+    }
+
+    private static bool TryToDouble(object value, out double result)
+    {
+        try
+        {
+            result = Convert.ToDouble(value, CultureInfo.InvariantCulture);
+            return true;
+        }
+        catch
+        {
+            result = default;
+            return false;
+        }
+    }
+
     private static object? Raw(JsonElement element) => element.ValueKind switch
     {
         JsonValueKind.String => element.GetString(),
-        JsonValueKind.Number => element.TryGetInt64(out var integer) ? integer : element.GetDecimal(),
+        JsonValueKind.Number => RawNumber(element),
         JsonValueKind.True => true,
         JsonValueKind.False => false,
         JsonValueKind.Null => null,
         _ => element.GetRawText()
     };
+
+    private static object RawNumber(JsonElement element)
+    {
+        if (element.TryGetDecimal(out var decimalValue)) return decimalValue;
+        if (element.TryGetDouble(out var doubleValue)) return doubleValue;
+        return element.GetRawText();
+    }
 }

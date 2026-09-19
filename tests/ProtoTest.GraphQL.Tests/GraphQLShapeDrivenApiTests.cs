@@ -199,7 +199,7 @@ public sealed class GraphQLShapeDrivenApiTests
                 .ExecuteAsync();
 
             var data = response.ReadDataAs<OrdersSelection>();
-            response.ShouldMatchData(new OrdersSelection([], new PageInfoSelection(false)));
+            response.ShouldMatchShape(new OrdersSelection([], new PageInfoSelection(false)));
 
             Assert.Multiple(() =>
             {
@@ -276,6 +276,99 @@ public sealed class GraphQLShapeDrivenApiTests
             {
                 Assert.That(document, Does.Contain("nodes {"));
                 Assert.That(document, Does.Contain("id"));
+            });
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task Select_ShouldKeepExplicitVariablesWhenTheShapeContributesNone()
+    {
+        string? requestBody = null;
+        await using var host = CreateHost(request =>
+        {
+            requestBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return Json("""{"data":{"viewer":{"displayName":"Ada"}}}""");
+        });
+        await host.StartTestAsync("shape keeps variables", "10", Method());
+        try
+        {
+            // The plain argument is inlined as a literal, so the shape contributes no variables and the
+            // explicit ones must survive Select.
+            using var response = await Proto.Context.GraphQL()
+                .Query("viewer", new { tenant = "acme" })
+                .Variables(new { other = "explicit" })
+                .Select(new { displayName = Gql.Field })
+                .ExecuteAsync();
+            response.ShouldHaveNoErrors();
+
+            using var envelope = JsonDocument.Parse(requestBody!);
+            Assert.Multiple(() =>
+            {
+                Assert.That(envelope.RootElement.GetProperty("variables").GetProperty("other").GetString(),
+                    Is.EqualTo("explicit"));
+                Assert.That(envelope.RootElement.GetProperty("query").GetString(), Does.Contain("tenant: \"acme\""));
+            });
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task Select_ShouldMergeShapeVariablesOverExplicitOnes()
+    {
+        string? requestBody = null;
+        await using var host = CreateHost(request =>
+        {
+            requestBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return Json("""{"data":{"orders":{"nodes":[]}}}""");
+        });
+        await host.StartTestAsync("shape merges variables", "12", Method());
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query("orders", new { first = Gql.Variable("Int!", 10) })
+                .Variables(new { other = "explicit", first = 99 })
+                .Select(new { nodes = Gql.Field })
+                .ExecuteAsync();
+            response.ShouldHaveNoErrors();
+
+            using var envelope = JsonDocument.Parse(requestBody!);
+            Assert.Multiple(() =>
+            {
+                Assert.That(envelope.RootElement.GetProperty("variables").GetProperty("other").GetString(),
+                    Is.EqualTo("explicit"));
+                Assert.That(envelope.RootElement.GetProperty("variables").GetProperty("first").GetInt32(),
+                    Is.EqualTo(10), "The shape's variable wins on a collision.");
+            });
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task Select_ShouldDeriveSelectionsFromDictionaryShapes()
+    {
+        string? document = null;
+        await using var host = CreateHost(request =>
+        {
+            document = Document(request);
+            return Json("""{"data":{"orders":{"nodes":[]}}}""");
+        });
+        await host.StartTestAsync("dictionary shape", "11", Method());
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query("orders")
+                .Select(new Dictionary<string, object?> { ["nodes"] = Gql.Field })
+                .ExecuteAsync();
+            response.ShouldHaveNoErrors();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(document, Does.Contain("nodes"));
+                // The old IEnumerable-first path scanned KeyValuePair and selected its Key/Value
+                // members; the dictionary entries themselves are the selection now.
+                Assert.That(document, Does.Not.Contain("key"));
+                Assert.That(document, Does.Not.Contain("value"));
             });
         }
         finally { await host.CompleteTestAsync(); }

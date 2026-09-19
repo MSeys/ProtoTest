@@ -17,8 +17,14 @@ public sealed class ApiKeyAuthenticator(string keyName, string keyValue, ApiKeyL
                 throw new InvalidOperationException($"API key header '{keyName}' could not be added to the request.");
             }
         }
-        else if (request.RequestUri is not null)
+        else
         {
+            if (request.RequestUri is null)
+            {
+                throw new InvalidOperationException(
+                    $"An API key in the query string requires the request to have a URI, but '{keyName}' was configured with ApiKeyLocation.Query on a request without one.");
+            }
+
             var uri = request.RequestUri;
             var updated = ProtoQueryString.SetParameter(
                 uri.OriginalString,

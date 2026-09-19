@@ -5,6 +5,7 @@ using System.Net;
 using System.Text.Json;
 using ProtoTest.Core;
 using ProtoTest.GraphQL.Internal;
+using ProtoTest.Http;
 using ProtoTest.Json;
 
 public sealed class GraphQLResponse : IDisposable
@@ -13,11 +14,13 @@ public sealed class GraphQLResponse : IDisposable
     private readonly ProtoExecutionContext _context;
     private readonly string _targetName;
     private readonly string _identifier;
-    private readonly GraphQLAttachmentOptions? _attachmentOptions;
+    private readonly ProtoHttpAttachmentOptions? _attachmentOptions;
     private readonly string? _attachmentPrefix;
     private readonly string? _requestTraceId;
     private readonly string? _selectedRootField;
     private int _shapeAssertionSequence;
+    private GraphQLAssertions? _should;
+    private GraphQLAssertions? _shouldNot;
 
     internal GraphQLResponse(
         HttpResponseMessage rawResponse,
@@ -27,7 +30,7 @@ public sealed class GraphQLResponse : IDisposable
         string targetName,
         string identifier,
         GraphQLBuiltOperation operation,
-        GraphQLAttachmentOptions? attachmentOptions,
+        ProtoHttpAttachmentOptions? attachmentOptions,
         string? attachmentPrefix,
         string? requestTraceId = null,
         string? selectedRootField = null)
@@ -68,6 +71,16 @@ public sealed class GraphQLResponse : IDisposable
 
     public HttpResponseMessage RawResponse { get; }
     public HttpStatusCode HttpStatusCode => RawResponse.StatusCode;
+
+    /// <summary>Positive assertions on this response, such as <c>Should.HaveHttpStatus(...)</c>.</summary>
+    public GraphQLAssertions Should => _should ??= new GraphQLAssertions(this, negated: false);
+
+    /// <summary>
+    /// Assertions that must not hold, such as <c>ShouldNot.HaveHttpStatus(...)</c>. Error and shape
+    /// assertions keep their own positive and negative forms.
+    /// </summary>
+    public GraphQLAssertions ShouldNot => _shouldNot ??= new GraphQLAssertions(this, negated: true);
+
     public string Content { get; }
     public TimeSpan ElapsedTime { get; }
     public IReadOnlyList<GraphQLError> Errors { get; }
@@ -89,20 +102,48 @@ public sealed class GraphQLResponse : IDisposable
     }
     public JsonElement? Extensions => _document.RootElement.TryGetProperty("extensions", out var extensions) ? extensions.Clone() : null;
 
-    public GraphQLResponse ShouldHaveHttpStatus(HttpStatusCode expected)
-        => Assert(
-            "assert.graphql.http_status",
-            $"Assert HTTP status · {(int)expected} {expected}",
-            new Dictionary<string, string?>
+    internal GraphQLResponse AssertHttpStatus(HttpStatusCode expected, bool negated)
+    {
+        var statusSatisfied = ProtoAssertion.IsSatisfied(HttpStatusCode == expected, negated);
+        using var operation = _context.Trace
+            .Operation(
+                "assert.http.status",
+                $"Assert HTTP status · {ProtoAssertion.Describe($"{(int)expected} {expected}", negated)}",
+                "ProtoTest.GraphQL")
+            .With("expected.status_code", ((int)expected).ToString())
+            .With("actual.status_code", ((int)HttpStatusCode).ToString())
+            .With("assertion.negated", negated ? "true" : null)
+            .Parent(_requestTraceId)
+            .Begin();
+        operation.AddSection(new ProtoTraceSection(
+            "Result",
+            ProtoTraceSectionKind.Checks,
+            [
+                new(
+                    "status",
+                    ((int)HttpStatusCode).ToString(),
+                    statusSatisfied
+                        ? null
+                        : $"expected {ProtoAssertion.Describe(((int)expected).ToString(), negated)}",
+                    statusSatisfied ? ProtoTraceSectionTone.Success : ProtoTraceSectionTone.Error)
+            ]));
+        try
+        {
+            if (!statusSatisfied)
             {
-                ["expected.status_code"] = ((int)expected).ToString(),
-                ["actual.status_code"] = ((int)HttpStatusCode).ToString()
-            },
-            () =>
-            {
-                if (HttpStatusCode != expected)
-                    throw new GraphQLAssertionException($"Expected GraphQL HTTP status {(int)expected} ({expected}), but received {(int)HttpStatusCode} ({HttpStatusCode}).");
-            });
+                throw new GraphQLAssertionException(
+                    $"Expected GraphQL HTTP status {ProtoAssertion.Describe($"{(int)expected} ({expected})", negated)}, " +
+                    $"but received {(int)HttpStatusCode} ({HttpStatusCode}).");
+            }
+            operation.Succeed();
+            return this;
+        }
+        catch (Exception exception)
+        {
+            operation.Fail(exception);
+            throw;
+        }
+    }
 
     public GraphQLResponse ShouldHaveNoErrors()
         => Assert(
@@ -140,61 +181,66 @@ public sealed class GraphQLResponse : IDisposable
                     throw new GraphQLAssertionException($"Expected a GraphQL error with code '{code}', but found: {string.Join(", ", Errors.Select(e => e.Code ?? "<none>"))}.");
             });
 
-    public GraphQLResponse ShouldMatchData(object expectedShape, JsonSerializerOptions? options = null)
+    public GraphQLResponse ShouldMatchShape(object expectedShape, JsonSerializerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
-        var expectedShapeJson = JsonDiagnosticSanitizer.Serialize(expectedShape, _attachmentOptions);
-        var actualShapeJson = SelectedData.HasValue
-            ? JsonDiagnosticSanitizer.Sanitize(SelectedData.Value.GetRawText(), _attachmentOptions)
-            : null;
-        using var operation = _context.Trace
-            .Operation("assert.graphql.data_shape", "Assert GraphQL data shape", "ProtoTest.GraphQL")
-            .With("expected.type", expectedShape.GetType().FullName)
-            .With("shape.expected", expectedShapeJson)
-            .With("shape.actual", actualShapeJson)
-            .With("graphql.operation", _identifier)
-            .Parent(_requestTraceId)
-            .Begin();
-        try
+        if (!SelectedData.HasValue)
         {
-            if (!SelectedData.HasValue) throw new GraphQLAssertionException("Expected GraphQL data, but the response did not contain data.");
-            if (_attachmentOptions?.CaptureExpectedShapes == true)
-            {
-                var assertionNumber = Interlocked.Increment(ref _shapeAssertionSequence);
-                var assertionSuffix = assertionNumber == 1 ? string.Empty : $"-{assertionNumber:00}";
-                _context.AddAttachment(
-                    $"{_attachmentPrefix}-expected-shape{assertionSuffix}",
-                    expectedShapeJson,
-                    "application/json",
-                    _identifier);
-            }
-            var matched = JsonShapeMatcher.AssertMatch(SelectedData.Value, expectedShape, options);
-            operation.SetAttribute("matched.property_count", matched.Count.ToString());
-            operation.SetAttribute("matched.properties", string.Join(", ", matched));
-            operation.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(matched, _attachmentOptions));
-            operation.SetAttribute("shape.result", "matched");
-            _context.RecordObservation(new ProtoObservation(
+            // A data-less response (errors-only, or "data": null) has nothing to match against; record
+            // the failed assertion the same way a mismatch is recorded, then keep the GraphQL-specific
+            // failure the docs promise.
+            using var operation = _context.Trace
+                .Operation("assert.json.shape", "Assert GraphQL data shape", "ProtoTest.GraphQL")
+                .With("expected.type", expectedShape.GetType().FullName)
+                .With("graphql.operation", _identifier)
+                .With("shape.result", "mismatched")
+                .Parent(_requestTraceId)
+                .Begin();
+            var exception = new GraphQLAssertionException(
+                "Expected GraphQL data, but the response did not contain data.");
+            operation.AddSection(new ProtoTraceSection(
+                "Result",
+                ProtoTraceSectionKind.Checks,
+                [
+                    new(
+                        "shape",
+                        "no data",
+                        exception.Message,
+                        ProtoTraceSectionTone.Error)
+                ]));
+            operation.Fail(exception);
+            throw exception;
+        }
+
+        string? attachmentName = null;
+        if (_attachmentOptions?.CaptureExpectedShapes == true)
+        {
+            var assertionNumber = Interlocked.Increment(ref _shapeAssertionSequence);
+            var assertionSuffix = assertionNumber == 1 ? string.Empty : $"-{assertionNumber:00}";
+            attachmentName = $"{_attachmentPrefix}-expected-shape{assertionSuffix}";
+        }
+
+        ProtoShapeAssertion.Assert(
+            new ProtoShapeAssertionContext(
+                _context,
+                "ProtoTest.GraphQL",
+                "Assert GraphQL data shape",
+                ParentOperationId: _requestTraceId,
+                ExtraAttributes: new Dictionary<string, string?> { ["graphql.operation"] = _identifier },
+                CaptureExpectedShape: attachmentName is not null,
+                AttachmentName: attachmentName,
+                AttachmentDescription: _identifier),
+            SelectedData?.GetRawText(),
+            expectedShape,
+            options,
+            _attachmentOptions,
+            matched => new ProtoObservation(
                 _targetName,
                 "graphql.contract.shape",
                 _identifier,
                 new GraphQLShapeMatchData(_identifier, matched)));
-            operation.Succeed();
-            return this;
-        }
-        catch (JsonShapeMismatchException exception)
-        {
-            operation.SetAttribute("shape.result", "mismatched");
-            operation.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(exception.MatchedProperties, _attachmentOptions));
-            operation.SetAttribute("shape.mismatches", JsonDiagnosticSanitizer.Serialize(exception.Mismatches, _attachmentOptions));
-            operation.SetAttribute("shape.mismatch_count", exception.Mismatches.Count.ToString());
-            operation.Fail(exception);
-            throw;
-        }
-        catch (Exception exception)
-        {
-            operation.Fail(exception);
-            throw;
-        }
+
+        return this;
     }
 
     public T? ReadDataAs<T>(JsonSerializerOptions? options = null)
@@ -254,15 +300,35 @@ public sealed class GraphQLResponse : IDisposable
         if (!root.TryGetProperty("errors", out var errors) || errors.ValueKind != JsonValueKind.Array) return [];
         return errors.EnumerateArray().Select(error =>
         {
-            var message = error.TryGetProperty("message", out var messageNode) ? messageNode.GetString() ?? string.Empty : string.Empty;
-            var path = error.TryGetProperty("path", out var pathNode) && pathNode.ValueKind == JsonValueKind.Array
-                ? pathNode.EnumerateArray().Select(item => item.ValueKind == JsonValueKind.Number ? (object)item.GetInt32() : item.GetString() ?? string.Empty).ToArray()
-                : [];
-            JsonElement? extensions = error.TryGetProperty("extensions", out var extensionNode) ? extensionNode.Clone() : null;
-            var code = extensions.HasValue && extensions.Value.ValueKind == JsonValueKind.Object && extensions.Value.TryGetProperty("code", out var codeNode)
-                ? codeNode.GetString()
-                : null;
+            var message = error.ValueKind == JsonValueKind.Object
+                && error.TryGetProperty("message", out var messageNode)
+                && messageNode.ValueKind == JsonValueKind.String
+                    ? messageNode.GetString() ?? string.Empty
+                    : string.Empty;
+            var path = error.ValueKind == JsonValueKind.Object
+                && error.TryGetProperty("path", out var pathNode)
+                && pathNode.ValueKind == JsonValueKind.Array
+                    ? pathNode.EnumerateArray().Select(ReadPathSegment).ToArray()
+                    : [];
+            JsonElement? extensions = error.ValueKind == JsonValueKind.Object
+                && error.TryGetProperty("extensions", out var extensionNode)
+                    ? extensionNode.Clone()
+                    : null;
+            var code = extensions is { ValueKind: JsonValueKind.Object }
+                && extensions.Value.TryGetProperty("code", out var codeNode)
+                && codeNode.ValueKind == JsonValueKind.String
+                    ? codeNode.GetString()
+                    : null;
             return new GraphQLError(message, path, code, extensions);
         }).ToArray();
     }
+
+    // A malformed path entry (an object, a float index, a null) must not throw out of error reading.
+    private static object ReadPathSegment(JsonElement item)
+        => item.ValueKind switch
+        {
+            JsonValueKind.Number when item.TryGetInt32(out var index) => index,
+            JsonValueKind.String => item.GetString() ?? string.Empty,
+            _ => item.GetRawText()
+        };
 }

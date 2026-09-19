@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Http;
 using ProtoTest.Json;
+using ProtoTest.Rest;
 
 [TestFixture]
 public sealed class GraphQLIntegrationTests
@@ -39,7 +40,7 @@ public sealed class GraphQLIntegrationTests
                         .PageInfo("hasNextPage", "endCursor")))
                 .ExecuteAsync();
 
-            response.ShouldHaveNoErrors().ShouldMatchData(new
+            response.ShouldHaveNoErrors().ShouldMatchShape(new
             {
                 products = new
                 {
@@ -65,7 +66,7 @@ public sealed class GraphQLIntegrationTests
                 Assert.That(request.Attributes["auth.outcome"], Is.EqualTo("skipped"));
                 Assert.That(entries, Has.Some.Matches<ProtoTraceEntry>(entry =>
                     entry.Kind == "assert.graphql.no_errors" && entry.ParentId == request.Id));
-                var shape = entries.Single(entry => entry.Kind == "assert.graphql.data_shape");
+                var shape = entries.Single(entry => entry.Kind == "assert.json.shape");
                 Assert.That(shape.ParentId, Is.EqualTo(request.Id));
                 Assert.That(shape.Attributes["shape.result"], Is.EqualTo("matched"));
                 Assert.That(shape.Attributes["shape.matches"], Does.Contain("$.products"));
@@ -283,6 +284,35 @@ public sealed class GraphQLIntegrationTests
     }
 
     [Test]
+    public async Task ConfigureResponses_ShouldLetKnownConfigurationSectionOverrideCodeDefaults()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:GraphQL:Responses:MaxResponseBodyBytes"] = "2048"
+            }));
+        builder.AddGraphQL(graphQL => graphQL.ConfigureResponses(options => options.MaxResponseBodyBytes = 4096));
+        await using var host = builder.Build();
+        await host.StartTestAsync(
+            "graphql response configuration",
+            "13",
+            (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!);
+
+        try
+        {
+            var options = Proto.Context.ResolveResponseOptions(ProtoGraphQLBuilder.ProtocolName);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(options.MaxResponseBodyBytes, Is.EqualTo(2048));
+                Assert.That(options.ConfigurationSectionName, Is.EqualTo("ProtoTest:GraphQL:Responses"));
+            });
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
     public async Task Attachments_ShouldRedactSensitiveRequestAndExpectedShapeValues()
     {
         var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
@@ -306,7 +336,7 @@ public sealed class GraphQLIntegrationTests
                     .Fields("token")))
                 .Variables(new { password = "client-secret" })
                 .ExecuteAsync();
-            response.ShouldMatchData(new { login = new { token = "server-secret" } });
+            response.ShouldMatchShape(new { login = new { token = "server-secret" } });
 
             Assert.That(Proto.Context.Attachments.Select(item => item.Name.Split('-', 2)[1]), Is.EquivalentTo(new[]
             {
@@ -316,9 +346,241 @@ public sealed class GraphQLIntegrationTests
             var text = Encoding.UTF8.GetString(await request.ReadAllBytesAsync());
             Assert.That(text, Does.Not.Contain("client-secret"));
             Assert.That(text, Does.Contain("[REDACTED]"));
+            var expectedShape = Proto.Context.Attachments.Single(item =>
+                item.Name.EndsWith("graphql-01-expected-shape", StringComparison.Ordinal));
+            var expectedShapeText = Encoding.UTF8.GetString(await expectedShape.ReadAllBytesAsync());
+            Assert.That(expectedShapeText, Does.Not.Contain("server-secret"));
+            Assert.That(expectedShapeText, Does.Contain("[REDACTED]"));
             var observation = (GraphQLResponseData)Proto.Context.RecordedObservations
                 .Single(item => item.Kind == "graphql.response").Data!;
             Assert.That(observation.VariablesJson, Does.Not.Contain("client-secret"));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task CaptureAttachments_ShouldLetKnownConfigurationSectionOverrideCodeDefaults()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:GraphQL:Attachments:CaptureRequestBodies"] = "false",
+                ["ProtoTest:GraphQL:Attachments:CaptureResponses"] = "true",
+                ["ProtoTest:GraphQL:Attachments:CaptureExpectedShapes"] = "false"
+            }));
+        builder.AddGraphQL(graphQL => graphQL.CaptureAttachments(options =>
+        {
+            options.CaptureResponses = false;
+            options.CaptureExpectedShapes = true;
+        }));
+        await using var host = builder.Build();
+        await host.StartTestAsync(
+            "graphql attachment configuration",
+            "12",
+            (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!);
+
+        try
+        {
+            var options = Proto.Context.ResolveAttachmentOptions(ProtoGraphQLBuilder.ProtocolName);
+
+            Assert.That(options, Is.Not.Null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(options!.CaptureRequestBodies, Is.False);
+                Assert.That(options.CaptureResponses, Is.True);
+                Assert.That(options.CaptureExpectedShapes, Is.False);
+            });
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task ResponseAndAttachmentConfiguration_ShouldBeIsolatedFromRest()
+    {
+        // GraphQL registers first this time: the response options must still be GraphQL's, and the
+        // attachments REST registers last must still be REST's own.
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Rest:Responses:MaxResponseBodyBytes"] = "2048",
+                ["ProtoTest:GraphQL:Responses:MaxResponseBodyBytes"] = "4096",
+                ["ProtoTest:Rest:Attachments:CaptureResponses"] = "false",
+                ["ProtoTest:GraphQL:Attachments:CaptureResponses"] = "true"
+            }));
+        builder.AddGraphQL(graphQL => graphQL.CaptureAttachments());
+        builder.AddRest(rest => rest.CaptureAttachments());
+        await using var host = builder.Build();
+        await host.StartTestAsync(
+            "graphql protocol options isolation",
+            "16",
+            (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!);
+
+        try
+        {
+            // Each protocol resolves its options under its own key and never another protocol's.
+            var graphQLResponses = Proto.Context.Services.GetKeyedService<ProtoHttpResponseOptions>(ProtoGraphQLBuilder.ProtocolName)!;
+            var restResponses = Proto.Context.Services.GetKeyedService<ProtoHttpResponseOptions>(ProtoRestBuilder.ProtocolName)!;
+            var graphQLAttachments = Proto.Context.Services.GetKeyedService<ProtoHttpAttachmentOptions>(ProtoGraphQLBuilder.ProtocolName)!;
+            var restAttachments = Proto.Context.Services.GetKeyedService<ProtoHttpAttachmentOptions>(ProtoRestBuilder.ProtocolName)!;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(graphQLResponses.ConfigurationSectionName, Is.EqualTo("ProtoTest:GraphQL:Responses"));
+                Assert.That(graphQLResponses.MaxResponseBodyBytes, Is.EqualTo(4096));
+                Assert.That(restResponses.ConfigurationSectionName, Is.EqualTo("ProtoTest:Rest:Responses"));
+                Assert.That(restResponses.MaxResponseBodyBytes, Is.EqualTo(2048));
+                Assert.That(graphQLAttachments.CaptureResponses, Is.True);
+                Assert.That(restAttachments.CaptureResponses, Is.False);
+                Assert.That(graphQLAttachments, Is.Not.SameAs(restAttachments));
+            });
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task HeaderTrace_ShouldRecordCountAndNamesWithoutValues()
+    {
+        const string secret = "super-secret-token";
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"data":{"ping":"pong"}}""")
+        });
+        await using var host = CreateHost(handler);
+        await host.StartTestAsync("header trace", "14", TestMethod());
+
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Header("Authorization", $"Bearer {secret}")
+                .Header("X-Trace", "first")
+                .Header("x-trace", "second")
+                .Query(null, query => query.Field("ping"))
+                .ExecuteAsync();
+            response.ShouldHaveNoErrors();
+
+            var snapshot = host.Trace.Snapshot();
+            var entries = snapshot.Tests.Single().Entries;
+            var operation = entries.Single(entry => entry.Kind == "graphql.operation");
+            var headerEvents = entries.Where(entry => entry.Kind == "http.header.configure").ToArray();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(operation.Attributes["http.request.header_count"], Is.EqualTo("2"));
+                Assert.That(headerEvents, Has.Length.EqualTo(2));
+                Assert.That(headerEvents.Select(entry => entry.Attributes["http.header.name"]),
+                    Is.EquivalentTo(new[] { "Authorization", "X-Trace" }));
+                Assert.That(headerEvents.Select(entry => entry.Attributes["http.header.value_recorded"]),
+                    Is.All.EqualTo("false"));
+                Assert.That(JsonSerializer.Serialize(snapshot), Does.Not.Contain(secret));
+            }
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task Variables_ShouldBeTruncatedToTheConfiguredDiagnosticLength()
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"data":{"search":[]}}""")
+        });
+        var builder = new ProtoHostBuilder();
+        builder.AddGraphQL(graphQL =>
+        {
+            graphQL.CaptureAttachments(options => options.MaxDiagnosticBodyLength = 64);
+            graphQL.AddClient("Default", "https://example.test/graphql", http =>
+                http.ConfigurePrimaryHttpMessageHandler(() => handler));
+        });
+        await using var host = builder.Build();
+        await host.StartTestAsync("variables truncation", "17", TestMethod());
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query("Search", query => query.Field("search"))
+                .Variables(new { term = new string('x', 512) })
+                .ExecuteAsync();
+
+            var observation = (GraphQLResponseData)Proto.Context.RecordedObservations
+                .Single(item => item.Kind == "graphql.response").Data!;
+            Assert.Multiple(() =>
+            {
+                Assert.That(observation.VariablesJson, Does.Contain("truncated"));
+                Assert.That(observation.VariablesJson!.Length, Is.LessThan(512));
+            });
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task AddClientFrom_ShouldReuseTheSourceClientThroughTheAlias()
+    {
+        Uri? requestedUri = null;
+        var handler = new StubHandler(request =>
+        {
+            requestedUri = request.RequestUri;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""{"data":{"ping":"pong"}}""")
+            };
+        });
+        var builder = new ProtoHostBuilder();
+        builder.AddGraphQL(graphQL =>
+        {
+            graphQL.AddClient("Catalog", "https://source.example/api/", http =>
+                http.ConfigurePrimaryHttpMessageHandler(() => handler));
+            graphQL.AddClientFrom("CatalogV2", "Catalog", "v2/");
+            graphQL.AddClientFrom("CatalogAlias", "Catalog");
+        });
+        await using var host = builder.Build();
+        await host.StartTestAsync("alias client", "13", TestMethod());
+        try
+        {
+            // A path-rooted alias keeps its prefix; without one the default GraphQL endpoint is used.
+            using var versioned = await Proto.Context.GraphQL("CatalogV2")
+                .Query(null, query => query.Field("ping"))
+                .ExecuteAsync();
+            Assert.That(requestedUri, Is.EqualTo(new Uri("https://source.example/api/v2/")));
+
+            using var aliased = await Proto.Context.GraphQL("CatalogAlias")
+                .Query(null, query => query.Field("ping"))
+                .ExecuteAsync();
+            Assert.That(requestedUri, Is.EqualTo(new Uri("https://source.example/graphql")));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task Errors_ShouldTolerateMalformedMessagesAndPaths()
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                """{"errors":[{"message":42,"path":["a",{"bad":true},null,1.5,2]},{"path":"not-an-array"},7]}""")
+        });
+        await using var host = CreateHost(handler);
+        await host.StartTestAsync("malformed errors", "18", TestMethod());
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            response.ShouldHaveErrors();
+            Assert.Multiple(() =>
+            {
+                Assert.That(response.Errors, Has.Count.EqualTo(3));
+                Assert.That(response.Errors[0].Message, Is.Empty);
+                Assert.That(response.Errors[0].Path[0], Is.EqualTo("a"));
+                Assert.That(response.Errors[0].Path[1], Is.EqualTo("""{"bad":true}"""));
+                Assert.That(response.Errors[0].Path[2], Is.EqualTo("null"));
+                Assert.That(response.Errors[0].Path[3], Is.EqualTo("1.5"));
+                Assert.That(response.Errors[0].Path[4], Is.EqualTo(2));
+                Assert.That(response.Errors[1].Message, Is.Empty);
+                Assert.That(response.Errors[1].Path, Is.Empty);
+                Assert.That(response.Errors[2].Message, Is.Empty);
+            });
         }
         finally { await host.CompleteTestAsync(); }
     }

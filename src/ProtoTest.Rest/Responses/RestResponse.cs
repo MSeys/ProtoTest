@@ -6,7 +6,6 @@ using ProtoTest.Json;
 using ProtoTest.Rest.Exceptions;
 using ProtoTest.Rest.Internal;
 using System.Dynamic;
-using System.Collections;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -16,10 +15,12 @@ public sealed class RestResponse : IDisposable, IProtoBinaryContent
     private readonly ProtoExecutionContext? _context;
     private readonly string? _targetName;
     private readonly string? _routeIdentifier;
-    private readonly RestAttachmentOptions? _attachmentOptions;
+    private readonly ProtoHttpAttachmentOptions? _attachmentOptions;
     private readonly string? _attachmentPrefix;
     private readonly string? _requestTraceId;
     private int _shapeAssertionSequence;
+    private RestAssertions? _should;
+    private RestAssertions? _shouldNot;
 
     private static readonly JsonSerializerOptions DefaultJsonOptions = new()
     {
@@ -33,7 +34,7 @@ public sealed class RestResponse : IDisposable, IProtoBinaryContent
         ProtoExecutionContext? context = null,
         string? targetName = null,
         string? routeIdentifier = null,
-        RestAttachmentOptions? attachmentOptions = null,
+        ProtoHttpAttachmentOptions? attachmentOptions = null,
         string? attachmentPrefix = null,
         ReadOnlyMemory<byte>? contentBytes = null,
         string? requestTraceId = null)
@@ -52,6 +53,16 @@ public sealed class RestResponse : IDisposable, IProtoBinaryContent
 
     public HttpResponseMessage RawResponse { get; }
     public HttpStatusCode StatusCode => RawResponse.StatusCode;
+
+    /// <summary>Positive assertions on this response, such as <c>Should.HaveHttpStatus(...)</c>.</summary>
+    public RestAssertions Should => _should ??= new RestAssertions(this, negated: false);
+
+    /// <summary>
+    /// Assertions that must not hold, such as <c>ShouldNot.HaveHttpStatus(...)</c>. Shape assertions
+    /// stay on this response because a negated shape match is not meaningful.
+    /// </summary>
+    public RestAssertions ShouldNot => _shouldNot ??= new RestAssertions(this, negated: true);
+
     public bool IsSuccessStatusCode => RawResponse.IsSuccessStatusCode;
     public HttpResponseHeaders Headers => RawResponse.Headers;
     public HttpContentHeaders ContentHeaders => RawResponse.Content.Headers;
@@ -121,18 +132,22 @@ public sealed class RestResponse : IDisposable, IProtoBinaryContent
         return ConvertJsonElement(doc.RootElement.Clone());
     }
 
-    public RestResponse ShouldHaveHttpStatus(HttpStatusCode expectedStatusCode)
+    internal RestResponse AssertHttpStatus(HttpStatusCode expectedStatusCode, bool negated)
     {
+        var statusSatisfied = ProtoAssertion.IsSatisfied(StatusCode == expectedStatusCode, negated);
         using var operation = _context is null
             ? null
             : _context.Trace
-                .Operation("assert.http.status", $"Assert status · {(int)expectedStatusCode} {expectedStatusCode}", "ProtoTest.Rest")
+                .Operation(
+                    "assert.http.status",
+                    $"Assert status · {ProtoAssertion.Describe($"{(int)expectedStatusCode} {expectedStatusCode}", negated)}",
+                    "ProtoTest.Rest")
                 .With("expected.status_code", ((int)expectedStatusCode).ToString())
                 .With("actual.status_code", ((int)StatusCode).ToString())
+                .With("assertion.negated", negated ? "true" : null)
                 .With("request.identifier", _routeIdentifier)
                 .Parent(_requestTraceId)
                 .Begin();
-        var statusPassed = StatusCode == expectedStatusCode;
         operation?.AddSection(new ProtoTraceSection(
             "Result",
             ProtoTraceSectionKind.Checks,
@@ -140,17 +155,22 @@ public sealed class RestResponse : IDisposable, IProtoBinaryContent
                 new(
                     "status",
                     ((int)StatusCode).ToString(),
-                    statusPassed ? null : $"expected {(int)expectedStatusCode}",
-                    statusPassed ? ProtoTraceSectionTone.Success : ProtoTraceSectionTone.Error)
+                    statusSatisfied
+                        ? null
+                        : $"expected {ProtoAssertion.Describe(((int)expectedStatusCode).ToString(), negated)}",
+                    statusSatisfied ? ProtoTraceSectionTone.Success : ProtoTraceSectionTone.Error)
             ]));
         try
         {
-            if (StatusCode != expectedStatusCode)
+            if (!statusSatisfied)
             {
+                // The failure message must not exceed either limit: the response section applies even
+                // when the protocol never opted into attachment capture, and the attachment options
+                // keep their own redaction rules when capture is on.
                 var diagnosticBody = ProtoHttpDiagnosticSanitizer.SanitizeBody(
                     Content,
-                    _attachmentOptions);
-                throw new RestStatusAssertionException(expectedStatusCode, StatusCode, diagnosticBody);
+                    ResolveStatusDiagnosticOptions());
+                throw new RestStatusAssertionException(expectedStatusCode, StatusCode, diagnosticBody, negated);
             }
             operation?.Succeed();
             return this;
@@ -160,133 +180,73 @@ public sealed class RestResponse : IDisposable, IProtoBinaryContent
             operation?.Fail(exception);
             throw;
         }
+    }
+
+    private ProtoHttpAttachmentOptions ResolveStatusDiagnosticOptions()
+    {
+        // The resolved ProtoTest:Rest:Responses section bounds the failure body even when the protocol
+        // never opted into attachment capture; attachment options, when present, keep their own
+        // redaction rules and may tighten the limit further.
+        var responseLimit = _context?.ResolveResponseOptions(ProtoRestBuilder.ProtocolName).MaxDiagnosticBodyLength
+            ?? new ProtoHttpResponseOptions().MaxDiagnosticBodyLength;
+        if (_attachmentOptions is null)
+            return new ProtoHttpAttachmentOptions { MaxDiagnosticBodyLength = responseLimit };
+        if (responseLimit >= _attachmentOptions.MaxDiagnosticBodyLength)
+            return _attachmentOptions;
+
+        return new ProtoHttpAttachmentOptions
+        {
+            RedactSensitiveData = _attachmentOptions.RedactSensitiveData,
+            SensitiveJsonProperties = [.. _attachmentOptions.SensitiveJsonProperties],
+            MaxDiagnosticBodyLength = responseLimit
+        };
     }
 
     public RestResponse ShouldMatchShape(object expectedShape, JsonSerializerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
-        var expectedShapeJson = JsonDiagnosticSanitizer.Serialize(DescribeExpectedValue(expectedShape), _attachmentOptions);
-        var actualShapeJson = ProtoHttpDiagnosticSanitizer.SanitizeBody(
-            Content,
-            _attachmentOptions);
-        using var operation = _context is null
-            ? null
-            : _context.Trace
-                .Operation("assert.json.shape", "Assert response shape", "ProtoTest.Rest")
-                .With("expected.type", expectedShape.GetType().FullName)
-                .With("shape.expected", expectedShapeJson)
-                .With("shape.actual", actualShapeJson)
-                .With("actual.media_type", RawResponse.Content.Headers.ContentType?.MediaType)
-                .With("request.identifier", _routeIdentifier)
-                .Parent(_requestTraceId)
-                .Begin();
-
-        try
+        string? attachmentName = null;
+        if (_context is not null && _attachmentOptions?.CaptureExpectedShapes == true)
         {
-            if (_context is not null && _attachmentOptions?.CaptureExpectedShapes == true)
-            {
-                var assertionNumber = Interlocked.Increment(ref _shapeAssertionSequence);
-                var assertionSuffix = assertionNumber == 1 ? string.Empty : $"-{assertionNumber:00}";
-                _context.AddAttachment(
-                    $"{_attachmentPrefix}-expected-shape{assertionSuffix}",
-                    ProtoHttpDiagnosticSanitizer.SanitizeBody(
-                        expectedShapeJson,
-                        _attachmentOptions),
-                    "application/json",
-                    _routeIdentifier);
-            }
+            var assertionNumber = Interlocked.Increment(ref _shapeAssertionSequence);
+            var assertionSuffix = assertionNumber == 1 ? string.Empty : $"-{assertionNumber:00}";
+            attachmentName = $"{_attachmentPrefix}-expected-shape{assertionSuffix}";
+        }
 
-            var matchedProps = JsonShapeMatcher.AssertMatch(Content, expectedShape, options);
-            operation?.SetAttribute("matched.property_count", matchedProps.Count.ToString());
-            operation?.SetAttribute("matched.properties", string.Join(", ", matchedProps));
-            operation?.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(matchedProps, _attachmentOptions));
-            operation?.SetAttribute("shape.result", "matched");
-            operation?.AddSection(new ProtoTraceSection(
-                "Result",
-                ProtoTraceSectionKind.Checks,
-                [
-                    new(
-                        "shape",
-                        $"{matchedProps.Count} {(matchedProps.Count == 1 ? "property" : "properties")}",
-                        Tone: ProtoTraceSectionTone.Success)
-                ]));
-
-            // Record the shape-match observation when an execution context is available.
-            if (_context != null && !string.IsNullOrEmpty(_targetName) && !string.IsNullOrEmpty(_routeIdentifier))
-            {
-                _context.RecordObservation(new ProtoObservation(
+        ProtoShapeAssertion.Assert(
+            new ProtoShapeAssertionContext(
+                _context,
+                "ProtoTest.Rest",
+                "Assert response shape",
+                ParentOperationId: _requestTraceId,
+                ExtraAttributes: new Dictionary<string, string?>
+                {
+                    ["actual.media_type"] = RawResponse.Content.Headers.ContentType?.MediaType,
+                    ["request.identifier"] = _routeIdentifier
+                },
+                CaptureExpectedShape: attachmentName is not null,
+                AttachmentName: attachmentName,
+                AttachmentDescription: _routeIdentifier),
+            Content,
+            expectedShape,
+            options,
+            _attachmentOptions,
+            matched => _context is not null && !string.IsNullOrEmpty(_targetName) && !string.IsNullOrEmpty(_routeIdentifier)
+                ? new ProtoObservation(
                     TargetName: _targetName,
                     Kind: "http.contract.shape",
                     Identifier: _routeIdentifier,
                     Data: new RestShapeMatchData(
                         RequestIdentifier: _routeIdentifier,
-                        MatchedProperties: matchedProps,
+                        MatchedProperties: matched,
                         TargetType: expectedShape.GetType(),
-                        StatusCode: (int)StatusCode
-                    )
-                ));
-            }
+                        StatusCode: (int)StatusCode))
+                : null);
 
-            operation?.Succeed();
-            return this;
-        }
-        catch (JsonShapeMismatchException exception)
-        {
-            operation?.SetAttribute("shape.result", "mismatched");
-            operation?.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(exception.MatchedProperties, _attachmentOptions));
-            operation?.SetAttribute("shape.mismatches", JsonDiagnosticSanitizer.Serialize(exception.Mismatches, _attachmentOptions));
-            operation?.SetAttribute("shape.mismatch_count", exception.Mismatches.Count.ToString());
-            operation?.AddSection(new ProtoTraceSection(
-                "Result",
-                ProtoTraceSectionKind.Checks,
-                [
-                    new(
-                        "shape",
-                        $"{exception.Mismatches.Count} {(exception.Mismatches.Count == 1 ? "mismatch" : "mismatches")}",
-                        exception.Message,
-                        ProtoTraceSectionTone.Error)
-                ]));
-            operation?.Fail(exception);
-            throw;
-        }
-        catch (Exception exception)
-        {
-            operation?.Fail(exception);
-            throw;
-        }
+        return this;
     }
 
     public byte[] ReadAsBytes() => ContentBytes.ToArray();
-
-    private static object? DescribeExpectedValue(object? expected)
-    {
-        if (expected is null)
-        {
-            return null;
-        }
-
-        if (expected is IJsonValueMatcher matcher)
-        {
-            return $"constraint: {matcher.Description}";
-        }
-
-        var type = expected.GetType();
-        if (type.IsPrimitive || type.IsEnum || expected is string or decimal or DateTime or DateTimeOffset or Guid)
-        {
-            return expected;
-        }
-
-        if (expected is IEnumerable values)
-        {
-            return values.Cast<object?>().Select(DescribeExpectedValue).ToArray();
-        }
-
-        return type.GetProperties()
-            .Where(property => property.GetIndexParameters().Length == 0)
-            .ToDictionary(
-                property => property.Name,
-                property => DescribeExpectedValue(property.GetValue(expected)));
-    }
 
     private static object? ConvertJsonElement(JsonElement element)
     {

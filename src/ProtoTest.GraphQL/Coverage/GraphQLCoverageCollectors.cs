@@ -8,9 +8,48 @@ using ProtoTest.Http;
 
 public sealed class GraphQLCoverageCollector(string targetName) : ProtoCoverageCollector(targetName)
 {
+    // GraphQL names are case-sensitive: "query FindProducts" and "query findproducts" are distinct
+    // operations and must stay distinct coverage items.
+    private readonly Dictionary<string, ProtoReportItem> _operationItems = new(StringComparer.Ordinal);
+
     public override string Category => "GraphQL operation";
+
     public override bool CanCollect(ProtoObservation observation)
         => base.CanCollect(observation) && observation.Kind == "graphql.response";
+
+    public override void Collect(ProtoObservation observation)
+    {
+        ArgumentNullException.ThrowIfNull(observation);
+        lock (_lock)
+        {
+            if (!_operationItems.TryGetValue(observation.Identifier, out var item))
+            {
+                item = new ProtoReportItem(
+                    TargetName,
+                    Category,
+                    observation.Identifier,
+                    Kind: ProtoReportItemKinds.Coverage,
+                    Status: ProtoReportStatus.Neutral,
+                    IsCovered: false);
+            }
+
+            _operationItems[observation.Identifier] = item with
+            {
+                Status = ProtoReportStatus.Success,
+                Count = item.Count + 1,
+                IsCovered = true,
+                Metadata = MergeMetadata(item.Metadata, observation.Metadata)
+            };
+        }
+    }
+
+    public override IEnumerable<ProtoReportItem> GetReportItems()
+    {
+        lock (_lock)
+        {
+            return [.. _operationItems.Values];
+        }
+    }
 }
 
 public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector
@@ -61,6 +100,8 @@ public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector
 
         lock (_lock)
         {
+            // Visited fragments are tracked per document, not per branch: a fragment spread reached
+            // from two sibling fields must count its fields once, not once per spread.
             VisitSelections(rootType, operation.SelectionSet, fragments, new HashSet<string>(StringComparer.Ordinal),
                 variableTypes, variableValues);
         }
@@ -175,8 +216,9 @@ public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector
                     break;
                 case FragmentSpreadNode spread when fragments.TryGetValue(spread.Name.Value, out var fragment)
                     && activeFragments.Add(spread.Name.Value):
+                    // activeFragments holds every fragment this document has already visited; it is
+                    // never removed, so a spread reached from two siblings is followed only once.
                     VisitSelections(fragment.TypeCondition.Name.Value, fragment.SelectionSet, fragments, activeFragments, variableTypes, variableValues);
-                    activeFragments.Remove(spread.Name.Value);
                     break;
             }
         }

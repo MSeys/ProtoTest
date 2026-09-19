@@ -3,6 +3,8 @@ namespace ProtoTest.Rest.Tests;
 using System.Net;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
@@ -223,11 +225,96 @@ public sealed class RestDiagnosticsAndExtensibilityTests
     }
 
     [Test]
+    public async Task HeaderTrace_ShouldRecordCountAndNamesWithoutValues()
+    {
+        const string secret = "super-secret-value";
+        var handler = new TestHttpMessageHandler
+        {
+            ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") }
+        };
+        var builder = new ProtoHostBuilder();
+        builder.AddRest(rest => rest.AddClient(
+            "Default",
+            "https://example.test",
+            http => http.ConfigurePrimaryHttpMessageHandler(() => handler)));
+        await using var host = builder.Build();
+        await host.StartTestAsync("header trace", "20013", CurrentMethod());
+
+        try
+        {
+            using var response = await Proto.Context.Rest()
+                .Header("Authorization", $"Bearer {secret}")
+                .Header("X-Trace", "first")
+                .Header("x-trace", "second")
+                .GetAsync("/orders");
+
+            response.Should.HaveHttpStatus(HttpStatusCode.OK);
+
+            var snapshot = host.Trace.Snapshot();
+            var entries = snapshot.Tests.Single().Entries;
+            var request = entries.Single(entry => entry.Kind == "http.request");
+            var headerEvents = entries.Where(entry => entry.Kind == "http.header.configure").ToArray();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(request.Attributes["http.request.header_count"], Is.EqualTo("2"));
+                Assert.That(headerEvents, Has.Length.EqualTo(2));
+                Assert.That(headerEvents.Select(entry => entry.Attributes["http.header.name"]),
+                    Is.EquivalentTo(new[] { "Authorization", "X-Trace" }));
+                Assert.That(headerEvents.Select(entry => entry.Attributes["http.header.value_recorded"]),
+                    Is.All.EqualTo("false"));
+                Assert.That(headerEvents.Select(entry => entry.ParentId), Is.All.EqualTo(request.Id));
+                Assert.That(handler.LastRequest!.Headers.GetValues("x-trace").Single(), Is.EqualTo("second"));
+                Assert.That(JsonSerializer.Serialize(snapshot), Does.Not.Contain(secret));
+            }
+        }
+        finally
+        {
+            await host.CompleteTestAsync();
+        }
+    }
+
+    [Test]
+    public async Task HeaderTrace_ShouldEmitOneEventPerHeaderWhenTheBuilderIsReused()
+    {
+        var handler = new TestHttpMessageHandler
+        {
+            ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") }
+        };
+        var builder = new ProtoHostBuilder();
+        builder.AddRest(rest => rest.AddClient(
+            "Default",
+            "https://example.test",
+            http => http.ConfigurePrimaryHttpMessageHandler(() => handler)));
+        await using var host = builder.Build();
+        await host.StartTestAsync("reused header trace", "20015", CurrentMethod());
+
+        try
+        {
+            var rest = Proto.Context.Rest().Header("X-Trace", "first");
+            using var first = await rest.GetAsync("/orders");
+            using var second = await rest.GetAsync("/orders");
+
+            var entries = host.Trace.Snapshot().Tests.Single().Entries;
+            var headerEvents = entries.Where(entry => entry.Kind == "http.header.configure").ToArray();
+
+            Assert.That(headerEvents, Has.Length.EqualTo(1));
+            Assert.That(headerEvents.Single().Attributes["http.header.name"], Is.EqualTo("X-Trace"));
+        }
+        finally
+        {
+            await host.CompleteTestAsync();
+        }
+    }
+
+    [Test]
     public async Task Diagnostics_ShouldRedactSensitiveDataAndLimitBodyLength()
     {
         const string secret = "super-secret-value";
-        var options = new RestAttachmentOptions { MaxDiagnosticBodyLength = 80 };
-        var services = new ServiceCollection().AddSingleton(options).BuildServiceProvider();
+        var options = new ProtoHttpAttachmentOptions { MaxDiagnosticBodyLength = 80 };
+        var services = new ServiceCollection()
+            .AddKeyedSingleton(ProtoRestBuilder.ProtocolName, options)
+            .BuildServiceProvider();
         await using var context = new ProtoExecutionContext(
             "Diagnostics",
             services.CreateScope(),
@@ -249,7 +336,7 @@ public sealed class RestDiagnosticsAndExtensibilityTests
         using var response = await new RestRequestBuilder(client, context, "Orders").GetAsync("/secure");
         var observation = (RestResponseData)context.RecordedObservations.Single().Data!;
         var exception = Assert.Throws<RestStatusAssertionException>(() =>
-            response.ShouldHaveHttpStatus(HttpStatusCode.OK));
+            response.Should.HaveHttpStatus(HttpStatusCode.OK));
         var attachmentBytes = await context.Attachments.Single().ReadAllBytesAsync();
 
         using (Assert.EnterMultipleScope())
@@ -261,6 +348,52 @@ public sealed class RestDiagnosticsAndExtensibilityTests
             Assert.That(exception!.ResponseBody, Does.Not.Contain(secret));
             Assert.That(attachmentBytes, Is.Not.Empty);
         }
+    }
+
+    [Test]
+    public async Task StatusAssertion_ShouldHonorTheConfiguredResponseBodyLimitWithoutAttachments()
+    {
+        const string secret = "super-secret-value";
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Rest:Responses:MaxDiagnosticBodyLength"] = "32"
+            }).Build();
+        var services = new ServiceCollection()
+            .AddSingleton<IConfiguration>(configuration);
+        ProtoHttpOptionsRegistration.TryAddResponseOptions(
+            services,
+            ProtoRestBuilder.ProtocolName,
+            ProtoRestBuilder.ResponsesConfigurationSectionName);
+        await using var provider = services.BuildServiceProvider();
+        await using var context = new ProtoExecutionContext(
+            "Status limit",
+            provider.CreateScope(),
+            "20014",
+            CurrentMethod());
+        var handler = new TestHttpMessageHandler
+        {
+            ResponseToReturn = new HttpResponseMessage(HttpStatusCode.Unauthorized)
+            {
+                Content = new StringContent(
+                    $"{{\"token\":\"{secret}\",\"message\":\"{new string('x', 200)}\"}}",
+                    Encoding.UTF8,
+                    "application/json")
+            }
+        };
+        using var client = new HttpClient(handler) { BaseAddress = new Uri("https://example.test") };
+
+        using var response = await new RestRequestBuilder(client, context, "Orders").GetAsync("/secure");
+        var exception = Assert.Throws<RestStatusAssertionException>(() =>
+            response.Should.HaveHttpStatus(HttpStatusCode.OK));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(context.ResolveAttachmentOptions(ProtoRestBuilder.ProtocolName), Is.Null);
+            Assert.That(context.ResolveResponseOptions(ProtoRestBuilder.ProtocolName).MaxDiagnosticBodyLength, Is.EqualTo(32));
+            Assert.That(exception!.ResponseBody, Does.Contain("truncated"));
+            Assert.That(exception.ResponseBody.Length, Is.LessThan(120));
+        });
     }
 
     [Test]
@@ -281,7 +414,9 @@ public sealed class RestDiagnosticsAndExtensibilityTests
     public async Task ResponseBuffering_ShouldEnforceConfiguredLimit()
     {
         var services = new ServiceCollection()
-            .AddSingleton(new RestResponseOptions { MaxResponseBodyBytes = 4 })
+            .AddKeyedSingleton(
+                ProtoRestBuilder.ProtocolName,
+                new ProtoHttpResponseOptions { MaxResponseBodyBytes = 4 })
             .BuildServiceProvider();
         await using var context = new ProtoExecutionContext(
             "Large response",

@@ -11,6 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\ProtoTest.GraphQL\ProtoTest.GraphQL.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Rest\ProtoTest.Rest.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="NUnit.Framework" />

@@ -3,6 +3,10 @@
 Runner-independent GraphQL testing with named clients, a fluent operation builder,
 GraphQL-aware assertions, observations, and SDL-driven field coverage.
 
+```bash
+dotnet add package ProtoTest.GraphQL --prerelease
+```
+
 The examples use `JsonValue` from `ProtoTest.Json`; GraphQL and REST intentionally use
 the same matcher API.
 
@@ -103,5 +107,12 @@ are tracked for both inline values and variables.
 The schema source accepts inline SDL, a file, or a URL. The parameterless
 `WithSchemaCoverage()` reads `ProtoTest:Applications:{name}:GraphQL:Schema`.
 
-Shape matching is powered by `ProtoTest.Json`, the protocol-independent matcher
-shared with `ProtoTest.Rest`.
+Shape matching — `ShouldMatchShape`, `ExpectAsync` and `ExpectNextAsync` — is powered by
+`ProtoTest.Json`, the protocol-independent matcher shared with `ProtoTest.Rest`,
+`ProtoTest.Grpc` and `ProtoTest.Messaging`.
+
+Recorded documents and request/response attachments redact string literals assigned to
+sensitive argument and input-field names (`password: "hunter2"` is recorded as
+`password: "[REDACTED]"`), reusing `SensitiveJsonProperties`. `$variable` references stay
+variables and their values are redacted in the recorded JSON. Redaction only affects what
+is recorded; the request actually sent never changes.

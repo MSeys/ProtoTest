@@ -96,6 +96,43 @@ public sealed class GraphQLWebSocketSubscriptionTests
     }
 
     [Test]
+    public async Task SseSubscription_ShouldRejectAFrameLargerThanTheConfiguredResponseLimit()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Applications:Default:GraphQL:SubscriptionTransport"] = "Sse"
+            }));
+        builder.AddGraphQL(graphQL =>
+        {
+            graphQL.ConfigureResponses(options => options.MaxResponseBodyBytes = 32);
+            graphQL.AddClient("Default", "https://example.test/graphql", http =>
+                http.ConfigurePrimaryHttpMessageHandler(() => new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        $"event: next\ndata: {{\"data\":{{\"value\":\"{new string('x', 128)}\"}}}}\n\n",
+                        Encoding.UTF8,
+                        "text/event-stream")
+                })));
+        });
+        await using var host = builder.Build();
+        await host.StartTestAsync("sse-limit", "4", Method());
+        try
+        {
+            await using var subscription = await Proto.Context.GraphQL()
+                .Subscription("orderCreated")
+                .Select(new { id = Gql.Field })
+                .SubscribeAsync();
+
+            var exception = Assert.ThrowsAsync<GraphQLProtocolException>(() => subscription.NextAsync());
+
+            Assert.That(exception!.Message, Does.Contain("exceeded the configured limit"));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
     public async Task Subscription_ShouldExplainRejectedWebSocketHandshake()
     {
         var socket = new StubWebSocket(

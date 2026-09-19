@@ -62,6 +62,29 @@ public sealed class ProtoHttpResponseBufferTests
     }
 
     [Test]
+    public async Task BufferAsync_ShouldNotRejectAHeadResponseWithALargeContentLength()
+    {
+        using var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            RequestMessage = new HttpRequestMessage(HttpMethod.Head, "https://example.test/orders"),
+            Content = new EmptyContentWithLength(1_000_000)
+        };
+
+        Assert.That(await ProtoHttpResponseBuffer.BufferAsync(response, 10), Is.Empty);
+    }
+
+    [Test]
+    public async Task BufferAsync_ShouldNotRejectANoContentResponseWithALargeContentLength()
+    {
+        using var response = new HttpResponseMessage(HttpStatusCode.NoContent)
+        {
+            Content = new EmptyContentWithLength(1_000_000)
+        };
+
+        Assert.That(await ProtoHttpResponseBuffer.BufferAsync(response, 10), Is.Empty);
+    }
+
+    [Test]
     public void BufferAsync_ShouldHonorCancellation()
     {
         using var response = Response(new StreamContent(new CancellingStream()));
@@ -78,5 +101,17 @@ public sealed class ProtoHttpResponseBufferTests
     {
         public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
             => ValueTask.FromCanceled<int>(cancellationToken);
+    }
+
+    private sealed class EmptyContentWithLength(long length) : HttpContent
+    {
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+            => Task.CompletedTask;
+
+        protected override bool TryComputeLength(out long computedLength)
+        {
+            computedLength = length;
+            return true;
+        }
     }
 }

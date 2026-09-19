@@ -5,6 +5,7 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
+using ProtoTest.Http;
 using ProtoTest.Rest.Exceptions;
 
 [TestFixture]
@@ -64,12 +65,12 @@ public class RestResponseTests
     }
 
     [Test]
-    public void ShouldHaveHttpStatus_Should_Throw_When_StatusCode_Mismatches()
+    public void Should_HaveHttpStatus_Should_Throw_When_StatusCode_Mismatches()
     {
         var rawResponse = new HttpResponseMessage(HttpStatusCode.NotFound);
         var response = new RestResponse(rawResponse, "Not Found Error", TimeSpan.FromMilliseconds(100));
 
-        var ex = Assert.Throws<RestStatusAssertionException>(() => response.ShouldHaveHttpStatus(HttpStatusCode.OK));
+        var ex = Assert.Throws<RestStatusAssertionException>(() => response.Should.HaveHttpStatus(HttpStatusCode.OK));
 
         using (Assert.EnterMultipleScope())
         {
@@ -77,9 +78,69 @@ public class RestResponseTests
             Assert.That(ex!.ExpectedStatusCode, Is.EqualTo(HttpStatusCode.OK));
             Assert.That(ex.ActualStatusCode, Is.EqualTo(HttpStatusCode.NotFound));
             Assert.That(ex.ResponseBody, Is.EqualTo("Not Found Error"));
+            Assert.That(ex.Negated, Is.False);
             Assert.That(ex.Message, Contains.Substring("Expected HTTP status 200 (OK), but received 404 (NotFound)"));
             Assert.That(ex.Message, Contains.Substring("Not Found Error"));
         }
+    }
+
+    [Test]
+    public void ShouldNot_HaveHttpStatus_Should_Pass_When_StatusCode_Differs()
+    {
+        var rawResponse = new HttpResponseMessage(HttpStatusCode.NotFound);
+        var response = new RestResponse(rawResponse, "Not Found Error", TimeSpan.FromMilliseconds(100));
+
+        response.ShouldNot.HaveHttpStatus(HttpStatusCode.OK);
+    }
+
+    [Test]
+    public void ShouldNot_HaveHttpStatus_Should_Throw_With_Negated_Message_When_StatusCode_Matches()
+    {
+        var rawResponse = new HttpResponseMessage(HttpStatusCode.OK);
+        var response = new RestResponse(rawResponse, "{}", TimeSpan.FromMilliseconds(100));
+
+        var ex = Assert.Throws<RestStatusAssertionException>(
+            () => response.ShouldNot.HaveHttpStatus(HttpStatusCode.OK));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(ex!.Negated, Is.True);
+            Assert.That(ex.ExpectedStatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(ex.ActualStatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(ex.Message, Contains.Substring("Expected HTTP status not 200 (OK), but received 200 (OK)"));
+        }
+    }
+
+    [Test]
+    public async Task ShouldNot_HaveHttpStatus_With_Context_Should_Record_The_Failed_Negated_Assertion()
+    {
+        var builder = new ProtoHostBuilder();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("rest negated status", TestMethod());
+        var response = new RestResponse(
+            new HttpResponseMessage(HttpStatusCode.OK),
+            "{}",
+            TimeSpan.Zero,
+            context);
+
+        var exception = Assert.Throws<RestStatusAssertionException>(
+            () => response.ShouldNot.HaveHttpStatus(HttpStatusCode.OK));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        var operation = host.Trace.Snapshot().Tests.Single().Entries
+            .Single(entry => entry.Kind == "assert.http.status");
+        Assert.Multiple(() =>
+        {
+            Assert.That(operation.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(operation.Attributes["expected.status_code"], Is.EqualTo("200"));
+            Assert.That(operation.Attributes["actual.status_code"], Is.EqualTo("200"));
+            Assert.That(operation.Attributes["assertion.negated"], Is.EqualTo("true"));
+            Assert.That(operation.Sections![0].Kind, Is.EqualTo(ProtoTraceSectionKind.Checks));
+            Assert.That(operation.Sections![0].Items![0].Tone, Is.EqualTo(ProtoTraceSectionTone.Error));
+            Assert.That(operation.Sections![0].Items![0].Detail, Does.Contain("not"));
+        });
+        await host.StopAsync();
     }
 
     [Test]
@@ -132,7 +193,7 @@ public class RestResponseTests
             _context,
             "Orders",
             "GET /orders/42",
-            new RestAttachmentOptions(),
+            new ProtoHttpAttachmentOptions(),
             "rest-01");
 
         response.ShouldMatchShape(new { id = 42 });
@@ -172,6 +233,15 @@ public class RestResponseTests
             Assert.That(result.name, Is.EqualTo("ProtoTest"));
             Assert.That(result.isFinished, Is.True);
         }
+    }
+
+    private static MethodInfo TestMethod()
+        => typeof(RestResponseTests).GetMethod(
+            nameof(Placeholder),
+            BindingFlags.NonPublic | BindingFlags.Static)!;
+
+    private static void Placeholder()
+    {
     }
 
     private class SampleDto

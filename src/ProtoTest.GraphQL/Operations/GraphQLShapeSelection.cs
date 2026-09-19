@@ -60,6 +60,23 @@ internal static class GraphQLShapeSelection
         declaredType = Nullable.GetUnderlyingType(declaredType) ?? declaredType;
         if (IsLeaf(value, declaredType)) return [];
 
+        // A dictionary is an object shape, not a sequence of its key/value pairs: IDictionary must be
+        // checked before IEnumerable because every IDictionary implementation enumerates as pairs.
+        if (value is IDictionary)
+        {
+            var entries = Properties(value, declaredType).ToArray();
+            if (entries.Length == 0)
+                throw new ArgumentException(
+                    $"GraphQL selection type '{declaredType.Name}' has no selectable public properties.",
+                    nameof(value));
+            return entries.Select(entry => new SelectionNode(
+                entry.Name,
+                SelectionNodes(entry.Value, entry.Type))).ToArray();
+        }
+
+        // A dictionary declared without an instance has no entries to derive a selection from.
+        if (value is null && typeof(IDictionary).IsAssignableFrom(declaredType)) return [];
+
         if (TryEnumerableElement(value, declaredType, out var item, out var itemType))
             return SelectionNodes(item, itemType);
 
@@ -101,7 +118,7 @@ internal static class GraphQLShapeSelection
     {
         item = null;
         itemType = typeof(object);
-        if (type == typeof(string) || !typeof(IEnumerable).IsAssignableFrom(type)) return false;
+        if (type == typeof(string) || typeof(IDictionary).IsAssignableFrom(type) || !typeof(IEnumerable).IsAssignableFrom(type)) return false;
 
         itemType = type.IsArray
             ? type.GetElementType()!

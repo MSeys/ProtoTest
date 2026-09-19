@@ -1,9 +1,12 @@
 namespace ProtoTest.GraphQL;
 
+using System.Collections;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.WebSockets;
+using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Http;
@@ -80,7 +83,7 @@ public sealed class GraphQLRequestBuilder
         var response = await ExecuteAsync(cancellationToken);
         try
         {
-            response.ShouldMatchData(expectedShape);
+            response.ShouldMatchShape(expectedShape);
             return response;
         }
         catch
@@ -117,12 +120,17 @@ public sealed class GraphQLRequestBuilder
 
     public GraphQLRequestBuilder Header(string name, string value)
     {
+        var isNewHeader = !_headers.ContainsKey(name);
         _headers[name] = value;
-        TraceConfiguration("http.header.configure", $"Header · {name}", new Dictionary<string, string?>()
+        if (isNewHeader)
         {
-            ["http.header.name"] = name,
-            ["http.header.value_recorded"] = "false"
-        });
+            TraceConfiguration("http.header.configure", $"Header · {name}", new Dictionary<string, string?>()
+            {
+                ["http.header.name"] = name,
+                ["http.header.value_recorded"] = "false"
+            });
+        }
+
         return this;
     }
 
@@ -205,13 +213,18 @@ public sealed class GraphQLRequestBuilder
         if (operation.Type == "subscription")
             throw new InvalidOperationException("Subscriptions return a stream. Use SubscribeAsync instead of ExecuteAsync.");
         var identifier = $"{operation.Type} {operation.Name ?? "<anonymous>"}";
-        using var traceOperation = _context.Trace
+        var operationScope = _context.Trace
             .Operation("graphql.operation", $"GraphQL · {identifier}", "ProtoTest.GraphQL")
             .For(ProtoTraceEntityKinds.Client, $"client:{typeof(HttpClient).FullName}:{_targetName}")
             .With("client.name", _targetName)
             .With("graphql.operation.type", operation.Type)
-            .With("graphql.operation.name", operation.Name)
-            .Begin();
+            .With("graphql.operation.name", operation.Name);
+        if (_headers.Count > 0)
+        {
+            operationScope = operationScope.With("http.request.header_count", _headers.Count.ToString());
+        }
+
+        using var traceOperation = operationScope.Begin();
         var stopwatch = Stopwatch.StartNew();
         Uri endpoint;
         using var resolveOperation = _context.Trace
@@ -239,15 +252,15 @@ public sealed class GraphQLRequestBuilder
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
         request.Headers.Accept.Add(GraphQLMediaType);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json", 0.9));
-        foreach (var header in _headers) request.Headers.TryAddWithoutValidation(header.Key, header.Value);
         var requestContent = GraphQLRequestContent.Create(operation.DocumentText, operation.Name, _variables);
         var requestEnvelope = requestContent.DiagnosticJson;
         var variablesJson = requestContent.VariablesJson;
         request.Content = requestContent.Content;
+        ApplyHeaders(request);
         if (requestContent.RequiresPreflight)
             request.Headers.TryAddWithoutValidation("GraphQL-preflight", "1");
 
-        var attachmentOptions = _context.TryService<GraphQLAttachmentOptions>();
+        var attachmentOptions = _context.ResolveAttachmentOptions(ProtoGraphQLBuilder.ProtocolName);
 
         try
         {
@@ -258,7 +271,9 @@ public sealed class GraphQLRequestBuilder
             if (attachmentOptions?.CaptureRequestBodies == true)
                 _context.AddAttachment(
                     $"{attachmentPrefix}-request",
-                    JsonDiagnosticSanitizer.Sanitize(requestEnvelope, attachmentOptions),
+                    JsonDiagnosticSanitizer.Sanitize(
+                        GraphQLDocumentRedactor.RedactEnvelope(requestEnvelope, attachmentOptions),
+                        attachmentOptions),
                     "application/json",
                     identifier);
 
@@ -287,7 +302,9 @@ public sealed class GraphQLRequestBuilder
                 if (attachmentOptions?.CaptureResponses == true)
                     _context.AddAttachment(
                         $"{attachmentPrefix}-response",
-                        JsonDiagnosticSanitizer.Sanitize(content, attachmentOptions),
+                        JsonDiagnosticSanitizer.Sanitize(
+                            GraphQLDocumentRedactor.Redact(content, attachmentOptions),
+                            attachmentOptions),
                         rawResponse.Content.Headers.ContentType?.MediaType ?? "application/json",
                         identifier);
 
@@ -298,12 +315,12 @@ public sealed class GraphQLRequestBuilder
                     new GraphQLResponseData(
                         operation.Type,
                         operation.Name,
-                        operation.DocumentText,
+                        GraphQLDocumentRedactor.Redact(operation.DocumentText, attachmentOptions),
                         (int)rawResponse.StatusCode,
                         response.Errors.Count,
                         response.Errors.Select(error => error.Code).Where(code => code is not null).Cast<string>().ToArray(),
                         stopwatch.Elapsed,
-                        variablesJson is null ? null : JsonDiagnosticSanitizer.Sanitize(variablesJson, attachmentOptions, truncate: false))));
+                        variablesJson is null ? null : JsonDiagnosticSanitizer.Sanitize(variablesJson, attachmentOptions))));
                 traceOperation
                     .SetAttribute("http.response.status_code", ((int)rawResponse.StatusCode).ToString())
                     .SetAttribute("graphql.error.count", response.Errors.Count.ToString());
@@ -347,9 +364,9 @@ public sealed class GraphQLRequestBuilder
         {
             if (_subscriptionTransport == GraphQLSubscriptionTransport.Sse)
                 request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
-            foreach (var header in _headers) request.Headers.TryAddWithoutValidation(header.Key, header.Value);
             var requestContent = GraphQLRequestContent.Create(operation.DocumentText, operation.Name, _variables);
             request.Content = requestContent.Content;
+            ApplyHeaders(request);
             if (requestContent.RequiresPreflight)
                 request.Headers.TryAddWithoutValidation("GraphQL-preflight", "1");
 
@@ -364,7 +381,7 @@ public sealed class GraphQLRequestBuilder
                 requestOperation: null,
                 cancellationToken);
 
-            var attachmentOptions = _context.TryService<GraphQLAttachmentOptions>();
+            var attachmentOptions = _context.ResolveAttachmentOptions(ProtoGraphQLBuilder.ProtocolName);
             var requestNumber = attachmentOptions is null
                 ? (int?)null
                 : (_context.TryResolve<GraphQLContextState>()
@@ -373,7 +390,9 @@ public sealed class GraphQLRequestBuilder
             if (attachmentOptions?.CaptureRequestBodies == true)
                 _context.AddAttachment(
                     $"{attachmentPrefix}-request",
-                    JsonDiagnosticSanitizer.Sanitize(requestContent.DiagnosticJson, attachmentOptions),
+                    JsonDiagnosticSanitizer.Sanitize(
+                        GraphQLDocumentRedactor.RedactEnvelope(requestContent.DiagnosticJson, attachmentOptions),
+                        attachmentOptions),
                     "application/json",
                     identifier);
 
@@ -381,8 +400,7 @@ public sealed class GraphQLRequestBuilder
                 ? null
                 : JsonDiagnosticSanitizer.Sanitize(
                     requestContent.VariablesJson,
-                    attachmentOptions,
-                    truncate: false);
+                    attachmentOptions);
 
             if (_subscriptionTransport == GraphQLSubscriptionTransport.WebSocket)
             {
@@ -436,6 +454,7 @@ public sealed class GraphQLRequestBuilder
             var subscription = new GraphQLSubscription(
                 rawResponse,
                 stream,
+                ResolveResponseOptions().MaxResponseBodyBytes,
                 stopwatch,
                 _context,
                 _targetName,
@@ -482,10 +501,14 @@ public sealed class GraphQLRequestBuilder
             if (type is "connection_error" or "error")
                 throw new GraphQLProtocolException(
                     "The GraphQL WebSocket rejected the connection.",
-                    JsonDiagnosticSanitizer.Sanitize(message, _context.TryService<GraphQLAttachmentOptions>()));
+                    JsonDiagnosticSanitizer.Sanitize(
+                        message,
+                        _context.ResolveAttachmentOptions(ProtoGraphQLBuilder.ProtocolName)));
             throw new GraphQLProtocolException(
                 $"Expected a GraphQL WebSocket 'connection_ack' message, but received '{type ?? "<missing>"}'.",
-                JsonDiagnosticSanitizer.Sanitize(message, _context.TryService<GraphQLAttachmentOptions>()));
+                JsonDiagnosticSanitizer.Sanitize(
+                    message,
+                    _context.ResolveAttachmentOptions(ProtoGraphQLBuilder.ProtocolName)));
         }
     }
 
@@ -559,7 +582,11 @@ public sealed class GraphQLRequestBuilder
             GraphQLShapeSelection.Apply(field, shape, shapeType);
         });
         _operation = operation.Build();
-        _variables = variables.Count == 0 ? null : variables;
+        // A shape that contributes no variables must not discard the ones the test set explicitly;
+        // the shape's variables win on a name collision because the shape supplied them last.
+        _variables = variables.Count == 0
+            ? _variables
+            : MergeVariables(_variables, variables);
         TraceConfiguration("graphql.operation.configure", $"Configure · {type} {_simpleOperationName ?? "<anonymous>"}",
             new Dictionary<string, string?>
             {
@@ -577,6 +604,86 @@ public sealed class GraphQLRequestBuilder
         _simpleRootField = null;
         _simpleArguments = null;
         _simpleOperationName = null;
+    }
+
+    /// <summary>
+    /// Merges the shape's variables over the explicitly configured ones so a shape that contributes
+    /// none does not discard <c>Variables(...)</c>. The shape wins on a name collision.
+    /// </summary>
+    private static Dictionary<string, object?> MergeVariables(
+        object? explicitVariables,
+        IReadOnlyDictionary<string, object?> shapeVariables)
+    {
+        var merged = new Dictionary<string, object?>(StringComparer.Ordinal);
+        if (explicitVariables is not null)
+        {
+            foreach (var (name, value) in ReadVariables(explicitVariables))
+                merged[name] = value;
+        }
+
+        foreach (var (name, value) in shapeVariables) merged[name] = value;
+        return merged;
+    }
+
+    private static IEnumerable<(string Name, object? Value)> ReadVariables(object variables)
+    {
+        if (variables is IDictionary dictionary)
+        {
+            foreach (DictionaryEntry entry in dictionary)
+                if (entry.Key is string key)
+                    yield return (key, entry.Value);
+            yield break;
+        }
+
+        // JSON-typed variables are enumerated as they will be serialized, so a shape can merge over
+        // them without reinterpreting their CLR shape.
+        if (variables is JsonElement element && element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+                yield return (property.Name, property.Value.Clone());
+            yield break;
+        }
+
+        if (variables is JsonDocument document && document.RootElement.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in document.RootElement.EnumerateObject())
+                yield return (property.Name, property.Value.Clone());
+            yield break;
+        }
+
+        if (variables is System.Text.Json.Nodes.JsonObject jsonObject)
+        {
+            foreach (var pair in jsonObject)
+                yield return (pair.Key, pair.Value);
+            yield break;
+        }
+
+        // Property names are normalized exactly as GraphQLRequestContent serializes them, so the merged
+        // dictionary keeps the wire names of the explicit variables.
+        foreach (var property in variables.GetType()
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Where(property => property.GetIndexParameters().Length == 0))
+        {
+            var name = property.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name
+                ?? JsonNamingPolicy.CamelCase.ConvertName(property.Name);
+            yield return (name, property.GetValue(variables));
+        }
+    }
+
+    /// <summary>
+    /// Adds the configured headers to the request, mirroring REST: a header that can be added to
+    /// neither the request nor its content is an error rather than a silent drop.
+    /// </summary>
+    private void ApplyHeaders(HttpRequestMessage request)
+    {
+        foreach (var (name, value) in _headers)
+        {
+            if (!request.Headers.TryAddWithoutValidation(name, value)
+                && (request.Content is null || !request.Content.Headers.TryAddWithoutValidation(name, value)))
+            {
+                throw new InvalidOperationException($"Header '{name}' could not be added to the GraphQL request.");
+            }
+        }
     }
 
     private void TraceConfiguration(string kind, string name, IReadOnlyDictionary<string, string?> attributes)
@@ -612,6 +719,6 @@ public sealed class GraphQLRequestBuilder
         }
     }
 
-    private GraphQLResponseOptions ResolveResponseOptions()
-        => _context.TryService<GraphQLResponseOptions>() ?? new GraphQLResponseOptions();
+    private ProtoHttpResponseOptions ResolveResponseOptions()
+        => _context.ResolveResponseOptions(ProtoGraphQLBuilder.ProtocolName);
 }

@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using ProtoTest.Core;
 using ProtoTest.GraphQL.Internal;
+using ProtoTest.Http;
 using ProtoTest.Json;
 
 public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAsyncDisposable
@@ -21,7 +22,7 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
     private readonly string _targetName;
     private readonly string _identifier;
     private readonly GraphQLBuiltOperation _operation;
-    private readonly GraphQLAttachmentOptions? _attachmentOptions;
+    private readonly ProtoHttpAttachmentOptions? _attachmentOptions;
     private readonly string? _attachmentPrefix;
     private readonly string? _variablesJson;
     private readonly string? _selectedRootField;
@@ -33,18 +34,20 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
     internal GraphQLSubscription(
         HttpResponseMessage response,
         Stream stream,
+        int maxMessageBytes,
         Stopwatch stopwatch,
         ProtoExecutionContext context,
         string targetName,
         string identifier,
         GraphQLBuiltOperation operation,
-        GraphQLAttachmentOptions? attachmentOptions,
+        ProtoHttpAttachmentOptions? attachmentOptions,
         string? attachmentPrefix,
         string? variablesJson,
         string? selectedRootField)
     {
         _response = response;
         _reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: false);
+        _maxMessageBytes = maxMessageBytes;
         Transport = GraphQLSubscriptionTransport.Sse;
         _stopwatch = stopwatch;
         _context = context;
@@ -65,7 +68,7 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
         string targetName,
         string identifier,
         GraphQLBuiltOperation operation,
-        GraphQLAttachmentOptions? attachmentOptions,
+        ProtoHttpAttachmentOptions? attachmentOptions,
         string? attachmentPrefix,
         string? variablesJson,
         string? selectedRootField)
@@ -101,7 +104,7 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
             var mediaType = _response!.Content.Headers.ContentType?.MediaType;
             if (!string.Equals(mediaType, "text/event-stream", StringComparison.OrdinalIgnoreCase))
             {
-                var payload = await _reader!.ReadToEndAsync(cancellationToken);
+                var payload = await ReadToEndWithinLimitAsync(cancellationToken);
                 var response = string.IsNullOrWhiteSpace(payload) ? null : CreateResponse(payload);
                 Complete();
                 return response;
@@ -150,7 +153,7 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
             ?? throw new GraphQLAssertionException("Expected another GraphQL subscription event, but the stream completed.");
         try
         {
-            response.ShouldMatchData(expectedShape);
+            response.ShouldMatchShape(expectedShape);
             return response;
         }
         catch
@@ -232,7 +235,9 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
         if (_attachmentOptions?.CaptureResponses == true)
             _context.AddAttachment(
                 $"{_attachmentPrefix}-event-{eventNumber:00}-response",
-                JsonDiagnosticSanitizer.Sanitize(payload, _attachmentOptions),
+                JsonDiagnosticSanitizer.Sanitize(
+                    GraphQLDocumentRedactor.Redact(payload, _attachmentOptions),
+                    _attachmentOptions),
                 "application/json",
                 _identifier);
         _context.RecordObservation(new ProtoObservation(
@@ -242,7 +247,7 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
             new GraphQLResponseData(
                 _operation.Type,
                 _operation.Name,
-                _operation.DocumentText,
+                GraphQLDocumentRedactor.Redact(_operation.DocumentText, _attachmentOptions),
                 (int)statusCode,
                 result.Errors.Count,
                 result.Errors.Select(error => error.Code).Where(code => code is not null).Cast<string>().ToArray(),
@@ -268,27 +273,106 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
     {
         string? eventName = null;
         var data = new StringBuilder();
-        while (await _reader!.ReadLineAsync(cancellationToken) is { } line)
+        var dataBytes = 0;
+        var line = new StringBuilder();
+        var buffer = new char[1024];
+        var previousWasCarriageReturn = false;
+        while (true)
         {
-            if (line.Length == 0)
+            var read = await _reader!.ReadAsync(buffer.AsMemory(), cancellationToken);
+            if (read == 0)
             {
-                if (eventName is not null || data.Length > 0)
-                    return (eventName, data.ToString(), false);
-                continue;
+                if (line.Length > 0)
+                    ProcessEventLine(line.ToString(), ref eventName, data, ref dataBytes);
+                return (eventName, data.ToString(), true);
             }
-            if (line[0] == ':') continue;
-            var separator = line.IndexOf(':');
-            var field = separator < 0 ? line : line[..separator];
-            var value = separator < 0 ? string.Empty : line[(separator + 1)..].TrimStart(' ');
-            if (field == "event") eventName = value;
-            else if (field == "data")
+
+            for (var index = 0; index < read; index++)
             {
-                if (data.Length > 0) data.Append('\n');
-                data.Append(value);
+                var character = buffer[index];
+
+                // SSE lines end with CR, LF or CRLF; CR may straddle two reads.
+                if (character == '\n' && previousWasCarriageReturn)
+                {
+                    previousWasCarriageReturn = false;
+                    continue;
+                }
+
+                previousWasCarriageReturn = false;
+                if (character is '\r' or '\n')
+                {
+                    previousWasCarriageReturn = character == '\r';
+                    var lineText = line.ToString();
+                    line.Clear();
+                    if (lineText.Length == 0)
+                    {
+                        if (eventName is not null || data.Length > 0)
+                            return (eventName, data.ToString(), false);
+                        continue;
+                    }
+
+                    ProcessEventLine(lineText, ref eventName, data, ref dataBytes);
+                    continue;
+                }
+
+                line.Append(character);
+                // A single frame line is never read past the cap, so an oversized frame cannot be
+                // buffered in full before it is rejected.
+                if (line.Length > _maxMessageBytes) throw TooLarge();
             }
         }
-        return (eventName, data.ToString(), true);
     }
+
+    private void ProcessEventLine(
+        string line,
+        ref string? eventName,
+        StringBuilder data,
+        ref int dataBytes)
+    {
+        EnsureWithinLimit(Encoding.UTF8.GetByteCount(line));
+        if (line[0] == ':') return;
+        var separator = line.IndexOf(':');
+        var field = separator < 0 ? line : line[..separator];
+        var value = separator < 0 ? string.Empty : line[(separator + 1)..].TrimStart(' ');
+        if (field == "event")
+        {
+            eventName = value;
+        }
+        else if (field == "data")
+        {
+            dataBytes += (data.Length > 0 ? 1 : 0) + Encoding.UTF8.GetByteCount(value);
+            EnsureWithinLimit(dataBytes);
+            if (data.Length > 0) data.Append('\n');
+            data.Append(value);
+        }
+    }
+
+    private async Task<string> ReadToEndWithinLimitAsync(CancellationToken cancellationToken)
+    {
+        var result = new StringBuilder();
+        var buffer = new char[1024];
+        var totalBytes = 0;
+        while (true)
+        {
+            var read = await _reader!.ReadAsync(buffer.AsMemory(), cancellationToken);
+            if (read == 0) break;
+            totalBytes += Encoding.UTF8.GetByteCount(buffer, 0, read);
+            EnsureWithinLimit(totalBytes);
+            result.Append(buffer, 0, read);
+        }
+
+        return result.ToString();
+    }
+
+    private void EnsureWithinLimit(int bytes)
+    {
+        if (bytes > _maxMessageBytes) throw TooLarge();
+    }
+
+    private GraphQLProtocolException TooLarge()
+        => new(
+            $"The GraphQL SSE response exceeded the configured limit of {_maxMessageBytes} bytes.",
+            string.Empty);
 
     private async Task<GraphQLResponse?> ReadWebSocketResultAsync(CancellationToken cancellationToken)
     {

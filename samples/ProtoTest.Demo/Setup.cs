@@ -220,7 +220,8 @@ public sealed class Setup : ProtoTestAssembly
 
                 app.AddRest(rest =>
                     {
-                        rest.AddClient("Api")
+                        rest.CaptureAttachments()
+                            .AddClient("Api")
                             .AddCollector<RestCoverageCollector>()
                             .AddCollector<OpenApiCoverageCollector>();
                     })
@@ -229,7 +230,7 @@ public sealed class Setup : ProtoTestAssembly
                         .AddClient("GraphQL")
                         .WithSubscriptionTransport(GraphQLSubscriptionTransport.WebSocket)
                         .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "northstar.graphql")))
-                    .AddGrpc(grpc => grpc.AddClient("Projects"));
+                    .AddGrpc(grpc => grpc.CaptureAttachments().AddClient("Projects"));
             })
             .AddSink<JsonReportSink>(sink => sink.OutputPath = Path.Combine(
                 "TestResults", "ProtoTest.Demo", "report.json"))
@@ -244,11 +245,11 @@ public sealed class Setup : ProtoTestAssembly
         // exchanges it binds its per-test taps to.
         if (useMessaging)
         {
-            builder.AddMessaging(messaging => messaging.UseRabbitMq());
+            builder.AddMessaging(messaging => messaging.CaptureAttachments().UseRabbitMq());
         }
         else
         {
-            builder.AddMessaging();
+            builder.AddMessaging(messaging => messaging.CaptureAttachments());
         }
     }
 

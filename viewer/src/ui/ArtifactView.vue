@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { Artifact as TraceArtifact } from "../trace/model";
 import AppButton from "./AppButton.vue";
 import EmptyState from "./EmptyState.vue";
@@ -13,12 +13,20 @@ const props = defineProps<{
    */
   fill?: boolean;
 }>();
+const TRACE_VIEWER = "https://trace.playwright.dev";
+
 const artifactUrl = ref("");
+const artifactBlob = ref<Blob>();
+const handoff = ref<"idle" | "opening" | "blocked" | "failed">("idle");
+const traceFrame = ref<HTMLIFrameElement>();
 const artifactText = ref("");
 const artifactError = ref("");
 const artifactLoading = ref(false);
 let artifactLoad = 0;
 const isJson = computed(() => props.artifact.mediaType.includes("json"));
+// Playwright names its own trace; a zip called …-trace.zip from an older run counts too.
+const isPlaywrightTrace = computed(() => props.artifact.mediaType.includes("playwright.trace")
+  || (props.artifact.mediaType.includes("zip") && /-trace\.zip$/i.test(props.artifact.name)));
 const formattedJson = computed(() => {
   if (!isJson.value || !artifactText.value) return "";
   try { return JSON.stringify(JSON.parse(artifactText.value), null, 2); }
@@ -43,6 +51,7 @@ async function loadArtifact() {
   try {
     const blob = await props.readArtifact(props.artifact);
     if (load !== artifactLoad) return;
+    artifactBlob.value = blob;
     artifactUrl.value = URL.createObjectURL(blob);
     if (props.artifact.mediaType.startsWith("text/") || props.artifact.mediaType.includes("json") || props.artifact.mediaType.includes("xml"))
       artifactText.value = await blob.text();
@@ -64,6 +73,49 @@ function openArtifact() {
   if (artifactUrl.value) window.open(artifactUrl.value, "_blank", "noopener,noreferrer");
 }
 
+/**
+ * Playwright's own viewer reads a trace in the browser: wherever it runs - embedded here or in its own tab -
+ * it announces itself with a ready message and then takes the file over postMessage. Nothing is uploaded, and
+ * the window cannot be opened with noopener: that is the channel it answers on.
+ *
+ * Both the frame below and a new tab answer on this one listener; a trace that arrives before its viewer is
+ * ready is posted again as soon as that viewer says so.
+ */
+function isTraceViewer(event: MessageEvent): boolean {
+  return event.origin === TRACE_VIEWER && (event.data as { method?: string } | null)?.method === "ready";
+}
+
+function send(target: Window | null | undefined) {
+  if (!target || !artifactBlob.value) return false;
+  target.postMessage({ method: "load", params: { trace: artifactBlob.value } }, TRACE_VIEWER);
+  return true;
+}
+
+function onViewerReady(event: MessageEvent) {
+  if (!isTraceViewer(event)) return;
+  if (send(event.source as Window | null) && handoff.value === "opening") handoff.value = "idle";
+}
+
+onMounted(() => window.addEventListener("message", onViewerReady));
+onBeforeUnmount(() => window.removeEventListener("message", onViewerReady));
+
+// The embedded viewer only asks once, so a trace that is still being read is posted when it arrives.
+watch(artifactBlob, blob => {
+  if (blob && isPlaywrightTrace.value) send(traceFrame.value?.contentWindow);
+});
+
+function openInPlaywright() {
+  const target = window.open(TRACE_VIEWER, "_blank");
+  if (!target) {
+    handoff.value = "blocked";
+    return;
+  }
+
+  handoff.value = "opening";
+  // The tab answers on the shared listener; if it never does, say so rather than leaving a spinner.
+  setTimeout(() => { if (handoff.value === "opening") handoff.value = "failed"; }, 20_000);
+}
+
 watch(() => props.artifact.id, () => void loadArtifact(), { immediate: true });
 onBeforeUnmount(releaseArtifactUrl);
 </script>
@@ -76,7 +128,10 @@ onBeforeUnmount(releaseArtifactUrl);
         <span>{{ artifact.description || artifact.mediaType }}</span>
       </div>
       <div class="actions">
-        <AppButton :disabled="!artifactUrl" @click="openArtifact">Open</AppButton>
+        <AppButton v-if="isPlaywrightTrace" :disabled="!artifactBlob || handoff === 'opening'" @click="openInPlaywright">
+          {{ handoff === "opening" ? "Opening…" : "Open in a tab ↗" }}
+        </AppButton>
+        <AppButton v-else :disabled="!artifactUrl" @click="openArtifact">Open</AppButton>
         <AppButton variant="primary" :disabled="!artifactUrl" @click="downloadArtifact">Download</AppButton>
         <slot name="actions" />
       </div>
@@ -91,6 +146,15 @@ onBeforeUnmount(releaseArtifactUrl);
     <iframe v-else-if="artifactUrl && artifact.mediaType === 'text/html'" :src="artifactUrl" :title="artifact.name" class="frame" sandbox="allow-scripts" />
     <pre v-else-if="formattedJson" class="text json"><code>{{ formattedJson }}</code></pre>
     <pre v-else-if="artifactText" class="text">{{ artifactText }}</pre>
+    <!-- Playwright's viewer, embedded: it reads the trace in this browser and never uploads it. -->
+    <div v-else-if="isPlaywrightTrace" class="playwright">
+      <iframe ref="traceFrame" :src="TRACE_VIEWER" title="Playwright trace viewer" class="frame" @load="send(traceFrame?.contentWindow)" />
+      <small class="source">Rendered by trace.playwright.dev inside this browser; the file is not uploaded.</small>
+      <p v-if="handoff === 'blocked'" class="warn">The tab did not open. Allow pop-ups for this page, or use the embedded viewer above.</p>
+      <p v-else-if="handoff === 'failed'" class="warn">
+        The tab did not answer. Download the trace and drop it onto trace.playwright.dev.
+      </p>
+    </div>
     <EmptyState v-else :message="`Preview is not available for ${artifact.mediaType}. Download the bundled file to inspect it.`" />
   </section>
 </template>
@@ -119,6 +183,10 @@ header span { color: var(--muted); font-size: var(--text-meta); }
   overflow-wrap: anywhere;
 }
 .json { tab-size: 2; }
+.playwright { min-width: 0; min-height: 0; display: grid; gap: var(--space-2); align-content: stretch; grid-template-rows: minmax(0, 1fr) auto; }
+.playwright p { margin: 0; color: var(--warning); font-size: var(--text-meta); }
+.playwright .source { color: var(--dim); font-size: var(--text-micro); }
+.fill .playwright { height: 100%; }
 .json code { padding: 0; background: transparent; color: inherit; font: inherit; }
 .media, .frame { display: block; width: 100%; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-2); }
 .media { max-height: 60vh; }

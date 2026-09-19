@@ -1,7 +1,7 @@
 import { ref } from "vue";
 
-export type TestView = "story" | "state" | "spans";
-export const testViews: TestView[] = ["story", "state", "spans"];
+export type TestView = "story" | "state" | "spans" | "files";
+export const testViews: TestView[] = ["story", "state", "spans", "files"];
 
 /** What the inspector shows: an operation, or a tracked item by kind and id. */
 export type Selection = { span: string } | { item: { kind: string; id: string } };

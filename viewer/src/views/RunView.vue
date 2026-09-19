@@ -1,15 +1,27 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import type { Run, TestTrace } from "../trace/model";
+import type { Artifact, Run, TestTrace } from "../trace/model";
 import { formatDate, formatDuration, pad, phaseSegments, testCodeName, testGroup, testMatches, testTitle, tone } from "../trace/format";
 import Panel from "../ui/Panel.vue";
 import TextInput from "../ui/TextInput.vue";
 import FilterChip from "../ui/FilterChip.vue";
 import EmptyState from "../ui/EmptyState.vue";
+import FileList from "../ui/FileList.vue";
+import type { FileEntry } from "../ui/FileList.vue";
 import VisibilityStrip from "../ui/VisibilityStrip.vue";
 
 const props = defineProps<{ run: Run; fileName: string }>();
-const emit = defineEmits<{ select: [test: TestTrace] }>();
+const emit = defineEmits<{ select: [test: TestTrace]; artifact: [artifact: Artifact] }>();
+
+// Every file the run produced, in one place: the run's own reports first, then each test's, in test order.
+// The inspector reaches an artifact through the operation that wrote it; this is the whole list.
+const files = computed<FileEntry[]>(() => [
+  ...[...props.run.artifacts.values()].map(artifact => ({ artifact, owner: "Run", detail: artifact.description ?? "Run artifact" })),
+  ...props.run.tests.flatMap(test => [...test.artifacts.values()].map(artifact => ({
+    artifact, owner: pad(test.number), detail: artifact.description ?? testTitle(test)
+  })))
+]);
+
 
 const query = ref("");
 const filter = ref<"all" | "attention">("all");
@@ -147,11 +159,16 @@ function reason(test: TestTrace): { title: string; detail: string } {
         <FilterChip label="Show all tests" @select="filter = 'all'; query = ''" />
       </EmptyState>
     </Panel>
+
+    <Panel v-if="files.length" title="Files" subtitle="Everything the run attached: reports, captured payloads, screenshots and browser traces." pad="none">
+      <FileList :entries="files" @open="emit('artifact', $event)" />
+    </Panel>
   </div>
 </template>
 
 <style scoped>
 .run { display: grid; gap: var(--space-4); container-type: inline-size; }
+
 
 .summary {
   padding: var(--space-4) var(--space-1) 0;

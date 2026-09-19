@@ -13,6 +13,9 @@ import TestRail from "./ui/TestRail.vue";
 import FailureCard from "./ui/FailureCard.vue";
 import OutcomePill from "./ui/OutcomePill.vue";
 import ArtifactOverlay from "./ui/ArtifactOverlay.vue";
+import FileList from "./ui/FileList.vue";
+import type { FileEntry } from "./ui/FileList.vue";
+import Panel from "./ui/Panel.vue";
 import ColumnResizer from "./ui/ColumnResizer.vue";
 import Icon from "./ui/Icon.vue";
 import { useColumnResize } from "./ui/useColumnResize";
@@ -180,13 +183,16 @@ function landing(test: TestTrace): { span: string } | undefined {
 }
 
 // Every tab is always there, in the same place: the test tabs open the chosen test, or the default one.
+const testFiles = computed<FileEntry[]>(() => [...(selectedTest.value?.artifacts.values() ?? [])]
+  .map(artifact => ({ artifact, detail: artifact.description })));
+
 const tabs = computed(() => {
   const test = selectedTest.value ?? defaultTest.value;
   const items = [{ id: "run", label: "Run", href: href({ name: "run" }) }];
   if (!test) return items;
   const current = route.value;
   const selection = selectedTest.value && current.name === "test" ? current.selection : landing(test);
-  const views: [TestView, string][] = [["story", "Story"], ["state", "State"], ["spans", "Spans"]];
+  const views: [TestView, string][] = [["story", "Story"], ["state", "State"], ["spans", "Spans"], ["files", "Files"]];
   for (const [id, label] of views) items.push({ id, label, href: href({ name: "test", testId: test.id, view: id, selection }) });
   return items;
 });
@@ -327,7 +333,7 @@ const problemTitle = computed(() => ({
           <p>The link names <code>{{ missingTestId }}</code>, which is not in {{ fileName }}. It may come from another run.</p>
           <AppButton variant="primary" @click="navigate({ name: 'run' })">Back to the run</AppButton>
         </div>
-        <RunView v-else-if="!selectedTest" :run="run" :file-name="fileName" @select="showTest" />
+        <RunView v-else-if="!selectedTest" :run="run" :file-name="fileName" @select="showTest" @artifact="openArtifact = $event" />
         <div v-else class="test">
           <header class="test-head">
             <b>{{ pad(selectedTest.number) }}</b>
@@ -342,6 +348,9 @@ const problemTitle = computed(() => ({
           <StoryView v-if="view === 'story'" :test="selectedTest" :selected="selectedSpan?.id" @select="selectSpan" />
           <StateView v-else-if="view === 'state'" :test="selectedTest" :selected="itemSelection" :selected-span="selectedSpan?.id"
                      @select-item="selectItem" @select-span="selectSpan" />
+          <Panel v-else-if="view === 'files'" title="Files" subtitle="Everything this test attached, in the order it produced them." pad="none">
+            <FileList :entries="testFiles" @open="openArtifact = $event" />
+          </Panel>
           <SpansView v-else :test="selectedTest" :selected="selectedSpan?.id" @select="selectSpan" />
         </div>
       </div>

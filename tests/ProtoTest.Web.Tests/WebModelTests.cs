@@ -1484,7 +1484,9 @@ public sealed class WebModelTests
     public async Task JQueryIdleWait_ShouldTimeOutWithTheLastObservation()
     {
         var factory = new FakeBackendFactory();
-        for (var i = 0; i < 1_000; i++) factory.Backend.EvaluateResults.Enqueue(false);
+        // The wait polls until its timeout, and how often that is depends on the machine: a queue of
+        // answers would run dry and read as ready. jQuery stays busy for as long as this test runs.
+        factory.Backend.EvaluateDefault = false;
         var host = CreateHost(factory, builder => builder.AddWebWait<JQueryIdleWait>(
             WebWaitTiming.Before,
             TimeSpan.FromMilliseconds(50),
@@ -1843,6 +1845,9 @@ public sealed class WebModelTests
             => ValueTask.FromResult(CheckedResult);
 
         public Queue<bool> EvaluateResults { get; } = new();
+
+        /// <summary>What an evaluation answers once the queued answers run out. Ready, unless a test says otherwise.</summary>
+        public bool EvaluateDefault { get; set; } = true;
         public List<string> EvaluatedScripts { get; } = [];
         public string? JsonResult { get; set; }
         public Exception? JsonFailure { get; set; }
@@ -1850,7 +1855,7 @@ public sealed class WebModelTests
         public ValueTask<bool> EvaluateBooleanAsync(string script, CancellationToken cancellationToken = default)
         {
             EvaluatedScripts.Add(script);
-            return ValueTask.FromResult(EvaluateResults.Count == 0 || EvaluateResults.Dequeue());
+            return ValueTask.FromResult(EvaluateResults.Count == 0 ? EvaluateDefault : EvaluateResults.Dequeue());
         }
 
         public ValueTask<string?> EvaluateJsonAsync(string script, CancellationToken cancellationToken = default)

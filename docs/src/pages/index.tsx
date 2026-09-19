@@ -204,7 +204,7 @@ public async Task Paying_an_invoice_publishes_invoice_paid()
         .PostAsync("/api/invoices/42/pay");
     response.ShouldHaveHttpStatus(HttpStatusCode.OK);
 
-    await Proto.Context.Messages().AwaitAsync(
+    await Proto.Context.Messaging().AwaitAsync(
         "invoice.paid",
         message => message.Payload!.Contains("\\"id\\":42"),
         TimeSpan.FromSeconds(15));
@@ -287,7 +287,7 @@ function TraceSection() {
             </p>
             <p>
               This is the REST test from above, run with a deliberately wrong expectation. The trace leads with
-              the check that failed and the values it compared, then shows every step around it — the tenant
+              the check that failed, the line of code that made it and the values it compared, then shows every step around it — the tenant
               the attribute created, the call, the cleanup.
             </p>
             <div className={styles.featureLinks}>

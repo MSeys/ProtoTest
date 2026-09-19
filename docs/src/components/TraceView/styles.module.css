@@ -42,6 +42,25 @@
 .verdict { color: var(--danger); font-size: var(--text-meta); font-weight: var(--weight-semibold); }
 .on { color: var(--muted); font-size: var(--text-meta); }
 
+/* The line that made the check, as the viewer's inspector shows it: recorded location, embedded code. */
+.source { min-width: 0; display: grid; gap: var(--space-1); }
+.sourceHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); }
+.sourceHead b { font: var(--weight-semibold) var(--text-meta) var(--font-mono); }
+.sourceHead small { min-width: 0; color: var(--muted); font-size: var(--text-micro); overflow-wrap: anywhere; }
+.source pre {
+  margin: 0;
+  padding: var(--space-2) 0;
+  overflow-x: auto;
+  border-radius: var(--radius-chip);
+  background: var(--surface-sunken);
+  color: var(--code-text);
+  font: var(--text-micro)/1.6 var(--font-mono);
+}
+.source pre span { display: block; padding-right: var(--space-3); white-space: pre; }
+.source pre span b { display: inline-block; width: 4ch; margin-right: var(--space-3); color: var(--code-comment); font-weight: var(--weight-regular); text-align: right; }
+.source pre .current { background: var(--code-highlight); box-shadow: inset 2px 0 0 var(--blueprint); }
+.source pre .current b { color: var(--code-text); }
+
 .shape { overflow: clip; border: 1px solid var(--border); border-radius: var(--radius-chip); background: var(--surface); }
 .shapeHead { padding: var(--space-1) var(--space-3); border-bottom: 1px solid var(--border); background: var(--surface-2); font-size: var(--text-meta); font-weight: var(--weight-semibold); }
 

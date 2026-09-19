@@ -29,6 +29,8 @@ A run contains tests, and a trace records two things about each of them:
 - **What ran** — a tree of **operations** (spans): each has a duration and an outcome — a request, a flow, a hook. Operations nest: a `web.flow` contains its clicks, a test's execution contains everything the test body did. Moments inside an operation — a server starting, a subscription message — are **events** on it, and so are the observations, attachments and findings it produced.
 - **What existed and changed** — the **state**: every client, context, resource and tracked value, with its state at the end and a trail of changes. Each change names the operation that caused it, and where the value came from: the test itself, a response it observed, or the application's own instrumentation.
 
+Tracked values carry the identity `value:{type}:{identity}`, where `{type}` is the CLR type name in snake_case — `InvoiceLine` becomes `invoice_line` — and `{identity}` is what the provisioner returned. An application's own identity attribute prefix must match the type segment (`invoice_line.number`) for its spans to correlate with the test-side value.
+
 Every entry belongs to a **phase**:
 
 | Phase | |
@@ -57,11 +59,17 @@ A few of the kinds recorded automatically:
 | `observation.record`, `attachment.register` | observations and attachments |
 | `auth.outcome` (`applied` / `skipped`) | HTTP authentication, recorded on the request operation itself |
 | `auth.handler.apply` | each handler of a composite authenticator |
-| `assert.json.shape` | shape assertions — expected, actual and matched properties |
+| `assert.json.shape` | shape assertions — REST, GraphQL, gRPC and messaging: expected, actual and matched properties |
+| `assert.http.status`, `assert.grpc.status` | status assertions |
 | `web.navigate`, `web.click`, `web.flow`, `web.login`, `assert.web`, … | the [browser](../integrations/web/diagnostics.md#what-the-trace-records-for-every-operation) |
+| `web.page.visited`, `web.page.verified`, `web.page.available` | [page coverage](../integrations/web/index.md#page-coverage) — observations, not operations: the pages a journey reached, checked and could reach |
 | `data.build`, `data.build_many`, `data.create`, `data.create_many`, `data.explain` | [building test data](../integrations/data/index.md) |
 | `data.provision`, `data.cleanup`, `data.value.resolve` | [provisioning and cleanup](../integrations/data/provisioners.md) |
-| `aspnetcore.server.initialize` | the in-process server |
+| `assert.sheets` | [sheet, range and table assertions](../integrations/sheets/index.md) — expected and actual values |
+| `sql.connection.open`, `sql.transaction.begin`, `sql.transaction.rollback`, `sql.enlist` | the [SQL connection lifecycle](../integrations/sql/index.md#tracing) |
+| `aspnetcore.server.initialize` | the in-process server, carrying `aspnetcore.application.type`, `aspnetcore.server.lifetime`, `aspnetcore.server.reused`, `aspnetcore.web_host.customized` and `aspnetcore.client.customized` |
+
+The in-process server is also a state entity with id `server:{type}` — `{type}` is the entry point's full name, as in `server:Northstar.Api.Program` — and those `aspnetcore.*` attributes are its state.
 
 Sensitive values stay out: form fills are recorded by length, headers and JSON properties are redacted using the [same rules as attachments](../integrations/rest/attachments.md#redaction), and sensitive query parameter values are redacted in HTTP request URLs and web navigation addresses.
 

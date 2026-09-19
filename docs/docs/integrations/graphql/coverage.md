@@ -48,6 +48,10 @@ Every executed document — shape-driven, fluent or raw — is parsed and walked
 
 Introspection types (`__Schema`, `__Type`, …) are ignored.
 
+## Operation coverage
+
+`GraphQLCoverageCollector` is the operation-level collector that sits alongside the schema collector. Where the schema collector reports fields, arguments and input fields, this one aggregates every `graphql.response` observation — shape-driven, fluent, raw, or a subscription event — into one covered `GraphQL operation` item per operation identifier, with a hit count. Register it the same way with `.AddCollector<GraphQLCoverageCollector>()`; it ignores other observation kinds such as `graphql.contract.shape`.
+
 ## What gets reported
 
 Items appear under the category `GraphQL schema`, nested like the schema:
@@ -60,6 +64,6 @@ GraphQL input type    CreateOrderInput
 └─ GraphQL input field   product
 ```
 
-Each item carries `IsCovered` and a hit count, and fields carry `returnType` and `deprecated` metadata — so the report also tells you whether you're still exercising deprecated fields.
+Each field, argument and input-field item carries `IsCovered` and a hit count, and fields carry `returnType` and `deprecated` metadata — so the report also tells you whether you're still exercising deprecated fields. Type rows aggregate the fields under them: they carry a hit count but no `IsCovered` verdict of their own, and the report summary leaves those aggregate rows out of its coverage totals.
 
 The report is written by whichever [sinks](../../observability/reporting.md) you register. See [Coverage](../../observability/coverage.md) for the bigger picture.

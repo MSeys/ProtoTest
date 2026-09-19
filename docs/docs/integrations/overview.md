@@ -14,7 +14,7 @@ Each integration is a NuGet package that adds a client to `ProtoExecutionContext
 | [`ProtoTest.GraphQL`](./graphql/index.md) | queries, mutations, subscriptions, uploads, schema coverage | `Proto.Context.GraphQL()` |
 | [`ProtoTest.Grpc`](./grpc/index.md) | unary and streaming gRPC clients, metadata authentication, service/method coverage | `Proto.Context.Grpc()` |
 | [`ProtoTest.Web`](./web/index.md) + `.Playwright` / `.Selenium` | page objects, flows, login, browser diagnostics | `Proto.Context.Web()` |
-| [`ProtoTest.Messaging`](./messaging/index.md) | publish messages and await the one that matters | `Proto.Context.Messages()` |
+| [`ProtoTest.Messaging`](./messaging/index.md) | publish messages and await the one that matters | `Proto.Context.Messaging()` |
 | [`ProtoTest.Sheets`](./sheets/index.md) | spreadsheet assertions and range coverage | `Proto.Context.Sheets()` |
 | [`ProtoTest.Data`](./data/index.md) | deterministic test data and provisioning | `Proto.Context.Data()` |
 | [`ProtoTest.Sql`](./sql/index.md) | one database connection per test, rolled back at the end | `Proto.Context.SqlConnection()` |

@@ -13,8 +13,7 @@ public sealed class InvoiceDataDefaults : IProtoDataDefaultsModule
 {
     public void Configure(ProtoDataConfiguration data)
     {
-        data.Values.For<InvoiceId>()
-            .Use(context => new InvoiceId(context.NextGuid()));
+        data.Values.Use<InvoiceId>(context => new InvoiceId(context.NextGuid()));
 
         data.For<Invoice>()
             .Default(x => x.Currency, "EUR")
@@ -35,7 +34,7 @@ For each member, the first of these that applies wins:
 
 1. **`With(...)`** in the test.
 2. A **member default** — `data.For<T>().Default(x => x.Member, …)`.
-3. A **type provider** — `data.Values.For<TValue>().Use(…)`, used for every member of that type.
+3. A **type provider** — `data.Values.Use<TValue>(…)`, used for every member of that type.
 4. A **custom resolver** — `IProtoDataValueResolver`, in registration order.
 5. A **safe built-in**: `null` for nullable members, a generated string for `string`, a generated `Guid`, or an empty array / list / enumerable.
 6. The constructor parameter's **default value**, if it has one.
@@ -64,8 +63,8 @@ Use the provider overload whenever the value must be unique — a constant email
 A type provider supplies a value for **every** member of a type, on any object:
 
 ```csharp
-data.Values.For<Money>().Use(_ => new Money(10m, "EUR"));
-data.Values.For<TenantId>().Use(context => new TenantId(context.NextGuid()));
+data.Values.Use<Money>(_ => new Money(10m, "EUR"));
+data.Values.Use<TenantId>(context => new TenantId(context.NextGuid()));
 ```
 
 ## The value context
@@ -131,5 +130,5 @@ Built values are recorded in ProtoTrace. Redact the sensitive ones — the trace
 
 ```csharp
 data.For<User>().Redact(x => x.AccessToken);   // one member
-data.Tracing.RedactValues<Password>();          // every value of a type
+data.RedactValueType<Password>();              // every value of a type
 ```

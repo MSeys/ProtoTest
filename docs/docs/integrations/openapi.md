@@ -48,7 +48,7 @@ A document that fails to parse throws with the parser's diagnostics.
 
 ### Passing the document directly
 
-`AddCollector` forwards extra arguments to the collector's constructor, which has overloads for a source string and a parsed document (the configuration route is the one exercised by the sample suite):
+`AddCollector` forwards extra arguments to the collector's constructor and resolves the rest from DI, which has overloads for the configuration route, a source string and a parsed document (the configuration route is the one exercised by the sample suite):
 
 ```csharp
 rest.AddClient("Api")
@@ -56,10 +56,15 @@ rest.AddClient("Api")
 ```
 
 ```csharp
-OpenApiCoverageCollector(string targetName, IConfiguration configuration)
+OpenApiCoverageCollector(
+    string targetName,
+    IConfiguration configuration,
+    IEnumerable<ProtoApplicationTarget> applicationTargets)
 OpenApiCoverageCollector(string targetName, string openApiSpecSource)
 OpenApiCoverageCollector(string targetName, OpenApiDocument document)
 ```
+
+The configuration overload receives the host's `IConfiguration` and its registered application targets from DI, so it can resolve which application the REST client belongs to and read that application's `OpenApi:Specification`.
 
 ## What it reports
 

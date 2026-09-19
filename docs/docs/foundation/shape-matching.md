@@ -6,7 +6,7 @@ description: "Describe the JSON you expect with an anonymous object: partial, ne
 
 # Shape matching
 
-REST's `ShouldMatchShape` and GraphQL's `ShouldMatchData` / `ExpectAsync` / `ExpectNextAsync` all use the same matcher from `ProtoTest.Json`. You describe the JSON you expect with an anonymous object, and the matcher compares.
+REST's `ShouldMatchShape`, GraphQL's `ShouldMatchShape` / `ExpectAsync` / `ExpectNextAsync`, gRPC's `ShouldMatchShape` and messaging's `ShouldMatchShape` all use the same matcher from `ProtoTest.Json`. You describe the JSON you expect with an anonymous object, and the matcher compares.
 
 ```csharp
 response.ShouldMatchShape(new

@@ -72,7 +72,23 @@ order.ShouldMatchShape(new
 });
 ```
 
-The reply is compared through its JSON form: field names are camelCase, enums are their names, and fields left at their default value are still present, so `quantity = 0` can be asserted. Every mismatch is reported at once, the same way a REST shape reports them.
+The reply is compared through its JSON form: field names are camelCase, enums are their names, and fields left at their default value are still present, so `quantity = 0` can be asserted. Every mismatch is reported at once, the same way a REST shape reports them. Pass the test context — `order.ShouldMatchShape(Proto.Context, new { ... })` — to record the assertion as an `assert.json.shape` operation with a `grpc.contract.shape` observation; without it, the reply is still matched, untraced.
+
+A failed call throws `RpcException`. `ShouldHaveStatus` asserts the status it carries, like REST's `ShouldHaveHttpStatus`:
+
+```csharp
+try
+{
+    await Proto.Context.Grpc().UnaryAsync(Orders.GetOrder, new GetOrderRequest { Id = 404 });
+    Assert.Fail("Expected the call to fail.");
+}
+catch (RpcException exception)
+{
+    exception.ShouldHaveStatus(StatusCode.NotFound, Proto.Context);
+}
+```
+
+With the test context it records an `assert.grpc.status` operation with the expected and actual `rpc.grpc.status_code`/`rpc.grpc.status`, and a Checks section; a mismatch throws `GrpcAssertionException`. Without the context the assertion is still made, untraced.
 
 ## Authentication
 
@@ -87,7 +103,17 @@ public sealed class OrderTests
 }
 ```
 
-Authenticators write HTTP headers as usual; the gRPC applier translates them to lowercase metadata keys. `authorization` and other sensitive metadata values are redacted in the trace.
+Authenticators write HTTP headers as usual; the gRPC applier translates them to lowercase metadata keys. `authorization` and other sensitive metadata values are redacted in the trace. Which keys are sensitive is configurable: `SensitiveMetadataKeys` starts with the defaults (`authorization`, `cookie`, `set-cookie`, `x-api-key`, `api-key`, `token`, `x-auth-token`) and entries under `ProtoTest:Grpc:SensitiveMetadataKeys` extend them. Matching is case-insensitive and by substring, so `authorization` also covers `proxy-authorization`.
+
+## Attachments
+
+```csharp
+builder.AddGrpc(grpc => grpc
+    .CaptureAttachments(options => options.MaxDiagnosticBodyLength = 16 * 1024)
+    .AddClient("Api"));
+```
+
+With capture enabled, each traced call attaches its request and response messages as JSON: `grpc-{client}-{service}-{method}-request-{n}` and `grpc-{client}-{service}-{method}-response-{n}`, where `{client}` is the sanitized client name and `n` is the call's position in the client's call sequence, so repeated calls to the same method — even from two clients in one test — stay distinct; field names are camelCase. Values run through the same redaction rules as REST and GraphQL — JSON properties such as `password` and `token`, and the metadata keys above — and each attachment is capped at `MaxDiagnosticBodyLength` from `ProtoTest:Grpc:Attachments`. `ClientStreamingAsync` and `ServerStreamingAsync` capture up to the first 10 streamed messages and record the total message count in the attachment description; `ClientStreamingAsync` records the number of sent messages in `grpc.request.count` and one received response in `grpc.response.count`, while `ServerStreamingAsync` records the number of received messages in `grpc.response.count`. A message that cannot be serialized is reported as a `grpc.attachment.failed` event and never fails the call. The raw `ServerStreaming` and `DuplexStreaming` calls remain untraced and are not captured.
 
 ## Tracing and coverage
 
@@ -98,4 +124,4 @@ The async helpers — `UnaryAsync`, `ClientStreamingAsync` and `ServerStreamingA
     .AddCollector<GrpcCoverageCollector>())
 ```
 
-The raw `ServerStreaming` and `DuplexStreaming` calls are an escape hatch: they return the call object for you to drive, and they are **not** traced and do **not** apply `[Auth]` metadata. Pass metadata explicitly if you need it.
+The raw `ServerStreaming` and `DuplexStreaming` calls are an escape hatch: they return the call object for you to drive, and they are **not** traced. They do apply the test's `[Auth]` metadata; pass metadata explicitly for anything else.

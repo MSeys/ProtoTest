@@ -19,7 +19,7 @@ GraphQLResponse ShouldHaveNoErrors();
 GraphQLResponse ShouldHaveErrors();
 GraphQLResponse ShouldHaveError(string code);                        // matches extensions.code, case-insensitive
 GraphQLResponse ShouldHaveHttpStatus(HttpStatusCode expected);
-GraphQLResponse ShouldMatchData(object expectedShape, JsonSerializerOptions? options = null);
+GraphQLResponse ShouldMatchShape(object expectedShape, JsonSerializerOptions? options = null);
 ```
 
 ```csharp
@@ -32,7 +32,7 @@ using var response = await Proto.Context.GraphQL()
 response.ShouldHaveErrors().ShouldHaveError("UNAUTHORIZED");
 ```
 
-`ShouldMatchData` uses the same rules as REST's `ShouldMatchShape` — partial objects, exact arrays, `JsonValue` constraints — see [Shape matching](../../foundation/shape-matching.md). For shape-driven operations it compares against the root field's value; for fluent and raw operations, against the whole `data` object.
+`ShouldMatchShape` uses the same rules as REST's `ShouldMatchShape` — partial objects, exact arrays, `JsonValue` constraints — see [Shape matching](../../foundation/shape-matching.md). For shape-driven operations it compares against the root field's value; for fluent and raw operations, against the whole `data` object.
 
 Assertion failures throw `GraphQLAssertionException`; shape failures throw `JsonShapeMismatchException` with every mismatch listed.
 
@@ -42,7 +42,7 @@ Assertion failures throw `GraphQLAssertionException`; shape failures throw `Json
 T? ReadDataAs<T>(JsonSerializerOptions? options = null);   // case-insensitive by default
 ```
 
-`ReadDataAs` reads the same element `ShouldMatchData` compares against.
+`ReadDataAs` reads the same element `ShouldMatchShape` compares against.
 
 ## Members
 

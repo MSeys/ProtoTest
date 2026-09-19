@@ -43,7 +43,7 @@ using var response = await Proto.Context.GraphQL()
 
 ### Select and assert in one step
 
-`ExpectAsync(shape)` is `Select(shape)` + `ExecuteAsync()` + `ShouldMatchData(shape)`:
+`ExpectAsync(shape)` is `Select(shape)` + `ExecuteAsync()` + `ShouldMatchShape(shape)`:
 
 ```csharp
 using var controlPlane = await Proto.Context.GraphQL()
@@ -170,7 +170,7 @@ using var response = await Proto.Context.GraphQL()
             .TotalCount()))
     .ExecuteAsync();
 
-response.ShouldHaveNoErrors().ShouldMatchData(new
+response.ShouldHaveNoErrors().ShouldMatchShape(new
 {
     orders = new
     {
@@ -193,7 +193,7 @@ response.ShouldHaveNoErrors().ShouldMatchData(new
 The filter builder emits the `{ field: { op: value } }` convention used by Hot Chocolate: `Equal`, `NotEqual`, `Contains`, `StartsWith`, `EndsWith`, `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual`, `In`, plus `Nested(field, …)`, `Some(field, …)` for lists, and `Or(...)`.
 
 :::note[Fluent responses aren't unwrapped]
-With shape-driven operations, `ShouldMatchData` compares against the **root field's value**. With fluent and raw operations there's no single root, so it compares against the whole `data` object — which is why the example above wraps its shape in `orders = …`.
+With shape-driven operations, `ShouldMatchShape` compares against the **root field's value**. With fluent and raw operations there's no single root, so it compares against the whole `data` object — which is why the example above wraps its shape in `orders = …`.
 :::
 
 ## Raw documents
@@ -211,7 +211,7 @@ using var response = await Proto.Context.GraphQL()
         operationName: "ViewerCard")
     .ExecuteAsync();
 
-response.ShouldHaveNoErrors().ShouldMatchData(new
+response.ShouldHaveNoErrors().ShouldMatchShape(new
 {
     viewer = new
     {
@@ -228,6 +228,8 @@ response.ShouldHaveNoErrors().ShouldMatchData(new
 GraphQLRequestBuilder Header(string name, string value);
 GraphQLRequestBuilder Variables(object variables);
 ```
+
+Header values are never traced; the trace records the count and each header's name.
 
 ## File uploads
 
@@ -249,7 +251,7 @@ using var uploaded = await Proto.Context.GraphQL()
     .Select(expected)
     .ExecuteAsync();
 
-uploaded.ShouldHaveNoErrors().ShouldMatchData(expected);
+uploaded.ShouldHaveNoErrors().ShouldMatchShape(expected);
 ```
 
 ```csharp

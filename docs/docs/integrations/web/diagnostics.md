@@ -14,11 +14,13 @@ When an action or assertion fails, the backend captures the page at that moment:
 
 | Artifact | Playwright | Selenium |
 | --- | --- | --- |
-| Screenshot | `web-{element}-failure.png` (full page) | `web-{session}-{element}-failure.png` |
-| Page HTML | `web-{element}-page.html` | `web-{session}-{element}-page.html` |
-| Location | `web-{element}-location.txt` (URL) | `web-{session}-{element}-location.txt` (URL and title) |
+| Screenshot | `web-{session}-{element}-{n}-failure.png` (full page) | `web-{session}-{element}-{n}-failure.png` |
+| Page HTML | `web-{session}-{element}-{n}-page.html` | `web-{session}-{element}-{n}-page.html` |
+| Location | `web-{session}-{element}-{n}-location.txt` (URL; the raw address when sanitizing does not apply) | `web-{session}-{element}-{n}-location.txt` (URL and title) |
 
-Capturing never replaces the original error. If capture itself fails, you'll see a `web.diagnostics.failed` or `web.diagnostics.artifact_failed` entry in the trace and still get the real exception.
+`{n}` is the backend's per-test failure number, so a failure repeated on the same element keeps both sets of artifacts. If the location is `about:blank`, the raw address is recorded instead of an empty artifact.
+
+Capturing never replaces the original error. Each artifact registers on its own, so one failing attachment does not drop the rest. If capture itself fails, you'll see a `web.diagnostics.failed` or `web.diagnostics.artifact_failed` entry in the trace and still get the real exception.
 
 ## Playwright traces
 
@@ -32,7 +34,7 @@ Playwright's own trace — a timeline with DOM snapshots you can open in the [Pl
 
 The kept trace is attached as `playwright-{session}-trace.zip`.
 
-With `CorrelateTraceGroups` on (the default), each ProtoTest operation is a named group in the Playwright trace, so the two timelines line up.
+With `CorrelateTraceGroups` on (the default), each ProtoTest operation is a named group in the Playwright trace, so the two timelines line up. Grouping is re-entrant: an operation nested inside another on the same session — a `WaitUntilAsync` predicate that reads an element — joins its caller's group instead of blocking on it.
 
 ### Browser signals
 

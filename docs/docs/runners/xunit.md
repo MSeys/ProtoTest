@@ -1,7 +1,7 @@
 ---
 sidebar_position: 2
 title: xUnit v2
-description: "Set up ProtoTest with xUnit v2: the collection fixture, [ProtoTest] tests, theories and outcomes."
+description: "Set up ProtoTest with xUnit v2: the collection fixture, [ProtoTestFact] tests, theories and outcomes."
 ---
 
 # xUnit v2
@@ -86,12 +86,3 @@ ProtoTest attachment 'rest-01-response': /path/to/TestResults/.../rest-01-respon
 
 **Forgetting `[Collection]` breaks the host.** Without it the fixture never runs, and the first test fails with `InvalidOperationException: ProtoHost is not initialized.`
 
-## The older `[Fact]` + `[ProtoTest]` style
-
-```csharp
-[Fact]
-[ProtoTest]
-public async Task Orders_endpoint_responds() { … }
-```
-
-This still works, but `[ProtoTest]` is a `BeforeAfterTestAttribute`, and xUnit v2 only reports a test's result *after* those attributes have finished. So with this style every test is recorded with outcome `Unknown`, and the lifecycle blocks on async work (`.GetAwaiter().GetResult()`) because the hook is synchronous. `ProtoTestAttribute` is marked `[Obsolete]`; prefer `[ProtoTestFact]` / `[ProtoTestTheory]`.

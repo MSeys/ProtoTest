@@ -38,7 +38,7 @@ The test runs when `ProtoHost.HasCapability(kind, CapabilityName)` is true. Othe
     Reason = "No broker is configured; set ProtoTest:Messaging:RabbitMq:ConnectionString.")]
 ```
 
-Integrations register a capability when they are configured, so the condition answers what the host *can actually do* rather than what it was asked to do. `ProtoCapabilityKinds` lists the built-in kinds — `server`, `protocol`, `store`, `broker`, `data`, `document` — and an integration may use its own. Use `CapabilityName` to require one specific capability of that kind:
+Integrations register a capability when they are configured, so the condition answers what the host *can actually do* rather than what it was asked to do. `ProtoCapabilityKinds` lists the built-in kinds — `server`, `protocol`, `browser`, `store`, `broker`, `data`, `document` — and an integration may use its own. Use `CapabilityName` to require one specific capability of that kind:
 
 ```csharp
 [RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "Northstar standalone")]
@@ -55,6 +55,43 @@ Class-level and method-level conditions accumulate like any other attribute; the
 ```
 
 Because `"server"` is a capability *kind* and not a hosting mode, any registered server capability satisfies it. A suite that registers a `server` capability for something other than the in-process application — a standalone copy it started itself — will run the test too. Require a `CapabilityName` when only a particular server may satisfy the condition.
+
+## Requiring a Playwright browser
+
+`AddWeb(...)` registers a `browser` capability named `Playwright` (or `Selenium`), so `[RequiresCapability(ProtoCapabilityKinds.Browser, CapabilityName = "Playwright")]` proves the backend is composed — it says nothing about whether a browser actually exists on the machine. `ProtoTest.Web.Playwright` ships a stronger, opt-in condition that probes the browser before the lifecycle starts, without launching one:
+
+```csharp
+[RequiresPlaywrightBrowser]                                   // the configured browser
+[RequiresPlaywrightBrowser(browser: PlaywrightBrowser.Firefox)]
+[RequiresPlaywrightBrowser(channel: "msedge", Reason = "No Edge in this environment.")]
+[RequiresPlaywrightBrowser(Session = "Admin")]                // the Admin session's options
+public async Task ...() { ... }
+```
+
+The condition reads the host's Playwright options — your `AddWeb(...)` callback supplies the defaults, configuration overrides them — and returns:
+
+- **nothing to skip** when `InstallBrowsers` is true — the backend pool downloads the browser on demand before its first launch;
+- **nothing to skip** when the configured bundled browser's executable exists; the probe starts the Playwright driver (no browser process is launched) and reads `BrowserType.ExecutablePath`;
+- **nothing to skip** for a channel Playwright recognizes (`chrome`, `msedge`, …) — a channel names a system browser, which only a real launch can resolve, so the condition cannot prove one absent; an unrecognized channel does skip;
+- **a reason naming Playwright** otherwise, pointing at the install options (`playwright.ps1 install …`, `InstallBrowsers=true`, or a `Channel`).
+
+Set `Session = "Admin"` when the test drives a named session: the probe then merges that session's `ProtoTest:Web:Sessions:Admin` section over `ProtoTest:Web:Playwright`, exactly like the backend binds, so a session-level browser, channel or install-browsers setting never disagrees with the launch.
+
+Like any condition, `Reason` replaces that default message.
+
+Selenium has no equivalent probe: the driver comes from your own factory, so the framework cannot know whether a browser exists. Gate Selenium tests with `[RequiresCapability(ProtoCapabilityKinds.Browser, CapabilityName = "Selenium")]` and a try/catch around the first session that uses the browser, calling your runner's skip mechanism:
+
+```csharp
+try
+{
+    var home = Proto.Context.Web().Page<HomePage>();
+    await home.OpenAsync("/");
+}
+catch (Exception exception) when (exception is WebDriverException or InvalidOperationException)
+{
+    Assert.Ignore($"No Selenium browser is available: {exception.Message}");
+}
+```
 
 ## Writing your own
 
@@ -79,7 +116,7 @@ Adapters evaluate the conditions before calling `StartTestAsync`:
 - nothing is written to the trace — no test record, no entries;
 - no teardown runs, because there is nothing to tear down.
 
-The reason is handed to the runner's skip mechanism, with one exception:
+The reason is handed to the runner's skip mechanism:
 
 | Runner | How the skip is raised | Reason reported |
 | --- | --- | --- |
@@ -87,9 +124,9 @@ The reason is handed to the runner's skip mechanism, with one exception:
 | [xUnit v2](../runners/xunit.md) with `[ProtoTestFact]` and `[ProtoTestTheory]` | `TestSkipped(Test, reason)` | yes |
 | [xUnit v3](../runners/xunit3.md) | `Assert.Skip(reason)` | yes |
 | [TUnit](../runners/tunit.md) | `TUnit.Core.Skip.Test(reason)` | yes |
-| [MSTest](../runners/mstest.md) | an ignored `TestResult` | **no** |
+| [MSTest](../runners/mstest.md) | an ignored `TestResult` | yes, on its `DisplayName` and `LogOutput` |
 
-MSTest has no dynamic skip API in the version ProtoTest targets, so the adapter can only return an ignored result carrying the method name. The reason is dropped — the test is still skipped, but the runner's output won't say why.
+MSTest has no public dynamic skip API in the version ProtoTest targets, so the adapter returns an ignored result instead. Its `IgnoreReason` is internal, so the reason travels on the public `LogOutput` and is also prefixed to the display name — the test reads as skipped and the runner's output still says why.
 
 :::note[Skipped tests are absent, not empty]
 Because nothing starts, a skipped test has no context, no trace record and no report entry. It appears in the runner's own results as skipped and nowhere in ProtoTest's output — the [runner overview](../runners/overview.md) describes the same rule from the outcome side.
@@ -97,7 +134,6 @@ Because nothing starts, a skipped test has no context, no trace record and no re
 
 ## Limits
 
-- **The obsolete xUnit v2 `[Fact]` + `[ProtoTest]` style doesn't evaluate conditions.** `ProtoTestAttribute` is a `BeforeAfterTestAttribute` that starts the lifecycle directly, with no skip check. Use `[ProtoTestFact]` / `[ProtoTestTheory]`.
 - **A condition only sees registered capabilities.** If an integration isn't configured, its capability is absent and tests that require it skip — which is the point. Configure the integration (or provide the connection string it reads) to make them run.
 - **`[RequiresInProcess]` doesn't inspect `BaseUrl`.** With no in-process server registered it skips, regardless of what the host can reach over the network.
 - **The reason is fixed at compile time.** Attribute arguments are constants; build messages from a name or a configuration key, as the examples do.

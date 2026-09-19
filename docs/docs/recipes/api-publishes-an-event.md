@@ -23,7 +23,7 @@ protected override void Configure(IProtoHostBuilder builder) =>
         // One broker for the run, its address handed to the tests and to the application.
         .AddInfrastructure(
             RabbitMqBroker.Container(),
-            ProtoRabbitMqOptions.ConnectionStringSetting,
+            RabbitMqOptions.ConnectionStringSetting,
             "Messaging:RabbitMq:ConnectionString")
         .AddApplication("Api", app => app
             .AddAspNetCoreServer<Program>()
@@ -65,7 +65,7 @@ public sealed class InvoiceTests
             .PostAsync("/api/invoices/{invoiceId}/pay", new { invoiceId = invoice.Id });
         paid.ShouldHaveHttpStatus(HttpStatusCode.OK);
 
-        var message = await Proto.Context.Messages().AwaitAsync(
+        var message = await Proto.Context.Messaging().AwaitAsync(
             "invoice.paid",
             candidate => candidate.Payload?.Contains($"\"id\":{invoice.Id}") == true,
             TimeSpan.FromSeconds(15));

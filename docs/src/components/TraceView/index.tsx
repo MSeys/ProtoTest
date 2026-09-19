@@ -41,6 +41,22 @@ const mismatches = [
   {property: 'planId', expected: '"nonexistent-plan"', actual: '"free"'},
 ];
 
+/* Where the check sits in the suite: the location the trace recorded, and the lines it embedded around it. */
+const source = {
+  file: 'DiagnosticsShowcase.cs',
+  line: 119,
+  method: 'DiagnosticsShowcase.TheOrganizationReportsItsPlanAndProjectCount',
+  lines: [
+    [116, 'using var organization = await Proto.Context.Rest().GetAsync("/api/v1/organization");'],
+    [117, ''],
+    [118, '// Assert'],
+    [119, 'organization.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new'],
+    [120, '{'],
+    [121, '    projectCount = 99,'],
+    [122, '    planId = "nonexistent-plan"'],
+  ] as const,
+};
+
 const phases: Phase[] = [
   {
     name: 'Setup',
@@ -140,6 +156,22 @@ export default function TraceView(): ReactNode {
           <strong>Assert response shape</strong>
           <span className={styles.verdict}>2 mismatches</span>
           <span className={styles.on}>on REST · GET /api/v1/organization</span>
+        </div>
+        <div className={styles.source}>
+          <div className={styles.sourceHead}>
+            <b>
+              {source.file}:{source.line}
+            </b>
+            <small>{source.method}</small>
+          </div>
+          <pre>
+            {source.lines.map(([number, text]) => (
+              <span key={number} className={number === source.line ? styles.current : undefined}>
+                <b>{number}</b>
+                {text || ' '}
+              </span>
+            ))}
+          </pre>
         </div>
         <div className={styles.shape}>
           <div className={styles.shapeHead}>Validated document</div>

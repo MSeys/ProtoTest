@@ -42,11 +42,12 @@ The runners differ in how much outcome information they can hand back, which sho
 | xUnit v3, NUnit, MSTest | Passed / Failed / Skipped, with the exception |
 | xUnit v2 with `[ProtoTestFact]` and `[ProtoTestTheory]` | Passed / Failed / Cancelled, with the exception |
 | TUnit | Passed / Failed / Cancelled, with the exception |
-| xUnit v2 with `[Fact]` + `[ProtoTest]` | Always `Unknown` — see [xUnit v2](./xunit.md#the-older-fact--prototest-style) |
+
+NUnit also records `Partial` when NUnit reports a `Warning` status: the test ran and passed with warnings attached. xUnit v3 and MSTest record `Unknown` when the runner reports a state their mapping doesn't cover (an unmapped xUnit result state, or an MSTest outcome other than passed, ignored/inconclusive, failed, error, timeout or aborted).
 
 ## Skip conditions
 
-A test can declare what it needs and skip when the host doesn't have it. All adapters evaluate [`[RequiresCapability]` and `[RequiresInProcess]`](../foundation/skip-conditions.md) before `StartTestAsync` — so a skipped test has no context, no trace entry and no teardown. The reason reaches NUnit, xUnit v3, TUnit and the xUnit v2 `[ProtoTestFact]` / `[ProtoTestTheory]` attributes; MSTest can only return an ignored result without a message. The obsolete xUnit v2 `[Fact]` + `[ProtoTest]` style doesn't evaluate conditions at all. See [Skip conditions](../foundation/skip-conditions.md) for the exact per-runner behaviour.
+A test can declare what it needs and skip when the host doesn't have it. All adapters evaluate [`[RequiresCapability]` and `[RequiresInProcess]`](../foundation/skip-conditions.md) before `StartTestAsync` — so a skipped test has no context, no trace entry and no teardown. The reason reaches NUnit, xUnit v3, TUnit and the xUnit v2 `[ProtoTestFact]` / `[ProtoTestTheory]` attributes; MSTest carries it on the ignored result's display name and log output. See [Skip conditions](../foundation/skip-conditions.md) for the exact per-runner behaviour.
 
 ## Attachments
 

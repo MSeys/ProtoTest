@@ -54,7 +54,7 @@ Setting `ProtoTest:Database=postgres` or `ProtoTest:Messaging:Broker=container` 
 ```csharp
 builder.AddInfrastructure(
     RabbitMqBroker.Container(),
-    ProtoRabbitMqOptions.ConnectionStringSetting,
+    RabbitMqOptions.ConnectionStringSetting,
     "Messaging:RabbitMq:ConnectionString");
 
 builder.AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar");

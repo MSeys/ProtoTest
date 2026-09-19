@@ -50,7 +50,11 @@ builder.AddApplication("Api", app => app.AddAspNetCoreServer<Program>(lifetime: 
 
 Choose `PerTest` when the application keeps state you can't partition — static caches, a single in-memory database without tenant separation — or when tests leave state behind in singleton services, such as a recording fake.
 
-The trace's `aspnetcore.server.initialize` event records the lifetime and whether the instance was reused (`server.reused`).
+The trace's `aspnetcore.server.initialize` event records the lifetime and whether the instance was reused (`aspnetcore.server.reused`).
+
+## Page coverage
+
+When the server runs in-process, starting it also inventories its page-like GET routes: each becomes a `web.page.available` observation, so the [web coverage report](./web/index.md#page-coverage) can show pages that exist but were never visited. The inventory is recorded once, by the first test that initializes the server, and coverage aggregates those observations for the whole run, so later tests do not repeat them; a failed inventory is not recorded, so a later test retries it. Razor Pages, MVC actions with HTML evidence (a `text/html` response or a view-result return type) and endpoints that declare `text/html` count — including `[ApiController]` actions that produce HTML; JSON controller actions do not. Only endpoints that explicitly declare GET count, and API-shaped, parameterized and catch-all routes do not. Narrow or widen the list per application with `ProtoTest:Applications:{app}:Web:Pages:Include` and `:Exclude` globs (an array or a scalar value). A published application never starts in-process, so there the inventory comes from `ProtoTest:Web:Pages` instead.
 
 ## Customising the application
 

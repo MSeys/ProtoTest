@@ -45,7 +45,7 @@ summary.Range("A4:B5").ShouldMatch(
 ]);
 ```
 
-Values are typed best-effort from the OpenXML cell type and number format. A missing sheet fails with the names that do exist; a reference outside the used range is an empty cell, not an error. Assertions are traced as `sheets.assert` operations with expected and actual values.
+Values are typed best-effort from the OpenXML cell type and number format. A missing sheet fails with the names that do exist; a reference outside the used range is an empty cell, not an error. Assertions are traced as `assert.sheets` operations with expected and actual values.
 
 ## Typed sheet models
 

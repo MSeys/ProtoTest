@@ -1,7 +1,7 @@
 ---
 sidebar_position: 6
 title: TUnit
-description: "Set up ProtoTest with TUnit: the test executor, the assembly hooks, [ProtoTest] tests and outcomes."
+description: "Set up ProtoTest with TUnit: the test executor, the assembly hooks, [Test] tests and outcomes."
 ---
 
 # TUnit

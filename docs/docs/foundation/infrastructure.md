@@ -51,7 +51,7 @@ Every key in `settings` receives the started connection string, so one started c
 ```csharp
 builder.AddInfrastructure(
     RabbitMqBroker.Container(),
-    ProtoRabbitMqOptions.ConnectionStringSetting,   // "ProtoTest:Messaging:RabbitMq:ConnectionString"
+    RabbitMqOptions.ConnectionStringSetting,   // "ProtoTest:Messaging:RabbitMq:ConnectionString"
     "Messaging:RabbitMq:ConnectionString");         // the in-process application's key
 ```
 
@@ -65,7 +65,7 @@ The sample suite registers exactly these two pieces of infrastructure:
 // Broker: one key for the messaging adapter, one for the in-process application.
 builder.AddInfrastructure(
     RabbitMqBroker.Container(),
-    ProtoRabbitMqOptions.ConnectionStringSetting,
+    RabbitMqOptions.ConnectionStringSetting,
     "Messaging:RabbitMq:ConnectionString");
 
 // Database: the application's key, and the same key the test-side domain reads.

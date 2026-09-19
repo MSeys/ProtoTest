@@ -71,7 +71,7 @@ The object overload serialises as `application/json`. The factory overload is in
 RestRequestBuilder Header(string name, string value);
 ```
 
-Header names are case-insensitive and the last value for a name wins. ProtoTest tries the request headers first and falls back to the content headers, throwing `InvalidOperationException` if neither accepts it.
+Header names are case-insensitive and the last value for a name wins. ProtoTest tries the request headers first and falls back to the content headers, throwing `InvalidOperationException` if neither accepts it. Header values are never traced; the trace records the count and each header's name.
 
 ## Authentication
 

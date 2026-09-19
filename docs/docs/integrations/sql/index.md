@@ -24,7 +24,7 @@ builder.AddSql(
     sql => sql.Isolation = SqlIsolation.Transaction);
 ```
 
-`AddSql` takes the factory that creates the test's `DbConnection` and an optional options callback. It registers the `SQL` store capability, the factory and `ProtoSqlSession` as scoped services (so each test gets its own), the options, the test hook that opens and releases the connection, and the run hook that guards the isolation declarations. Calling it twice on one host throws.
+`AddSql` takes the factory that creates the test's `DbConnection` and an optional options callback. It registers the `SQL` store capability, the factory and `ProtoSqlSession` as scoped services (so each test gets its own), the options, the test hook that opens and releases the connection, and the run hook that guards the isolation declarations. Calling it twice on one host is a no-op: the first registration's factory and options win.
 
 The factory runs inside the test's scope, so it can resolve services — the demo reads a container's connection string from infrastructure settings:
 
@@ -57,8 +57,8 @@ An undeclared application fails the run at start with an explanation telling you
 
 | Key | Option | Default |
 | --- | --- | --- |
-| `ProtoTest:Sql:Isolation` | `ProtoSqlOptions.Isolation` (`Transaction` or `None`) | `Transaction` |
-| `ProtoTest:Sql:SharedWithApplications` | `ProtoSqlOptions.SharedWithApplications` (a list of application names) | empty |
+| `ProtoTest:Sql:Isolation` | `SqlOptions.Isolation` (`Transaction` or `None`) | `Transaction` |
+| `ProtoTest:Sql:SharedWithApplications` | `SqlOptions.SharedWithApplications` (a list of application names) | empty |
 
 `SharedWith` is the read-only view of the declared names, `ShareConnectionWith(params string[])` is the code API for the same thing, and `SharesConnectionWith(name)` answers whether one was declared. Configuration is layered over the code callback, as with every [configurable option](../../getting-started/configuration.md).
 
@@ -103,10 +103,11 @@ var connectionString = provider.GetService<ProtoInfrastructureSettings>() is { }
     : fallback;
 ```
 
-An application hosted in process receives the same keys as host settings automatically (see [ASP.NET Core](../aspnetcore.md)), so the application and the tests can point at one database without environment variables. The default image is `postgres:16-alpine`, configurable through the builder passed to `Container`. `Container()` does not start anything now: the host starts it with the run, so a missing Docker runtime fails the run's start. `TryStart` reports the reason instead of throwing (for a fallback or a skip decision), and `Start` starts now or throws.
+An application hosted in process receives the same keys as host settings automatically (see [ASP.NET Core](../aspnetcore.md)), so the application and the tests can point at one database without environment variables. The default image is `postgres:16-alpine`, configurable through the builder passed to `Container`. `Container()` does not start anything now: the host starts it with the run — before any test-level skip condition — so a missing Docker runtime fails the run's start. `TryStart` reports the reason instead of throwing: call it in the suite fixture before `AddInfrastructure` to fall back or skip the suite, and `Start` starts now or throws.
 
 ## Tracing
 
+- Operations follow the connection's lifecycle: `sql.connection.open` (Setup, with `sql.connection.type`), `sql.transaction.begin` (Setup, child of the open, with `sql.isolation`), `sql.transaction.rollback` (Teardown, inside the connection resource's release) and `sql.enlist` (Setup, when a `DbContext` joins the transaction, with `db.context`).
 - The connection is a **test-scoped resource**: entity kind `database`, id `database:connection`, described as the connection type and isolation, plus the names it is shared with when there are any. Its release runs in teardown before the test's clients are disposed, and is recorded as a `resource.release` entry with `resource.kind = database`.
 - The run registers `SQL` and `Entity Framework Core` as `store` capabilities.
 - Individual commands are not traced — ProtoTest records the connection's lifecycle, not the SQL your test sends.
@@ -139,7 +140,7 @@ Isolation stays `None` on purpose: the in-process application keeps its own conn
 
 ## Limits
 
-- **The container needs a container runtime.** `PostgresDatabase.Container()` fails the run at start when the runtime is missing; use `TryStart` outside the host to decide to fall back to another database or skip the tests that need one.
+- **The container needs a container runtime.** The container starts with the host, before any test-level skip condition, so `PostgresDatabase.Container()` fails the run at start when the runtime is missing; call `TryStart` in the suite fixture before registering it to fall back to another database, or skip the suite with the reported reason.
 - **The transaction covers one connection.** The application's own connection is not rolled back unless the application is built on ProtoTest's connection; `ShareConnectionWith` declares that fact and satisfies the run-start guard, but it does not make the application use the connection.
 - **The guard only sees registered applications.** An application hosted without `AddApplication` cannot be detected, so nothing fails the run if it writes outside the transaction.
-- **`AddSql` is once per host.** A second call throws rather than layering a second connection.
+- **`AddSql` is once per host.** A second call is a no-op rather than layering a second connection: the first registration's factory and options win, matching [repeated registration](../../getting-started/configuration.md#repeated-registration).

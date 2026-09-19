@@ -39,6 +39,10 @@ builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryColl
 
 Tests read configuration through `Proto.Context.Configuration`.
 
+## Repeated registration
+
+Repeated registration is safe: calling an integration's `AddX` — `AddRest`, `AddGraphQL`, `AddGrpc`, `AddMessaging`, `AddSheets`, `AddWeb`, `AddAspNetCoreServer`, `AddSql`, `AddData`, `AddEntityFrameworkCore`, `AddInfrastructure`, `AddSink`, `AddCapability` — more than once never errors. Infrastructure is registered once — hooks, options, capabilities and run resources are first-wins — while clients compose: a second `AddRest(rest => rest.AddClient("Second"))` adds that client instead of discarding it, and re-registering the same client name keeps the first registration that initializes. A call whose `configure` callback throws does not prevent a later successful call. Registrations that are additive by design, such as `AddData` defaults and coverage collectors, keep composing. Calling each `AddX` once remains the clearest style; the guarantee exists so a helper invoked twice cannot duplicate services or run resources.
+
 ## Which value wins
 
 For options that support both, values are applied in this order — **later wins**:

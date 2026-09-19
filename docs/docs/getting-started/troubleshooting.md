@@ -26,7 +26,7 @@ Each runner's page under [Test runners](../runners/overview.md) shows the comple
 
 > **No active ProtoExecutionContext available on this thread.**
 
-`Proto.Context` was read outside a ProtoTest test. Usually the test uses the runner's own attribute — `[Test]`, `[Fact]`, `[TestMethod]` — instead of `[ProtoTest]`, which is what opens the context. It also happens in code that runs outside the test's async flow, such as a static initializer or a thread started by hand; pass the `ProtoExecutionContext` along instead.
+`Proto.Context` was read outside a ProtoTest test. Usually the test uses the runner's own attribute — `[Test]`, `[Fact]`, `[TestMethod]` — instead of the ProtoTest attribute that opens the context (`[ProtoTest]`, or `[ProtoTestFact]` / `[ProtoTestTheory]` for xUnit). It also happens in code that runs outside the test's async flow, such as a static initializer or a thread started by hand; pass the `ProtoExecutionContext` along instead.
 
 ## A client cannot be resolved
 
@@ -53,7 +53,7 @@ Infrastructure such as `PostgresDatabase.Container()` runs on Docker through Tes
 
 - Start Docker Desktop, or on Linux make sure the current user can reach the Docker socket.
 - On CI, use a runner image with Docker available.
-- To run the suite where Docker is not available, give it a connection string through configuration instead of a container, and mark the tests that need the container with `[RequiresCapability]` so they skip there. See [Skip conditions](../foundation/skip-conditions.md).
+- To run the suite where Docker is not available, give it a connection string through configuration instead of a container. `[RequiresCapability]` cannot skip past it: `AddInfrastructure` starts containers with the host, so the run fails at start. Call `PostgresDatabase.TryStart(...)` or `RabbitMqBroker.TryStart(...)` in the suite fixture before registering infrastructure — it reports why the container could not start, so the fixture can choose a fallback mode or skip the suite with that reason (`Start` starts now or throws). See [Skip conditions](../foundation/skip-conditions.md).
 
 ## The browser does not launch
 

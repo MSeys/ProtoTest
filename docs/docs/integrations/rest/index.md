@@ -34,7 +34,8 @@ A test selects the application with `[Application("Api")]`; the protocol accesso
 IProtoTargetBuilder AddClient(
     string name = "Default",
     string? baseUrl = null,
-    Action<IHttpClientBuilder>? configure = null);
+    Action<IHttpClientBuilder>? configure = null,
+    string? endpoint = null);
 
 IProtoTargetBuilder AddClient(
     string name,
@@ -47,9 +48,11 @@ IProtoTargetBuilder AddClient(
     Action<IHttpClientBuilder>? configure = null);
 ```
 
-The resolver overloads let the target depend on the running test — useful when each test gets its own tenant or environment. The URI is resolved per request.
+The resolver overloads let the target depend on the running test — useful when each test gets its own tenant or environment. The URI is resolved per request. On the first overload, `endpoint` names the `Endpoints` key to join to the application's base URL; it defaults to the client name.
 
 A base URL that isn't an absolute `http`/`https` URI throws `ArgumentException`.
+
+`AddClientFrom(name, sourceClientName, basePath)` registers a client that reuses the transport of an HTTP client another integration registered, such as an in-process ASP.NET Core server, optionally rooted at a path. See [ASP.NET Core](../aspnetcore.md).
 
 ### Base URL from configuration
 

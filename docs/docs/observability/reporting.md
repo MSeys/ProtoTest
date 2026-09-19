@@ -33,7 +33,9 @@ Both files are also added to the [`.prototrace` archive](./prototrace.md#the-fil
 
 A single self-contained page: a summary (covered, uncovered, occurrences, findings, run gates, resources, errors) and every report item — endpoint → response → property for OpenAPI, type → field → argument for GraphQL — with covered, partially covered and uncovered paths marked.
 
-Items are different things, so the report keeps them apart in sections: **Coverage** for what the contract exercises, **Findings** for evidence tests deliberately recorded, **Run gates** for run verdicts, labelled passed, advisory, failed or skipped, and **Resources** for what tests owned and released. An integration's own kind gets a section too, titled after the kind, rather than being dropped. Searching and filtering apply across all sections, and a section that filters to nothing disappears.
+Items are different things, so the report keeps them apart in sections: **Coverage** for what the contract exercises, **Findings** for evidence tests deliberately recorded, **Run gates** for run verdicts, labelled passed, warning, failed or skipped, and **Resources** for what tests owned and released. An integration's own kind gets a section too, titled after the kind, rather than being dropped. Searching and filtering apply across all sections, and a section that filters to nothing disappears.
+
+The report is a snapshot taken before the run's own resources are released: test-scoped resources have already been released when it is written, but a run-scoped resource (infrastructure, a container) still reads as registered and neutral there. Its release is recorded in the [ProtoTrace](./prototrace.md), after the reports were written.
 
 ## The JSON report
 
@@ -59,7 +61,7 @@ The same data, for tooling:
 }
 ```
 
-Property names match the .NET types (`ProtoReport`, `ProtoReportSummary`, `ProtoReportItem`) and enums are written as strings. The summary counts nested items too; `TotalOccurrences` counts observed hits only, so a finding or a gate verdict does not inflate it, and `CoveragePercentage` is rounded to two decimals and is `0` when there are no coverage items.
+Property names match the .NET types (`ProtoReport`, `ProtoReportSummary`, `ProtoReportItem`) and enums are written as strings. The summary counts nested items too; `TotalOccurrences` counts observed hits only, so a finding or a gate verdict does not inflate it, and `CoveragePercentage` is rounded to two decimals and is `0` when there are no coverage items. Coverage totals count units only: an item whose `IsCovered` is `null` is an aggregate row (a GraphQL type, for example), not a unit, so it stays out of `CoverageTotal`, `Covered`, `Uncovered` and `CoveragePercentage` — and a run gate's `CoverageSummaries` leaves it out too.
 
 :::tip[A coverage gate]
 A **run gate** checks the finished report and fails the run when it says no. Register one with `AddRunGate`; it can read coverage through `CoverageFor` / `CoverageSummaries`, so a threshold gate is a few lines rather than a CI script.

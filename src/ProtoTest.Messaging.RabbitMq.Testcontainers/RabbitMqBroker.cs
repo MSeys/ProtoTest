@@ -52,27 +52,13 @@ public sealed class RabbitMqBroker : ProtoContainerResource<RabbitMqContainer>
         out string? error)
     {
         var candidate = Container(configure);
-        try
+        if (TryStartContainer(candidate, out error))
         {
-            candidate.StartAsync().GetAwaiter().GetResult();
             broker = candidate;
-            error = null;
             return true;
         }
-        catch (Exception exception)
-        {
-            broker = null;
-            error = $"{exception.GetType().Name}: {exception.Message}";
-            try
-            {
-                candidate.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            }
-            catch
-            {
-                // The start failure is what the caller needs to see.
-            }
 
-            return false;
-        }
+        broker = null;
+        return false;
     }
 }

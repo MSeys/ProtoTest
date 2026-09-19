@@ -17,7 +17,7 @@ public static class ProtoGrpcClientRegistration
         string protocolName,
         string name,
         string? address,
-        Action<ProtoGrpcClientOptions>? configure,
+        Action<GrpcClientOptions>? configure,
         string? application = null,
         bool allowMissingAddress = false)
     {
@@ -32,7 +32,7 @@ public static class ProtoGrpcClientRegistration
 
         services.AddSingleton<IProtoClientInitializer>(serviceProvider =>
         {
-            var options = new ProtoGrpcClientOptions();
+            var options = new GrpcClientOptions();
             configure?.Invoke(options);
             options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
             return new ProtoGrpcClientInitializer(
@@ -44,7 +44,7 @@ public static class ProtoGrpcClientRegistration
                 application: application);
         });
         services.AddSingleton(new ProtoApplicationTarget(name, application ?? name));
-        return new ProtoGrpcTargetBuilder(name, services);
+        return new ProtoTargetBuilder(name, services);
     }
 
     /// <summary>Registers a named gRPC client whose address is resolved from per-test context.</summary>
@@ -53,7 +53,7 @@ public static class ProtoGrpcClientRegistration
         string protocolName,
         string name,
         Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> addressResolver,
-        Action<ProtoGrpcClientOptions>? configure,
+        Action<GrpcClientOptions>? configure,
         string? application = null)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -62,7 +62,7 @@ public static class ProtoGrpcClientRegistration
 
         services.AddSingleton<IProtoClientInitializer>(serviceProvider =>
         {
-            var options = new ProtoGrpcClientOptions();
+            var options = new GrpcClientOptions();
             configure?.Invoke(options);
             options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
             return new ProtoGrpcClientInitializer(
@@ -73,8 +73,7 @@ public static class ProtoGrpcClientRegistration
                 application: application,
                 addressResolver: addressResolver);
         });
-        services.AddSingleton(new ProtoGrpcAddressRegistration(protocolName, name, addressResolver));
         services.AddSingleton(new ProtoApplicationTarget(name, application ?? name));
-        return new ProtoGrpcTargetBuilder(name, services);
+        return new ProtoTargetBuilder(name, services);
     }
 }

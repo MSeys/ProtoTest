@@ -1,6 +1,7 @@
 namespace ProtoTest.Messaging.RabbitMq;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 using ProtoTest.Messaging;
@@ -14,25 +15,26 @@ public static class ProtoMessagingBuilderExtensions
     /// </summary>
     public static ProtoMessagingBuilder UseRabbitMq(
         this ProtoMessagingBuilder messaging,
-        Action<ProtoRabbitMqOptions>? configure = null)
+        Action<RabbitMqOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(messaging);
-        messaging.Services.AddSingleton(serviceProvider =>
+        // The first RabbitMQ registration wins, like every other option; a repeated call cannot replace it.
+        messaging.Services.TryAddSingleton(serviceProvider =>
         {
-            var options = new ProtoRabbitMqOptions();
+            var options = new RabbitMqOptions();
             configure?.Invoke(options);
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
             options.BindFromConfiguration(configuration);
 
             // Precedence: an explicitly configured connection string wins, then a started broker
             // container, then whatever the registration or the defaults chose.
-            var configured = configuration[ProtoRabbitMqOptions.ConnectionStringSetting];
+            var configured = configuration[RabbitMqOptions.ConnectionStringSetting];
             if (!string.IsNullOrWhiteSpace(configured))
             {
                 options.ConnectionString = configured;
             }
             else if (serviceProvider.GetService<ProtoInfrastructureSettings>() is { } settings
-                && settings.Values.TryGetValue(ProtoRabbitMqOptions.ConnectionStringSetting, out var provided))
+                && settings.Values.TryGetValue(RabbitMqOptions.ConnectionStringSetting, out var provided))
             {
                 options.ConnectionString = provided;
             }
@@ -41,7 +43,7 @@ public static class ProtoMessagingBuilderExtensions
         });
         return messaging.UseBroker(serviceProvider =>
         {
-            var options = serviceProvider.GetRequiredService<ProtoRabbitMqOptions>();
+            var options = serviceProvider.GetRequiredService<RabbitMqOptions>();
             return new RabbitMqMessageBroker(options);
         });
     }

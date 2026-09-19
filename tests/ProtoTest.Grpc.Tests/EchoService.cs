@@ -6,11 +6,12 @@ using global::Grpc.Core;
 public sealed class EchoService : Echo.EchoBase
 {
     public static string? LastAuthorization { get; private set; }
+    public static string? LastStreamAuthorization { get; private set; }
 
     public override Task<EchoReply> Say(EchoRequest request, ServerCallContext context)
     {
         LastAuthorization = context.RequestHeaders.GetValue("authorization");
-        return Task.FromResult(new EchoReply { Message = request.Message });
+        return Task.FromResult(new EchoReply { Message = request.Message, Password = request.Password });
     }
 
     public override async Task Stream(
@@ -18,6 +19,7 @@ public sealed class EchoService : Echo.EchoBase
         IServerStreamWriter<EchoReply> responseStream,
         ServerCallContext context)
     {
+        LastStreamAuthorization = context.RequestHeaders.GetValue("authorization");
         foreach (var part in request.Message.Split(',', StringSplitOptions.RemoveEmptyEntries))
         {
             await responseStream.WriteAsync(new EchoReply { Message = part.Trim() });

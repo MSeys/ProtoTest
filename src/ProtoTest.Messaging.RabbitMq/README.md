@@ -1,6 +1,6 @@
 # ProtoTest.Messaging.RabbitMq
 
-RabbitMQ adapter for the ProtoTest messaging capability: publish to exchanges and tap events through one queue per awaited destination.
+RabbitMQ adapter for the ProtoTest messaging capability: publish to exchanges and tap events through a per-test queue per awaited destination.
 
 ```bash
 dotnet add package ProtoTest.Messaging.RabbitMq --prerelease
@@ -18,9 +18,9 @@ For a broker the run owns, add the container as infrastructure instead - the sta
 
 ```csharp
 builder.AddInfrastructure(RabbitMqBroker.Container(),
-    ProtoRabbitMqOptions.ConnectionStringSetting, "Messaging:RabbitMq:ConnectionString");
+    RabbitMqOptions.ConnectionStringSetting, "Messaging:RabbitMq:ConnectionString");
 builder.AddMessaging(messaging => messaging.UseRabbitMq());
 ```
 
 
-Publishing sends to the exchange named like the destination, so the application's topology decides routing. Awaiting uses a run-level tap: one exclusive, auto-delete queue per awaited destination, bound catch-all to the destination exchange and prepared (purged) before the act so another test's messages cannot satisfy it. The queue stays declared for the run, and an await for a destination that was never prepared binds just in time, seeing only messages published after the await begins. A tap never competes with the application's own consumers; parallel tests should await distinct destinations. The connection is owned and released by the run. See the [messaging guide](https://github.com/MSeys/ProtoTest/blob/main/docs/docs/integrations/messaging/index.md).
+Publishing sends to the exchange named like the destination, so the application's topology decides routing. Awaiting uses a genuinely per-test tap: the test's consumer owns its own channel on the run's shared connection and declares one exclusive, auto-delete queue per awaited destination, bound to the destination exchange with the destination routing key and with `#`. Direct exchanges match the routing key, topic exchanges match the catch-all, and fanout and headers exchanges match every message because their bindings carry no arguments. A destination that was never prepared is bound just in time at the await, seeing only messages published after the await begins. Every queue is deleted when the test ends, a tap never competes with the application's own consumers, and parallel tests on the same destination each get their own queue. The connection is owned and released by the run. See the [messaging guide](https://github.com/MSeys/ProtoTest/blob/main/docs/docs/integrations/messaging/index.md).

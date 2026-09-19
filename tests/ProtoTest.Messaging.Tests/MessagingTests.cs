@@ -15,7 +15,7 @@ public sealed class MessagingTests
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("messaging publish", TestMethod());
-        var messages = context.Messages();
+        var messages = context.Messaging();
 
         await messages.PublishAsync("invoices", "{\"id\":1}", contentType: "application/json");
         var received = await messages.AwaitAsync(
@@ -43,7 +43,7 @@ public sealed class MessagingTests
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("messaging timeout", TestMethod());
-        var messages = context.Messages();
+        var messages = context.Messaging();
 
         var timeout = Assert.ThrowsAsync<TimeoutException>(async () =>
             await messages.AwaitAsync("invoices", _ => false, TimeSpan.FromMilliseconds(50)));
@@ -61,18 +61,170 @@ public sealed class MessagingTests
         await host.StartAsync();
 
         var first = await host.StartTestAsync("messaging first", TestMethod());
-        await first.Messages().PublishAsync("invoices", "{\"id\":1}");
+        await first.Messaging().PublishAsync("invoices", "{\"id\":1}");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
         var second = await host.StartTestAsync("messaging second", TestMethod());
         var timeout = Assert.ThrowsAsync<TimeoutException>(async () =>
-            await second.Messages().AwaitAsync(
+            await second.Messaging().AwaitAsync(
                 "invoices",
                 message => message.Destination == "invoices",
                 TimeSpan.FromMilliseconds(50)));
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(timeout!));
         Assert.That(timeout!.Message, Does.Contain("invoices"));
+    }
+
+    [Test]
+    public async Task ConsumersCreatedInOrder_ShouldNotSeeEachOthersMessages()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("messaging consumers", TestMethod());
+        var broker = context.Service<IProtoMessageBroker>();
+        var messages = context.Messaging();
+
+        var first = await broker.CreateConsumerAsync();
+        context.RegisterResource("messaging:consumer:first", "consumer", "First consumer", _ => first.DisposeAsync());
+        await first.PrepareAsync(["invoices"]);
+        await messages.PublishAsync("invoices", "{\"id\":1}");
+
+        var second = await broker.CreateConsumerAsync();
+        context.RegisterResource("messaging:consumer:second", "consumer", "Second consumer", _ => second.DisposeAsync());
+        await second.PrepareAsync(["invoices"]);
+        await messages.PublishAsync("invoices", "{\"id\":2}");
+
+        var secondOwn = await second.AwaitAsync(
+            "invoices",
+            message => message.Payload == "{\"id\":2}",
+            TimeSpan.FromSeconds(2));
+        var firstMessages = await first.AwaitAsync(
+            "invoices",
+            message => message.Payload == "{\"id\":2}",
+            TimeSpan.FromSeconds(2));
+        var missed = Assert.ThrowsAsync<TimeoutException>(async () =>
+            await second.AwaitAsync(
+                "invoices",
+                message => message.Payload == "{\"id\":1}",
+                TimeSpan.FromMilliseconds(50)));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(missed!));
+        Assert.Multiple(() =>
+        {
+            Assert.That(secondOwn.Payload, Is.EqualTo("{\"id\":2}"));
+            Assert.That(firstMessages.Payload, Is.EqualTo("{\"id\":2}"));
+            Assert.That(missed!.Message, Does.Contain("invoices"));
+        });
+    }
+
+    [Test]
+    public async Task ThrowingPredicate_ShouldNotHangOrLoseOtherWaiters()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("messaging throwing predicate", TestMethod());
+        var broker = context.Service<IProtoMessageBroker>();
+        var messages = context.Messaging();
+
+        var throwing = await broker.CreateConsumerAsync();
+        context.RegisterResource("messaging:consumer:throwing", "consumer", "Throwing consumer", _ => throwing.DisposeAsync());
+        var healthy = await broker.CreateConsumerAsync();
+        context.RegisterResource("messaging:consumer:healthy", "consumer", "Healthy consumer", _ => healthy.DisposeAsync());
+        await throwing.PrepareAsync(["invoices"]);
+        await healthy.PrepareAsync(["invoices"]);
+
+        var faulty = throwing.AwaitAsync(
+            "invoices",
+            _ => throw new InvalidOperationException("predicate exploded"),
+            TimeSpan.FromSeconds(5));
+        var healthyAwait = healthy.AwaitAsync(
+            "invoices",
+            message => message.Payload == "{\"id\":1}",
+            TimeSpan.FromSeconds(2));
+
+        await messages.PublishAsync("invoices", "{\"id\":1}");
+
+        var received = await healthyAwait;
+        var failure = Assert.ThrowsAsync<InvalidOperationException>(async () => await faulty);
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(failure!));
+        Assert.Multiple(() =>
+        {
+            Assert.That(received.Payload, Is.EqualTo("{\"id\":1}"),
+                "the publish completed and the healthy waiter still matched");
+            Assert.That(failure!.Message, Is.EqualTo("predicate exploded"),
+                "the throwing predicate fails only the await that owns it");
+        });
+    }
+
+    [Test]
+    public async Task RepeatedAwaits_ShouldConsumeInsteadOfRedeliveringTheFirstMatch()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("messaging consumption", TestMethod());
+        var messages = context.Messaging();
+
+        await messages.PublishAsync("invoices", "{\"id\":1}");
+        await messages.PublishAsync("invoices", "{\"id\":2}");
+        var first = await messages.AwaitAsync("invoices", _ => true, TimeSpan.FromSeconds(2));
+        var second = await messages.AwaitAsync("invoices", _ => true, TimeSpan.FromSeconds(2));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.Payload, Is.EqualTo("{\"id\":1}"));
+            Assert.That(second.Payload, Is.EqualTo("{\"id\":2}"),
+                "the first match is consumed, like an auto-acking RabbitMQ tap");
+        });
+    }
+
+    [Test]
+    public async Task Await_ShouldNotTimeOutAfterAMatchWasAssigned()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("messaging boundary", TestMethod());
+        var broker = context.Service<IProtoMessageBroker>();
+        var messages = context.Messaging();
+
+        for (var index = 0; index < 50; index++)
+        {
+            var consumer = await broker.CreateConsumerAsync();
+            var payload = $"{{\"id\":{index}}}";
+            var awaited = consumer.AwaitAsync(
+                "invoices",
+                message => message.Payload == payload,
+                TimeSpan.FromMilliseconds(1));
+            await Task.Run(() => messages.PublishAsync("invoices", payload));
+
+            try
+            {
+                var received = await awaited;
+                Assert.That(received.Payload, Is.EqualTo(payload), "a won race returns the matching message");
+            }
+            catch (TimeoutException)
+            {
+                var recovered = await consumer.AwaitAsync(
+                    "invoices",
+                    message => message.Payload == payload,
+                    TimeSpan.FromSeconds(2));
+                Assert.That(recovered.Payload, Is.EqualTo(payload),
+                    "a lost race must not consume the message already published at the timeout boundary");
+            }
+
+            await consumer.DisposeAsync();
+        }
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
     }
 
     [Test]
@@ -92,7 +244,7 @@ public sealed class MessagingTests
 
         await host.StartAsync();
         var context = await host.StartTestAsync("messaging lifecycle", TestMethod());
-        _ = context.Messages();
+        _ = context.Messaging();
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         Assert.That(adapter.Disposed, Is.False);
 
@@ -104,22 +256,32 @@ public sealed class MessagingTests
     {
         public string Name => "Fake";
 
-        public long Position => 0;
-
         public bool Disposed { get; private set; }
 
         public ValueTask PublishAsync(ProtoMessage message, CancellationToken cancellationToken = default)
             => ValueTask.CompletedTask;
 
-        public ValueTask<ProtoMessage> AwaitAsync(
-            string destination,
-            Func<ProtoMessage, bool> predicate,
-            TimeSpan timeout,
-            long afterPosition,
-            CancellationToken cancellationToken = default)
-            => throw new TimeoutException("The fake broker never has messages.");
+        public ValueTask<IProtoMessageConsumer> CreateConsumerAsync(CancellationToken cancellationToken = default)
+            => new(new FakeConsumer());
 
         public void Dispose() => Disposed = true;
+
+        private sealed class FakeConsumer : IProtoMessageConsumer
+        {
+            public ValueTask PrepareAsync(
+                IReadOnlyCollection<string> destinations,
+                CancellationToken cancellationToken = default)
+                => ValueTask.CompletedTask;
+
+            public ValueTask<ProtoMessage> AwaitAsync(
+                string destination,
+                Func<ProtoMessage, bool> predicate,
+                TimeSpan timeout,
+                CancellationToken cancellationToken = default)
+                => throw new TimeoutException("The fake broker never has messages.");
+
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
     }
 
     private static MethodInfo TestMethod()
@@ -129,4 +291,3 @@ public sealed class MessagingTests
     {
     }
 }
-

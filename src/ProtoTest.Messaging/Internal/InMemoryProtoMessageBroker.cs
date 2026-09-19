@@ -1,10 +1,11 @@
 namespace ProtoTest.Messaging.Internal;
 
 /// <summary>
-/// The default broker: messages live for the run, ordered by a publish position, and
-/// <see cref="AwaitAsync"/> resolves immediately when a matching message already arrived after the
-/// consumer's position. It makes the API and the demo independent of infrastructure; a real adapter
-/// replaces it with the broker the system under test actually uses.
+/// The default broker: messages live for the run, ordered by a publish position, and every consumer
+/// snapshots the current position at creation, so it only ever matches messages published after its own
+/// test started. A match advances that consumer's position, so repeated awaits consume the stream like
+/// RabbitMQ does instead of re-delivering the first match. It makes the API and the demo independent of
+/// infrastructure; a real adapter replaces it with the broker the system under test actually uses.
 /// </summary>
 internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
 {
@@ -15,50 +16,73 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
 
     public string Name => "InMemory";
 
-    public long Position
+    public ValueTask<IProtoMessageConsumer> CreateConsumerAsync(CancellationToken cancellationToken = default)
     {
-        get
+        long position;
+        lock (_gate)
         {
-            lock (_gate)
-            {
-                return _position;
-            }
+            position = _position;
         }
+
+        return new ValueTask<IProtoMessageConsumer>(new InMemoryProtoMessageConsumer(this, position));
     }
 
     public ValueTask PublishAsync(ProtoMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
-        List<Waiter>? matched = null;
+        long position;
+        Waiter[] waiters;
         lock (_gate)
         {
-            var entry = new Entry(++_position, message);
-            _messages.Add(entry);
-            for (var index = _waiters.Count - 1; index >= 0; index--)
+            position = ++_position;
+            _messages.Add(new Entry(position, message));
+            waiters = [.. _waiters];
+        }
+
+        // User predicates run outside the broker lock: a slow or throwing predicate must not stall other
+        // publishes, and its failure only fails the await that owns the predicate.
+        foreach (var waiter in waiters)
+        {
+            if (position <= waiter.AfterPosition
+                || !string.Equals(message.Destination, waiter.Destination, StringComparison.Ordinal))
             {
-                var waiter = _waiters[index];
-                if (entry.Position <= waiter.AfterPosition
-                    || !string.Equals(message.Destination, waiter.Destination, StringComparison.Ordinal)
-                    || !waiter.Predicate(message))
+                continue;
+            }
+
+            lock (waiter)
+            {
+                bool matched;
+                try
                 {
+                    matched = waiter.Predicate(message);
+                }
+                catch (Exception exception)
+                {
+                    lock (_gate)
+                    {
+                        _waiters.Remove(waiter);
+                    }
+
+                    waiter.Completion.TrySetException(exception);
                     continue;
                 }
 
-                matched ??= [];
-                matched.Add(waiter);
-                _waiters.RemoveAt(index);
+                if (!matched) continue;
+                lock (_gate)
+                {
+                    _waiters.Remove(waiter);
+                    // Completed under the lock: an await whose timeout fires at the same instant either
+                    // sees the completed match or the waiter is already gone and the timeout wins; it can
+                    // never time out after a match was assigned.
+                    waiter.Completion.TrySetResult(new MatchedMessage(message, position));
+                }
             }
-        }
-
-        foreach (var waiter in matched ?? [])
-        {
-            waiter.Completion.TrySetResult(message);
         }
 
         return ValueTask.CompletedTask;
     }
 
-    public async ValueTask<ProtoMessage> AwaitAsync(
+    private async ValueTask<MatchedMessage> AwaitAsync(
         string destination,
         Func<ProtoMessage, bool> predicate,
         TimeSpan timeout,
@@ -67,7 +91,7 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(destination);
         ArgumentNullException.ThrowIfNull(predicate);
-        Task<ProtoMessage> completion;
+        Task<MatchedMessage> completion;
         Waiter waiter;
         lock (_gate)
         {
@@ -79,7 +103,7 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
                 .FirstOrDefault();
             if (existing is { } found)
             {
-                return found.Message;
+                return new MatchedMessage(found.Message, found.Position);
             }
 
             waiter = new Waiter(destination, predicate, afterPosition);
@@ -90,15 +114,16 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
         var timeoutTask = Task.Delay(timeout, CancellationToken.None);
         var cancellation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var registration = cancellationToken.Register(() => cancellation.TrySetResult());
-        var completed = await Task.WhenAny(completion, timeoutTask, cancellation.Task);
+        await Task.WhenAny(completion, timeoutTask, cancellation.Task);
 
+        bool assigned;
         lock (_gate)
         {
             _waiters.Remove(waiter);
+            assigned = completion.IsCompleted;
         }
 
-        // A publish may have matched the waiter between WhenAny's decision and its removal.
-        if (completion.IsCompleted)
+        if (assigned)
         {
             return await completion;
         }
@@ -110,6 +135,42 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
 
     private readonly record struct Entry(long Position, ProtoMessage Message);
 
+    private readonly record struct MatchedMessage(ProtoMessage Message, long Position);
+
+    private sealed class InMemoryProtoMessageConsumer(InMemoryProtoMessageBroker broker, long afterPosition)
+        : IProtoMessageConsumer
+    {
+        private long _position = afterPosition;
+
+        public ValueTask PrepareAsync(
+            IReadOnlyCollection<string> destinations,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(destinations);
+            return ValueTask.CompletedTask;
+        }
+
+        public async ValueTask<ProtoMessage> AwaitAsync(
+            string destination,
+            Func<ProtoMessage, bool> predicate,
+            TimeSpan timeout,
+            CancellationToken cancellationToken = default)
+        {
+            var matched = await broker.AwaitAsync(
+                destination,
+                predicate,
+                timeout,
+                Volatile.Read(ref _position),
+                cancellationToken);
+            // A match is consumed: advance past it so a later await sees the next message, exactly like
+            // an auto-acking RabbitMQ tap.
+            Volatile.Write(ref _position, matched.Position);
+            return matched.Message;
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
     private sealed class Waiter(string destination, Func<ProtoMessage, bool> predicate, long afterPosition)
     {
         public string Destination { get; } = destination;
@@ -118,7 +179,7 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
 
         public long AfterPosition { get; } = afterPosition;
 
-        public TaskCompletionSource<ProtoMessage> Completion { get; } =
+        public TaskCompletionSource<MatchedMessage> Completion { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 }

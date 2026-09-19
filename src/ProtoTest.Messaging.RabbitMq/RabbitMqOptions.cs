@@ -3,7 +3,7 @@ namespace ProtoTest.Messaging.RabbitMq;
 using ProtoTest.Core;
 
 /// <summary>RabbitMQ connection choices, layered from <c>ProtoTest:Messaging:RabbitMq</c>.</summary>
-public sealed class ProtoRabbitMqOptions : IProtoConfigurableOptions
+public sealed class RabbitMqOptions : IProtoConfigurableOptions
 {
     public const string ConfigurationSectionName = "ProtoTest:Messaging:RabbitMq";
 

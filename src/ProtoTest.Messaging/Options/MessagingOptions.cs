@@ -3,7 +3,7 @@ namespace ProtoTest.Messaging;
 using ProtoTest.Core;
 
 /// <summary>Messaging defaults, layered from <c>ProtoTest:Messaging</c> over the code-based registration.</summary>
-public sealed class ProtoMessagingOptions : IProtoConfigurableOptions
+public sealed class MessagingOptions : IProtoConfigurableOptions
 {
     public const string ConfigurationSectionName = "ProtoTest:Messaging";
 
@@ -13,8 +13,8 @@ public sealed class ProtoMessagingOptions : IProtoConfigurableOptions
     public TimeSpan DefaultTimeout { get; set; } = TimeSpan.FromSeconds(10);
 
     /// <summary>
-    /// Destinations this suite awaits, declared at test setup so an adapter can bind its tap before the
-    /// system under test publishes. Optional for brokers that keep history.
+    /// Destinations this suite awaits, configured for the run; an adapter declares the test's per-test
+    /// taps from it before the system under test publishes. Optional for brokers that keep history.
     /// </summary>
     public IList<string> Destinations { get; set; } = new List<string>();
 }

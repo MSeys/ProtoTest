@@ -2,6 +2,7 @@ namespace ProtoTest.Messaging;
 
 using System.Globalization;
 using ProtoTest.Core;
+using ProtoTest.Json;
 
 /// <summary>
 /// The test-side messaging API over the configured broker. Publishes and awaits are traced as
@@ -12,19 +13,20 @@ public sealed class ProtoMessageClient
 {
     private readonly ProtoExecutionContext _context;
     private readonly IProtoMessageBroker _broker;
-    private readonly ProtoMessagingOptions _options;
-    private readonly long _afterPosition;
+    private readonly IProtoMessageConsumer _consumer;
+    private readonly MessagingOptions _options;
+    private int _captureSequence;
 
     internal ProtoMessageClient(
         ProtoExecutionContext context,
         IProtoMessageBroker broker,
-        ProtoMessagingOptions options,
-        long afterPosition)
+        IProtoMessageConsumer consumer,
+        MessagingOptions options)
     {
         _context = context;
         _broker = broker;
+        _consumer = consumer;
         _options = options;
-        _afterPosition = afterPosition;
     }
 
     /// <summary>Publishes one message, optionally with headers and a content type.</summary>
@@ -41,18 +43,30 @@ public sealed class ProtoMessageClient
             .With("messaging.system", _broker.Name)
             .With("messaging.destination", destination)
             .Begin();
+        var attachmentOptions = _context.TryService<MessagingAttachmentOptions>();
         if (payload is { Length: > 0 })
         {
             operation.AddSection(new ProtoTraceSection(
                 "Message",
                 ProtoTraceSectionKind.Code,
-                Content: payload,
+                Content: ProtoTraceContent.Preview(JsonDiagnosticSanitizer.Sanitize(payload, attachmentOptions)),
                 Language: contentType));
         }
 
         try
         {
             await _broker.PublishAsync(new ProtoMessage(destination, payload, headers, contentType), cancellationToken);
+            if (payload is { Length: > 0 } && attachmentOptions?.CapturePublishedPayloads == true)
+            {
+                Capture(
+                    operation,
+                    attachmentOptions,
+                    $"message-publish-{destination}-{Interlocked.Increment(ref _captureSequence)}-payload",
+                    payload,
+                    contentType,
+                    $"Published payload · {destination}");
+            }
+
             operation.Succeed();
             _context.RecordObservation(new ProtoObservation(
                 _broker.Name,
@@ -87,16 +101,30 @@ public sealed class ProtoMessageClient
             .With("messaging.destination", destination)
             .With("messaging.timeout_ms", effective.TotalMilliseconds.ToString("0", CultureInfo.InvariantCulture))
             .Begin();
+        var attachmentOptions = _context.TryService<MessagingAttachmentOptions>();
         try
         {
-            var message = await _broker.AwaitAsync(destination, predicate, effective, _afterPosition, cancellationToken);
+            var message = await _consumer.AwaitAsync(destination, predicate, effective, cancellationToken);
             operation
                 .SetAttribute("messaging.destination", message.Destination)
                 .AddSection(new ProtoTraceSection(
                     "Message",
                     ProtoTraceSectionKind.Code,
-                    Content: message.Payload,
+                    Content: message.Payload is null
+                        ? null
+                        : ProtoTraceContent.Preview(JsonDiagnosticSanitizer.Sanitize(message.Payload, attachmentOptions)),
                     Language: message.ContentType));
+            if (attachmentOptions?.CaptureReceivedPayloads == true)
+            {
+                Capture(
+                    operation,
+                    attachmentOptions,
+                    $"message-receive-{message.Destination}-{Interlocked.Increment(ref _captureSequence)}-payload",
+                    message.Payload,
+                    message.ContentType,
+                    $"Received payload · {message.Destination}");
+            }
+
             operation.Succeed();
             _context.RecordObservation(new ProtoObservation(
                 _broker.Name,
@@ -110,5 +138,53 @@ public sealed class ProtoMessageClient
             operation.Fail(exception);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Attaches one sanitized payload. The name carries a per-client sequence so repeated captures on the
+    /// same destination stay distinct. Capture never fails the operation: a failure is recorded as a
+    /// <c>messaging.attachment.failed</c> event, the same rule gRPC and web diagnostics follow.
+    /// </summary>
+    private void Capture(
+        ProtoTraceOperation operation,
+        MessagingAttachmentOptions options,
+        string name,
+        string? payload,
+        string? contentType,
+        string description)
+    {
+        try
+        {
+            _context.AddAttachment(
+                name,
+                JsonDiagnosticSanitizer.Sanitize(payload ?? string.Empty, options),
+                ResolveMediaType(payload, contentType),
+                description);
+        }
+        catch (Exception exception)
+        {
+            _context.Trace.WriteEvent(
+                "messaging.attachment.failed",
+                $"Messaging attachment · {name}",
+                "ProtoTest.Messaging",
+                outcome: ProtoTraceOutcome.Failed,
+                attributes: new Dictionary<string, string?> { ["attachment.name"] = name },
+                exception: exception,
+                parentId: operation.Id);
+        }
+    }
+
+    /// <summary>An explicit content type wins; otherwise Json payloads are <c>application/json</c> and everything else is text.</summary>
+    private static string ResolveMediaType(string? payload, string? contentType)
+    {
+        if (!string.IsNullOrWhiteSpace(contentType)) return contentType;
+        return LooksLikeJson(payload) ? "application/json" : "text/plain";
+    }
+
+    private static bool LooksLikeJson(string? payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload)) return false;
+        var trimmed = payload.AsSpan().TrimStart();
+        return !trimmed.IsEmpty && trimmed[0] is '{' or '[';
     }
 }

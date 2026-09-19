@@ -1,7 +1,10 @@
 namespace ProtoTest.Grpc;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
+using ProtoTest.Http;
 
 public sealed class ProtoGrpcBuilder
 {
@@ -23,11 +26,11 @@ public sealed class ProtoGrpcBuilder
     public IProtoTargetBuilder AddClient(
         string name = "Default",
         string? address = null,
-        Action<ProtoGrpcClientOptions>? configure = null)
+        Action<GrpcClientOptions>? configure = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var applicationName = _application?.ApplicationName;
-        var registeredName = Qualify(name, applicationName);
+        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
         _application?.RegisterClient("Grpc", name);
         return Clients.ProtoGrpcClientRegistration.AddClient(
             Services,
@@ -43,11 +46,11 @@ public sealed class ProtoGrpcBuilder
     public IProtoTargetBuilder AddClient(
         string name,
         Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> addressResolver,
-        Action<ProtoGrpcClientOptions>? configure = null)
+        Action<GrpcClientOptions>? configure = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var applicationName = _application?.ApplicationName;
-        var registeredName = Qualify(name, applicationName);
+        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
         _application?.RegisterClient("Grpc", name);
         return Clients.ProtoGrpcClientRegistration.AddClient(
             Services,
@@ -62,12 +65,23 @@ public sealed class ProtoGrpcBuilder
     public IProtoTargetBuilder AddClient(
         string name,
         Func<ProtoExecutionContext, Uri> addressResolver,
-        Action<ProtoGrpcClientOptions>? configure = null)
+        Action<GrpcClientOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(addressResolver);
         return AddClient(name, (context, _) => ValueTask.FromResult(addressResolver(context)), configure);
     }
 
-    private static string Qualify(string name, string? applicationName)
-        => applicationName is null ? name : $"{applicationName}:{name}";
+    /// <summary>Enables automatic request and response message attachments, sanitized and redacted.</summary>
+    public ProtoGrpcBuilder CaptureAttachments(Action<GrpcAttachmentOptions>? configure = null)
+    {
+        Services.RemoveAll<GrpcAttachmentOptions>();
+        Services.AddSingleton(serviceProvider =>
+        {
+            var options = new GrpcAttachmentOptions();
+            configure?.Invoke(options);
+            options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
+            return options;
+        });
+        return this;
+    }
 }

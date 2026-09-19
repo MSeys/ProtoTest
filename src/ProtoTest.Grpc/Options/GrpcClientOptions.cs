@@ -8,7 +8,7 @@ using ProtoTest.Core;
 /// per-call metadata, and the default deadline. Values layer from <c>ProtoTest:Grpc</c> over the
 /// code-based registration.
 /// </summary>
-public sealed class ProtoGrpcClientOptions : IProtoConfigurableOptions
+public sealed class GrpcClientOptions : IProtoConfigurableOptions
 {
     public const string ConfigurationSectionName = "ProtoTest:Grpc";
 
@@ -22,4 +22,12 @@ public sealed class ProtoGrpcClientOptions : IProtoConfigurableOptions
 
     /// <summary>A default deadline applied when a call does not name one.</summary>
     public TimeSpan? DefaultDeadline { get; set; }
+
+    /// <summary>
+    /// Metadata keys whose values are redacted in the trace. Matching is case-insensitive and by
+    /// substring, so <c>authorization</c> also covers <c>proxy-authorization</c>. Configuration
+    /// under <c>ProtoTest:Grpc:SensitiveMetadataKeys</c> extends these defaults.
+    /// </summary>
+    public List<string> SensitiveMetadataKeys { get; set; } =
+        ["authorization", "cookie", "set-cookie", "x-api-key", "api-key", "token", "x-auth-token"];
 }

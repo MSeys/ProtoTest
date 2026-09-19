@@ -14,6 +14,6 @@ builder.AddInfrastructure(
 builder.AddMessaging(messaging => messaging.UseRabbitMq());
 ```
 
-`AddInfrastructure` starts the container with the run and fills the RabbitMQ connection-string setting, so the adapter and an in-process application both reach the same broker. (Registering it with `AddResource` only owns its release; it does not start it or fill settings.) `RabbitMqBroker.Start()` / `TryStart(...)` remain for code that wants to start a container itself and fall back when no runtime is present.
+`AddInfrastructure` starts the container with the run and fills the RabbitMQ connection-string setting, so the adapter and an in-process application both reach the same broker. (Registering it with `AddResource` only owns its release; it does not start it or fill settings.) Because it starts with the host — before any test-level skip condition is evaluated — a missing container runtime fails the run at start. `RabbitMqBroker.Start()` / `TryStart(...)` remain for a suite fixture that decides *before* registering infrastructure: call `TryStart` to choose another mode, or skip the suite with the reason it reports.
 
 The container starts once for the run and is released when the host is disposed, after the run stopped and the reports were written. The same shape as `ProtoTest.Sql.Testcontainers`, and the same contract: the tests and the application under test share one broker.

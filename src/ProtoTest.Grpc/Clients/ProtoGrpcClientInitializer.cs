@@ -13,7 +13,7 @@ using ProtoTest.Http;
 public sealed class ProtoGrpcClientInitializer(
     string protocolName,
     string name,
-    ProtoGrpcClientOptions options,
+    GrpcClientOptions options,
     string? explicitAddress = null,
     bool allowMissingAddress = false,
     string? application = null,

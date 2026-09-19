@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package prototest.echo;
 
+import "google/protobuf/any.proto";
+
 option csharp_namespace = "ProtoTest.Grpc.Tests.Echo";
 
 service Echo {
@@ -13,8 +15,11 @@ service Echo {
 
 message EchoRequest {
   string message = 1;
+  string password = 2;
+  google.protobuf.Any payload = 3;
 }
 
 message EchoReply {
   string message = 1;
+  string password = 2;
 }

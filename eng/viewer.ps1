@@ -11,8 +11,9 @@ $viewer = Join-Path $PSScriptRoot "..\viewer"
 $log = Join-Path $env:TEMP "prototest-viewer.log"
 $errorLog = Join-Path $env:TEMP "prototest-viewer.err.log"
 
-if ($Mode -eq "preview" -and -not $NoBuild -and -not (Test-Path (Join-Path $viewer "dist"))) {
-    Write-Host "No dist yet; building the viewer (this is the only step that takes a while)..."
+if ($Mode -eq "preview" -and -not $NoBuild) {
+    # Always rebuild: an existing dist may predate the sources, and serving it silently shows a stale viewer.
+    Write-Host "Building the viewer (this is the only step that takes a while)..."
     & npm --prefix $viewer run build
     if ($LASTEXITCODE -ne 0) { throw "The viewer build failed." }
 }

@@ -48,7 +48,7 @@ try {
         # Where in the suite's code each operation started, with that code embedded for the viewer.
         $manifest = Read-ArchiveJson $archive "manifest.json"
         if ($null -eq $manifest.sources) { throw "Expected embedded sources in the manifest." }
-        $located = @($spans.resourceSpans | ForEach-Object { @($_.scopeSpans)[0].spans } |
+        $located = @($spans.resourceSpans | ForEach-Object { @($_.scopeSpans) | ForEach-Object { $_.spans } } |
             Where-Object { $_ -and $_.attributes.'code.file.path' })
         if ($located.Count -lt 1) { throw "Expected operations with a code.file.path in spans.json." }
         foreach ($path in @($located | ForEach-Object { $_.attributes.'code.file.path' } | Sort-Object -Unique)) {
@@ -69,8 +69,9 @@ try {
                     throw "Artifact '$($artifact.id)' is declared but '$($artifact.archivePath)' is not in the archive."
                 }
             }
-            $scope = @($group.scopeSpans)[0]
-            $attachments = @(@($scope.spans | ForEach-Object { $_.events }) + @($scope.events) |
+            $groupSpans = @(@($group.scopeSpans) | ForEach-Object { $_.spans })
+            $groupEvents = @(@($group.scopeSpans) | ForEach-Object { $_.events })
+            $attachments = @(@($groupSpans | ForEach-Object { $_.events }) + $groupEvents |
                 Where-Object { $_ -and $_.record -eq "attachment" })
             foreach ($attachment in $attachments) {
                 if (-not $attachment.artifactId -or -not $declared.ContainsKey($attachment.artifactId)) {
@@ -92,27 +93,52 @@ try {
     }
 
     $failedTests = @($testGroups | Where-Object { $_.resource.attributes.testOutcome -eq "failed" })
-    $succeededTests = @($testGroups | Where-Object { $_.resource.attributes.testOutcome -eq "succeeded" })
-    $partialTests = @($testGroups | Where-Object { $_.resource.attributes.testOutcome -eq "partial" })
-    # The demo grows with every journey, so no fixed total: every test succeeds except the two diagnostic
-    # showcases (partial) and the one intentional shape mismatch (failed).
-    if ($succeededTests.Count + $partialTests.Count + $failedTests.Count -ne $testGroups.Count -or
-        $succeededTests.Count -lt 1 -or $partialTests.Count -ne 2 -or $failedTests.Count -ne 1 -or
-        $failedTests[0].resource.attributes.testMethod -ne "TheOrganizationReportsItsPlanAndProjectCount") {
-        throw "Expected every test to succeed except 2 partial diagnostic tests and the intentional shape-mismatch failure."
+    # The demo grows with every journey, so the exact totals change: require at least the tests that
+    # existed when this gate was written, allow new succeeded or partial tests, and require the only
+    # failure to be the one intentional shape mismatch.
+    $minimumTestCount = 40
+    $intentionalFailure = "TheOrganizationReportsItsPlanAndProjectCount"
+    if ($testGroups.Count -lt $minimumTestCount) {
+        throw "Expected at least $minimumTestCount test resources in spans.json, but found $($testGroups.Count)."
     }
 
-    $allEvents = @($groups | ForEach-Object { $scope = @($_.scopeSpans)[0]; @($scope.spans | ForEach-Object { $_.events }) + @($scope.events) } |
-        Where-Object { $_ })
-    if ($testGroups | Where-Object { @(@($_.scopeSpans)[0].spans).Count -lt 1 }) {
+    $unknownTests = @($testGroups | Where-Object {
+        $_.resource.attributes.testOutcome -notin @("succeeded", "partial", "failed")
+    })
+    if ($unknownTests.Count -gt 0) {
+        throw "Expected every test resource to report a succeeded, partial or failed outcome, but $($unknownTests.Count) did not."
+    }
+
+    $intentionalFailures = @($failedTests | Where-Object {
+        $_.resource.attributes.testMethod -eq $intentionalFailure
+    })
+    if ($intentionalFailures.Count -ne 1) {
+        throw "Expected exactly one intentional failure '$intentionalFailure' in spans.json, but found $($intentionalFailures.Count)."
+    }
+
+    $unexpectedFailures = @($failedTests | Where-Object {
+        $_.resource.attributes.testMethod -ne $intentionalFailure
+    })
+    if ($unexpectedFailures.Count -gt 0) {
+        $names = @($unexpectedFailures | ForEach-Object { $_.resource.attributes.testMethod }) -join ", "
+        throw "Expected no failures other than '$intentionalFailure', but found: $names."
+    }
+
+    $allEvents = @($groups | ForEach-Object {
+            $scopes = @($_.scopeSpans)
+            @($scopes | ForEach-Object { $_.spans } | ForEach-Object { $_.events }) + @($scopes | ForEach-Object { $_.events })
+        } | Where-Object { $_ })
+    if ($testGroups | Where-Object { @(@($_.scopeSpans) | ForEach-Object { $_.spans }).Count -lt 1 }) {
         throw "Expected every test resource to carry spans."
     }
 
     # The run's own trace: how its gates judged it. Gate verdicts have no operation above them, so they
     # travel as scope events.
-    $runScope = @($runGroup[0].scopeSpans)[0]
-    $runKinds = @($runScope.spans | ForEach-Object { $_.kind }) +
-        @(@($runScope.spans | ForEach-Object { $_.events }) + @($runScope.events) | Where-Object { $_ } | ForEach-Object { $_.kind })
+    $runScopes = @($runGroup[0].scopeSpans)
+    $runSpans = @($runScopes | ForEach-Object { $_.spans })
+    $runKinds = @($runSpans | ForEach-Object { $_.kind }) +
+        @(@($runSpans | ForEach-Object { $_.events }) + @($runScopes | ForEach-Object { $_.events }) |
+            Where-Object { $_ } | ForEach-Object { $_.kind })
     if ($runKinds -notcontains "gate.evaluate") {
         throw "Expected the run's gate verdicts in the viewer trace."
     }

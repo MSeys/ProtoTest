@@ -66,7 +66,7 @@ public static IProtoHostBuilder AddWebWait<TCondition>(
     where TCondition : class, IWebWaitCondition;
 ```
 
-With no operations listed, the wait applies to `Navigate`, `Click` and `Fill`. The full list of operation kinds is `Navigate`, `Click`, `Fill`, `Check`, `SelectOption`, `Press`, `Count`, `ReadText`, `ReadValue`, `IsVisible`, `IsEnabled`, `IsChecked` and `Assert`. A non-positive timeout or interval throws `ArgumentOutOfRangeException`.
+With no operations listed, the wait applies to `Navigate`, `Click` and `Fill`. The full list of operation kinds is `Navigate`, `Click`, `Fill`, `Check`, `SelectOption`, `Press`, `Count`, `ReadText`, `ReadValue`, `IsVisible`, `IsEnabled`, `IsChecked`, `Assert` and `Download`. A non-positive timeout or interval throws `ArgumentOutOfRangeException`.
 
 If the condition isn't ready in time, the operation fails with `WebWaitTimeoutException`, including the last observation you returned — so make those messages useful.
 

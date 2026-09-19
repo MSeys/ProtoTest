@@ -163,7 +163,7 @@ catch (Exception exception)
 context.Trace.WriteEvent(
     "saas.correlation.begin",
     "Begin correlated SaaS scenario",
-    "ProtoTest.SampleApp.Testing",
+    "Northstar.ProtoTest",
     outcome: ProtoTraceOutcome.Succeeded,
     attributes: new Dictionary<string, string?> { ["saas.correlation_id"] = correlationId });
 ```

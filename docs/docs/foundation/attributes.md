@@ -95,7 +95,7 @@ public sealed class SampleUserAttribute : ProtoAttribute
 }
 ```
 
-The sample suite's real pair is [`NorthstarTenantAttribute` and `SignedInAsAttribute`](../../../samples/ProtoTest.SampleApp.Testing/NorthstarAttributes.cs).
+The sample suite's real pair is [`NorthstarTenantAttribute` and `SignedInAsAttribute`](../../../samples/Northstar.ProtoTest/NorthstarAttributes.cs).
 
 What makes these work well:
 

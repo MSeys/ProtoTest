@@ -35,6 +35,37 @@ await page.RememberMe.CheckAsync();
 
 To wait for something application-specific — a spinner, a pending XHR — add a [wait condition](./middleware.md#wait-conditions).
 
+## Downloads
+
+A test can capture a file the browser downloads and check its contents, without knowing where the browser would have put it:
+
+```csharp
+public sealed class ReportPage : WebPage
+{
+    public WebElement Export => Element(By.TestId("export"));
+}
+```
+
+```csharp
+var page = Proto.Context.Web().Page<ReportPage>();
+await page.OpenAsync("/reports");
+
+var download = await page.DownloadAsync(
+    ct => page.Export.ClickAsync(ct).AsTask(),   // the trigger that starts the download
+    name: "monthly-report.csv",                  // optional; defaults to the browser's suggested name
+    timeout: TimeSpan.FromSeconds(15));          // optional; defaults to the backend's own wait
+
+Encoding.UTF8.GetString(download.Content.Span);  // "name,total\natlas,42"
+download.FileName;                                // monthly-report.csv
+download.MediaType;                               // text/csv (guessed from the extension)
+download.Size;                                    // bytes
+```
+
+`WebSession.DownloadAsync` and its `WebPage` shortcut run the trigger through the normal operation pipeline, wait for the file, return a `WebDownload` and register the file as a test attachment, so it reaches the runner's output and the `.prototrace` archive. A trigger that runs other session operations (like the semantic click above) nests them inside the download's operation. An explicit `name` replaces the browser's suggested file name for the record and the attachment; its extension refines the media type guess. A non-positive `timeout` throws `ArgumentOutOfRangeException`.
+
+- **Playwright** captures natively: the trigger runs, Playwright waits for the download, and ProtoTest reads the completed file. This covers link, form and generated (`blob:`, `data:`) downloads.
+- **Selenium** has no download API in the WebDriver protocol, so `DownloadAsync` throws `WebBackendCapabilityException` before the trigger runs, naming the limitation. Fetch the file over HTTP with [ProtoTest.Rest](../rest/index.md) instead.
+
 ## Reading state
 
 ```csharp

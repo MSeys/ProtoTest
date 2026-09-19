@@ -22,6 +22,10 @@ The name parts are lowercased and sanitized (non-letters/digits become `-`), `{e
 
 Capturing never replaces the original error. Each artifact registers on its own, so one failing attachment does not drop the rest. If capture itself fails, you'll see a `web.diagnostics.artifact_failed` entry — or `web.diagnostics.failed` when the backend produced no attachments at all — and still get the real exception.
 
+## Captured downloads
+
+`WebSession.DownloadAsync` (and its [`WebPage` shortcut](./interactions.md#downloads)) also registers the file the browser downloaded as a test attachment, named `web-{session}-download-{n}-{file}`: the session and stem are sanitized, the sequence keeps two downloads of the same name apart, and the extension is kept so the file stays openable. The media type is guessed from the extension. The attachment reaches your runner's output and the `.prototrace` archive like any other; a download that cannot be attached is traced as `web.download.attachment_failed` and the file is still returned to the test. Selenium fails the call with `WebBackendCapabilityException` before the trigger runs, because the WebDriver protocol has no download API.
+
 ## Playwright traces
 
 Playwright's own trace — a timeline with DOM snapshots you can open in the [Playwright Trace Viewer](https://trace.playwright.dev) — is recorded while the test runs and kept according to `TraceRetention`:
@@ -78,6 +82,7 @@ Every web operation is a trace entry carrying `web.backend` and `web.session`; e
 | `assert.web` | every `Should`/`ShouldNot` assertion | `web.expectation`, `web.assert.negated`, `web.assert.timeout` |
 | `web.flow` | [flows](./flows.md) | `web.flow.step_count` |
 | `web.wait.until` | `WaitUntilAsync` | `web.expectation`, `web.wait.timeout` |
+| `web.download` | [`DownloadAsync`](./interactions.md#downloads) | `web.download.requested_name`, `web.download.name`, `web.download.media_type`, `web.download.size`; registers the file as an attachment |
 | `web.wait` | [wait conditions](./middleware.md) | `web.wait.timing`, `web.wait.condition`, `web.wait.timeout`, `web.wait.last_observed`, `web.operation` |
 | `web.login` | [login](./login.md), setup phase | `web.login.persona`, `web.login.strategy` |
 | `web.session.initialize` | the browser starting | `web.backend` |
@@ -87,7 +92,7 @@ Inside each parent operation, a child `web.backend.execute` named `{backend} · 
 
 Coverage observations are the other half of the trace: `web.page.visited`, `web.page.verified` and `web.page.available`, each with `web.session` and `web.page.source` (`navigate`, `assert`, `vue-router` or `aspnetcore`). See [Page coverage](./index.md#page-coverage).
 
-Other event kinds worth knowing when you read a trace: `web.page.discovery.failed` (Vue route discovery), `web.page.inventory.failed` (in-process ASP.NET Core inventory), `web.playwright.correlation_failed` / `web.playwright.trace_failed`, and `web.diagnostics.failed` / `web.diagnostics.artifact_failed`.
+Other event kinds worth knowing when you read a trace: `web.page.discovery.failed` (Vue route discovery), `web.page.inventory.failed` (in-process ASP.NET Core inventory), `web.playwright.correlation_failed` / `web.playwright.trace_failed`, and `web.diagnostics.failed` / `web.diagnostics.artifact_failed` / `web.download.attachment_failed`.
 
 ## When artifacts are finalised
 

@@ -56,7 +56,7 @@ public sealed class NorthstarScenarioHook : IProtoTestHook
 }
 ```
 
-Its `AfterTestAsync` resolves the state, records a `scenario.completed` observation and adds a `scenario-summary.json` attachment. Attachments added in `AfterTestAsync` are still published — publishing happens after all hooks have finished. The full hook is [`samples/ProtoTest.SampleApp.Testing/NorthstarScenario.cs`](../../../samples/ProtoTest.SampleApp.Testing/NorthstarScenario.cs).
+Its `AfterTestAsync` resolves the state, records a `scenario.completed` observation and adds a `scenario-summary.json` attachment. Attachments added in `AfterTestAsync` are still published — publishing happens after all hooks have finished. The full hook is [`samples/Northstar.ProtoTest/NorthstarScenario.cs`](../../../samples/Northstar.ProtoTest/NorthstarScenario.cs).
 
 ## Run hooks
 

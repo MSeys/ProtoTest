@@ -159,4 +159,4 @@ When cleanup happens at a coarser level — say, the whole tenant is deleted by 
 - [Data overview](./index.md) — install, registration and the builder surface.
 - [Defaults](./defaults.md) — what happens before a provisioner runs.
 - [Cleanup and resources](../../foundation/lifecycle.md) — how test resources are released.
-- The demo's registration and samples: [`samples/ProtoTest.Demo/Setup.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs) and [`samples/ProtoTest.SampleApp.Testing/NorthstarData.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.SampleApp.Testing/NorthstarData.cs).
+- The demo's registration and samples: [`samples/ProtoTest.Demo/Setup.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs) and [`samples/Northstar.ProtoTest/NorthstarData.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/NorthstarData.cs).

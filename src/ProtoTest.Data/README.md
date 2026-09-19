@@ -45,4 +45,4 @@ Values are never invented, `Build()` results never enter the identity map, and r
 ## Learn more
 
 - [Data guide](https://prototest.dev/docs/integrations/data/)
-- [NorthstarData.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.SampleApp.Testing/NorthstarData.cs)
+- [NorthstarData.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/NorthstarData.cs)

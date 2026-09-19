@@ -140,6 +140,10 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
     private sealed class InMemoryProtoMessageConsumer(InMemoryProtoMessageBroker broker, long afterPosition)
         : IProtoMessageConsumer
     {
+        // One consumer delivers each message once: concurrent awaits serialize, so the later one never
+        // snapshots the position the earlier one is about to consume past. Without the gate both waiters
+        // match the same publish and the second message stays unread.
+        private readonly SemaphoreSlim _awaitGate = new(1, 1);
         private long _position = afterPosition;
 
         public ValueTask PrepareAsync(
@@ -156,16 +160,24 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
             TimeSpan timeout,
             CancellationToken cancellationToken = default)
         {
-            var matched = await broker.AwaitAsync(
-                destination,
-                predicate,
-                timeout,
-                Volatile.Read(ref _position),
-                cancellationToken);
-            // A match is consumed: advance past it so a later await sees the next message, exactly like
-            // an auto-acking RabbitMQ tap.
-            Volatile.Write(ref _position, matched.Position);
-            return matched.Message;
+            await _awaitGate.WaitAsync(cancellationToken);
+            try
+            {
+                var matched = await broker.AwaitAsync(
+                    destination,
+                    predicate,
+                    timeout,
+                    Volatile.Read(ref _position),
+                    cancellationToken);
+                // A match is consumed: advance past it so a later await sees the next message, exactly
+                // like an auto-acking RabbitMQ tap.
+                Volatile.Write(ref _position, matched.Position);
+                return matched.Message;
+            }
+            finally
+            {
+                _awaitGate.Release();
+            }
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;

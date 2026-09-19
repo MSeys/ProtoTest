@@ -225,6 +225,30 @@ public sealed class GrpcIntegrationTests
     }
 
     [Test]
+    public async Task OpenDuplexStreamingAsync_ShouldExchangeInBothDirections()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("grpc async duplex", TestMethod());
+        var client = context.Grpc("Echo");
+
+        using var call = await client.OpenDuplexStreamingAsync(ChatMethod);
+        await call.RequestStream.WriteAsync(new EchoRequest { Message = "one" });
+        await call.RequestStream.WriteAsync(new EchoRequest { Message = "two" });
+        await call.RequestStream.CompleteAsync();
+        var replies = new List<string>();
+        await foreach (var reply in call.ResponseStream.ReadAllAsync())
+        {
+            replies.Add(reply.Message);
+        }
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.That(replies, Is.EqualTo(new[] { "ONE", "TWO" }));
+    }
+
+    [Test]
     public async Task CaptureAttachments_ShouldRedactSensitiveRequestAndResponseFields()
     {
         var builder = new ProtoHostBuilder();

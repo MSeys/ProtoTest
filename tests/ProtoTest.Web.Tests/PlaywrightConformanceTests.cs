@@ -129,6 +129,32 @@ public sealed class PlaywrightConformanceTests
     }
 
     [Test]
+    public async Task PageScopedTableCellByHeader_ShouldResolveFromThePageRoot()
+    {
+        var host = new ProtoHostBuilder()
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Off;
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("playwright page-scoped header cell", TestMethod());
+        var web = context.Web();
+        var backend = await OpenBrowserAsync(web);
+        await backend.Page.SetContentAsync(ConformanceMarkup.Html);
+        var page = web.Page<ConformancePage>();
+
+        // The cell locator is not inside a row component here: the page itself is the search context,
+        // which has no direct table cells, so the axis has to widen to the document.
+        await page.TotalCell.Should.HaveTextAsync("€ 10");
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
     public async Task MultipleMatchRead_ShouldThrowTheResolutionExceptionInsteadOfRawPlaywrightFailure()
     {
         var host = new ProtoHostBuilder()
@@ -246,6 +272,108 @@ public sealed class PlaywrightConformanceTests
                 && entry.Outcome == ProtoTraceOutcome.Succeeded), Is.True);
             Assert.That(entries.Count(entry => entry.Kind == "web.read_text"), Is.GreaterThanOrEqualTo(1),
                 "the nested read ran inside the wait");
+        });
+    }
+
+    [Test]
+    [CancelAfter(60_000)]
+    public async Task ConcurrentSessionsAndOperations_ShouldNotLeakTraceGroups()
+    {
+        var host = new ProtoHostBuilder()
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Always;
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("playwright concurrent sessions", TestMethod());
+        var web = context.Web();
+        var other = context.Web("Other");
+        const string markup = "<!doctype html><html><body><div role=\"status\">ready</div></body></html>";
+        await (await OpenBrowserAsync(web)).Page.SetContentAsync(markup);
+        await (await other.GetBackendAsync<PlaywrightWebBackend>()).Page.SetContentAsync(markup);
+        var page = web.Page<ConformancePage>();
+        var otherPage = other.Page<ConformancePage>();
+
+        // Interleaved reads and assertions across two sessions: each session owns its trace-group gate,
+        // and a leaked gate anywhere would hang the later operations instead of completing.
+        var operations = Enumerable.Range(0, 8).Select(index => Task.Run(async () =>
+        {
+            var target = index % 2 == 0 ? page : otherPage;
+            await target.Status.TextAsync();
+            await target.Status.Should.HaveTextAsync("ready", TimeSpan.FromSeconds(5));
+        })).ToArray();
+        await Task.WhenAll(operations);
+
+        await Task.WhenAll(
+            web.WaitUntilAsync(async ct => await page.Status.TextAsync(ct) == "ready", TimeSpan.FromSeconds(5)).AsTask(),
+            other.WaitUntilAsync(async ct => await otherPage.Status.TextAsync(ct) == "ready", TimeSpan.FromSeconds(5)).AsTask());
+        await page.Status.TextAsync();
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        var entries = host.Trace.Snapshot().Tests.Single().Entries;
+        Assert.Multiple(() =>
+        {
+            Assert.That(entries.Any(entry => entry.Kind == "web.playwright.correlation_failed"), Is.False);
+            Assert.That(
+                entries.Where(entry => entry.Kind == "web.backend.execute")
+                    .All(entry => entry.Outcome == ProtoTraceOutcome.Succeeded),
+                Is.True,
+                "every operation completed through a paired begin/end");
+        });
+    }
+
+    [Test]
+    [CancelAfter(30_000)]
+    public async Task NestedWaitUntil_WithAReadInTheInnerPredicate_ShouldNotDeadlock()
+    {
+        var host = new ProtoHostBuilder()
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Always;
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("playwright nested wait in wait", TestMethod());
+        var web = context.Web();
+        var backend = await OpenBrowserAsync(web);
+        await backend.Page.SetContentAsync("<!doctype html><html><body><div role=\"status\">ready</div></body></html>");
+        var page = web.Page<ConformancePage>();
+
+        // A wait inside a wait predicate: the inner wait is nested under the outer one, and the read in
+        // the inner predicate is nested under the inner wait. Only the outer wait owns a native trace
+        // group, so starting a group for the read would block on the outer wait's gate forever.
+        await web.WaitUntilAsync(
+            async ct =>
+            {
+                await web.WaitUntilAsync(
+                    async innerCt => await page.Status.TextAsync(innerCt) == "ready",
+                    TimeSpan.FromSeconds(2),
+                    cancellationToken: ct);
+                return true;
+            },
+            TimeSpan.FromSeconds(5));
+
+        var text = await page.Status.TextAsync();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        var entries = host.Trace.Snapshot().Tests.Single().Entries;
+        var waits = entries.Where(entry => entry.Kind == "web.wait.until").ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(text, Is.EqualTo("ready"));
+            Assert.That(waits, Has.Length.EqualTo(2), "both waits completed and paired their begin/end");
+            Assert.That(waits.All(entry => entry.Outcome == ProtoTraceOutcome.Succeeded), Is.True);
+            Assert.That(entries.Any(entry => entry.Kind == "web.read_text"), Is.True,
+                "the read in the inner predicate ran");
+            Assert.That(entries.Any(entry => entry.Kind == "web.playwright.correlation_failed"), Is.False,
+                "no trace group operation failed against the gate");
         });
     }
 
@@ -454,6 +582,7 @@ public sealed class PlaywrightConformanceTests
         public WebElement Language => Element(By.Label("Language"));
         public WebElement Save => Element(By.Role(WebRole.Button, "Save"));
         public WebElement Status => Element(By.Role(WebRole.Status));
+        public WebElement TotalCell => Element(By.TableCell("Total"));
         public InvoiceTable Invoices => Component<InvoiceTable>(By.TestId("invoices"));
     }
 

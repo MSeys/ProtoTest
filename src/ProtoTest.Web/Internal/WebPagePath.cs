@@ -52,7 +52,10 @@ internal static class WebPagePath
             .Split('/', StringSplitOptions.RemoveEmptyEntries)
             .Select(MapDynamicSegment)
             .Where(segment => segment.Length > 0);
-        return Normalize(string.Join('/', segments));
+        var joined = string.Join('/', segments);
+        // The root route "/" has no segments; it is a page, not an empty definition. Normalize returns
+        // null for an empty value, which would silently drop it from discovery.
+        return joined.Length == 0 ? Normalize("/") : Normalize(joined);
     }
 
     /// <summary>

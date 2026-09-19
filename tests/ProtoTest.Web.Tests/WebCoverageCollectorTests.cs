@@ -42,6 +42,49 @@ public sealed class WebCoverageCollectorTests
     }
 
     [Test]
+    public async Task Collector_ShouldBeSafeUnderConcurrentCollectAndReport()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Web:Pages:0"] = "/users/{id}",
+                ["ProtoTest:Web:Pages:1"] = "/static"
+            })
+            .Build();
+        var collector = new WebCoverageCollector("Web", configuration);
+        var failures = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
+
+        var workers = Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
+        {
+            try
+            {
+                for (var index = 0; index < 200; index++)
+                {
+                    collector.Collect(new ProtoObservation(
+                        "Web",
+                        "web.page.verified",
+                        index % 2 == 0 ? "/users/42" : "/static"));
+                    if (index % 20 == 0) _ = collector.GetReportItems().Count();
+                }
+            }
+            catch (Exception exception)
+            {
+                failures.Enqueue(exception);
+            }
+        })).ToArray();
+        await Task.WhenAll(workers);
+
+        var items = collector.GetReportItems().ToDictionary(item => item.Identifier, StringComparer.Ordinal);
+        Assert.Multiple(() =>
+        {
+            Assert.That(failures, Is.Empty, "collect and report never raced on the item store");
+            Assert.That(items["/users/{id}"].Count, Is.EqualTo(800),
+                "every concurrent verification of the concrete path lands on the pattern exactly once");
+            Assert.That(items["/static"].Count, Is.EqualTo(800));
+        });
+    }
+
+    [Test]
     public void Collector_ShouldIgnoreOtherTargetsAndKinds()
     {
         var collector = new WebCoverageCollector("Web");
@@ -80,6 +123,37 @@ public sealed class WebCoverageCollectorTests
                 "the concrete paths land on the pattern instead of creating their own items");
             Assert.That(items["/users/{id}"].IsCovered, Is.True);
             Assert.That(items["/users/{id}"].Count, Is.EqualTo(2), "the pattern counts one per verification");
+            Assert.That(items["/docs/{...}"].IsCovered, Is.False);
+        });
+    }
+
+    [Test]
+    public void Collector_ShouldPreferAnExactEntryAndANonCatchAllPattern()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                // The catch-all and the pattern both match; the exact entry and the specific pattern win.
+                ["ProtoTest:Web:Pages:0"] = "/users/{id}",
+                ["ProtoTest:Web:Pages:1"] = "/users/me",
+                ["ProtoTest:Web:Pages:2"] = "/docs/{...}",
+                ["ProtoTest:Web:Pages:3"] = "/docs/{section}"
+            })
+            .Build();
+        var collector = new WebCoverageCollector("Web", configuration);
+
+        collector.Collect(new ProtoObservation("Web", "web.page.verified", "/users/me"));
+        collector.Collect(new ProtoObservation("Web", "web.page.verified", "/docs/intro"));
+
+        var items = collector.GetReportItems().ToDictionary(item => item.Identifier, StringComparer.Ordinal);
+        Assert.Multiple(() =>
+        {
+            Assert.That(items["/users/me"].IsCovered, Is.True,
+                "an exact inventory entry wins over a pattern that also matches");
+            Assert.That(items["/users/me"].Count, Is.EqualTo(1));
+            Assert.That(items["/users/{id}"].IsCovered, Is.False);
+            Assert.That(items["/docs/{section}"].IsCovered, Is.True,
+                "a specific pattern wins over the catch-all that also matches");
             Assert.That(items["/docs/{...}"].IsCovered, Is.False);
         });
     }
@@ -145,6 +219,15 @@ public sealed class WebCoverageCollectorTests
         var parsed = VueRouteDiscovery.Parse("""["/users/:id","/orders/:id?","/legacy/*"]""").ToArray();
 
         Assert.That(parsed, Is.EqualTo(new[] { "/users/{id}", "/orders/{id}", "/legacy/{...}" }));
+    }
+
+    [Test]
+    public void VueRouteDiscovery_ShouldKeepTheRootRoute()
+    {
+        var parsed = VueRouteDiscovery.Parse("""["/","/users/:id"]""").ToArray();
+
+        Assert.That(parsed, Is.EqualTo(new[] { "/", "/users/{id}" }),
+            "the root route is a page like any other, not an empty route definition");
     }
 
     [Test]

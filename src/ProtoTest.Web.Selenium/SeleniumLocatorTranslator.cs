@@ -45,7 +45,7 @@ internal static class SeleniumLocatorTranslator
             TableCellWebLocator value => documentScoped
                 ? $"(//*[self::th or self::td])[{value.Index + 1}]"
                 : $"./*[self::th or self::td][position()={value.Index + 1}]",
-            TableCellByHeaderWebLocator value => WebXPath.TableCellByHeader(value),
+            TableCellByHeaderWebLocator value => WebXPath.TableCellByHeader(value, documentScoped),
             NthWebLocator value => XPath(value.Source, documentScoped),
             HasTextWebLocator => throw new WebBackendCapabilityException("HasText is a filter and must be composed with another locator using And()."),
             CssWebLocator => throw new WebBackendCapabilityException("CSS locators are translated directly and cannot be embedded in XPath."),

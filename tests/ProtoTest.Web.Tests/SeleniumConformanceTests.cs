@@ -85,6 +85,36 @@ public sealed class SeleniumConformanceTests
     }
 
     [Test]
+    public void TableCellByHeader_ShouldBeDocumentScopedFromTheDriverAndRowScopedFromAnElement()
+    {
+        // The single data row keeps the document-scoped column lookup a single match.
+        var document = Parse(ConformanceMarkup.Html);
+        const string prefix = "By.XPath: ";
+
+        var driverSelector = SeleniumLocatorTranslator.DiagnosticSelector(By.TableCell("Total"), documentScoped: true);
+        var elementSelector = SeleniumLocatorTranslator.DiagnosticSelector(By.TableCell("Total"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(driverSelector, Does.Not.Contain("./*[self::th or self::td]"),
+                "the driver-rooted lookup must not address the document's direct children");
+            Assert.That(elementSelector, Does.Contain("./*[self::th or self::td]"));
+        });
+
+        var driverScoped = document.XPathSelectElements(driverSelector[prefix.Length..]).ToArray();
+        var row = document.Descendants("tr").First(element => element.Elements("td").Count() == 2);
+        var elementScoped = row.XPathSelectElements(elementSelector[prefix.Length..]).ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(driverScoped.Select(cell => cell.Value), Is.EqualTo(new[] { "€ 10" }),
+                "the header 'Total' addresses the second column from the document");
+            Assert.That(elementScoped.Select(cell => cell.Value), Is.EqualTo(new[] { "€ 10" }),
+                "the row scope still addresses its own header-named cell");
+        });
+    }
+
+    [Test]
     public void And_WithACssLeft_ShouldRejectWithTheDocumentedLimitation()
     {
         var exception = Assert.Throws<WebBackendCapabilityException>(() =>

@@ -186,6 +186,35 @@ public sealed class MessagingTests
     }
 
     [Test]
+    public async Task ConcurrentAwaitsOnOneConsumer_ShouldConsumeEachMessageOnce()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("messaging concurrent awaits", TestMethod());
+        var broker = context.Service<IProtoMessageBroker>();
+        var consumer = await broker.CreateConsumerAsync();
+        context.RegisterResource(
+            "messaging:consumer:concurrent",
+            "consumer",
+            "Concurrent consumer",
+            _ => consumer.DisposeAsync());
+
+        var first = consumer.AwaitAsync("invoices", _ => true, TimeSpan.FromSeconds(2)).AsTask();
+        var second = consumer.AwaitAsync("invoices", _ => true, TimeSpan.FromSeconds(2)).AsTask();
+        await Task.Delay(100);
+        await context.Messaging().PublishAsync("invoices", "{\"id\":1}");
+        await context.Messaging().PublishAsync("invoices", "{\"id\":2}");
+
+        var received = await Task.WhenAll(first, second);
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.That(received.Select(message => message.Payload),
+            Is.EquivalentTo(new[] { "{\"id\":1}", "{\"id\":2}" }),
+            "each message is consumed once per consumer; a concurrent await must not receive one another owns");
+    }
+
+    [Test]
     public async Task Await_ShouldNotTimeOutAfterAMatchWasAssigned()
     {
         var builder = new ProtoHostBuilder();

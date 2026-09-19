@@ -55,6 +55,11 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     {
         if (operation.ParentCorrelationId is { } parent && _openOperations.ContainsKey(parent))
         {
+            // A nested operation never owns a trace group - its group-owning ancestor holds the gate -
+            // but it is tracked while it runs so its own descendants keep resolving the lineage at any
+            // depth. Without the registration a read inside a nested WaitUntil would look top-level and
+            // start a group while the outer wait still holds the gate, deadlocking against itself.
+            _openOperations[operation.CorrelationId] = 0;
             return ValueTask.CompletedTask;
         }
 
@@ -355,7 +360,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
                 ? Page.Locator("th, td")
                 : scope.Locator(":scope > th, :scope > td")).Nth(value.Index),
             TableCellByHeaderWebLocator value => scope is null
-                ? Page.Locator($"xpath={WebXPath.TableCellByHeader(value)}")
+                ? Page.Locator($"xpath={WebXPath.TableCellByHeader(value, documentScoped: true)}")
                 : scope.Locator($"xpath={WebXPath.TableCellByHeader(value)}"),
             AndWebLocator value => And(scope, value),
             HasTextWebLocator => throw new WebBackendCapabilityException("HasText is a filter and must be composed with another locator using And()."),

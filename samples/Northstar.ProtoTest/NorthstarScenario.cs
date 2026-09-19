@@ -1,7 +1,7 @@
-namespace ProtoTest.SampleApp.Testing;
+namespace Northstar.ProtoTest;
 
 using System.Text.Json;
-using ProtoTest.Core;
+using global::ProtoTest.Core;
 
 public static class NorthstarTargets
 {
@@ -74,7 +74,7 @@ public sealed class NorthstarScenarioHook : IProtoTestHook
         context.Trace.WriteEvent(
             "northstar.scenario.begin",
             "Begin correlated Northstar scenario",
-            "ProtoTest.SampleApp.Testing",
+            "Northstar.ProtoTest",
             outcome: ProtoTraceOutcome.Succeeded,
             attributes: new Dictionary<string, string?>
             {
@@ -108,7 +108,7 @@ public sealed class NorthstarScenarioHook : IProtoTestHook
         context.Trace.WriteEvent(
             "northstar.scenario.end",
             "Complete correlated Northstar scenario",
-            "ProtoTest.SampleApp.Testing",
+            "Northstar.ProtoTest",
             outcome: ProtoTraceOutcome.Succeeded,
             attributes: new Dictionary<string, string?>
             {

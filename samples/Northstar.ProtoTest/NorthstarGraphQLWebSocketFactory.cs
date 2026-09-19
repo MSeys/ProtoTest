@@ -1,12 +1,16 @@
-namespace ProtoTest.Demo;
+namespace Northstar.ProtoTest;
 
 using System.Net.WebSockets;
-using ProtoTest.AspNetCore;
-using ProtoTest.Core;
-using ProtoTest.GraphQL;
-using ProtoTest.SampleApp;
-using ProtoTest.SampleApp.Testing;
+using global::ProtoTest.AspNetCore;
+using global::ProtoTest.Core;
+using global::ProtoTest.GraphQL;
+using global::ProtoTest.SampleApp;
 
+/// <summary>
+/// Connects GraphQL subscriptions through the in-process test server's own WebSocket client, so the
+/// subscription rides the same host the application runs in. Registered by
+/// <c>AddNorthstarTestSupport(UseInProcessGraphQLWebSockets = true)</c>.
+/// </summary>
 internal sealed class NorthstarGraphQLWebSocketFactory : IGraphQLWebSocketFactory
 {
     public async ValueTask<WebSocket> ConnectAsync(

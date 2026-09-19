@@ -70,6 +70,18 @@ public abstract class WebPage : WebComponent
 
     public ValueTask OpenAsync(Uri address, CancellationToken cancellationToken = default)
         => Web.NavigateAsync(address, cancellationToken);
+
+    /// <summary>
+    /// Runs <paramref name="trigger"/> and captures the download it starts, returning the file and
+    /// registering it as a test attachment. A backend without download support throws
+    /// <see cref="WebBackendCapabilityException"/> before the trigger runs.
+    /// </summary>
+    public ValueTask<WebDownload> DownloadAsync(
+        Func<CancellationToken, Task> trigger,
+        string? name = null,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+        => Web.DownloadAsync(trigger, name, timeout, cancellationToken);
 }
 
 internal sealed record ComponentScope(IReadOnlyList<WebLocator> Roots, string Path);

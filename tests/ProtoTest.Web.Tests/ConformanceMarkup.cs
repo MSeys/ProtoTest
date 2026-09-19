@@ -97,4 +97,16 @@ internal static class ConformanceMarkup
           <script>setTimeout(() => document.querySelector('button').disabled = false, 100);</script>
         </body></html>
         """;
+
+    /// <summary>A page whose export link downloads a small generated CSV, with no server involved.</summary>
+    public const string DownloadHtml = """
+        <!doctype html>
+        <html><body>
+          <a id="export" download="monthly-report.csv">Export</a>
+          <script>
+            const csv = new Blob(["name,total\natlas,42"], { type: "text/csv" });
+            document.getElementById("export").href = URL.createObjectURL(csv);
+          </script>
+        </body></html>
+        """;
 }

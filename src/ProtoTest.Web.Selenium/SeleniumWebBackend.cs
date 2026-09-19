@@ -7,7 +7,7 @@ using OpenQA.Selenium;
 using ProtoTest.Core;
 using ProtoTest.Web.Internal;
 
-public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics
+public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics, IWebBackendDownloads
 {
     private readonly ProtoExecutionContext _context;
     private readonly SeleniumWebOptions _options;
@@ -149,6 +149,19 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
                     $"Selenium driver '{Driver.GetType().FullName}' does not support JavaScript execution.");
             return javascript.ExecuteScript($"return ({script});")?.ToString();
         }, cancellationToken);
+
+    /// <summary>
+    /// Selenium has no download API: the WebDriver protocol gives a driver no way to observe or fetch
+    /// a browser download, and the download itself depends on driver-specific profile preferences.
+    /// The capability fails with the documented exception instead of pretending to capture anything.
+    /// </summary>
+    public ValueTask<WebDownload> DownloadAsync(
+        Func<CancellationToken, Task> trigger,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+        => throw new WebBackendCapabilityException(
+            "Selenium does not support browser download capture: the WebDriver protocol has no download " +
+            "API. Use the Playwright backend for downloads, or fetch the file over HTTP with ProtoTest.Rest.");
 
     public async ValueTask<IReadOnlyList<ProtoTestAttachment>> CaptureFailureAsync(
         WebFailureContext failure,

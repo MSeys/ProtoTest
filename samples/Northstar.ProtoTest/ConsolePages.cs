@@ -1,7 +1,16 @@
-namespace ProtoTest.Demo;
+namespace Northstar.ProtoTest;
 
-using ProtoTest.SampleApp.Testing;
-using ProtoTest.Web;
+using global::ProtoTest.Web;
+
+/// <summary>The bounded waits console journeys give a screen, fact or live update to settle.</summary>
+public static class NorthstarConsole
+{
+    /// <summary>How long a screen or fact may take to appear or change.</summary>
+    public static readonly TimeSpan Wait = TimeSpan.FromSeconds(15);
+
+    /// <summary>How long a live update may take to reach a console screen.</summary>
+    public static readonly TimeSpan LiveUpdateWait = TimeSpan.FromSeconds(20);
+}
 
 /// <summary>
 /// The console shell every screen renders: brand, session facts, navigation and the toast host.
@@ -243,10 +252,12 @@ public sealed class NorthstarConsoleLogin : IWebLoginStrategy
         var organization = context.Execution.Resolve<NorthstarOrganizationContext>();
         var page = context.Web.Page<SignInPage>();
         await page.OpenAsync("/console/signin", cancellationToken);
-        await page.Page.Should.BeVisibleAsync(DemoSupport.ConsoleWait, cancellationToken);
-        await page.Token.FillAsync(organization.OwnerToken, cancellationToken);
-        await page.Submit.ClickAsync(cancellationToken);
+        await page.Page.Should.BeVisibleAsync(NorthstarConsole.Wait, cancellationToken);
+        await page.Flow("Sign in with the tenant token")
+            .Fill(signIn => signIn.Token, organization.OwnerToken)
+            .Click(signIn => signIn.Submit)
+            .RunAsync(cancellationToken);
         // The exchange lands on the dashboard; the shell's session facts prove the cookie session.
-        await page.SessionOrganization.Should.BeVisibleAsync(DemoSupport.ConsoleWait, cancellationToken);
+        await page.SessionOrganization.Should.BeVisibleAsync(NorthstarConsole.Wait, cancellationToken);
     }
 }

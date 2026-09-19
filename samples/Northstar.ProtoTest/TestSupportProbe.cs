@@ -1,10 +1,10 @@
-namespace ProtoTest.SampleApp.Testing;
+namespace Northstar.ProtoTest;
 
 using System.Net;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Configuration;
-using ProtoTest.Core;
-using ProtoTest.Rest;
+using global::ProtoTest.Core;
+using global::ProtoTest.Rest;
 
 /// <summary>
 /// Verifies once per run that the application exposes <c>/test-support</c>, so a deployment that

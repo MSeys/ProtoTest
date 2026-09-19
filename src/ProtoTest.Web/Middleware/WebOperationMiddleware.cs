@@ -16,7 +16,8 @@ public enum WebOperationKind
     IsVisible,
     IsEnabled,
     IsChecked,
-    Assert
+    Assert,
+    Download
 }
 
 public enum WebKey

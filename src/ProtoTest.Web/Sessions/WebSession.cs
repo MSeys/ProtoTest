@@ -2,6 +2,7 @@ namespace ProtoTest.Web;
 
 using ProtoTest.Web.Internal;
 
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,7 @@ public sealed class WebSession : IAsyncDisposable
     private Task<IWebBackend>? _backendTask;
     private int _completeStarted;
     private int _disposeStarted;
+    private int _downloadSequence;
     private int _routeDiscoveryStarted;
 
     internal WebSession(
@@ -440,6 +442,125 @@ public sealed class WebSession : IAsyncDisposable
     private static string Shorten(string value)
         => value.Length <= 80 ? value : $"{value[..77]}...";
 
+    /// <summary>
+    /// Runs <paramref name="trigger"/> — typically a click that starts a download — and captures the
+    /// file the browser downloads. The file is returned and registered as a test attachment; a backend
+    /// without the download capability throws <see cref="WebBackendCapabilityException"/> before the
+    /// trigger runs.
+    /// </summary>
+    /// <param name="trigger">The action that starts the download.</param>
+    /// <param name="name">
+    /// An explicit file name for the capture. Defaults to the browser's suggested file name; an
+    /// extension in the explicit name refines the media type guess.
+    /// </param>
+    /// <param name="timeout">
+    /// How long the backend waits for the download. When omitted, the backend's own wait timeout applies.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the capture.</param>
+    public ValueTask<WebDownload> DownloadAsync(
+        Func<CancellationToken, Task> trigger,
+        string? name = null,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(trigger);
+        if (timeout is { } wait && wait <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(timeout));
+        }
+
+        var requestedName = string.IsNullOrWhiteSpace(name) ? null : name;
+        return ExecuteAsync(
+            "web.download",
+            requestedName is null ? "WEB · Download" : $"WEB · Download · {requestedName}",
+            WebOperationKind.Download,
+            element: null,
+            new Dictionary<string, string?>
+            {
+                ["web.download.requested_name"] = requestedName,
+                ["web.download.timeout"] = timeout?.ToString()
+            },
+            async (backend, ct) =>
+            {
+                if (backend is not IWebBackendDownloads downloads)
+                {
+                    throw new WebBackendCapabilityException(
+                        $"Web backend '{backend.Name}' cannot capture browser downloads. Use a backend " +
+                        $"that provides the {nameof(IWebBackendDownloads)} capability (Playwright does), " +
+                        "or fetch the file over HTTP instead.");
+                }
+
+                var captured = await downloads.DownloadAsync(trigger, timeout, ct);
+                if (requestedName is null)
+                {
+                    return captured;
+                }
+
+                // An explicit name wins for the record and the attachment. A known extension refines
+                // the media type guess; an unknown or missing one keeps the suggested file's type.
+                var mediaType = WebMediaTypes.Guess(requestedName);
+                return captured with
+                {
+                    FileName = requestedName,
+                    MediaType = mediaType == WebMediaTypes.Default ? captured.MediaType : mediaType
+                };
+            },
+            cancellationToken,
+            opensNestingScope: true,
+            afterCapture: RegisterDownload);
+    }
+
+    /// <summary>
+    /// Records the captured file on the download operation and registers it as an attachment. The
+    /// artifact registers on its own: a failed attachment is traced and never replaces the download.
+    /// </summary>
+    private void RegisterDownload(WebDownload download, ProtoTraceOperation operation)
+    {
+        var attributes = new Dictionary<string, string?>
+        {
+            ["web.download.name"] = download.FileName,
+            ["web.download.media_type"] = download.MediaType,
+            ["web.download.size"] = download.Size.ToString(CultureInfo.InvariantCulture)
+        };
+        foreach (var (key, value) in attributes)
+        {
+            operation.SetAttribute(key, value);
+        }
+
+        var attachmentName = DownloadAttachmentName(download.FileName);
+        try
+        {
+            _context.AddAttachment(ProtoTestAttachment.FromBytes(
+                attachmentName,
+                download.Content,
+                download.MediaType,
+                $"Downloaded file captured by Web session '{Name}'."));
+        }
+        catch (Exception exception)
+        {
+            _context.Trace.WriteEvent(
+                "web.download.attachment_failed",
+                $"Web download attachment failed · {attachmentName}",
+                TraceSource,
+                outcome: ProtoTraceOutcome.Failed,
+                attributes: new Dictionary<string, string?> { ["web.artifact"] = attachmentName },
+                exception: exception,
+                parentId: operation.Id);
+        }
+    }
+
+    private string DownloadAttachmentName(string fileName)
+    {
+        var sequence = Interlocked.Increment(ref _downloadSequence);
+        var name = Path.GetFileName(fileName);
+        var extension = Path.GetExtension(name);
+        var stem = WebNames.SafeName(Path.GetFileNameWithoutExtension(name));
+        if (stem.Length == 0) stem = "download";
+        var safeExtension = extension.Length > 1 ? WebNames.SafeName(extension[1..]) : string.Empty;
+        var suffix = safeExtension.Length > 0 ? $".{safeExtension}" : string.Empty;
+        return $"web-{WebNames.SafeName(Name)}-download-{sequence}-{stem}{suffix}";
+    }
+
     private async ValueTask AssertUntilAsync(
         WebElementReference element,
         bool negated,
@@ -551,7 +672,8 @@ public sealed class WebSession : IAsyncDisposable
         Dictionary<string, string?> attributes,
         Func<IWebBackend, CancellationToken, ValueTask<TResult>> execute,
         CancellationToken cancellationToken,
-        bool opensNestingScope = false)
+        bool opensNestingScope = false,
+        Action<TResult, ProtoTraceOperation>? afterCapture = null)
     {
         var backend = await GetOrCreateBackendAsync(cancellationToken);
         attributes["web.backend"] = backend.Name;
@@ -619,8 +741,10 @@ public sealed class WebSession : IAsyncDisposable
 
             await pipeline(webOperation, cancellationToken);
 
+            var result = (TResult)webOperation.Result!;
+            afterCapture?.Invoke(result, operation);
             operation.Succeed();
-            return (TResult)webOperation.Result!;
+            return result;
         }
         catch (OperationCanceledException exception)
         {

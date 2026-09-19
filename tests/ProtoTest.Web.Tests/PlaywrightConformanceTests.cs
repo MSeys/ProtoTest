@@ -1,6 +1,8 @@
 namespace ProtoTest.Web.Tests;
 
+using System.Globalization;
 using System.Reflection;
+using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Playwright;
 using ProtoTest.Core;
@@ -553,6 +555,64 @@ public sealed class PlaywrightConformanceTests
         });
     }
 
+    [Test]
+    [CancelAfter(60_000)]
+    public async Task Download_ShouldCaptureTheFileAttachItAndNestTheTrigger()
+    {
+        var host = new ProtoHostBuilder()
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Always;
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("playwright download", TestMethod());
+        var web = context.Web();
+        var backend = await OpenBrowserAsync(web);
+        await backend.Page.SetContentAsync(ConformanceMarkup.DownloadHtml);
+        var page = web.Page<DownloadPage>();
+
+        // The trigger is a real semantic click, so the download operation has to nest it: on
+        // Playwright a top-level trigger would race the trace-group gate the download still holds.
+        var download = await page.DownloadAsync(
+            ct => page.Export.ClickAsync(ct).AsTask(),
+            timeout: TimeSpan.FromSeconds(15));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        var entries = host.Trace.Snapshot().Tests.Single().Entries;
+        var operation = entries.Single(entry => entry.Kind == "web.download");
+        var click = entries.Single(entry => entry.Kind == "web.click");
+        var ancestors = new HashSet<string>();
+        for (var current = click; current.ParentId is { } parentId;)
+        {
+            ancestors.Add(parentId);
+            current = entries.Single(entry => entry.Id == parentId);
+        }
+
+        var attachment = context.Attachments.Single(item => item.Name.EndsWith(".csv", StringComparison.Ordinal));
+        var attached = Encoding.UTF8.GetString(await attachment.ReadAllBytesAsync());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(download.FileName, Is.EqualTo("monthly-report.csv"));
+            Assert.That(download.MediaType, Is.EqualTo("text/csv"));
+            Assert.That(Encoding.UTF8.GetString(download.Content.Span), Is.EqualTo("name,total\natlas,42"));
+            Assert.That(download.Size, Is.EqualTo(download.Content.Length));
+            Assert.That(operation.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
+            Assert.That(operation.Attributes["web.download.name"], Is.EqualTo("monthly-report.csv"));
+            Assert.That(operation.Attributes["web.download.size"],
+                Is.EqualTo(download.Size.ToString(CultureInfo.InvariantCulture)));
+            Assert.That(ancestors, Does.Contain(operation.Id),
+                "the triggering click is nested under the download through the nesting scope");
+            Assert.That(attachment.Name, Does.Contain("web-default-download-1-").And.EndsWith(".csv"));
+            Assert.That(attachment.MediaType, Is.EqualTo("text/csv"));
+            Assert.That(attached, Is.EqualTo("name,total\natlas,42"));
+        });
+    }
+
     /// <summary>
     /// Opens the browser, skipping with the reason when no browser can run here - a headless CI image
     /// without the browser dependencies should report a skip, not a failure.
@@ -569,7 +629,6 @@ public sealed class PlaywrightConformanceTests
             throw;
         }
     }
-
     private static MethodInfo TestMethod()
         => typeof(PlaywrightConformanceTests).GetMethod(nameof(Placeholder), BindingFlags.Static | BindingFlags.NonPublic)!;
 
@@ -616,6 +675,11 @@ public sealed class PlaywrightConformanceTests
     public sealed class DuplicatePage : WebPage
     {
         public WebElement Duplicate => Element(By.Css("p.dup"));
+    }
+
+    public sealed class DownloadPage : WebPage
+    {
+        public WebElement Export => Element(By.Css("#export"));
     }
 
 }

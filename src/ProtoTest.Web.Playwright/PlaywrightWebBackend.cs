@@ -6,7 +6,7 @@ using Microsoft.Playwright;
 using ProtoTest.Core;
 using ProtoTest.Web.Internal;
 
-public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics
+public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics, IWebBackendDownloads
 {
     private readonly ProtoExecutionContext _context;
     private readonly IBrowserContext _browserContext;
@@ -253,6 +253,30 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     {
         cancellationToken.ThrowIfCancellationRequested();
         return await Page.EvaluateAsync<string?>(script);
+    }
+
+    /// <summary>
+    /// Runs the trigger and waits for the download it starts with Playwright's own waiter, then reads
+    /// the completed file and its suggested name.
+    /// </summary>
+    public async ValueTask<WebDownload> DownloadAsync(
+        Func<CancellationToken, Task> trigger,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(trigger);
+        cancellationToken.ThrowIfCancellationRequested();
+        var options = new PageRunAndWaitForDownloadOptions();
+        if (timeout is { } wait)
+        {
+            options.Timeout = (float)wait.TotalMilliseconds;
+        }
+
+        var download = await Page.RunAndWaitForDownloadAsync(() => trigger(cancellationToken), options);
+        var fileName = download.SuggestedFilename;
+        var path = await download.PathAsync();
+        var content = await File.ReadAllBytesAsync(path, cancellationToken);
+        return new WebDownload(fileName, WebMediaTypes.Guess(fileName), content);
     }
 
     public async ValueTask<IReadOnlyList<ProtoTestAttachment>> CaptureFailureAsync(

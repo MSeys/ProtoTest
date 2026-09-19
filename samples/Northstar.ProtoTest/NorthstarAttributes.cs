@@ -1,11 +1,14 @@
-namespace ProtoTest.SampleApp.Testing;
+namespace Northstar.ProtoTest;
 
-using System.Net;
-using ProtoTest.Core;
-using ProtoTest.Rest;
-using ProtoTest.SampleApp.Contracts;
+using global::ProtoTest.Core;
+using global::ProtoTest.Data;
+using global::ProtoTest.SampleApp.Contracts;
 
-/// <summary>Provisions an isolated Northstar organization and removes it after the test.</summary>
+/// <summary>
+/// Provisions an isolated Northstar organization and removes it after the test. Whether that runs
+/// through the domain or the test-support surface is the registration's decision; the test only sees
+/// the provisioned <see cref="NorthstarOrganizationContext"/>.
+/// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, Inherited = true)]
 public sealed class NorthstarTenantAttribute : ProtoAttribute
 {
@@ -20,36 +23,17 @@ public sealed class NorthstarTenantAttribute : ProtoAttribute
 
     public override async Task BeforeTestAsync(ProtoExecutionContext context)
     {
-        await TestSupportProbe.EnsureAvailableAsync(context);
-        var name = $"northstar-{context.TestId}";
-        using var response = await context.Rest()
-            .WithoutAuth()
-            .Body(new ProvisionTenantRequest(name, PlanId))
-            .PostAsync("/test-support/tenants");
-
-        response.Should.HaveHttpStatus(HttpStatusCode.Created);
-        var tenant = response.ReadAsJson<TenantResponse>()
-            ?? throw new InvalidOperationException("The sample app provisioned no tenant.");
+        var tenant = await context.Data()
+            .For<ProvisionTenantRequest>()
+            .With(request => request.Name, $"northstar-{context.TestId}")
+            .With(request => request.PlanId, PlanId)
+            .CreateAsync<TenantResponse>();
         context.SetContext(new NorthstarOrganizationContext(
             tenant.Tenant,
             tenant.OrganizationId,
             tenant.OwnerEmail,
             tenant.OwnerToken,
             tenant.ApiBaseUrl));
-    }
-
-    public override async Task AfterTestAsync(ProtoExecutionContext context)
-    {
-        var organization = context.TryResolve<NorthstarOrganizationContext>();
-        if (organization is null)
-        {
-            return;
-        }
-
-        using var response = await context.Rest()
-            .WithoutAuth()
-            .DeleteAsync("/test-support/tenants/{tenant}", new { tenant = organization.Tenant });
-        response.Should.HaveHttpStatus(HttpStatusCode.NoContent);
     }
 }
 
@@ -79,15 +63,11 @@ public sealed class SignedInAsAttribute : ProtoAttribute
             return;
         }
 
-        var email = $"{Role}.{context.TestId}@example.test";
-        using var response = await context.Rest()
-            .WithoutAuth()
-            .Body(new InviteMemberRequest(email, Role))
-            .PostAsync("/test-support/tenants/{tenant}/members", new { tenant = organization.Tenant });
-
-        response.Should.HaveHttpStatus(HttpStatusCode.Created);
-        var member = response.ReadAsJson<TestMemberResponse>()
-            ?? throw new InvalidOperationException("The sample app provisioned no member.");
+        var member = await context.Data()
+            .For<InviteMemberRequest>()
+            .With(request => request.Email, $"{Role}.{context.TestId}@example.test")
+            .With(request => request.Role, Role)
+            .CreateAsync<TestMemberResponse>();
         context.SetContext(new NorthstarMemberContext(
             member.Membership.Id,
             member.Membership.Email,

@@ -1,7 +1,7 @@
-namespace ProtoTest.SampleApp.Testing;
+namespace Northstar.ProtoTest;
 
 using System.Net.Http.Headers;
-using ProtoTest.Http;
+using global::ProtoTest.Http;
 
 /// <summary>Sends the signed-in member's bearer token. Shared by REST and GraphQL via [Auth&lt;&gt;].</summary>
 public sealed class NorthstarAuthenticator : IProtoHttpAuthenticator

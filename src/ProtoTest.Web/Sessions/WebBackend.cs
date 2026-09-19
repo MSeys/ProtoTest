@@ -86,6 +86,24 @@ public interface IWebBackendDiagnostics
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Optional backend capability: captures a file the browser downloads. Playwright implements it with
+/// its native download waiter. Selenium implements it by throwing <see cref="WebBackendCapabilityException"/>
+/// because the WebDriver protocol has no download API, so a session using Selenium fails before the
+/// trigger runs instead of quietly capturing nothing.
+/// </summary>
+public interface IWebBackendDownloads
+{
+    /// <summary>
+    /// Runs <paramref name="trigger"/> (the action that starts the download) and returns the file it
+    /// produced, waiting up to <paramref name="timeout"/> when one is given.
+    /// </summary>
+    ValueTask<WebDownload> DownloadAsync(
+        Func<CancellationToken, Task> trigger,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default);
+}
+
 public interface IWebBackendFactory
 {
     string Name { get; }

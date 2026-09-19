@@ -1,6 +1,7 @@
 namespace ProtoTest.Web.Tests;
 
 using System.Reflection;
+using System.Text;
 using System.Xml.Linq;
 using System.Xml.XPath;
 using ProtoTest.Core;
@@ -670,6 +671,101 @@ public sealed class WebModelTests
         await host.CompleteTestAsync(ProtoTestResult.Failed(expected));
         var click = host.Trace.Snapshot().Tests.Single().Entries.Single(entry => entry.Kind == "web.click");
         Assert.That(click.Error?.Message, Is.EqualTo("native click failed"));
+    }
+
+    [Test]
+    public async Task DownloadAsync_ShouldUseTheCapabilityTraceAndAttachTheFile()
+    {
+        var stub = new DownloadingBackend
+        {
+            DownloadResult = new WebDownload("orders.csv", "text/csv", Encoding.UTF8.GetBytes("id,total\n1,42"))
+        };
+        var factory = new FakeBackendFactory(stub);
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web download", TestMethod());
+        var triggered = false;
+        var timeout = TimeSpan.FromSeconds(3);
+
+        var download = await context.Web().DownloadAsync(
+            _ =>
+            {
+                triggered = true;
+                return Task.CompletedTask;
+            },
+            name: "Monthly orders.csv",
+            timeout: timeout);
+
+        var entry = host.Trace.Snapshot().Tests.Single().Entries.Single(item => item.Kind == "web.download");
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(triggered, Is.True);
+            Assert.That(stub.TriggerCount, Is.EqualTo(1));
+            Assert.That(stub.LastTimeout, Is.EqualTo(timeout));
+            Assert.That(download.FileName, Is.EqualTo("Monthly orders.csv"));
+            Assert.That(download.MediaType, Is.EqualTo("text/csv"), "an explicit name with the same extension keeps the type");
+            Assert.That(download.Size, Is.EqualTo(13));
+            Assert.That(entry.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
+            Assert.That(entry.Attributes["web.download.name"], Is.EqualTo("Monthly orders.csv"));
+            Assert.That(entry.Attributes["web.download.media_type"], Is.EqualTo("text/csv"));
+            Assert.That(entry.Attributes["web.download.size"], Is.EqualTo("13"));
+            Assert.That(entry.Attributes["web.download.requested_name"], Is.EqualTo("Monthly orders.csv"));
+            Assert.That(entry.Attributes["web.download.timeout"], Is.EqualTo(timeout.ToString()));
+            Assert.That(context.Attachments.Select(item => item.Name),
+                Has.Some.EndsWith("web-default-download-1-monthly-orders.csv"));
+        });
+    }
+
+    [Test]
+    public async Task DownloadAsync_ShouldFailCleanlyWhenTheBackendHasNoDownloadCapability()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web download unsupported", TestMethod());
+        var triggered = false;
+
+        var exception = Assert.ThrowsAsync<WebBackendCapabilityException>(async () =>
+            await context.Web().DownloadAsync(_ =>
+            {
+                triggered = true;
+                return Task.CompletedTask;
+            }));
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(triggered, Is.False, "the trigger never runs when the backend cannot capture");
+            Assert.That(exception!.Message, Does.Contain("Fake").And.Contains("IWebBackendDownloads"));
+        });
+    }
+
+    [Test]
+    public async Task SeleniumDownload_ShouldFailWithTheDocumentedCapabilityException()
+    {
+        var host = new ProtoHostBuilder().AddWeb(() => new StubWebDriver()).Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("selenium download", TestMethod());
+        var triggered = false;
+
+        var exception = Assert.ThrowsAsync<WebBackendCapabilityException>(async () =>
+            await context.Web().DownloadAsync(_ =>
+            {
+                triggered = true;
+                return Task.CompletedTask;
+            }));
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(triggered, Is.False, "the trigger never runs on Selenium");
+            Assert.That(exception!.Message, Does.Contain("Selenium").And.Contains("WebDriver protocol"));
+        });
     }
 
     [Test]
@@ -1638,8 +1734,9 @@ public sealed class WebModelTests
 
     private sealed class FakeBackendFactory : IWebBackendFactory
     {
+        public FakeBackendFactory(FakeBackend? backend = null) => Backend = backend ?? new FakeBackend();
         public string Name => "Fake";
-        public FakeBackend Backend { get; } = new();
+        public FakeBackend Backend { get; }
         public Exception? Failure { get => Backend.Failure; init => Backend.Failure = value; }
         public ValueTask<IWebBackend> CreateAsync(
             ProtoExecutionContext context,
@@ -1651,7 +1748,7 @@ public sealed class WebModelTests
         }
     }
 
-    private sealed class FakeBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics
+    private class FakeBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics
     {
         public string Name => "Fake";
         public List<(string Kind, WebElementReference? Element, string? Value)> Operations { get; } = [];
@@ -1783,6 +1880,24 @@ public sealed class WebModelTests
         {
             Disposed = true;
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class DownloadingBackend : FakeBackend, IWebBackendDownloads
+    {
+        public WebDownload? DownloadResult { get; set; }
+        public TimeSpan? LastTimeout { get; private set; }
+        public int TriggerCount { get; private set; }
+
+        public async ValueTask<WebDownload> DownloadAsync(
+            Func<CancellationToken, Task> trigger,
+            TimeSpan? timeout = null,
+            CancellationToken cancellationToken = default)
+        {
+            TriggerCount++;
+            LastTimeout = timeout;
+            await trigger(cancellationToken);
+            return DownloadResult ?? throw new InvalidOperationException("No download result is configured.");
         }
     }
 

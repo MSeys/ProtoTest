@@ -33,9 +33,10 @@ await row.Cell("Project").Should.HaveTextAsync("atlas");
 - **Sessions** — `Proto.Context.Web(name?, application?)` creates a per-test session lazily; `[WebSession(name, Open = …, Application = …)]` and `[LoginAs<TStrategy>(persona, Session = …)]` cover setup and login.
 - **Model** — `WebPage`/`WebComponent` with `Element`, `Component<T>()` and `Components<T>()`; `WebTable<TRow>` and `WebTableRow` for tables; every operation carries its scope path.
 - **Actions and assertions** — `ClickAsync`, `FillAsync`, `CheckAsync`, `SelectOptionAsync`, `PressAsync`, reads, and `element.Should`/`ShouldNot` (`BeVisibleAsync`, `BeEnabledAsync`, `HaveTextAsync`, `ContainTextAsync`, `HaveValueAsync`, …).
+- **Downloads** — `session.DownloadAsync(trigger, …)` and the `WebPage` shortcut capture the file a trigger downloads as a `WebDownload` (file name, guessed media type, bytes, size) and register it as a test attachment named `web-{session}-download-{n}-{file}`. Playwright only: Selenium fails with `WebBackendCapabilityException` before the trigger runs, because the WebDriver protocol has no download API.
 - **Flows, middleware and waits** — `Flow<T>()`/`InteractAsync`, `AddWebMiddleware<T>()`, `AddWebWait<TCondition>(timing, …)` and `WaitUntilAsync`.
 - **Coverage** — a successful navigation records `web.page.visited`, a passing assertion `web.page.verified`, and inventory records `web.page.available`; `WebCoverageCollector` reports one item per page.
-- **Tracing** — `web.navigate`, `web.click`, `web.fill` (redacted value), `web.press`, `assert.web` and friends, with `web.backend.execute` child entries.
+- **Tracing** — `web.navigate`, `web.click`, `web.fill` (redacted value), `web.press`, `web.download`, `assert.web` and friends, with `web.backend.execute` child entries.
 
 ## Configuration
 

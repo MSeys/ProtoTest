@@ -44,8 +44,8 @@ public sealed class WebJourney
         var row = page.Projects.RowMatching(By.HasText("web-atlas"));
         Assert.Multiple(async () =>
         {
-            await row.Cell("Project").ShouldHaveTextAsync("web-atlas");
-            await row.Cell("Status").ShouldHaveTextAsync(project.Status);
+            await row.Cell("Project").Should.HaveTextAsync("web-atlas");
+            await row.Cell("Status").Should.HaveTextAsync(project.Status);
         });
     }
 

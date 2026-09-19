@@ -36,10 +36,10 @@ public sealed class MessagingJourney
         using var paid = await Proto.Context.Rest()
             .Body(new PayInvoiceRequest(PaymentMethods.Visa))
             .PostAsync("/api/v1/invoices/{invoiceId}/pay", new { invoiceId = invoice.Id });
-        paid.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        paid.Should.HaveHttpStatus(HttpStatusCode.OK);
 
         // Assert: the application's event arrives, and it is about this invoice.
-        var message = await Proto.Context.Messages().AwaitAsync(
+        var message = await Proto.Context.Messaging().AwaitAsync(
             "invoice.paid",
             candidate => candidate.Payload is not null
                 && candidate.Payload.Contains(

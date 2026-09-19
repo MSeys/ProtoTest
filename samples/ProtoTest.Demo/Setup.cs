@@ -46,10 +46,14 @@ public sealed class Setup : ProtoTestAssembly
         var targetUrl = demoConfiguration["ProtoTest:TargetUrl"];
         var hostedInProcess = string.IsNullOrWhiteSpace(targetUrl);
         var configuredDatabase = demoConfiguration.GetConnectionString("Northstar");
-        var usePostgres = string.Equals(
+        var usePostgresContainer = string.Equals(
             demoConfiguration["ProtoTest:Database"],
             "postgres",
             StringComparison.OrdinalIgnoreCase);
+        // The store's provider is configuration, not an assumption: an external PostgreSQL connection
+        // string must not be handed to the SQLite provider just because no container is owned.
+        var postgresStore = usePostgresContainer || IsPostgresStore(
+            demoConfiguration["Database:Provider"], configuredDatabase);
         // A configured connection string points at an existing broker; Broker=container lets the run own
         // one. The adapter reads it under its own key, the in-process application under its own - both
         // are filled from the same started container.
@@ -62,13 +66,13 @@ public sealed class Setup : ProtoTestAssembly
         {
             builder.AddInfrastructure(
                 RabbitMqBroker.Container(),
-                ProtoRabbitMqOptions.ConnectionStringSetting,
+                RabbitMqOptions.ConnectionStringSetting,
                 "Messaging:RabbitMq:ConnectionString");
         }
 
         var useMessaging = useMessagingContainer || !string.IsNullOrWhiteSpace(configuredMessaging);
 
-        if (usePostgres)
+        if (usePostgresContainer)
         {
             // Owned by the whole run and started with the host; its connection string reaches the
             // test-side domain and the in-process application through infrastructure settings.
@@ -79,7 +83,7 @@ public sealed class Setup : ProtoTestAssembly
         // readers and the writer work at the same time, and a fresh file per run keeps tenant slugs
         // from colliding with the previous run.
         string? ownedDatabasePath = null;
-        if (!usePostgres && configuredDatabase is null)
+        if (!postgresStore && configuredDatabase is null)
         {
             ownedDatabasePath = Path.GetFullPath(Path.Combine("TestResults", "ProtoTest.Demo", "northstar-demo.db"));
             foreach (var suffix in new[] { "", "-wal", "-shm" })
@@ -92,15 +96,16 @@ public sealed class Setup : ProtoTestAssembly
         }
 
         var fallbackDatabase = configuredDatabase ?? $"Data Source={ownedDatabasePath}";
-        var databaseProvider = usePostgres ? "postgres" : "sqlite";
-        var composeDomainInTests = hostedInProcess || configuredDatabase is not null || usePostgres;
+        var databaseProvider = postgresStore ? "postgres" : "sqlite";
+        var composeDomainInTests = hostedInProcess || configuredDatabase is not null || postgresStore;
 
-        if (!usePostgres)
+        if (hostedInProcess && !usePostgresContainer)
         {
             // The standalone instance the browser journeys drive; the host starts it with the run and
             // fills the web session's base URL from it. Its capability is what lets those journeys skip
-            // when the suite cannot own the store.
-            builder.AddInfrastructure(new StandaloneSampleApp(fallbackDatabase));
+            // when the suite cannot own the store. A published run (TargetUrl set) drives the published
+            // application instead, so starting a local copy would point the journeys at the wrong store.
+            builder.AddInfrastructure(new StandaloneSampleApp(fallbackDatabase, databaseProvider));
             builder.AddCapability(new ProtoCapabilityDescriptor(
                 "Northstar standalone", ProtoCapabilityKinds.Server, "Demo"));
         }
@@ -113,13 +118,13 @@ public sealed class Setup : ProtoTestAssembly
             // release what they create.
             builder
                 .AddSql(
-                    provider => CreateDatabaseConnection(ResolveDatabase(provider, fallbackDatabase), usePostgres),
+                    provider => CreateDatabaseConnection(ResolveDatabase(provider, fallbackDatabase), postgresStore),
                     sql => sql.Isolation = SqlIsolation.None)
                 .ConfigureServices(services => services.AddNorthstarDomain(
                     (provider, options) =>
                     {
                         var connection = provider.GetRequiredService<DbConnection>();
-                        if (usePostgres)
+                        if (postgresStore)
                         {
                             options.UseNpgsql(connection);
                         }
@@ -184,9 +189,10 @@ public sealed class Setup : ProtoTestAssembly
                     // no process-wide environment variables involved.
                     app.AddAspNetCoreServer<Program>(configureWebHost: webHost =>
                     {
-                        if (!usePostgres)
+                        if (!usePostgresContainer)
                         {
-                            // A container's connection string arrives as infrastructure settings.
+                            // A container's connection string arrives as infrastructure settings; otherwise
+                            // the configured or run-owned store is passed through here.
                             webHost.UseSetting("ConnectionStrings:Northstar", fallbackDatabase);
                         }
 
@@ -232,6 +238,24 @@ public sealed class Setup : ProtoTestAssembly
         {
             builder.AddMessaging();
         }
+    }
+
+    /// <summary>
+    /// Whether the configured store is PostgreSQL. An explicit <c>Database:Provider</c> wins; otherwise
+    /// the connection string decides, and anything that is not clearly PostgreSQL stays SQLite.
+    /// </summary>
+    internal static bool IsPostgresStore(string? provider, string? connectionString)
+    {
+        if (!string.IsNullOrWhiteSpace(provider))
+        {
+            return string.Equals(provider, "postgres", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(provider, "postgresql", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (string.IsNullOrWhiteSpace(connectionString)) return false;
+        return connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
+            || connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase)
+            || connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ResolveDatabase(IServiceProvider provider, string fallback)

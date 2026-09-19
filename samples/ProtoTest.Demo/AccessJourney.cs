@@ -31,9 +31,9 @@ public sealed class AccessJourney
             .PostAsync("/api/v1/projects");
 
         // Assert
-        developerAttempt.ShouldHaveHttpStatus(HttpStatusCode.Forbidden)
+        developerAttempt.Should.HaveHttpStatus(HttpStatusCode.Forbidden)
             .ShouldMatchShape(new { code = ProblemCodes.Forbidden });
-        billingAttempt.ShouldHaveHttpStatus(HttpStatusCode.Forbidden)
+        billingAttempt.Should.HaveHttpStatus(HttpStatusCode.Forbidden)
             .ShouldMatchShape(new { code = ProblemCodes.Forbidden });
     }
 
@@ -49,7 +49,7 @@ public sealed class AccessJourney
             .PostAsync("/api/v1/projects");
 
         // Assert
-        project.ShouldHaveHttpStatus(HttpStatusCode.Created)
+        project.Should.HaveHttpStatus(HttpStatusCode.Created)
             .ShouldMatchShape(new { name = "owner-project", status = ProjectStatuses.Active });
     }
 
@@ -75,11 +75,11 @@ public sealed class AccessJourney
             .PostAsync("/api/v1/environments/{environmentId}/deployments", new { environmentId = production.Id });
 
         // Assert
-        previewDeploy.ShouldHaveHttpStatus(HttpStatusCode.Created)
+        previewDeploy.Should.HaveHttpStatus(HttpStatusCode.Created)
             .ShouldMatchShape(new { status = DeploymentStatuses.Succeeded });
-        productionAttempt.ShouldHaveHttpStatus(HttpStatusCode.Forbidden)
+        productionAttempt.Should.HaveHttpStatus(HttpStatusCode.Forbidden)
             .ShouldMatchShape(new { code = ProblemCodes.Forbidden });
-        productionDeploy.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        productionDeploy.Should.HaveHttpStatus(HttpStatusCode.Created);
     }
 
     [ProtoTest]
@@ -92,7 +92,7 @@ public sealed class AccessJourney
         using var audit = await DemoSupport.As(viewer).GetAsync("/api/v1/audit");
 
         // Assert
-        audit.ShouldHaveHttpStatus(HttpStatusCode.Forbidden)
+        audit.Should.HaveHttpStatus(HttpStatusCode.Forbidden)
             .ShouldMatchShape(new { code = ProblemCodes.Forbidden });
     }
 
@@ -106,7 +106,7 @@ public sealed class AccessJourney
         using var audit = await DemoSupport.As(billing).GetAsync("/api/v1/audit");
 
         // Assert
-        audit.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        audit.Should.HaveHttpStatus(HttpStatusCode.OK);
     }
 
     [ProtoTest]
@@ -117,7 +117,7 @@ public sealed class AccessJourney
         using var createdToken = await DemoSupport.As(owner)
             .Body(new CreateApiTokenRequest("ci-readonly", [TokenScopes.Read]))
             .PostAsync("/api/v1/tokens");
-        createdToken.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        createdToken.Should.HaveHttpStatus(HttpStatusCode.Created);
         var readOnly = createdToken.ReadAsJson<ApiTokenSecretResponse>()!.Secret;
         var project = await DemoSupport.CreateProjectAsync("scoped");
         var preview = await DemoSupport.CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
@@ -128,7 +128,7 @@ public sealed class AccessJourney
             .PostAsync("/api/v1/environments/{environmentId}/deployments", new { environmentId = preview.Id });
 
         // Assert
-        deployment.ShouldHaveHttpStatus(HttpStatusCode.Forbidden)
+        deployment.Should.HaveHttpStatus(HttpStatusCode.Forbidden)
             .ShouldMatchShape(new { code = ProblemCodes.Forbidden });
     }
 
@@ -141,12 +141,12 @@ public sealed class AccessJourney
             .WithoutAuth()
             .Body(new ProvisionTenantRequest($"northstar-intruder-{Proto.Context.TestId}"))
             .PostAsync("/test-support/tenants");
-        secondTenant.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        secondTenant.Should.HaveHttpStatus(HttpStatusCode.Created);
         var intruder = secondTenant.ReadAsJson<TenantResponse>()!;
         using var secret = await DemoSupport.As(intruder.OwnerToken)
             .Body(new CreateProjectRequest("secret"))
             .PostAsync("/api/v1/projects");
-        secret.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        secret.Should.HaveHttpStatus(HttpStatusCode.Created);
         var secretProject = secret.ReadAsJson<ProjectResponse>()!;
 
         // Act
@@ -154,7 +154,7 @@ public sealed class AccessJourney
             .GetAsync("/api/v1/projects/{projectId}", new { projectId = secretProject.Id });
 
         // Assert
-        attempt.ShouldHaveHttpStatus(HttpStatusCode.NotFound)
+        attempt.Should.HaveHttpStatus(HttpStatusCode.NotFound)
             .ShouldMatchShape(new { code = ProblemCodes.NotFound });
     }
 
@@ -173,7 +173,7 @@ public sealed class AccessJourney
         using var limited = await DemoSupport.As(owner).GetAsync("/api/v1/organization");
 
         // Assert
-        limited.ShouldHaveHttpStatus(HttpStatusCode.TooManyRequests)
+        limited.Should.HaveHttpStatus(HttpStatusCode.TooManyRequests)
             .ShouldMatchShape(new { code = ProblemCodes.RateLimited });
     }
 }

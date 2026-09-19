@@ -32,7 +32,7 @@ public sealed class DomainAccessJourney
         // Assert: no HTTP call was made to create it, yet the application reads it back.
         using var response = await Proto.Context.Rest()
             .GetAsync("/api/v1/projects/{projectId}", new { projectId = project.Id });
-        response.ShouldHaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        response.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
         {
             id = project.Id,
             name = "domain-atlas",

@@ -19,7 +19,7 @@ internal static class DemoSupport
         using var response = await Proto.Context.Rest()
             .Body(new CreateProjectRequest(name))
             .PostAsync("/api/v1/projects");
-        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        response.Should.HaveHttpStatus(HttpStatusCode.Created);
         return response.ReadAsJson<ProjectResponse>()!;
     }
 
@@ -28,7 +28,7 @@ internal static class DemoSupport
         using var response = await Proto.Context.Rest()
             .Body(new CreateEnvironmentRequest(name, kind))
             .PostAsync("/api/v1/projects/{projectId}/environments", new { projectId });
-        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        response.Should.HaveHttpStatus(HttpStatusCode.Created);
         return response.ReadAsJson<EnvironmentResponse>()!;
     }
 
@@ -37,7 +37,7 @@ internal static class DemoSupport
         using var response = await Proto.Context.Rest()
             .Body(new CreateDeploymentRequest(version, commitSha))
             .PostAsync("/api/v1/environments/{environmentId}/deployments", new { environmentId });
-        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        response.Should.HaveHttpStatus(HttpStatusCode.Created);
         return response.ReadAsJson<DeploymentResponse>()!;
     }
 
@@ -48,7 +48,7 @@ internal static class DemoSupport
             .WithoutAuth()
             .Body(new AdvanceClockRequest(Days: days))
             .PostAsync("/test-support/tenants/{tenant}/clock/advance", new { tenant = organization.Tenant });
-        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        response.Should.HaveHttpStatus(HttpStatusCode.OK);
         return response.ReadAsJson<ClockResponse>()!;
     }
 
@@ -57,12 +57,12 @@ internal static class DemoSupport
         using var usage = await Proto.Context.Rest()
             .Body(new RecordUsageRequest(UsageMetrics.DeployMinutes, 1))
             .PostAsync("/api/v1/usage");
-        usage.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        usage.Should.HaveHttpStatus(HttpStatusCode.Created);
         await AdvanceClockAsync(31);
 
         using var invoices = await Proto.Context.Rest()
             .GetAsync("/api/v1/invoices", new { status = InvoiceStatuses.Open });
-        invoices.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        invoices.Should.HaveHttpStatus(HttpStatusCode.OK);
         return invoices.ReadAsJson<CursorPage<InvoiceResponse>>()!.Items.Single();
     }
 
@@ -72,7 +72,7 @@ internal static class DemoSupport
             .WithoutAuth()
             .Body(new ConfigureWebhookSinkRequest(null, failuresBeforeSuccess))
             .PostAsync("/test-support/webhook-sinks");
-        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        response.Should.HaveHttpStatus(HttpStatusCode.Created);
         return response.ReadAsJson<WebhookSinkResponse>()!;
     }
 
@@ -81,7 +81,7 @@ internal static class DemoSupport
         using var response = await Proto.Context.Rest()
             .WithoutAuth()
             .GetAsync("/test-support/webhook-sinks/{sinkId}/receipts", new { sinkId });
-        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        response.Should.HaveHttpStatus(HttpStatusCode.OK);
         return response.ReadAsJson<IReadOnlyList<WebhookReceiptResponse>>()!;
     }
 
@@ -117,7 +117,7 @@ internal static class DemoSupport
             .WithoutAuth()
             .Body(new InviteMemberRequest($"{role}.{Proto.Context.TestId}@example.test", role))
             .PostAsync("/test-support/tenants/{tenant}/members", new { tenant = organization.Tenant });
-        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        response.Should.HaveHttpStatus(HttpStatusCode.Created);
         return response.ReadAsJson<TestMemberResponse>()!.Token;
     }
 

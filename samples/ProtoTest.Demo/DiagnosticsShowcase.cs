@@ -24,7 +24,7 @@ public sealed class DiagnosticsShowcase
     {
         // Arrange
         using var organization = await Proto.Context.Rest().GetAsync("/api/v1/organization");
-        organization.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        organization.Should.HaveHttpStatus(HttpStatusCode.OK);
 
         // Act
         JsonShapeMismatchException? mismatch = null;
@@ -73,7 +73,7 @@ public sealed class DiagnosticsShowcase
             Proto.Context.TestId,
             new { exception.Message });
         using var organization = await Proto.Context.Rest().GetAsync("/api/v1/organization");
-        organization.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        organization.Should.HaveHttpStatus(HttpStatusCode.OK);
     }
 
     [ProtoTest]
@@ -116,7 +116,7 @@ public sealed class DiagnosticsShowcase
         using var organization = await Proto.Context.Rest().GetAsync("/api/v1/organization");
 
         // Assert
-        organization.ShouldHaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        organization.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
         {
             projectCount = 99,
             planId = "nonexistent-plan"

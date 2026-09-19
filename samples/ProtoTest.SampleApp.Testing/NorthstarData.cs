@@ -27,7 +27,7 @@ public sealed class NorthstarMemberProvisioner : IProtoDataProvisioner<InviteMem
         using var response = await context.Execution.Rest()
             .Body(value)
             .PostAsync("/api/v1/members", ct: cancellationToken);
-        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        response.Should.HaveHttpStatus(HttpStatusCode.Created);
         var member = response.ReadAsJson<MembershipResponse>()
             ?? throw new InvalidOperationException("The sample app returned no provisioned member.");
         return new ProtoDataProvisioningResult<MembershipResponse>(member, member.Id);

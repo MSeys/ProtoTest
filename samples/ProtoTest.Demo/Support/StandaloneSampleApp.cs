@@ -12,7 +12,7 @@ using ProtoTest.Web;
 /// real address. It is run-scoped infrastructure: the host starts it, exposes its address as the web
 /// session's base URL, and releases it with the run - the journey file only contains the journey.
 /// </summary>
-internal sealed class StandaloneSampleApp(string connectionString) : IProtoSettingsInfrastructure
+internal sealed class StandaloneSampleApp(string connectionString, string databaseProvider = "sqlite") : IProtoSettingsInfrastructure
 {
     private Process? _process;
     private string _baseUrl = string.Empty;
@@ -45,11 +45,17 @@ internal sealed class StandaloneSampleApp(string connectionString) : IProtoSetti
         };
         start.Environment["ASPNETCORE_URLS"] = _baseUrl;
         start.Environment["ConnectionStrings__Northstar"] = connectionString;
-        start.Environment["Database__Provider"] = "sqlite";
+        start.Environment["Database__Provider"] = databaseProvider;
         start.Environment["ProtoTest__TestSupport"] = "true";
         // The UI instance reads the store; the suite's in-process instance owns webhook dispatch.
         start.Environment["Northstar__DisableWebhookDispatcher"] = "true";
         _process = Process.Start(start)!;
+        // Redirected pipes fill up and block the child once nobody drains them, so a chatty application
+        // would deadlock the run. The handlers keep both streams flowing; the output is diagnostic only.
+        _process.OutputDataReceived += (_, _) => { };
+        _process.ErrorDataReceived += (_, _) => { };
+        _process.BeginOutputReadLine();
+        _process.BeginErrorReadLine();
 
         using var client = new HttpClient { BaseAddress = new Uri(_baseUrl) };
         for (var attempt = 0; attempt < 50; attempt++)

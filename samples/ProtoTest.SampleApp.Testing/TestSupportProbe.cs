@@ -1,22 +1,27 @@
 namespace ProtoTest.SampleApp.Testing;
 
 using System.Net;
+using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 using ProtoTest.Rest;
 
 /// <summary>
-/// Verifies once per process that the application exposes <c>/test-support</c>, so a deployment that
+/// Verifies once per run that the application exposes <c>/test-support</c>, so a deployment that
 /// does not enable the development affordance fails with a clear message instead of a 404 during
 /// scenario provisioning.
 /// </summary>
 internal static class TestSupportProbe
 {
-    private static int _verified;
+    // The run's own configuration is the identity of the run: a new host builds a new configuration,
+    // so a second run in the same process probes again instead of trusting the first run's target.
+    private static readonly ConditionalWeakTable<IConfiguration, StrongBox<bool>> Verified = new();
 
     public static async Task EnsureAvailableAsync(ProtoExecutionContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (Volatile.Read(ref _verified) == 1)
+        var verified = Verified.GetValue(context.Configuration, _ => new StrongBox<bool>());
+        if (verified.Value)
         {
             return;
         }
@@ -30,7 +35,7 @@ internal static class TestSupportProbe
                 "the suite at an environment that enables it.");
         }
 
-        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
-        Volatile.Write(ref _verified, 1);
+        response.Should.HaveHttpStatus(HttpStatusCode.OK);
+        verified.Value = true;
     }
 }

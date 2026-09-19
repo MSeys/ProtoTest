@@ -49,18 +49,33 @@ public sealed class PlatformJourney
             .Select(expected)
             .SubscribeAsync();
 
-        // graphql-transport-ws acknowledges the connection, not each subscribe message.
-        await Task.Delay(100);
+        // graphql-transport-ws acknowledges the connection, not each subscribe message, so a deployment
+        // published before the server registers the subscription would be lost. Start the read first,
+        // then keep publishing while it is pending: the read completes on the first event that reaches
+        // the registered subscription, so the readiness race cannot drop it. The attempts are capped
+        // with a growing pause so a broken subscription fails the test instead of flooding the API.
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var pending = subscription.NextAsync(timeout.Token);
+        const int maxAttempts = 10;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            // Act
+            using var deployment = await Proto.Context.Rest()
+                .Body(new CreateDeploymentRequest("1.0.0", "abc1234"))
+                .PostAsync("/api/v1/environments/{environmentId}/deployments", new { environmentId = preview.Id });
+            deployment.Should.HaveHttpStatus(HttpStatusCode.Created);
 
-        // Act
-        using var deployment = await Proto.Context.Rest()
-            .Body(new CreateDeploymentRequest("1.0.0", "abc1234"))
-            .PostAsync("/api/v1/environments/{environmentId}/deployments", new { environmentId = preview.Id });
+            var backoff = Task.Delay(TimeSpan.FromMilliseconds(Math.Min(50 * attempt, 500)));
+            if (ReferenceEquals(await Task.WhenAny(pending, backoff), pending))
+            {
+                break;
+            }
+        }
 
         // Assert
-        deployment.ShouldHaveHttpStatus(HttpStatusCode.Created);
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        using var notification = await subscription.ExpectNextAsync(expected, timeout.Token);
+        using var notification = await pending
+            ?? throw new GraphQLAssertionException("Expected a deployment status event, but the stream completed.");
+        notification.ShouldMatchShape(expected);
         notification.ShouldHaveNoErrors();
     }
 
@@ -116,7 +131,7 @@ public sealed class PlatformJourney
         using var webhook = await Proto.Context.Rest()
             .Body(new CreateWebhookRequest(sink.Url.ToString(), [WebhookEventTypes.ProjectCreated]))
             .PostAsync("/api/v1/webhooks");
-        webhook.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        webhook.Should.HaveHttpStatus(HttpStatusCode.Created);
         var endpoint = webhook.ReadAsJson<WebhookEndpointResponse>()!;
 
         // Act
@@ -125,7 +140,7 @@ public sealed class PlatformJourney
             .PostAsync("/api/v1/projects");
 
         // Assert
-        project.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        project.Should.HaveHttpStatus(HttpStatusCode.Created);
         var delivery = await DemoSupport.WaitForDeliveredAsync(WebhookEventTypes.ProjectCreated);
         var receipt = (await DemoSupport.ReceiptsAsync(sink.Id)).Single();
         using (Assert.EnterMultipleScope())

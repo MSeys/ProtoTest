@@ -25,7 +25,7 @@ public sealed class OnboardingJourney
         using var audit = await Proto.Context.Rest().GetAsync("/api/v1/audit");
 
         // Assert
-        organization.ShouldHaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        organization.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
         {
             planId = PlanIds.Free,
             planName = "Free",
@@ -36,7 +36,7 @@ public sealed class OnboardingJourney
             projectLimit = 1,
             cancelAtPeriodEnd = false
         });
-        audit.ShouldHaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        audit.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
         {
             items = new[]
             {
@@ -61,7 +61,7 @@ public sealed class OnboardingJourney
             .PostAsync("/api/v1/members");
 
         // Assert
-        invitation.ShouldHaveHttpStatus(HttpStatusCode.PaymentRequired)
+        invitation.Should.HaveHttpStatus(HttpStatusCode.PaymentRequired)
             .ShouldMatchShape(new { code = ProblemCodes.PlanLimitExceeded });
     }
 
@@ -77,7 +77,7 @@ public sealed class OnboardingJourney
         using var upgraded = await Proto.Context.Rest()
             .Body(new ChangePlanRequest(PlanIds.Growth, 10))
             .PostAsync("/api/v1/subscription");
-        upgraded.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        upgraded.Should.HaveHttpStatus(HttpStatusCode.OK);
 
         // Act
         using var invitation = await Proto.Context.Rest()
@@ -85,7 +85,7 @@ public sealed class OnboardingJourney
             .PostAsync("/api/v1/members");
 
         // Assert
-        invitation.ShouldHaveHttpStatus(HttpStatusCode.Created).ShouldMatchShape(new
+        invitation.Should.HaveHttpStatus(HttpStatusCode.Created).ShouldMatchShape(new
         {
             email = "overflow@example.test",
             role = MemberRoles.Viewer,
@@ -101,7 +101,7 @@ public sealed class OnboardingJourney
         using var first = await Proto.Context.Rest()
             .Body(new CreateProjectRequest("atlas"))
             .PostAsync("/api/v1/projects");
-        first.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        first.Should.HaveHttpStatus(HttpStatusCode.Created);
 
         // Act
         using var second = await Proto.Context.Rest()
@@ -109,7 +109,7 @@ public sealed class OnboardingJourney
             .PostAsync("/api/v1/projects");
 
         // Assert
-        second.ShouldHaveHttpStatus(HttpStatusCode.PaymentRequired).ShouldMatchShape(new
+        second.Should.HaveHttpStatus(HttpStatusCode.PaymentRequired).ShouldMatchShape(new
         {
             code = ProblemCodes.PlanLimitExceeded,
             details = new { limit = "1", active = "1" }
@@ -125,7 +125,7 @@ public sealed class OnboardingJourney
         using var upgraded = await Proto.Context.Rest()
             .Body(new ChangePlanRequest(PlanIds.Starter, null))
             .PostAsync("/api/v1/subscription");
-        upgraded.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        upgraded.Should.HaveHttpStatus(HttpStatusCode.OK);
 
         // Act
         using var second = await Proto.Context.Rest()
@@ -133,7 +133,7 @@ public sealed class OnboardingJourney
             .PostAsync("/api/v1/projects");
 
         // Assert
-        second.ShouldHaveHttpStatus(HttpStatusCode.Created).ShouldMatchShape(new
+        second.Should.HaveHttpStatus(HttpStatusCode.Created).ShouldMatchShape(new
         {
             name = "beacon",
             status = ProjectStatuses.Active,

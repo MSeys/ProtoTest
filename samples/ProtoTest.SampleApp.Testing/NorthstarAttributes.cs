@@ -27,7 +27,7 @@ public sealed class NorthstarTenantAttribute : ProtoAttribute
             .Body(new ProvisionTenantRequest(name, PlanId))
             .PostAsync("/test-support/tenants");
 
-        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        response.Should.HaveHttpStatus(HttpStatusCode.Created);
         var tenant = response.ReadAsJson<TenantResponse>()
             ?? throw new InvalidOperationException("The sample app provisioned no tenant.");
         context.SetContext(new NorthstarOrganizationContext(
@@ -49,7 +49,7 @@ public sealed class NorthstarTenantAttribute : ProtoAttribute
         using var response = await context.Rest()
             .WithoutAuth()
             .DeleteAsync("/test-support/tenants/{tenant}", new { tenant = organization.Tenant });
-        response.ShouldHaveHttpStatus(HttpStatusCode.NoContent);
+        response.Should.HaveHttpStatus(HttpStatusCode.NoContent);
     }
 }
 
@@ -85,7 +85,7 @@ public sealed class SignedInAsAttribute : ProtoAttribute
             .Body(new InviteMemberRequest(email, Role))
             .PostAsync("/test-support/tenants/{tenant}/members", new { tenant = organization.Tenant });
 
-        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        response.Should.HaveHttpStatus(HttpStatusCode.Created);
         var member = response.ReadAsJson<TestMemberResponse>()
             ?? throw new InvalidOperationException("The sample app provisioned no member.");
         context.SetContext(new NorthstarMemberContext(

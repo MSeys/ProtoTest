@@ -39,7 +39,7 @@ public sealed class SheetsJourney
 
         // Act: download the generated workbook; the response is content the sheet reader understands.
         using var response = await Proto.Context.Rest().GetAsync("/api/v1/reports/monthly.xlsx");
-        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        response.Should.HaveHttpStatus(HttpStatusCode.OK);
         var report = Proto.Context.Sheets().Open(response).Model<ProjectReportRow>();
 
         // Assert: the model checks the layout, and the exact values are ordinary assertions.

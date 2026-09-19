@@ -435,7 +435,7 @@ public sealed class WebModelTests
     public async Task NegatedTextAssertion_ShouldFailWhenTheTextMatches()
     {
         var factory = new FakeBackendFactory();
-        for (var i = 0; i < 100; i++) factory.Backend.TextResults.Enqueue("ready");
+        factory.Backend.TextDefault = "ready";
         var host = CreateHost(factory);
         await using var ownedHost = host;
         await host.StartAsync();
@@ -1760,6 +1760,9 @@ public sealed class WebModelTests
         public bool AddAttachmentOnComplete { get; set; }
         public int CountResult { get; set; }
         public Queue<string> TextResults { get; } = new();
+
+        /// <summary>What a read answers once the queued answers run out. Sticky, so a stable text stays stable however often it is polled.</summary>
+        public string TextDefault { get; set; } = "text";
         public string? ValueResult { get; set; }
         public bool VisibleResult { get; set; } = true;
         public bool EnabledResult { get; set; } = true;
@@ -1826,7 +1829,7 @@ public sealed class WebModelTests
         public ValueTask<string> ReadTextAsync(WebElementReference element, CancellationToken cancellationToken = default)
         {
             Operations.Add(("text", element, null));
-            return ValueTask.FromResult(TextResults.Count == 0 ? "text" : TextResults.Dequeue());
+            return ValueTask.FromResult(TextResults.Count == 0 ? TextDefault : TextResults.Dequeue());
         }
 
         public ValueTask<string?> ReadValueAsync(WebElementReference element, CancellationToken cancellationToken = default)

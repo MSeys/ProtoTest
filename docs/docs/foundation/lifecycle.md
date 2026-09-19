@@ -27,12 +27,29 @@ IProtoHostBuilder ConfigureServices(Action<IServiceCollection> configure);
 IProtoHostBuilder ConfigureAppConfiguration(Action<IConfigurationBuilder> configure);
 IProtoHostBuilder ConfigureTracing(Action<ProtoTraceOptions> configure);
 IProtoHostBuilder ConfigureTestIds(Action<ProtoTestIdOptions> configure);
-IProtoHostBuilder AddRunHook<TRunHook>() where TRunHook : class, IProtoRunHook;
 IProtoHostBuilder AddTestHook<THook>() where THook : class, IProtoTestHook;
+IProtoHostBuilder AddRunHook<TRunHook>() where TRunHook : class, IProtoRunHook;
+IProtoHostBuilder AddRunGate<TGate>() where TGate : class, IProtoRunGate;
+IProtoHostBuilder AddRunGate(string name, Func<ProtoRunGateContext, ProtoRunGateResult> evaluate);
+IProtoHostBuilder AddResource(IProtoResource resource);
 ProtoHost Build();
 ```
 
-Every integration's `Add…` method is an extension on this same builder. A builder can only build once.
+Every integration's `Add…` method is an extension on this same builder. A builder can only build once. The option tables for `ProtoTestIdOptions` and `ProtoTraceOptions` are in [Configuration](../getting-started/configuration.md#host-options-code-only).
+
+## Run gates and resources
+
+`AddRunGate` registers a check that runs **once, after the last test and before the reports are written**, so it can see everything the run's collectors produced. `ProtoRunGateContext` exposes `Items`, `ItemsOfKind`, `InCategory`, `ForTarget` and `WithStatus`, plus coverage helpers such as `CoverageFor(target)`. A result is `Passed`, `Warning`, `Failed` or `Skipped`; a gate that returns no result is treated as failed, and a failed gate throws `ProtoRunGateException` out of `AfterRunAsync`. The delegate overload is the quick form:
+
+```csharp
+builder.AddRunGate("no error findings", context => context
+    .ItemsOfKind(ProtoReportItemKinds.Finding)
+    .Any(item => item.Status == ProtoReportStatus.Error)
+    ? ProtoRunGateResult.Failed("The run recorded error findings.")
+    : ProtoRunGateResult.Passed("No error findings were recorded."));
+```
+
+`AddResource(IProtoResource)` registers an already-created, run-scoped resource — a started container, a connection — that the host owns and releases with the run, without starting anything. `AddInfrastructure` is the variant that starts with the run and fills settings; see [Infrastructure](./infrastructure.md).
 
 ## Test ids
 
@@ -68,14 +85,14 @@ sequenceDiagram
     Note over Runner,Host: …tests run…
     Runner->>Host: StopAsync
     Host->>RunHooks: AfterRunAsync (descending Order)
-    Note over Host: report sinks export, then the .prototrace is written
+    Note over Host: gates evaluate, report sinks export, run resources release, then the .prototrace is written
 ```
 
 - If a `BeforeRunAsync` throws, the hooks that already started get their `AfterRunAsync` in reverse, and startup fails.
 - `StopAsync` runs every `AfterRunAsync` even if some throw, then reports all failures together.
 - Once stopping has begun, starting a new test throws.
 
-ProtoTest's own run hooks are ordered to run **last** on the way out: report sinks export first, then the trace archive is written, so it can include the reports.
+ProtoTest's own run hooks are ordered to run **last** on the way out: run gates evaluate first, report sinks export next, run-scoped resources release, and the trace archive is written last, so it can include the reports.
 
 ## A test
 
@@ -97,10 +114,10 @@ When the runner completes the test:
 1. Attributes run `AfterTestAsync` in **reverse** order.
 2. Hooks run `AfterTestAsync` in **reverse** order.
 3. [Attachments](./attachments.md) are published to the runner.
-4. Clients are disposed in reverse registration order, then the DI scope.
-5. The test's trace is finalised with its outcome, and `Proto.Context` is cleared.
+4. `context.DisposeAsync` releases owned resources in reverse registration order, then disposes the DI scope.
+5. The test's trace artifacts are captured and the recorder is completed with its outcome; `Proto.Context` is cleared.
 
-**Every step is attempted**, even when an earlier one throws. All failures are collected and thrown together as one `AggregateException` — so a failing cleanup never hides another failing cleanup.
+**Every step is attempted**, even when an earlier one throws. A teardown failure is recorded as an `Error` finding and does not replace the outcome the test already reported — a cleanup error never hides a failed assertion. The failure still surfaces to the runner: one exception is rethrown as-is, several become one `AggregateException`.
 
 ### When setup fails
 
@@ -122,7 +139,7 @@ This is why teardown code should tolerate partial setup. The sample environment 
 
 ### One test per async flow
 
-A context is tied to the async flow that started it. Starting a second test on the same flow before completing the first throws, as does completing a test from a different host.
+A context is tied to the async flow that started it. Starting a second test on the same flow before completing the first throws, as does completing a test from a different host. Skipped tests never reach this point: a [skip condition](./skip-conditions.md) is evaluated before `StartTestAsync`, so there is no context to complete.
 
 ## `ProtoHost`
 
@@ -130,10 +147,13 @@ A context is tied to the async flow that started it. Starting a second test on t
 public sealed class ProtoHost : IAsyncDisposable
 {
     static ProtoExecutionContext CurrentContext { get; }
+    static ProtoExecutionContext? CurrentContextOrNull { get; }
     static ProtoHost CurrentHost { get; }
+    static IProtoTraceWriter? FindTraceWriter(ActivityTraceId traceId);
 
     IConfiguration Configuration { get; }
     IProtoTraceSource Trace { get; }
+    bool HasCapability(string kind, string? name = null);
 
     Task StartAsync(CancellationToken cancellationToken = default);
     Task StopAsync(CancellationToken cancellationToken = default);

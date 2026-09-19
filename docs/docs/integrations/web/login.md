@@ -14,8 +14,8 @@ Almost every browser test starts by logging someone in, and almost every applica
 public async Task Billing_admin_sees_open_invoices()
 {
     var invoices = Proto.Context.Web().Page<InvoicesPage>();
-    await invoices.OpenAsync("https://portal.example.test/invoices");
-    await invoices.Heading.ShouldBeVisibleAsync();
+    await invoices.OpenAsync("/invoices");
+    await invoices.Heading.Should.BeVisibleAsync();
 }
 ```
 
@@ -43,7 +43,7 @@ public sealed class BackOfficeLogin(ICredentialStore credentials) : IWebLoginStr
         var secret = credentials.PasswordFor(context.Persona);
 
         var login = context.Web.Page<LoginPage>();
-        await login.OpenAsync("https://portal.example.test/login", cancellationToken);
+        await login.OpenAsync("/login", cancellationToken);
 
         await login.Form.Flow("Sign in")
             .Fill(form => form.Username, context.Persona)
@@ -51,10 +51,12 @@ public sealed class BackOfficeLogin(ICredentialStore credentials) : IWebLoginStr
             .Click(form => form.Submit)
             .RunAsync(cancellationToken);
 
-        await login.Form.Status.ShouldHaveTextAsync("Signed in", cancellationToken: cancellationToken);
+        await login.Form.Status.Should.HaveTextAsync("Signed in", cancellationToken: cancellationToken);
     }
 }
 ```
+
+The demo's strategy against the sample application's own login page is in [StandaloneSampleApp.cs](../../../../samples/ProtoTest.Demo/Support/StandaloneSampleApp.cs).
 
 ### Using state another attribute created
 
@@ -93,7 +95,7 @@ public sealed class LoginAsAttribute<TStrategy>(string persona, params object[] 
 ```
 
 - **`persona`** is a name, not a credential. Keep secrets in your strategy or a service it depends on — attribute arguments are compiled into your assembly metadata.
-- **Constructor arguments** after the persona are passed to the strategy's constructor, and any remaining parameters are resolved from dependency injection (including `ProtoExecutionContext`):
+- **Constructor arguments** after the persona are passed to the strategy's constructor, and any remaining parameters are resolved from dependency injection through `ProtoAuthenticatorFactory.Create<TStrategy>(context, constructorArgs)`, which also injects the `ProtoExecutionContext` itself:
 
   ```csharp
   [LoginAs<TenantLogin>("admin", "tenant-a")]
@@ -101,13 +103,27 @@ public sealed class LoginAsAttribute<TStrategy>(string persona, params object[] 
   public sealed class TenantLogin(string tenant, ICredentialStore credentials) : IWebLoginStrategy { … }
   ```
 
-- **`Session`** picks which [named session](./index.md#several-sessions-in-one-test) to log in, so one test can have two different people signed in. Declare each session with `[WebSession]` (which can also open a start URL) — it runs before `[LoginAs]`:
+- **`Session`** picks which [named session](./index.md#several-sessions-in-one-test) to log in, so one test can have two different people signed in (it defaults to `"Default"`).
 
-  ```csharp
-  [WebSession("Admin", Application = "ControlPlane", Open = "/back-office")]   // address from ProtoTest:Applications:ControlPlane:BaseUrl
-  [WebSession("Customer")]
-  [LoginAs<BackOfficeLogin>("billing.admin", Session = "Admin")]
-  [LoginAs<StorefrontLogin>("customer@example.test", Session = "Customer")]
-  ```
+## Sessions and ordering
 
-The login runs during setup as a `web.login` trace operation named `Login · {persona} [{session}]`. If it fails, the test fails in setup and everything that already ran is [rolled back](../../foundation/lifecycle.md#when-setup-fails).
+A logged-in session must exist first. `[WebSession]` declares one during setup and can open a start URL; `Application` selects the application, `Open` the address, and the attribute's fixed `Order = -10` runs it before `[LoginAs]`:
+
+```csharp
+[WebSession("Admin", Application = "ControlPlane", Open = "/back-office")]   // address from ProtoTest:Applications:ControlPlane:BaseUrl
+[WebSession("Customer")]
+[LoginAs<BackOfficeLogin>("billing.admin", Session = "Admin")]
+[LoginAs<StorefrontLogin>("customer@example.test", Session = "Customer")]
+public async Task ...
+```
+
+`ProtoTest:Web:Sessions:{name}:Open` overrides the attribute's `Open`, so code stays environment-agnostic; started infrastructure settings win over static configuration. A relative `Open` resolves against the session's `BaseUrl`.
+
+## Tracing
+
+The login runs during setup as a `web.login` trace operation named `Login · {persona} [{session}]`, carrying `web.session`, `web.login.persona` and `web.login.strategy`. If it fails, the test fails in setup and everything that already ran is [rolled back](../../foundation/lifecycle.md#when-setup-fails).
+
+## Next
+
+- [Waits and middleware](./middleware.md) — wait for the application after a login.
+- [Diagnostics and artifacts](./diagnostics.md) — what a failed login leaves in the trace.

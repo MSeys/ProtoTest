@@ -121,7 +121,7 @@ The reason is handed to the runner's skip mechanism:
 | Runner | How the skip is raised | Reason reported |
 | --- | --- | --- |
 | [NUnit](../runners/nunit.md) | `Assert.Ignore(reason)` | yes |
-| [xUnit v2](../runners/xunit.md) with `[ProtoTestFact]` and `[ProtoTestTheory]` | `TestSkipped(Test, reason)` | yes |
+| [xUnit v2](../runners/xunit.md) with `[ProtoTestFact]` and `[ProtoTestTheory]` | the discovered test case's `SkipReason` | yes |
 | [xUnit v3](../runners/xunit3.md) | `Assert.Skip(reason)` | yes |
 | [TUnit](../runners/tunit.md) | `TUnit.Core.Skip.Test(reason)` | yes |
 | [MSTest](../runners/mstest.md) | an ignored `TestResult` | yes, on its `DisplayName` and `LogOutput` |
@@ -137,6 +137,7 @@ Because nothing starts, a skipped test has no context, no trace record and no re
 - **A condition only sees registered capabilities.** If an integration isn't configured, its capability is absent and tests that require it skip — which is the point. Configure the integration (or provide the connection string it reads) to make them run.
 - **`[RequiresInProcess]` doesn't inspect `BaseUrl`.** With no in-process server registered it skips, regardless of what the host can reach over the network.
 - **The reason is fixed at compile time.** Attribute arguments are constants; build messages from a name or a configuration key, as the examples do.
+- **Conditions are selected in resolution order, not `Order`.** `ProtoTestSkip.GetReason` returns the first non-null `GetSkipReason` in the order the adapter resolved the attributes — for NUnit, class-level before method-level in reflection order — because ordering by `Order` only happens inside `StartTestAsync`, which a skipped test never reaches.
 
 ## In the sample suite
 

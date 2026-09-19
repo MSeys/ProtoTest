@@ -23,13 +23,16 @@ Each lambda receives the component, so steps are type-checked and refactor-safe.
 ## Steps
 
 ```csharp
-WebFlow<T> Fill(Func<T, WebElement> element, string value);
-WebFlow<T> Click(Func<T, WebElement> element);
-WebFlow<T> Check(Func<T, WebElement> element, bool isChecked = true);
-WebFlow<T> Select(Func<T, WebElement> element, string value);
-WebFlow<T> Press(Func<T, WebElement> element, WebKey key);
-WebFlow<T> Do(Func<T, CancellationToken, ValueTask> interaction);
-ValueTask RunAsync(CancellationToken cancellationToken = default);
+public sealed class WebFlow<TComponent> where TComponent : WebComponent
+{
+    WebFlow<TComponent> Fill(Func<TComponent, WebElement> element, string value);
+    WebFlow<TComponent> Click(Func<TComponent, WebElement> element);
+    WebFlow<TComponent> Check(Func<TComponent, WebElement> element, bool isChecked = true);
+    WebFlow<TComponent> Select(Func<TComponent, WebElement> element, string value);
+    WebFlow<TComponent> Press(Func<TComponent, WebElement> element, WebKey key);
+    WebFlow<TComponent> Do(Func<TComponent, CancellationToken, ValueTask> interaction);
+    ValueTask RunAsync(CancellationToken cancellationToken = default);
+}
 ```
 
 `Check(..., isChecked: false)` unchecks. `Do` runs anything else — including assertions — as a step:
@@ -37,22 +40,45 @@ ValueTask RunAsync(CancellationToken cancellationToken = default);
 ```csharp
 await dialog.Flow("Confirm deletion")
     .Fill(d => d.Confirmation, "DELETE")
-    .Do((d, ct) => d.Confirm.ShouldBeEnabledAsync(cancellationToken: ct))
+    .Do((d, ct) => d.Confirm.Should.BeEnabledAsync(cancellationToken: ct))
     .Click(d => d.Confirm)
     .RunAsync();
 ```
 
+Create a flow on any component or page with `Flow(name)`:
+
+```csharp
+public static WebFlow<TComponent> Flow<TComponent>(this TComponent component, string name)
+    where TComponent : WebComponent;
+```
+
+The demo's real login strategy drives its login page through a flow — see [StandaloneSampleApp.cs](../../../../samples/ProtoTest.Demo/Support/StandaloneSampleApp.cs).
+
 ## Rules
 
 - Steps run **in order**, one at a time.
-- Each step keeps its normal behaviour: actionability waits, [wait conditions](./middleware.md), middleware and its own trace entry.
+- Each step keeps its normal behaviour: actionability waits, [wait conditions](./middleware.md), [middleware](./middleware.md#middleware) and its own trace entry.
 - A flow runs **once**. Calling `RunAsync()` again, or adding a step after it started, throws `InvalidOperationException`.
-- The flow's trace entry has kind `web.flow` and records the step count.
+- The flow's trace entry has kind `web.flow`, the name `WEB flow · {name}`, and records `web.session`, `web.backend` and `web.flow.step_count`.
 
 ## A single named interaction
 
-For one-off interactions that deserve a name in the trace, `InteractAsync` wraps an arbitrary delegate the same way:
+For one-off interactions that deserve a name in the trace, `InteractAsync` wraps an arbitrary delegate as a one-step flow:
+
+```csharp
+public static ValueTask InteractAsync<TComponent>(
+    this TComponent component,
+    string name,
+    Func<TComponent, ValueTask> interaction,
+    CancellationToken cancellationToken = default)
+    where TComponent : WebComponent;
+```
 
 ```csharp
 await page.Banner.InteractAsync("Dismiss cookie banner", banner => banner.Accept.ClickAsync());
 ```
+
+## Next
+
+- [Logging in](./login.md) — a login strategy built from flows.
+- [Diagnostics and artifacts](./diagnostics.md) — how a failed flow step appears in the trace.

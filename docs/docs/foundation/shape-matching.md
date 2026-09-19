@@ -55,7 +55,7 @@ Nested objects are partial, nested arrays are exact, all the way down.
 
 ### Names are case-insensitive
 
-`workspaceCount` matches `WorkspaceCount` in the JSON. Names come from `[JsonPropertyName]` if present, otherwise the naming policy in your `JsonSerializerOptions`, otherwise the C# name. Pass options with `PropertyNameCaseInsensitive = false` to make matching strict.
+`workspaceCount` matches `WorkspaceCount` in the JSON. Names come from `[JsonPropertyName]` if present, otherwise the naming policy in your `JsonSerializerOptions`, otherwise the C# name. Pass options with `PropertyNameCaseInsensitive = false` to make matching strict, and `[JsonIgnore]` properties are not part of the expected shape.
 
 String **values** are compared exactly and case-sensitively.
 
@@ -63,13 +63,15 @@ String **values** are compared exactly and case-sensitively.
 
 | Expected | Matches |
 | --- | --- |
-| number | any JSON number with the same decimal value — `12` matches `12.0` |
-| `string` | the same string |
+| number | any JSON number with the same decimal value — `12` matches `12.0`; compared as `decimal` first, then `double` for values outside its range |
+| `string` | the same string, ordinal and case-sensitive |
 | `bool` | `true` / `false` |
 | enum | its name (case-insensitive) or its numeric value |
 | `Guid`, `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `Uri` | a JSON string that parses to the same value |
 | `null` | JSON `null` |
-| dictionary with string keys | an object, like an anonymous type |
+| dictionary with string keys | an object, like an anonymous type; non-string keys are compared through their invariant string form |
+
+A `null` expectation requires an actual JSON `null`; use `JsonValue.NotNull()` (or `JsonValue.Any()`) when you only need the property to be present.
 
 ### Every mismatch is reported
 
@@ -90,7 +92,7 @@ public sealed class JsonShapeMismatchException : ProtoAssertionException
 }
 ```
 
-Empty or invalid JSON throws `JsonDocumentAssertionException` instead, carrying the content.
+Empty or invalid JSON throws `JsonDocumentAssertionException` instead, with the content in its `Content` property.
 
 ## Constraints
 
@@ -111,14 +113,14 @@ Empty or invalid JSON throws `JsonDocumentAssertionException` instead, carrying 
 | `JsonValue.StringStartingWith(s, comparison?)` | starts with `s` |
 | `JsonValue.StringEndingWith(s, comparison?)` | ends with `s` |
 | `JsonValue.Regex(pattern, options?)` | matches the regular expression |
-| `JsonValue.StringMatching(predicate, description)` | a string satisfying your predicate |
+| `JsonValue.StringMatching(predicate, description?)` | a string satisfying your predicate |
 | `JsonValue.Matching(predicate, description)` | any value satisfying your predicate |
 
-String comparisons default to `StringComparison.Ordinal`.
+String comparisons default to `StringComparison.Ordinal`. The comparison constraints and `Between` take an `IComparable` threshold; `OneOf` compares scalars, allowing numeric types to differ (the JSON value is converted to `decimal`) while everything else must be **type-compatible**, so the string `"2"` never matches `2`.
 
 Comparison constraints convert the JSON value to the type you passed. A value that can't be converted **doesn't match** — `JsonValue.LessThan(10)` against `"not-a-number"` is a mismatch, not an exception. So use `200m` rather than `200` when the value is a decimal amount.
 
-`Matching` receives the raw value: a `string`, a `long` or `decimal`, a `bool`, `null`, or raw JSON text for objects and arrays. `StringMatching` receives the value as a `string`, or `null` when it isn't one.
+`Matching` receives the raw value: a `string`, a **`decimal` or `double`** (JSON numbers never surface as a `.NET` `long`), a `bool`, `null`, or raw JSON text for objects and arrays. `StringMatching` receives the value as a `string`, or `null` when it isn't one.
 
 ```csharp
 createdAt = JsonValue.StringMatching(
@@ -172,4 +174,25 @@ IReadOnlyList<string> matched = JsonShapeMatcher.AssertMatch(json, expectedShape
 IReadOnlyList<string> matched = JsonShapeMatcher.AssertMatch(jsonElement, expectedShape, options);
 ```
 
-It returns the JSON paths that matched — the same list [OpenAPI coverage](../observability/coverage.md) uses.
+It returns the JSON paths that matched and throws the same exceptions the protocol assertions do.
+
+## Evidence in the trace
+
+The protocol assertions run through the shared `ProtoShapeAssertion.Assert`, which records one `assert.json.shape` operation per assertion with:
+
+- `expected.type`, `shape.expected` and `shape.actual` — the described shape and the sanitized actual JSON;
+- `matched.property_count` and `matched.properties`, or `shape.mismatches` and `shape.mismatch_count` on failure;
+- `shape.matches` (the matched paths) and `shape.result` (`matched` or `mismatched`).
+
+The expected-shape description is capped at depth 16 and 4096 expanded containers; deeper nodes become `<Type at depth limit>`, so a cyclic or pathologically large shape cannot hang the run. On success the protocol records an observation built from the matched paths — `http.contract.shape` for REST, `graphql.contract.shape` for GraphQL — which is what [OpenAPI](../observability/coverage.md) and GraphQL schema coverage consume.
+
+## Limits
+
+- Partial objects mean extra server fields never fail a shape.
+- Arrays are length- and position-sensitive; order matters.
+- Numbers surface as `decimal` or `double`, never `long`; strings are compared ordinally.
+
+## Next
+
+- [ProtoTrace](../observability/prototrace.md) — where the assertion evidence lands.
+- [Coverage](../observability/coverage.md) — matched paths become contract coverage.

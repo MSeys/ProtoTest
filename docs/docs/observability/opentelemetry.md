@@ -9,9 +9,11 @@ description: "Export ProtoTest operations to OpenTelemetry, so test runs land in
 Every ProtoTrace operation is also a .NET `Activity` on the `ActivitySource` named **`ProtoTest`**. `ProtoTest.OpenTelemetry` is a one-line bridge that subscribes an OpenTelemetry tracer to it, so test runs can land in the same backend as your application's telemetry.
 
 ```bash
-dotnet add package ProtoTest.OpenTelemetry
+dotnet add package ProtoTest.OpenTelemetry --prerelease
 dotnet add package OpenTelemetry.Exporter.OpenTelemetryProtocol
 ```
+
+The package targets .NET 8, 9 and 10 (the project template defaults to `net10.0`; pass `-f net8.0` or `net9.0` for an older runtime). It is a bridge, not an exporter: install the exporter you want separately.
 
 ```csharp
 using OpenTelemetry;
@@ -67,9 +69,23 @@ Spans and events carry these tags:
 | `prototest.phase` | `setup`, `execution`, `teardown`, `rollback` or `run` |
 | `prototest.outcome` | `succeeded`, `failed`, `partial`, `cancelled`, `skipped` or `unknown` |
 | `prototest.logical_parent_id` | the ProtoTrace parent entry id (spans only) |
+| `prototest.entity.kind`, `prototest.entity.id` | the client, context, server or capability an entry belongs to, when it has one |
+| `prototest.entry.count` | how many identical error-free events collapsed into one entry |
 
 The operation's own trace attributes — `http.method`, `web.locator`, your custom ones — are exported as tags too, except values longer than 2,048 characters and the large structured ones (shape snapshots, serialised context state, observation data). Those stay in the `.prototrace` file only, so spans remain lightweight.
 
 ## Correlating with your application
 
 Because operations are real `Activity` instances, `HttpClient`'s standard W3C trace-context propagation applies to requests sent while one is current. If your application is instrumented with OpenTelemetry too, that is what lets its server spans line up under the test step that caused them — this end-to-end path isn't covered by the repository's tests yet, so treat it as expected rather than guaranteed.
+
+## Limits
+
+- **No exporter included.** The package only subscribes the `ProtoTest` source; install the exporter you want, as above.
+- **Large values stay out of spans.** Values longer than 2,048 characters and the structured keys `context.value`, `observation.data`, `observation.metadata`, `shape.expected`, `shape.actual`, `shape.matches` and `shape.mismatches` exist only in `.prototrace`. The same cap applies to spans captured from your application.
+- **The `.prototrace` archive is unaffected.** Tracing stays on by default and remains the complete record; OpenTelemetry is a second consumer of the same operations.
+- **Propagation into the application is expected, not proven.** The end-to-end W3C path is not covered by the repository's tests.
+
+## Links
+
+- [ProtoTrace](./prototrace.md) is the full record; [coverage](./coverage.md) explains observations.
+- [Run hooks](../foundation/hooks.md) hold the `TracerProvider` for the run.

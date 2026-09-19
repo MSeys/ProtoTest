@@ -18,9 +18,9 @@ When an action or assertion fails, the backend captures the page at that moment:
 | Page HTML | `web-{session}-{element}-{n}-page.html` | `web-{session}-{element}-{n}-page.html` |
 | Location | `web-{session}-{element}-{n}-location.txt` (URL; the raw address when sanitizing does not apply) | `web-{session}-{element}-{n}-location.txt` (URL and title) |
 
-`{n}` is the backend's per-test failure number, so a failure repeated on the same element keeps both sets of artifacts. If the location is `about:blank`, the raw address is recorded instead of an empty artifact.
+The name parts are lowercased and sanitized (non-letters/digits become `-`), `{element}` falls back to the operation name when the failure is not element-bound, and `{n}` is a per-test sequence so a failure repeated on the same element keeps both sets of artifacts. Captures run in order screenshot, DOM, location.
 
-Capturing never replaces the original error. Each artifact registers on its own, so one failing attachment does not drop the rest. If capture itself fails, you'll see a `web.diagnostics.failed` or `web.diagnostics.artifact_failed` entry in the trace and still get the real exception.
+Capturing never replaces the original error. Each artifact registers on its own, so one failing attachment does not drop the rest. If capture itself fails, you'll see a `web.diagnostics.artifact_failed` entry — or `web.diagnostics.failed` when the backend produced no attachments at all — and still get the real exception.
 
 ## Playwright traces
 
@@ -32,40 +32,68 @@ Playwright's own trace — a timeline with DOM snapshots you can open in the [Pl
 | `Always` | for every test |
 | `Off` | never; tracing isn't started |
 
-The kept trace is attached as `playwright-{session}-trace.zip`.
+The kept trace is attached as `playwright-{session}-trace.zip` with content type `application/vnd.microsoft.playwright.trace+zip`; a capture failure is traced as `web.playwright.trace_failed` and never replaces the test's own error.
 
-With `CorrelateTraceGroups` on (the default), each ProtoTest operation is a named group in the Playwright trace, so the two timelines line up. Grouping is re-entrant: an operation nested inside another on the same session — a `WaitUntilAsync` predicate that reads an element — joins its caller's group instead of blocking on it.
+With `CorrelateTraceGroups` on (the default), each ProtoTest operation is a named group in the Playwright trace, `[correlationId] [session] {name}`, so the two timelines line up. Grouping is re-entrant: an operation nested inside another on the same session — a `WaitUntilAsync` predicate that reads an element — joins its caller's group instead of blocking on it. Groups are serialized by a semaphore, are skipped entirely when `TraceRetention = Off`, and a failure to start or end a group is traced as `web.playwright.correlation_failed`.
 
 ### Browser signals
 
-These go into ProtoTrace as events on the test:
+These go into ProtoTrace as events on the test, parented to the active operation via `web.correlation_id`:
 
 | Option | Trace entry |
 | --- | --- |
-| `ConsoleCapture` (`WarningsAndErrors` by default) | `web.browser.console` — type and text, truncated at 4096 characters |
-| `CapturePageErrors` | `web.browser.page_error` |
-| `CaptureRequestFailures` | `web.browser.request_failed` — method, URL without query or fragment, failure reason |
+| `ConsoleCapture` (`WarningsAndErrors` by default) | `web.browser.console` — `browser.console.type` and `browser.console.text`, truncated at 4096 characters |
+| `CapturePageErrors` | `web.browser.page_error` — `browser.error.message`, truncated at 4096 characters |
+| `CaptureRequestFailures` | `web.browser.request_failed` — `http.method`, `http.url` without query or fragment, and `browser.request.failure`, truncated at 4096 characters |
 
 ## Selenium diagnostics
 
-Selenium has no equivalent trace format, so ProtoTest writes its own `selenium-{session}-diagnostics.json`, kept according to `DiagnosticTraceRetention` (same three values, same default). It records the driver type, final URL and title, and **every actionability attempt** — operation, element, locator, attempt number, outcome, what was observed and how long it took. When a Selenium click "randomly" fails, this is where you find out it was covered by a toast for 4.8 seconds.
+Selenium has no equivalent trace format, so ProtoTest writes its own `selenium-{session}-diagnostics.json`, kept according to `DiagnosticTraceRetention` (same three values, same default). The payload schema is `format = "prototest.selenium.diagnostics.v1"`:
+
+| Field | |
+| --- | --- |
+| `format` | `"prototest.selenium.diagnostics.v1"` |
+| `startedAtUtc`, `completedAtUtc` | the session's window |
+| `driverType` | the concrete driver type |
+| `url`, `title` | the final location, best-effort |
+| `entries[]` | **every actionability attempt**: `TimestampUtc`, `Operation`, `ComponentPath`, `Element`, `Locator`, `Attempt`, `Outcome`, `Observation` and `ElapsedMilliseconds` |
+
+When a Selenium click "randomly" fails, this is where you find out it was covered by a toast for 4.8 seconds. A failure while writing the attachment is traced as `web.diagnostics.artifact_failed`. The timeline exists only as this one JSON attachment — there is no second report system.
 
 ## What the trace records for every operation
 
-Each web operation is a trace entry carrying the component path, element name, locator description, backend and session:
+Every web operation is a trace entry carrying `web.backend` and `web.session`; element operations add `web.component`, `web.element`, `web.locator` and `web.component.roots`:
 
-| Kind | For |
-| --- | --- |
-| `web.navigate` | `OpenAsync` — with the address |
-| `web.click`, `web.check`, `web.select_option`, `web.press` | actions |
-| `web.fill` | fills — the value is recorded as `[REDACTED]` with its length |
-| `web.read_text`, `web.read_value`, `web.is_visible`, `web.is_enabled`, `web.is_checked`, `web.count` | reads |
-| `assert.web` | assertions — with the expectation and timeout |
-| `web.flow` | [flows](./flows.md) |
-| `web.login` | [login](./login.md) |
-| `web.wait` | [wait conditions](./middleware.md) |
-| `web.session.initialize` / `web.session.complete` | the browser's lifetime |
+| Kind | For | Extra attributes |
+| --- | --- | --- |
+| `web.navigate` | `OpenAsync` | `web.address` |
+| `web.click` | `ClickAsync` | |
+| `web.fill` | `FillAsync` | `web.value = [REDACTED]`, `web.value.length` |
+| `web.check` | `CheckAsync` / `UncheckAsync` | |
+| `web.select_option` | `SelectOptionAsync` | `web.option` |
+| `web.press` | `PressAsync` | `web.key` |
+| `web.count` | `CountAsync` | |
+| `web.read_text` / `web.read_value` | `TextAsync` / `ValueAsync` | |
+| `web.is_visible` / `web.is_enabled` / `web.is_checked` | the state reads | |
+| `assert.web` | every `Should`/`ShouldNot` assertion | `web.expectation`, `web.assert.negated`, `web.assert.timeout` |
+| `web.flow` | [flows](./flows.md) | `web.flow.step_count` |
+| `web.wait.until` | `WaitUntilAsync` | `web.expectation`, `web.wait.timeout` |
+| `web.wait` | [wait conditions](./middleware.md) | `web.wait.timing`, `web.wait.condition`, `web.wait.timeout`, `web.wait.last_observed`, `web.operation` |
+| `web.login` | [login](./login.md), setup phase | `web.login.persona`, `web.login.strategy` |
+| `web.session.initialize` | the browser starting | `web.backend` |
+| `web.session.complete` | the session closing, teardown phase | `web.backend` |
+
+Inside each parent operation, a child `web.backend.execute` named `{backend} · {kind}` carries `web.correlation_id`, the phase, the outcome and any failure — it is the link between a semantic operation and the native driver call.
+
+Coverage observations are the other half of the trace: `web.page.visited`, `web.page.verified` and `web.page.available`, each with `web.session` and `web.page.source` (`navigate`, `assert`, `vue-router` or `aspnetcore`). See [Page coverage](./index.md#page-coverage).
+
+Other event kinds worth knowing when you read a trace: `web.page.discovery.failed` (Vue route discovery), `web.page.inventory.failed` (in-process ASP.NET Core inventory), `web.playwright.correlation_failed` / `web.playwright.trace_failed`, and `web.diagnostics.failed` / `web.diagnostics.artifact_failed`.
 
 ## When artifacts are finalised
 
-Browser artifacts are finalised during teardown **before** attachments are published and before the browser is closed — so the Playwright trace and Selenium diagnostics always make it into the runner's output and the `.prototrace` archive.
+Web sessions complete during teardown in reverse order, after normal teardown hooks but before attachments are published and before the browser is disposed. The Playwright trace and Selenium diagnostics are written at that point, and a failure is recorded on the session's `web.session.complete` entry and aggregated into a teardown failure. That ordering is what guarantees the native trace and diagnostics make it into the runner's output and the `.prototrace` archive.
+
+## Next
+
+- [Overview](./index.md) — sessions, options and page coverage.
+- [Waits and middleware](./middleware.md) — the `web.wait` entries in context.

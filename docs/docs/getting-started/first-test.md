@@ -11,17 +11,17 @@ This tutorial builds a small suite against an ASP.NET Core API, one step at a ti
 ## 1. Create the project
 
 :::tip[Rather start from a working solution?]
-`dotnet new install ProtoTest.Templates`, then `dotnet new prototest -n Orders` creates an API and a suite for it that is already composed, traced and reported — steps 1 to 4 and 6 of this tutorial, ready to run. See [Installation](./installation.md#start-from-the-template).
+`dotnet new install ProtoTest.Templates`, then `dotnet new prototest -n Orders` creates an API and a suite for it that is already composed, traced and reported — steps 1 to 4 and 6 of this tutorial, ready to run. See [Installation](./installation.md#quick-start-the-template).
 :::
 
 ```bash
 dotnet new nunit -n Orders.Tests
 cd Orders.Tests
 dotnet add reference ../Orders.Api/Orders.Api.csproj
-dotnet add package ProtoTest.NUnit
-dotnet add package ProtoTest.Rest
-dotnet add package ProtoTest.AspNetCore
-dotnet add package ProtoTest.Reporting
+dotnet add package ProtoTest.NUnit --prerelease
+dotnet add package ProtoTest.Rest --prerelease
+dotnet add package ProtoTest.AspNetCore --prerelease
+dotnet add package ProtoTest.Reporting --prerelease
 ```
 
 For a minimal-API application, make its entry point visible to the tests by adding this to `Orders.Api`:
@@ -80,7 +80,7 @@ public sealed class OrderTests
             .Body(new { product = "notebook", quantity = 2 })
             .PostAsync("/api/orders");
 
-        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        response.Should.HaveHttpStatus(HttpStatusCode.Created);
     }
 }
 ```
@@ -96,8 +96,10 @@ Run it with `dotnet test`.
 A status code says little. Describe the parts of the body the behaviour depends on:
 
 ```csharp
+using ProtoTest.Json;
+
 response
-    .ShouldHaveHttpStatus(HttpStatusCode.Created)
+    .Should.HaveHttpStatus(HttpStatusCode.Created)
     .ShouldMatchShape(new
     {
         id = JsonValue.GreaterThan(0),
@@ -107,19 +109,13 @@ response
     });
 ```
 
-Add `using ProtoTest.Json;` for `JsonValue`. The shape is **partial** — properties you don't list are ignored — and every mismatch is reported at once with its JSON path. See [Shape matching](../foundation/shape-matching.md).
+`Should.HaveHttpStatus` returns the response, so the shape assertion chains; `ShouldNot` is the negated form. The shape is **partial** — properties you don't list are ignored — and every mismatch is reported at once with its JSON path. See [Shape matching](../foundation/shape-matching.md).
 
 ## 5. Turn setup into a capability
 
 Suppose every order test needs a signed-in customer. Instead of a `[SetUp]` method, write an attribute once:
 
 ```csharp
-using System.Net;
-using ProtoTest.Core;
-using ProtoTest.Rest;
-
-namespace Orders.Tests;
-
 public sealed record CustomerContext(string Id, string AccessToken) : IProtoContext;
 
 public sealed class CustomerAttribute : ProtoAttribute
@@ -132,7 +128,7 @@ public sealed class CustomerAttribute : ProtoAttribute
             .PostAsync("/test-support/customers");
 
         var customer = response
-            .ShouldHaveHttpStatus(HttpStatusCode.Created)
+            .Should.HaveHttpStatus(HttpStatusCode.Created)
             .ReadAsJson<CustomerContext>()!;
 
         context.SetContext(customer);
@@ -193,18 +189,26 @@ protected override void Configure(IProtoHostBuilder builder) =>
         .AddSink<HtmlReportSink>(sink => sink.OutputPath = "TestResults/report.html");
 ```
 
-(`using ProtoTest.Reporting;` for the sink.)
+(`using ProtoTest.Reporting;` for the sink, `using ProtoTest.Rest;` for the collector.)
 
 Run the tests again, then:
 
 - open `TestResults/report.html` for the endpoints your suite exercised;
 - drop `TestResults/orders.prototrace` onto [trace.prototest.dev](https://trace.prototest.dev) to see every step of every test — the customer being created, the authenticated request, the shape comparison.
 
-Tracing is on even without `ConfigureTracing`; the setting only chooses where the file goes.
+Tracing is on even without `ConfigureTracing`; that call only chooses where the file goes. Without it, the trace is written to `TestResults/prototest-{runId}.prototrace`.
+
+## Rules, options and limits
+
+- **One context per async flow.** Starting a second test before completing the active one throws. `Proto.Context` outside a test throws *"No active ProtoExecutionContext available on this thread."*
+- **A skip starts nothing.** A test stopped by a [skip condition](../foundation/skip-conditions.md) has no context, no trace record and no teardown.
+- **Ids are configurable.** `ConfigureTestIds(ids => ids.RunPrefix = 42)` fixes the run prefix (random six digits by default); `SequenceDigits` defaults to `6` and accepts 1–9. Ids are at most 18 digits.
+- **Tracing is configurable.** `ProtoTraceOptions` also has `Enabled`, `ActivitySources`, `CaptureSourceLocations` and `EmbedSources`; `EmbedSources` only applies when `CaptureSourceLocations` is on. See [Configuration](./configuration.md).
+- **Attachment names are namespaced.** A name without a prefix is stored as `{testId}-{name}`, and a duplicate name throws.
 
 ## Where to next
 
-- [Configuration](./configuration.md) — run the same suite against a deployed environment.
+- [Configuration](./configuration.md) — the host options and how to run the same suite against a deployed environment.
 - [Troubleshooting](./troubleshooting.md) — when the host, a client or a container does not come up.
 - [Foundation](../foundation/overview.md) — how the lifecycle, context and attributes fit together.
 - [Coverage](../observability/coverage.md) — add `OpenApiCoverageCollector` to find what your suite *doesn't* test.

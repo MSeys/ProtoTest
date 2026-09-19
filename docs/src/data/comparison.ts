@@ -164,7 +164,7 @@ public sealed class BillingTests
             .Body(new CreateOrderRequest("observability-seat", 12, 19.95m))
             .PostAsync("/api/orders");
 
-        created.ShouldHaveHttpStatus(HttpStatusCode.Created).ShouldMatchShape(new
+        created.Should.HaveHttpStatus(HttpStatusCode.Created).ShouldMatchShape(new
         {
             product = "observability-seat",
             quantity = 12,
@@ -175,7 +175,7 @@ public sealed class BillingTests
         using var invoices = await Proto.Context.Rest()
             .GetAsync("/api/billing/invoices", new { state = "open" });
 
-        invoices.ShouldHaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        invoices.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
         {
             state = "open",
             invoices = new[]
@@ -231,7 +231,7 @@ public sealed class SampleEnvironmentAttribute : ProtoAttribute
             .PostAsync("/test-support/environments");
 
         var environment = response
-            .ShouldHaveHttpStatus(HttpStatusCode.Created)
+            .Should.HaveHttpStatus(HttpStatusCode.Created)
             .ReadAsJson<EnvironmentResponse>()!;
 
         context.SetContext(new SampleEnvironmentContext(
@@ -247,7 +247,7 @@ public sealed class SampleEnvironmentAttribute : ProtoAttribute
             .WithoutAuth()
             .DeleteAsync("/test-support/environments/{tenant}",
                 new { environment.Tenant });
-        response.ShouldHaveHttpStatus(HttpStatusCode.NoContent);
+        response.Should.HaveHttpStatus(HttpStatusCode.NoContent);
     }
 }
 
@@ -263,7 +263,7 @@ public sealed class SampleUserAttribute(string role) : ProtoAttribute
                 new { environment.Tenant });
 
         var user = response
-            .ShouldHaveHttpStatus(HttpStatusCode.Created)
+            .Should.HaveHttpStatus(HttpStatusCode.Created)
             .ReadAsJson<UserResponse>()!;
 
         context.SetContext(new SampleUserContext(

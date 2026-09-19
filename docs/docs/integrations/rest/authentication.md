@@ -29,8 +29,10 @@ Because the context carries the running test, an authenticator can read typed st
 | Authenticator | Constructor | Adds |
 | --- | --- | --- |
 | `BearerTokenAuthenticator` | `(string token)` | `Authorization: Bearer <token>` |
-| `BasicAuthAuthenticator` | `(string username, string password)` | `Authorization: Basic <base64>` |
-| `ApiKeyAuthenticator` | `(string keyName, string keyValue, ApiKeyLocation location = ApiKeyLocation.Header)` | a header, or a query parameter with `ApiKeyLocation.Query` |
+| `BasicAuthAuthenticator` | `(string username, string password)` | `Authorization: Basic <base64>` (UTF-8) |
+| `ApiKeyAuthenticator` | `(string keyName, string keyValue, ApiKeyLocation location = ApiKeyLocation.Header)` | a header via `TryAddWithoutValidation`, or a query parameter with `ApiKeyLocation.Query` |
+
+`ApiKeyLocation` is `Header` or `Query`; the query form needs a request URI and throws `InvalidOperationException` if there is none.
 
 ## Applying it
 
@@ -58,10 +60,15 @@ public class OrderTests
     {
         // Authorization is already applied.
         var response = await Proto.Context.Rest().GetAsync("/api/orders");
-        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        response.Should.HaveHttpStatus(HttpStatusCode.OK);
     }
 }
 ```
+
+`AuthAttribute<TAuthenticator>` applies to a class or method, allows several attributes at the same level, and inherits. Two properties shape it:
+
+- `Order` — several attributes at the same level run in this order.
+- `Protocols` — empty (the default) applies to every HTTP-based protocol the application exposes; otherwise it matches protocol names case-insensitively, for example `["GraphQL"]`.
 
 `[Application("Api")]` selects the application the test targets; `Rest()` uses that application's default REST client. Bind a different client with `[Application("Api", "Rest:Billing")]`.
 
@@ -83,7 +90,7 @@ using var response = await Proto.Context.Rest()
     .GetAsync("/api/control-plane");
 
 response
-    .ShouldHaveHttpStatus(HttpStatusCode.Forbidden)
+    .Should.HaveHttpStatus(HttpStatusCode.Forbidden)
     .ShouldMatchShape(new { error = "tenant-access-denied" });
 ```
 
@@ -93,10 +100,10 @@ When several of these apply, this is what wins:
 
 1. **`[Application]`** on the method beats the one on the class (and its client bindings replace the class's).
 2. **`[Auth<T>]` on the method replaces the class-level ones entirely** — they don't merge.
-3. Several `[Auth<T>]` attributes at the same level are ordered by their `Order` property and **composed**: each runs in turn on the same request.
+3. Several `[Auth<T>]` attributes at the same level are ordered by their `Order` property and **composed**: `ProtoCompositeHttpAuthenticator` runs each in turn on the same request, recording every handler under an `auth.handler.apply` operation with its `auth.type` and `client.name`. The composite's trace source is `ProtoTest.{protocol}`.
 4. **A per-request `.Auth(...)` overrides** whatever the attributes resolved, and **`.WithoutAuth()` clears it**.
 
-An authenticator is created once per request builder and reused if that builder sends more than once. Authentication is recorded on the request operation itself: `auth.outcome` is `applied` or `skipped` (with `auth.type` when applied), and a composite authenticator records each handler it runs as an `auth.handler.apply` operation. Header values are never traced; the trace records the count and each header's name.
+The REST and GraphQL lifecycle hooks (Order 100) resolve the attributes before each test and record a `Auth` entity state under the protocol name with `auth.source` (`method`, `class` or `none`), `auth.count` and `auth.types`. Per request, the applied authenticator is recorded on the request operation: `auth.outcome` is `applied` or `skipped`, with `auth.type` when applied. Header **values** are never traced; the trace records the header count and each header's name with `http.header.value_recorded=false`.
 
 ## Writing your own
 
@@ -145,4 +152,4 @@ public sealed class TenantTokenAuthenticator(
 
 This keeps secrets out of attribute metadata: the attribute carries only a name, and the authenticator looks up the real value.
 
-The same authenticator serves GraphQL too: [`[Auth<T>]`](../graphql/index.md#authentication) applies to every HTTP-based protocol the application exposes, and its `Protocols` property narrows it when an application exposes both and you only want one.
+The same authenticator serves GraphQL too: `[Auth<T>]` applies to every HTTP-based protocol the application exposes, and its `Protocols` property narrows it when an application exposes both and you only want one. [Extending ProtoTest](../../advanced/extending.md) covers the factory behind it.

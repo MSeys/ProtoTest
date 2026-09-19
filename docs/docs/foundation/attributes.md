@@ -34,57 +34,47 @@ public abstract class ProtoAttribute : Attribute
 }
 ```
 
-Here's the environment attribute from the sample suite, in full:
+Here's the shape of the environment attribute from the sample suite:
 
 ```csharp
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, Inherited = true)]
 public sealed class SampleEnvironmentAttribute : ProtoAttribute
 {
-    public SampleEnvironmentAttribute()
-    {
-        Order = -200;
-    }
+    public SampleEnvironmentAttribute() => Order = -200;
 
     public override async Task BeforeTestAsync(ProtoExecutionContext context)
     {
-        var environmentName = $"test-{context.TestId}";
         using var response = await context.Rest(SampleAppTargets.Api)
             .WithoutAuth()
-            .Body(new CreateEnvironmentRequest(environmentName))
+            .Body(new CreateEnvironmentRequest($"test-{context.TestId}"))
             .PostAsync("/test-support/environments");
 
-        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
-        var environment = response.ReadAsJson<EnvironmentResponse>()
-            ?? throw new InvalidOperationException("The sample app returned no environment.");
-
-        context.SetContext(new SampleEnvironmentContext(
-            environment.Tenant,
-            environment.Name,
-            environment.ApiBaseUrl));
+        response.Should.HaveHttpStatus(HttpStatusCode.Created);
+        var environment = response.ReadAsJson<EnvironmentResponse>()!;
+        context.SetContext(new SampleEnvironmentContext(environment.Tenant, environment.Name));
     }
+}
+```
 
-    public override async Task AfterTestAsync(ProtoExecutionContext context)
-    {
-        var environment = context.TryResolve<SampleEnvironmentContext>();
-        if (environment is null) return;
+Its teardown tolerates a setup that never got that far:
 
-        using var response = await context.Rest(SampleAppTargets.Api)
-            .WithoutAuth()
-            .DeleteAsync("/test-support/environments/{tenant}", new { environment.Tenant });
-        response.ShouldHaveHttpStatus(HttpStatusCode.NoContent);
-    }
+```csharp
+public override async Task AfterTestAsync(ProtoExecutionContext context)
+{
+    if (context.TryResolve<SampleEnvironmentContext>() is not { } environment) return;
+    using var response = await context.Rest(SampleAppTargets.Api)
+        .WithoutAuth()
+        .DeleteAsync("/test-support/environments/{tenant}", new { environment.Tenant });
+    response.Should.HaveHttpStatus(HttpStatusCode.NoContent);
 }
 ```
 
 And the user attribute that builds on it:
 
 ```csharp
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, Inherited = true)]
 public sealed class SampleUserAttribute : ProtoAttribute
 {
     public SampleUserAttribute(string role = SampleRoles.Member)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(role);
         Role = role;
         Order = -100;
     }
@@ -94,21 +84,18 @@ public sealed class SampleUserAttribute : ProtoAttribute
     public override async Task BeforeTestAsync(ProtoExecutionContext context)
     {
         var environment = context.Resolve<SampleEnvironmentContext>();
-        var email = $"{Role}.{context.TestId}@example.test";
-
         using var response = await context.Rest(SampleAppTargets.Api)
             .WithoutAuth()
-            .Body(new CreateUserRequest(email, Role))
+            .Body(new CreateUserRequest($"{Role}.{context.TestId}@example.test", Role))
             .PostAsync("/test-support/environments/{tenant}/users", new { environment.Tenant });
 
-        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
-        var user = response.ReadAsJson<UserResponse>()
-            ?? throw new InvalidOperationException("The sample app returned no user.");
-
-        context.SetContext(new SampleUserContext(user.Id, user.Tenant, user.Email, user.Role, user.AccessToken));
+        response.Should.HaveHttpStatus(HttpStatusCode.Created);
+        context.SetContext(response.ReadAsJson<UserResponse>()!);
     }
 }
 ```
+
+The sample suite's real pair is [`NorthstarTenantAttribute` and `SignedInAsAttribute`](../../../samples/ProtoTest.SampleApp.Testing/NorthstarAttributes.cs).
 
 What makes these work well:
 
@@ -166,7 +153,7 @@ An attribute can also stop a test before the lifecycle starts. Implement `IProto
 [RequiresInProcess]
 ```
 
-Conditions run before `StartTestAsync`, so a skipped test has no context and no teardown, and the reason is reported by the runner where it can be — MSTest is the one adapter that cannot carry it. [Skip conditions](./skip-conditions.md) covers evaluation, the per-runner behaviour and the limits.
+Conditions run before `StartTestAsync`, so a skipped test has no context and no teardown, and the runner reports the reason. MSTest has no public dynamic-skip API: it returns an ignored result and carries the reason on the display name and log output. Conditions are **adapter-opt-in**: a runner that does not evaluate them simply runs the test, and evaluation happens in the order the runner resolves attributes, not in `Order` — NUnit, for example, checks class-level conditions before method-level ones in reflection order. [Skip conditions](./skip-conditions.md) covers evaluation, the per-runner behaviour and the limits.
 
 ## Attributes ProtoTest ships
 
@@ -181,3 +168,10 @@ Conditions run before `StartTestAsync`, so a skipped test has no context and no 
 | `[ProtoTest]`, `[ProtoTestFact]`, `[ProtoTestTheory]` | [runner](../runners/overview.md) entry points |
 
 Most of the capabilities in a real suite are ones you write — that's the point.
+
+## Limits
+
+- C# attributes are created by reflection: no constructor injection. Resolve services from the context inside `BeforeTestAsync`/`AfterTestAsync`, and pass only compile-time constants to constructors.
+- Only `Order` decides sequencing, and ties put class-level attributes first; a failed setup rolls back only the components that completed, so teardown must tolerate partial state (`TryResolve`, early return).
+- A skip condition only sees [registered capabilities](./skip-conditions.md): an integration that is not configured makes its tests skip, which is the point.
+- `[RequiresInProcess]` inspects capability registration only — it does not look at `BaseUrl`.

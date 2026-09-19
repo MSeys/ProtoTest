@@ -46,7 +46,7 @@ public async Task SubscriptionStreamsShapeMatchedEvents()
 The same `expected` object builds the subscription's selection set and asserts the event that arrives.
 
 :::tip[Give the server a moment]
-`SubscribeAsync()` returns once the server acknowledges the **connection**, not the individual subscription. If you trigger the event immediately afterwards, a fast server can publish it before it has registered the subscriber. The sample suite waits briefly (`await Task.Delay(100)`) before firing the mutation.
+`SubscribeAsync()` returns once the server acknowledges the **connection**, not the individual subscription. If you trigger the event immediately afterwards, a fast server can publish it before it has registered the subscriber. The sample suite waits briefly (`await Task.Delay(100)`) before firing the mutation; `PlatformJourney` starts the read first and publishes until it lands.
 :::
 
 ## `GraphQLSubscription`
@@ -91,15 +91,21 @@ await using var subscription = await Proto.Context.GraphQL()
     .SubscribeAsync();
 ```
 
+Without `ConnectionPayload`, `connection_init` is sent with a `null` payload.
+
 ## Protocol behaviour
 
-**WebSocket:** ProtoTest sends `connection_init` (with your payload), waits for `connection_ack` — answering server `ping`s with `pong` — then subscribes. `next` messages become responses, `complete` ends the stream, and an `error` message is delivered as a final response with errors. `connection_error` or anything unexpected before the ack throws `GraphQLProtocolException`.
+**WebSocket:** ProtoTest sends `connection_init` (with your payload), waits for `connection_ack` — answering server `ping`s with `pong`, echoing the ping payload when there is one — then sends `subscribe`. `next` messages become responses, `complete` ends the stream, and an `error` message is delivered as a final response with errors. `connection_error`, an unexpected message before the ack, or a non-text or oversized message throws `GraphQLProtocolException`.
 
-**SSE:** `event: next`, `event: complete` and `event: error` frames map the same way.
+**SSE:** `event: next`, `event: complete` and `event: error` frames map the same way. A response that isn't `text/event-stream` is read to the end within the message limit and delivered as one response.
+
+Each event is recorded: a `graphql.response` observation and a `graphql.subscription.next` event (event number, transport, error count), with response attachments named `graphql-{n:00}-event-{nn}-response`. The end of the stream records `graphql.subscription.complete` with the event count, transport and duration.
 
 **Disposal** sends `complete`, then closes the socket. Socket errors during close are swallowed so they never mask a test failure.
 
 The endpoint scheme is rewritten automatically: `http` → `ws`, `https` → `wss`.
+
+Message size is capped by `ProtoTest:GraphQL:Responses:MaxResponseBodyBytes` (10 MiB default) on both transports.
 
 ## Choosing the transport
 
@@ -108,7 +114,7 @@ graphQL.AddClient("Api", "https://api.example.test/graphql")
     .WithSubscriptionTransport(GraphQLSubscriptionTransport.Sse);
 ```
 
-or `ProtoTest:Applications:Api:GraphQL:SubscriptionTransport = "Sse"` in configuration.
+or `ProtoTest:Applications:Api:GraphQL:SubscriptionTransport = "Sse"` in configuration. The per-target registration wins; otherwise the configured value is read the first time the test calls `GraphQL()`. An invalid value throws `InvalidOperationException` naming `WebSocket` and `Sse`.
 
 ## Supplying your own WebSocket
 

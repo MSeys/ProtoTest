@@ -10,10 +10,10 @@ The problems below are the ones a new suite meets first. Each starts with the me
 
 ## The host is not there
 
-> **ProtoHost is not initialized. Initialize the ProtoTest assembly fixture before running tests.**
+> **ProtoHost is not initialized.**
 > **No active ProtoHost is available.**
 
-The runner never ran your setup class, so no host was built. Check the one that applies to your runner:
+The runner never ran your setup class, so no host was built — the second sentence of the message is the adapter's own hint (`Ensure your setup class inherits from ProtoTestAssembly.`, `Register your fixture with [assembly: AssemblyFixture(...)]`, …). Check the one that applies to your runner:
 
 - **NUnit** — the `[SetUpFixture]` only covers its own namespace and the namespaces below it. A test in `Orders.Tests.Api` is covered by a setup in `Orders.Tests`, not by one in `Orders.Tests.Web`. Move the setup up, or out of any namespace to cover the whole assembly.
 - **xUnit v3** — `[assembly: AssemblyFixture(typeof(Setup))]` is missing.
@@ -30,11 +30,11 @@ Each runner's page under [Test runners](../runners/overview.md) shows the comple
 
 ## A client cannot be resolved
 
-> **No application is selected for this test. Apply [Application(name)] or pass a REST client name to the accessor.**
+> **No application is selected for this test. Apply [Application(name)] or pass a Rest client name to the accessor.**
 
 `Proto.Context.Rest()` without a name uses the selected application's client. Put `[Application("Api")]` on the class or the test, or ask for a client by name: `Proto.Context.Rest("Api")`.
 
-> **Application 'Api' has no REST client registered. Register one in AddApplication or pass a client name to the accessor.**
+> **Application 'Api' has no Rest client registered. Register one in AddApplication or pass a client name to the accessor.**
 
 The application is composed without that protocol. Add it in the setup: `.AddApplication("Api", app => app.AddRest(rest => rest.AddClient("Api")))`.
 
@@ -53,7 +53,7 @@ Infrastructure such as `PostgresDatabase.Container()` runs on Docker through Tes
 
 - Start Docker Desktop, or on Linux make sure the current user can reach the Docker socket.
 - On CI, use a runner image with Docker available.
-- To run the suite where Docker is not available, give it a connection string through configuration instead of a container. `[RequiresCapability]` cannot skip past it: `AddInfrastructure` starts containers with the host, so the run fails at start. Call `PostgresDatabase.TryStart(...)` or `RabbitMqBroker.TryStart(...)` in the suite fixture before registering infrastructure — it reports why the container could not start, so the fixture can choose a fallback mode or skip the suite with that reason (`Start` starts now or throws). See [Skip conditions](../foundation/skip-conditions.md).
+- To run the suite where Docker is not available, give it a connection string through configuration instead of a container. A test-level skip cannot get in front of it: `AddInfrastructure` starts the container with the host, before any skip condition is evaluated, so a missing runtime fails the run at start. Start the container in the suite fixture instead, before registering anything: `PostgresDatabase.TryStart(...)` and `RabbitMqBroker.TryStart(...)` report the failure instead of throwing, so the fixture can fall back, replace the connection string, or skip the suite. When the fixture starts the container itself, register it with `AddResource` so the host still releases it — `AddInfrastructure` is for containers the host starts. `TryStart` blocks the calling thread while the container starts and has no timeout. See [Skip conditions](../foundation/skip-conditions.md).
 
 ## The browser does not launch
 
@@ -75,7 +75,7 @@ Tests that genuinely cannot run side by side need the runner's own tool: `[NonPa
 
 Without `ConfigureTracing`, the trace is written to `TestResults/prototest-{runId}.prototrace`. Relative paths — that one and your own — resolve against the directory the tests run in, which for `dotnet test` is the test project's output folder: `bin/Debug/net10.0/TestResults/`. Set an absolute path, or one built from an environment variable, to collect it from CI.
 
-If [trace.prototest.dev](https://trace.prototest.dev) says the trace is **from an older ProtoTest**, the file was written before trace format 2.0. Run the tests again with a current ProtoTest.
+If [trace.prototest.dev](https://trace.prototest.dev) says the trace is **from an older ProtoTest**, the file was written before trace snapshot format 1.9. Run the tests again with a current ProtoTest. (The archive itself is manifest format 2.0: `spans.json` plus `state.json`, whose state documents are format 1.1.)
 
 ## Still stuck?
 

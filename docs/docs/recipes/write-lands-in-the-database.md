@@ -8,20 +8,11 @@ description: Create an order over REST, then read the row the application wrote 
 
 The API answers `201 Created`, but did the order reach the database with the right status? The test creates it over REST, then reads the row itself — on a database the run started, shared with the in-process application.
 
+The demo's host composes the same way — [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs) registers the container and the test-side connection; [DomainAccessJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/DomainAccessJourney.cs) writes the other way around. The full API surface is in [SQL](../integrations/sql/index.md).
+
 ## Compose
 
 ```csharp
-using System.Data.Common;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Npgsql;
-using ProtoTest.AspNetCore;
-using ProtoTest.Core;
-using ProtoTest.Rest;
-using ProtoTest.Sql;
-using ProtoTest.Sql.EntityFrameworkCore;
-using ProtoTest.Sql.Testcontainers;
-
 protected override void Configure(IProtoHostBuilder builder) =>
     builder
         // One PostgreSQL for the run; the application reads its connection string from this key.
@@ -32,13 +23,14 @@ protected override void Configure(IProtoHostBuilder builder) =>
         // The test's own connection, to the same database.
         .AddSql(
             services => new NpgsqlConnection(
-                services.GetRequiredService<ProtoInfrastructureSettings>().Values["ConnectionStrings:Orders"]),
+                services.GetRequiredService<ProtoInfrastructureSettings>()
+                    .Values["ConnectionStrings:Orders"]),
             sql => sql.Isolation = SqlIsolation.None)
         .AddEntityFrameworkCore<OrdersDbContext>((services, options) =>
             options.UseNpgsql(services.GetRequiredService<DbConnection>()));
 ```
 
-`OrdersDbContext` is the application's own context, so the test reads the row with the same mapping the application wrote it with.
+`OrdersDbContext` is the application's own context, so the test reads the row with the same mapping the application wrote it with. Configure it here rather than calling a host `AddDbContext<OrdersDbContext>` afterwards — EF Core keeps the first options registration and drops later ones.
 
 ## The test
 
@@ -54,7 +46,7 @@ public sealed class OrderPersistenceTests
         using var response = await Proto.Context.Rest()
             .Body(new { reference, product = "notebook", quantity = 2 })
             .PostAsync("/api/orders");
-        response.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        response.Should.HaveHttpStatus(HttpStatusCode.Created);
 
         var stored = await Proto.Context.Sql<OrdersDbContext>().Orders
             .AsNoTracking()
@@ -69,10 +61,13 @@ public sealed class OrderPersistenceTests
 }
 ```
 
-## Watch for
+## What it proves
 
-- **Why `SqlIsolation.None`.** The in-process application opens its own connection and commits. A rollback on the test's connection would not undo that write, so the default `Transaction` isolation would only pretend to clean up. That is why the host refuses `Transaction` until every application is declared as sharing the test's connection. See [Isolation](../integrations/sql/index.md#isolation).
+The assertion is about the row the application committed — not the request body echoed back. `Proto.Context.Sql<T>()` resolves the scoped context over the test's connection, so the read runs in the same context the trace records next to the REST call.
+
+## Limits
+
+- **Why `SqlIsolation.None`.** The in-process application opens its own connection and commits; a rollback on the test's connection would not undo that write. With the default `Transaction` isolation the run-start guard throws while an application registered through `AddApplication` is not declared with `ShareConnectionWith(...)` — and a declaration is only a statement, not enforcement. See [Isolation](../integrations/sql/index.md#isolation).
 - **Unique values, not cleanup.** The container lives for one run, so nothing survives to the next one. Within a run, a reference built from `TestId` keeps parallel tests out of each other's rows.
-- **Read what the application wrote, not what you sent.** Assert on values the application decides — the status, a computed total — rather than echoing the request back.
-
-Against a deployed environment the suite usually cannot reach the database. Compose `AddSql` only where it can, and mark the test `[RequiresCapability(ProtoCapabilityKinds.Store)]`: where no store is composed, it skips instead of failing.
+- **No SQL tracing.** The connection and transaction lifecycle is traced; individual commands are not.
+- **Against a deployed environment the suite usually cannot reach the database.** Compose `AddSql` only where it can, and mark the test `[RequiresCapability(ProtoCapabilityKinds.Store)]`: where no store is composed, it skips instead of failing.

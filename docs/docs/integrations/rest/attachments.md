@@ -33,26 +33,31 @@ Each test then gets numbered attachments, which your [runner](../../runners/over
 
 | Attachment | Contains |
 | --- | --- |
-| `rest-01-request` | the request body |
-| `rest-01-response` | the response, with its status in the description |
-| `rest-01-expected-shape` | the shape you asserted (`-02`, `-03`… for repeated assertions on one response) |
+| `rest-01-request` | the request body, when `CaptureRequestBodies` is on |
+| `rest-01-response` | the response, with its status in the description, when `CaptureResponses` is on |
+| `rest-01-expected-shape` | the shape you asserted (`-02`, `-03`… for repeated assertions on one response), when `CaptureExpectedShapes` is on |
 
 The number is a per-test sequence, so the second request in a test is `rest-02-…`.
 
-### Options
+## Options
 
-| Option | Default |
-| --- | --- |
-| `CaptureRequestBodies` | `true` |
-| `CaptureResponses` | `true` |
-| `CaptureExpectedShapes` | `true` |
-| `RedactSensitiveData` | `true` |
-| `MaxDiagnosticBodyLength` | `65536` |
-| `SensitiveHeaders` | `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` |
-| `SensitiveQueryParameters` | `access_token`, `refresh_token`, `token`, `apiKey`, `api_key`, `key` |
-| `SensitiveJsonProperties` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key` |
+`ProtoTest:Rest:Attachments` binds a `ProtoHttpAttachmentOptions` — the same base type GraphQL uses under its own key, so capture and redaction stay identical across the HTTP protocols.
 
-All of these can also come from configuration:
+| Option | Type | Default |
+| --- | --- | --- |
+| `CaptureRequestBodies` | `bool` | `true` |
+| `CaptureResponses` | `bool` | `true` |
+| `CaptureExpectedShapes` | `bool` | `true` |
+| `SensitiveHeaders` | `List<string>` | `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` |
+| `SensitiveQueryParameters` | `List<string>` | `access_token`, `refresh_token`, `token`, `apiKey`, `api_key`, `key` |
+| `RedactSensitiveData` (inherited) | `bool` | `true` |
+| `MaxDiagnosticBodyLength` (inherited) | `int` | `65536` |
+| `SensitiveJsonProperties` (inherited) | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key` |
+| `ConfigurationSectionName` (get-only) | `string` | the section this instance binds from; not bindable |
+
+`RedactSensitiveData`, `MaxDiagnosticBodyLength` and `SensitiveJsonProperties` come from `JsonDiagnosticOptions`, shared with GraphQL, gRPC and messaging diagnostics.
+
+Code configuration composes rather than replaces: every `CaptureAttachments(...)` callback runs in registration order, then the known section is bound over the result, so **configuration wins over code**. Repeated calls each apply.
 
 ```json
 {
@@ -67,17 +72,19 @@ All of these can also come from configuration:
 }
 ```
 
-Configuration wins over the `CaptureAttachments(...)` callback — see [Configuration](../../getting-started/configuration.md).
+See [Configuration](../../getting-started/configuration.md) for how sections bind.
 
 ### Redaction
 
 With `RedactSensitiveData` on (the default):
 
-- Sensitive **headers** are replaced with `[REDACTED]` (matched case-insensitively).
-- Sensitive **query parameter values** in URLs are replaced with `[REDACTED]`.
-- Sensitive **JSON properties** in bodies are redacted, and bodies are truncated to `MaxDiagnosticBodyLength`.
+- Sensitive **headers** are replaced with `[REDACTED]` (matched case-insensitively; repeated values are joined with `, `).
+- Sensitive **query parameter values** in URLs are replaced with `[REDACTED]`; URI user-info (`user:password@`) is **always** removed, even when redaction is off.
+- Sensitive **JSON properties** in bodies are redacted by name, at any depth, tolerating duplicate keys.
+- Bodies that aren't JSON are scanned for the same keys: form-urlencoded, multipart (`Content-Disposition` `name=`) and XML (element text of sensitive tags and attributes) are all covered.
+- Every body is truncated at `MaxDiagnosticBodyLength` with a `… [N characters truncated]` marker.
 
-The same sanitiser is used for the response body included in `RestStatusAssertionException` messages.
+The same sanitizer is used for the response body included in `RestStatusAssertionException` messages and for captured attachment content. GraphQL additionally redacts inline literals in documents — see [Queries and mutations](../graphql/operations.md#transport-details).
 
 ## Coverage
 
@@ -90,6 +97,6 @@ builder.AddApplication("Api", app => app
         .AddCollector<RestCoverageCollector>()));
 ```
 
-`RestCoverageCollector` reports every endpoint your suite **called**, with a hit count. It can only list what it saw — to find endpoints you **never** called, and response fields you never asserted, use [`OpenApiCoverageCollector`](../openapi.md), which walks your whole specification.
+`RestCoverageCollector` reports every endpoint your suite **called**, with a hit count, under the `REST` category. It can only list what it saw — to find endpoints you **never** called, and response fields you never asserted, use [`OpenApiCoverageCollector`](../openapi.md), which walks your whole specification and consumes the `http.contract.shape` observations produced by shape assertions.
 
 Both write into the same reports; see [Coverage](../../observability/coverage.md).

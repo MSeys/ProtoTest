@@ -18,6 +18,12 @@ public interface IWebWaitCondition
     string Name { get; }
     ValueTask<WebWaitObservation> ObserveAsync(WebWaitContext context, CancellationToken cancellationToken = default);
 }
+
+public sealed record WebWaitObservation(bool Satisfied, string? LastObserved = null)
+{
+    public static WebWaitObservation Ready(string? observation = null);
+    public static WebWaitObservation Pending(string? observation = null);
+}
 ```
 
 ```csharp
@@ -60,7 +66,7 @@ public static IProtoHostBuilder AddWebWait<TCondition>(
     where TCondition : class, IWebWaitCondition;
 ```
 
-With no operations listed, the wait applies to `Navigate`, `Click` and `Fill`. The full list of operation kinds is `Navigate`, `Click`, `Fill`, `Check`, `SelectOption`, `Press`, `Count`, `ReadText`, `ReadValue`, `IsVisible`, `IsEnabled`, `IsChecked` and `Assert`.
+With no operations listed, the wait applies to `Navigate`, `Click` and `Fill`. The full list of operation kinds is `Navigate`, `Click`, `Fill`, `Check`, `SelectOption`, `Press`, `Count`, `ReadText`, `ReadValue`, `IsVisible`, `IsEnabled`, `IsChecked` and `Assert`. A non-positive timeout or interval throws `ArgumentOutOfRangeException`.
 
 If the condition isn't ready in time, the operation fails with `WebWaitTimeoutException`, including the last observation you returned — so make those messages useful.
 
@@ -75,7 +81,7 @@ If the condition isn't ready in time, the operation fails with `WebWaitTimeoutEx
 | `IsVisibleAsync(element)` | check an element's visibility |
 | `CountAsync(elements)` | count matches |
 
-The latter two take a `WebElementReference` — get one from any element's `Reference` property.
+The latter two take a `WebElementReference` — get one from any element's [`Reference`](./interactions.md#element-metadata) property. `EvaluateBooleanAsync` throws `WebBackendCapabilityException` when the active backend does not implement `IWebBackendJavaScript` (a custom backend without JavaScript support).
 
 ### Built in: jQuery
 
@@ -85,7 +91,11 @@ The latter two take a `WebElementReference` — get one from any element's `Refe
 builder.AddWebWait<JQueryIdleWait>(WebWaitTiming.After);
 ```
 
-Each wait shows up in the trace as a `web.wait` entry with its condition, timeout and last observation.
+It evaluates `typeof window.jQuery === 'undefined' || window.jQuery.active === 0`, and reports "jQuery is absent or has no active requests" or "jQuery.active is greater than zero" as its observation.
+
+### Trace evidence
+
+Each wait is a `web.wait` entry named `Wait · {condition}` with `web.wait.timing`, `web.wait.condition`, `web.wait.timeout`, `web.wait.last_observed` and `web.operation` (the operation kind it wrapped).
 
 ## Middleware
 
@@ -123,10 +133,13 @@ public sealed class SlowOperationWarning(ILogger<SlowOperationWarning> logger) :
 builder.AddWebMiddleware<SlowOperationWarning>();
 ```
 
-Middleware and wait conditions are resolved from dependency injection, so their constructors can take any registered service.
-
-`WebOperationContext` exposes `Execution` (the test's `ProtoExecutionContext`), `Kind`, `Name`, `BackendName`, `SessionName`, `CorrelationId`, `Element` and — after `next` returns — `Result`.
+Middleware and wait conditions are resolved from dependency injection, so their constructors can take any registered service. `WebOperationContext` exposes `Execution` (the test's `ProtoExecutionContext`), `Kind`, `Name`, `BackendName`, `SessionName`, `CorrelationId`, `Element` and — after `next` returns — `Result`. The backend operation itself is traced as the child `web.backend.execute`, which is what links the middleware pipeline to the native driver call.
 
 Middleware nests like ASP.NET Core's: the **first one registered is the outermost**, and the backend call sits in the middle. All wait conditions run inside one built-in middleware, which takes its place in that order at your first `AddWebWait` call.
 
 Middleware is created once per test (scoped), and registering the same middleware type twice has no extra effect.
+
+## Next
+
+- [Diagnostics and artifacts](./diagnostics.md) — the trace entries these hooks produce.
+- [Actions and assertions](./interactions.md) — the operations middleware wraps.

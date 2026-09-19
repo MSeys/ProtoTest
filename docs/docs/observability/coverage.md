@@ -8,7 +8,7 @@ description: "Coverage of your API's surface rather than its lines: which endpoi
 
 Code coverage tells you which lines ran. It can't tell you which **parts of your API** your tests actually checked — an endpoint can be called by a setup helper a thousand times and never have its response asserted once.
 
-ProtoTest measures coverage against the *contract*: your OpenAPI document, your GraphQL schema. And for REST, it counts a response property as covered only when a shape assertion actually matched it.
+ProtoTest measures coverage against the *contract*: your OpenAPI document, your GraphQL schema. For REST, it counts a response property as covered only when a shape assertion actually matched it, and gRPC coverage counts the services and methods your calls reached.
 
 ## Turning it on
 
@@ -21,7 +21,10 @@ builder
             .AddCollector<OpenApiCoverageCollector>())
         .AddGraphQL(graphQL => graphQL
             .AddClient("GraphQL")
-            .WithSchemaCoverage("schema.graphql")))
+            .WithSchemaCoverage("schema.graphql"))
+        .AddGrpc(grpc => grpc
+            .AddClient("Projects")
+            .AddCollector<GrpcCoverageCollector>()))
     .AddSink<HtmlReportSink>();
 ```
 
@@ -30,8 +33,11 @@ builder
 | `RestCoverageCollector` | every REST endpoint your suite called, with hit counts |
 | [`OpenApiCoverageCollector`](../integrations/openapi.md) | the **whole** OpenAPI document: endpoints → responses → response properties, covered or not |
 | [GraphQL schema coverage](../integrations/graphql/coverage.md) | the whole schema: types → fields → arguments, and input types → input fields |
+| `GrpcCoverageCollector` | every gRPC service/method your suite called, from the client's `grpc.response` observations |
 
 Collectors gather; [sinks](./reporting.md) write the results. Without a sink you won't see anything.
+
+`AddCollector` hangs off the `IProtoTargetBuilder` returned by a client registration — REST, GraphQL and gRPC all support it. The collector's first constructor argument is the target name, and any extra arguments to `AddCollector` follow it.
 
 ## Reading the report
 
@@ -68,10 +74,14 @@ flowchart LR
     Sinks --> Archive[".prototrace"]
 ```
 
-1. Integrations record **observations** as tests run. REST records `http.response` for every response and `http.contract.shape` for every successful shape assertion; GraphQL records `graphql.response`.
+1. Integrations record **observations** as tests run. REST records `http.response` for every response and `http.contract.shape` for every successful shape assertion; GraphQL records `graphql.response` and `graphql.contract.shape`; gRPC records `grpc.response` per call and `grpc.contract.shape`; messaging records `messaging.publish` and `messaging.receive`, plus `messaging.contract.shape` from a message shape assertion.
 2. Each observation is offered to every registered **collector** whose `CanCollect` accepts it. Collectors live for the whole run, so they aggregate across all tests.
 3. When the run stops, every collector's **report items** are gathered, sorted by target, category and identifier, and passed to every **sink**.
 4. Files the sinks wrote are added to the `.prototrace` archive.
+
+:::warning[Messaging ships no collector]
+`ProtoTest.Messaging` records `messaging.publish`, `messaging.receive` and `messaging.contract.shape` observations, but the package contains no collector, so they never appear in a report unassisted. Register a collector of your own with the broker's target name (`RabbitMQ`, or `InMemory` for the default broker) if you want destinations aggregated. The same is true of `ProtoTest.Messaging.RabbitMq`.
+:::
 
 ## Observations
 
@@ -108,7 +118,7 @@ public sealed class InvoiceStateCoverage(string targetName) : ProtoCoverageColle
 }
 ```
 
-The base class matches observations whose `TargetName` equals its own (ignoring case), and records one covered item per distinct `Identifier` with a hit count. That's exactly how `RestCoverageCollector` is built. Under an `[Application]` the client is registered under its qualified name (`Api` becomes `Northstar:Api`), and observations carry that same qualified name, so collectors attached to the client keep matching.
+The base class matches observations whose `TargetName` equals its own (ignoring case), and records one covered item per distinct `Identifier` with a hit count. That's exactly how `RestCoverageCollector` and `GrpcCoverageCollector` are built. Under an `[Application]` the client is registered under its qualified name (`Api` becomes `Northstar:Api`), and observations carry that same qualified name, so collectors attached to the client keep matching.
 
 To report things that were **not** observed — the valuable part — override `GetReportItems` and enumerate the full set, as the OpenAPI collector does with the specification:
 
@@ -117,10 +127,7 @@ public sealed class InvoiceStateCoverage(string targetName) : ProtoCoverageColle
 {
     private static readonly string[] AllStates = ["draft", "open", "paid", "overdue", "void"];
 
-    public override string Category => "Invoice states";
-
-    public override bool CanCollect(ProtoObservation observation) =>
-        base.CanCollect(observation) && observation.Kind == "invoice.state";
+    // Category and CanCollect as above ...
 
     public override IEnumerable<ProtoReportItem> GetReportItems()
     {
@@ -137,23 +144,18 @@ public sealed class InvoiceStateCoverage(string targetName) : ProtoCoverageColle
 }
 ```
 
-Register it on a target — the target name is passed as the first constructor argument, and any extra arguments to `AddCollector` follow it:
-
-```csharp
-builder.AddApplication("Api", app => app
-    .AddRest(rest => rest.AddClient("Billing").AddCollector<InvoiceStateCoverage>()));
-```
-
-Collectors must be thread-safe; tests run in parallel. Use the base class's `protected readonly ProtoLock _lock`.
-
 ### Collectors not tied to a client
 
-`AddCollector` hangs off a client registration. For a collector that isn't about any client, register it directly:
+For a collector that isn't about any client, register it directly:
 
 ```csharp
 builder.ConfigureServices(services =>
     services.AddSingleton<IProtoCollector>(new InvoiceStateCoverage("Billing")));
 ```
+
+A messaging collector is one of these: the observation target is the broker name, not a client target, so construct the collector with that name (`RabbitMQ`) and register it directly.
+
+Collectors must be thread-safe; tests run in parallel. Use the base class's `protected readonly ProtoLock _lock`.
 
 The interfaces underneath are small:
 
@@ -192,3 +194,8 @@ public sealed record ProtoReportItem(
 ```
 
 Items nest through `Children`, and the kinds cover more than coverage: a `Metric` with a `Value` and `Unit`, or a `Finding` with a `Warning` status and a `Message`, show up in the same reports. A kind is an open string, so an integration can define its own; the built-in ones are named by `ProtoReportItemKinds`. The HTML report keeps the kinds in their own sections — coverage, findings, run gates, resources — and gives an unknown kind its own section titled after it, so a passed gate is never read as a finding.
+
+## Links
+
+- [Reporting](./reporting.md) writes these items out; [ProtoTrace](./prototrace.md) records the observations alongside the run.
+- [OpenAPI contract coverage](../integrations/openapi.md) and [GraphQL schema coverage](../integrations/graphql/coverage.md) define what "covered" means for each contract.

@@ -8,7 +8,20 @@ description: "Clients are what a test talks to. ProtoTest creates them per test,
 
 A client is anything a test talks to — an `HttpClient`, a browser session, a message bus connection, a fake. ProtoTest creates clients **per test**, registers them on the context, and disposes them afterwards. Every integration uses this mechanism, and you can use it for your own.
 
-## Client initializers
+## The context API
+
+```csharp
+void RegisterClient<TClient>(TClient client, string name = "Default", bool disposeWithContext = true)
+    where TClient : class;
+TClient Client<TClient>(string name = "Default") where TClient : class;
+TClient? TryClient<TClient>(string name = "Default") where TClient : class;
+```
+
+Clients are keyed by **type and case-insensitive name**: an `HttpClient` named `Api` and a web session named `Api` can coexist. Registering the same type and name twice throws, and registering after release has begun throws `ObjectDisposedException`. A failed `Client<T>` lookup records a `client.resolve` event before throwing; `TryClient` never traces.
+
+## Writing an initializer
+
+An initializer creates one named client for a test and registers it:
 
 ```csharp
 public interface IProtoClientInitializer
@@ -24,7 +37,7 @@ public interface IProtoClientInitializer<TClient> : IProtoClientInitializer wher
 }
 ```
 
-An initializer creates one named client for a test and registers it with `context.RegisterClient`. From the sample suite:
+From the sample suite:
 
 ```csharp
 public sealed class ScenarioProbe
@@ -66,11 +79,13 @@ public static class ScenarioProbeExtensions
 }
 ```
 
-## When clients are created
+## When clients are created and released
 
-Before any of your hooks or attributes run, ProtoTest's client hook goes through every registered initializer and creates its client. So clients are available in `BeforeTestAsync` everywhere.
+Before any of your hooks or attributes run, ProtoTest's client hook groups every registered initializer by client type and name, tries each group in registration order, and creates its client. The trace records one `client.initialize` operation per group — not one per attempt — and the winning initializer is written as the client entity's `client.initializer` state. A candidate that returns `false` is not traced individually; an initializer that throws fails the `client.initialize` operation.
 
-If a client implements `IDisposable` or `IAsyncDisposable`, it's disposed when the test ends — in reverse order of registration.
+If no initializer in a group succeeds, the test fails in setup with *"No registered initializer could create a client of type 'X' with name 'Y'."*
+
+If a client implements `IDisposable` or `IAsyncDisposable`, it's disposed when the test ends — in reverse order of registration. Client resources are framework-managed: a successful release is recorded as the client entity's `resource.state = released` rather than a `resource.release` operation, and a **failed** release writes a `resource.release` event so the failure is explainable.
 
 ## Sharing one client across tests
 
@@ -99,13 +114,13 @@ builder.ConfigureServices(services =>
     services.AddSingleton<IProtoClientInitializer>(_ => new SharedBusInitializer()));
 ```
 
-With `disposeWithContext: false` the test releases its reference to the client (a `resource.release` trace entry) without disposing it. Registering through a factory delegate, as above, lets the host's service provider dispose the initializer — and with it the shared client — when the run ends. This is how the [ASP.NET Core integration](../integrations/aspnetcore.md#one-application-or-one-per-test) shares one application across tests. Remember that tests running in parallel will use a shared client concurrently.
+With `disposeWithContext: false` the test registers the client as shared and does not dispose it at teardown — the trace marks the entity `client.owned = false`, and the release writes state, not a dispose. Registering through a factory delegate, as above, lets the host's service provider dispose the initializer — and with it the shared client — when the run ends. This is how the [ASP.NET Core integration](../integrations/aspnetcore.md) shares one application across tests. Remember that tests running in parallel will use a shared client concurrently.
 
 ## Fallback chains
 
 Several initializers can offer the same client type and name. They're tried **in registration order**, and the first to return `true` wins. Returning `false` means "not me" — and the initializer must leave the context untouched when it does.
 
-This is how a client bound to an application is served by a real URL when the application has a `BaseUrl`, and by the [in-process ASP.NET Core server](../integrations/aspnetcore.md#real-server-or-in-process) otherwise:
+This is how a client bound to an application is served by a real URL when the application has a `BaseUrl`, and by the [in-process ASP.NET Core server](../integrations/aspnetcore.md) otherwise:
 
 ```csharp
 public async Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
@@ -118,10 +133,9 @@ public async Task<bool> TryInitializeAsync(ProtoExecutionContext context, Cancel
 }
 ```
 
-If no initializer succeeds, the test fails in setup with *"No registered initializer could create a client of type 'X' with name 'Y'."*
+## Limits
 
-Each attempt is traced as `client.initializer.attempt`, marked with whether it was selected — so the trace tells you which one served a client.
-
-## Names
-
-Client names are **case-insensitive**, and a name is unique per client type: an `HttpClient` named `Api` and a `WebSession` named `Api` can coexist. Registering the same type and name twice throws.
+- Initializers are singleton services: a shared client must tolerate concurrent tests, and a per-test client must still be created fresh inside `TryInitializeAsync`.
+- Ordering is registration order only; there is no `Order` property on an initializer.
+- A group with no successful initializer fails the test's setup — there is no silent fallback.
+- Registration after the context starts releasing throws, so a client can only be registered during setup (or while the test body runs).

@@ -8,14 +8,11 @@ description: Download the workbook the application generates over REST and verif
 
 The application generates a monthly report as an `.xlsx`. The test downloads it over the API and checks it the way a reader would: the right sheet, the right columns, every value within its rules, and the row for the project the test created.
 
+The same journey runs in the demo — [SheetsJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/SheetsJourney.cs) (test); its host calls `.AddSheets()` in [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs). The full API surface is in [Sheets](../integrations/sheets/index.md).
+
 ## Compose
 
 ```csharp
-using ProtoTest.AspNetCore;
-using ProtoTest.Core;
-using ProtoTest.Rest;
-using ProtoTest.Sheets;
-
 protected override void Configure(IProtoHostBuilder builder) =>
     builder
         .AddApplication("Api", app => app
@@ -49,10 +46,10 @@ public sealed class MonthlyReportTests
         using var created = await Proto.Context.Rest()
             .Body(new { name })
             .PostAsync("/api/projects");
-        created.ShouldHaveHttpStatus(HttpStatusCode.Created);
+        created.Should.HaveHttpStatus(HttpStatusCode.Created);
 
         using var response = await Proto.Context.Rest().GetAsync("/api/reports/monthly.xlsx");
-        response.ShouldHaveHttpStatus(HttpStatusCode.OK);
+        response.Should.HaveHttpStatus(HttpStatusCode.OK);
 
         var report = Proto.Context.Sheets().Open(response).Model<ProjectReportRow>();
 
@@ -63,10 +60,14 @@ public sealed class MonthlyReportTests
 }
 ```
 
-## Watch for
+## What it proves
+
+`Verify()` checks the model's rules across every row — uniqueness, patterns, minimums — and `Row(...)` proves the report actually contains the project this test created. The workbook is read as OpenXML, so it makes no difference whether the application wrote it with ClosedXML, EPPlus or anything else.
+
+## Limits
 
 - **`Open(response)` needs no file.** A REST response is named content, so the workbook is read straight from it. Turn on [REST capture](../integrations/rest/attachments.md) to keep the exact file with the test.
-- **`Verify()` reports everything at once.** A missing header fails as soon as the model is read, naming it; broken column rules are collected, each with its cell reference, into one failure.
-- **The library does not matter.** The workbook is read as OpenXML, so it makes no difference whether the application wrote it with ClosedXML, EPPlus or anything else.
-
-See [Sheets](../integrations/sheets/index.md) for single cells, formulas and ranges.
+- **`Verify()` reports everything at once.** A missing header fails when the model is read, naming it; broken column rules are collected, each with its cell reference, into one failure.
+- **OpenXML `.xlsx` only.** There is no `.xls`, no CSV and no writing.
+- **Formulas are cached values.** Nothing is recalculated, and dates are detected from the cell's style, not a schema.
+- **Ranges are capped at 1,000,000 cells**, and hidden sheets are skipped unless the options ask for them.

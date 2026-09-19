@@ -14,7 +14,8 @@ The demo's `Setup` decides all three from configuration:
 var targetUrl = demoConfiguration["ProtoTest:TargetUrl"];
 var hostedInProcess = string.IsNullOrWhiteSpace(targetUrl);
 var configuredDatabase = demoConfiguration.GetConnectionString("Northstar");
-var usePostgres = string.Equals(demoConfiguration["ProtoTest:Database"], "postgres", StringComparison.OrdinalIgnoreCase);
+var usePostgresContainer = string.Equals(demoConfiguration["ProtoTest:Database"], "postgres", StringComparison.OrdinalIgnoreCase);
+var postgresStore = usePostgresContainer || IsPostgresStore(demoConfiguration["Database:Provider"], configuredDatabase);
 var useMessagingContainer = string.Equals(demoConfiguration["ProtoTest:Messaging:Broker"], "container", StringComparison.OrdinalIgnoreCase);
 ```
 
@@ -24,7 +25,7 @@ var useMessagingContainer = string.Equals(demoConfiguration["ProtoTest:Messaging
 | Application | `AddAspNetCoreServer<Program>` | in-process, fed by infrastructure settings | never started; clients target `BaseUrl` |
 | Store | file SQLite under `TestResults/ProtoTest.Demo` | `PostgresDatabase.Container()` | `ConnectionStrings:Northstar` |
 | Broker | in-memory default | `RabbitMqBroker.Container()` | `ProtoTest:Messaging:RabbitMq:ConnectionString` |
-| Browser journeys | a standalone app the run starts | skipped (no standalone instance) | a standalone app the run starts (unless PostgreSQL is used) |
+| Browser journeys | a standalone app the run starts | started unless the run owns PostgreSQL | skipped — no local instance is started |
 
 ## In-process
 
@@ -33,7 +34,7 @@ With no `TargetUrl`, the host builds the application in-process and the REST, Gr
 ```csharp
 app.AddAspNetCoreServer<Program>(configureWebHost: webHost =>
 {
-    if (!usePostgres)
+    if (!usePostgresContainer)
     {
         webHost.UseSetting("ConnectionStrings:Northstar", fallbackDatabase);
     }
@@ -43,7 +44,7 @@ app.AddAspNetCoreServer<Program>(configureWebHost: webHost =>
 });
 ```
 
-The demo owns a **file** SQLite database per run (`TestResults/ProtoTest.Demo/northstar-demo.db`, deleted before the run starts). The sample application itself would fall back to a named in-memory SQLite database if it were launched without a connection string, but the demo always hands it one. When the suite doesn't own PostgreSQL, it also starts a standalone copy of the application for the browser journeys and fills the default [web session](../integrations/web/index.md)'s base URL from it.
+The demo owns a **file** SQLite database per run (`TestResults/ProtoTest.Demo/northstar-demo.db`, deleted before the run starts). The sample application itself would fall back to a named in-memory SQLite database if it were launched without a connection string, but the demo always hands it one. When the suite doesn't own a PostgreSQL container, it also starts a standalone copy of the application for the browser journeys and fills the default [web session](../integrations/web/index.md)'s base URL from it.
 
 Because the test-side domain is composed over the same store, `DomainAccessJourney` runs; because no RabbitMQ adapter is configured, `MessagingJourney` skips.
 
@@ -60,7 +61,7 @@ builder.AddInfrastructure(
 builder.AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar");
 ```
 
-The started connection strings reach the tests through `ProtoInfrastructureSettings` and the in-process application through its web host settings, so both work against the same database or broker. An explicitly configured connection string is applied afterwards and wins. With PostgreSQL owned by the run, no standalone application is started, so the browser journey's `[RequiresCapability("server", CapabilityName = "Northstar standalone")]` skips it.
+The started connection strings reach the tests through `ProtoInfrastructureSettings` and the in-process application through its web host settings, so both work against the same database or broker. With PostgreSQL owned by the run, no standalone application is started, so the browser journey's `[RequiresCapability("server", CapabilityName = "Northstar standalone")]` skips it — a broker container alone does not stop the standalone app from starting. A web session can be pointed at a published address through `ProtoTest:Web:Sessions:{name}:BaseUrl`, but the demo registers its `"Northstar standalone"` capability only when it starts that process itself, so a published run skips the browser journey too.
 
 ## Published
 
@@ -73,10 +74,10 @@ if (!hostedInProcess)
 }
 ```
 
-No ASP.NET Core server is registered: HTTP clients connect over the network, and the browser journeys are the only local process (unless the suite owns PostgreSQL). Connection strings come from configuration, and the test-side domain is composed when `ConnectionStrings:Northstar` is set:
+No ASP.NET Core server is registered and no standalone process is started: HTTP clients connect over the network to `BaseUrl`, and the browser journeys skip because the `"Northstar standalone"` capability is never registered. Connection strings come from configuration, and the test-side domain is composed when `ConnectionStrings:Northstar` is set:
 
 ```csharp
-var composeDomainInTests = hostedInProcess || configuredDatabase is not null || usePostgres;
+var composeDomainInTests = hostedInProcess || configuredDatabase is not null || postgresStore;
 ```
 
 ## What doesn't change

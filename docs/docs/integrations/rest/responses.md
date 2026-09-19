@@ -10,7 +10,7 @@ Every verb returns a `RestResponse`. The body is already buffered, so you can re
 
 ## Asserting
 
-Both assertions return the response, so they chain:
+`RestResponse` exposes two facades. `Should` asserts what must hold, `ShouldNot` asserts what must not — both return the response, so assertions chain:
 
 ```csharp
 using var response = await Proto.Context.Rest()
@@ -18,7 +18,7 @@ using var response = await Proto.Context.Rest()
     .PostAsync("/api/orders");
 
 response
-    .ShouldHaveHttpStatus(HttpStatusCode.Created)
+    .Should.HaveHttpStatus(HttpStatusCode.Created)
     .ShouldMatchShape(new
     {
         product = "observability-seat",
@@ -26,21 +26,25 @@ response
         total = JsonValue.GreaterThan(200m),
         status = "pending"
     });
-```
 
-### `ShouldHaveHttpStatus`
+response.ShouldNot.HaveHttpStatus(HttpStatusCode.InternalServerError);
+```
 
 ```csharp
-RestResponse ShouldHaveHttpStatus(HttpStatusCode expectedStatusCode);
+public RestAssertions Should { get; }
+public RestAssertions ShouldNot { get; }
+
+public RestResponse HaveHttpStatus(HttpStatusCode expected);            // on RestAssertions
+public RestResponse ShouldMatchShape(object expectedShape, JsonSerializerOptions? options = null);
 ```
 
-On failure it throws `RestStatusAssertionException` with `ExpectedStatusCode`, `ActualStatusCode` and `ResponseBody`. The body is appended to the message (with sensitive values redacted), so a failing `400` tells you *why* without re-running anything.
+`ShouldNot.HaveHttpStatus(expected)` asserts the status is **anything but** `expected`; shape assertions are positive-only and live on the response.
+
+### Status assertions
+
+A status assertion records an `assert.http.status` operation (source `ProtoTest.Rest`, parented to the request) with the expected and actual status codes, the client identity and `assertion.negated` when it is the `ShouldNot` side. `RestStatusAssertionException` carries `ExpectedStatusCode`, `ActualStatusCode`, `ResponseBody` and `Negated`, and appends the sanitized response body to its message — bounded by the smaller of `ProtoTest:Rest:Responses:MaxDiagnosticBodyLength` and the attachment options' cap — so a failing `400` tells you *why* without re-running anything.
 
 ### `ShouldMatchShape`
-
-```csharp
-RestResponse ShouldMatchShape(object expectedShape, JsonSerializerOptions? options = null);
-```
 
 Describe the JSON you expect as an anonymous object. The short version of the rules:
 
@@ -56,9 +60,9 @@ Shape mismatch failed with 2 error(s):
   • [$.status]: Values did not match. (Expected: "pending", Actual: "cancelled")
 ```
 
-The full rules and every available matcher are on the [Shape matching](../../foundation/shape-matching.md) page.
+The assertion records an `assert.json.shape` operation with the expected type, the actual media type, the expected and actual shapes, and the matched properties or every mismatch (`matched.property_count`, `shape.mismatches`, `shape.mismatch_count`, `shape.result`). On success it records an `http.contract.shape` observation carrying the request identifier, matched property paths, target type and status code — the input [OpenAPI coverage](../openapi.md) uses. When `CaptureExpectedShapes` is on, the expected shape is attached as `rest-{n:00}-expected-shape` (`-02`, `-03` … for repeated assertions on one response).
 
-Shape assertions also do double duty: the property paths they match are what [OpenAPI coverage](../../observability/coverage.md) uses to report which response fields your suite actually checked.
+The full rules and every available matcher are on the [Shape matching](../../foundation/shape-matching.md) page.
 
 :::tip[Shape a whole array]
 Because arrays are positional, a list assertion is precise:
@@ -81,7 +85,7 @@ dynamic? ReadAsDynamic();
 byte[] ReadAsBytes();
 ```
 
-`ReadAsJson<T>` is case-insensitive by default and returns `default` for an empty body. `ReadAsAnonymous` exists purely for type inference — the argument's values are ignored:
+`ReadAsJson<T>` is case-insensitive by default and returns `default` for an empty body. A deserialization failure records an `http.response.deserialize` event with `target.type` and `content.length`, then rethrows. `ReadAsAnonymous` exists purely for type inference — the argument's values are ignored:
 
 ```csharp
 var created = response.ReadAsAnonymous(new { id = 0, status = "" })!;
@@ -92,7 +96,7 @@ A common pattern is assert-then-read, so the test fails with a useful message be
 
 ```csharp
 var workspace = response
-    .ShouldHaveHttpStatus(HttpStatusCode.Created)
+    .Should.HaveHttpStatus(HttpStatusCode.Created)
     .ReadAsJson<WorkspaceResponse>()!;
 ```
 

@@ -102,7 +102,7 @@ To make options bindable from `appsettings.json` like the built-in ones, impleme
 ```csharp
 public sealed class BusOptions : IProtoConfigurableOptions
 {
-    public string ConfigurationSectionName => "ProtoTest:Bus";
+    public string ConfigurationSectionName => "Acme:Bus";
     public string Endpoint { get; set; } = "amqp://localhost";
 }
 

@@ -29,7 +29,7 @@ A run contains tests, and a trace records two things about each of them:
 - **What ran** — a tree of **operations** (spans): each has a duration and an outcome — a request, a flow, a hook. Operations nest: a `web.flow` contains its clicks, a test's execution contains everything the test body did. Moments inside an operation — a server starting, a subscription message — are **events** on it, and so are the observations, attachments and findings it produced.
 - **What existed and changed** — the **state**: every client, context, resource and tracked value, with its state at the end and a trail of changes. Each change names the operation that caused it, and where the value came from: the test itself, a response it observed, or the application's own instrumentation.
 
-Tracked values carry the identity `value:{type}:{identity}`, where `{type}` is the CLR type name in snake_case — `InvoiceLine` becomes `invoice_line` — and `{identity}` is what the provisioner returned. An application's own identity attribute prefix must match the type segment (`invoice_line.number`) for its spans to correlate with the test-side value.
+Tracked values are items with kind `value` and an id of the form `{type}:{identity}`. Test-side provisioning writes the result type in snake_case as the type segment — `InvoiceLine` becomes `invoice_line`, so the item reads `invoice_line:42` — and `{identity}` is what the provisioner returned. An application's own instrumentation writes the prefix of its identity-shaped attribute instead: `invoice.id = 42` contributes `invoice:42`. The two are the same item only when the attribute prefix matches the type segment and the values match, so name a type's identity attribute after the type (`invoice_line.number`) to correlate them.
 
 Every entry belongs to a **phase**:
 
@@ -54,13 +54,15 @@ A few of the kinds recorded automatically:
 | Kind | From |
 | --- | --- |
 | `test.setup`, `test.execution`, `test.teardown`, `test.rollback` | the lifecycle |
-| `client.initialize`, `client.resolve`, `client.register` | clients |
-| `context.set`, `context.resolve` | typed state — with a snapshot of the value |
-| `observation.record`, `attachment.register` | observations and attachments |
+| `client.initialize`, `client.resolve` | clients — initialization, and a lookup that failed |
+| `context.resolve` | typed state — a failed lookup; `SetContext` is a state change on the context entity, not an entry |
+| `attachment.publish`, and the `observation` / `attachment` / `finding` records on an operation | attachments, observations and findings |
 | `auth.outcome` (`applied` / `skipped`) | HTTP authentication, recorded on the request operation itself |
 | `auth.handler.apply` | each handler of a composite authenticator |
 | `assert.json.shape` | shape assertions — REST, GraphQL, gRPC and messaging: expected, actual and matched properties |
 | `assert.http.status`, `assert.grpc.status` | status assertions |
+| `grpc.call`, `grpc.client.resolve`, `grpc.attachment.failed` | the [gRPC client](../integrations/grpc/index.md) — calls, fallback resolution and capture failures |
+| `messaging.publish`, `messaging.await`, `messaging.attachment.failed` | [publishing and awaiting messages](../integrations/messaging/index.md) |
 | `web.navigate`, `web.click`, `web.flow`, `web.login`, `assert.web`, … | the [browser](../integrations/web/diagnostics.md#what-the-trace-records-for-every-operation) |
 | `web.page.visited`, `web.page.verified`, `web.page.available` | [page coverage](../integrations/web/index.md#page-coverage) — observations, not operations: the pages a journey reached, checked and could reach |
 | `data.build`, `data.build_many`, `data.create`, `data.create_many`, `data.explain` | [building test data](../integrations/data/index.md) |
@@ -134,7 +136,7 @@ run.prototrace
 - **`sources`** in the manifest maps each recorded `code.file.path` to its embedded copy.
 - Each artifact is declared once, with its media type, size and path in the archive; an attachment event refers to it by id.
 
-Entries are stored **uncompressed**, so a browser can read the archive without a decompression library. Property names are camelCase. Traces written before format 2.0 had a single `run.json` instead; the current viewer says so and asks for a trace from a current ProtoTest.
+Entries are stored **uncompressed**, so a browser can read the archive without a decompression library. Property names are camelCase. The archive manifest is format **2.0**, its spans document is 2.0, and its state document is **1.1** — tracked values are generic `value` items with the domain type in the id. The live snapshot exposed to code (`host.Trace.Snapshot()`) reports format **1.9**.
 
 Test artifacts — every [attachment](../foundation/attachments.md) — live under the test's id. Run-level artifacts, such as the reports written by [sinks](./reporting.md), live under `resources/run/`.
 

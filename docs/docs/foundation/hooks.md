@@ -36,51 +36,27 @@ Test hooks are registered as **singletons**, and constructor parameters are reso
 
 ### A fuller example
 
-The sample suite uses a hook to give every test a correlation id, record observations, and attach a summary:
+The sample suite's `NorthstarScenarioHook` gives every test a correlation id, records observations, and attaches a summary:
 
 ```csharp
-public sealed class SaasScenarioHook : IProtoTestHook
+public sealed class NorthstarScenarioHook : IProtoTestHook
 {
     public int Order => -1_000;
 
     public Task BeforeTestAsync(ProtoExecutionContext context)
     {
-        var correlation = new ScenarioCorrelationContext(
+        var scenario = new NorthstarScenarioContext(
             $"scenario-{context.TestId}-{Guid.NewGuid():N}",
             DateTimeOffset.UtcNow,
             context.TestName);
-        context.SetContext(correlation);
-
-        context.Trace.WriteEvent(
-            "saas.correlation.begin",
-            "Begin correlated SaaS scenario",
-            "ProtoTest.SampleApp.Testing",
-            outcome: ProtoTraceOutcome.Succeeded,
-            attributes: new Dictionary<string, string?>
-            {
-                ["saas.correlation_id"] = correlation.CorrelationId
-            });
-
-        return Task.CompletedTask;
-    }
-
-    public Task AfterTestAsync(ProtoExecutionContext context)
-    {
-        var correlation = context.Resolve<ScenarioCorrelationContext>();
-        var duration = DateTimeOffset.UtcNow - correlation.StartedAtUtc;
-
-        context.AddAttachment(
-            "scenario-summary.json",
-            JsonSerializer.Serialize(new { correlation.CorrelationId, DurationMs = duration.TotalMilliseconds }),
-            "application/json",
-            "Correlation for this scenario.");
-
+        context.SetContext(scenario);
+        context.RecordObservation("Northstar", "scenario.started", scenario.CorrelationId);
         return Task.CompletedTask;
     }
 }
 ```
 
-Attachments added in `AfterTestAsync` are still published — publishing happens after all hooks have finished.
+Its `AfterTestAsync` resolves the state, records a `scenario.completed` observation and adds a `scenario-summary.json` attachment. Attachments added in `AfterTestAsync` are still published — publishing happens after all hooks have finished. The full hook is [`samples/ProtoTest.SampleApp.Testing/NorthstarScenario.cs`](../../../samples/ProtoTest.SampleApp.Testing/NorthstarScenario.cs).
 
 ## Run hooks
 
@@ -121,12 +97,27 @@ Lower runs earlier on the way in and later on the way out, so a hook with `Order
 
 ProtoTest's built-in hooks sit at the extremes on purpose:
 
-- The hook that creates clients runs **first** on the way in, so your hooks can use them.
-- The hooks that export reports and write the trace archive run **last** on the way out.
+| Hook | `Order` | Why |
+| --- | --- | --- |
+| Client initializer (test) | `int.MinValue` | runs first on the way in, so your hooks can use clients |
+| Trace export (run) | `int.MinValue` | runs last on the way out, after reports and resources |
+| Run resources (run) | `int.MinValue + 1` | releases run-scoped resources before the trace archive is written |
+| Report sinks (run) | `int.MinValue + 2` | exports reports before resources are released, so the report is a snapshot of the run |
+| Run gates (run) | `int.MinValue + 3` | evaluates first on the way out, before reports export |
+| HTTP auth (test) | `100` | applies `[Auth<T>]` after your hooks, so it can override the request |
+
+The hook that creates clients runs **first** on the way in, so your hooks can use them. The run hooks that export reports, release resources and write the trace archive run **last** on the way out, in the reverse order above.
 
 Integrations add their own test hooks too — the HTTP integrations apply `[Auth<T>]` from a hook with `Order = 100`.
 
 Remember that **all test hooks run before any [attribute](./attributes.md)**. See [Host and lifecycle](./lifecycle.md) for the full sequence and failure rules.
+
+## Limits
+
+- Test hooks are registered as singletons and resolved from the root container; per-test state must come from `context.Services` or the context itself.
+- `AddTestHook` and `AddRunHook` do **not** dedupe: every call adds another registration. Register each hook once.
+- Run hooks get no context — there is no test yet — and `BeforeRunAsync` failures roll back only the hooks that already started, in reverse.
+- A teardown failure in a test hook is recorded as an `Error` finding and does not replace the test's outcome, but it still surfaces to the runner.
 
 ## Hook or attribute?
 

@@ -77,7 +77,7 @@ Both containers are started only when the suite opted in (`ProtoTest:Messaging:B
 The demo also registers a settings-only resource with no keys:
 
 ```csharp
-builder.AddInfrastructure(new StandaloneSampleApp(fallbackDatabase));
+builder.AddInfrastructure(new StandaloneSampleApp(fallbackDatabase, databaseProvider));
 ```
 
 It starts the sample application as a standalone process and fills `ProtoTest:Web:Sessions:Default:BaseUrl` from its `Settings`, so the [web sessions](../integrations/web/index.md) have an address. A settings-only infrastructure fills its dictionary whether or not keys were passed.
@@ -93,7 +93,7 @@ It starts the sample application as a standalone process and fills `ProtoTest:We
 
 Runner assembly setups call `StartAsync` before any test (see the [runner overview](../runners/overview.md)), so infrastructure is guaranteed to be started and its settings filled before the first test lifecycle begins. Each started piece is recorded in the trace as a run entity with `change: "started"` and its settings keys.
 
-If a registered piece throws during `StartAsync`, the run fails to start and the host disposes itself; pieces that had already started are released. The container packages offer `TryStart`, which reports *why* a container could not start instead of throwing, so a suite can fall back or decide to [skip](./skip-conditions.md) before registering it.
+If a registered piece throws during `StartAsync`, the run fails to start: `ProtoHost.StartAsync` releases the pieces that had already started, clears the settings it filled, and rethrows — leaving the host in `Created` for a retry. The runner's host lifetime then disposes the host. The container packages offer `TryStart`, which reports *why* a container could not start instead of throwing, so a suite can fall back or decide to [skip](./skip-conditions.md) before registering it.
 
 ## How settings reach tests
 
@@ -130,7 +130,8 @@ The web session is the deliberate exception: the address of the process the run 
 
 Infrastructure is released with the run, after the run stops and the reports are written:
 
-- report sinks and run gates run as `AfterRunAsync` hooks first;
+- the **run gates** evaluate first, so they see the collected items before the reports export;
+- the **report sinks** export next;
 - the **run resource hook** then releases run-scoped resources, infrastructure included, and writes the release into the trace;
 - finally the trace archive is written.
 

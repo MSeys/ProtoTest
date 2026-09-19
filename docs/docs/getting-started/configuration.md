@@ -39,9 +39,57 @@ builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryColl
 
 Tests read configuration through `Proto.Context.Configuration`.
 
+## Host options (code only)
+
+Two option sets are set in code while the host is built; neither binds from configuration, because Core options do not implement `IProtoConfigurableOptions` and so have no configuration section.
+
+`ConfigureTestIds` fills a `ProtoTestIdOptions`:
+
+| Key | Type | Default |
+| --- | --- | --- |
+| `RunPrefix` | `long?` | a random six-digit number per host |
+| `SequenceDigits` | `int` | `6` (valid 1–9) |
+
+`ConfigureTracing` fills a `ProtoTraceOptions`:
+
+| Key | Type | Default |
+| --- | --- | --- |
+| `Enabled` | `bool` | `true` |
+| `OutputPath` | `string?` | `null` → `TestResults/prototest-{runId}.prototrace` |
+| `ActivitySources` | `IList<string>` | empty |
+| `CaptureSourceLocations` | `bool` | `true` |
+| `EmbedSources` | `bool` | `true`; embedding requires `CaptureSourceLocations && EmbedSources` |
+
+```csharp
+builder
+    .ConfigureTestIds(ids => ids.RunPrefix = 42)
+    .ConfigureTracing(trace =>
+    {
+        trace.OutputPath = "TestResults/run.prototrace";
+        trace.ActivitySources.Add("MyApp.Domain");
+    });
+```
+
+To replace the id scheme entirely, register your own `IProtoTestIdGenerator` with `ConfigureServices`.
+
 ## Repeated registration
 
-Repeated registration is safe: calling an integration's `AddX` — `AddRest`, `AddGraphQL`, `AddGrpc`, `AddMessaging`, `AddSheets`, `AddWeb`, `AddAspNetCoreServer`, `AddSql`, `AddData`, `AddEntityFrameworkCore`, `AddInfrastructure`, `AddSink`, `AddCapability` — more than once never errors. Infrastructure is registered once — hooks, options, capabilities and run resources are first-wins — while clients compose: a second `AddRest(rest => rest.AddClient("Second"))` adds that client instead of discarding it, and re-registering the same client name keeps the first registration that initializes. A call whose `configure` callback throws does not prevent a later successful call. Registrations that are additive by design, such as `AddData` defaults and coverage collectors, keep composing. Calling each `AddX` once remains the clearest style; the guarantee exists so a helper invoked twice cannot duplicate services or run resources.
+The rule of thumb: **infrastructure registers once, clients compose, config callbacks accumulate** — with hooks and gates as the exception. A repeated `Add…` is safe by design, but what the second call does depends on what it registers:
+
+| You call | What a second call does |
+| --- | --- |
+| `AddTestHook`, `AddRunHook`, `AddRunGate` | adds another hook or gate; there is **no dedupe** |
+| `AddCapability` | an equal descriptor registers once |
+| `AddSink<TSink>` | the first registration of the sink type wins; a repeated generic call appends its `configure` callback |
+| `AddInfrastructure`, `AddResource` | the same instance is a no-op (`AddInfrastructure` also merges the repeated call's settings keys); a different instance under the same id throws *"already owned by the run"* |
+| `AddClient` | clients compose and the first registration that initializes for a type and name wins |
+| `ConfigureResponses`, `CaptureAttachments` (REST, GraphQL) | callbacks compose; the known configuration section is bound over the result |
+| `CaptureAttachments` (gRPC, Messaging) | the last call replaces the previous options; the known section still binds over them |
+| `AddSql`, `AddSheets`, `AddEntityFrameworkCore` | the first call wins; later calls are no-ops |
+| `AddData` | composes onto one registry; every call's callback runs |
+| `AddCollector<TCollector>` | the same collector type for the same target registers once |
+
+Some repeat rules are errors rather than no-ops: a different run resource under an existing id throws, `AddInfrastructure` rejects a resource whose `Scope` is not `Run` and rejects settings keys without an `IProtoConnectionInfrastructure`, and a duplicate client type and name throws during setup. A `configure` callback that throws is not remembered — a later successful call can still compose the integration.
 
 ## Which value wins
 
@@ -63,37 +111,13 @@ The one exception is a base address: a URL passed directly to `AddClient("Api", 
     "Applications": {
       "ControlPlane": {
         "BaseUrl": "https://staging.example.test/",
-        "Endpoints": {
-          "Api": "/api",
-          "GraphQL": "/graphql"
-        },
-        "OpenApi": { "Specification": "https://staging.example.test/swagger/v1/swagger.json" },
-        "GraphQL": { "Schema": "schema.graphql", "SubscriptionTransport": "WebSocket" }
+        "Endpoints": { "Api": "/api", "GraphQL": "/graphql" },
+        "OpenApi": { "Specification": "https://staging.example.test/swagger/v1/swagger.json" }
       }
     },
-    "Rest": {
-      "Attachments": {
-        "CaptureRequestBodies": true,
-        "CaptureResponses": true,
-        "CaptureExpectedShapes": true,
-        "RedactSensitiveData": true,
-        "MaxDiagnosticBodyLength": 65536
-      },
-      "Responses": { "MaxResponseBodyBytes": 10485760 }
-    },
-    "GraphQL": {
-      "Attachments": { "CaptureResponses": true },
-      "Responses": { "MaxResponseBodyBytes": 10485760 }
-    },
-    "Web": {
-      "Playwright": { "Browser": "Chromium", "Headless": true },
-      "Selenium": { "ActionTimeout": "00:00:05" },
-      "Sessions": { "Admin": { "TraceRetention": "Always" } }
-    },
-    "Reporting": {
-      "Json": { "OutputPath": "TestResults/report.json", "Indented": true },
-      "Html": { "OutputPath": "TestResults/report.html", "Title": "ProtoTest Report" }
-    }
+    "Rest": { "Responses": { "MaxResponseBodyBytes": 10485760 } },
+    "Web": { "Playwright": { "Browser": "Chromium", "Headless": false } },
+    "Reporting": { "Json": { "OutputPath": "TestResults/report.json", "Indented": true } }
   }
 }
 ```
@@ -103,16 +127,11 @@ The one exception is a base address: a URL passed directly to `AddClient("Api", 
 | `ProtoTest:Applications:{name}:BaseUrl` | the address of a system under test, shared by its HTTP clients and [web sessions](../integrations/web/index.md) |
 | `ProtoTest:Applications:{name}:Endpoints:{client}` | a relative path appended to `BaseUrl` for that client |
 | `ProtoTest:Applications:{name}:OpenApi:Specification` | [OpenAPI](../integrations/openapi.md) |
-| `ProtoTest:Applications:{name}:GraphQL:*` | [GraphQL](../integrations/graphql/index.md#target-options), [schema coverage](../integrations/graphql/coverage.md) |
-| `ProtoTest:Rest:*` | [REST attachments](../integrations/rest/attachments.md), [request limits](../integrations/rest/requests.md#response-size-limit) |
-| `ProtoTest:GraphQL:*` | [GraphQL](../integrations/graphql/index.md#builder-options) |
-| `ProtoTest:Web:*` | [Web](../integrations/web/index.md#from-configuration) |
-| `ProtoTest:Reporting:*` | [Reporting](../observability/reporting.md#configuring-from-files) |
+| `ProtoTest:Applications:{name}:GraphQL:*` | [GraphQL](../integrations/graphql/index.md), [schema coverage](../integrations/graphql/coverage.md) |
+| `ProtoTest:Applications:{name}:Grpc:Address` | [gRPC](../integrations/grpc/index.md) |
+| `ProtoTest:Rest:*` | [REST attachments](../integrations/rest/attachments.md), [request limits](../integrations/rest/requests.md) |
+| `ProtoTest:GraphQL:*` | [GraphQL](../integrations/graphql/index.md) |
+| `ProtoTest:Web:*` | [Web](../integrations/web/index.md) |
+| `ProtoTest:Reporting:*` | [Reporting](../observability/reporting.md) |
 
-Configured only in code:
-
-- tracing — `ConfigureTracing`,
-- test ids — `ConfigureTestIds`,
-- data defaults — `AddData`.
-
-Those callbacks run while the host is being built, before configuration exists, so they can't read `IConfiguration`. If a value needs to vary per environment, read it yourself — for example `trace.OutputPath = Environment.GetEnvironmentVariable("TRACE_PATH") ?? "TestResults/run.prototrace";`. Inside tests, hooks and attributes, `context.Configuration` has everything.
+Configured only in code: tracing (`ConfigureTracing`), test ids (`ConfigureTestIds`) and data defaults (`AddData`). Those callbacks run while the host is being built, before configuration exists, so they can't read `IConfiguration`. If a value needs to vary per environment, read it yourself — for example `trace.OutputPath = Environment.GetEnvironmentVariable("TRACE_PATH") ?? "TestResults/run.prototrace";`. Inside tests, hooks and attributes, `context.Configuration` has everything.

@@ -65,7 +65,7 @@ public sealed class DiagnosticsShowcase
             .GetAsync("/api/v1/organization");
 
         organization
-            .ShouldHaveHttpStatus(HttpStatusCode.OK)
+            .Should.HaveHttpStatus(HttpStatusCode.OK)
             .ShouldMatchShape(new
             {
                 projectCount = 99,
@@ -180,7 +180,7 @@ public async Task Paying_an_invoice_marks_it_paid()
 {
     using var response = await Proto.Context.Rest()
         .PostAsync("/api/invoices/42/pay");
-    response.ShouldHaveHttpStatus(HttpStatusCode.OK);
+    response.Should.HaveHttpStatus(HttpStatusCode.OK);
 
     // The store the application writes to, on the
     // connection and transaction the test owns.
@@ -202,7 +202,7 @@ public async Task Paying_an_invoice_publishes_invoice_paid()
 {
     using var response = await Proto.Context.Rest()
         .PostAsync("/api/invoices/42/pay");
-    response.ShouldHaveHttpStatus(HttpStatusCode.OK);
+    response.Should.HaveHttpStatus(HttpStatusCode.OK);
 
     await Proto.Context.Messaging().AwaitAsync(
         "invoice.paid",

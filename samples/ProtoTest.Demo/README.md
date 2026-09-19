@@ -45,6 +45,6 @@ dotnet test samples/ProtoTest.Demo
 
 The assembly runs testcases and fixtures concurrently with eight NUnit workers. Its HTML/JSON reports, the OpenAPI and GraphQL coverage and `prototest-demo.prototrace` are written under `TestResults/ProtoTest.Demo`.
 
-`DiagnosticsShowcase.TheOrganizationReportsItsPlanAndProjectCount` is skipped unless `ProtoTest:Demo:IncludeFailure=true` (or `ProtoTest__Demo__IncludeFailure=true`) is set, so CI stays green while the run still contains deliberately failed child operations that the tests inspect.
+`DiagnosticsShowcase.TheOrganizationReportsItsPlanAndProjectCount` and `DiagnosticsShowcase.TheDashboardNeverShowsAnotherTenantsPlan` are skipped unless `ProtoTest:Demo:IncludeFailure=true` (or `ProtoTest__Demo__IncludeFailure=true`) is set, so CI stays green while the run still contains deliberately failed child operations that the tests inspect.
 
-The viewer's bundled trace is produced from a full demo run that includes that intentional failure.
+The viewer's bundled trace is produced from a full demo run that includes both intentional failures: the REST shape mismatch and the web plan mismatch, the latter carrying the retained Playwright trace and its failure artifacts.

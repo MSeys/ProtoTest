@@ -8,6 +8,7 @@ using ProtoTest.Json;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
+using ProtoTest.Web;
 using System.Net;
 
 /// <summary>
@@ -122,5 +123,37 @@ public sealed class DiagnosticsShowcase
             projectCount = 99,
             planId = "nonexistent-plan"
         });
+    }
+
+    /// <summary>
+    /// The demo's intentional web failure: the dashboard shows the tenant's real plan, but this assertion
+    /// expects another one, so the failure exercises the web diagnostics end to end - the Playwright trace
+    /// is retained on failure together with the screenshot, DOM snapshot, location and console capture.
+    /// Opt-in through the same switch as the REST shape failure, so an ordinary run stays green.
+    /// </summary>
+    [ProtoTest]
+    [SignedInAs]
+    [LoginAs<NorthstarConsoleLogin>("owner")]
+    [RequiresCapability(
+        ProtoCapabilityKinds.Server,
+        CapabilityName = "Northstar standalone",
+        Reason = "The standalone application is only started when the suite owns the store.")]
+    [RequiresConsoleBuild]
+    public async Task TheDashboardNeverShowsAnotherTenantsPlan()
+    {
+        // Arrange
+        var includeFailure = Proto.Host.Configuration["ProtoTest:Demo:IncludeFailure"];
+        if (!string.Equals(includeFailure, "true", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(includeFailure, "1", StringComparison.Ordinal))
+        {
+            Assert.Ignore("Set ProtoTest:Demo:IncludeFailure=true to include the intentional viewer-demo failure.");
+        }
+
+        // Act
+        var dashboard = Proto.Context.Web().Page<DashboardPage>();
+        await dashboard.Page.Should.BeVisibleAsync(NorthstarConsole.Wait);
+
+        // Assert: the tenant is on the free plan; expecting Enterprise is the deliberate mistake.
+        await dashboard.Plan.Should.HaveTextAsync("Enterprise", TimeSpan.FromSeconds(3));
     }
 }

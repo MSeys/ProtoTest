@@ -7,6 +7,8 @@ import { shapeTreeOf } from "../trace/shapes";
 import SectionView from "./SectionView.vue";
 import ShapeResultTree from "./ShapeResultTree.vue";
 import JsonView from "./JsonView.vue";
+import SourceView from "./SourceView.vue";
+import { sourceLocation } from "../trace/sources";
 
 /*
  * Everything one operation recorded, in the order a reader asks for it: what went wrong, what was compared,
@@ -38,6 +40,8 @@ const attributeGroups = computed(() => {
   }
   return [...groups.entries()];
 });
+// Where in the suite's code this operation started, when the trace recorded it.
+const location = computed(() => sourceLocation(props.span.attributes));
 const attributeCount = computed(() => Object.keys(props.span.attributes).length);
 
 function isJson(value: string | null): boolean {
@@ -61,6 +65,8 @@ function value(input: unknown): string {
       </details>
       <pre v-else>{{ span.error.message }}</pre>
     </section>
+
+    <SourceView v-if="location" :location="location" />
 
     <section v-if="shapeTree" class="block">
       <h3>Expected against actual</h3>

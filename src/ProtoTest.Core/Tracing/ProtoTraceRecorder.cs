@@ -272,6 +272,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         var currentParent = _current.Value;
         var resolvedParentId = parentId ?? currentParent?.Id ?? Volatile.Read(ref _defaultParentId);
         var resolvedPhase = ResolvePhase(phase, resolvedParentId, currentParent);
+        attributes = WithSourceLocation(attributes);
         var entry = new TraceEntryState(
             id,
             resolvedParentId,
@@ -291,6 +292,24 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         _entriesById.TryAdd(entry.Id, entry);
         _current.Value = entry;
         return new ProtoTraceOperation(this, entry);
+    }
+
+    private IReadOnlyDictionary<string, string?>? WithSourceLocation(IReadOnlyDictionary<string, string?>? attributes)
+    {
+        if (!_options.CaptureSourceLocations
+            || attributes?.ContainsKey(ProtoSourceLocator.FilePathAttribute) == true
+            || ProtoSourceLocator.Find() is not { } location)
+        {
+            return attributes;
+        }
+
+        var merged = attributes is null
+            ? new Dictionary<string, string?>(StringComparer.Ordinal)
+            : new Dictionary<string, string?>(attributes, StringComparer.Ordinal);
+        merged[ProtoSourceLocator.FilePathAttribute] = location.File;
+        merged[ProtoSourceLocator.LineNumberAttribute] = location.Line.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        merged[ProtoSourceLocator.FunctionAttribute] = location.Function;
+        return merged;
     }
 
     public void WriteEvent(

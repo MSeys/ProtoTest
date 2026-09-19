@@ -22,6 +22,7 @@ import { buildRun } from "./trace/model";
 import type { Artifact, Item, Run, Span, TestTrace } from "./trace/model";
 import { formatDuration, pad, testCodeName, testGroup, testTitle } from "./trace/format";
 import { href, navigate, replace, route } from "./router";
+import { useSources } from "./trace/sources";
 import type { TestView } from "./router";
 
 const fileInput = ref<HTMLInputElement>();
@@ -221,6 +222,7 @@ async function loadBuffer(buffer: ArrayBuffer, name: string) {
     const opened = await openTraceArchive(buffer);
     run.value = buildRun(opened.spans, opened.state);
     archive.value = opened;
+    useSources(path => opened.readSource(path));
     fileName.value = name;
   } catch (reason) {
     problem.value = reason instanceof TraceOpenError

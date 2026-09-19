@@ -18,6 +18,7 @@ internal static class ProtoTraceArchiveWriter
         string path,
         ProtoTraceRun run,
         IReadOnlyList<ProtoTraceArtifactSource>? artifacts = null,
+        bool embedSources = false,
         CancellationToken cancellationToken = default)
     {
         // Every document describes a finished run, so an open run is closed once here rather than per document.
@@ -35,13 +36,56 @@ internal static class ProtoTraceArchiveWriter
             await stream.WriteAsync(source.Content, cancellationToken);
         }
 
+        var sources = embedSources ? await WriteSourcesAsync(archive, run, cancellationToken) : null;
+
         await WriteJsonAsync(
             archive,
             "manifest.json",
-            new ProtoTraceManifest(ArchiveFormatVersion, "spans.json", "state.json"),
+            new ProtoTraceManifest(ArchiveFormatVersion, "spans.json", "state.json", sources),
             cancellationToken);
         await WriteJsonAsync(archive, "spans.json", ProtoTraceWire.Spans(run), cancellationToken);
         await WriteJsonAsync(archive, "state.json", ProtoTraceWire.State(run), cancellationToken);
+    }
+
+    /// <summary>
+    /// Copies each source file an operation's location points at, once, and returns where each landed. A file
+    /// that is gone or too large is left out; the location still names it.
+    /// </summary>
+    private static async Task<IReadOnlyDictionary<string, string>?> WriteSourcesAsync(
+        ZipArchive archive,
+        ProtoTraceRun run,
+        CancellationToken cancellationToken)
+    {
+        const long MaxSourceBytes = 512 * 1024;
+        var paths = run.Tests.SelectMany(test => test.Entries)
+            .Concat(run.Entries ?? [])
+            .Select(entry => entry.Attributes.GetValueOrDefault(ProtoSourceLocator.FilePathAttribute))
+            .OfType<string>()
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var sources = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var path in paths)
+        {
+            try
+            {
+                var file = new FileInfo(ProtoSourceLocator.Resolve(path));
+                if (!file.Exists || file.Length > MaxSourceBytes) continue;
+                var archivePath = $"sources/{sources.Count + 1}/{file.Name}";
+                var entry = archive.CreateEntry(archivePath, CompressionLevel.NoCompression);
+                await using var stream = entry.Open();
+                await using var content = file.OpenRead();
+                await content.CopyToAsync(stream, cancellationToken);
+                sources[path] = archivePath;
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
+
+        return sources.Count == 0 ? null : sources;
     }
 
     private static async Task WriteJsonAsync<T>(
@@ -69,5 +113,6 @@ internal static class ProtoTraceArchiveWriter
     private sealed record ProtoTraceManifest(
         string FormatVersion,
         string SpansEntry,
-        string StateEntry);
+        string StateEntry,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<string, string>? Sources);
 }

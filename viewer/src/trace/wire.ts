@@ -162,4 +162,6 @@ export interface WireManifest {
   runEntry?: string;
   spansEntry?: string;
   stateEntry?: string;
+  /** Source files the operations' code.file.path attributes point at, keyed by that path. */
+  sources?: Record<string, string>;
 }

@@ -45,6 +45,20 @@ try {
         $spans = Read-ArchiveJson $archive "spans.json"
         $state = Read-ArchiveJson $archive "state.json"
 
+        # Where in the suite's code each operation started, with that code embedded for the viewer.
+        $manifest = Read-ArchiveJson $archive "manifest.json"
+        if ($null -eq $manifest.sources) { throw "Expected embedded sources in the manifest." }
+        $located = @($spans.resourceSpans | ForEach-Object { @($_.scopeSpans)[0].spans } |
+            Where-Object { $_ -and $_.attributes.'code.file.path' })
+        if ($located.Count -lt 1) { throw "Expected operations with a code.file.path in spans.json." }
+        foreach ($path in @($located | ForEach-Object { $_.attributes.'code.file.path' } | Sort-Object -Unique)) {
+            $embedded = $manifest.sources.$path
+            if (-not $embedded -or $null -eq $archive.GetEntry($embedded)) {
+                throw "Source '$path' is located by an operation but not embedded in the archive."
+            }
+            if ([System.IO.Path]::IsPathRooted($path)) { throw "Source '$path' is recorded as an absolute path." }
+        }
+
         # Every declared artifact must be in the archive; every attachment must refer to a declared artifact.
         foreach ($group in @($spans.resourceSpans)) {
             $declared = @{}
@@ -80,9 +94,12 @@ try {
     $failedTests = @($testGroups | Where-Object { $_.resource.attributes.testOutcome -eq "failed" })
     $succeededTests = @($testGroups | Where-Object { $_.resource.attributes.testOutcome -eq "succeeded" })
     $partialTests = @($testGroups | Where-Object { $_.resource.attributes.testOutcome -eq "partial" })
-    if ($testGroups.Count -ne 37 -or $succeededTests.Count -ne 34 -or $partialTests.Count -ne 2 -or $failedTests.Count -ne 1 -or
+    # The demo grows with every journey, so no fixed total: every test succeeds except the two diagnostic
+    # showcases (partial) and the one intentional shape mismatch (failed).
+    if ($succeededTests.Count + $partialTests.Count + $failedTests.Count -ne $testGroups.Count -or
+        $succeededTests.Count -lt 1 -or $partialTests.Count -ne 2 -or $failedTests.Count -ne 1 -or
         $failedTests[0].resource.attributes.testMethod -ne "TheOrganizationReportsItsPlanAndProjectCount") {
-        throw "Expected 34 successful tests, 2 partial diagnostic tests and only the intentional shape-mismatch failure in the viewer trace."
+        throw "Expected every test to succeed except 2 partial diagnostic tests and the intentional shape-mismatch failure."
     }
 
     $allEvents = @($groups | ForEach-Object { $scope = @($_.scopeSpans)[0]; @($scope.spans | ForEach-Object { $_.events }) + @($scope.events) } |

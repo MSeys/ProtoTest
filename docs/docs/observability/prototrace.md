@@ -83,9 +83,27 @@ The [ProtoTrace viewer](https://trace.prototest.dev) is a static web app. Trace 
 - **Story** tells the test phase by phase: each call carries its checks, and the framework's own steps fold away until you open them.
 - **State** shows every tracked item with its lifeline and changes; select a change to jump to the operation that made it.
 - **Spans** is the complete, searchable tree.
-- **The inspector** shows everything one operation recorded — request and response, JSON as a collapsible tree, the shape a check validated, what it changed — and every item's change trail. The address holds the selection, so a link opens the same place.
+- **The inspector** shows everything one operation recorded — where in your code it started, request and response, JSON as a collapsible tree, the shape a check validated, what it changed — and every item's change trail. The address holds the selection, so a link opens the same place.
 
 The viewer's source is in the repository under [`viewer/`](https://github.com/MSeys/ProtoTest/tree/main/viewer) if you'd rather host it yourself.
+
+## Where in the code
+
+Every operation your suite starts — a request, a check, a browser step, a gRPC call — records where in your code it started: the file, the line and the method, as the OpenTelemetry attributes `code.file.path`, `code.line.number` and `code.function.name`. The inspector shows that line with the code around it, so a failed check points at the line that made it.
+
+- The location comes from the stack and your test project's symbols, which the .NET SDK writes by default. ProtoTest's own lifecycle — setup, teardown, the test's execution — records none.
+- Inside a git repository the path is relative to its root (`tests/Orders.Tests/OrderTests.cs`), so it reads the same on every machine and does not carry your local directory layout.
+- The trace embeds each source file a location points at, so the viewer can show the code without access to the repository.
+
+```csharp
+builder.ConfigureTracing(trace =>
+{
+    trace.CaptureSourceLocations = false; // no locations, and so no embedded code
+    trace.EmbedSources = false;           // locations only, no code in the file
+});
+```
+
+Turn `EmbedSources` off when a trace goes to people who should not read the suite's code.
 
 ## The file format
 
@@ -96,6 +114,7 @@ run.prototrace
 ├── manifest.json            { "formatVersion": "2.0", "spansEntry": "spans.json", "stateEntry": "state.json" }
 ├── spans.json               what ran: one resource group per test and one for the run
 ├── state.json               what existed and changed: tracked items with their changes
+├── sources/1/OrderTests.cs   the code an operation's location points at, when embedded
 └── resources/
     ├── {testId}/artifact-1/rest-01-response.json
     ├── {testId}/artifact-2/playwright-default-trace.zip
@@ -104,6 +123,7 @@ run.prototrace
 
 - **`spans.json`** holds a resource group per test — its id, name, class, method, outcome and duration — with its operations, their events, and the artifacts the test declared. The run's own group carries its id, start and end, and the environment it ran in (`environment.runtime`, `environment.os`, …); run-level events such as gate verdicts sit on it too.
 - **`state.json`** holds the run's tracked items and each test's: kind, id, name, scope, first and last seen, the state at the end and every change, with the operation that caused it.
+- **`sources`** in the manifest maps each recorded `code.file.path` to its embedded copy.
 - Each artifact is declared once, with its media type, size and path in the archive; an attachment event refers to it by id.
 
 Entries are stored **uncompressed**, so a browser can read the archive without a decompression library. Property names are camelCase. Traces written before format 2.0 had a single `run.json` instead; the current viewer says so and asks for a trace from a current ProtoTest.

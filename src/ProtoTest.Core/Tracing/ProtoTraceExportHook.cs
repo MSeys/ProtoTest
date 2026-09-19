@@ -19,6 +19,7 @@ internal sealed class ProtoTraceExportHook(
             path,
             run,
             traceSession.SnapshotArtifactSources(),
+            options.CaptureSourceLocations && options.EmbedSources,
             cancellationToken);
     }
 }

@@ -39,6 +39,64 @@ public sealed class ProtoTracingTests
     }
 
     [Test]
+    public async Task Operation_ShouldRecordWhereTheSuiteStartedIt_AndEmbedThatSource()
+    {
+        var path = TemporaryTracePath();
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = path);
+        await using var host = builder.Build();
+
+        await host.StartAsync();
+        var context = await host.StartTestAsync("located test", TestMethod());
+        using (var operation = context.Trace.Operation("sample.operation", "Sample", "ProtoTest.Core.Tests").Begin())
+        {
+            operation.Succeed();
+        }
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        var test = host.Trace.Snapshot().Tests.Single();
+        var located = test.Entries.Single(entry => entry.Kind == "sample.operation").Attributes;
+        using var archive = ZipFile.OpenRead(path);
+        using var manifest = JsonDocument.Parse(archive.GetEntry("manifest.json")!.Open());
+        var sources = manifest.RootElement.GetProperty("sources");
+        var recordedPath = located["code.file.path"]!;
+
+        Assert.Multiple(() =>
+        {
+            // Relative to the repository root, the same on every machine.
+            Assert.That(recordedPath, Is.EqualTo("tests/ProtoTest.Core.Tests/ProtoTracingTests.cs"));
+            Assert.That(int.Parse(located["code.line.number"]!), Is.GreaterThan(0));
+            Assert.That(located["code.function.name"],
+                Is.EqualTo("ProtoTest.Core.Tests.ProtoTracingTests.Operation_ShouldRecordWhereTheSuiteStartedIt_AndEmbedThatSource"));
+            Assert.That(archive.GetEntry(sources.GetProperty(recordedPath).GetString()!), Is.Not.Null);
+        });
+    }
+
+    [Test]
+    public async Task SourceLocations_CanBeTurnedOff()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options =>
+        {
+            options.OutputPath = TemporaryTracePath();
+            options.CaptureSourceLocations = false;
+        });
+        await using var host = builder.Build();
+
+        await host.StartAsync();
+        var context = await host.StartTestAsync("unlocated test", TestMethod());
+        using (context.Trace.Operation("sample.operation", "Sample", "ProtoTest.Core.Tests").Begin())
+        {
+        }
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        var operation = host.Trace.Snapshot().Tests.Single().Entries.Single(entry => entry.Kind == "sample.operation");
+        Assert.That(operation.Attributes.ContainsKey("code.file.path"), Is.False);
+    }
+
+    [Test]
     public async Task Lifecycle_ShouldProduceParentedExecutionTrace()
     {
         var path = TemporaryTracePath();

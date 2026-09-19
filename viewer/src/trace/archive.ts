@@ -31,6 +31,8 @@ export interface TraceArchive {
   state: WireState;
   /** Reads a file the trace declared as an artifact; anything else in the ZIP stays closed. */
   readFile(archivePath: string, mediaType: string): Promise<Blob>;
+  /** Reads a source file the manifest embedded for a code.file.path, or undefined when it was not embedded. */
+  readSource(path: string): Promise<string | undefined>;
 }
 
 export async function openTraceArchive(buffer: ArrayBuffer): Promise<TraceArchive> {
@@ -57,6 +59,11 @@ export async function openTraceArchive(buffer: ArrayBuffer): Promise<TraceArchiv
       const content = await readEntry(bytes, view, entries, archivePath);
       const copy = content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength) as ArrayBuffer;
       return new Blob([copy], { type: mediaType });
+    },
+    async readSource(path) {
+      const archivePath = manifest.sources?.[path];
+      if (!archivePath || !entries.has(archivePath)) return undefined;
+      return decoder.decode(await readEntry(bytes, view, entries, archivePath));
     }
   };
 }

@@ -15,6 +15,11 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
+  <!-- Marks every ProtoTest package, so a trace can tell the suite's own frames from ProtoTest's. -->
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <AssemblyMetadata Include="ProtoTest.Framework" Value="true" />
+  </ItemGroup>
+
   <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)\README.md')">
     <None Include="README.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>

@@ -107,12 +107,14 @@ public static class ProtoHostBuilderExtensions
                 });
             }
 
-            services.TryAddSingleton<IProtoClientInitializer>(
-                _ => new ProtoMessageClientInitializer("Default"));
         });
 
+        // Once per host builder, not once per call: TryAdd would be skipped entirely as soon as another
+        // integration registered an initializer of its own, leaving the tests without a message client.
         if (Interlocked.Exchange(ref registration.ResourceRegistered, 1) == 0)
         {
+            builder.ConfigureServices(services => services.AddSingleton<IProtoClientInitializer>(
+                _ => new ProtoMessageClientInitializer("Default")));
             builder.AddResource(new ProtoResource(
                 "messaging:broker",
                 "broker",

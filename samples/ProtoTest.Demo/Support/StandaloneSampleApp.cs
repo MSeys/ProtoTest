@@ -1,5 +1,6 @@
 namespace ProtoTest.Demo;
 
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
@@ -15,6 +16,10 @@ internal sealed class StandaloneSampleApp(
     string databaseProvider = "sqlite",
     Func<string?>? messagingConnection = null) : IProtoSettingsInfrastructure
 {
+    private const int OutputTailLines = 40;
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(30);
+
+    private readonly ConcurrentQueue<string> _output = new();
     private Process? _process;
     private string _baseUrl = string.Empty;
 
@@ -65,15 +70,28 @@ internal sealed class StandaloneSampleApp(
 
         _process = Process.Start(start)!;
         // Redirected pipes fill up and block the child once nobody drains them, so a chatty application
-        // would deadlock the run. The handlers keep both streams flowing; the output is diagnostic only.
-        _process.OutputDataReceived += (_, _) => { };
-        _process.ErrorDataReceived += (_, _) => { };
+        // would deadlock the run. The handlers keep both streams flowing and remember the tail, so a
+        // failure to become healthy can report why instead of a bare timeout.
+        _process.OutputDataReceived += (_, e) => Remember(e.Data);
+        _process.ErrorDataReceived += (_, e) => Remember(e.Data);
         _process.BeginOutputReadLine();
         _process.BeginErrorReadLine();
 
-        using var client = new HttpClient { BaseAddress = new Uri(_baseUrl) };
-        for (var attempt = 0; attempt < 50; attempt++)
+        using var client = new HttpClient
         {
+            BaseAddress = new Uri(_baseUrl),
+            Timeout = TimeSpan.FromSeconds(5)
+        };
+        var deadline = DateTime.UtcNow + StartupTimeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (_process.HasExited)
+            {
+                throw new InvalidOperationException(
+                    $"The standalone sample application exited with code {_process.ExitCode} before becoming " +
+                    $"healthy at {_baseUrl}.{Environment.NewLine}Last output:{Environment.NewLine}{Tail()}");
+            }
+
             try
             {
                 using var response = await client.GetAsync("/health", cancellationToken);
@@ -86,11 +104,17 @@ internal sealed class StandaloneSampleApp(
             {
                 // Still starting.
             }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // The per-request timeout elapsed; the process may still be starting.
+            }
 
-            await Task.Delay(200, cancellationToken);
+            await Task.Delay(250, cancellationToken);
         }
 
-        throw new InvalidOperationException("The standalone sample application did not become healthy.");
+        throw new InvalidOperationException(
+            $"The standalone sample application did not become healthy at {_baseUrl} within " +
+            $"{(int)StartupTimeout.TotalSeconds}s.{Environment.NewLine}Last output:{Environment.NewLine}{Tail()}");
     }
 
     public ValueTask ReleaseAsync(ProtoResourceReleaseContext context)
@@ -100,6 +124,21 @@ internal sealed class StandaloneSampleApp(
         _process = null;
         return ValueTask.CompletedTask;
     }
+
+    private void Remember(string? line)
+    {
+        if (line is null)
+        {
+            return;
+        }
+
+        _output.Enqueue(line);
+        while (_output.Count > OutputTailLines && _output.TryDequeue(out _))
+        {
+        }
+    }
+
+    private string Tail() => _output.IsEmpty ? "(no output)" : string.Join(Environment.NewLine, _output);
 
     private static int FreePort()
     {

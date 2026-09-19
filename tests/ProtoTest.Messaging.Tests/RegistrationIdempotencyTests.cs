@@ -9,6 +9,35 @@ using System.Reflection;
 public sealed class RegistrationIdempotencyTests
 {
     [Test]
+    public async Task AddMessaging_AfterAnotherIntegrationRegisteredOne_ShouldStillGiveTheTestAClient()
+    {
+        var builder = new ProtoHostBuilder();
+        // Every integration registers client initializers; a host composes several, and messaging is
+        // usually registered last so the applications it taps have declared their topology first.
+        builder.ConfigureServices(services => services.AddSingleton<IProtoClientInitializer, OtherClientInitializer>());
+        builder.AddMessaging();
+
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("messaging beside another client", TestMethod());
+
+        Assert.That(context.Messaging(), Is.Not.Null);
+    }
+
+    private sealed class OtherClientInitializer : IProtoClientInitializer
+    {
+        public string Name => "Default";
+
+        public Type ClientType => typeof(object);
+
+        public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
+        {
+            context.RegisterClient(new object(), Name);
+            return Task.FromResult(true);
+        }
+    }
+
+    [Test]
     public async Task AddMessaging_CalledTwice_ShouldRegisterOneInitializerAndOneRunResource()
     {
         var builder = new ProtoHostBuilder();

@@ -87,6 +87,9 @@ public sealed class Setup : ProtoTestAssembly
         if (!postgresStore && configuredDatabase is null)
         {
             ownedDatabasePath = Path.GetFullPath(Path.Combine("TestResults", "ProtoTest.Demo", "northstar-demo.db"));
+            // SQLite creates the file but never its folder, and the standalone application opens the store
+            // before any test does - on a clean checkout that folder does not exist yet.
+            Directory.CreateDirectory(Path.GetDirectoryName(ownedDatabasePath)!);
             foreach (var suffix in new[] { "", "-wal", "-shm" })
             {
                 if (File.Exists(ownedDatabasePath + suffix))

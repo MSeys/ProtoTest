@@ -4,11 +4,19 @@ title: A write lands in the database
 description: Create an order over REST, then read the row the application wrote through Entity Framework Core — against a PostgreSQL container the run owns.
 ---
 
+import TraceExample from '@site/src/components/TraceExample';
+
 # A write lands in the database
 
 The API answers `201 Created`, but did the order reach the database with the right status? The test creates it over REST, then reads the row itself — on a database the run started, shared with the in-process application.
 
-The demo's host composes the same way — [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs) registers the container and the test-side connection; [DomainAccessJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/DomainAccessJourney.cs) writes the other way around. The full API surface is in [SQL](../integrations/sql/index.md).
+The same journey runs in the demo — [DomainAccessJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/DomainAccessJourney.cs) writes through REST and reads the committed row through the test-side SQL connection; [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs) composes both sides over the same store. The full API surface is in [SQL](../integrations/sql/index.md).
+
+<TraceExample
+  demo="rest-database"
+  title="REST write → committed database row"
+  path="POST /api/v1/projects · SELECT Projects"
+/>
 
 ## Compose
 

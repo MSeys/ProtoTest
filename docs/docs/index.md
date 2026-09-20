@@ -36,6 +36,7 @@ ProtoTest 1.0 and this documentation ship together: the packages are stable on N
 | stop hand-writing test data | [Data](./integrations/data/index.md) |
 | know what your suite misses | [Coverage](./observability/coverage.md) |
 | debug a failure from CI | [ProtoTrace](./observability/prototrace.md) |
+| keep traces and reports in CI | [Continuous integration](./continuous-integration/index.md) |
 | add your own integration | [Extending ProtoTest](./advanced/extending.md) |
 
 ## See it in a real suite

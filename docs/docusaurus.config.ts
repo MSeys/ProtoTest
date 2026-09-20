@@ -86,6 +86,9 @@ export default async function createConfig(): Promise<Config> {
           showLastUpdateTime: true,
         },
         blog: false,
+        sitemap: {
+          ignorePatterns: ['/search'],
+        },
         theme: {
           customCss: './src/css/custom.css',
         },
@@ -94,7 +97,12 @@ export default async function createConfig(): Promise<Config> {
   ],
 
   themeConfig: {
-    image: 'img/brand/prototest-banner.png',
+    image: 'img/brand/prototest-social.png',
+    metadata: [
+      {name: 'application-name', content: 'ProtoTest'},
+      {property: 'og:site_name', content: 'ProtoTest'},
+      {name: 'theme-color', content: '#061a28'},
+    ],
     colorMode: {
       defaultMode: 'light',
       respectPrefersColorScheme: true,
@@ -121,6 +129,7 @@ export default async function createConfig(): Promise<Config> {
           label: 'Docs',
         },
         {to: '/docs/recipes/overview', label: 'Recipes', position: 'left'},
+        {href: 'https://prototest.dev/api/', label: 'API reference', position: 'left'},
         {href: 'https://trace.prototest.dev', label: 'Trace viewer', position: 'left'},
         {
           type: 'custom-github',
@@ -149,6 +158,7 @@ export default async function createConfig(): Promise<Config> {
             {label: 'Installation', to: '/docs/getting-started/installation'},
             {label: 'Your first test', to: '/docs/getting-started/first-test'},
             {label: 'Recipes', to: '/docs/recipes/overview'},
+            {label: 'CI', to: '/docs/continuous-integration/'},
             {label: 'Troubleshooting', to: '/docs/getting-started/troubleshooting'},
           ],
         },
@@ -156,9 +166,11 @@ export default async function createConfig(): Promise<Config> {
           title: 'Reference',
           items: [
             {label: 'Foundation', to: '/docs/foundation/overview'},
+            {label: 'API reference', href: 'https://prototest.dev/api/'},
             {label: 'Integrations', to: '/docs/integrations/overview'},
             {label: 'Observability', to: '/docs/observability/prototrace'},
             {label: 'Test runners', to: '/docs/runners/overview'},
+            {label: 'Continuous integration', to: '/docs/continuous-integration/'},
             {label: 'Extending', to: '/docs/advanced/extending'},
           ],
         },
@@ -168,6 +180,8 @@ export default async function createConfig(): Promise<Config> {
             {label: 'Trace viewer', href: 'https://trace.prototest.dev'},
             {label: 'Changelog', to: '/changelog'},
             {label: 'GitHub', href: 'https://github.com/MSeys/ProtoTest'},
+            {label: 'Contributing', href: 'https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md'},
+            {label: 'Support', href: 'https://github.com/MSeys/ProtoTest/blob/main/SUPPORT.md'},
             {label: 'NuGet', href: 'https://www.nuget.org/packages?q=ProtoTest'},
             {label: 'Issues', href: 'https://github.com/MSeys/ProtoTest/issues'},
           ],

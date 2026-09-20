@@ -4,11 +4,19 @@ title: Written over REST, read over GraphQL
 description: Create a project over REST and read it back through the GraphQL API of the same application, both clients on one in-process server.
 ---
 
+import TraceExample from '@site/src/components/TraceExample';
+
 # Written over REST, read over GraphQL
 
 Many applications write through REST and read through GraphQL. Testing each API alone misses the question that matters: does a write through one show up in the other? Both clients can target the same application in one test.
 
 The same journey runs in the demo — [PlatformJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/PlatformJourney.cs); its host composes both clients in [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs). The full API surface is in [GraphQL](../integrations/graphql/index.md).
+
+<TraceExample
+  demo="rest-graphql"
+  title="REST write → GraphQL read"
+  path="POST /api/v1/projects · query projects"
+/>
 
 ## Compose
 

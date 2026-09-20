@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
-title: Overview
+title: Browser integration testing
+sidebar_label: Overview
 description: "A driver-independent browser-testing model — pages, components, flows and login — run by Playwright or Selenium underneath."
 ---
 

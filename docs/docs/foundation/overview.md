@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
-title: Overview
+title: ProtoTest foundation
+sidebar_label: Overview
 description: "The handful of ProtoTest.Core concepts every integration builds on: the host, the execution context, attributes, clients, hooks and the trace."
 ---
 

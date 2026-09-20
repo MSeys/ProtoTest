@@ -26,6 +26,16 @@ npm run build
 
 This command generates static content into the `build` directory and can be served using any static contents hosting service.
 
+To build the complete uploadable site — Docusaurus plus the generated .NET API reference under
+`/api/` — run this from the repository root:
+
+```powershell
+./eng/build-docs-site.ps1
+```
+
+Upload the resulting `docs/build` folder to Cloudflare Pages. Use `-NoRestore` after the local DocFX
+tool has already been restored.
+
 ## Deployment
 
 Using SSH:

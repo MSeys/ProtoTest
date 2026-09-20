@@ -241,12 +241,23 @@ async function loadBuffer(buffer: ArrayBuffer, name: string) {
 async function loadFile(file: File) {
   await loadBuffer(await file.arrayBuffer(), file.name);
 }
-async function loadDemo() {
+const bundledDemos: Record<string, {file: string; label: string}> = {
+  full: { file: "prototest-demo.prototrace", label: "ProtoTest demo trace" },
+  "rest-graphql": { file: "recipes/rest-graphql.prototrace", label: "REST to GraphQL recipe" },
+  "rest-database": { file: "recipes/rest-database.prototrace", label: "REST to database recipe" },
+  workbook: { file: "recipes/workbook.prototrace", label: "Workbook recipe" }
+};
+
+async function loadDemo(key = "full") {
   loading.value = true;
   try {
-    const response = await fetch(`${import.meta.env.BASE_URL}demos/prototest-demo.prototrace`);
+    const demo = bundledDemos[key] ?? bundledDemos.full;
+    const response = await fetch(`${import.meta.env.BASE_URL}demos/${demo.file}`);
     if (!response.ok) throw new Error(`The demo trace could not be loaded (${response.status}).`);
-    await loadBuffer(await response.arrayBuffer(), "ProtoTest demo trace");
+    await loadBuffer(await response.arrayBuffer(), demo.label);
+    if (key !== "full" && run.value?.tests.length === 1) {
+      replace({ name: "test", testId: run.value.tests[0].id, view: "story" });
+    }
   } catch (reason) {
     problem.value = { kind: "load", message: reason instanceof Error ? reason.message : "The demo trace could not be opened." };
     loading.value = false;
@@ -256,8 +267,9 @@ function fileChanged(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0];
   if (file) void loadFile(file);
 }
-// ?demo=1 loads the bundled trace, so a link (or a capture) never depends on clicking through the UI.
-if (new URLSearchParams(location.search).has("demo")) void loadDemo();
+// ?demo=1 opens the full run; named demos open compact traces that exactly match a docs recipe.
+const requestedDemo = new URLSearchParams(location.search).get("demo");
+if (requestedDemo !== null) void loadDemo(requestedDemo === "1" ? "full" : requestedDemo);
 function dropped(event: DragEvent) {
   dragging.value = false;
   const file = event.dataTransfer?.files?.[0];
@@ -291,7 +303,7 @@ const problemTitle = computed(() => ({
           <p v-if="problem.kind === 'legacy'">Run the tests again with the current ProtoTest to produce a trace this viewer reads.</p>
           <div class="empty-actions">
             <AppButton variant="primary" @click.stop="openPicker">Choose another file</AppButton>
-            <AppButton @click.stop="loadDemo">Open the demo trace</AppButton>
+            <AppButton @click.stop="loadDemo()">Open the demo trace</AppButton>
           </div>
         </template>
         <template v-else>
@@ -299,7 +311,7 @@ const problemTitle = computed(() => ({
           <p>Drop a <code>.prototrace</code> file here, choose one, or explore the bundled SaaS demo.</p>
           <div class="empty-actions">
             <AppButton variant="primary" @click.stop="openPicker">Choose trace file</AppButton>
-            <AppButton @click.stop="loadDemo">Open demo trace</AppButton>
+            <AppButton @click.stop="loadDemo()">Open demo trace</AppButton>
           </div>
           <small>Your files are read in this browser. Nothing is uploaded.</small>
         </template>

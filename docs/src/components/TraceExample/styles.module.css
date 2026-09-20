@@ -1,0 +1,27 @@
+.example {
+  margin: var(--space-6) 0;
+  padding: var(--space-5);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3) var(--space-5);
+  align-items: end;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-panel);
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    var(--surface);
+  background-size: var(--grid-size) var(--grid-size);
+  color: var(--text);
+}
+
+.kind { grid-column: 1 / -1; color: var(--phase-execution); font: var(--weight-bold) var(--text-micro) var(--font-mono); letter-spacing: var(--tracking-eyebrow); }
+.example div { display: grid; gap: var(--space-1); }
+.example strong { font-size: var(--text-title); }
+.example code { width: fit-content; padding: 0; border: 0; background: none; color: var(--dim); }
+.link { font-weight: var(--weight-semibold); white-space: nowrap; }
+
+@media (max-width: 620px) {
+  .example { grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .link { white-space: normal; }
+}

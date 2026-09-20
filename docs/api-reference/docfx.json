@@ -1,0 +1,68 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "../..",
+          "files": [
+            "src/**/*.csproj"
+          ],
+          "exclude": [
+            "src/ProtoTest.Templates/**"
+          ]
+        }
+      ],
+      "dest": "_generated",
+      "properties": {
+        "TargetFramework": "net8.0"
+      }
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": [
+          "index.md",
+          "toc.yml",
+          "_generated/**.yml"
+        ]
+      }
+    ],
+    "resource": [
+      {
+        "src": "../static/img/brand",
+        "files": [
+          "prototest-mark.svg",
+          "prototest-mark-white.svg"
+        ]
+      },
+      {
+        "src": "../../design",
+        "dest": "public",
+        "files": [
+          "prototest-tokens.css"
+        ]
+      }
+    ],
+    "output": "../../artifacts/api-reference",
+    "template": [
+      "default",
+      "modern",
+      "template"
+    ],
+    "globalMetadata": {
+      "_appName": "ProtoTest API Reference",
+      "_appTitle": "ProtoTest API Reference",
+      "_appFooter": "ProtoTest is open source under the MIT license.",
+      "_appLogoPath": "prototest-mark-white.svg",
+      "_appLogoUrl": "https://prototest.dev/",
+      "_appFaviconPath": "prototest-mark.svg",
+      "_enableSearch": true,
+      "_disableContribution": false,
+      "_gitContribute": {
+        "repo": "https://github.com/MSeys/ProtoTest",
+        "branch": "main"
+      }
+    }
+  }
+}

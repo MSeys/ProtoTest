@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { Artifact as TraceArtifact } from "../trace/model";
 import AppButton from "./AppButton.vue";
 import EmptyState from "./EmptyState.vue";
+import WorkbookPreview from "./WorkbookPreview.vue";
 
 const props = defineProps<{
   artifact: TraceArtifact;
@@ -27,6 +28,8 @@ const artifactError = ref("");
 const artifactLoading = ref(false);
 let artifactLoad = 0;
 const isJson = computed(() => props.artifact.mediaType.includes("json"));
+const isWorkbook = computed(() => props.artifact.mediaType.includes("spreadsheetml")
+  || /\.xlsx$/i.test(props.artifact.name));
 // Playwright names its own trace; a zip called …-trace.zip from an older run counts too.
 const isPlaywrightTrace = computed(() => props.artifact.mediaType.includes("playwright.trace")
   || (props.artifact.mediaType.includes("zip") && /-trace\.zip$/i.test(props.artifact.name)));
@@ -138,7 +141,7 @@ onBeforeUnmount(releaseArtifactUrl);
         <AppButton v-if="isPlaywrightTrace" :disabled="!artifactBlob || handoff === 'opening'" @click="openInPlaywright">
           {{ handoff === "opening" ? "Opening…" : "Open in a tab ↗" }}
         </AppButton>
-        <AppButton v-else :disabled="!artifactUrl" @click="openArtifact">Open</AppButton>
+        <AppButton v-else-if="!isWorkbook" :disabled="!artifactUrl" @click="openArtifact">Open</AppButton>
         <AppButton variant="primary" :disabled="!artifactUrl" @click="downloadArtifact">Download</AppButton>
         <slot name="actions" />
       </div>
@@ -151,6 +154,7 @@ onBeforeUnmount(releaseArtifactUrl);
     <audio v-else-if="artifactUrl && artifact.mediaType.startsWith('audio/')" :src="artifactUrl" class="audio" controls />
     <iframe v-else-if="artifactUrl && artifact.mediaType === 'application/pdf'" :src="artifactUrl" :title="artifact.name" class="frame" sandbox="" />
     <iframe v-else-if="artifactUrl && artifact.mediaType === 'text/html'" :src="artifactUrl" :title="artifact.name" class="frame" sandbox="allow-scripts" />
+    <WorkbookPreview v-else-if="artifactBlob && isWorkbook" :blob="artifactBlob" />
     <pre v-else-if="formattedJson" class="text json"><code>{{ formattedJson }}</code></pre>
     <pre v-else-if="artifactText" class="text">{{ artifactText }}</pre>
     <!-- Playwright's viewer: it reads the trace in this browser, and only once you ask for it. -->

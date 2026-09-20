@@ -1,0 +1,46 @@
+name: Docs quality
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'design/prototest-tokens.css'
+      - '.github/workflows/docs-quality.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Build the documentation
+        working-directory: docs
+        run: |
+          npm ci
+          npm run build
+
+      # Kept outside package.json: Lighthouse currently brings a large audit surface that readers and
+      # ordinary docs builds do not need. The exact CLI version still makes this CI run reproducible.
+      - name: Audit representative pages
+        working-directory: docs
+        run: npx --yes @lhci/cli@0.15.1 autorun --config=./lighthouserc.cjs
+
+      - name: Keep Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: docs/.lighthouseci/reports
+          if-no-files-found: ignore
+          retention-days: 14

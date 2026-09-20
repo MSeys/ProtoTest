@@ -1,8 +1,11 @@
 ---
 sidebar_position: 1
-title: Overview
+title: ProtoTest integrations
+sidebar_label: Overview
 description: "Every ProtoTest integration joins the same execution context and lifecycle, so several in one test share one trace, one set of attributes and one set of outcomes."
 ---
+
+import StackBuilder from '@site/src/components/StackBuilder';
 
 # Integrations overview
 
@@ -37,6 +40,8 @@ public sealed class ApiTests
 
 Run this with any [runner](../runners/overview.md), then add `AddGraphQL`, `AddWeb`, `AddMessaging`, … to the same application: the same context hands each protocol its client, and everything lands in one trace and one report.
 
+<StackBuilder />
+
 ## Going further: several integrations in one test
 
 Adapted from `samples/ProtoTest.Demo/SheetsJourney.cs` — data through one package, an HTTP download through another, and a spreadsheet assertion through a third, all in one test:
@@ -62,7 +67,9 @@ public async Task TheMonthlyReport_ShouldMatchItsModel()
 
 The same pattern works across protocols: change something through REST and check it through GraphQL in the same test, with one `[Auth<T>]` authenticator serving both. The [recipes](../recipes/overview.md) walk through scenarios like these end to end.
 
-## The package matrix
+## Complete package reference
+
+The composer above gives a suite its direct starting packages. This reference includes the adapters, infrastructure helpers and supporting packages you may add as the suite grows.
 
 ### Integration packages
 

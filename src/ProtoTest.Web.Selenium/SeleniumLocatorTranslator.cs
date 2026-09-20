@@ -5,11 +5,14 @@ using SeleniumBy = OpenQA.Selenium.By;
 
 internal static class SeleniumLocatorTranslator
 {
+    /// <summary>Translates a backend-neutral web locator to Selenium's locator representation.</summary>
+    /// <param name="locator">The ProtoTest locator to translate.</param>
     /// <param name="documentScoped">
     /// Whether the search context is the driver rather than an element. A driver-rooted lookup has no
     /// direct children to address, so locators that are relative by nature (a table cell) widen their
     /// axis to the document.
     /// </param>
+    /// <returns>The equivalent Selenium locator.</returns>
     public static SeleniumBy Translate(WebLocator locator, bool documentScoped = false)
         => locator switch
         {

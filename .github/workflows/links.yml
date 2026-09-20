@@ -1,0 +1,28 @@
+name: Check external links
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Docusaurus already rejects broken internal links during its build. This slower, scheduled check
+      # covers URLs outside the repository without making every pull request depend on third-party uptime.
+      - name: Check external links in documentation
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --no-progress
+            --exclude '^https?://(localhost|127\.0\.0\.1)'
+            './**/*.md'
+          fail: true

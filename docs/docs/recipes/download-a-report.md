@@ -4,6 +4,8 @@ title: A downloaded report matches its model
 description: Download the workbook the application generates over REST and verify it with a typed sheet model — layout, column rules and the row the test created.
 ---
 
+import TraceExample from '@site/src/components/TraceExample';
+
 # A downloaded report matches its model
 
 The application generates a monthly report as an `.xlsx`. The test downloads it over the API and checks it the way a reader would: the right sheet, the right columns, every value within its rules, and the row for the project the test created.
@@ -63,6 +65,12 @@ public sealed class MonthlyReportTests
 ## What it proves
 
 `Verify()` checks the model's rules across every row — uniqueness, patterns, minimums — and `Row(...)` proves the report actually contains the project this test created. The workbook is read as OpenXML, so it makes no difference whether the application wrote it with ClosedXML, EPPlus or anything else.
+
+<TraceExample
+  demo="workbook"
+  title="The monthly report matches its model"
+  path="Data → REST download → workbook model → checks"
+/>
 
 ## Limits
 

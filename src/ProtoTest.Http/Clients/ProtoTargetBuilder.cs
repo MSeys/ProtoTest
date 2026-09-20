@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 
 /// <summary>
-/// Records a collector registered for a target, so a repeated <see cref="AddCollector{TCollector}"/>
+/// Records a collector registered for a target, so a repeated <see cref="ProtoTargetBuilder.AddCollector{TCollector}"/>
 /// call for the same type and target registers once instead of reporting twice.
 /// </summary>
 internal sealed record ProtoCollectorRegistration(string TargetName, Type CollectorType);

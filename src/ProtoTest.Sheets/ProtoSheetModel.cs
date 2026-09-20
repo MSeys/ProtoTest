@@ -8,7 +8,7 @@ using ProtoTest.Core;
 /// <summary>
 /// A sheet modelled as a record: <c>[Sheet]</c> and <c>[Column]</c> declare the layout once, the model
 /// verifies it, and tests read typed rows and columns without repeating header paths. The record is the
-/// model; <see cref="ProtoSheetModel"/> classes remain the escape hatch for shapes a record cannot hold.
+/// model; <see cref="ProtoSheetModel{TRow}"/> remains the escape hatch for shapes a record cannot hold.
 /// </summary>
 public sealed class ProtoSheetModel<TRow> where TRow : notnull
 {

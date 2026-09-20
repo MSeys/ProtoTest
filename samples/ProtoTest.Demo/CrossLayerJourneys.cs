@@ -39,7 +39,12 @@ public sealed class ApiThenBrowserJourney
         await projects.OpenAsync("/console/projects");
         await projects.Empty.Should.BeVisibleAsync(NorthstarConsole.Wait);
 
-        var project = await Proto.Context.Data().CreateProjectAsync(ProjectName);
+        using var created = await Proto.Context.Rest()
+            .Body(new CreateProjectRequest(ProjectName))
+            .PostAsync("/api/v1/projects");
+        var project = created
+            .Should.HaveHttpStatus(HttpStatusCode.Created)
+            .ReadAsJson<ProjectResponse>()!;
 
         // Refresh: the console re-reads the list the API just changed.
         await projects.OpenAsync("/console/projects");

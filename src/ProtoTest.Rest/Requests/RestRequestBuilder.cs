@@ -307,11 +307,26 @@ public sealed class RestRequestBuilder
 
             if (attachmentOptions?.CaptureResponses == true)
             {
-                _context.AddAttachment(
-                    $"{attachmentPrefix}-response",
-                    diagnosticBody,
-                    responseMediaType ?? "text/plain",
-                    $"{attachmentDescription} returned {(int)responseMessage.StatusCode} ({responseMessage.StatusCode})");
+                var attachmentName = $"{attachmentPrefix}-response";
+                var attachmentMediaType = responseMediaType ?? "application/octet-stream";
+                var attachmentDescriptionText =
+                    $"{attachmentDescription} returned {(int)responseMessage.StatusCode} ({responseMessage.StatusCode})";
+                if (IsTextMediaType(responseMediaType))
+                {
+                    _context.AddAttachment(
+                        attachmentName,
+                        diagnosticBody,
+                        attachmentMediaType,
+                        attachmentDescriptionText);
+                }
+                else
+                {
+                    _context.AddAttachment(
+                        attachmentName,
+                        bodyBytes,
+                        attachmentMediaType,
+                        attachmentDescriptionText);
+                }
             }
 
             var headersDict = ProtoHttpDiagnosticSanitizer.SanitizeHeaders(
@@ -367,6 +382,19 @@ public sealed class RestRequestBuilder
                 attachmentOptions);
             throw;
         }
+    }
+
+    private static bool IsTextMediaType(string? mediaType)
+    {
+        if (mediaType is null) return false;
+        var normalized = mediaType.ToLowerInvariant();
+        return normalized.StartsWith("text/", StringComparison.Ordinal)
+            || normalized is "application/json" or "application/xml" or "application/yaml"
+                or "application/x-yaml" or "application/javascript"
+                or "application/x-www-form-urlencoded" or "application/graphql"
+            || normalized.EndsWith("+json", StringComparison.Ordinal)
+            || normalized.EndsWith("+xml", StringComparison.Ordinal)
+            || normalized.EndsWith("+yaml", StringComparison.Ordinal);
     }
 
     private void TraceConfiguredHeaders(ProtoTraceOperation operation)

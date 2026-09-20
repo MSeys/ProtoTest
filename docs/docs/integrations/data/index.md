@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
-title: Overview
+title: Test data
+sidebar_label: Overview
 description: "Build test objects with deterministic defaults, so a test only states the values it is about, and create them in the system under test."
 ---
 

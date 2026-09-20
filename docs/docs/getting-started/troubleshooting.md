@@ -8,6 +8,17 @@ description: The first problems a new suite runs into — the host not starting,
 
 The problems below are the ones a new suite meets first. Each starts with the message you see.
 
+| What you see | Start here |
+| --- | --- |
+| `ProtoHost is not initialized` | [The host is not there](#the-host-is-not-there) |
+| `No active ProtoExecutionContext` | [There is no test context](#there-is-no-test-context) |
+| `No application is selected` or `has no Rest client registered` | [A client cannot be resolved](#a-client-cannot-be-resolved) |
+| `Program` is inaccessible or the in-process host fails | [The application does not start in-process](#the-application-does-not-start-in-process) |
+| Docker endpoint or container startup failure | [Containers do not start](#containers-do-not-start) |
+| Playwright cannot find a browser executable | [The browser does not launch](#the-browser-does-not-launch) |
+| Tests pass separately but fail in a full run | [Tests pass alone and fail together](#tests-pass-alone-and-fail-together) |
+| No `.prototrace`, report or CI artifact | [Where is the trace?](#where-is-the-trace) and [The CI artifact is empty](#the-ci-artifact-is-empty) |
+
 ## The host is not there
 
 > **ProtoHost is not initialized.**
@@ -77,6 +88,14 @@ Without `ConfigureTracing`, the trace is written to `TestResults/prototest-{runI
 
 If [trace.prototest.dev](https://trace.prototest.dev) says the trace is **from an older ProtoTest**, the file was written before trace snapshot format 1.9. Run the tests again with a current ProtoTest. (The archive itself is manifest format 2.0: `spans.json` plus `state.json`, whose state documents are format 1.1.)
 
+## The CI artifact is empty
+
+> **No files were found with the provided path.**
+
+The trace's default relative path starts below the test process working directory, commonly `bin/Release/net10.0/TestResults/`, while the CI upload step usually searches from the repository root. Set an absolute `PROTOTEST_RESULTS` directory and use it for the trace and report sinks as shown in [Continuous integration](../continuous-integration/index.md#put-every-artifact-in-one-place).
+
+Also make the upload step run after failures: `if: always()` on GitHub Actions, `succeededOrFailed()` on Azure Pipelines or `artifacts: when: always` on GitLab. If the upload still fails, print the configured absolute directory once from the suite setup; do not broaden the artifact glob to the entire workspace, where it can accidentally collect unrelated files.
+
 ## Still stuck?
 
-Open the trace: the test's story shows every hook, request and check in order, and the failure leads with the check that decided it. If that does not explain it, [open an issue](https://github.com/MSeys/ProtoTest/issues) with the trace attached.
+Open the trace: the test's story shows every hook, request and check in order, and the failure leads with the check that decided it. If that does not explain it, [open an issue](https://github.com/MSeys/ProtoTest/issues). Only attach a trace after checking it for application data and secrets.

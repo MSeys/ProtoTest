@@ -94,6 +94,25 @@ public class RestRequestBuilderTests
     }
 
     [Test]
+    public async Task SendAsync_ShouldPreserveBinaryResponseAttachment()
+    {
+        var expected = new byte[] { 0, 1, 2, 128, 255 };
+        _handler.ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(expected)
+        };
+        _handler.ResponseToReturn.Content.Headers.ContentType =
+            new System.Net.Http.Headers.MediaTypeHeaderValue("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
+        using var response = await new RestRequestBuilder(_httpClient, _context, "Files").GetAsync("/report.xlsx");
+
+        Assert.That(_context.Attachments, Has.Count.EqualTo(1));
+        Assert.That(_context.Attachments[0].MediaType,
+            Is.EqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        Assert.That(await _context.Attachments[0].ReadAllBytesAsync(), Is.EqualTo(expected));
+    }
+
+    [Test]
     public async Task SendAsync_ShouldKeepRawResponseAliveUntilRestResponseIsDisposed()
     {
         var content = new TrackingContent("raw response");

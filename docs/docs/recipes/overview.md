@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
-title: Overview
+title: Integration testing recipes
+sidebar_label: Overview
 description: Scenarios that combine several ProtoTest capabilities in one test — an API call and its event, a write and its row, an API and a browser, a download and its workbook.
 ---
 
@@ -25,3 +26,5 @@ Every recipe uses one application, `Api`, and adds only what the scenario needs.
 - **One trace.** The request, the event, the query and the browser's steps land in the same test's story, in the order they happened. When a recipe fails, the [trace](../observability/prototrace.md) shows which half broke.
 
 Each recipe page ends with what it does **not** prove — the assumptions a passing test leaves standing.
+
+The report-download recipe also opens directly on its matching test in the bundled [ProtoTrace demo](https://trace.prototest.dev/?demo=1). The archive stays in the browser; the link only selects the relevant story.

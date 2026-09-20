@@ -1,5 +1,6 @@
 import type {ReactNode} from 'react';
 import Link from '@docusaurus/Link';
+import Head from '@docusaurus/Head';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 
@@ -481,8 +482,27 @@ function CtaSection() {
 export default function Home(): ReactNode {
   return (
     <Layout
-      title="ProtoTest — a composable integration-testing foundation for .NET"
+      title="Composable integration testing for .NET"
       description="ProtoTest is a composable integration-testing foundation for .NET: compose REST, GraphQL, browser, data and SQL capabilities onto one execution context, and get a trace of everything they do.">
+      <Head>
+        <script type="application/ld+json">
+          {JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'SoftwareApplication',
+            name: 'ProtoTest',
+            applicationCategory: 'DeveloperApplication',
+            operatingSystem: 'Windows, Linux, macOS',
+            softwareVersion: '1.0.0',
+            programmingLanguage: 'C#',
+            url: 'https://prototest.dev/',
+            downloadUrl: 'https://www.nuget.org/profiles/MSeys',
+            codeRepository: 'https://github.com/MSeys/ProtoTest',
+            license: 'https://github.com/MSeys/ProtoTest/blob/main/LICENSE',
+            description:
+              'A composable integration-testing foundation for .NET with shared lifecycle, context and portable execution traces.',
+          })}
+        </script>
+      </Head>
       <Hero />
       <main>
         <InHouseSection />

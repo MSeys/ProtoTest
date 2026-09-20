@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
-title: Overview
+title: REST API integration testing
+sidebar_label: Overview
 description: "A per-test HTTP client on IHttpClientFactory, with JSON shape assertions, shared authentication, capture and coverage."
 ---
 

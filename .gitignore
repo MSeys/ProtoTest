@@ -490,3 +490,6 @@ FodyWeavers.xsd
 # Sample app UI (Vite): installed packages and build output
 samples/ProtoTest.SampleApp/Ui/node_modules/
 samples/ProtoTest.SampleApp/Ui/dist/
+
+# Generated DocFX metadata (the rendered site already falls under artifacts/).
+docs/api-reference/_generated/

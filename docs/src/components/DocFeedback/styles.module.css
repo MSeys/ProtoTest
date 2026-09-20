@@ -1,0 +1,21 @@
+.feedback {
+  margin-top: var(--space-7);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  border: 1px solid var(--blueprint-line);
+  border-left: 3px solid var(--blueprint);
+  border-radius: var(--radius-control);
+  background: var(--blueprint-soft);
+}
+
+.feedback div { display: grid; gap: 2px; }
+.feedback strong { color: var(--text); }
+.feedback span { color: var(--muted); font-size: var(--text-meta); }
+.link { flex: 0 0 auto; font-weight: var(--weight-semibold); }
+
+@media (max-width: 560px) {
+  .feedback { align-items: flex-start; flex-direction: column; }
+}

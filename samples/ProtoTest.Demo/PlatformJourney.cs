@@ -21,8 +21,11 @@ public sealed class PlatformJourney
     [SignedInAs]
     public async Task RestWritesAreVisibleThroughGraphQL()
     {
-        // Arrange
-        await Proto.Context.Data().CreateProjectAsync("atlas");
+        // Arrange: write through the public REST surface.
+        using var created = await Proto.Context.Rest()
+            .Body(new CreateProjectRequest("atlas"))
+            .PostAsync("/api/v1/projects");
+        created.Should.HaveHttpStatus(HttpStatusCode.Created);
 
         // Act
         using var projects = await Proto.Context.GraphQL()

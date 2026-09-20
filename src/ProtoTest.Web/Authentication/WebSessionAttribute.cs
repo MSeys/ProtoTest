@@ -5,7 +5,7 @@ using ProtoTest.Core;
 /// <summary>
 /// Declares a named web session for the test during setup, created on demand like any other session.
 /// Optionally navigates it to a start URL. Combine with <see cref="LoginAsAttribute{TStrategy}"/> when
-/// the session also needs authentication; use <see cref="Order"/> to sequence the two if needed.
+/// the session also needs authentication; use <see cref="ProtoAttribute.Order"/> to sequence the two if needed.
 /// </summary>
 /// <example>
 /// <code>

@@ -60,14 +60,19 @@ jobs:
             ./eng/release.ps1 -Configuration Release
           }
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         if: github.ref_type == 'tag' && inputs.dry_run != true
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Native command failures are inspected through $LASTEXITCODE, so the create-then-edit fallback
+          # never turns into a thrown stderr on newer pwsh versions.
+          if (Test-Path variable:PSNativeCommandUseErrorActionPreference) { $PSNativeCommandUseErrorActionPreference = $false }
+
           $tag = $env:GITHUB_REF_NAME
           $version = $tag -replace '^v', ''
+          $title = "ProtoTest $version"
           $notes = Join-Path $env:RUNNER_TEMP 'release-notes.md'
           if (Test-Path -LiteralPath CHANGELOG.md) {
             $text = Get-Content -LiteralPath CHANGELOG.md -Raw
@@ -77,8 +82,20 @@ jobs:
               $section.Value.Trim() | Set-Content -LiteralPath $notes -Encoding utf8
             }
           }
+
+          # A release may already exist - created by hand when the tag was made - so create first and
+          # fall back to editing: the workflow owns the title and the notes either way.
           if (Test-Path -LiteralPath $notes) {
-            gh release create $tag --verify-tag --title "ProtoTest $version" --notes-file $notes
+            gh release create $tag --verify-tag --title $title --notes-file $notes
           } else {
-            gh release create $tag --verify-tag --title "ProtoTest $version" --generate-notes
+            gh release create $tag --verify-tag --title $title --generate-notes
+          }
+
+          if ($LASTEXITCODE -ne 0) {
+            if (Test-Path -LiteralPath $notes) {
+              gh release edit $tag --title $title --notes-file $notes
+            } else {
+              gh release edit $tag --title $title
+            }
+            if ($LASTEXITCODE -ne 0) { throw "Neither create nor edit succeeded for release '$tag'." }
           }

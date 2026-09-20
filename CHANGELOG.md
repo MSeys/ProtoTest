@@ -12,8 +12,7 @@ scenario it describes while the framework quietly owns everything around it — 
 for .NET 8, 9 and 10. One host, one execution context and one explicit lifecycle; the test runner you
 already use; and every integration sharing the same assertions, evidence and coverage, all the way down to
 a portable trace you can open and read. Every package ships together at 1.0.0, documented, tested, and
-ready for production suites. Thank you to everyone who pushed on the preview builds, reported the sharp
-edges and helped make this release worth the name.
+ready for production suites.
 
 ProtoTest is a composable integration-testing foundation: compose capabilities onto a host, and each test
 runs through a recorded lifecycle of phases, operations, state changes, checks and findings.

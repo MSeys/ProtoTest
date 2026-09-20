@@ -9,7 +9,7 @@ Every ProtoTest package shares one version number, so this page lists releases, 
 
 ## 1.0.0 — 2026-09-19
 
-**ProtoTest 1.0 is here.** What began as a stubborn idea — that an integration test should read like the scenario it describes while the framework quietly owns everything around it — is now a stable foundation for .NET 8, 9 and 10. One host, one execution context and one explicit lifecycle; the test runner you already use; and every integration sharing the same assertions, evidence and coverage, all the way down to a portable trace you can open and read. Every package ships together at 1.0.0, documented, tested, and ready for production suites. Thank you to everyone who pushed on the preview builds, reported the sharp edges and helped make this release worth the name.
+**ProtoTest 1.0 is here.** What began as a stubborn idea — that an integration test should read like the scenario it describes while the framework quietly owns everything around it — is now a stable foundation for .NET 8, 9 and 10. One host, one execution context and one explicit lifecycle; the test runner you already use; and every integration sharing the same assertions, evidence and coverage, all the way down to a portable trace you can open and read. Every package ships together at 1.0.0, documented, tested, and ready for production suites.
 
 ProtoTest is a composable integration-testing foundation: compose capabilities onto a host, and each test runs through a recorded lifecycle of phases, operations, state changes, checks and findings.
 

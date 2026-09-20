@@ -141,6 +141,10 @@ project.fragment.lock.json
 artifacts/
 .artifacts/
 
+# This is viewer source code for rendering workbook artifacts, not generated output.
+!viewer/src/artifacts/
+!viewer/src/artifacts/workbook.ts
+
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
 

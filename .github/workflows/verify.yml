@@ -57,6 +57,10 @@ jobs:
         shell: pwsh
         run: ./eng/pack.ps1 -Configuration Release -NoBuild -NoRestore
 
+      - name: Validate release plan
+        shell: pwsh
+        run: ./eng/release.ps1 -Configuration Release -DryRun
+
       # The template is packed with every run; this proves the package actually installs, generates a
       # project against the just-packed packages, and builds and tests it.
       - name: Smoke-test the starter template

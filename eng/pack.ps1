@@ -8,6 +8,26 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# Windows PowerShell 5 cannot load the modern System.Reflection.Metadata assembly used by the
+# PDB/DLL identity checks below. Re-enter through PowerShell 7 when someone starts this script from
+# the legacy `powershell.exe`; CI already runs it with pwsh.
+if ($PSVersionTable.PSEdition -ne "Core") {
+    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
+    if (-not $pwsh) {
+        throw "eng/pack.ps1 requires PowerShell 7. Install it or run this script with pwsh."
+    }
+
+    $forwarded = @("-NoProfile", "-File", $PSCommandPath, "-Configuration", $Configuration, "-OutputPath", $OutputPath)
+    if ($NoBuild) { $forwarded += "-NoBuild" }
+    if ($NoRestore) { $forwarded += "-NoRestore" }
+    & $pwsh.Source @forwarded
+    if ($LASTEXITCODE -ne 0) {
+        throw "PowerShell 7 package validation failed with exit code $LASTEXITCODE."
+    }
+    return
+}
+
 $repository = Split-Path -Parent $PSScriptRoot
 $packages = @(
     "src/ProtoTest.Core/ProtoTest.Core.csproj",
@@ -81,6 +101,66 @@ foreach ($project in $packages) {
 # Every package has to agree with the rest of the family: same version, a README, and ProtoTest
 # dependencies that point at a package in this set, at exactly this version.
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+Add-Type -AssemblyName System.Reflection.Metadata
+
+function Copy-ZipEntryToMemoryStream {
+    param([System.IO.Compression.ZipArchiveEntry]$Entry)
+
+    $memory = [IO.MemoryStream]::new()
+    $source = $Entry.Open()
+    try {
+        $source.CopyTo($memory)
+        $memory.Position = 0
+        return $memory
+    }
+    catch {
+        $memory.Dispose()
+        throw
+    }
+    finally {
+        $source.Dispose()
+    }
+}
+
+function Get-DllPdbIdentity {
+    param([System.IO.Compression.ZipArchiveEntry]$Entry)
+
+    $memory = Copy-ZipEntryToMemoryStream $Entry
+    $reader = [Reflection.PortableExecutable.PEReader]::new($memory)
+    try {
+        $debugEntries = @($reader.ReadDebugDirectory() | Where-Object Type -eq CodeView)
+        if ($debugEntries.Count -ne 1) {
+            throw "'$($Entry.FullName)' contains $($debugEntries.Count) CodeView debug entries; expected one."
+        }
+        $codeView = $reader.ReadCodeViewDebugDirectoryData($debugEntries[0])
+        return [pscustomobject]@{ Guid = $codeView.Guid; Stamp = $debugEntries[0].Stamp }
+    }
+    finally {
+        $reader.Dispose()
+        $memory.Dispose()
+    }
+}
+
+function Get-PortablePdbIdentity {
+    param([System.IO.Compression.ZipArchiveEntry]$Entry)
+
+    $memory = Copy-ZipEntryToMemoryStream $Entry
+    $provider = [Reflection.Metadata.MetadataReaderProvider]::FromPortablePdbStream($memory)
+    try {
+        [byte[]]$id = $provider.GetMetadataReader().DebugMetadataHeader.Id
+        if ($id.Length -ne 20) {
+            throw "'$($Entry.FullName)' has an invalid portable PDB identifier."
+        }
+        return [pscustomobject]@{
+            Guid = [Guid]::new([byte[]]$id[0..15])
+            Stamp = [BitConverter]::ToUInt32($id, 16)
+        }
+    }
+    finally {
+        $provider.Dispose()
+        $memory.Dispose()
+    }
+}
 
 $expectedVersion = ([xml](Get-Content -LiteralPath (Join-Path $repository "Directory.Build.props") -Raw)).Project.PropertyGroup.Version | ForEach-Object { $_.Trim() } | Where-Object { $_ } | Select-Object -First 1
 if ([string]::IsNullOrWhiteSpace($expectedVersion)) {
@@ -94,6 +174,7 @@ if ($produced.Count -ne $packages.Count) {
 
 $packagesById = @{}
 $dependencies = @()
+$verifiedSymbols = 0
 
 foreach ($file in $produced) {
     $archive = [IO.Compression.ZipFile]::OpenRead($file.FullName)
@@ -109,6 +190,45 @@ foreach ($file in $produced) {
         }
         finally {
             $reader.Dispose()
+        }
+
+        $assemblyEntries = @($archive.Entries | Where-Object { $_.FullName -match '^lib/.+\.dll$' })
+        $assemblyPaths = @($assemblyEntries | ForEach-Object { $_.FullName.ToLowerInvariant() })
+        if ($assemblyPaths.Count -gt 0) {
+            $symbolPath = Join-Path $file.DirectoryName ($file.BaseName + '.snupkg')
+            if (-not (Test-Path -LiteralPath $symbolPath)) {
+                throw "The symbol package for '$($file.Name)' is missing: '$symbolPath'."
+            }
+
+            $symbolArchive = [IO.Compression.ZipFile]::OpenRead($symbolPath)
+            try {
+                $pdbEntries = @($symbolArchive.Entries | Where-Object { $_.FullName -match '^lib/.+\.pdb$' })
+                $pdbPaths = @($pdbEntries | ForEach-Object { $_.FullName.ToLowerInvariant() })
+                foreach ($pdbEntry in $pdbEntries) {
+                    $pdbPath = $pdbEntry.FullName.ToLowerInvariant()
+                    $expectedDll = [IO.Path]::ChangeExtension($pdbPath, '.dll')
+                    if ($assemblyPaths -notcontains $expectedDll) {
+                        throw "'$([IO.Path]::GetFileName($symbolPath))' contains '$pdbPath', but '$($file.Name)' has no matching '$expectedDll'."
+                    }
+
+                    $assemblyEntry = $assemblyEntries | Where-Object { $_.FullName.Equals($expectedDll, [StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
+                    $dllIdentity = Get-DllPdbIdentity $assemblyEntry
+                    $pdbIdentity = Get-PortablePdbIdentity $pdbEntry
+                    if ($dllIdentity.Guid -ne $pdbIdentity.Guid -or $dllIdentity.Stamp -ne $pdbIdentity.Stamp) {
+                        throw "'$pdbPath' does not belong to '$expectedDll'; their portable PDB identifiers differ."
+                    }
+                    $verifiedSymbols++
+                }
+                foreach ($assemblyPath in $assemblyPaths) {
+                    $expectedPdb = [IO.Path]::ChangeExtension($assemblyPath, '.pdb')
+                    if ($pdbPaths -notcontains $expectedPdb) {
+                        throw "'$($file.Name)' contains '$assemblyPath', but its symbol package has no matching '$expectedPdb'."
+                    }
+                }
+            }
+            finally {
+                $symbolArchive.Dispose()
+            }
         }
     }
     finally {
@@ -154,4 +274,4 @@ foreach ($dependency in $dependencies) {
     $verified++
 }
 
-Write-Host "Packed $($packagesById.Count) packages and verified $verified ProtoTest dependency references at version $expectedVersion."
+Write-Host "Packed $($packagesById.Count) packages and verified $verified ProtoTest dependency references and $verifiedSymbols PDB/DLL pairs at version $expectedVersion."

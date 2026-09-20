@@ -5,6 +5,33 @@ All notable changes to ProtoTest are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-09-20
+
+### Fixed
+
+- Preserve binary REST response artifacts byte-for-byte instead of converting them through text. This
+  keeps downloaded workbooks, PDFs, archives, images and other binary responses valid inside
+  `.prototrace` files.
+- Correct API documentation links emitted from XML comments across the HTTP, Sheets and Web packages.
+
+### Added
+
+- Preview `.xlsx` artifacts directly in the ProtoTrace viewer, with worksheet tabs, dimensions, sticky
+  row and column headers, typed cell values and bounded rendering for large workbooks.
+- Add focused, shareable recipe traces for REST-to-GraphQL, REST-to-database and workbook journeys.
+- Publish a generated .NET API reference alongside the task-oriented documentation, with one command
+  producing the complete uploadable site.
+- Add documentation quality, link and API-reference workflows; contributor, support, security and
+  code-of-conduct guidance; richer CI guidance; and interactive stack and trace examples.
+
+### Changed
+
+- Improve the documentation landing page, navigation, SEO metadata, social preview and per-page feedback.
+- Harden release validation: every ProtoTest package must share one version, every symbols package must
+  match its DLL paths and portable-PDB identities, and a release tag must match the package version.
+- Refuse duplicate NuGet versions during publishing so a rebuilt symbols package cannot be paired with
+  an already immutable DLL from another commit.
+
 ## [1.0.0] - 2026-09-19
 
 **ProtoTest 1.0 is here.** What began as a stubborn idea — that an integration test should read like the
@@ -63,4 +90,5 @@ runs through a recorded lifecycle of phases, operations, state changes, checks a
 **Welcome to 1.0.** Install a package, compose the capabilities your system actually has, and run the same
 suite in-process, in containers, or against a published environment. The trace will tell you the rest.
 
+[1.0.1]: https://github.com/MSeys/ProtoTest/releases/tag/v1.0.1
 [1.0.0]: https://github.com/MSeys/ProtoTest/releases/tag/v1.0.0

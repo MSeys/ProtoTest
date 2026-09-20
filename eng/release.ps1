@@ -101,6 +101,18 @@ foreach ($package in $packages.Values) {
     }
 }
 
+$versions = @($packages.Values.Version | Sort-Object -Unique)
+if ($versions.Count -ne 1) {
+    throw "The release folder contains multiple package versions: $($versions -join ', ')."
+}
+$releaseVersion = $versions[0]
+if ($env:GITHUB_REF_TYPE -eq 'tag') {
+    $expectedTag = "v$releaseVersion"
+    if ($env:GITHUB_REF_NAME -ne $expectedTag) {
+        throw "Release tag '$($env:GITHUB_REF_NAME)' does not match package version '$releaseVersion'. Expected '$expectedTag'."
+    }
+}
+
 $remaining = @{}
 foreach ($package in $packages.Values) {
     $remaining[$package.Id] = @($package.Dependencies)
@@ -147,9 +159,9 @@ if ($DryRun) {
     Write-Host "Dry run: nothing will be pushed. Commands:"
     foreach ($id in $ordered) {
         $package = $packages[$id]
-        Write-Host "dotnet nuget push `"$($package.PackagePath)`" --api-key $keyDisplay --source `"$Source`" --no-symbols --skip-duplicate"
+        Write-Host "dotnet nuget push `"$($package.PackagePath)`" --api-key $keyDisplay --source `"$Source`" --no-symbols"
         if ($package.SymbolsExpected) {
-            Write-Host "dotnet nuget push `"$($package.SymbolPath)`" --api-key $keyDisplay --source `"$Source`" --skip-duplicate"
+            Write-Host "dotnet nuget push `"$($package.SymbolPath)`" --api-key $keyDisplay --source `"$Source`""
         }
     }
     return
@@ -169,10 +181,11 @@ foreach ($id in $ordered) {
     foreach ($path in $paths) {
         Write-Host "Pushing $path"
         # The CLI pushes an adjacent .snupkg on its own, and symbols are pushed explicitly below, so the
-        # package push stays symbols-free: every file reaches nuget.org exactly once. --skip-duplicate
-        # makes a resumed release idempotent - packages that are already published, or whose symbols are
-        # still validating, are skipped instead of failing the push.
-        $arguments = @('nuget', 'push', $path, '--api-key', $ApiKey, '--source', $Source, '--skip-duplicate')
+        # The package push stays symbols-free because symbols are pushed explicitly below. Deliberately
+        # do not use --skip-duplicate: dotnet may still upload the adjacent/newly built symbols after a
+        # duplicate package is skipped. NuGet then compares those PDBs with the already immutable DLL and
+        # rejects them when the version was rebuilt from another commit. A reused version must fail here.
+        $arguments = @('nuget', 'push', $path, '--api-key', $ApiKey, '--source', $Source)
         if (-not $path.EndsWith('.snupkg', [StringComparison]::OrdinalIgnoreCase)) {
             $arguments += '--no-symbols'
         }

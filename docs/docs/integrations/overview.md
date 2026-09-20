@@ -1,12 +1,12 @@
 ---
 sidebar_position: 1
 title: Overview
-description: "Every ProtoTest integration adds a client to the same execution context, so several in one test share one lifecycle, one trace and one set of attributes."
+description: "Every ProtoTest integration joins the same execution context and lifecycle, so several in one test share one trace, one set of attributes and one set of outcomes."
 ---
 
 # Integrations overview
 
-Each integration is a NuGet package that adds a client to `ProtoExecutionContext`. They all share the [foundation](../foundation/overview.md) — lifecycle, attributes, attachments, tracing, coverage — so using several in one test doesn't mean learning several models. Every library and runner package targets .NET 8, 9 and 10 and is stable on NuGet, so `dotnet add package` lines install directly.
+Each integration is a NuGet package that joins the foundation: most bring a client to `ProtoExecutionContext`, others contribute collectors, resources or host capabilities. They all share the [foundation](../foundation/overview.md) — lifecycle, attributes, attachments, tracing, coverage — so using several in one test doesn't mean learning several models. Every library and runner package targets .NET 8, 9 and 10 and is stable on NuGet, so `dotnet add package` lines install directly.
 
 ## Quick start
 

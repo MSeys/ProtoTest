@@ -6,7 +6,7 @@ description: "Clients are what a test talks to. ProtoTest creates them per test,
 
 # Clients
 
-A client is anything a test talks to — an `HttpClient`, a browser session, a message bus connection, a fake. ProtoTest creates clients **per test**, registers them on the context, and disposes them afterwards. Every integration uses this mechanism, and you can use it for your own.
+A client is anything a test talks to — an `HttpClient`, a browser session, a message bus connection, a fake. ProtoTest creates clients **per test**, registers them on the context, and disposes them afterwards. Most integrations use this mechanism for the systems they connect to, and you can use it for your own.
 
 ## The context API
 

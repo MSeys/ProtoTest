@@ -77,7 +77,7 @@ Register services with `builder.ConfigureServices(...)`. Scoped services are per
 
 ## Clients
 
-Integrations register their clients on the context; you normally use their extension methods (`Rest()`, `GraphQL()`, `Web()`). The underlying API:
+Integrations with a system to talk to register their clients on the context; you normally use their extension methods (`Rest()`, `GraphQL()`, `Web()`). The underlying API:
 
 ```csharp
 void RegisterClient<TClient>(TClient client, string name = "Default", bool disposeWithContext = true) where TClient : class;

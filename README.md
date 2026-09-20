@@ -1,4 +1,13 @@
-# ProtoTest
+<p align="center">
+  <img width="1200" alt="ProtoTest" src="assets/brand/prototest-banner.svg" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/MSeys/ProtoTest/actions/workflows/ci.yml"><img src="https://github.com/MSeys/ProtoTest/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://www.nuget.org/packages/ProtoTest.Core"><img src="https://img.shields.io/nuget/v/ProtoTest.Core" alt="NuGet" /></a>
+  <a href="https://www.nuget.org/packages/ProtoTest.Core"><img src="https://img.shields.io/nuget/dt/ProtoTest.Core" alt="Downloads" /></a>
+  <a href="https://www.nuget.org/profiles/MSeys"><img src="https://img.shields.io/badge/nuget-all%20packages-blue" alt="All NuGet packages" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/MSeys/ProtoTest" alt="License" /></a>
 
 ProtoTest is a foundation for integration testing on .NET 8, 9 and 10. Its integrations share the same test context, lifecycle, cleanup and trace.
 

@@ -21,6 +21,7 @@ The Cloudflare Pages security headers allow `connect-src 'self'` solely so the v
 
 ```bash
 npm install
+npm test
 npm run dev
 ```
 

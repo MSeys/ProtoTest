@@ -193,7 +193,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: |
             docs/package-lock.json
@@ -218,6 +218,7 @@ jobs:
         working-directory: viewer
         run: |
           npm ci
+          npm test
           npm run build
 
   windows-build-test:

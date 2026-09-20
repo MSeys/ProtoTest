@@ -84,6 +84,9 @@ public sealed class OutcomeTests
     }
 
     // Private, so MSTest's own discovery ignores these; they only run through the fake ITestMethod below.
+    // The analyzer cannot see that deliberate indirection, and Passing's constant assertion is the
+    // controlled successful outcome consumed by the adapter test rather than an assertion under test.
+#pragma warning disable MSTEST0030, MSTEST0032
     private sealed class Subjects
     {
         [ProtoTest]
@@ -99,6 +102,7 @@ public sealed class OutcomeTests
         [RequiresCapability("not-composed", Reason = "the adapter proves the skip path")]
         public void RequiresCapability() => throw new InvalidOperationException("A skipped test must not run its body.");
     }
+#pragma warning restore MSTEST0030, MSTEST0032
 
     /// <summary>
     /// Stands in for the MSTest runner: it invokes the subject like the framework would and turns the

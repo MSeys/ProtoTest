@@ -289,9 +289,9 @@ function Hero() {
               Test the whole journey. Trace every layer.
             </Heading>
             <p className={styles.heroLead}>
-              Call the API, await the event, inspect the database, drive the browser and verify generated
-              files in one coherent suite. ProtoTest gives every test a shared lifecycle, context, cleanup and
-              portable trace — so your team tests the behaviour instead of maintaining its own test platform.
+              ProtoTest brings the setup around an integration test into one place. Choose the integrations a
+              suite needs; they share the same context, lifecycle, cleanup and trace. A test can call an API,
+              wait for an event, inspect a database, drive a browser or verify a generated file.
             </p>
             <div className={styles.heroButtons}>
               <Link className={`${styles.btn} ${styles.btnPrimary}`} to="/docs/getting-started/installation">
@@ -309,51 +309,22 @@ function Hero() {
   );
 }
 
-/*
- * The positioning: serious suites tend to grow this foundation themselves, privately and for one application.
- * Each card pairs what that in-house foundation tends to become with what ProtoTest does instead.
- */
-const inHouse = [
-  {
-    before: 'Built for one application',
-    after: 'Generic by design',
-    text: 'Capabilities are composed per suite. Your domain — tenants, sign-in, test data — lives in attributes and builders you write on top, not inside the framework.',
-  },
-  {
-    before: 'Understood by one person',
-    after: 'Documented in the open',
-    text: 'Every capability has a page, the recipes show them combined, and a failing test explains itself through its trace to whoever opens it.',
-  },
-  {
-    before: 'Rebuilt for the next project',
-    after: 'The same packages everywhere',
-    text: 'A second service, a second team, a second repository: the same NuGet packages, the same patterns and the same trace format, from the first test.',
-  },
-];
-
 function InHouseSection() {
   return (
     <section className={`${styles.section} ${styles.sectionAlt}`}>
       <div className="container">
-        <div className={styles.sectionHead}>
-          <Heading as="h2">Every serious integration suite grows a foundation of its own.</Heading>
+        <div className={`${styles.sectionHead} ${styles.originCopy}`}>
+          <Heading as="h2">Why I built ProtoTest</Heading>
           <p>
-            A serious .NET integration suite eventually needs one: a fixture that boots the application,
-            helpers that sign users in, builders for test data, cleanup that mostly works, and logging for the
-            day CI fails. It usually stays internal. ProtoTest is that foundation, public and generic, so the
-            suite can start from it instead of growing its own.
+            ProtoTest comes from things I have struggled with while writing integration tests. Once a suite grows,
+            a lot of the work shifts to setup, infrastructure and figuring out failures that only happen sometimes.
+            I wanted the different integrations to work from the same context and lifecycle instead of each one
+            solving that again.
           </p>
-        </div>
-        <div className={styles.inHouse}>
-          {inHouse.map((item) => (
-            <div key={item.after} className={styles.inHouseCard}>
-              <span className={styles.inHouseBefore}>
-                <s>{item.before}</s>
-              </span>
-              <Heading as="h3">{item.after}</Heading>
-              <p>{item.text}</p>
-            </div>
-          ))}
+          <p>
+            Application-specific setup still belongs to the test project. ProtoTest provides the host, context,
+            lifecycle, tracing and integration points underneath it.
+          </p>
         </div>
       </div>
     </section>
@@ -366,15 +337,11 @@ function TraceSection() {
       <div className="container">
         <div className={styles.featureRow}>
           <div className={styles.featureCopy}>
-            <Heading as="h2">When a test fails, the trace explains it.</Heading>
+            <Heading as="h2">Following a failed test</Heading>
             <p>
-              Everything you compose is traced: each hook, client, request and check, per phase, with what it
-              changed. Nothing to log, nothing to instrument.
-            </p>
-            <p>
-              This is the test in the REST tab above, run with a deliberately wrong expectation. The trace leads with
-              the check that failed, the line of code that made it and the values it compared, then shows every step around it — the tenant
-              the attribute created, the call, the cleanup.
+              This example uses a deliberately wrong REST expectation. The trace starts at the failed check,
+              shows the values that differed and keeps the setup, request and cleanup around it. Hooks, clients,
+              requests and checks are recorded under the phase where they ran.
             </p>
             <div className={styles.featureLinks}>
               <Link className={styles.featureLink} href="https://trace.prototest.dev/?demo=1">
@@ -397,10 +364,11 @@ function ComparisonSection() {
     <section className={`${styles.section} ${styles.sectionAlt}`}>
       <div className="container">
         <div className={styles.sectionHead}>
-          <Heading as="h2">Most of an integration test isn't the test.</Heading>
+          <Heading as="h2">What stays in the test</Heading>
           <p>
-            The same scenario, the same assertions, the same in-process application. Hatched is the
-            plumbing a fixture carries; solid is the scenario itself. Open any task to see the code from both sides.
+            This is the same scenario against the same in-process application, first with a regular fixture and
+            then with ProtoTest. Hatched lines are setup; solid lines belong to the scenario. Open a task to see
+            the code from both sides.
           </p>
         </div>
         <Comparison without={withoutProtoTest} with={withProtoTest} concerns={comparisonConcerns} />
@@ -414,24 +382,22 @@ function PayoffSection() {
     <section className={styles.section}>
       <div className="container">
         <div className={styles.sectionHead}>
-          <Heading as="h2">Beyond pass or fail.</Heading>
+          <Heading as="h2">Coverage and run output</Heading>
           <p>
-            Because ProtoTest coordinates the lifecycle and understands its own integrations, it can
-            report on the run without you instrumenting anything.
+            Integrations record observations while a test runs. Collectors use those observations to build
+            coverage and reports for the complete run.
           </p>
         </div>
 
         <div className={styles.featureRow}>
           <div className={styles.featureCopy}>
-            <Heading as="h3">Your assertions become a coverage map.</Heading>
+            <Heading as="h3">Contract coverage</Heading>
             <p>
-              Point a collector at your OpenAPI document or GraphQL schema and ProtoTest walks the
-              whole contract — every endpoint, every declared response, every response property —
-              and reports which ones your suite actually asserted.
+              OpenAPI and GraphQL collectors compare recorded calls and assertions with the contract. The report
+              shows which endpoints, responses, properties and fields the suite reached or checked.
             </p>
             <p>
-              Not "how many lines executed". Which parts of your API's surface no test has ever
-              looked at.
+              This is contract coverage, not source-code coverage.
             </p>
             <Link className={styles.featureLink} to="/docs/observability/coverage">
               How coverage works →
@@ -442,11 +408,11 @@ function PayoffSection() {
 
         <div className={`${styles.featureRow} ${styles.featureRowReverse}`}>
           <div className={styles.featureCopy}>
-            <Heading as="h3">The whole run travels as one file.</Heading>
+            <Heading as="h3">Portable trace files</Heading>
             <p>
-              Every hook, client, request, check and artifact lands in one portable <code>.prototrace</code>{' '}
-              file, with what existed and changed while each test ran. Open it in the viewer on your machine or
-              straight from a CI artifact; nothing is uploaded.
+              A <code>.prototrace</code> file contains the hooks, clients, requests, checks and artifacts recorded
+              during the run. It can be opened locally or downloaded from CI and opened in the viewer; the viewer
+              does not upload it.
             </p>
             <p>
               The trace also says what it could not see: whether the application ran in-process, which
@@ -468,11 +434,11 @@ function LayersSection() {
     <section className={`${styles.section} ${styles.sectionAlt}`}>
       <div className="container">
         <div className={styles.sectionHead}>
-          <Heading as="h2">One foundation. Every layer.</Heading>
+          <Heading as="h2">Integrations share one context</Heading>
           <p>
-            A test can stand anywhere: drive the browser at one end, read the store the application writes at
-            the other. Every capability plugs into the same <code>ProtoExecutionContext</code>, so the depth you
-            choose changes what a test sees, not how it is written, and every depth lands in the same trace.
+            Browser, API, database, messaging, data and document integrations plug into the same{' '}
+            <code>ProtoExecutionContext</code>. A test can use only one of them or combine several, while their
+            operations still land in the same trace.
           </p>
           <div className={styles.featureLinks}>
             <Link className={styles.featureLink} to="/docs/integrations/overview">
@@ -494,10 +460,9 @@ function CtaSection() {
     <section className={styles.section}>
       <div className="container">
         <div className={styles.ctaBanner}>
-          <Heading as="h2">Start with one test.</Heading>
+          <Heading as="h2">Try the starter project</Heading>
           <p>
-            ProtoTest 1.0 is stable, built in the open. The runtime is real — and
-            the sample app in the repository runs every layer shown here.
+            The template creates a small ASP.NET Core API and a ProtoTest suite that you can run locally.
           </p>
           <div className={`${styles.heroButtons} ${styles.heroButtonsCenter}`}>
             <Link className={`${styles.btn} ${styles.btnPrimary}`} to="/docs/getting-started/first-test">
@@ -517,7 +482,7 @@ export default function Home(): ReactNode {
   return (
     <Layout
       title="Test the whole journey. Trace every layer."
-      description="ProtoTest is a composable integration-testing foundation for .NET, powered by a shared runtime for lifecycle, context, cleanup, evidence and tracing across every system layer.">
+      description="ProtoTest is a foundation for composing .NET integration tests around one context, lifecycle and trace.">
       <Head>
         <script type="application/ld+json">
           {JSON.stringify({
@@ -533,7 +498,7 @@ export default function Home(): ReactNode {
             codeRepository: 'https://github.com/MSeys/ProtoTest',
             license: 'https://github.com/MSeys/ProtoTest/blob/main/LICENSE',
             description:
-              'A composable integration-testing foundation for .NET, powered by a shared runtime for lifecycle, context, cleanup, evidence and tracing across every system layer.',
+              'A foundation for composing .NET integration tests around one context, lifecycle and trace.',
           })}
         </script>
       </Head>

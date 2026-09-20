@@ -3,27 +3,25 @@ id: index
 slug: /
 sidebar_position: 0
 title: Introduction
-description: "ProtoTest is a composable integration-testing foundation for .NET, powered by a shared runtime for lifecycle, context, cleanup, evidence and tracing."
+description: "ProtoTest is a foundation for composing .NET integration tests around one context, lifecycle and trace."
 ---
 
 # ProtoTest
 
-ProtoTest is a composable integration-testing foundation for .NET 8, 9 and 10. Its shared runtime lets one journey write through REST, observe the result through GraphQL or messaging, inspect the database, drive a browser and verify a generated workbook. Every capability shares **one host, one execution context and one lifecycle**, so the test describes behaviour while ProtoTest owns coordination, cleanup, evidence and tracing.
+ProtoTest is a foundation for integration testing on .NET 8, 9 and 10. You choose the integrations a suite needs, and they share the same host, test context, lifecycle and trace.
 
-ProtoTest 1.0 targets **.NET 8, 9 and 10**. Packages are stable on NuGet, so `dotnet add package <id>` installs them directly; the template targets `net10.0` unless `--framework net8.0` or `net9.0` is passed.
+That lets one test write through REST and read through GraphQL, or combine API, browser, database, messaging and file checks when that is useful.
 
-:::note[ProtoTest 1.0 is released]
-ProtoTest 1.0 and this documentation ship together: the packages are stable on NuGet, the API is documented as released, and the examples track it. If something looks wrong or missing, [open an issue](https://github.com/MSeys/ProtoTest/issues).
-:::
+ProtoTest 1.0 packages are available on NuGet. The template targets `net10.0` by default; pass `--framework net8.0` or `net9.0` to use another supported target.
 
-## What it gives you
+## Main pieces
 
-- **Capabilities as attributes.** "A fresh tenant", "a billing administrator", "logged into the portal" become attributes you write once and compose onto any test.
-- **Clients that share a context.** `Proto.Context.Rest()`, `.GraphQL()`, `.Web()` and `.Data()` all live on the same per-test context, so one test can create data, drive the browser and verify through the API.
-- **Assertions that describe shapes.** Say what the JSON should look like — partially, with constraints — and get every mismatch at once.
-- **Contract coverage.** Find the endpoints, status codes, response fields and GraphQL fields your suite never checked.
-- **A trace of everything.** Every hook, request, browser action and assertion is recorded automatically into a portable `.prototrace` file you can open in the [viewer](https://trace.prototest.dev).
-- **Your runner, unchanged.** xUnit, NUnit, MSTest and TUnit are all supported.
+- **Attributes** can hold reusable setup such as creating a tenant or signing in a user.
+- **Clients** such as `Proto.Context.Rest()`, `.GraphQL()`, `.Web()` and `.Data()` use the same per-test context.
+- **Shape assertions** compare the parts of a response that matter to the test and report all mismatches together.
+- **Coverage collectors** report which parts of an OpenAPI document or GraphQL schema were called and checked.
+- **ProtoTrace** records lifecycle phases, operations, checks and artifacts in a portable `.prototrace` file.
+- **Runner packages** connect the same runtime to xUnit, NUnit, MSTest and TUnit.
 
 ## Where to start
 
@@ -41,4 +39,4 @@ ProtoTest 1.0 and this documentation ship together: the packages are stable on N
 
 ## See it in a real suite
 
-The repository contains a complete sample: "Northstar", an ASP.NET Core multi-tenant deployment control-plane application in `samples/ProtoTest.SampleApp`, and twelve journeys in `samples/ProtoTest.Demo` that test it through REST, GraphQL (including a live subscription), gRPC, signed webhooks, spreadsheets, messaging, a real browser and in-process hosting — running in parallel, with coverage, reports and a trace. The application also serves Northstar Console, a real Vue 3 SPA, which the browser journeys drive end to end. Many examples in these docs are taken from it.
+The repository contains [Northstar](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.SampleApp), a multi-tenant sample application, and a [ProtoTest.Demo](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.Demo) suite that tests it across API, messaging, browser, database and workbook boundaries. Examples throughout these docs come from that suite.

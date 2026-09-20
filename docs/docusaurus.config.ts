@@ -178,6 +178,8 @@ export default async function createConfig(): Promise<Config> {
           title: 'Project',
           items: [
             {label: 'Trace viewer', href: 'https://trace.prototest.dev'},
+            {label: 'Why ProtoTest', to: '/docs/project/why-prototest'},
+            {label: 'AI usage', to: '/docs/project/ai-usage'},
             {label: 'Changelog', to: '/changelog'},
             {label: 'GitHub', href: 'https://github.com/MSeys/ProtoTest'},
             {label: 'Contributing', href: 'https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md'},

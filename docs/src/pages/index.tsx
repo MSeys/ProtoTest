@@ -275,8 +275,8 @@ function Hero() {
 }
 
 /*
- * The positioning: most teams with a serious suite end up building this themselves, privately and for one
- * application. Each card pairs what that in-house foundation tends to become with what ProtoTest does instead.
+ * The positioning: serious suites tend to grow this foundation themselves, privately and for one application.
+ * Each card pairs what that in-house foundation tends to become with what ProtoTest does instead.
  */
 const inHouse = [
   {
@@ -301,12 +301,12 @@ function InHouseSection() {
     <section className={`${styles.section} ${styles.sectionAlt}`}>
       <div className="container">
         <div className={styles.sectionHead}>
-          <Heading as="h2">The framework your team was going to build anyway.</Heading>
+          <Heading as="h2">Every serious integration suite grows a foundation of its own.</Heading>
           <p>
-            Every .NET team with a serious integration suite ends up with one: a fixture that boots the
-            application, helpers that sign users in, builders for test data, cleanup that mostly works, and
-            logging for the day CI fails. It usually stays internal. ProtoTest is that foundation, public and
-            generic, so you start from it instead of growing your own.
+            A serious .NET integration suite eventually needs one: a fixture that boots the application,
+            helpers that sign users in, builders for test data, cleanup that mostly works, and logging for the
+            day CI fails. It usually stays internal. ProtoTest is that foundation, public and generic, so the
+            suite can start from it instead of growing its own.
           </p>
         </div>
         <div className={styles.inHouse}>

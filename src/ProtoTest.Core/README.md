@@ -1,6 +1,7 @@
 # ProtoTest.Core
 
-The runner-independent foundation of ProtoTest: host and lifecycle, execution context, hooks and attributes, clients, resources and tracing.
+The shared, runner-independent runtime at the centre of the ProtoTest foundation: host and lifecycle,
+an isolated execution context per test, hooks and attributes, clients, owned resources and tracing.
 
 ```bash
 dotnet add package ProtoTest.Core

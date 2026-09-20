@@ -3,12 +3,12 @@ id: index
 slug: /
 sidebar_position: 0
 title: Introduction
-description: "ProtoTest is a composable integration-testing foundation for .NET: REST, GraphQL, gRPC, browsers, data, SQL and messaging on one host, one context and one lifecycle."
+description: "ProtoTest is a composable integration-testing foundation for .NET, powered by a shared runtime for lifecycle, context, cleanup, evidence and tracing."
 ---
 
 # ProtoTest
 
-ProtoTest is a composable integration-testing foundation for .NET 8, 9 and 10. REST, GraphQL, browser automation, test data and in-process ASP.NET Core all attach to **one host, one execution context and one lifecycle** — so a test describes behaviour, and the infrastructure around it is written once and reused.
+ProtoTest is a composable integration-testing foundation for .NET 8, 9 and 10. Its shared runtime lets one journey write through REST, observe the result through GraphQL or messaging, inspect the database, drive a browser and verify a generated workbook. Every capability shares **one host, one execution context and one lifecycle**, so the test describes behaviour while ProtoTest owns coordination, cleanup, evidence and tracing.
 
 ProtoTest 1.0 targets **.NET 8, 9 and 10**. Packages are stable on NuGet, so `dotnet add package <id>` installs them directly; the template targets `net10.0` unless `--framework net8.0` or `net9.0` is passed.
 

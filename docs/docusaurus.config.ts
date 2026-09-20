@@ -29,7 +29,7 @@ export default async function createConfig(): Promise<Config> {
 
   const config: Config = {
   title: 'ProtoTest',
-  tagline: 'A composable integration-testing foundation for .NET',
+  tagline: 'Test the whole journey. Trace every layer.',
   // Theme-aware: the mark follows the operating system, like the viewer's and the report's.
   favicon: 'img/favicon.svg',
 

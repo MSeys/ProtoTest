@@ -15,6 +15,41 @@ import styles from './index.module.css';
 
 const heroTabs: CodeTab[] = [
   {
+    id: 'journey',
+    label: 'Journey',
+    filename: 'PlatformJourney.cs',
+    code: `[ProtoTest]
+[SignedInAs]
+public async Task
+    RestWritesAreVisibleThroughGraphQL()
+{
+    using var created = await Proto.Context.Rest()
+        .Body(new CreateProjectRequest("atlas"))
+        .PostAsync("/api/v1/projects");
+
+    created.Should.HaveHttpStatus(HttpStatusCode.Created);
+
+    using var projects = await Proto.Context.GraphQL()
+        .Query("projects", new { first = 10 })
+        .ExpectAsync(new
+        {
+            totalCount = 1,
+            nodes = new[]
+            {
+                new
+                {
+                    name = "atlas",
+                    status = ProjectStatuses.Active
+                }
+            }
+        });
+
+    projects.ShouldHaveNoErrors();
+}`,
+    footnote:
+      'One journey writes through REST and reads through GraphQL. Tenant, sign-in, lifecycle, cleanup and trace are shared automatically.',
+  },
+  {
     id: 'compose',
     label: 'Compose',
     filename: 'Setup.cs',
@@ -249,15 +284,14 @@ function Hero() {
       <div className="container">
         <div className={styles.heroInner}>
           <div>
-            <div className={styles.eyebrow}>Integration testing for .NET</div>
+            <div className={styles.eyebrow}>Composable integration testing for .NET</div>
             <Heading as="h1" className={styles.heroTitle}>
-              A composable integration-testing foundation.
+              Test the whole journey. Trace every layer.
             </Heading>
             <p className={styles.heroLead}>
-              Pick the capabilities your tests need — REST, GraphQL, the browser, test data, SQL, an
-              in-process ASP.NET Core host — and compose them onto one execution context. ProtoTest coordinates
-              their lifecycle and traces everything they do, so a failing test shows the check that failed,
-              the values it compared and every step before it.
+              Call the API, await the event, inspect the database, drive the browser and verify generated
+              files in one coherent suite. ProtoTest gives every test a shared lifecycle, context, cleanup and
+              portable trace — so your team tests the behaviour instead of maintaining its own test platform.
             </p>
             <div className={styles.heroButtons}>
               <Link className={`${styles.btn} ${styles.btnPrimary}`} to="/docs/getting-started/installation">
@@ -338,7 +372,7 @@ function TraceSection() {
               changed. Nothing to log, nothing to instrument.
             </p>
             <p>
-              This is the REST test from above, run with a deliberately wrong expectation. The trace leads with
+              This is the test in the REST tab above, run with a deliberately wrong expectation. The trace leads with
               the check that failed, the line of code that made it and the values it compared, then shows every step around it — the tenant
               the attribute created, the call, the cleanup.
             </p>
@@ -462,7 +496,7 @@ function CtaSection() {
         <div className={styles.ctaBanner}>
           <Heading as="h2">Start with one test.</Heading>
           <p>
-            ProtoTest 1.0 is stable, built in the open. The foundation is real — and
+            ProtoTest 1.0 is stable, built in the open. The runtime is real — and
             the sample app in the repository runs every layer shown here.
           </p>
           <div className={`${styles.heroButtons} ${styles.heroButtonsCenter}`}>
@@ -482,8 +516,8 @@ function CtaSection() {
 export default function Home(): ReactNode {
   return (
     <Layout
-      title="Composable integration testing for .NET"
-      description="ProtoTest is a composable integration-testing foundation for .NET: compose REST, GraphQL, browser, data and SQL capabilities onto one execution context, and get a trace of everything they do.">
+      title="Test the whole journey. Trace every layer."
+      description="ProtoTest is a composable integration-testing foundation for .NET, powered by a shared runtime for lifecycle, context, cleanup, evidence and tracing across every system layer.">
       <Head>
         <script type="application/ld+json">
           {JSON.stringify({
@@ -492,14 +526,14 @@ export default function Home(): ReactNode {
             name: 'ProtoTest',
             applicationCategory: 'DeveloperApplication',
             operatingSystem: 'Windows, Linux, macOS',
-            softwareVersion: '1.0.0',
+            softwareVersion: '1.0',
             programmingLanguage: 'C#',
             url: 'https://prototest.dev/',
             downloadUrl: 'https://www.nuget.org/profiles/MSeys',
             codeRepository: 'https://github.com/MSeys/ProtoTest',
             license: 'https://github.com/MSeys/ProtoTest/blob/main/LICENSE',
             description:
-              'A composable integration-testing foundation for .NET with shared lifecycle, context and portable execution traces.',
+              'A composable integration-testing foundation for .NET, powered by a shared runtime for lifecycle, context, cleanup, evidence and tracing across every system layer.',
           })}
         </script>
       </Head>

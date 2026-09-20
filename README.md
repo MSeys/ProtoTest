@@ -10,11 +10,11 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/MSeys/ProtoTest" alt="License" /></a>
 </p>
 
-**ProtoTest is a composable integration-testing foundation for .NET 8, 9 and 10.** It keeps an integration
-test a readable scenario and takes the machinery around it. One host per
-run, one execution context per test, one lifecycle, one trace. REST, GraphQL, gRPC, messaging, SQL, data,
-browsers, spreadsheets and in-process ASP.NET Core all hang off that same test — so the setup is written
-once, and the scenario is the only thing left to read.
+**ProtoTest is a composable integration-testing foundation for .NET 8, 9 and 10.** Its shared runtime
+coordinates the machinery around each test: one host per run, one isolated execution context per test,
+one lifecycle and one portable trace. A single journey can cross REST, GraphQL, gRPC, messaging, SQL,
+browsers, spreadsheets and in-process ASP.NET Core while the scenario — not the plumbing — remains the
+thing you read.
 
 ## The idea
 

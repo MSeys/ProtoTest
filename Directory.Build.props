@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
 
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Authors>Matthias Seys</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://prototest.dev/</PackageProjectUrl>

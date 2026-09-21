@@ -131,7 +131,6 @@ export default async function createConfig(): Promise<Config> {
         {to: '/docs/recipes/overview', label: 'Recipes', position: 'left'},
         {href: 'https://prototest.dev/api/', label: 'API reference', position: 'left'},
         {href: 'https://trace.prototest.dev', label: 'Trace viewer', position: 'left'},
-        {to: '/changelog', label: 'Changelog', position: 'left'},
         {
           type: 'custom-github',
           position: 'right',

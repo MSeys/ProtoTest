@@ -13,19 +13,21 @@ ProtoTest is a foundation for integration testing on .NET 8, 9 and 10.
 
 ## What is ProtoTest?
 
-Hard to describe it. You could call it a foundation, a large test framework or something else. I have a preference for 'foundation' since it describes the goal I personally see in ProtoTest.
+Hard to describe it. You could call it a foundation, a large test framework or something else. I have a preference for "foundation", since that best describes what I personally want ProtoTest to be.
 
-It's something you can build upon to do integration testing.
+It's something you can build upon to do integration testing without having to build all of the supporting infrastructure yourself.
 
 [Documentation](https://prototest.dev/)
 
 ## What does it bring me?
 
-The Core gives you the essence of ProtoTest. It gives you a proper lifecycle independent of the test runner of your choice. (This makes swapping test runners as easy as 1-2-3.)
+Core gives you the foundation of ProtoTest.
 
-It gives you one unique test context with shareable context states for sharing info between lifecycle steps (hooks, attributes, test), easy client access, integration access point, observations, tracing and much more.
+It provides a lifecycle independent of the test runner you choose, so ProtoTest itself doesn't lock you into one runner. Adapters are available for NUnit, xUnit, TUnit and MSTest.
 
-[Learn more about Core](https://prototest.dev/docs/advanced/extending)
+Each test gets its own `ProtoExecutionContext`. That context can share state between hooks, attributes and the test itself, while also giving you access to configured clients and integrations, observations, tracing and other shared functionality.
+
+The idea is that integrations don't each live in their own little world. They participate in the same test execution and can make use of the same lifecycle, context and tracing.
 
 ProtoTest currently integrates with REST, GraphQL, gRPC, SQL, Entity Framework Core,
 Playwright, Selenium, RabbitMQ, ASP.NET Core, Testcontainers, OpenTelemetry and more.
@@ -34,23 +36,29 @@ This definitely is a large list. I picked these because they're commonly used, b
 
 Use only what your test suite needs. You're not obligated to use everything.
 
+[Learn more about Core](https://prototest.dev/docs/advanced/extending)
+
 [Explore the integrations](https://prototest.dev/docs/integrations/overview)
+
 [Extend ProtoTest yourself](https://prototest.dev/docs/advanced/extending)
 
 ## What if it breaks?
 
-I admit, ProtoTest hides a lot of setup now for you, or puts it behind abstract layers. 
+I admit, ProtoTest hides a lot of setup for you, or puts it behind abstract layers.
 
-To solve this, as well as help discover test failures, I have taken inspiration from Playwright traces.
+That makes tests cleaner, but it can also make figuring out what went wrong harder.
 
-The provided integrations all hook into the tracing provided in core. At the end of the run, a `.prototrace` file will be provided containing the execution trace (including setup and teardown), attachments, additional reports (if configured) and more. 
+To help with that, I took inspiration from Playwright traces.
+
+The built-in integrations hook into the tracing provided by Core. At the end of a run, ProtoTest writes a `.prototrace` file containing the execution trace, including setup and teardown, observations, state, attachments and additional reports when configured.
 
 That brings us to ProtoTrace. The place where you can hopefully find what went wrong with your test.
 
 [ProtoTrace](https://trace.prototest.dev)
-[Interactive trace](https://trace.prototest.dev/?demo=1)
 
-# Add screenshot here (TODO)
+[Open an interactive trace](https://trace.prototest.dev/?demo=1)
+
+<!-- TODO: ProtoTrace screenshot -->
 
 
 ## Why did I build this?

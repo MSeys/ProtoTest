@@ -9,7 +9,49 @@
   <a href="https://www.nuget.org/profiles/MSeys"><img src="https://img.shields.io/badge/nuget-all%20packages-blue" alt="All NuGet packages" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/MSeys/ProtoTest" alt="License" /></a>
 
-ProtoTest is a foundation for integration testing on .NET 8, 9 and 10. Its integrations share the same test context, lifecycle, cleanup and trace.
+ProtoTest is a foundation for integration testing on .NET 8, 9 and 10. (Big words, but it's hard to explain what it truly is)
+
+## What is ProtoTest?
+
+Hard to describe it. You could call it a foundation, a large test framework or something else. I have a preference for 'foundation' since it describes the goal I personally see in ProtoTest.
+
+It's something you can build upon to do integration testing.
+
+[Documentation](https://prototest.dev/)
+
+## What does it bring me?
+
+The Core gives you the essence of ProtoTest. It gives you a proper lifecycle independent of the test runner of your choice. (This makes swapping test runners as easy as 1-2-3.)
+
+It gives you one unique test context with shareable context states for sharing info between lifecycle steps (hooks, attributes, test), easy client access, integration access point, observations, tracing and much more.
+
+[Learn more about Core](https://prototest.dev/docs/advanced/extending)
+
+ProtoTest currently integrates with REST, GraphQL, gRPC, SQL, Entity Framework Core,
+Playwright, Selenium, RabbitMQ, ASP.NET Core, Testcontainers, OpenTelemetry and more.
+
+This definitely is a large list. I picked these because they're commonly used, but if something is missing, you can easily create an integration yourself, extend an existing one or open a discussion and I'll check it out.
+
+Use only what your test suite needs. You're not obligated to use everything.
+
+[Explore the integrations](https://prototest.dev/docs/integrations/overview)
+[Extend ProtoTest yourself](https://prototest.dev/docs/advanced/extending)
+
+## What if it breaks?
+
+I admit, ProtoTest hides a lot of setup now for you, or puts it behind abstract layers. 
+
+To solve this, as well as help discover test failures, I have taken inspiration from Playwright traces.
+
+The provided integrations all hook into the tracing provided in core. At the end of the run, a `.prototrace` file will be provided containing the execution trace (including setup and teardown), attachments, additional reports (if configured) and more. 
+
+That brings us to ProtoTrace. The place where you can hopefully find what went wrong with your test.
+
+[ProtoTrace](https://trace.prototest.dev)
+[Interactive trace](https://trace.prototest.dev/?demo=1)
+
+# Add screenshot here (TODO)
+
 
 ## Why did I build this?
 
@@ -66,19 +108,6 @@ Common application setup can stay outside the test. Setup that matters to the sc
 
 Is it the best for everyone? Probably not. But it might just help someone do integration testing.
 
-## Integrations
-
-ProtoTest currently integrates with REST, GraphQL, gRPC, SQL, Entity Framework Core,
-Playwright, Selenium, RabbitMQ, ASP.NET Core, Testcontainers, OpenTelemetry and more.
-
-This definitely is a large list. I picked these because they're commonly used, but if something is missing, you can easily create an integration yourself, extend an existing one or open a discussion and I'll check it out.
-
-Use only what your test suite needs. You're not obligated to use everything.
-
-[Explore the integrations →](https://prototest.dev/docs/integrations/overview)
-
-[Extend ProtoTest yourself →](https://prototest.dev/docs/advanced/extending)
-
 ## Try it
 
 ```bash
@@ -88,10 +117,7 @@ cd Shop
 dotnet test
 ```
 
-- [Documentation](https://prototest.dev/)
-- [Interactive trace](https://trace.prototest.dev/?demo=1)
-- [Integrations](https://prototest.dev/docs/integrations/overview)
-- [Demo suite](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.Demo)
+[Additional demo suite](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.Demo)
 
 ## AI usage?
 

@@ -54,12 +54,12 @@ The built-in integrations hook into the tracing provided by Core. At the end of 
 
 That brings us to ProtoTrace. The place where you can hopefully find what went wrong with your test.
 
-[ProtoTrace](https://trace.prototest.dev)
+<p align="center">
+  <img src="assets/trace-viewer.png" alt="ProtoTrace showing a failed integration test, its execution story, response mismatch and cleanup" />
+</p>
 
+[ProtoTrace](https://trace.prototest.dev) ·
 [Open an interactive trace](https://trace.prototest.dev/?demo=1)
-
-<!-- TODO: ProtoTrace screenshot -->
-
 
 ## Why did I build this?
 

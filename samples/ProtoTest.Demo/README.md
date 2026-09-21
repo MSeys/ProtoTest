@@ -1,50 +1,28 @@
 # ProtoTest.Demo
 
-A parallel end-to-end suite for **Northstar**, a multi-tenant release/deployment control-plane SaaS, driven through the real ASP.NET Core application in `samples/ProtoTest.SampleApp`.
+A larger test suite for Northstar, the multi-tenant ASP.NET Core application included in this repository.
 
-The suite is organised as journeys rather than API probes:
+The starter template is meant to be small. This demo is where I combine REST, GraphQL, gRPC, messaging, SQL, browser tests and generated workbooks in the same application.
 
-| Journey | What it follows |
-| --- | --- |
-| `OnboardingJourney` | A new organization lands on Free, hits the seat and project limits, and upgrades. |
-| `DeliveryJourney` | A release goes to preview, is promoted to production, fails a build, and is rolled back. |
-| `BillingJourney` | Deploy minutes are metered, invoiced at period close, paid or declined, and a mid-cycle upgrade is prorated. |
-| `AccessJourney` | The role matrix, API token scopes, tenant isolation and rate limiting. |
-| `PlatformJourney` | REST, GraphQL (including a live subscription) and signed, retrying webhooks describing the same platform. |
-| `DomainAccessJourney` | The test composes the application's own domain over the shared store. |
-| `SheetsJourney` | The generated monthly report is verified as an OpenXML workbook. |
-| `GrpcJourney` | The application's own gRPC service is called and its replies shape-asserted. |
-| `MessagingJourney` | The application's `invoice.paid` event is awaited over the broker, whether the invoice was paid over REST or on the console's billing screen. |
-| `WebJourney` | The Northstar console end to end in one session: sign-in, dashboard, project and environment creation, a deployment's status, an invoice paid in billing, and the monthly report verified with Sheets. |
-| `ApiThenBrowserJourney` | A project created through REST appears in the console after it refreshes. |
-| `BrowserThenApiJourney` | A project created on the console's form is asserted back through REST and GraphQL. |
-| `DiagnosticsShowcase` | ProtoTest's own failure diagnostics, attachments and trace. |
+## Run it
 
-Some journeys skip, before their lifecycle starts, unless their infrastructure is present: the domain
-journey needs a composed store, the messaging journey a broker, and the console journeys a standalone
-instance (`ProtoTest:TargetUrl` or the session's base URL) with a built SPA under
-`samples/ProtoTest.SampleApp/Ui/dist`.
-
-## Supporting projects
-
-`samples/Northstar.ProtoTest` is the application-specific test integration the journeys build on: the
-`[NorthstarTenant]` and `[SignedInAs]` attributes with their contexts, `NorthstarAuthenticator`, the
-data defaults and provisioners, and the typed console page objects the browser journeys drive.
-
-Fixtures are requested through Data and provisioned through the application's own domain over the
-shared store whenever it is reachable — in-process and container runs. A published run
-(`ProtoTest:TargetUrl`) falls back to the portable API provisioners, and only what the application
-alone can do — advance the tenant clock, dispatch a webhook — goes through test-support endpoints.
-Tests that only make sense with the composed store are gated by the store capability.
-
-The application is in memory but behaves like a product: plans and entitlements, billing state machines, a per-tenant virtual clock (`POST /test-support/tenants/{tenant}/clock/advance`) so periods can be closed deterministically, a webhook outbox with HMAC-SHA256 signatures and retries, an audit trail, `Idempotency-Key` replay and per-token rate limits.
-
-```powershell
+```bash
 dotnet test samples/ProtoTest.Demo
 ```
 
-The assembly runs testcases and fixtures concurrently with eight NUnit workers. Its HTML/JSON reports, the OpenAPI and GraphQL coverage and `prototest-demo.prototrace` are written under `TestResults/ProtoTest.Demo`.
+The run writes its trace and reports under `TestResults/ProtoTest.Demo`.
 
-`DiagnosticsShowcase.TheOrganizationReportsItsPlanAndProjectCount` and `DiagnosticsShowcase.TheDashboardNeverShowsAnotherTenantsPlan` are skipped unless `ProtoTest:Demo:IncludeFailure=true` (or `ProtoTest__Demo__IncludeFailure=true`) is set, so CI stays green while the run still contains deliberately failed child operations that the tests inspect.
+The default run uses SQLite. PostgreSQL and RabbitMQ containers are optional, and browser journeys are skipped when the Northstar Vue application has not been built.
 
-The viewer's bundled trace is produced from a full demo run that includes both intentional failures: the REST shape mismatch and the web plan mismatch, the latter carrying the retained Playwright trace and its failure artifacts.
+## Where should I start?
+
+- `Setup.cs` composes the application, integrations, tracing and reporting once for the suite.
+- `CrossLayerJourneys.cs` verifies the same scenario through more than one interface.
+- `DiagnosticsShowcase.cs` contains opt-in failures used by the bundled demo trace.
+- `samples/Northstar.ProtoTest` contains the application-specific attributes, authentication, page objects and data provisioners. This is what you would create for your own application to integrate your needs into ProtoTest.
+
+## Learn more
+
+- [Interactive trace](https://trace.prototest.dev/?demo=1)
+- [Recipes](https://prototest.dev/docs/recipes/overview)
+- [ProtoTest documentation](https://prototest.dev/)

@@ -92,18 +92,22 @@ function readDirectory(bytes: Uint8Array, view: DataView): Map<string, ZipEntry>
   let offset = view.getUint32(eocd + 16, true);
   const entries = new Map<string, ZipEntry>();
   for (let index = 0; index < count; index++) {
+    if (!contains(bytes, offset, 46)) throw new TraceOpenError("corrupt", "The trace's ZIP directory is damaged.");
     if (view.getUint32(offset, true) !== CENTRAL_FILE) throw new TraceOpenError("corrupt", "The trace's ZIP directory is damaged.");
     const nameLength = view.getUint16(offset + 28, true);
     const extraLength = view.getUint16(offset + 30, true);
     const commentLength = view.getUint16(offset + 32, true);
+    const recordLength = 46 + nameLength + extraLength + commentLength;
+    if (!contains(bytes, offset, recordLength)) throw new TraceOpenError("corrupt", "The trace's ZIP directory is damaged.");
     const name = decoder.decode(bytes.subarray(offset + 46, offset + 46 + nameLength));
+    if (entries.has(name)) throw new TraceOpenError("corrupt", `The trace contains duplicate entries named ${name}.`);
     entries.set(name, {
       method: view.getUint16(offset + 10, true),
       compressedSize: view.getUint32(offset + 20, true),
       uncompressedSize: view.getUint32(offset + 24, true),
       localOffset: view.getUint32(offset + 42, true)
     });
-    offset += 46 + nameLength + extraLength + commentLength;
+    offset += recordLength;
   }
   return entries;
 }
@@ -113,10 +117,15 @@ async function readEntry(bytes: Uint8Array, view: DataView, entries: Map<string,
   if (!entry) throw new TraceOpenError("corrupt", `The trace is missing ${name}.`);
   if (entry.uncompressedSize > MAX_ARCHIVE_BYTES) throw new TraceOpenError("unsupported", `${name} is too large to read.`);
   const offset = entry.localOffset;
+  if (!contains(bytes, offset, 30)) throw new TraceOpenError("corrupt", `${name} is damaged.`);
   if (view.getUint32(offset, true) !== LOCAL_FILE) throw new TraceOpenError("corrupt", `${name} is damaged.`);
   const start = offset + 30 + view.getUint16(offset + 26, true) + view.getUint16(offset + 28, true);
+  if (!contains(bytes, start, entry.compressedSize)) throw new TraceOpenError("corrupt", `${name} is damaged.`);
   const compressed = bytes.slice(start, start + entry.compressedSize);
-  if (entry.method === 0) return compressed;
+  if (entry.method === 0) {
+    if (compressed.byteLength !== entry.uncompressedSize) throw new TraceOpenError("corrupt", `${name} has an invalid size.`);
+    return compressed;
+  }
   if (entry.method !== 8 || typeof DecompressionStream === "undefined")
     throw new TraceOpenError("unsupported", "This trace uses a ZIP compression this browser cannot read.");
 
@@ -148,5 +157,16 @@ async function readEntry(bytes: Uint8Array, view: DataView, entries: Map<string,
     decompressed.set(chunk, written);
     written += chunk.byteLength;
   }
+  if (decompressed.byteLength !== entry.uncompressedSize)
+    throw new TraceOpenError("corrupt", `${name} has an invalid size.`);
   return decompressed;
+}
+
+function contains(bytes: Uint8Array, offset: number, length: number): boolean {
+  return Number.isSafeInteger(offset)
+    && Number.isSafeInteger(length)
+    && offset >= 0
+    && length >= 0
+    && offset <= bytes.length
+    && length <= bytes.length - offset;
 }

@@ -8,77 +8,151 @@
   <a href="https://www.nuget.org/packages/ProtoTest.Core"><img src="https://img.shields.io/nuget/dt/ProtoTest.Core" alt="Downloads" /></a>
   <a href="https://www.nuget.org/profiles/MSeys"><img src="https://img.shields.io/badge/nuget-all%20packages-blue" alt="All NuGet packages" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/MSeys/ProtoTest" alt="License" /></a>
+
+ProtoTest is a foundation for integration testing on .NET 8, 9 and 10.
+
+## What is ProtoTest?
+
+Hard to describe it. You could call it a foundation, a large test framework or something else. I have a preference for "foundation", since that best describes what I personally want ProtoTest to be.
+
+It's something you can build upon to do integration testing without having to build all of the supporting infrastructure yourself.
+
+[Documentation](https://prototest.dev/)
+
+## What does it bring me?
+
+Core gives you the foundation of ProtoTest.
+
+It provides a lifecycle independent of the test runner you choose, so ProtoTest itself doesn't lock you into one runner. Adapters are available for NUnit, xUnit, TUnit and MSTest.
+
+Each test gets its own `ProtoExecutionContext`. That context can share state between hooks, attributes and the test itself, while also giving you access to configured clients and integrations, observations, tracing and other shared functionality.
+
+The idea is that integrations don't each live in their own little world. They participate in the same test execution and can make use of the same lifecycle, context and tracing.
+
+ProtoTest currently integrates with REST, GraphQL, gRPC, SQL, Entity Framework Core,
+Playwright, Selenium, RabbitMQ, ASP.NET Core, Testcontainers, OpenTelemetry and more.
+
+This definitely is a large list. I picked these because they're commonly used, but if something is missing, you can easily create an integration yourself, extend an existing one or open a discussion and I'll check it out.
+
+Use only what your test suite needs. You're not obligated to use everything.
+
+[Learn more about Core](https://prototest.dev/docs/foundation/overview)
+
+[Explore the integrations](https://prototest.dev/docs/integrations/overview)
+
+[Extend ProtoTest yourself](https://prototest.dev/docs/advanced/extending)
+
+## What if it breaks?
+
+I admit, ProtoTest hides a lot of setup for you, or puts it behind abstract layers.
+
+That makes tests cleaner, but it can also make figuring out what went wrong harder.
+
+To help with that, I took inspiration from Playwright traces.
+
+The built-in integrations hook into the tracing provided by Core. At the end of a run, ProtoTest writes a `.prototrace` file containing the execution trace, including setup and teardown, observations, state, attachments and additional reports when configured.
+
+That brings us to ProtoTrace. The place where you can hopefully find what went wrong with your test.
+
+<p align="center">
+  <img src="assets/trace-viewer.png" alt="ProtoTrace showing a failed integration test, its execution story, response mismatch and cleanup" />
 </p>
 
-**ProtoTest is a composable integration-testing foundation for .NET 8, 9 and 10.** Its shared runtime
-coordinates the machinery around each test: one host per run, one isolated execution context per test,
-one lifecycle and one portable trace. A single journey can cross REST, GraphQL, gRPC, messaging, SQL,
-browsers, spreadsheets and in-process ASP.NET Core while the scenario — not the plumbing — remains the
-thing you read.
+[ProtoTrace](https://trace.prototest.dev) ·
+[Open an interactive trace](https://trace.prototest.dev/?demo=1)
 
-## The idea
+## Why did I build this?
 
-Infrastructure is not the test. A server should be a capability you compose, not a fixture you fight; a
-tenant should be data you own, not a call to a control plane that only exists locally; a database should
-come with the run, not with a runbook. ProtoTest composes those pieces onto the host and gives every test
-a context where they are already there.
+I love programming, but especially building tools and solving abstract problems.
 
-And a green run can still be a fluke — a fallback taken, a retry that hid a failure, a check that never
-ran. So every test leaves a portable `.prototrace`: what was wired, what moved, what changed, and what was
-actually verified. Anything the code cannot say, the trace does.
+Integration testing can get rough, especially for bigger applications such as SaaS applications. There's so much infrastructure, setup and so on.
 
-## A test, and what it leaves behind
+My focus is and always has been clean and readable code. ProtoTest is my response to how messy that setup gets.
+
+It's built from scratch, but on what I learned from a testing framework I wrote by hand years ago. I had already been thinking about building ProtoTest since March, but was in a bit of a coding slump and never really got started. Once I did, it moved very quickly.
+
+[Read more about why I built ProtoTest.](https://prototest.dev/docs/project/why-prototest)
+
+## What does that look like?
 
 ```csharp
 [ProtoTest]
-public async Task CreatingAProjectReturnsIt()
+[SignedInAs]
+public async Task RestWritesAreVisibleThroughGraphQL()
 {
-    var created = await Proto.Context.Rest()
-        .Post("/api/v1/projects")
-        .Body(new { name = "orion" })
-        .ExecuteAsync();
+    using var created = await Proto.Context.Rest()
+        .Body(new CreateProjectRequest("atlas"))
+        .PostAsync("/api/v1/projects");
 
-    created.Should.HaveHttpStatus(HttpStatusCode.Created)
-        .ShouldMatchShape(new { id = JsonValue.Any, name = "orion" });
+    created.Should.HaveHttpStatus(HttpStatusCode.Created);
+
+    using var projects = await Proto.Context.GraphQL()
+        .Query("projects", new { first = 10 })
+        .ExpectAsync(new
+        {
+            totalCount = 1,
+            nodes = new[] { new { name = "atlas", status = ProjectStatuses.Active } }
+        });
+
+    projects.ShouldHaveNoErrors();
 }
 ```
 
-```
-test.execution                                    succeeded   142 ms
-├─ http.request · POST /api/v1/projects           succeeded    38 ms
-│  ├─ assert.http.status                           passed    201
-│  └─ assert.json.shape                            passed    matched { id, name: "orion" }
-├─ state  value:project:orion                      created
-└─ resources.release                               succeeded     6 ms
-```
+This is a simple example combining the REST and GraphQL integrations. The focus lies on a clean test with most of the infrastructure moved out of the test once it has been configured.
 
-That bundle opens in the [viewer](https://trace.prototest.dev/) — one page per test, operations with their
-evidence, tracked state with its versions, and the places a suite is thinner than it looks.
+The test can focus on the behavior. If something goes wrong, its lifecycle, operations and checks are written to the same `.prototrace` file.
 
-## What ships
+## Is it just wrappers?
 
-- **Protocols**: REST, GraphQL, gRPC and messaging clients with the `[Auth<T>]` pipeline, shape
-  assertions and destination coverage.
-- **State and data**: a per-test SQL connection and EF Core context, deterministic builders and
-  provisioners, run-owned PostgreSQL and RabbitMQ containers.
-- **Surfaces**: in-process ASP.NET Core with access to the application's own services, and browser sessions
-  with page objects, flows, login and page coverage over Playwright or Selenium.
-- **Evidence**: spreadsheet assertions for generated `.xlsx` files, OpenAPI contract coverage, JSON and
-  HTML reports, an OpenTelemetry bridge, and the trace itself.
-- **Runners**: NUnit, xUnit v2, xUnit v3, MSTest and TUnit, sharing one lifecycle and one set of outcomes.
+In essence, you could call it that. They wrap around proven frameworks that do certain jobs really well.
 
-## Start here
+If they already do their job well, why wrap them?
+
+I'm a huge fan of AAA since discovering that principle. Tests should simply be that readable: Arrange-Act-Assert. Straight to the point.
+
+That's why the wrappers exist. They integrate with the Core and they're my opinionated view on how I want to test with them.
+
+Common application setup can stay outside the test. Setup that matters to the scenario should still be visible.
+
+Is it the best for everyone? Probably not. But it might just help someone do integration testing.
+
+## Try it
 
 ```bash
 dotnet new install ProtoTest.Templates
 dotnet new prototest -n Shop
-cd Shop && dotnet test
+cd Shop
+dotnet test
 ```
 
-The template leaves `Shop.prototrace` and `Shop.html` in the test output. Everything else — installation,
-concepts, a page per package — lives at **[prototest.dev](https://prototest.dev/)**. The twelve-journey demo
-over a real SaaS, its Vue console and its browser journeys is in
-[`samples/ProtoTest.Demo`](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.Demo).
+[Additional demo suite](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.Demo)
 
-Contributions and sharp observations welcome at [MSeys/ProtoTest](https://github.com/MSeys/ProtoTest).
-Build with `./eng/test.ps1`, validate packages with `./eng/pack.ps1`. MIT [licensed](LICENSE).
+## Bonus: Behind the name
+
+A little bonus since ProtoTest might seem like a weird name. I tend to use Proto for projects that match my vision. As a student, I created ProtoEngine (a C++ 2D game engine, also available on GitHub).
+
+Why Proto? Is it short for Prototype?
+
+Yes, you'd be correct. Prototype in the sense of looking simple and straight to the point.
+
+That's always my goal, even if I don't succeed in every step or implementation. It has to look readable and simple while still being extendable.
+
+That's where the name ProtoTest comes from: Proto, from Prototype, combined with Testing. Bringing some of that simplicity and directness to integration testing.
+
+## AI usage?
+
+Yes, extensively. This is the first personal project where I have used AI this much.
+
+I had already built a similar testing framework by hand before the AI boom. ProtoTest was built from scratch, but the vision for most of it already existed.
+
+AI helped me work through ideas, alternatives and implementations much faster. I know what it can produce without enough direction, so I used different models, compared their suggestions, said no often and kept control over what ProtoTest became.
+
+Do I regret using it? I don't know yet.
+
+**ProtoTest is still what I wanted to build.**
+
+[Read the longer explanation in the documentation.](https://prototest.dev/docs/project/ai-usage)
+
+## License
+
+ProtoTest is available under the [MIT license](https://github.com/MSeys/ProtoTest/blob/main/LICENSE). Issues and contributions are welcome.

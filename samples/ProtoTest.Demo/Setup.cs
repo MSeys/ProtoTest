@@ -1,10 +1,10 @@
 namespace ProtoTest.Demo;
 
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Northstar.ProtoTest;
 using ProtoTest.AspNetCore;
@@ -31,39 +31,32 @@ public sealed class Setup : ProtoTestAssembly
 {
     protected override void Configure(IProtoHostBuilder builder)
     {
-        // Where the application runs and which store it uses are infrastructure, chosen from
-        // configuration and nothing else: ProtoTest:TargetUrl points the same suite at a published
-        // environment, ProtoTest:Database=postgres owns a container, ConnectionStrings:Northstar
-        // points at that environment's store, and the demo's opt-in failure lives under ProtoTest:Demo.
-        var demoConfiguration = new ConfigurationBuilder()
+        var configuration = LoadConfiguration();
+        var environment = DemoEnvironment.From(configuration);
+
+        environment.PrepareOwnedDatabase();
+        var messagingBroker = ConfigureInfrastructure(builder, environment);
+        ConfigureLocalApplications(builder, environment, messagingBroker);
+        ConfigureDomain(builder, environment);
+        ConfigureProtoTest(builder, environment);
+        ConfigureMessaging(builder, environment);
+    }
+
+    private static IConfiguration LoadConfiguration()
+        => new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
             .AddEnvironmentVariables()
             .Build();
 
-        var targetUrl = demoConfiguration["ProtoTest:TargetUrl"];
-        var hostedInProcess = string.IsNullOrWhiteSpace(targetUrl);
-        var configuredDatabase = demoConfiguration.GetConnectionString("Northstar");
-        var usePostgresContainer = string.Equals(
-            demoConfiguration["ProtoTest:Database"],
-            "postgres",
-            StringComparison.OrdinalIgnoreCase);
-        // The store's provider is configuration, not an assumption: an external PostgreSQL connection
-        // string must not be handed to the SQLite provider just because no container is owned.
-        var postgresStore = usePostgresContainer || IsPostgresStore(
-            demoConfiguration["Database:Provider"], configuredDatabase);
-        // A configured connection string points at an existing broker; Broker=container lets the run own
-        // one. The adapter reads it under its own key, the in-process application under its own - both
-        // are filled from the same started container.
-        var configuredMessaging = demoConfiguration["ProtoTest:Messaging:RabbitMq:ConnectionString"];
-        var useMessagingContainer = string.Equals(
-            demoConfiguration["ProtoTest:Messaging:Broker"],
-            "container",
-            StringComparison.OrdinalIgnoreCase);
+    private static IProtoConnectionInfrastructure? ConfigureInfrastructure(
+        IProtoHostBuilder builder,
+        DemoEnvironment environment)
+    {
         IProtoConnectionInfrastructure? messagingBroker = null;
-        if (useMessagingContainer)
+        if (environment.OwnsMessagingBroker)
         {
-            // Held so the standalone application can be handed the same broker the tests await on.
+            // The standalone application and the messaging adapter share the broker owned by this run.
             messagingBroker = RabbitMqBroker.Container();
             builder.AddInfrastructure(
                 messagingBroker,
@@ -71,167 +64,84 @@ public sealed class Setup : ProtoTestAssembly
                 "Messaging:RabbitMq:ConnectionString");
         }
 
-        var useMessaging = useMessagingContainer || !string.IsNullOrWhiteSpace(configuredMessaging);
-
-        if (usePostgresContainer)
+        if (environment.OwnsPostgres)
         {
-            // Owned by the whole run and started with the host; its connection string reaches the
-            // test-side domain and the in-process application through infrastructure settings.
             builder.AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar");
         }
 
-        // Without PostgreSQL the demo owns a file database: several connections can share it, WAL lets
-        // readers and the writer work at the same time, and a fresh file per run keeps tenant slugs
-        // from colliding with the previous run.
-        string? ownedDatabasePath = null;
-        if (!postgresStore && configuredDatabase is null)
-        {
-            ownedDatabasePath = Path.GetFullPath(Path.Combine("TestResults", "ProtoTest.Demo", "northstar-demo.db"));
-            // SQLite creates the file but never its folder, and the standalone application opens the store
-            // before any test does - on a clean checkout that folder does not exist yet.
-            Directory.CreateDirectory(Path.GetDirectoryName(ownedDatabasePath)!);
-            foreach (var suffix in new[] { "", "-wal", "-shm" })
-            {
-                if (File.Exists(ownedDatabasePath + suffix))
-                {
-                    File.Delete(ownedDatabasePath + suffix);
-                }
-            }
-        }
+        return messagingBroker;
+    }
 
-        var fallbackDatabase = configuredDatabase ?? $"Data Source={ownedDatabasePath}";
-        var databaseProvider = postgresStore ? "postgres" : "sqlite";
-        var composeDomainInTests = hostedInProcess || configuredDatabase is not null || postgresStore;
-
-        if (hostedInProcess && !usePostgresContainer)
+    private static void ConfigureLocalApplications(
+        IProtoHostBuilder builder,
+        DemoEnvironment environment,
+        IProtoConnectionInfrastructure? messagingBroker)
+    {
+        if (environment.RunsStandaloneConsole)
         {
-            // The standalone instance the browser journeys drive; the host starts it with the run and
-            // fills the web session's base URL from it. Its capability is what lets those journeys skip
-            // when the suite cannot own the store. A published run (TargetUrl set) drives the published
-            // application instead, so starting a local copy would point the journeys at the wrong store.
+            // Browser journeys use a real process. Published runs point at their configured target instead.
             builder.AddInfrastructure(new StandaloneSampleApp(
-                fallbackDatabase,
-                databaseProvider,
-                () => messagingBroker?.ConnectionString ?? configuredMessaging));
+                environment.DatabaseConnection,
+                environment.DatabaseProvider,
+                () => messagingBroker?.ConnectionString ?? environment.ConfiguredMessaging));
             builder.AddCapability(new ProtoCapabilityDescriptor(
                 "Northstar standalone", ProtoCapabilityKinds.Server, "Demo"));
         }
 
-        if (hostedInProcess)
+        if (environment.UsesLocalApplications)
         {
-            // The console build path reaches the in-process application as a host setting: the ASP.NET
-            // Core initializer forwards every started infrastructure setting to the web host.
             builder.AddInfrastructure(new NorthstarConsoleBuild());
         }
+    }
 
-        if (composeDomainInTests)
-        {
-            // The test's own composition of the same domain, over a connection ProtoTest owns and
-            // releases as a resource. Isolation stays None because the application has its own
-            // connection: a test transaction would hide the test's writes from it. Provisioners
-            // release what they create.
-            builder
-                .AddSql(
-                    provider => CreateDatabaseConnection(ResolveDatabase(provider, fallbackDatabase), postgresStore),
-                    sql => sql.Isolation = SqlIsolation.None)
-                .ConfigureServices(services => services.AddNorthstarDomain(
-                    (provider, options) =>
+    private static void ConfigureDomain(IProtoHostBuilder builder, DemoEnvironment environment)
+    {
+        if (!environment.CanComposeDomain) return;
+
+        // The application has its own connection, so a test transaction would hide fixture writes.
+        builder
+            .AddSql(
+                provider => CreateDatabaseConnection(
+                    ResolveDatabase(provider, environment.DatabaseConnection),
+                    environment.UsesPostgres),
+                sql => sql.Isolation = SqlIsolation.None)
+            .ConfigureServices(services => services.AddNorthstarDomain(
+                (provider, options) =>
+                {
+                    var connection = provider.GetRequiredService<DbConnection>();
+                    if (environment.UsesPostgres)
                     {
-                        var connection = provider.GetRequiredService<DbConnection>();
-                        if (postgresStore)
-                        {
-                            options.UseNpgsql(connection);
-                        }
-                        else
-                        {
-                            options.UseSqlite(connection);
-                        }
-                    },
-                    ServiceLifetime.Scoped));
-        }
+                        options.UseNpgsql(connection);
+                    }
+                    else
+                    {
+                        options.UseSqlite(connection);
+                    }
+                },
+                ServiceLifetime.Scoped));
+    }
 
+    private static void ConfigureProtoTest(IProtoHostBuilder builder, DemoEnvironment environment)
+    {
         builder
             .ConfigureTracing(trace =>
             {
                 trace.OutputPath = Path.Combine("TestResults", "ProtoTest.Demo", "prototest-demo.prototrace");
-                // Watch the application's own instrumentation the way any OpenTelemetry consumer would.
                 trace.ActivitySources.Add("Northstar.Domain");
             })
-            .ConfigureAppConfiguration(configuration =>
-            {
-                // Everything the demo chose above is visible to the tests through configuration.
-                configuration.AddConfiguration(demoConfiguration);
-                var settings = new Dictionary<string, string?>
-                {
-                    [$"ProtoTest:Applications:{NorthstarTargets.Api}:OpenApi:Specification"] = Path.Combine(
-                        AppContext.BaseDirectory, "northstar.openapi.json"),
-                    [$"ProtoTest:Applications:{NorthstarTargets.Api}:Endpoints:GraphQL"] = "/graphql",
-                    // Page coverage: the console's Vue sources are inventoried from disk, and the session
-                    // also asks the running router for its routes - source scan and runtime discovery.
-                    ["ProtoTest:Web:Pages:Source"] = ConsoleBuild.SourceFolder,
-                    ["ProtoTest:Web:Pages:Framework"] = "vue",
-                    ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
-                };
-
-                if (!hostedInProcess)
-                {
-                    settings[$"ProtoTest:Applications:{NorthstarTargets.Api}:BaseUrl"] = targetUrl;
-                }
-
-                configuration.AddInMemoryCollection(settings);
-            })
+            .ConfigureAppConfiguration(configuration => ConfigureTests(configuration, environment))
             .AddSheets()
             .AddWeb()
             .AddNorthstarTestSupport(support =>
-                // In-process subscriptions ride the test server's own WebSocket client.
-                support.UseInProcessGraphQLWebSockets = hostedInProcess)
+                support.UseInProcessGraphQLWebSockets = environment.UsesLocalApplications)
             .AddNorthstarData(data =>
-                // Without a reachable store the same fixtures are provisioned over the public API.
-                data.UseDomainProvisioners = composeDomainInTests)
+                data.UseDomainProvisioners = environment.CanComposeDomain)
             .AddRunGate("no error findings", context => context
                 .ItemsOfKind(ProtoReportItemKinds.Finding)
                 .Any(item => item.Status == ProtoReportStatus.Error)
                 ? ProtoRunGateResult.Failed("The run recorded error findings.")
                 : ProtoRunGateResult.Passed("No error findings were recorded."))
-            .AddApplication(NorthstarTargets.Api, app =>
-            {
-                if (hostedInProcess)
-                {
-                    // The in-process application receives the same choices through host settings -
-                    // no process-wide environment variables involved.
-                    app.AddAspNetCoreServer<Program>(configureWebHost: webHost =>
-                    {
-                        if (!usePostgresContainer)
-                        {
-                            // A container's connection string arrives as infrastructure settings; otherwise
-                            // the configured or run-owned store is passed through here.
-                            webHost.UseSetting("ConnectionStrings:Northstar", fallbackDatabase);
-                        }
-
-                        webHost.UseSetting("Database:Provider", databaseProvider);
-                        webHost.UseSetting("ProtoTest:TestSupport", "true");
-                        if (!string.IsNullOrWhiteSpace(configuredMessaging))
-                        {
-                            // An external broker is configuration, not infrastructure; pass it through.
-                            webHost.UseSetting("Messaging:RabbitMq:ConnectionString", configuredMessaging);
-                        }
-                    });
-                }
-
-                app.AddRest(rest =>
-                    {
-                        rest.CaptureAttachments()
-                            .AddClient("Api")
-                            .AddCollector<RestCoverageCollector>()
-                            .AddCollector<OpenApiCoverageCollector>();
-                    })
-                    .AddGraphQL(graphQL => graphQL
-                        .CaptureAttachments()
-                        .AddClient("GraphQL")
-                        .WithSubscriptionTransport(GraphQLSubscriptionTransport.WebSocket)
-                        .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "northstar.graphql")))
-                    .AddGrpc(grpc => grpc.CaptureAttachments().AddClient("Projects"));
-            })
+            .AddApplication(NorthstarTargets.Api, app => ConfigureApplication(app, environment))
             .AddSink<JsonReportSink>(sink => sink.OutputPath = Path.Combine(
                 "TestResults", "ProtoTest.Demo", "report.json"))
             .AddSink<HtmlReportSink>(sink =>
@@ -239,11 +149,76 @@ public sealed class Setup : ProtoTestAssembly
                 sink.OutputPath = Path.Combine("TestResults", "ProtoTest.Demo", "report.html");
                 sink.Title = "Northstar Platform · ProtoTest Demo";
             });
+    }
 
-        // Registered last on purpose: the application's client initializer runs first and starts the
-        // in-process app, which declares its event topology - the messaging initializer then finds the
-        // exchanges it binds its per-test taps to.
-        if (useMessaging)
+    private static void ConfigureTests(
+        IConfigurationBuilder configuration,
+        DemoEnvironment environment)
+    {
+        configuration.AddConfiguration(environment.Configuration);
+        var settings = new Dictionary<string, string?>
+        {
+            [$"ProtoTest:Applications:{NorthstarTargets.Api}:OpenApi:Specification"] = Path.Combine(
+                AppContext.BaseDirectory, "northstar.openapi.json"),
+            [$"ProtoTest:Applications:{NorthstarTargets.Api}:Endpoints:GraphQL"] = "/graphql",
+            ["ProtoTest:Web:Pages:Source"] = ConsoleBuild.SourceFolder,
+            ["ProtoTest:Web:Pages:Framework"] = "vue",
+            ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
+        };
+
+        if (!environment.UsesLocalApplications)
+        {
+            settings[$"ProtoTest:Applications:{NorthstarTargets.Api}:BaseUrl"] = environment.TargetUrl;
+        }
+
+        configuration.AddInMemoryCollection(settings);
+    }
+
+    private static void ConfigureApplication(
+        IProtoApplicationBuilder app,
+        DemoEnvironment environment)
+    {
+        if (environment.UsesLocalApplications)
+        {
+            app.AddAspNetCoreServer<Program>(configureWebHost: webHost =>
+            {
+                if (!environment.OwnsPostgres)
+                {
+                    webHost.UseSetting("ConnectionStrings:Northstar", environment.DatabaseConnection);
+                }
+
+                webHost.UseSetting("Database:Provider", environment.DatabaseProvider);
+                webHost.UseSetting("ProtoTest:TestSupport", "true");
+
+                // Container settings are forwarded by the host; external configuration is passed explicitly.
+                if (!string.IsNullOrWhiteSpace(environment.ConfiguredMessaging))
+                {
+                    webHost.UseSetting(
+                        "Messaging:RabbitMq:ConnectionString",
+                        environment.ConfiguredMessaging);
+                }
+            });
+        }
+
+        app.AddRest(rest =>
+            {
+                rest.CaptureAttachments()
+                    .AddClient("Api")
+                    .AddCollector<RestCoverageCollector>()
+                    .AddCollector<OpenApiCoverageCollector>();
+            })
+            .AddGraphQL(graphQL => graphQL
+                .CaptureAttachments()
+                .AddClient("GraphQL")
+                .WithSubscriptionTransport(GraphQLSubscriptionTransport.WebSocket)
+                .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "northstar.graphql")))
+            .AddGrpc(grpc => grpc.CaptureAttachments().AddClient("Projects"));
+    }
+
+    private static void ConfigureMessaging(IProtoHostBuilder builder, DemoEnvironment environment)
+    {
+        // Registered last because the application declares the topology before messaging binds its taps.
+        if (environment.UsesMessaging)
         {
             builder.AddMessaging(messaging => messaging.CaptureAttachments().UseRabbitMq());
         }
@@ -251,24 +226,6 @@ public sealed class Setup : ProtoTestAssembly
         {
             builder.AddMessaging(messaging => messaging.CaptureAttachments());
         }
-    }
-
-    /// <summary>
-    /// Whether the configured store is PostgreSQL. An explicit <c>Database:Provider</c> wins; otherwise
-    /// the connection string decides, and anything that is not clearly PostgreSQL stays SQLite.
-    /// </summary>
-    internal static bool IsPostgresStore(string? provider, string? connectionString)
-    {
-        if (!string.IsNullOrWhiteSpace(provider))
-        {
-            return string.Equals(provider, "postgres", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(provider, "postgresql", StringComparison.OrdinalIgnoreCase);
-        }
-
-        if (string.IsNullOrWhiteSpace(connectionString)) return false;
-        return connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
-            || connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase)
-            || connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ResolveDatabase(IServiceProvider provider, string fallback)
@@ -282,4 +239,3 @@ public sealed class Setup : ProtoTestAssembly
             ? new NpgsqlConnection(connectionString)
             : new SqliteConnection(connectionString);
 }
-

@@ -9,7 +9,7 @@
   <a href="https://www.nuget.org/profiles/MSeys"><img src="https://img.shields.io/badge/nuget-all%20packages-blue" alt="All NuGet packages" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/MSeys/ProtoTest" alt="License" /></a>
 
-ProtoTest is a foundation for integration testing on .NET 8, 9 and 10. (Big words, but it's hard to explain what it truly is)
+ProtoTest is a foundation for integration testing on .NET 8, 9 and 10.
 
 ## What is ProtoTest?
 

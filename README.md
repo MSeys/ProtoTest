@@ -36,7 +36,7 @@ This definitely is a large list. I picked these because they're commonly used, b
 
 Use only what your test suite needs. You're not obligated to use everything.
 
-[Learn more about Core](https://prototest.dev/docs/advanced/extending)
+[Learn more about Core](https://prototest.dev/docs/foundation/overview)
 
 [Explore the integrations](https://prototest.dev/docs/integrations/overview)
 
@@ -110,7 +110,7 @@ If they already do their job well, why wrap them?
 
 I'm a huge fan of AAA since discovering that principle. Tests should simply be that readable: Arrange-Act-Assert. Straight to the point.
 
-That's why the wrappers exist. They integrate with the core and they're my opinionated view on how I want to test with them.
+That's why the wrappers exist. They integrate with the Core and they're my opinionated view on how I want to test with them.
 
 Common application setup can stay outside the test. Setup that matters to the scenario should still be visible.
 
@@ -127,6 +127,18 @@ dotnet test
 
 [Additional demo suite](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.Demo)
 
+## Bonus: Behind the name
+
+A little bonus since ProtoTest might seem like a weird name. I tend to use Proto for projects that match my vision. As a student, I created ProtoEngine (a C++ 2D game engine, also available on GitHub).
+
+Why Proto? Is it short for Prototype?
+
+Yes, you'd be correct. Prototype in the sense of looking simple and straight to the point.
+
+That's always my goal, even if I don't succeed in every step or implementation. It has to look readable and simple while still being extendable.
+
+That's where the name ProtoTest comes from: Proto, from Prototype, combined with Testing. Bringing some of that simplicity and directness to integration testing.
+
 ## AI usage?
 
 Yes, extensively. This is the first personal project where I have used AI this much.
@@ -140,5 +152,7 @@ Do I regret using it? I don't know yet.
 **ProtoTest is still what I wanted to build.**
 
 [Read the longer explanation in the documentation.](https://prototest.dev/docs/project/ai-usage)
+
+## License
 
 ProtoTest is available under the [MIT license](https://github.com/MSeys/ProtoTest/blob/main/LICENSE). Issues and contributions are welcome.

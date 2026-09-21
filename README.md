@@ -66,6 +66,19 @@ Common application setup can stay outside the test. Setup that matters to the sc
 
 Is it the best for everyone? Probably not. But it might just help someone do integration testing.
 
+## Integrations
+
+ProtoTest currently integrates with REST, GraphQL, gRPC, SQL, Entity Framework Core,
+Playwright, Selenium, RabbitMQ, ASP.NET Core, Testcontainers, OpenTelemetry and more.
+
+This definitely is a large list. I picked these because they're commonly used, but if something is missing, you can easily create an integration yourself, extend an existing one or open a discussion and I'll check it out.
+
+Use only what your test suite needs. You're not obligated to use everything.
+
+[Explore the integrations →](https://prototest.dev/docs/integrations/)
+
+[Extend ProtoTest yourself →](https://prototest.dev/docs/advanced/extending)
+
 ## Try it
 
 ```bash

@@ -69,7 +69,7 @@ Integration testing can get rough, especially for bigger applications such as Sa
 
 My focus is and always has been clean and readable code. ProtoTest is my response to how messy that setup gets.
 
-It's built from scratch, but on what I learned from a testing framework I wrote by hand years ago.
+It's built from scratch, but on what I learned from a testing framework I wrote by hand years ago. I had already been thinking about building ProtoTest since March, but was in a bit of a coding slump and never really got started. Once I did, it moved very quickly.
 
 [Read more about why I built ProtoTest.](https://prototest.dev/docs/project/why-prototest)
 

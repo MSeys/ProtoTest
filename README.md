@@ -75,7 +75,7 @@ This definitely is a large list. I picked these because they're commonly used, b
 
 Use only what your test suite needs. You're not obligated to use everything.
 
-[Explore the integrations →](https://prototest.dev/docs/integrations/)
+[Explore the integrations →](https://prototest.dev/docs/integrations/overview)
 
 [Extend ProtoTest yourself →](https://prototest.dev/docs/advanced/extending)
 

@@ -20,7 +20,6 @@ using ProtoTest.Core;
 /// [RequiresPlaywrightBrowser]                                   // the configured browser
 /// [RequiresPlaywrightBrowser(browser: PlaywrightBrowser.Firefox)]
 /// [RequiresPlaywrightBrowser(channel: "msedge", Reason = "No Edge in this environment.")]
-/// [RequiresPlaywrightBrowser(Session = "Admin")]                // the Admin session's options
 /// public async Task ...() { ... }
 /// </code>
 /// </example>
@@ -53,14 +52,6 @@ public sealed class RequiresPlaywrightBrowserAttribute : ProtoAttribute, IProtoS
     /// <summary>The required system browser channel, or <see langword="null"/> to use the host's configuration.</summary>
     public string? Channel { get; }
 
-    /// <summary>
-    /// The session whose options the probe follows, or <see langword="null"/> for the protocol-level
-    /// section. Set it when the test drives a named session, because the backend binds
-    /// <c>ProtoTest:Web:Sessions:{name}</c> over <c>ProtoTest:Web:Playwright</c>; without it a
-    /// session-level browser, channel or install-browsers setting could disagree with the launch.
-    /// </summary>
-    public string? Session { get; init; }
-
     /// <summary>The reason reported when the browser cannot run.</summary>
     public string? Reason { get; init; }
 
@@ -73,7 +64,7 @@ public sealed class RequiresPlaywrightBrowserAttribute : ProtoAttribute, IProtoS
 
     private PlaywrightWebOptions Resolve(ProtoHost host)
     {
-        var options = PlaywrightWebDefaults.Resolve(host.Configuration, Session);
+        var options = PlaywrightWebDefaults.Resolve(host.Configuration);
         if (Browser is not null)
         {
             options.Browser = Browser.Value;

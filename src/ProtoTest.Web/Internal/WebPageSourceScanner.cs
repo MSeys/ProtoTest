@@ -1,5 +1,7 @@
 namespace ProtoTest.Web.Internal;
 
+using ProtoTest.Core.Internal;
+
 using System.Text.Json;
 using System.Text.RegularExpressions;
 

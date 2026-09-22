@@ -1,5 +1,7 @@
 namespace ProtoTest.AspNetCore.Internal;
 
+using ProtoTest.Core.Internal;
+
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Metadata;
@@ -18,8 +20,9 @@ using Microsoft.Extensions.DependencyInjection;
 /// <list type="bullet">
 /// <item>Razor Page endpoints, non-API MVC actions, and endpoints that produce <c>text/html</c> count as pages.</item>
 /// <item>API-shaped prefixes (<c>/api</c>, <c>/graphql</c>, framework <c>/_…</c> routes and similar) are excluded.</item>
-/// <item>Parameterized and catch-all templates (<c>{id}</c>, <c>{**path}</c>) are excluded, because a route
-/// pattern cannot be matched by a concrete visited path; inventory is for stable page paths.</item>
+/// <item>Parameterized templates (<c>{id}</c>) become the same <c>{name}</c> pattern the web scanner and
+/// Vue discovery produce, so a visited <c>/orders/42</c> covers <c>/orders/{id}</c>; catch-alls
+/// (<c>{**path}</c>) become <c>{...}</c>.</item>
 /// <item>Only endpoints that explicitly declare GET are considered; an endpoint with no method
 /// metadata is not inventoried as a page.</item>
 /// </list>
@@ -50,23 +53,24 @@ internal static class AspNetCorePageInventory
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
-        var include = ReadGlobs(configuration, applicationName, "Include");
-        var exclude = ReadGlobs(configuration, applicationName, "Exclude");
+        var include = WebPageConfig.Read(
+            configuration, $"ProtoTest:Applications:{applicationName}:Web:Pages:Include");
+        var exclude = WebPageConfig.Read(
+            configuration, $"ProtoTest:Applications:{applicationName}:Web:Pages:Exclude");
         var paths = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var endpoint in EnumerateEndpoints(services))
         {
             if (endpoint is not RouteEndpoint route) continue;
             var pattern = route.RoutePattern.RawText;
             if (string.IsNullOrWhiteSpace(pattern)) continue;
-            if (pattern.Contains('{')) continue;
-            var path = NormalizePath(pattern);
+            var path = WebPagePath.NormalizeRoute(pattern);
             if (path is null) continue;
             if (!IsGet(endpoint)) continue;
             // An API-shaped route is excluded unless the endpoint is page-like beyond JSON: an
             // [ApiController] action that renders a view or produces HTML is still a page.
             if (IsApiShaped(path) && !HasHtmlEvidence(endpoint) && !ReturnsViewResultFor(endpoint)) continue;
             if (!IsPageLike(endpoint)) continue;
-            if (include.Length > 0 && !include.Any(glob => GlobMatch(glob, path))) continue;
+            if (include.Count > 0 && !include.Any(glob => GlobMatch(glob, path))) continue;
             if (exclude.Any(glob => GlobMatch(glob, path))) continue;
             paths.Add(path);
         }
@@ -179,63 +183,7 @@ internal static class AspNetCorePageInventory
             path.Equals(prefix, StringComparison.OrdinalIgnoreCase)
             || path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase));
 
-    private static string? NormalizePath(string pattern)
-    {
-        var value = pattern.Trim();
-        if (value.Length == 0) return null;
-        if (!value.StartsWith('/')) value = "/" + value;
-        if (value.Length > 1) value = value.TrimEnd('/');
-        return value.Length == 0 ? "/" : value;
-    }
-
-    private static string[] ReadGlobs(IConfiguration configuration, string applicationName, string name)
-    {
-        var section = configuration.GetSection($"ProtoTest:Applications:{applicationName}:Web:Pages:{name}");
-        var values = section.GetChildren()
-            .Select(child => child.Value)
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value!)
-            .ToList();
-        // A single Include/Exclude value is a scalar in configuration; the web collector reads the
-        // same section the same way, so the two inventories cannot disagree.
-        if (values.Count == 0 && !string.IsNullOrWhiteSpace(section.Value))
-        {
-            values.Add(section.Value!);
-        }
-
-        return [.. values];
-    }
-
     /// <summary>Case-insensitive glob match: <c>*</c> is any run of characters, <c>?</c> is exactly one.</summary>
     internal static bool GlobMatch(string pattern, string value)
-    {
-        int patternIndex = 0, valueIndex = 0, starIndex = -1, mark = 0;
-        while (valueIndex < value.Length)
-        {
-            if (patternIndex < pattern.Length
-                && (pattern[patternIndex] == '?'
-                    || char.ToLowerInvariant(pattern[patternIndex]) == char.ToLowerInvariant(value[valueIndex])))
-            {
-                patternIndex++;
-                valueIndex++;
-            }
-            else if (patternIndex < pattern.Length && pattern[patternIndex] == '*')
-            {
-                starIndex = patternIndex++;
-                mark = valueIndex;
-            }
-            else if (starIndex >= 0)
-            {
-                patternIndex = starIndex + 1;
-                valueIndex = ++mark;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-        while (patternIndex < pattern.Length && pattern[patternIndex] == '*') patternIndex++;
-        return patternIndex == pattern.Length;
-    }
+        => System.IO.Enumeration.FileSystemName.MatchesSimpleExpression(pattern, value, ignoreCase: true);
 }

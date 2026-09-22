@@ -90,7 +90,7 @@ public sealed class ProtoXunitTestCase : XunitTestCase
 }
 
 [EditorBrowsable(EditorBrowsableState.Never)]
-public sealed class ProtoXunitTheoryTestCase : XunitTheoryTestCase
+internal sealed class ProtoXunitTheoryTestCase : XunitTheoryTestCase
 {
     [Obsolete("Called by the de-serializer; should only be called by deriving classes for de-serialization purposes")]
     public ProtoXunitTheoryTestCase()
@@ -214,6 +214,8 @@ internal sealed class ProtoXunitTheoryTestCaseRunner(
 /// </summary>
 internal sealed class ProtoXunitTestRunner : XunitTestRunner
 {
+    private readonly ProtoTestPreparation _preparation;
+
     public ProtoXunitTestRunner(
         ITest test,
         IMessageBus messageBus,
@@ -237,12 +239,16 @@ internal sealed class ProtoXunitTestRunner : XunitTestRunner
             aggregator,
             cancellationTokenSource)
     {
+        // Preparing in the constructor resolves the attributes once and decides the skip before
+        // invocation; the runner for a row starts from the very same resolution.
+        _preparation = ProtoTestAdapter.Prepare(testMethod, ProtoTestAssembly.Host, Test.DisplayName);
+
         // xUnit v2 has no dynamic skip API and its non-virtual RunAsync decides pass/fail from the
         // invoker's aggregator, so a TestSkipped queued from InvokeTestMethodAsync would still be
         // counted and announced as TestPassed. RunAsync checks SkipReason before invoking anything,
         // so the dynamic skip belongs there: skipping before the lifecycle starts keeps the trace
         // honest - nothing ran, so nothing failed.
-        SkipReason ??= ProtoTestSkip.GetReason(ProtoAttributeResolver.Resolve(testMethod), ProtoTestAssembly.Host);
+        SkipReason ??= _preparation.SkipReason;
     }
 
     protected override async Task<decimal> InvokeTestMethodAsync(ExceptionAggregator aggregator)
@@ -250,11 +256,7 @@ internal sealed class ProtoXunitTestRunner : XunitTestRunner
         var host = ProtoTestAssembly.Host;
         try
         {
-            await host.StartTestAsync(
-                Test.DisplayName,
-                TestMethod,
-                ProtoAttributeResolver.Resolve(TestMethod),
-                Xunit2AttachmentPublisher.Instance);
+            await _preparation.StartAsync(host, Xunit2AttachmentPublisher.Instance);
         }
         catch (Exception exception)
         {
@@ -281,3 +283,4 @@ internal sealed class ProtoXunitTestRunner : XunitTestRunner
         return executionTime;
     }
 }
+

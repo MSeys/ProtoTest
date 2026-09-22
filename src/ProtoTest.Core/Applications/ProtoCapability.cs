@@ -49,14 +49,5 @@ public static class ProtoCapabilityExtensions
     // integrations declaring the same adapter - must report one capability, while distinct descriptors
     // of the same CLR type still each register.
     private static void AddCapability(IServiceCollection services, ProtoCapabilityDescriptor capability)
-    {
-        if (services.Any(descriptor =>
-                descriptor.ServiceType == typeof(ProtoCapabilityDescriptor)
-                && Equals(descriptor.ImplementationInstance, capability)))
-        {
-            return;
-        }
-
-        services.AddSingleton(capability);
-    }
+        => ProtoRegistration.TryAdd(services, capability, existing => existing == capability);
 }

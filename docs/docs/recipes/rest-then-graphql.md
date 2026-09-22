@@ -25,7 +25,7 @@ protected override void Configure(IProtoHostBuilder builder) =>
     builder.AddApplication("Api", app => app
         .AddAspNetCoreServer<Program>()
         .AddRest(rest => rest.AddClient("Api"))
-        .AddGraphQL(graphQL => graphQL.AddClient("GraphQL")));
+        .AddGraphQL(graphQL => graphQL.AddClient("GraphQL", endpoint: "GraphQL")));
 ```
 
 Both clients reuse the in-process server's transport. The GraphQL client is rooted at the path configured under `ProtoTest:Applications:Api:Endpoints:GraphQL` — the demo sets it to `/graphql`; with no path configured, the transport root is used.

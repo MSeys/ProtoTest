@@ -22,6 +22,10 @@ public sealed class ProtoGrpcClientInitializer(
 {
     public string Name { get; } = name;
 
+    public string Protocol => protocolName;
+
+    private string ScopedName => ProtoClientResolution.ScopedName(Protocol, Name);
+
     public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
     {
         var configured = ResolveConfiguredAddress(context.Configuration);
@@ -39,7 +43,7 @@ public sealed class ProtoGrpcClientInitializer(
             addressResolver,
             application,
             ct));
-        context.RegisterClient(client, Name);
+        context.RegisterClient(client, ScopedName);
         TraceConfiguration(context, configured, source);
         return Task.FromResult(true);
     }
@@ -113,7 +117,7 @@ public sealed class ProtoGrpcClientInitializer(
 
         context.Trace.SetEntityState(
             ProtoTraceEntityKinds.Client,
-            $"client:{typeof(ProtoGrpcClient).FullName}:{Name}",
+            $"client:{typeof(ProtoGrpcClient).FullName}:{ScopedName}",
             $"gRPC client {Name}",
             state,
             scope: context.TestName);

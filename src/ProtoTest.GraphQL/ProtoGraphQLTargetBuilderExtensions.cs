@@ -5,12 +5,20 @@ using ProtoTest.Core;
 
 public static class ProtoGraphQLTargetBuilderExtensions
 {
+    /// <summary>
+    /// Selects the transport a target's subscriptions use, unless one was already selected for it: the
+    /// first registration wins, matching how collectors and messaging adapters treat repeats.
+    /// </summary>
     public static IProtoTargetBuilder WithSubscriptionTransport(
         this IProtoTargetBuilder target,
         GraphQLSubscriptionTransport transport)
     {
         ArgumentNullException.ThrowIfNull(target);
-        target.Services.AddSingleton(new GraphQLSubscriptionTransportRegistration(target.TargetName, transport));
+        var marker = new GraphQLSubscriptionTransportRegistration(target.TargetName, transport);
+        ProtoRegistration.TryAdd(
+            target.Services,
+            marker,
+            existing => string.Equals(existing.TargetName, marker.TargetName, StringComparison.OrdinalIgnoreCase));
         return target;
     }
 

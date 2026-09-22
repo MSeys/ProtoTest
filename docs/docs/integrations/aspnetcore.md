@@ -204,7 +204,7 @@ An application's HTTP clients reuse its in-process server when no URL is configu
 | yes | real server at the configured URL |
 | no | the application's in-process server |
 
-The same suite runs in-process on a developer machine and against a deployed environment in CI, just by setting `BaseUrl` there. `AddClientFrom(name, sourceClientName, basePath?)` remains available when a client must reuse a *differently named* client's transport or a path prefix.
+The same suite runs in-process on a developer machine and against a deployed environment in CI, just by setting `BaseUrl` there. A configured `BaseUrl` takes precedence and leaves the in-process server unstarted; without one, the application's HTTP clients fall back to its transport automatically, so there is nothing to point at by hand.
 
 In the first row the application is never started — with the default `PerRun` lifetime it only starts the first time a test actually needs it.
 

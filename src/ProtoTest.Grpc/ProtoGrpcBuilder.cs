@@ -21,17 +21,19 @@ public sealed class ProtoGrpcBuilder
     /// <summary>
     /// Registers a named gRPC client. Inside <c>AddApplication</c> the client belongs to that application
     /// and takes its address from <c>ProtoTest:Applications:{app}:Grpc:Address</c>, falling back to the
-    /// application's <c>BaseUrl</c> or its in-process transport.
+    /// application's <c>BaseUrl</c> or its in-process transport. The name may be omitted for an
+    /// application's only gRPC client.
     /// </summary>
     public IProtoTargetBuilder AddClient(
-        string name = "Default",
+        string? name = null,
         string? address = null,
         Action<GrpcClientOptions>? configure = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var clientName = name ?? "Default";
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
         var applicationName = _application?.ApplicationName;
-        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
-        _application?.RegisterClient("Grpc", name);
+        var registeredName = ProtoHttpClientRegistration.Qualify(clientName, applicationName);
+        _application?.RegisterClient("Grpc", clientName);
         return Clients.ProtoGrpcClientRegistration.AddClient(
             Services,
             "Grpc",
@@ -44,14 +46,15 @@ public sealed class ProtoGrpcBuilder
 
     /// <summary>Adds a client whose absolute address is resolved from per-test context.</summary>
     public IProtoTargetBuilder AddClient(
-        string name,
+        string? name,
         Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> addressResolver,
         Action<GrpcClientOptions>? configure = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var clientName = name ?? "Default";
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
         var applicationName = _application?.ApplicationName;
-        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
-        _application?.RegisterClient("Grpc", name);
+        var registeredName = ProtoHttpClientRegistration.Qualify(clientName, applicationName);
+        _application?.RegisterClient("Grpc", clientName);
         return Clients.ProtoGrpcClientRegistration.AddClient(
             Services,
             "Grpc",
@@ -63,7 +66,7 @@ public sealed class ProtoGrpcBuilder
 
     /// <summary>Adds a client whose absolute address is read from per-test context.</summary>
     public IProtoTargetBuilder AddClient(
-        string name,
+        string? name,
         Func<ProtoExecutionContext, Uri> addressResolver,
         Action<GrpcClientOptions>? configure = null)
     {

@@ -130,7 +130,8 @@ public sealed class ProtoWorkbook
         foreach (var cell in part.Worksheet.Descendants<Cell>())
         {
             var reference = cell.CellReference?.Value;
-            if (!SheetReferences.TryParse(reference, out _, out _))
+            if (string.IsNullOrWhiteSpace(reference)
+                || !SheetReferences.TryParse(reference, out _, out _))
             {
                 // A malformed reference is file corruption; skipping it keeps the rest readable.
                 continue;

@@ -7,6 +7,13 @@ description: What changed in each ProtoTest release, with every breaking change 
 
 Every ProtoTest package shares one version number, so this page lists releases, not packages. Each release that changes a public API lists the change under **Breaking** with what to write instead.
 
+## 1.0.1 — 2026-09-20
+
+- Binary REST response artifacts now keep their original bytes in `.prototrace` files. This fixes previews and downloads of workbooks, PDFs, images and other binary responses.
+- The trace viewer can preview `.xlsx` artifacts.
+- The docs gained recipe traces and a generated [.NET API reference](https://prototest.dev/api/).
+- Package validation now checks that symbol files match the DLLs shipped in the corresponding NuGet packages.
+
 ## 1.0.0 — 2026-09-19
 
 **ProtoTest 1.0 is here.** What began as a stubborn idea — that an integration test should read like the scenario it describes while the framework quietly owns everything around it — is now a stable foundation for .NET 8, 9 and 10. One host, one execution context and one explicit lifecycle; the test runner you already use; and every integration sharing the same assertions, evidence and coverage, all the way down to a portable trace you can open and read. Every package ships together at 1.0.0, documented, tested, and ready for production suites.

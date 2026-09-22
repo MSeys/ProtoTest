@@ -8,7 +8,7 @@ internal sealed class ProtoRunGateHook(
 {
     // AfterRun executes in descending order. Gates run first so their verdicts reach the sinks, the
     // run-scoped resources are still alive, and the trace archive picks everything up.
-    public int Order => int.MinValue + 3;
+    public int Order => ProtoHookOrder.RunGates;
 
     public Task AfterRunAsync(CancellationToken cancellationToken = default)
     {
@@ -91,3 +91,4 @@ internal sealed class ProtoRunGateHook(
         _ => ProtoTraceOutcome.Skipped
     };
 }
+

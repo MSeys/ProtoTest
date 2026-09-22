@@ -33,14 +33,13 @@ Repeated registration never errors: the lifecycle hook and keyed options registe
 
 | Overload | Base address |
 | --- | --- |
-| `AddClient(name = "Default", baseUrl = null, configure = null, endpoint = null)` | the explicit `baseUrl`, else the application's `BaseUrl` joined with `Endpoints:{endpoint}` |
+| `AddClient(name = null, baseUrl = null, configure = null, endpoint = null)` | the explicit `baseUrl`, else the application's `BaseUrl` joined with `Endpoints:{endpoint}` |
 | `AddClient(name, Func<ProtoExecutionContext, Uri> resolver, configure = null)` | resolved per request from the running test |
 | `AddClient(name, Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> resolver, configure = null)` | async per-request resolution |
-| `AddClientFrom(name, sourceClientName, basePath = null)` | another integration's registered client, optionally rooted at `basePath` |
 
-The **endpoint default rule**: `endpoint` names the key under `ProtoTest:Applications:{application}:Endpoints` to append to the application's `BaseUrl`. Inside `AddApplication` it defaults to the client name; a host-level client registered with `AddRest` has no endpoint default. An explicit non-absolute base URL throws `ArgumentException`.
+The name may be omitted when the application has one REST client; pass one only to address several targets (`Rest("Billing")`, `[Application("Api", "Rest:Billing")]`).
 
-`AddClientFrom` reuses the transport of an HTTP client another integration registered — an in-process ASP.NET Core server, for example — and the source client must have a base address when the alias resolves. See [ASP.NET Core](../aspnetcore.md).
+There is **no endpoint default**: `endpoint` names the key under `ProtoTest:Applications:{application}:Endpoints` to append to the application's `BaseUrl`. Without it the base URL is used as-is — an explicit `baseUrl`, or the application's `BaseUrl`. An explicit non-absolute base URL throws `ArgumentException`.
 
 ### Base URL from configuration
 
@@ -104,11 +103,11 @@ public sealed class OrderTests
 - **Attachments** — `.CaptureAttachments()` records sanitized request, response and expected-shape attachments: [Attachments and coverage](./attachments.md).
 - **Coverage** — attach `.AddCollector<RestCoverageCollector>()` to the client; [OpenAPI coverage](../openapi.md) consumes the shape assertions' matched paths.
 - **Multiple clients** — pass `.Rest("Billing")`, or bind one for the whole test with `[Application("Api", "Rest:Billing")]`.
-- **In-process server** — `AddAspNetCoreServer<Program>()` plus a client with no URL reuses its transport, or point `AddClientFrom` at another client explicitly.
+- **In-process server** — `AddAspNetCoreServer<Program>()` plus a client with no URL reuses its transport automatically; a configured `BaseUrl` takes precedence and leaves the server unstarted.
 
 ## Tracing and coverage
 
-Each request records an `http.request` operation (`REST · {METHOD} {route}`) under the `client:HttpClient:{target}` entity, with the method, route, sanitized URL, header count and response status. Assertions record `assert.http.status` and `assert.json.shape` as children of that request. Observations: `http.response` for every response (method, route template, status, sanitized body and headers, duration), `http.failure` when sending or URI building fails, and `http.contract.shape` when a shape assertion matches. `RestCoverageCollector` turns `http.response` observations into `REST` coverage items. See [ProtoTrace](../../observability/prototrace.md) and [Coverage](../../observability/coverage.md).
+Each request records an `http.request` operation (`REST · {METHOD} {route}`) under the protocol-scoped client entity (`client:HttpClient:Rest:{target}`), with the method, route, sanitized URL, header count and response status. Assertions record `assert.http.status` and `assert.json.shape` as children of that request. Observations: `http.response` for every response (method, route template, status, sanitized body and headers, duration), `http.failure` when sending or URI building fails, and `http.contract.shape` when a shape assertion matches. `RestCoverageCollector` turns `http.response` observations into `REST` coverage items. See [ProtoTrace](../../observability/prototrace.md) and [Coverage](../../observability/coverage.md).
 
 ## Skip
 

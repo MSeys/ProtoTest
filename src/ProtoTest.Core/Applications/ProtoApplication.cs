@@ -38,6 +38,50 @@ public static class ProtoApplication
     public static string? BaseUrl(IConfiguration configuration, string applicationName)
         => configuration[$"{SectionPath}:{applicationName}:BaseUrl"];
 
+    /// <summary>
+    /// Returns the base address of an application for a running test: an address a started instance
+    /// advertised through infrastructure settings wins over static configuration. Browser sessions use
+    /// this, because a session may run against a process infrastructure started (the same application,
+    /// second instance); HTTP clients stay on static configuration.
+    /// </summary>
+    public static string? BaseUrl(ProtoExecutionContext context, string applicationName)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentException.ThrowIfNullOrWhiteSpace(applicationName);
+        var key = $"{SectionPath}:{applicationName}:BaseUrl";
+        if (context.TryService<ProtoInfrastructureSettings>() is { } settings
+            && settings.Values.TryGetValue(key, out var provided)
+            && !string.IsNullOrWhiteSpace(provided))
+        {
+            return provided;
+        }
+
+        return context.Configuration[key];
+    }
+
+    /// <summary>
+    /// Returns the address of an application endpoint: the application's base URL joined with its
+    /// <c>Endpoints:{endpointName}</c> path when one is configured, or the base URL unchanged.
+    /// </summary>
+    public static string? EndpointAddress(ProtoExecutionContext context, string applicationName, string? endpointName)
+    {
+        var baseUrl = BaseUrl(context, applicationName);
+        if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(endpointName))
+        {
+            return baseUrl;
+        }
+
+        var path = Endpoint(context.Configuration, applicationName, endpointName);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return baseUrl;
+        }
+
+        return Uri.TryCreate(baseUrl, UriKind.Absolute, out var origin)
+            ? new Uri(origin, path).ToString()
+            : baseUrl;
+    }
+
     /// <summary>Returns the relative path configured for a named endpoint of an application, or null.</summary>
     public static string? Endpoint(IConfiguration configuration, string applicationName, string endpointName)
     {

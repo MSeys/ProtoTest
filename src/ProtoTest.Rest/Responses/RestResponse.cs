@@ -134,52 +134,23 @@ public sealed class RestResponse : IDisposable, IProtoBinaryContent
 
     internal RestResponse AssertHttpStatus(HttpStatusCode expectedStatusCode, bool negated)
     {
-        var statusSatisfied = ProtoAssertion.IsSatisfied(StatusCode == expectedStatusCode, negated);
-        using var operation = _context is null
-            ? null
-            : _context.Trace
-                .Operation(
-                    "assert.http.status",
-                    $"Assert status · {ProtoAssertion.Describe($"{(int)expectedStatusCode} {expectedStatusCode}", negated)}",
-                    "ProtoTest.Rest")
-                .With("expected.status_code", ((int)expectedStatusCode).ToString())
-                .With("actual.status_code", ((int)StatusCode).ToString())
-                .With("assertion.negated", negated ? "true" : null)
-                .With("request.identifier", _routeIdentifier)
-                .Parent(_requestTraceId)
-                .Begin();
-        operation?.AddSection(new ProtoTraceSection(
-            "Result",
-            ProtoTraceSectionKind.Checks,
-            [
-                new(
-                    "status",
-                    ((int)StatusCode).ToString(),
-                    statusSatisfied
-                        ? null
-                        : $"expected {ProtoAssertion.Describe(((int)expectedStatusCode).ToString(), negated)}",
-                    statusSatisfied ? ProtoTraceSectionTone.Success : ProtoTraceSectionTone.Error)
-            ]));
-        try
-        {
-            if (!statusSatisfied)
-            {
-                // The failure message must not exceed either limit: the response section applies even
-                // when the protocol never opted into attachment capture, and the attachment options
-                // keep their own redaction rules when capture is on.
-                var diagnosticBody = ProtoHttpDiagnosticSanitizer.SanitizeBody(
-                    Content,
-                    ResolveStatusDiagnosticOptions());
-                throw new RestStatusAssertionException(expectedStatusCode, StatusCode, diagnosticBody, negated);
-            }
-            operation?.Succeed();
-            return this;
-        }
-        catch (Exception exception)
-        {
-            operation?.Fail(exception);
-            throw;
-        }
+        ProtoStatusAssertion.Assert(
+            _context,
+            "ProtoTest.Rest",
+            expectedStatusCode,
+            StatusCode,
+            negated,
+            // The failure message must not exceed either limit: the response section applies even
+            // when the protocol never opted into attachment capture, and the attachment options
+            // keep their own redaction rules when capture is on.
+            failureFactory: () => new RestStatusAssertionException(
+                expectedStatusCode,
+                StatusCode,
+                ProtoHttpDiagnosticSanitizer.SanitizeBody(Content, ResolveStatusDiagnosticOptions()),
+                negated),
+            parentOperationId: _requestTraceId,
+            requestIdentifier: _routeIdentifier);
+        return this;
     }
 
     private ProtoHttpAttachmentOptions ResolveStatusDiagnosticOptions()

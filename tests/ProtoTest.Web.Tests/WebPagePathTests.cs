@@ -1,5 +1,7 @@
 namespace ProtoTest.Web.Tests;
 
+using ProtoTest.Core.Internal;
+
 using ProtoTest.Web.Internal;
 
 [TestFixture]

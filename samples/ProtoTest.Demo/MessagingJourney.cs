@@ -22,6 +22,7 @@ using ProtoTest.Web;
 [Application(NorthstarTargets.Api)]
 [NorthstarTenant(PlanIds.Growth)]
 [Auth<NorthstarAuthenticator>]
+[WebSession("Default", DiscoverRoutes = true)]
 [RequiresCapability(
     ProtoCapabilityKinds.Broker,
     Reason = "No broker is configured; set ProtoTest:Messaging:RabbitMq:ConnectionString.")]

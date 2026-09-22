@@ -72,6 +72,7 @@ public sealed class GrpcIntegrationTests
             SayMethod,
             new EchoRequest { Message = "hello" },
             metadata => metadata.Add("authorization", "Bearer secret"));
+        reply.ShouldMatchShape(new { message = "hello" });
 
         // Resolve coverage before the test completes: the test scope is disposed with the result.
         var coverage = context.Services.GetServices<IProtoCollector>()
@@ -84,7 +85,10 @@ public sealed class GrpcIntegrationTests
         Assert.Multiple(() =>
         {
             Assert.That(reply.Message, Is.EqualTo("hello"));
-            reply.ShouldMatchShape(new { message = "hello" });
+            Assert.That(
+                test.Entries.Any(entry => entry.Kind == "assert.json.shape" && entry.Outcome == ProtoTraceOutcome.Succeeded),
+                Is.True,
+                "the shared shape assertion traces with the rest of the call");
             Assert.That(EchoService.LastAuthorization, Is.EqualTo("Bearer secret"));
             var call = test.Entries.Single(entry => entry.Kind == "grpc.call");
             Assert.That(call.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
@@ -112,6 +116,26 @@ public sealed class GrpcIntegrationTests
             Assert.That(entity.State["client.protocol"], Is.EqualTo("Grpc"));
             Assert.That(entity.State["client.initializer"], Is.EqualTo("ProtoGrpcClientInitializer"));
         });
+    }
+
+    [Test]
+    public async Task ClientName_ShouldFindAHostRegisteredClientInsideAnApplication()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("grpc host client", TestMethod());
+        context.SetContext(new ProtoApplicationState("Api", new Dictionary<string, string>()));
+
+        // The host registered "Echo"; inside application "Api" the qualified name "Api:Echo" does not
+        // exist, so the explicit name must fall back to the host client instead of the transport.
+        var client = context.Grpc("Echo");
+        var reply = await client.UnaryAsync(SayMethod, new EchoRequest { Message = "host" });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.That(reply.Message, Is.EqualTo("host"),
+            "a host-registered client is reachable by its own name inside an application");
     }
 
     [Test]

@@ -182,7 +182,7 @@ Nesting is automatic: an operation started while another is running becomes its 
 A runner integration needs three things, all visible in the existing runner packages:
 
 1. Build and start one `ProtoHost` per process, and stop it at the end.
-2. Around each test, call `ProtoAttributeResolver.Resolve(method)` and then `StartTestAsync(name, method, attributes, publisher)`; afterwards, `CompleteTestAsync(result)` with the best outcome the runner can tell you.
+2. Around each test, call `ProtoTestAdapter.Prepare(method, host)` and start the returned preparation with `StartAsync(host, publisher)`. Skip through your runner's own mechanism when `CanRun` is false; afterwards, `CompleteTestAsync(result)` with the best outcome the runner can tell you — `ProtoTestResult` has factories for passed, skipped, partial, failed and cancelled.
 3. Implement `IProtoTestAttachmentPublisher` using the runner's own attachment API.
 
 Start the test on the same async flow the test body will run on — `Proto.Context` depends on it.

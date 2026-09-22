@@ -10,7 +10,7 @@ internal sealed class ProtoRunResourceHook(
     ProtoTraceSession trace) : IProtoRunHook
 {
     // AfterRun executes in descending order: gates, reports, run resources, trace archive.
-    public int Order => int.MinValue + 1;
+    public int Order => ProtoHookOrder.RunResources;
 
     public Task BeforeRunAsync(CancellationToken cancellationToken = default)
     {
@@ -61,3 +61,4 @@ internal sealed class ProtoRunResourceHook(
             "One or more run-scoped resources failed to release.", [.. failures]);
     }
 }
+

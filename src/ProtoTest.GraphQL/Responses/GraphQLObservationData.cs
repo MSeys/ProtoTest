@@ -12,7 +12,7 @@ public sealed record GraphQLResponseData(
     string? VariablesJson = null);
 
 /// <summary>Failure data attached to a <c>graphql.failure</c> observation.</summary>
-public sealed record GraphQLFailureData(
+internal sealed record GraphQLFailureData(
     string OperationType,
     string? OperationName,
     TimeSpan Duration,
@@ -20,4 +20,6 @@ public sealed record GraphQLFailureData(
     string Message);
 
 /// <summary>Shape-match data attached to a <c>graphql.contract.shape</c> observation.</summary>
-public sealed record GraphQLShapeMatchData(string RequestIdentifier, IReadOnlyList<string> MatchedProperties);
+internal sealed record GraphQLShapeMatchData(string RequestIdentifier, IReadOnlyList<string> MatchedProperties);
+
+

@@ -19,12 +19,10 @@ public class ProtoTestExecutor : ITestExecutor
     {
         var methodInfo = context.Metadata.TestDetails.MethodMetadata.GetReflectionInfo()
             ?? throw new InvalidOperationException("TUnit did not expose a reflection MethodInfo for the test method.");
-        var attributes = ProtoAttributeResolver.Resolve(methodInfo);
-        var skipReason = ProtoTestSkip.GetReason(attributes, ProtoTestAssembly.Host);
-        if (skipReason is not null)
+        var preparation = ProtoTestAdapter.Prepare(methodInfo, ProtoTestAssembly.Host);
+        if (!preparation.CanRun)
         {
-            // Skipping before the lifecycle starts keeps the trace honest: nothing ran, so nothing failed.
-            global::TUnit.Core.Skip.Test(skipReason);
+            global::TUnit.Core.Skip.Test(preparation.SkipReason!);
         }
 
         var lifecycleStarted = false;
@@ -32,8 +30,7 @@ public class ProtoTestExecutor : ITestExecutor
         Exception? failure = null;
         try
         {
-            await ProtoTestAssembly.Host.StartTestAsync(
-                ProtoTestName.FromMethod(methodInfo), methodInfo, attributes, new TUnitAttachmentPublisher(context));
+            await preparation.StartAsync(ProtoTestAssembly.Host, new TUnitAttachmentPublisher(context));
             lifecycleStarted = true;
             await action();
             result = ProtoTestResult.Passed;

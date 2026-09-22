@@ -107,6 +107,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
 
         // Internal hooks
         _services.AddSingleton<IProtoTestHook, ProtoClientInitializerHook>();
+        _services.AddSingleton<IProtoTestHook, ProtoClientCompletionHook>();
         _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoRunHook, ProtoTraceExportHook>());
         _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoRunHook, ProtoRunGateHook>());
         _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoRunHook, ProtoRunResourceHook>());

@@ -65,6 +65,30 @@ public sealed class RegistrationIdempotencyTests
     }
 
     [Test]
+    public async Task AddSql_AfterTheHostRegisteredOptions_ShouldComposeAroundThem()
+    {
+        var hostOptions = new SqlOptions();
+        var builder = new ProtoHostBuilder()
+            .ConfigureServices(services => services.AddSingleton(hostOptions))
+            .AddSql(_ => new SqliteConnection(ConnectionString));
+
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("sql composed options", TestMethod());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Proto.Context.Service<SqlOptions>(), Is.SameAs(hostOptions),
+                "the host's options are used instead of disabling the integration");
+            Assert.That(Proto.Context.SqlConnection().State, Is.EqualTo(ConnectionState.Open),
+                "the connection, session, hooks and guard still compose");
+        });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
+
+    [Test]
     public async Task AddEntityFrameworkCore_CalledTwiceForTheSameContext_ShouldKeepTheFirstRegistration()
     {
         var builder = new ProtoHostBuilder();

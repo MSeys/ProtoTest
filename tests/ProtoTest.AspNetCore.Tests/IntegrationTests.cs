@@ -313,7 +313,7 @@ public class IntegrationTests
     }
 
     [Test]
-    public async Task AspNetCore_First_Should_Take_Precedence_Over_Configured_Rest_Client()
+    public async Task Configured_Url_Should_Win_Regardless_Of_Server_Registration_Order()
     {
         var inMemoryConfig = new Dictionary<string, string?>
         {
@@ -322,7 +322,7 @@ public class IntegrationTests
 
         var host = new ProtoHostBuilder()
             .ConfigureAppConfiguration(builder => builder.AddInMemoryCollection(inMemoryConfig))
-            .AddAspNetCoreServer<SampleApi.Program>("OrderApi")
+            .AddAspNetCoreServer<SampleApi.Program>("OrderApi") // declared before REST on purpose
             .AddRest(rest => rest.AddClient("OrderApi"))
             .Build();
 
@@ -330,10 +330,17 @@ public class IntegrationTests
 
         try
         {
-            var response = await Proto.Context.Client<HttpClient>("OrderApi").GetAsync("/ping");
+            var client = Proto.Context.Client<HttpClient>("OrderApi");
 
-            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(Proto.Context.ServerFactory<SampleApi.Program>("OrderApi"), Is.Not.Null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(client.BaseAddress, Is.EqualTo(new Uri("https://api.example.com/")),
+                    "the configured URL wins; the in-process server is its fallback");
+                Assert.That(
+                    Proto.Context.TryClient<WebApplicationFactory<SampleApi.Program>>("OrderApi:Factory"),
+                    Is.Null,
+                    "the fallback stays unstarted while a URL is configured");
+            });
         }
         finally
         {

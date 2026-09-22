@@ -61,8 +61,8 @@ public static class ProtoHostBuilderExtensions
 
     /// <summary>
     /// Backs an application with an in-process ASP.NET Core server, registered under the application
-    /// name so the application's HTTP clients can reuse its transport (for example
-    /// <c>rest.AddClientFrom("Api", app.Name)</c>).
+    /// name so the application's HTTP clients (a client with no configured URL) fall back to its
+    /// transport automatically.
     /// </summary>
     /// <remarks>
     /// Repeating the call registers each server and lets the client initializer hook pick the first that

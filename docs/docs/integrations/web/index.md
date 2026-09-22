@@ -46,13 +46,12 @@ A machine may have no browser at all. Rather than hand-rolling `Assert.Ignore`, 
 [RequiresPlaywrightBrowser]                       // the configured browser
 [RequiresPlaywrightBrowser(PlaywrightBrowser.Firefox)]
 [RequiresPlaywrightBrowser(channel: "msedge")]
-[RequiresPlaywrightBrowser(Session = "Admin")]    // the Admin session's options
 public async Task ...() { ... }
 ```
 
 It probes the installed browser before the lifecycle starts, without launching one, and skips with a reason naming Playwright and the install options; `InstallBrowsers = true` never skips. Selenium has no equivalent probe, so its tests combine `[RequiresCapability(ProtoCapabilityKinds.Browser, CapabilityName = "Selenium")]` with a try/catch around the first session. Both patterns are documented under [skip conditions](../../foundation/skip-conditions.md#requiring-a-playwright-browser) and summarized under [Skip](#skip).
 
-A session can target its own address instead of the application's: `ProtoTest:Web:Sessions:{name}:BaseUrl` wins over `ProtoTest:Applications:{application}:BaseUrl`. Infrastructure that started an application with the run fills that key, so a browser journey needs no fixture code.
+A session follows its application's address: `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with `ProtoTest:Applications:{application}:Endpoints:{endpoint}`. Infrastructure that started an application with the run advertises that same setting, so a browser journey can run against a standalone instance without fixture code.
 
 ## Registering
 
@@ -106,14 +105,13 @@ Sessions are not declared at registration: a test names the sessions it needs wi
 Both backends also read their options from configuration, so CI can run headless on another browser without code changes. Values are applied in this order, later winning:
 
 1. your `AddWeb(...)` callback,
-2. `ProtoTest:Web:Playwright` or `ProtoTest:Web:Selenium` — every session of that backend,
-3. `ProtoTest:Web:Sessions:{name}` — one named session.
+2. `ProtoTest:Web:Playwright` or `ProtoTest:Web:Selenium` — the run's backend options.
 
-Started infrastructure settings are merged over static configuration before binding, so they win over the same key in `appsettings.json`. Selenium's `ActionTimeout`/`PollInterval` are validated after binding; a non-positive value throws `ArgumentOutOfRangeException`. `TimeSpan` values bind as `"hh:mm:ss(.fffffff)"` and enums bind by name.
+Started infrastructure settings are merged over static configuration before binding, so they win over the same key in `appsettings.json`. Selenium's `ActionTimeout`/`PollInterval` and Playwright's `ActionTimeout` are validated after binding; a non-positive value throws `ArgumentOutOfRangeException`. `TimeSpan` values bind as `"hh:mm:ss(.fffffff)"` and enums bind by name.
 
 ### Playwright options
 
-Key names below are relative to `ProtoTest:Web:Playwright` or `ProtoTest:Web:Sessions:{name}` (`src/ProtoTest.Web.Playwright/PlaywrightWebOptions.cs`):
+Key names below are relative to `ProtoTest:Web:Playwright` (`src/ProtoTest.Web.Playwright/PlaywrightWebOptions.cs`):
 
 | Key | Type | Default | |
 | --- | --- | --- | --- |
@@ -122,6 +120,7 @@ Key names below are relative to `ProtoTest:Web:Playwright` or `ProtoTest:Web:Ses
 | `SlowMo` | float? (ms) | `null` | delay between actions, for watching a run |
 | `Channel` | string? | `null` | e.g. `"msedge"` or `"chrome"` to use an installed browser |
 | `InstallBrowsers` | bool | `false` | download the selected browser before the first launch when it is missing |
+| `ActionTimeout` | `TimeSpan` | 5 s | how long a read or action waits for its element before failing with the documented resolution/actionability exception |
 | `Context` | `BrowserNewContextOptions` | `new()` | nested keys bind, e.g. `Context:Locale`, `Context:ViewportSize:Width` |
 | `TraceRetention` | `PlaywrightTraceRetention` | `OnWebFailure` | `Off`, `OnWebFailure`, `Always` |
 | `CorrelateTraceGroups` | bool | `true` | group Playwright trace actions under ProtoTest operations |
@@ -131,7 +130,7 @@ Key names below are relative to `ProtoTest:Web:Playwright` or `ProtoTest:Web:Ses
 
 ### Selenium options
 
-Key names below are relative to `ProtoTest:Web:Selenium` or `ProtoTest:Web:Sessions:{name}` (`src/ProtoTest.Web.Selenium/SeleniumWebOptions.cs`):
+Key names below are relative to `ProtoTest:Web:Selenium` (`src/ProtoTest.Web.Selenium/SeleniumWebOptions.cs`):
 
 | Key | Type | Default | |
 | --- | --- | --- | --- |
@@ -141,18 +140,30 @@ Key names below are relative to `ProtoTest:Web:Selenium` or `ProtoTest:Web:Sessi
 | `CheckClickObstruction` | bool | `true` | fail if something covers the element |
 | `DiagnosticTraceRetention` | `SeleniumDiagnosticTraceRetention` | `OnWebFailure` | `Off`, `OnWebFailure`, `Always` |
 
-### Session keys
+### Demanding a session
 
-The session section `ProtoTest:Web:Sessions:{name}` also carries the backend-neutral keys (`src/ProtoTest.Web/Sessions/WebSession.cs`, `Authentication/WebSessionAttribute.cs`):
+A session exists because a test asks for it, not because configuration declares it. Demand it in code with the attribute:
 
-| Key | Type | Default | Infrastructure settings? |
-| --- | --- | --- | --- |
-| `ProtoTest:Web:Sessions:{name}:Application` | string | the session name | no — static configuration only |
-| `ProtoTest:Web:Sessions:{name}:BaseUrl` | absolute URI | `ProtoTest:Applications:{application}:BaseUrl`; may be absent | yes, wins over static configuration |
-| `ProtoTest:Web:Sessions:{name}:Open` | absolute or relative URL | `[WebSession(..., Open = "…")]`; may be absent | yes, wins over static configuration |
-| `ProtoTest:Web:Sessions:{name}:DiscoverRoutes` | bool | `false` | yes, wins over static configuration |
+```csharp
+[WebSession("Admin", Application = "BackOffice", Endpoint = "Admin", DiscoverRoutes = true,
+            Open = "/back-office")]
+```
 
-`Application` selects which `ProtoTest:Applications:{application}` section supplies the base URL and whether the session is counted for that application's coverage. It does not consult infrastructure settings.
+or inside the test with the accessor:
+
+```csharp
+var session = Proto.Context.Web("Admin", application: "BackOffice", endpoint: "Admin");
+```
+
+| Member | Effect |
+| --- | --- |
+| name | the session name; `context.Web()` uses the application's `Web:` binding, then `"Default"` |
+| `Application` | the `ProtoTest:Applications:{application}` section that supplies the address and owns the session's coverage; defaults to the test's application, then the session name |
+| `Endpoint` | joins `ProtoTest:Applications:{application}:Endpoints:{endpoint}` to the base URL, like an HTTP client |
+| `DiscoverRoutes` | records the session's Vue Router routes as page inventory after the first navigation |
+| `Open` | navigates the session during setup; a relative value resolves against the application address |
+
+Configuration holds the environment, never the session: addresses under `ProtoTest:Applications:{application}`, backend options under `ProtoTest:Web:{backend}`.
 
 ### From configuration
 
@@ -165,20 +176,20 @@ The session section `ProtoTest:Web:Sessions:{name}` also carries the backend-neu
         "Headless": true,
         "TraceRetention": "Always",
         "Context": { "Locale": "nl-BE", "ViewportSize": { "Width": 1280, "Height": 720 } }
-      },
-      "Sessions": {
-        "Admin": { "Application": "ControlPlane", "BaseUrl": "https://ops.example.test" }
       }
+    },
+    "Applications": {
+      "ControlPlane": { "BaseUrl": "https://ops.example.test" }
     }
   }
 }
 ```
 
-Nested Playwright context options such as `Context:Locale` bind too. Options are bound once, the first time a session of that name opens a browser.
+Nested Playwright context options such as `Context:Locale` bind too. Options are bound once, the first time a session opens a browser.
 
 ## Sessions
 
-`Proto.Context.Web(sessionName = null, application = null)` returns the test's `WebSession`. The browser is created **lazily** on the first operation, so a test that never touches the browser never starts one, and the session is completed and disposed at teardown. `application` defaults to the application selected for the test; `sessionName` defaults to the application's `Web` client name, then `"Default"`.
+`Proto.Context.Web(sessionName = null, application = null, endpoint = null, discoverRoutes = false)` returns the test's `WebSession`. The browser is created **lazily** on the first operation, so a test that never touches the browser never starts one, and the session is completed and disposed at teardown. `application` defaults to the application selected for the test; `sessionName` defaults to the application's `Web` client name, then `"Default"`.
 
 ```csharp
 public sealed class WebSession : IAsyncDisposable
@@ -239,7 +250,7 @@ Sessions can also be declared on the test, so setup creates (and optionally navi
 public async Task ...() { ... }
 ```
 
-`Application = "ControlPlane"` on the attribute names the application the session targets, defaulting to the session name. A relative `Open` resolves against the session's base URL, and the configuration key `ProtoTest:Web:Sessions:{name}:Open` supplies the whole URL when even the path differs per environment — configuration wins over the attribute.
+`Application = "ControlPlane"` on the attribute names the application the session targets, defaulting to the test's application and then the session name. A relative `Open` resolves against the session's application address — `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with the named endpoint.
 
 ### Dropping down to the driver
 
@@ -445,7 +456,7 @@ React has no generic runtime route table to read, and ProtoTest deliberately doe
 - **Scanner:** a relative `Source` may not escape the test assembly's base directory; there is no Nuxt 2 underscore-dynamic support, only absolute route literals are collected, and there is no runtime React discovery.
 - **Vue discovery** latches after the first non-null route table, so a router that later adds routes in the same session is not re-read.
 - **Page origin:** an external redirect contributes no visited or verified coverage, and a backend that cannot report an address still passes the test.
-- **Playwright:** the browser pool is scoped to one test — identical launch options share a process only inside that test. There is no retry layer beyond Playwright's own auto-waiting, `InstallBrowsers` does nothing when `Channel` is set, trace groups are serialized by a semaphore and skipped when `TraceRetention = Off`, console/page-error/request-failure text is truncated at 4096 characters, and the skip probe starts the Playwright driver.
+- **Playwright:** the browser pool is scoped to one test — identical launch options share a process only inside that test. Reads and actions use Playwright's own auto-waiting, bounded by `ActionTimeout` (5 s by default); a timeout becomes the same resolution or actionability exception Selenium raises. `InstallBrowsers` does nothing when `Channel` is set, trace groups are serialized by a semaphore and skipped when `TraceRetention = Off`, console/page-error/request-failure text is truncated at 4096 characters, and the skip probe starts the Playwright driver.
 - **Selenium:** one driver per session, no pooling, so sessions do not share cookies or storage; native failures surface as `WebActionabilityException` after `ActionTimeout`; `SelectOptionAsync` matches the `value` DOM property exactly and requires a single match.
 
 ## Next

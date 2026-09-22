@@ -8,9 +8,18 @@ public interface IProtoClientInitializer
 {
     /// <summary>
     /// Gets the registration name for this client (e.g., "Default", "OrderService").
-    /// Initializers with the same name and <see cref="ClientType"/> form an ordered provider chain.
+    /// Initializers with the same <see cref="Protocol"/>, client type and name form an ordered provider
+    /// chain.
     /// </summary>
     string Name { get; }
+
+    /// <summary>
+    /// Gets the protocol this initializer serves (for example "Rest"), or <see langword="null"/> for a
+    /// host-level client. Protocols keep their own provider chains, and a provider registers its client
+    /// under <c>Protocol:Name</c> (see <see cref="ProtoClientResolution.ScopedName( string?, string)"/>),
+    /// so two protocols can own the same client name without shadowing each other.
+    /// </summary>
+    string? Protocol => null;
 
     /// <summary>
     /// Gets the type under which the client is registered in the execution context.

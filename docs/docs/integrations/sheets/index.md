@@ -146,7 +146,7 @@ sales.Row(row => row.Region == "EMEA")
 - `Rows` returns the projected records; `Row(predicate)` fails when nothing matches; `Column(row => row.Amount)` reads a typed column.
 - Typed columns support `string`, `decimal`, `double`, `int`, `long`, `bool`, `DateTime` and their nullables. `Should.Be` uses `EqualityComparer<TValue?>.Default`, `Should.BeSortedBy` uses `Comparer<TValue?>.Default`, and `ShouldAll(predicate)` is positive-only and reports the first failing row.
 - `Verify()` checks every declared column and reports **all** violations in one failure — emptiness and non-nullability, conversion, `Min`/`Max` (numbers and date serial values), `Pattern`, `OneOf`, and `Unique` with kind-aware keys. The message shows up to ten, then `+N more`.
-- A row is matched with the same [shapes](../../foundation/shape-matching.md) as a JSON response, through `row.ShouldMatchShape(shape)`.
+- A row is matched with the same [shapes](../../foundation/shape-matching.md) as a JSON response, through `row.ShouldMatchShape(shape)`. The assertion is a traced `assert.json.shape` operation on the ambient test context with the same expected/actual evidence as a response assertion, and its failure keeps the mismatch details as the inner exception.
 - Records are populated without running their constructors; an optional empty cell binds as `null`.
 
 ### Hidden sheets

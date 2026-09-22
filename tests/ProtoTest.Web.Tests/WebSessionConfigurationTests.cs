@@ -8,7 +8,7 @@ using ProtoTest.Web.Playwright;
 public sealed class WebSessionConfigurationTests
 {
     [Test]
-    public async Task SessionBaseUrl_ShouldComeFromSettingsInfrastructure()
+    public async Task ApplicationBaseUrl_ShouldComeFromSettingsInfrastructure()
     {
         var builder = new ProtoHostBuilder();
         builder.AddWeb(options => options.InstallBrowsers = true);
@@ -21,7 +21,7 @@ public sealed class WebSessionConfigurationTests
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         Assert.That(web.BaseUrl, Is.EqualTo(new Uri("http://standalone.test:8080/")),
-            "Started infrastructure fills the session's base URL.");
+            "Started infrastructure fills the application's base URL, which the session follows.");
     }
 
     private sealed class FakeSettingsInfrastructure : IProtoSettingsInfrastructure
@@ -36,7 +36,7 @@ public sealed class WebSessionConfigurationTests
 
         public IReadOnlyDictionary<string, string> Settings { get; } = new Dictionary<string, string>
         {
-            ["ProtoTest:Web:Sessions:Default:BaseUrl"] = "http://standalone.test:8080/"
+            ["ProtoTest:Applications:Default:BaseUrl"] = "http://standalone.test:8080/"
         };
 
         public ValueTask StartAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;

@@ -2,12 +2,39 @@ name: Verify
 
 on:
   workflow_call:
+    inputs:
+      upload_packages:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  sample-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: samples/ProtoTest.SampleApp/Ui/package-lock.json
+      - name: Build the sample app UI
+        working-directory: samples/ProtoTest.SampleApp/Ui
+        run: |
+          npm ci
+          npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sample-app-ui
+          path: samples/ProtoTest.SampleApp/Ui/dist
+          if-no-files-found: error
+
   build-test-pack:
+    needs: sample-ui
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -37,17 +64,10 @@ jobs:
           dotnet build tests/ProtoTest.Web.Tests/ProtoTest.Web.Tests.csproj --configuration Release --no-restore
           pwsh tests/ProtoTest.Web.Tests/bin/Release/net8.0/playwright.ps1 install --with-deps chromium
 
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: samples/ProtoTest.SampleApp/Ui/package-lock.json
-
-      - name: Build the sample app UI
-        working-directory: samples/ProtoTest.SampleApp/Ui
-        run: |
-          npm ci
-          npm run build
+          name: sample-app-ui
+          path: samples/ProtoTest.SampleApp/Ui/dist
 
       - name: Restore, build, and test every runner
         shell: pwsh
@@ -96,7 +116,16 @@ jobs:
           dotnet build (Join-Path $starter "Starter.slnx") --configuration Release --no-restore
           dotnet test (Join-Path $starter "Starter.Tests/Starter.Tests.csproj") --configuration Release --no-build --no-restore
 
+      - name: Keep the validated release packages
+        if: inputs.upload_packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-packages
+          path: artifacts/packages/*
+          if-no-files-found: error
+
   postgres-demo:
+    needs: sample-ui
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -110,17 +139,10 @@ jobs:
             9.0.x
             10.0.x
 
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: samples/ProtoTest.SampleApp/Ui/package-lock.json
-
-      - name: Build the sample app UI
-        working-directory: samples/ProtoTest.SampleApp/Ui
-        run: |
-          npm ci
-          npm run build
+          name: sample-app-ui
+          path: samples/ProtoTest.SampleApp/Ui/dist
 
       # The container path only runs where a container runtime exists, which is why it is its own job.
       - name: Run the demo against a PostgreSQL container
@@ -133,6 +155,7 @@ jobs:
           dotnet test samples/ProtoTest.Demo/ProtoTest.Demo.csproj --configuration Release --no-build --no-restore --verbosity minimal
 
   rabbitmq-demo:
+    needs: sample-ui
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -152,17 +175,10 @@ jobs:
             9.0.x
             10.0.x
 
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: samples/ProtoTest.SampleApp/Ui/package-lock.json
-
-      - name: Build the sample app UI
-        working-directory: samples/ProtoTest.SampleApp/Ui
-        run: |
-          npm ci
-          npm run build
+          name: sample-app-ui
+          path: samples/ProtoTest.SampleApp/Ui/dist
 
       # The broker path: the adapter's round trips and the demo's event journey only run here. The
       # adapter tests use the job's own service; the demo still owns a container as infrastructure.

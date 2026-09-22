@@ -9,7 +9,7 @@ using ProtoTest.Http;
 /// Registers the named gRPC client and its initializer, so Core creates the channel during setup the
 /// same way it creates every other client. Mirrors the HTTP client registration the other protocols use.
 /// </summary>
-public static class ProtoGrpcClientRegistration
+internal static class ProtoGrpcClientRegistration
 {
     /// <summary>Registers a named gRPC client with an explicit or application-resolved address.</summary>
     public static IProtoTargetBuilder AddClient(
@@ -77,3 +77,4 @@ public static class ProtoGrpcClientRegistration
         return new ProtoTargetBuilder(name, services);
     }
 }
+

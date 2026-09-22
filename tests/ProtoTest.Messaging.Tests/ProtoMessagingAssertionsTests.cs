@@ -18,7 +18,7 @@ public sealed class ProtoMessagingAssertionsTests
         var context = await host.StartTestAsync("messaging shape", TestMethod());
         var message = new ProtoMessage("invoice.paid", """{"id":42,"status":"paid"}""", ContentType: "application/json");
 
-        message.ShouldMatchShape(context, new { id = 42, status = "paid" });
+        message.ShouldMatchShape(new { id = 42, status = "paid" });
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         var operation = host.Trace.Snapshot().Tests.Single().Entries
@@ -48,7 +48,7 @@ public sealed class ProtoMessagingAssertionsTests
         var message = new ProtoMessage("invoice.paid", """{"id":42}""");
 
         var exception = Assert.Throws<JsonShapeMismatchException>(
-            () => message.ShouldMatchShape(context, new { id = 7 }));
+            () => message.ShouldMatchShape(new { id = 7 }));
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
         var operation = host.Trace.Snapshot().Tests.Single().Entries
@@ -73,9 +73,9 @@ public sealed class ProtoMessagingAssertionsTests
         var context = await host.StartTestAsync("messaging payload", TestMethod());
 
         var empty = Assert.Throws<JsonDocumentAssertionException>(
-            () => new ProtoMessage("invoice.paid", null).ShouldMatchShape(context, new { id = 42 }));
+            () => new ProtoMessage("invoice.paid", null).ShouldMatchShape(new { id = 42 }));
         var text = Assert.Throws<JsonDocumentAssertionException>(
-            () => new ProtoMessage("invoice.paid", "not json").ShouldMatchShape(context, new { id = 42 }));
+            () => new ProtoMessage("invoice.paid", "not json").ShouldMatchShape(new { id = 42 }));
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(text!));
         Assert.Multiple(() =>

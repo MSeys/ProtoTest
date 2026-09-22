@@ -8,6 +8,7 @@ using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
+using ProtoTest.Json;
 
 [TestFixture]
 public sealed class SheetsTests
@@ -25,7 +26,8 @@ public sealed class SheetsTests
         var worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
         var sheetData = new SheetData();
         worksheetPart.Worksheet = new Worksheet(sheetData);
-        workbookPart.Workbook.AppendChild(new Sheets()).Append(new Sheet
+        var sheets = workbookPart.Workbook.AppendChild(new Sheets());
+        sheets.Append(new Sheet
         {
             Id = workbookPart.GetIdOfPart(worksheetPart),
             SheetId = 1,
@@ -146,7 +148,7 @@ public sealed class SheetsTests
         var salesPart = workbookPart.AddNewPart<WorksheetPart>();
         var salesData = new SheetData();
         salesPart.Worksheet = new Worksheet(salesData);
-        workbookPart.Workbook.Sheets.Append(new Sheet
+        sheets.Append(new Sheet
         {
             Id = workbookPart.GetIdOfPart(salesPart),
             SheetId = 2,
@@ -165,7 +167,7 @@ public sealed class SheetsTests
         var ledgerPart = workbookPart.AddNewPart<WorksheetPart>();
         var ledgerData = new SheetData();
         ledgerPart.Worksheet = new Worksheet(ledgerData);
-        workbookPart.Workbook.Sheets.Append(new Sheet
+        sheets.Append(new Sheet
         {
             Id = workbookPart.GetIdOfPart(ledgerPart),
             SheetId = 3,
@@ -182,7 +184,7 @@ public sealed class SheetsTests
         var yearsPart = workbookPart.AddNewPart<WorksheetPart>();
         var yearsData = new SheetData();
         yearsPart.Worksheet = new Worksheet(yearsData);
-        workbookPart.Workbook.Sheets.Append(new Sheet
+        sheets.Append(new Sheet
         {
             Id = workbookPart.GetIdOfPart(yearsPart),
             SheetId = 4,
@@ -197,7 +199,7 @@ public sealed class SheetsTests
         var keysPart = workbookPart.AddNewPart<WorksheetPart>();
         var keysData = new SheetData();
         keysPart.Worksheet = new Worksheet(keysData);
-        workbookPart.Workbook.Sheets.Append(new Sheet
+        sheets.Append(new Sheet
         {
             Id = workbookPart.GetIdOfPart(keysPart),
             SheetId = 5,
@@ -213,7 +215,7 @@ public sealed class SheetsTests
         var datedPart = workbookPart.AddNewPart<WorksheetPart>();
         var datedData = new SheetData();
         datedPart.Worksheet = new Worksheet(datedData);
-        workbookPart.Workbook.Sheets.Append(new Sheet
+        sheets.Append(new Sheet
         {
             Id = workbookPart.GetIdOfPart(datedPart),
             SheetId = 6,
@@ -228,7 +230,7 @@ public sealed class SheetsTests
         var mixedPart = workbookPart.AddNewPart<WorksheetPart>();
         var mixedData = new SheetData();
         mixedPart.Worksheet = new Worksheet(mixedData);
-        workbookPart.Workbook.Sheets.Append(new Sheet
+        sheets.Append(new Sheet
         {
             Id = workbookPart.GetIdOfPart(mixedPart),
             SheetId = 7,
@@ -243,7 +245,7 @@ public sealed class SheetsTests
         var mixedDuplicatePart = workbookPart.AddNewPart<WorksheetPart>();
         var mixedDuplicateData = new SheetData();
         mixedDuplicatePart.Worksheet = new Worksheet(mixedDuplicateData);
-        workbookPart.Workbook.Sheets.Append(new Sheet
+        sheets.Append(new Sheet
         {
             Id = workbookPart.GetIdOfPart(mixedDuplicatePart),
             SheetId = 12,
@@ -259,7 +261,7 @@ public sealed class SheetsTests
         var formatsPart = workbookPart.AddNewPart<WorksheetPart>();
         var formatsData = new SheetData();
         formatsPart.Worksheet = new Worksheet(formatsData);
-        workbookPart.Workbook.Sheets.Append(new Sheet
+        sheets.Append(new Sheet
         {
             Id = workbookPart.GetIdOfPart(formatsPart),
             SheetId = 8,
@@ -283,7 +285,7 @@ public sealed class SheetsTests
         var headersPart = workbookPart.AddNewPart<WorksheetPart>();
         var headersData = new SheetData();
         headersPart.Worksheet = new Worksheet(headersData);
-        workbookPart.Workbook.Sheets.Append(new Sheet
+        sheets.Append(new Sheet
         {
             Id = workbookPart.GetIdOfPart(headersPart),
             SheetId = 9,
@@ -296,7 +298,7 @@ public sealed class SheetsTests
         var hiddenPart = workbookPart.AddNewPart<WorksheetPart>();
         var hiddenData = new SheetData();
         hiddenPart.Worksheet = new Worksheet(hiddenData);
-        workbookPart.Workbook.Sheets.Append(new Sheet
+        sheets.Append(new Sheet
         {
             Id = workbookPart.GetIdOfPart(hiddenPart),
             SheetId = 10,
@@ -310,7 +312,7 @@ public sealed class SheetsTests
         var corruptPart = workbookPart.AddNewPart<WorksheetPart>();
         var corruptData = new SheetData();
         corruptPart.Worksheet = new Worksheet(corruptData);
-        workbookPart.Workbook.Sheets.Append(new Sheet
+        sheets.Append(new Sheet
         {
             Id = workbookPart.GetIdOfPart(corruptPart),
             SheetId = 11,
@@ -330,7 +332,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Open_ShouldReadTypedCellsAndFormulas()
     {
-        var (host, context) = await StartAsync("sheets read");
+        var (host, context) = Start("sheets read");
         var workbook = context.Sheets().Open(_path);
 
         var sheet = workbook.Sheet("Summary");
@@ -351,7 +353,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Sheet_ShouldFailWithTheAvailableNames()
     {
-        var (host, context) = await StartAsync("sheets missing");
+        var (host, context) = Start("sheets missing");
         var workbook = context.Sheets().Open(_path);
 
         var exception = Assert.Throws<SpreadsheetAssertionException>(() => workbook.Sheet("Missing"));
@@ -363,7 +365,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Range_ShouldMatchAndCountCoverage()
     {
-        var (host, context) = await StartAsync("sheets range");
+        var (host, context) = Start("sheets range");
         var sheet = context.Sheets().Open(_path).Sheet("Summary");
 
         sheet.Range("A4:B5").Should.Match(
@@ -388,7 +390,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Table_ShouldHandleLayeredHeadersAndMergedGroups()
     {
-        var (host, context) = await StartAsync("sheets table");
+        var (host, context) = Start("sheets table");
         var table = context.Sheets().Open(_path).Sheet("Sales").Table(1, 2);
 
         Assert.Multiple(() =>
@@ -413,7 +415,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Table_ShouldNotRecordCoverageUntilRead()
     {
-        var (host, context) = await StartAsync("sheets table untouched");
+        var (host, context) = Start("sheets table untouched");
         var table = context.Sheets().Open(_path).Sheet("Sales").Table(1, 2);
 
         Assert.That(table.Headers, Has.Count.EqualTo(3));
@@ -425,7 +427,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Table_ShouldRecordOnlyTheRangesActuallyRead()
     {
-        var (host, context) = await StartAsync("sheets table coverage");
+        var (host, context) = Start("sheets table coverage");
         var table = context.Sheets().Open(_path).Sheet("Sales").Table(1, 2);
 
         _ = table.Column("Amount");
@@ -502,7 +504,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Model_ShouldRecordTheRangesItRead()
     {
-        var (host, context) = await StartAsync("sheets model coverage");
+        var (host, context) = Start("sheets model coverage");
         var model = context.Sheets().Open(_path).Model<SalesRow>();
 
         model.Verify();
@@ -520,7 +522,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Model_ShouldFailOnAnEmptyCellForANonNullableValueAndProjectOptionalDefaults()
     {
-        var (host, context) = await StartAsync("sheets model empty");
+        var (host, context) = Start("sheets model empty");
         var sheet = context.Sheets().Open(_path);
         var strict = sheet.Model<LedgerRow>();
 
@@ -540,7 +542,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Model_VerifyShouldReportDuplicateNumericValues()
     {
-        var (host, context) = await StartAsync("sheets unique numbers");
+        var (host, context) = Start("sheets unique numbers");
         var model = context.Sheets().Open(_path).Model<LedgerRow>();
 
         var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Verify());
@@ -552,7 +554,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Table_ShouldUseTypedHeaderValues()
     {
-        var (host, context) = await StartAsync("sheets numeric header");
+        var (host, context) = Start("sheets numeric header");
         var table = context.Sheets().Open(_path).Sheet("Years").Table(1);
 
         Assert.That(table.Headers[0], Is.EqualTo(new[] { "2024" }));
@@ -564,7 +566,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Range_ShouldMatchTypedValues()
     {
-        var (host, context) = await StartAsync("sheets typed range");
+        var (host, context) = Start("sheets typed range");
         var sheet = context.Sheets().Open(_path).Sheet("Sales");
 
         sheet.Range("B3:C4").Should.Match(
@@ -579,7 +581,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Cell_ShouldNotBeBlank_ShouldFailOnABlankCell()
     {
-        var (host, context) = await StartAsync("sheets negative blank");
+        var (host, context) = Start("sheets negative blank");
         var sheet = context.Sheets().Open(_path).Sheet("Summary");
 
         var exception = Assert.Throws<SpreadsheetAssertionException>(
@@ -596,7 +598,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Column_ShouldNotBe_ShouldPassOnAWrongSequence()
     {
-        var (host, context) = await StartAsync("sheets negative column");
+        var (host, context) = Start("sheets negative column");
         var table = context.Sheets().Open(_path).Sheet("Sales").Table(1, 2);
 
         table.Column("Amount").ShouldNot.Be(["999", "111"]);
@@ -608,7 +610,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Column_ShouldNotBe_ShouldFailOnAMatchingSequence()
     {
-        var (host, context) = await StartAsync("sheets negative column failure");
+        var (host, context) = Start("sheets negative column failure");
         var table = context.Sheets().Open(_path).Sheet("Sales").Table(1, 2);
 
         var exception = Assert.Throws<SpreadsheetAssertionException>(
@@ -621,7 +623,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Range_ShouldNotHaveDimensions_ShouldPassOnAMismatch()
     {
-        var (host, context) = await StartAsync("sheets negative dimensions");
+        var (host, context) = Start("sheets negative dimensions");
         var sheet = context.Sheets().Open(_path).Sheet("Summary");
 
         sheet.Range("A4:B5").ShouldNot.HaveDimensions(3, 3);
@@ -633,7 +635,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Range_ShouldNot_ShouldFailOnAMatchingRange()
     {
-        var (host, context) = await StartAsync("sheets negative range failure");
+        var (host, context) = Start("sheets negative range failure");
         var sheet = context.Sheets().Open(_path).Sheet("Summary");
 
         var dimensions = Assert.Throws<SpreadsheetAssertionException>(
@@ -656,7 +658,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Table_ShouldNotContainRow_ShouldFailOnAnExistingRow()
     {
-        var (host, context) = await StartAsync("sheets negative row");
+        var (host, context) = Start("sheets negative row");
         var table = context.Sheets().Open(_path).Sheet("Sales").Table(1, 2);
 
         table.ShouldNot.ContainRow("Region", "NOPE");
@@ -670,7 +672,7 @@ public sealed class SheetsTests
     [Test]
     public async Task ModelColumn_ShouldNot_ShouldFailOnAMatchingSequence()
     {
-        var (host, context) = await StartAsync("sheets negative model");
+        var (host, context) = Start("sheets negative model");
         var model = context.Sheets().Open(_path).Model<SalesRow>();
 
         model.Column(row => row.Amount).ShouldNot.Be([100m, 200m]);
@@ -690,7 +692,7 @@ public sealed class SheetsTests
     [Test]
     public async Task NegativeAssertion_ShouldRecordTheFailedAssertOperation()
     {
-        var (host, context) = await StartAsync("sheets negative trace");
+        var (host, context) = Start("sheets negative trace");
         var sheet = context.Sheets().Open(_path).Sheet("Summary");
 
         var exception = Assert.Throws<SpreadsheetAssertionException>(
@@ -715,21 +717,22 @@ public sealed class SheetsTests
     [Test]
     public async Task NegativeAssertions_ShouldStillRecordReads()
     {
-        var (host, context) = await StartAsync("sheets negative coverage");
+        var (host, context) = Start("sheets negative coverage");
         var table = context.Sheets().Open(_path).Sheet("Sales").Table(1, 2);
 
         table.Column("Amount").ShouldNot.Be(["999", "111"]);
         table.ShouldNot.ContainRow("Region", "NOPE");
 
+        // Coverage must be read before completion: completing the test disposes the test scope.
+        var coverage = Coverage(context).Select(item => item.Identifier).ToArray();
         await host.CompleteTestAsync(ProtoTestResult.Passed);
-        Assert.That(Coverage(context).Select(item => item.Identifier),
-            Is.EquivalentTo(new[] { "Sales!B3:B4", "Sales!A3:C4" }));
+        Assert.That(coverage, Is.EquivalentTo(new[] { "Sales!B3:B4", "Sales!A3:C4" }));
     }
 
     [Test]
     public async Task NumberFormatWithQuotedCurrency_ShouldStayANumber()
     {
-        var (host, context) = await StartAsync("sheets currency format");
+        var (host, context) = Start("sheets currency format");
         var sheet = context.Sheets().Open(_path).Sheet("Summary");
         var quoted = sheet.Cell("D1");
         var bracketed = sheet.Cell("E1");
@@ -752,7 +755,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Model_ShouldBindTypedRowsAndVerify()
     {
-        var (host, context) = await StartAsync("sheets model");
+        var (host, context) = Start("sheets model");
         var model = context.Sheets().Open(_path).Model<SalesRow>();
         model.Verify();
 
@@ -773,7 +776,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Model_ShouldFailWithTheMissingColumn()
     {
-        var (host, context) = await StartAsync("sheets model failure");
+        var (host, context) = Start("sheets model failure");
         var exception = Assert.Throws<SpreadsheetAssertionException>(() =>
         {
             _ = context.Sheets().Open(_path).Model<BrokenRow>();
@@ -786,7 +789,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Model_ShouldMatchRowShape()
     {
-        var (host, context) = await StartAsync("sheets shape");
+        var (host, context) = Start("sheets shape");
         var model = context.Sheets().Open(_path).Model<SalesRow>();
         var emea = model.Row(row => row.Region == "EMEA");
 
@@ -795,13 +798,22 @@ public sealed class SheetsTests
             emea.ShouldMatchShape(new { Region = "Nope" }));
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(mismatch!));
-        Assert.That(mismatch!.Message, Does.Contain("Region"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(mismatch!.Message, Does.Contain("Region"));
+            Assert.That(mismatch.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
+                "the shared mismatch details stay inspectable");
+            Assert.That(host.Trace.Snapshot().Tests.Single().Entries,
+                Has.Some.Matches<ProtoTraceEntry>(entry =>
+                    entry.Kind == "assert.json.shape" && entry.Outcome == ProtoTraceOutcome.Failed),
+                "a row shape mismatch leaves the same traced evidence as a protocol assertion");
+        });
     }
 
     [Test]
     public async Task Verify_ShouldReportConstraintViolations()
     {
-        var (host, context) = await StartAsync("sheets constraints");
+        var (host, context) = Start("sheets constraints");
         var model = context.Sheets().Open(_path).Model<StrictSalesRow>();
 
         var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Verify());
@@ -813,7 +825,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Open_ShouldAcceptNamedContent()
     {
-        var (host, context) = await StartAsync("sheets content");
+        var (host, context) = Start("sheets content");
         var content = new NamedContent(
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             File.ReadAllBytes(_path),
@@ -828,7 +840,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Table_RowWhere_ShouldMatchATypedKeyCell()
     {
-        var (host, context) = await StartAsync("sheets typed key");
+        var (host, context) = Start("sheets typed key");
         var table = context.Sheets().Open(_path).Sheet("Keys").Table(1);
 
         var first = table.RowWhere("Id", "100");
@@ -843,7 +855,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Model_VerifyShouldSeparateTextAndNumberValuesForUnique()
     {
-        var (host, context) = await StartAsync("sheets unique kinds");
+        var (host, context) = Start("sheets unique kinds");
         var model = context.Sheets().Open(_path).Model<MixedCodeRow>();
 
         model.Verify();
@@ -854,7 +866,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Model_VerifyShouldStillReportDuplicateTextValues()
     {
-        var (host, context) = await StartAsync("sheets unique text duplicates");
+        var (host, context) = Start("sheets unique text duplicates");
         var model = context.Sheets().Open(_path).Model<DuplicateCodeRow>();
 
         var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Verify());
@@ -866,7 +878,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Rows_ShouldFailOnAnEmptyCellForANonNullableValue()
     {
-        var (host, context) = await StartAsync("sheets rows empty");
+        var (host, context) = Start("sheets rows empty");
         var model = context.Sheets().Open(_path).Model<LedgerRow>();
 
         var exception = Assert.Throws<SpreadsheetAssertionException>(() => _ = model.Rows);
@@ -882,7 +894,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Model_VerifyShouldValidateMinAndMaxAgainstDateCells()
     {
-        var (host, context) = await StartAsync("sheets date constraints");
+        var (host, context) = Start("sheets date constraints");
         var workbook = context.Sheets().Open(_path);
 
         var minException = Assert.Throws<SpreadsheetAssertionException>(() => workbook.Model<MinDateRow>().Verify());
@@ -901,7 +913,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Model_VerifyShouldValidatePatternAndOneOfAgainstNumericCells()
     {
-        var (host, context) = await StartAsync("sheets numeric constraints");
+        var (host, context) = Start("sheets numeric constraints");
         var model = context.Sheets().Open(_path).Model<NumericConstraintRow>();
 
         var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Verify());
@@ -918,7 +930,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Model_OptionalOnANonNullableValueType_ShouldFailWithGuidance()
     {
-        var (host, context) = await StartAsync("sheets optional value");
+        var (host, context) = Start("sheets optional value");
         var exception = Assert.Throws<SpreadsheetAssertionException>(() =>
             _ = context.Sheets().Open(_path).Model<OptionalValueRow>());
 
@@ -929,7 +941,7 @@ public sealed class SheetsTests
     [Test]
     public async Task ModelColumn_ShouldFailWithGuidanceForAnUnmappedProperty()
     {
-        var (host, context) = await StartAsync("sheets unmapped property");
+        var (host, context) = Start("sheets unmapped property");
         var model = context.Sheets().Open(_path).Model<UnmappedPropertyRow>();
 
         var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Column(row => row.NotAColumn));
@@ -941,7 +953,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Range_ShouldRejectAReversedReference()
     {
-        var (host, context) = await StartAsync("sheets reversed range");
+        var (host, context) = Start("sheets reversed range");
         var sheet = context.Sheets().Open(_path).Sheet("Summary");
 
         var exception = Assert.Throws<SpreadsheetAssertionException>(() => sheet.Range("C10:A1"));
@@ -957,7 +969,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Range_ShouldRejectARectangleThatExceedsTheCellLimit()
     {
-        var (host, context) = await StartAsync("sheets huge range");
+        var (host, context) = Start("sheets huge range");
         var sheet = context.Sheets().Open(_path).Sheet("Summary");
 
         var exception = Assert.Throws<SpreadsheetAssertionException>(() => sheet.Range("A1:XFD1048576"));
@@ -973,7 +985,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Cell_ShouldNotRecordCoverageForAnInvalidReference()
     {
-        var (host, context) = await StartAsync("sheets invalid reference");
+        var (host, context) = Start("sheets invalid reference");
         var sheet = context.Sheets().Open(_path).Sheet("Summary");
 
         Assert.Throws<FormatException>(() => sheet.Cell("NOT-A-CELL"));
@@ -985,7 +997,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Table_RowRange_ShouldBeGuardedWhenThereAreNoDataRows()
     {
-        var (host, context) = await StartAsync("sheets empty row range");
+        var (host, context) = Start("sheets empty row range");
         var table = context.Sheets().Open(_path).Sheet("Headers").Table(1);
         Assert.That(table.RowCount, Is.Zero);
 
@@ -1001,7 +1013,7 @@ public sealed class SheetsTests
     [Test]
     public async Task Open_ShouldTolerateCorruptMergesAndDuplicateCells()
     {
-        var (host, context) = await StartAsync("sheets corrupt data");
+        var (host, context) = Start("sheets corrupt data");
         var sheet = context.Sheets().Open(_path).Sheet("Corrupt");
 
         Assert.Multiple(() =>
@@ -1016,7 +1028,7 @@ public sealed class SheetsTests
     [Test]
     public async Task NumberFormats_ShouldReadElapsedTimeAndBuiltInDateIds()
     {
-        var (host, context) = await StartAsync("sheets date format ids");
+        var (host, context) = Start("sheets date format ids");
         var sheet = context.Sheets().Open(_path).Sheet("Formats");
 
         var builtIn = sheet.Cell("A1");
@@ -1066,7 +1078,7 @@ public sealed class SheetsTests
                 worksheetPart.Worksheet.Save();
             }
 
-            var (host, context) = await StartAsync("sheets 1904");
+            var (host, context) = Start("sheets 1904");
             var cell = context.Sheets().Open(path).Sheet("Dates").Cell("A1");
 
             await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -1082,13 +1094,13 @@ public sealed class SheetsTests
     [Test]
     public async Task IncludeHiddenSheets_ShouldChangeTheSheetCount()
     {
-        var (host, context) = await StartAsync("sheets hidden excluded");
+        var (host, context) = Start("sheets hidden excluded");
         var visible = context.Sheets().Open(_path);
         Assert.That(visible.Sheets.Any(sheet => sheet.Name == "Hidden"), Is.False,
             "Hidden sheets are excluded by default.");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
-        var (includedHost, includedContext) = await StartAsync(
+        var (includedHost, includedContext) = Start(
             "sheets hidden included",
             options => options.IncludeHiddenSheets = true);
         var included = includedContext.Sheets().Open(_path);
@@ -1114,7 +1126,7 @@ public sealed class SheetsTests
             .GetReportItems()
             .ToArray();
 
-    private static async Task<(ProtoHost Host, ProtoExecutionContext Context)> StartAsync(
+    private static (ProtoHost Host, ProtoExecutionContext Context) Start(
         string name,
         Action<SheetsOptions>? configure = null)
     {
@@ -1122,8 +1134,10 @@ public sealed class SheetsTests
         builder.AddSheets(configure);
         var host = builder.Build();
         Assert.That(host.HasCapability(ProtoCapabilityKinds.Document), Is.True);
-        await host.StartAsync();
-        var context = await host.StartTestAsync(name, TestMethod());
+        // The ambient Proto.Context is an AsyncLocal that StartTestAsync sets synchronously; awaiting
+        // inside an async helper would scope it to the helper and hide it from the test method.
+        host.StartAsync().GetAwaiter().GetResult();
+        var context = host.StartTestAsync(name, TestMethod()).GetAwaiter().GetResult();
         return (host, context);
     }
 

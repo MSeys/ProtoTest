@@ -1,5 +1,7 @@
 namespace ProtoTest.Web;
 
+using ProtoTest.Core.Internal;
+
 using ProtoTest.Web.Internal;
 
 using System.Globalization;
@@ -9,7 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 
 /// <summary>Test-scoped entry point for pages, operations, and explicit native backend access.</summary>
-public sealed class WebSession : IAsyncDisposable
+public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
 {
     private const string TraceSource = "ProtoTest.Web";
     private readonly ProtoExecutionContext _context;
@@ -28,29 +30,38 @@ public sealed class WebSession : IAsyncDisposable
         ProtoExecutionContext context,
         IWebBackendFactory factory,
         string name,
-        string? application = null)
+        string? application = null,
+        string? endpoint = null,
+        bool discoverRoutes = false)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         Name = name;
-        Application = application
-            ?? ProtoApplication.ResolveName(context.Configuration, $"ProtoTest:Web:Sessions:{name}", name);
-        BaseUrl = ResolveBaseUrl(context, name, Application);
+        Endpoint = endpoint;
+        DiscoverRoutes = discoverRoutes;
+        Application = string.IsNullOrWhiteSpace(application) ? name : application;
+        BaseUrl = ResolveBaseUrl(context, Application, endpoint);
     }
 
     public string Name { get; }
 
     /// <summary>
-    /// Gets the application this session targets, from <c>ProtoTest:Web:Sessions:{name}:Application</c>
-    /// and defaulting to the session name.
+    /// Gets the application this session targets: the one the test selected, or the session name. Its
+    /// address comes from <c>ProtoTest:Applications:{application}:BaseUrl</c>, the same setting REST,
+    /// GraphQL and gRPC resolve, so a browser session and an HTTP client share one application address.
     /// </summary>
     public string Application { get; }
 
+    /// <summary>Gets the application endpoint this session is rooted at, or <see langword="null"/>.</summary>
+    public string? Endpoint { get; }
+
+    /// <summary>Gets whether Vue Router route discovery is enabled for this session.</summary>
+    public bool DiscoverRoutes { get; }
+
     /// <summary>
-    /// Gets the origin for relative navigation, read from the application's
-    /// <c>ProtoTest:Applications:{application}:BaseUrl</c> — the same section REST and GraphQL clients
-    /// target, so a browser session and an HTTP client can share one application address.
+    /// Gets the origin for relative navigation, read from the application's base address (optionally
+    /// joined with the named endpoint) — the same setting the HTTP-based protocols target.
     /// </summary>
     public Uri? BaseUrl { get; }
     public string BackendName => _backendTask is { IsCompletedSuccessfully: true }
@@ -125,39 +136,25 @@ public sealed class WebSession : IAsyncDisposable
 
         var baseUrl = BaseUrl ?? throw new InvalidOperationException(
             $"Web session '{Name}' was asked to open the relative address '{address}', but application " +
-            $"'{Application}' has no base address. Set 'ProtoTest:Applications:{Application}:BaseUrl' or " +
-            $"'ProtoTest:Web:Sessions:{Name}:BaseUrl'.");
+            $"'{Application}' has no base address. Set 'ProtoTest:Applications:{Application}:BaseUrl'.");
         return new Uri(baseUrl, address);
     }
 
-    private static Uri? ResolveBaseUrl(ProtoExecutionContext context, string sessionName, string applicationName)
+    private static Uri? ResolveBaseUrl(ProtoExecutionContext context, string application, string? endpoint)
     {
-        // A session can target its own address (for example a standalone instance infrastructure started,
-        // which fills it after the host started); otherwise it shares the application's address with the
-        // HTTP-based protocols.
-        string? configured = null;
-        var sessionKey = $"ProtoTest:Web:Sessions:{sessionName}:BaseUrl";
-        if (context.TryService<ProtoInfrastructureSettings>() is { } settings
-            && settings.Values.TryGetValue(sessionKey, out var provided))
-        {
-            configured = provided;
-        }
-
-        configured ??= context.Configuration[sessionKey];
-        if (string.IsNullOrWhiteSpace(configured))
-        {
-            configured = ProtoApplication.BaseUrl(context.Configuration, applicationName);
-        }
-
-        if (string.IsNullOrWhiteSpace(configured))
+        // Sessions follow the application address like every other client; a started standalone
+        // instance advertises that same setting through infrastructure settings.
+        var address = ProtoApplication.EndpointAddress(context, application, endpoint);
+        if (string.IsNullOrWhiteSpace(address))
         {
             return null;
         }
 
-        return Uri.TryCreate(configured, UriKind.Absolute, out var uri)
+        return Uri.TryCreate(address, UriKind.Absolute, out var uri)
             ? uri
             : throw new InvalidOperationException(
-                $"The base URL '{configured}' for web session '{sessionName}' must be an absolute URI.");
+                $"The base URL '{address}' for web session application '{application}' must be an absolute URI. " +
+                $"Set 'ProtoTest:Applications:{application}:BaseUrl'.");
     }
 
     internal ValueTask ClickAsync(WebElementReference element, CancellationToken cancellationToken)
@@ -415,11 +412,8 @@ public sealed class WebSession : IAsyncDisposable
                         {
                             return await condition(token);
                         }
-                        catch (WebElementResolutionException)
-                        {
-                            return false;
-                        }
-                        catch (WebActionabilityException)
+                        catch (Exception exception) when (
+                            exception is WebElementResolutionException or WebActionabilityException)
                         {
                             return false;
                         }
@@ -591,11 +585,8 @@ public sealed class WebSession : IAsyncDisposable
                         {
                             return await inspect(backend, token);
                         }
-                        catch (WebElementResolutionException exception)
-                        {
-                            return (Holds: false, Observation: exception.Message);
-                        }
-                        catch (WebActionabilityException exception)
+                        catch (Exception exception) when (
+                            exception is WebElementResolutionException or WebActionabilityException)
                         {
                             return (Holds: false, Observation: exception.Message);
                         }
@@ -845,24 +836,27 @@ public sealed class WebSession : IAsyncDisposable
     }
 
     /// <summary>
-    /// Opt-in Vue Router discovery (<c>ProtoTest:Web:Sessions:{name}:DiscoverRoutes</c>). It runs once per
+    /// Opt-in Vue Router discovery (<c>DiscoverRoutes</c> on <c>[WebSession]</c> or
+    /// <c>Proto.Context.Web(...)</c>). It runs once per
     /// session after a navigation, answers with nothing when Vue or its router is absent, and never fails
     /// the test; a genuine backend failure is recorded on the trace instead.
     /// </summary>
     private async ValueTask DiscoverRoutesAsync(IWebBackend backend, CancellationToken cancellationToken)
     {
         if (Volatile.Read(ref _routeDiscoveryStarted) != 0) return;
-        if (!RouteDiscoveryEnabled()) return;
+        if (!DiscoverRoutes) return;
         if (backend is not IWebBackendJavaScript javascript) return;
         try
         {
             var json = await javascript.EvaluateJsonAsync(VueRouteDiscovery.Script, cancellationToken);
             if (json is null) return;
             Interlocked.Exchange(ref _routeDiscoveryStarted, 1);
-            foreach (var path in VueRouteDiscovery.Parse(json))
-            {
-                RecordPageObservation("web.page.available", path, "vue-router");
-            }
+            WebPageInventory.Record(
+                _context,
+                "Web",
+                VueRouteDiscovery.Parse(json),
+                "vue-router",
+                new Dictionary<string, object> { ["web.session"] = Name });
         }
         catch (OperationCanceledException)
         {
@@ -878,20 +872,6 @@ public sealed class WebSession : IAsyncDisposable
                 outcome: ProtoTraceOutcome.Unknown,
                 exception: exception);
         }
-    }
-
-    private bool RouteDiscoveryEnabled()
-    {
-        var key = $"ProtoTest:Web:Sessions:{Name}:DiscoverRoutes";
-        string? configured = null;
-        if (_context.TryService<ProtoInfrastructureSettings>() is { } settings
-            && settings.Values.TryGetValue(key, out var provided))
-        {
-            configured = provided;
-        }
-
-        configured ??= _context.Configuration[key];
-        return bool.TryParse(configured, out var enabled) && enabled;
     }
 
     internal async ValueTask RunFlowAsync(
@@ -978,6 +958,8 @@ public sealed class WebSession : IAsyncDisposable
             throw;
         }
     }
+
+    ValueTask IProtoClientCompletion.CompleteAsync() => CompleteAsync();
 
     public async ValueTask DisposeAsync()
     {

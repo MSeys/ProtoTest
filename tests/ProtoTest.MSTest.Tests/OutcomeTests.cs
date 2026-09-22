@@ -73,6 +73,44 @@ public sealed class OutcomeTests
         Assert.AreEqual(ProtoTraceOutcome.Partial, result.Outcome);
     }
 
+    [TestMethod]
+    public void TimedOutRow_ShouldRecordCancelledOutcomeWithQualifiedErrorType()
+    {
+        var result = ProtoTestAttribute.ToProtoTestResult([new TestResult { Outcome = UnitTestOutcome.Timeout }]);
+
+        Assert.AreEqual(ProtoTraceOutcome.Cancelled, result.Outcome);
+        Assert.AreEqual("MSTest.Timeout", result.Error?.Type);
+    }
+
+    [TestMethod]
+    public void AbortedRow_ShouldRecordCancelledOutcome()
+    {
+        var result = ProtoTestAttribute.ToProtoTestResult([new TestResult { Outcome = UnitTestOutcome.Aborted }]);
+
+        Assert.AreEqual(ProtoTraceOutcome.Cancelled, result.Outcome);
+    }
+
+    [TestMethod]
+    public void FailedRowWithoutException_ShouldRecordQualifiedErrorType()
+    {
+        var result = ProtoTestAttribute.ToProtoTestResult([new TestResult { Outcome = UnitTestOutcome.Error }]);
+
+        Assert.AreEqual(ProtoTraceOutcome.Failed, result.Outcome);
+        Assert.AreEqual("MSTest.Error", result.Error?.Type);
+    }
+
+    [TestMethod]
+    public void FailedRow_ShouldOutweighATimedOutRow()
+    {
+        var result = ProtoTestAttribute.ToProtoTestResult(
+        [
+            new TestResult { Outcome = UnitTestOutcome.Timeout },
+            new TestResult { Outcome = UnitTestOutcome.Failed, TestFailureException = new InvalidOperationException("row") }
+        ]);
+
+        Assert.AreEqual(ProtoTraceOutcome.Failed, result.Outcome);
+    }
+
     private static async Task<ProtoTestTrace> RunSubjectAsync(string subjectName)
     {
         var method = typeof(Subjects).GetMethod(subjectName)!;

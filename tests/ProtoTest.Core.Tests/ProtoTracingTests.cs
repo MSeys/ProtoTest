@@ -601,6 +601,49 @@ public sealed class ProtoTracingTests
     }
 
     [Test]
+    public async Task OrphanRecords_ShouldRemainCompleteDuringConcurrentSnapshots()
+    {
+        const int count = 300;
+        var recorder = new ProtoTestTraceRecorder(
+            "00001", "concurrent records", TestMethod(), new ProtoTraceOptions { Enabled = true });
+
+        var writes = Task.WhenAll(
+            Task.Run(() =>
+            {
+                for (var index = 0; index < count; index++)
+                    recorder.Observation("probe", "probe.observed", $"observation-{index}");
+            }),
+            Task.Run(() =>
+            {
+                for (var index = 0; index < count; index++)
+                    recorder.Attachment($"attachment-{index}", "text/plain");
+            }),
+            Task.Run(() =>
+            {
+                for (var index = 0; index < count; index++)
+                    recorder.Finding($"finding-{index}", "warning", "probe");
+            }));
+
+        var snapshots = Task.Run(async () =>
+        {
+            while (!writes.IsCompleted)
+            {
+                _ = recorder.Snapshot();
+                await Task.Yield();
+            }
+        });
+
+        await Task.WhenAll(writes, snapshots);
+        var record = recorder.Snapshot().Record!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(record.Observations, Has.Count.EqualTo(count));
+            Assert.That(record.Attachments, Has.Count.EqualTo(count));
+            Assert.That(record.Findings, Has.Count.EqualTo(count));
+        });
+    }
+
+    [Test]
     public async Task RunArtifacts_ShouldReceiveUniqueIdsUnderConcurrentCapture()
     {
         var builder = new ProtoHostBuilder();

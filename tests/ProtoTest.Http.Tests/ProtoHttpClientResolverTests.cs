@@ -23,7 +23,6 @@ public sealed class ProtoHttpClientResolverTests
                 Assert.That(resolution.RequestedName, Is.EqualTo("Orders"));
                 Assert.That(resolution.ResolvedName, Is.EqualTo("Orders:Orders"));
                 Assert.That(resolution.ApplicationName, Is.EqualTo("Orders"));
-                Assert.That(resolution.SourceName, Is.EqualTo("Orders:Orders"));
                 // The in-process transport resolver roots this client, so it is the one named.
                 Assert.That(resolution.EndpointResolver, Is.EqualTo("transport"));
                 Assert.That(resolution.Client.BaseAddress, Is.EqualTo(new Uri("http://transport.test/")));
@@ -37,16 +36,14 @@ public sealed class ProtoHttpClientResolverTests
     }
 
     [Test]
-    public async Task Resolve_ShouldRootTheGraphQlTransportFallbackAtTheProtocolEndpoint()
+    public async Task Resolve_ShouldRootTheTransportFallbackAtTheEndpointTheClientRegistered()
     {
-        // The client is named "Api": only the protocol's own default endpoint can produce "/graphql".
-        await using var host = BuildHost("Headless", "GraphQL", "Api", "GraphQL", "/graphql").Build();
+        await using var host = BuildHost("Headless", "GraphQL", "Api", "Api", "/graphql").Build();
         await host.StartTestAsync("graphql fallback", "02", TestMethod(), [new ApplicationAttribute("Headless")]);
 
         try
         {
-            var resolution = ProtoHttpClientResolver.Resolve(
-                Proto.Context, "GraphQL", defaultEndpointName: "GraphQL");
+            var resolution = ProtoHttpClientResolver.Resolve(Proto.Context, "GraphQL");
 
             Assert.Multiple(() =>
             {
@@ -62,34 +59,29 @@ public sealed class ProtoHttpClientResolverTests
     }
 
     [Test]
-    public async Task Resolve_ShouldReportTheAliasResolverWhenAnAliasSuppliesTheAddress()
+    public async Task Resolve_ShouldKeepProtocolClientsApartWhenTheyShareAName()
     {
         var builder = new ProtoHostBuilder();
         builder.ConfigureServices(services =>
         {
-            services.AddSingleton(new ProtoHttpClientAliasRegistration(
-                "Rest", "Catalog", "Transport",
-                (_, _) => ValueTask.FromResult(new Uri("http://alias.test/"))));
-            services.AddSingleton(new ProtoApplicationTarget("Catalog", "Catalog"));
             services.AddSingleton<IProtoClientInitializer>(
-                new StubTransportInitializer("Transport", "http://transport.test/"));
+                new StubTransportInitializer("Rest", "Api", "http://rest.test/"));
+            services.AddSingleton<IProtoClientInitializer>(
+                new StubTransportInitializer("GraphQL", "Api", "http://graphql.test/"));
         });
         await using var host = builder.Build();
-        await host.StartTestAsync("alias resolver", "03", TestMethod());
+        await host.StartTestAsync("scoped clients", "03", TestMethod());
 
         try
         {
-            var resolution = ProtoHttpClientResolver.Resolve(Proto.Context, "Rest", "Catalog");
+            var rest = ProtoHttpClientResolver.Resolve(Proto.Context, "Rest", "Api");
+            var graphql = ProtoHttpClientResolver.Resolve(Proto.Context, "GraphQL", "Api");
 
             Assert.Multiple(() =>
             {
-                Assert.That(resolution.EndpointResolver, Is.EqualTo("alias"));
-                Assert.That(resolution.SourceName, Is.EqualTo("Transport"));
-                Assert.That(resolution.BaseAddressResolver, Is.Not.Null);
+                Assert.That(rest.Client.BaseAddress, Is.EqualTo(new Uri("http://rest.test/")));
+                Assert.That(graphql.Client.BaseAddress, Is.EqualTo(new Uri("http://graphql.test/")));
             });
-            Assert.That(
-                await resolution.BaseAddressResolver!(Proto.Context, CancellationToken.None),
-                Is.EqualTo(new Uri("http://alias.test/")));
         }
         finally { await host.CompleteTestAsync(); }
     }
@@ -110,10 +102,12 @@ public sealed class ProtoHttpClientResolverTests
         builder.AddApplication(applicationName, app =>
         {
             app.RegisterClient(protocolName, clientName);
+            app.Services.AddSingleton(new ProtoHttpClientEndpointRegistration(
+                ProtoHttpClientRegistration.Qualify(clientName, applicationName), endpointName));
             // Stands in for AddAspNetCoreServer: the transport the accessor falls back to without a base URL.
             app.Services.AddSingleton(new ProtoApplicationTransport(applicationName, applicationName));
             app.Services.AddSingleton<IProtoClientInitializer>(
-                new StubTransportInitializer(applicationName, "http://transport.test/"));
+                new StubTransportInitializer(null, applicationName, "http://transport.test/"));
         });
         return builder;
     }
@@ -125,13 +119,17 @@ public sealed class ProtoHttpClientResolverTests
     {
     }
 
-    private sealed class StubTransportInitializer(string name, string baseAddress) : IProtoClientInitializer<HttpClient>
+    private sealed class StubTransportInitializer(string? protocol, string name, string baseAddress) : IProtoClientInitializer<HttpClient>
     {
         public string Name { get; } = name;
 
+        public string? Protocol { get; } = protocol;
+
         public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
         {
-            context.RegisterClient(new HttpClient { BaseAddress = new Uri(baseAddress) }, Name);
+            context.RegisterClient(
+                new HttpClient { BaseAddress = new Uri(baseAddress) },
+                ProtoClientResolution.ScopedName(Protocol, Name));
             return Task.FromResult(true);
         }
     }

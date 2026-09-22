@@ -103,7 +103,7 @@ When several of these apply, this is what wins:
 3. Several `[Auth<T>]` attributes at the same level are ordered by their `Order` property and **composed**: `ProtoCompositeHttpAuthenticator` runs each in turn on the same request, recording every handler under an `auth.handler.apply` operation with its `auth.type` and `client.name`. The composite's trace source is `ProtoTest.{protocol}`.
 4. **A per-request `.Auth(...)` overrides** whatever the attributes resolved, and **`.WithoutAuth()` clears it**.
 
-The REST and GraphQL lifecycle hooks (Order 100) resolve the attributes before each test and record a `Auth` entity state under the protocol name with `auth.source` (`method`, `class` or `none`), `auth.count` and `auth.types`. Per request, the applied authenticator is recorded on the request operation: `auth.outcome` is `applied` or `skipped`, with `auth.type` when applied. Header **values** are never traced; the trace records the header count and each header's name with `http.header.value_recorded=false`.
+The REST and GraphQL lifecycle hooks (`ProtoHookOrder.Authentication`) resolve the attributes before each test and record a `Auth` entity state under the protocol name with `auth.source` (`method`, `class` or `none`), `auth.count` and `auth.types`. Per request, the applied authenticator is recorded on the request operation: `auth.outcome` is `applied` or `skipped`, with `auth.type` when applied. Header **values** are never traced; the trace records the header count and each header's name with `http.header.value_recorded=false`.
 
 ## Writing your own
 

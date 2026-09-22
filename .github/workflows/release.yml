@@ -17,6 +17,8 @@ permissions:
 jobs:
   verify:
     uses: ./.github/workflows/verify.yml
+    with:
+      upload_packages: true
 
   release:
     needs: verify
@@ -38,9 +40,11 @@ jobs:
             9.0.x
             10.0.x
 
-      - name: Pack
-        shell: pwsh
-        run: ./eng/pack.ps1 -Configuration Release
+      - name: Download the packages verified by this run
+        uses: actions/download-artifact@v4
+        with:
+          name: verified-packages
+          path: artifacts/packages
 
       - name: NuGet login (OIDC to temporary key)
         id: login

@@ -34,39 +34,32 @@ public sealed class WebSessionAttribute : ProtoAttribute
     public string? Open { get; init; }
 
     /// <summary>
-    /// Gets or sets the application this session targets. Defaults to
-    /// <c>ProtoTest:Web:Sessions:{name}:Application</c>, then the session name.
+    /// Gets or sets the application this session targets, defaulting to the application selected for the
+    /// test and then to the session name. Its address comes from
+    /// <c>ProtoTest:Applications:{application}:BaseUrl</c>.
     /// </summary>
     public string? Application { get; init; }
 
+    /// <summary>
+    /// Gets or sets the application endpoint this session is rooted at, joined to the application's base
+    /// URL through <c>ProtoTest:Applications:{application}:Endpoints:{endpoint}</c>.
+    /// </summary>
+    public string? Endpoint { get; init; }
+
+    /// <summary>Gets or sets whether Vue Router discovery records this session's routes as page inventory.</summary>
+    public bool DiscoverRoutes { get; init; }
+
     public override async Task BeforeTestAsync(ProtoExecutionContext context)
     {
-        var session = context.Web(Name, Application);
+        var session = context.Web(Name, Application, Endpoint, DiscoverRoutes);
 
-        // The whole URL can come from configuration, so code can stay environment-agnostic:
-        // ProtoTest:Web:Sessions:{name}:Open overrides the attribute; a relative value resolves
-        // against the session's BaseUrl (ProtoTest:Applications:{application}:BaseUrl). Settings
-        // provided by started infrastructure win over the static configuration, like the session's
-        // BaseUrl resolution.
-        var key = $"ProtoTest:Web:Sessions:{Name}:Open";
-        string? open = null;
-        if (context.TryService<ProtoInfrastructureSettings>() is { } settings
-            && settings.Values.TryGetValue(key, out var provided))
-        {
-            open = provided;
-        }
-
-        open ??= context.Configuration[key];
-        if (string.IsNullOrWhiteSpace(open))
-        {
-            open = Open;
-        }
-
-        if (string.IsNullOrWhiteSpace(open))
+        // The start URL is code, resolved against the session's application address, so a relative value
+        // stays environment-agnostic.
+        if (string.IsNullOrWhiteSpace(Open))
         {
             return;
         }
 
-        await session.NavigateAsync(new Uri(open, UriKind.RelativeOrAbsolute), CancellationToken.None);
+        await session.NavigateAsync(new Uri(Open, UriKind.RelativeOrAbsolute), CancellationToken.None);
     }
 }

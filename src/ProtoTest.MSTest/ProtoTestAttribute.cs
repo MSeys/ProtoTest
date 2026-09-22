@@ -13,10 +13,10 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
     public override async Task<TestResult[]> ExecuteAsync(ITestMethod testMethod)
     {
         var methodInfo = testMethod.MethodInfo;
-        var attributes = ProtoAttributeResolver.Resolve(methodInfo);
-        var skipReason = ProtoTestSkip.GetReason(attributes, ProtoTestAssembly.Host);
-        if (skipReason is not null)
+        var preparation = ProtoTestAdapter.Prepare(methodInfo, ProtoTestAssembly.Host);
+        if (!preparation.CanRun)
         {
+            var skipReason = preparation.SkipReason;
             // MSTest.TestFramework 4.4 has no public dynamic-skip API: an ignored result is what the
             // runner reports as skipped. Its IgnoreReason is internal, so the reason travels on the
             // public LogOutput and is prefixed to the display name. Skipping before the lifecycle
@@ -37,8 +37,7 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
         var lifecycleStarted = false;
         try
         {
-            await ProtoTestAssembly.Host.StartTestAsync(
-                ProtoTestName.FromMethod(methodInfo), methodInfo, attributes, attachmentPublisher);
+            await preparation.StartAsync(ProtoTestAssembly.Host, attachmentPublisher);
             lifecycleStarted = true;
 
             results = await base.ExecuteAsync(testMethod);
@@ -76,18 +75,27 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
         {
             // Some data rows ran while others were skipped: Partial keeps both facts visible, where
             // Passed would hide the skip and Skipped would hide the rows that ran.
-            return new ProtoTestResult(ProtoTraceOutcome.Partial);
+            return ProtoTestResult.Partial;
         }
 
         var failed = results.FirstOrDefault(result => result.Outcome is
-            UnitTestOutcome.Failed or UnitTestOutcome.Error or UnitTestOutcome.Timeout or UnitTestOutcome.Aborted);
+            UnitTestOutcome.Failed or UnitTestOutcome.Error);
         if (failed is not null)
         {
             if (failed.TestFailureException is not null)
                 return ProtoTestResult.Failed(failed.TestFailureException);
-            return ProtoTestResult.Failed(new ProtoTraceError(
-                $"MSTest.{failed.Outcome}",
-                $"MSTest completed with outcome {failed.Outcome}."));
+            return ProtoTestResult.Failed(
+                "MSTest", failed.Outcome.ToString(), $"MSTest completed with outcome {failed.Outcome}.");
+        }
+
+        var interrupted = results.FirstOrDefault(result => result.Outcome is
+            UnitTestOutcome.Timeout or UnitTestOutcome.Aborted);
+        if (interrupted is not null)
+        {
+            // A timeout or abort means the test never finished; recording it as cancelled keeps it
+            // distinct from a failing assertion, matching how the other adapters report interruption.
+            return ProtoTestResult.Cancelled(
+                "MSTest", interrupted.Outcome.ToString(), $"MSTest completed with outcome {interrupted.Outcome}.");
         }
 
         return ProtoTestResult.Unknown;

@@ -1,5 +1,7 @@
 namespace ProtoTest.Web;
 
+using ProtoTest.Core.Internal;
+
 using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 using ProtoTest.Web.Internal;
@@ -32,7 +34,7 @@ public sealed class WebCoverageCollector : ProtoCoverageCollector
     public WebCoverageCollector(string targetName, IConfiguration? configuration = null) : base(targetName)
     {
         if (configuration is null) return;
-        foreach (var value in ReadConfiguredPages(configuration))
+        foreach (var value in WebPageConfig.Read(configuration, "ProtoTest:Web:Pages", "Source", "Framework"))
         {
             AddInventory(WebPagePath.Normalize(value));
         }
@@ -127,26 +129,4 @@ public sealed class WebCoverageCollector : ProtoCoverageCollector
             _inventory.Add(path);
         }
     }
-
-    private static IReadOnlyList<string> ReadConfiguredPages(IConfiguration configuration)
-    {
-        var section = configuration.GetSection("ProtoTest:Web:Pages");
-        var values = section.GetChildren()
-            .Where(child => !IsInventorySetting(child.Key))
-            .Select(child => child.Value)
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value!)
-            .ToList();
-        if (values.Count == 0 && !string.IsNullOrWhiteSpace(section.Value))
-        {
-            values.Add(section.Value!);
-        }
-
-        return values;
-    }
-
-    /// <summary><c>Source</c> and <c>Framework</c> configure discovery; they are never page entries.</summary>
-    private static bool IsInventorySetting(string key)
-        => key.Equals("Source", StringComparison.OrdinalIgnoreCase)
-           || key.Equals("Framework", StringComparison.OrdinalIgnoreCase);
 }

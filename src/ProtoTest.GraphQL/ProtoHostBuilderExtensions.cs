@@ -20,17 +20,9 @@ public static class ProtoHostBuilderExtensions
         // the builder.
         builder.ConfigureServices(services =>
         {
-            services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, GraphQLLifecycleHook>());
-            services.TryAddSingleton<IGraphQLWebSocketFactory, ClientGraphQLWebSocketFactory>();
-            ProtoHttpOptionsRegistration.TryAddResponseOptions(
-                services,
-                ProtoGraphQLBuilder.ProtocolName,
-                ProtoGraphQLBuilder.ResponsesConfigurationSectionName);
+            RegisterInfrastructure(services);
+            configure?.Invoke(new ProtoGraphQLBuilder(services));
         });
-        if (configure is not null)
-        {
-            builder.ConfigureServices(services => configure(new ProtoGraphQLBuilder(services)));
-        }
         return builder.AddCapability(new ProtoCapabilityDescriptor(
             "GraphQL", ProtoCapabilityKinds.Protocol, "ProtoTest.GraphQL"));
     }
@@ -45,14 +37,19 @@ public static class ProtoHostBuilderExtensions
         Action<ProtoGraphQLBuilder>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(application);
-        application.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, GraphQLLifecycleHook>());
-        application.Services.TryAddSingleton<IGraphQLWebSocketFactory, ClientGraphQLWebSocketFactory>();
-        ProtoHttpOptionsRegistration.TryAddResponseOptions(
-            application.Services,
-            ProtoGraphQLBuilder.ProtocolName,
-            ProtoGraphQLBuilder.ResponsesConfigurationSectionName);
+        RegisterInfrastructure(application.Services);
         configure?.Invoke(new ProtoGraphQLBuilder(application.Services, application));
         return application.AddCapability(new ProtoCapabilityDescriptor(
             "GraphQL", ProtoCapabilityKinds.Protocol, "ProtoTest.GraphQL"));
+    }
+
+    private static void RegisterInfrastructure(IServiceCollection services)
+    {
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, GraphQLLifecycleHook>());
+        services.TryAddSingleton<IGraphQLWebSocketFactory, ClientGraphQLWebSocketFactory>();
+        ProtoHttpOptionsRegistration.TryAddResponseOptions(
+            services,
+            ProtoGraphQLBuilder.ProtocolName,
+            ProtoGraphQLBuilder.ResponsesConfigurationSectionName);
     }
 }

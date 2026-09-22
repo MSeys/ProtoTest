@@ -2,6 +2,7 @@ namespace ProtoTest.Core.Tests;
 
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
+using ProtoTest.Core.Internal;
 using System.Reflection;
 
 [TestFixture]
@@ -81,6 +82,37 @@ public sealed class ProtoExecutionContextResourceTests
         Assert.That(second.DisposeCount, Is.EqualTo(1));
     }
 
+    [Test]
+    public async Task ClientCompletion_ShouldRunOnceForAnAliasedClient()
+    {
+        using var rootProvider = new ServiceCollection().BuildServiceProvider();
+        await using var context = CreateContext(rootProvider);
+        var client = new CompletingClient();
+        context.RegisterClient(client, "Rest:Api", disposeWithContext: false);
+        context.RegisterClientAlias(typeof(CompletingClient), "Api", client);
+
+        await new ProtoClientCompletionHook().AfterTestAsync(context);
+
+        Assert.That(client.CompletionCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ClientResolution_ShouldSkipExcludedClientAtEveryLookupName()
+    {
+        using var rootProvider = new ServiceCollection().BuildServiceProvider();
+        await using var context = CreateContext(rootProvider);
+        var transport = new DisposableClient();
+        context.RegisterClient(transport, "Rest:App:Api", disposeWithContext: false);
+        context.RegisterClientAlias(typeof(DisposableClient), "App:Api", transport);
+        context.RegisterClientAlias(typeof(DisposableClient), "Rest:Api", transport);
+        context.RegisterClientAlias(typeof(DisposableClient), "Api", transport);
+
+        var resolution = ProtoClientResolution.Find<DisposableClient>(
+            context, "Rest", "Api", "App:Api", transport);
+
+        Assert.That(resolution.Client, Is.Null);
+    }
+
     private static ProtoExecutionContext CreateContext(ServiceProvider rootProvider)
         => new(
             "Test",
@@ -101,6 +133,17 @@ public sealed class ProtoExecutionContextResourceTests
         {
             base.Dispose();
             throw new InvalidOperationException("Expected disposal failure.");
+        }
+    }
+
+    private sealed class CompletingClient : IProtoClientCompletion
+    {
+        public int CompletionCount { get; private set; }
+
+        public ValueTask CompleteAsync()
+        {
+            CompletionCount++;
+            return ValueTask.CompletedTask;
         }
     }
 }

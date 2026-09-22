@@ -117,7 +117,7 @@ A logged-in session must exist first. `[WebSession]` declares one during setup a
 public async Task ...
 ```
 
-`ProtoTest:Web:Sessions:{name}:Open` overrides the attribute's `Open`, so code stays environment-agnostic; started infrastructure settings win over static configuration. A relative `Open` resolves against the session's `BaseUrl`.
+A relative `Open` resolves against the session's application address — `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with the named endpoint.
 
 ## Tracing
 

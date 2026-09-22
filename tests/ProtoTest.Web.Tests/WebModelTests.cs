@@ -545,16 +545,12 @@ public sealed class WebModelTests
     {
         var factory = new FakeBackendFactory();
         factory.Backend.JsonResult = """["/orders","/orders/new"]""";
-        var host = CreateHost(factory, builder => builder.ConfigureAppConfiguration(configuration =>
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
-            })));
+        var host = CreateHost(factory);
         await using var ownedHost = host;
         await host.StartAsync();
         var context = await host.StartTestAsync("vue discovery", TestMethod());
 
-        await context.Web().Page<LoginPage>().OpenAsync("https://example.test/orders");
+        await context.Web(discoverRoutes: true).Page<LoginPage>().OpenAsync("https://example.test/orders");
 
         var available = context.RecordedObservations
             .Where(item => item.Kind == "web.page.available")
@@ -572,16 +568,12 @@ public sealed class WebModelTests
     public async Task RouteDiscovery_ShouldBeANoOpWithoutAVueRouter()
     {
         var factory = new FakeBackendFactory();
-        var host = CreateHost(factory, builder => builder.ConfigureAppConfiguration(configuration =>
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
-            })));
+        var host = CreateHost(factory);
         await using var ownedHost = host;
         await host.StartAsync();
         var context = await host.StartTestAsync("vue absent", TestMethod());
 
-        await context.Web().Page<LoginPage>().OpenAsync("https://example.test/login");
+        await context.Web(discoverRoutes: true).Page<LoginPage>().OpenAsync("https://example.test/login");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
         Assert.Multiple(() =>
@@ -764,7 +756,7 @@ public sealed class WebModelTests
         Assert.Multiple(() =>
         {
             Assert.That(triggered, Is.False, "the trigger never runs on Selenium");
-            Assert.That(exception!.Message, Does.Contain("Selenium").And.Contains("WebDriver protocol"));
+            Assert.That(exception!.Message, Does.Contain("Selenium").And.Contains("Playwright"));
         });
     }
 
@@ -901,15 +893,11 @@ public sealed class WebModelTests
     public async Task VueRouteDiscovery_ShouldRetryAfterAFailedEvaluation()
     {
         var factory = new FakeBackendFactory();
-        var host = CreateHost(factory, builder => builder.ConfigureAppConfiguration(configuration =>
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
-            })));
+        var host = CreateHost(factory);
         await using var ownedHost = host;
         await host.StartAsync();
         var context = await host.StartTestAsync("vue discovery retry", TestMethod());
-        var session = context.Web();
+        var session = context.Web(discoverRoutes: true);
 
         factory.Backend.JsonFailure = new InvalidOperationException("the router is not ready yet");
         await session.Page<InvoicesPage>().OpenAsync("https://example.test/one");
@@ -1186,49 +1174,6 @@ public sealed class WebModelTests
     }
 
     [Test]
-    public async Task WebSession_ShouldUseTheApplicationFromConfiguration()
-    {
-        var factory = new FakeBackendFactory();
-        var host = CreateHost(factory, builder => builder.ConfigureAppConfiguration(configuration =>
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ProtoTest:Web:Sessions:Admin:Application"] = "ControlPlane",
-                ["ProtoTest:Applications:ControlPlane:BaseUrl"] = "https://control.test"
-            })));
-        await using var ownedHost = host;
-        await host.StartAsync();
-
-        await host.StartTestAsync(
-            "web session",
-            TestMethod(),
-            [new WebSessionAttribute("Admin") { Open = "/back-office" }]);
-
-        Assert.That(factory.Backend.Operations.Single().Value, Is.EqualTo("https://control.test/back-office"));
-        await host.CompleteTestAsync(ProtoTestResult.Passed);
-    }
-
-    [Test]
-    public async Task WebSession_ShouldPreferAConfiguredOpenUrlOverTheAttribute()
-    {
-        var factory = new FakeBackendFactory();
-        var host = CreateHost(factory, builder => builder.ConfigureAppConfiguration(configuration =>
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ProtoTest:Web:Sessions:Admin:Open"] = "https://env.test/from-config"
-            })));
-        await using var ownedHost = host;
-        await host.StartAsync();
-
-        await host.StartTestAsync(
-            "web session",
-            TestMethod(),
-            [new WebSessionAttribute("Admin") { Open = "https://code.test/from-code" }]);
-
-        Assert.That(factory.Backend.Operations.Single().Value, Is.EqualTo("https://env.test/from-config"));
-        await host.CompleteTestAsync(ProtoTestResult.Passed);
-    }
-
-    [Test]
     public async Task WebSession_ShouldRequireAnOriginForRelativeOpen()
     {
         var factory = new FakeBackendFactory();
@@ -1243,35 +1188,6 @@ public sealed class WebModelTests
                 [new WebSessionAttribute("Admin") { Open = "/back-office" }]));
 
         Assert.That(exception!.Message, Does.Contain("BaseUrl"));
-    }
-
-    [Test]
-    public async Task WebSession_ShouldPreferAnOpenUrlFromStartedInfrastructure()
-    {
-        var factory = new FakeBackendFactory();
-        var host = CreateHost(factory, builder =>
-        {
-            builder.AddInfrastructure(new FakeSettingsInfrastructure(new Dictionary<string, string>
-            {
-                ["ProtoTest:Web:Sessions:Admin:Open"] = "http://standalone.test:8080/from-infrastructure"
-            }));
-            builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
-                new Dictionary<string, string?>
-                {
-                    ["ProtoTest:Web:Sessions:Admin:Open"] = "https://env.test/from-config"
-                }));
-        });
-        await using var ownedHost = host;
-        await host.StartAsync();
-
-        await host.StartTestAsync(
-            "web session",
-            TestMethod(),
-            [new WebSessionAttribute("Admin") { Open = "https://code.test/from-code" }]);
-
-        Assert.That(factory.Backend.Operations.Single().Value,
-            Is.EqualTo("http://standalone.test:8080/from-infrastructure"));
-        await host.CompleteTestAsync(ProtoTestResult.Passed);
     }
 
     [Test]
@@ -1294,7 +1210,7 @@ public sealed class WebModelTests
         var context = await host.StartTestAsync("web options", TestMethod());
 
         var settings = context.TryService<ProtoInfrastructureSettings>();
-        var options = WebBackendOptions.Resolve<SeleniumWebOptions>(context, "Default");
+        var options = WebBackendOptions.Resolve<SeleniumWebOptions>(context);
 
         Assert.Multiple(() =>
         {
@@ -1571,15 +1487,14 @@ public sealed class WebModelTests
     }
 
     [Test]
-    public async Task SeleniumOptions_ShouldBindBackendAndSessionSectionsFromConfiguration()
+    public async Task SeleniumOptions_ShouldBindTheBackendSectionFromConfiguration()
     {
         var publisher = new RecordingAttachmentPublisher();
         var host = new ProtoHostBuilder()
             .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
-                    ["ProtoTest:Web:Selenium:DiagnosticTraceRetention"] = "Always",
-                    ["ProtoTest:Web:Sessions:Quiet:DiagnosticTraceRetention"] = "Off"
+                    ["ProtoTest:Web:Selenium:DiagnosticTraceRetention"] = "Always"
                 }))
             .AddWeb(() => new StubWebDriver())
             .Build();
@@ -1587,20 +1502,15 @@ public sealed class WebModelTests
         await host.StartAsync();
         var context = await host.StartTestAsync("web test", TestMethod(), attachmentPublisher: publisher);
         await context.Web().Page<LoginPage>().OpenAsync("https://example.test");
-        await context.Web("Quiet").Page<LoginPage>().OpenAsync("https://example.test");
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
         var names = publisher.Attachments.Select(item => item.Name).ToArray();
-        Assert.Multiple(() =>
-        {
-            Assert.That(names, Has.Some.EndsWith("selenium-default-diagnostics.json"));
-            Assert.That(names, Has.None.Contains("quiet").IgnoreCase);
-        });
+        Assert.That(names, Has.Some.EndsWith("selenium-default-diagnostics.json"));
     }
 
     [Test]
-    public async Task Options_ShouldApplyCodeThenBackendThenSessionConfiguration()
+    public async Task Options_ShouldApplyCodeThenBackendConfiguration()
     {
         var host = new ProtoHostBuilder()
             .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -1609,9 +1519,7 @@ public sealed class WebModelTests
                 ["ProtoTest:Web:Playwright:Channel"] = "msedge",
                 ["ProtoTest:Web:Playwright:Context:Locale"] = "nl-BE",
                 ["ProtoTest:Web:Playwright:Context:ViewportSize:Width"] = "1280",
-                ["ProtoTest:Web:Playwright:Context:ViewportSize:Height"] = "720",
-                ["ProtoTest:Web:Sessions:Admin:Channel"] = "chrome-beta",
-                ["ProtoTest:Web:Sessions:Admin:TraceRetention"] = "Always"
+                ["ProtoTest:Web:Playwright:Context:ViewportSize:Height"] = "720"
             }))
             .Build();
         await using var ownedHost = host;
@@ -1620,7 +1528,6 @@ public sealed class WebModelTests
 
         var resolved = WebBackendOptions.Resolve<ProtoTest.Web.Playwright.PlaywrightWebOptions>(
             context,
-            "Admin",
             options =>
             {
                 options.Headless = false;
@@ -1633,8 +1540,7 @@ public sealed class WebModelTests
             Assert.That(resolved.Headless, Is.False, "code value without configuration is kept");
             Assert.That(resolved.SlowMo, Is.EqualTo(10));
             Assert.That(resolved.Browser, Is.EqualTo(ProtoTest.Web.Playwright.PlaywrightBrowser.Firefox));
-            Assert.That(resolved.Channel, Is.EqualTo("chrome-beta"), "session section wins over backend section");
-            Assert.That(resolved.TraceRetention, Is.EqualTo(ProtoTest.Web.Playwright.PlaywrightTraceRetention.Always));
+            Assert.That(resolved.Channel, Is.EqualTo("msedge"), "the backend section wins over code");
             Assert.That(resolved.Context.Locale, Is.EqualTo("nl-BE"));
             Assert.That(resolved.Context.ViewportSize?.Width, Is.EqualTo(1280));
             Assert.That(resolved.Context.ViewportSize?.Height, Is.EqualTo(720));
@@ -1658,15 +1564,20 @@ public sealed class WebModelTests
         Assert.Multiple(() =>
         {
             Assert.Throws<ArgumentOutOfRangeException>(() =>
-                WebBackendOptions.Resolve<SeleniumWebOptions>(context, "Default", validate: SeleniumWebOptions.Validate),
+                WebBackendOptions.Resolve<SeleniumWebOptions>(context, validate: SeleniumWebOptions.Validate),
                 "the bound result is validated");
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 WebBackendOptions.Resolve<SeleniumWebOptions>(
                     context,
-                    "Default",
                     configure: options => options.PollInterval = TimeSpan.Zero,
                     validate: SeleniumWebOptions.Validate),
                 "code configuration that survives binding is validated");
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                WebBackendOptions.Resolve<ProtoTest.Web.Playwright.PlaywrightWebOptions>(
+                    context,
+                    configure: options => options.ActionTimeout = TimeSpan.Zero,
+                    validate: ProtoTest.Web.Playwright.PlaywrightWebOptions.Validate),
+                "Playwright's action timeout is validated the same way");
         });
         await host.CompleteTestAsync(ProtoTestResult.Passed);
     }

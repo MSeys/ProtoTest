@@ -1,29 +1,44 @@
 namespace ProtoTest.Sheets;
 
 using System.Text.Json;
+using ProtoTest.Core;
 using ProtoTest.Json;
 
 /// <summary>
-/// Row-level shape assertions for record models, reusing the Json shape matcher the REST and GraphQL
-/// integrations use. A row record serializes with its property names, so an anonymous expected shape
-/// reads the same way as elsewhere.
+/// Row-level shape assertions for record models. The row serializes with its property names and is
+/// matched by the same <see cref="ProtoShapeAssertion"/> the protocol integrations use, traced on the
+/// ambient <see cref="Proto.Context"/> like every other assertion that runs inside a test body.
 /// </summary>
 public static class SheetModelAssertions
 {
-    /// <summary>Matches one model row against an expected shape.</summary>
-    public static void ShouldMatchShape<TRow>(this TRow row, object expectedShape, JsonSerializerOptions? options = null)
+    /// <summary>Matches one model row against an expected shape and traces the assertion.</summary>
+    public static void ShouldMatchShape<TRow>(
+        this TRow row,
+        object expectedShape,
+        JsonSerializerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(row);
         ArgumentNullException.ThrowIfNull(expectedShape);
+        var context = Proto.Context;
         var actual = JsonSerializer.SerializeToElement(row, options);
         try
         {
-            // The matcher returns the matched paths and throws on any mismatch.
-            _ = JsonShapeMatcher.AssertMatch(actual, expectedShape, options);
+            ProtoShapeAssertion.Assert(
+                new ProtoShapeAssertionContext(
+                    context,
+                    "ProtoTest.Sheets",
+                    "Assert row shape",
+                    ExtraAttributes: new Dictionary<string, string?>
+                    {
+                        ["sheet.row.type"] = typeof(TRow).Name
+                    }),
+                actual.GetRawText(),
+                expectedShape,
+                options);
         }
-        catch (Core.ProtoAssertionException exception)
+        catch (ProtoAssertionException exception)
         {
-            throw new SpreadsheetAssertionException(exception.Message);
+            throw new SpreadsheetAssertionException(exception.Message, exception);
         }
     }
 }

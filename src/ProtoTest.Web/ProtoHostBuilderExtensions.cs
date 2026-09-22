@@ -61,8 +61,8 @@ public static class ProtoHostBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(factory);
-        services.TryAddScoped<WebSessionRegistry>();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, WebLifecycleHook>());
+        // One backend per host: browsers are the tool a run uses, not a per-session choice. A second
+        // backend package keeps the first registration, so referencing both is a no-op, not a conflict.
         services.TryAddSingleton<IWebBackendFactory>(factory);
         // Every backend gets page coverage: Playwright and Selenium both register through this method.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoCollector, WebCoverageCollector>());

@@ -465,15 +465,18 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         }
         else
         {
-            _orphanObservations.Add(new ProtoTraceObservationRecord(
-                string.Empty,
-                null,
-                DateTimeOffset.UtcNow,
-                targetName,
-                kind,
-                identifier,
-                data,
-                metadata));
+            lock (_orphanGate)
+            {
+                _orphanObservations.Add(new ProtoTraceObservationRecord(
+                    string.Empty,
+                    null,
+                    DateTimeOffset.UtcNow,
+                    targetName,
+                    kind,
+                    identifier,
+                    data,
+                    metadata));
+            }
         }
         WriteRecordActivityEvent("observation", kind, targetName, identifier);
     }
@@ -490,13 +493,16 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         }
         else
         {
-            _orphanAttachments.Add(new ProtoTraceAttachmentRecord(
-                string.Empty,
-                null,
-                DateTimeOffset.UtcNow,
-                name,
-                mediaType,
-                description));
+            lock (_orphanGate)
+            {
+                _orphanAttachments.Add(new ProtoTraceAttachmentRecord(
+                    string.Empty,
+                    null,
+                    DateTimeOffset.UtcNow,
+                    name,
+                    mediaType,
+                    description));
+            }
         }
         WriteRecordActivityEvent("attachment", mediaType, name, name);
     }
@@ -520,16 +526,19 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         }
         else
         {
-            _orphanFindings.Add(new ProtoTraceFindingRecord(
-                string.Empty,
-                null,
-                DateTimeOffset.UtcNow,
-                message,
-                status,
-                category,
-                targetName,
-                tags,
-                metadata));
+            lock (_orphanGate)
+            {
+                _orphanFindings.Add(new ProtoTraceFindingRecord(
+                    string.Empty,
+                    null,
+                    DateTimeOffset.UtcNow,
+                    message,
+                    status,
+                    category,
+                    targetName,
+                    tags,
+                    metadata));
+            }
         }
         WriteRecordActivityEvent("finding", category, message, status);
     }

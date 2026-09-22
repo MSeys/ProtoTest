@@ -232,7 +232,22 @@ public sealed record ProtoTestResult(
     public static ProtoTestResult Unknown { get; } = new(ProtoTraceOutcome.Unknown);
     public static ProtoTestResult Passed { get; } = new(ProtoTraceOutcome.Succeeded);
     public static ProtoTestResult Skipped { get; } = new(ProtoTraceOutcome.Skipped);
+    public static ProtoTestResult Partial { get; } = new(ProtoTraceOutcome.Partial);
     public static ProtoTestResult Failed(Exception exception) => new(ProtoTraceOutcome.Failed, exception);
     public static ProtoTestResult Failed(ProtoTraceError error) => new(ProtoTraceOutcome.Failed, Error: error);
     public static ProtoTestResult Cancelled(Exception? exception = null) => new(ProtoTraceOutcome.Cancelled, exception);
+
+    /// <summary>
+    /// A failure a runner reported without an exception. The framework and its own state join into the
+    /// error type - "NUnit.Failed", "MSTest.Error" - so runner-reported failures read alike in a trace.
+    /// </summary>
+    public static ProtoTestResult Failed(string source, string state, string message, string? stackTrace = null)
+        => new(ProtoTraceOutcome.Failed, Error: new ProtoTraceError($"{source}.{state}", message, stackTrace));
+
+    /// <summary>
+    /// A run a runner reported as timed out or aborted. It did not finish, which is different from a
+    /// failing assertion, so it records as cancelled - matching how adapters report cancellation.
+    /// </summary>
+    public static ProtoTestResult Cancelled(string source, string state, string message, string? stackTrace = null)
+        => new(ProtoTraceOutcome.Cancelled, Error: new ProtoTraceError($"{source}.{state}", message, stackTrace));
 }

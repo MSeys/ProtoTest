@@ -27,69 +27,31 @@ public sealed class ProtoGraphQLBuilder
 
     /// <summary>
     /// Registers a named GraphQL client. Inside <c>AddApplication</c> the client belongs to that
-    /// application and takes its endpoint from <c>ProtoTest:Applications:{app}</c>.
+    /// application and takes its endpoint from <c>ProtoTest:Applications:{app}</c>. The name may be
+    /// omitted for an application's only GraphQL client; pass an endpoint key to root it at a path.
     /// </summary>
     public IProtoTargetBuilder AddClient(
-        string name = "Default",
+        string? name = null,
         string? baseUrl = null,
         Action<IHttpClientBuilder>? configure = null,
-        string? endpoint = "GraphQL")
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        var applicationName = _application?.ApplicationName;
-        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
-        _application?.RegisterClient(ProtocolName, name);
-
-        return ProtoHttpClientRegistration.AddClient(
-            Services,
-            ProtocolName,
-            "GraphQL",
-            registeredName,
-            baseUrl,
-            configure,
-            applicationName,
-            endpoint,
-            allowMissingBaseUrl: applicationName is not null && baseUrl is null);
-    }
+        string? endpoint = null)
+        => ProtoHttpClientRegistration.AddNamedClient(
+            Services, ProtocolName, "GraphQL", _application, name, baseUrl, configure, endpoint);
 
     public IProtoTargetBuilder AddClient(
-        string name,
+        string? name,
         Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> baseAddressResolver,
         Action<IHttpClientBuilder>? configure = null)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        var applicationName = _application?.ApplicationName;
-        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
-        _application?.RegisterClient(ProtocolName, name);
-        return ProtoHttpClientRegistration.AddClient(
-            Services, ProtocolName, registeredName, baseAddressResolver, configure, applicationName);
-    }
+        => ProtoHttpClientRegistration.AddResolvedClient(
+            Services, ProtocolName, _application, name, baseAddressResolver, configure);
 
     public IProtoTargetBuilder AddClient(
-        string name,
+        string? name,
         Func<ProtoExecutionContext, Uri> baseAddressResolver,
         Action<IHttpClientBuilder>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(baseAddressResolver);
         return AddClient(name, (context, _) => ValueTask.FromResult(baseAddressResolver(context)), configure);
-    }
-
-    /// <summary>
-    /// Uses an HTTP client registered by another integration, such as an in-process ASP.NET Core server.
-    /// </summary>
-    public IProtoTargetBuilder AddClientFrom(
-        string name,
-        string sourceClientName,
-        string endpointPath = "/graphql")
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(sourceClientName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(endpointPath);
-        var applicationName = _application?.ApplicationName;
-        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
-        _application?.RegisterClient(ProtocolName, name);
-        return ProtoHttpClientRegistration.AddClientFrom(
-            Services, ProtocolName, registeredName, sourceClientName, endpointPath, applicationName);
     }
 
     public ProtoGraphQLBuilder CaptureAttachments(Action<ProtoHttpAttachmentOptions>? configure = null)

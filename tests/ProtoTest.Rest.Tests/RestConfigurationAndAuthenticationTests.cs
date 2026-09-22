@@ -245,7 +245,7 @@ public class RestConfigurationAndAuthenticationTests
     }
 
     [Test]
-    public async Task AddClientFrom_ShouldReuseTheSourceClientThroughTheAlias()
+    public async Task NamedClients_ShouldRouteEachNameToItsOwnBaseAddress()
     {
         var handler = new TestHttpMessageHandler
         {
@@ -256,23 +256,22 @@ public class RestConfigurationAndAuthenticationTests
         {
             rest.AddClient("Orders", "https://source.example/api/", http =>
                 http.ConfigurePrimaryHttpMessageHandler(() => handler));
-            rest.AddClientFrom("OrdersV2", "Orders", "/v2/");
-            rest.AddClientFrom("OrdersAlias", "Orders");
+            rest.AddClient("OrdersV2", "https://source.example/v2/", http =>
+                http.ConfigurePrimaryHttpMessageHandler(() => handler));
         });
         await using var host = builder.Build();
         await host.StartTestAsync(
-            "AliasClient",
+            "NamedClient",
             "00005",
             (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!);
 
         try
         {
-            // A path-rooted alias keeps its prefix; without one the source address is reused as-is.
             using var versioned = await Proto.Context.Rest("OrdersV2").GetAsync("orders/42");
             Assert.That(handler.LastRequest!.RequestUri,
                 Is.EqualTo(new Uri("https://source.example/v2/orders/42")));
 
-            using var aliased = await Proto.Context.Rest("OrdersAlias").GetAsync("orders/42");
+            using var orders = await Proto.Context.Rest("Orders").GetAsync("orders/42");
             Assert.That(handler.LastRequest!.RequestUri,
                 Is.EqualTo(new Uri("https://source.example/api/orders/42")));
         }

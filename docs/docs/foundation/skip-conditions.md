@@ -64,7 +64,6 @@ Because `"server"` is a capability *kind* and not a hosting mode, any registered
 [RequiresPlaywrightBrowser]                                   // the configured browser
 [RequiresPlaywrightBrowser(browser: PlaywrightBrowser.Firefox)]
 [RequiresPlaywrightBrowser(channel: "msedge", Reason = "No Edge in this environment.")]
-[RequiresPlaywrightBrowser(Session = "Admin")]                // the Admin session's options
 public async Task ...() { ... }
 ```
 
@@ -74,8 +73,6 @@ The condition reads the host's Playwright options — your `AddWeb(...)` callbac
 - **nothing to skip** when the configured bundled browser's executable exists; the probe starts the Playwright driver (no browser process is launched) and reads `BrowserType.ExecutablePath`;
 - **nothing to skip** for a channel Playwright recognizes (`chrome`, `msedge`, …) — a channel names a system browser, which only a real launch can resolve, so the condition cannot prove one absent; an unrecognized channel does skip;
 - **a reason naming Playwright** otherwise, pointing at the install options (`playwright.ps1 install …`, `InstallBrowsers=true`, or a `Channel`).
-
-Set `Session = "Admin"` when the test drives a named session: the probe then merges that session's `ProtoTest:Web:Sessions:Admin` section over `ProtoTest:Web:Playwright`, exactly like the backend binds, so a session-level browser, channel or install-browsers setting never disagrees with the launch.
 
 Like any condition, `Reason` replaces that default message.
 

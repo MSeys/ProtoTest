@@ -162,8 +162,7 @@ public sealed class Setup : ProtoTestAssembly
                 AppContext.BaseDirectory, "northstar.openapi.json"),
             [$"ProtoTest:Applications:{NorthstarTargets.Api}:Endpoints:GraphQL"] = "/graphql",
             ["ProtoTest:Web:Pages:Source"] = ConsoleBuild.SourceFolder,
-            ["ProtoTest:Web:Pages:Framework"] = "vue",
-            ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
+            ["ProtoTest:Web:Pages:Framework"] = "vue"
         };
 
         if (!environment.UsesLocalApplications)
@@ -209,7 +208,7 @@ public sealed class Setup : ProtoTestAssembly
             })
             .AddGraphQL(graphQL => graphQL
                 .CaptureAttachments()
-                .AddClient("GraphQL")
+                .AddClient("GraphQL", endpoint: "GraphQL")
                 .WithSubscriptionTransport(GraphQLSubscriptionTransport.WebSocket)
                 .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "northstar.graphql")))
             .AddGrpc(grpc => grpc.CaptureAttachments().AddClient("Projects"));

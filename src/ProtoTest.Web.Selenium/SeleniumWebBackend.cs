@@ -7,7 +7,7 @@ using OpenQA.Selenium;
 using ProtoTest.Core;
 using ProtoTest.Web.Internal;
 
-public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics, IWebBackendDownloads
+public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics
 {
     private readonly ProtoExecutionContext _context;
     private readonly SeleniumWebOptions _options;
@@ -152,16 +152,9 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
 
     /// <summary>
     /// Selenium has no download API: the WebDriver protocol gives a driver no way to observe or fetch
-    /// a browser download, and the download itself depends on driver-specific profile preferences.
-    /// The capability fails with the documented exception instead of pretending to capture anything.
+    /// a browser download. The backend does not implement <see cref="IWebBackendDownloads"/>, so
+    /// <c>WebSession.DownloadAsync</c> reports the capability it actually lacks.
     /// </summary>
-    public ValueTask<WebDownload> DownloadAsync(
-        Func<CancellationToken, Task> trigger,
-        TimeSpan? timeout = null,
-        CancellationToken cancellationToken = default)
-        => throw new WebBackendCapabilityException(
-            "Selenium does not support browser download capture: the WebDriver protocol has no download " +
-            "API. Use the Playwright backend for downloads, or fetch the file over HTTP with ProtoTest.Rest.");
 
     public async ValueTask<IReadOnlyList<ProtoTestAttachment>> CaptureFailureAsync(
         WebFailureContext failure,
@@ -519,7 +512,7 @@ internal sealed class SeleniumWebBackendFactory(
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var options = WebBackendOptions.Resolve(context, sessionName, configure, SeleniumWebOptions.Validate);
+        var options = WebBackendOptions.Resolve(context, configure, SeleniumWebOptions.Validate);
         return ValueTask.FromResult<IWebBackend>(
             new SeleniumWebBackend(context, createDriver(), options, sessionName));
     }

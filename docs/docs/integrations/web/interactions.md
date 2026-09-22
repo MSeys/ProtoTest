@@ -30,7 +30,7 @@ await page.RememberMe.CheckAsync();
 
 ### How actions wait
 
-- **Playwright** keeps its own auto-waiting: an action waits until the element is attached, visible, stable and enabled. ProtoTest resolves the locator and calls the native action; it never re-issues a failed one.
+- **Playwright** keeps its own auto-waiting: an action waits until the element is attached, visible, stable and enabled, bounded by `ActionTimeout` (5 s by default). ProtoTest resolves the locator and calls the native action; it never re-issues a failed one. A timed-out action becomes `WebActionabilityException` and a read of an element that never appears becomes `WebElementResolutionException`, so polling assertions and negations behave the same on either backend.
 - **Selenium** retries for up to `ActionTimeout` (5 s by default), polling every `PollInterval`, until the element is displayed and enabled — and, for fills and selects, not read-only; for clicks and checks, not moving (when `WaitForStableBounds`) and not covered by another element (when `CheckClickObstruction` and the driver supports JavaScript). Otherwise it throws `WebActionabilityException` with the component path, locator and last observation.
 
 To wait for something application-specific — a spinner, a pending XHR — add a [wait condition](./middleware.md#wait-conditions).

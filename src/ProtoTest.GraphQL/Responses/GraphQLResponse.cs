@@ -104,45 +104,18 @@ public sealed class GraphQLResponse : IDisposable
 
     internal GraphQLResponse AssertHttpStatus(HttpStatusCode expected, bool negated)
     {
-        var statusSatisfied = ProtoAssertion.IsSatisfied(HttpStatusCode == expected, negated);
-        using var operation = _context.Trace
-            .Operation(
-                "assert.http.status",
-                $"Assert HTTP status · {ProtoAssertion.Describe($"{(int)expected} {expected}", negated)}",
-                "ProtoTest.GraphQL")
-            .With("expected.status_code", ((int)expected).ToString())
-            .With("actual.status_code", ((int)HttpStatusCode).ToString())
-            .With("assertion.negated", negated ? "true" : null)
-            .Parent(_requestTraceId)
-            .Begin();
-        operation.AddSection(new ProtoTraceSection(
-            "Result",
-            ProtoTraceSectionKind.Checks,
-            [
-                new(
-                    "status",
-                    ((int)HttpStatusCode).ToString(),
-                    statusSatisfied
-                        ? null
-                        : $"expected {ProtoAssertion.Describe(((int)expected).ToString(), negated)}",
-                    statusSatisfied ? ProtoTraceSectionTone.Success : ProtoTraceSectionTone.Error)
-            ]));
-        try
-        {
-            if (!statusSatisfied)
-            {
-                throw new GraphQLAssertionException(
-                    $"Expected GraphQL HTTP status {ProtoAssertion.Describe($"{(int)expected} ({expected})", negated)}, " +
-                    $"but received {(int)HttpStatusCode} ({HttpStatusCode}).");
-            }
-            operation.Succeed();
-            return this;
-        }
-        catch (Exception exception)
-        {
-            operation.Fail(exception);
-            throw;
-        }
+        ProtoStatusAssertion.Assert(
+            _context,
+            "ProtoTest.GraphQL",
+            expected,
+            HttpStatusCode,
+            negated,
+            failureFactory: () => new GraphQLAssertionException(
+                $"Expected GraphQL HTTP status {ProtoAssertion.Describe($"{(int)expected} ({expected})", negated)}, " +
+                $"but received {(int)HttpStatusCode} ({HttpStatusCode})."),
+            parentOperationId: _requestTraceId,
+            requestIdentifier: _identifier);
+        return this;
     }
 
     public GraphQLResponse ShouldHaveNoErrors()

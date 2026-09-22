@@ -86,7 +86,7 @@ public sealed record ProtoMessage(string Destination, string? Payload = null,
     IReadOnlyDictionary<string, string?>? Headers = null, string? ContentType = null);
 ```
 
-`message.ShouldMatchShape(Proto.Context, shape)` matches the payload with the same [shape matcher](../rest/responses.md#shouldmatchshape) as REST, GraphQL and gRPC. It records an `assert.json.shape` operation with a `messaging.contract.shape` observation and throws `JsonShapeMismatchException` with every mismatch listed; a payload that is empty or not JSON fails with a message naming the destination.
+`message.ShouldMatchShape(shape)` matches the payload with the same [shape matcher](../rest/responses.md#shouldmatchshape) as REST, GraphQL and gRPC. It records an `assert.json.shape` operation with a `messaging.contract.shape` observation on the ambient test context and throws `JsonShapeMismatchException` with every mismatch listed; a payload that is empty or not JSON fails with a message naming the destination.
 
 ### The adapter contract
 
@@ -126,7 +126,7 @@ public async Task PayingAnInvoicePublishesAnEvent()
         "invoice.paid",
         candidate => candidate.Payload!.Contains("\"id\":42"));
 
-    message.ShouldMatchShape(Proto.Context, new { id = 42 });
+    message.ShouldMatchShape(new { id = 42 });
 }
 ```
 

@@ -10,8 +10,7 @@ public enum SeleniumDiagnosticTraceRetention
 }
 
 /// <summary>
-/// Selenium session options. Besides code, they bind from <c>ProtoTest:Web:Selenium</c> and
-/// <c>ProtoTest:Web:Sessions:{name}</c>, in that order.
+/// Selenium session options. Besides code, they bind from <c>ProtoTest:Web:Selenium</c>.
 /// </summary>
 public sealed class SeleniumWebOptions : IProtoConfigurableOptions
 {

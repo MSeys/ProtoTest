@@ -39,7 +39,7 @@ ValueTask OpenAsync(string address, CancellationToken cancellationToken = defaul
 ValueTask OpenAsync(Uri address, CancellationToken cancellationToken = default);
 ```
 
-A relative address is resolved against the session's base URL before either backend sees it — `ProtoTest:Web:Sessions:{name}:BaseUrl`, or the targeted application's `ProtoTest:Applications:{application}:BaseUrl` (see [Sessions](./index.md#sessions)). With no base URL configured, a relative address throws an `InvalidOperationException` naming both keys. An absolute address is used as given.
+A relative address is resolved against the session's application address — `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with the named endpoint (see [Sessions](./index.md#sessions)). With no address configured, a relative address throws an `InvalidOperationException` naming the application. An absolute address is used as given.
 
 ## Components
 

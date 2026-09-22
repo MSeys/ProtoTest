@@ -1,5 +1,7 @@
 namespace ProtoTest.AspNetCore.Internal;
 
+using ProtoTest.Core.Internal;
+
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Mvc.Testing.Handlers;
@@ -104,22 +106,13 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
         if (Volatile.Read(ref _pageInventoryRecorded) != 0) return;
         try
         {
-            var discovered = false;
-            foreach (var path in AspNetCorePageInventory.Discover(server.Factory.Services, context.Configuration, Name))
-            {
-                discovered = true;
-                context.RecordObservation(new ProtoObservation(
-                    "Web",
-                    "web.page.available",
-                    path,
-                    Metadata: new Dictionary<string, object>
-                    {
-                        ["web.application"] = Name,
-                        ["web.page.source"] = "aspnetcore"
-                    }));
-            }
-
-            if (discovered)
+            var recorded = WebPageInventory.Record(
+                context,
+                "Web",
+                AspNetCorePageInventory.Discover(server.Factory.Services, context.Configuration, Name),
+                "aspnetcore",
+                new Dictionary<string, object> { ["web.application"] = Name });
+            if (recorded > 0)
             {
                 Interlocked.Exchange(ref _pageInventoryRecorded, 1);
             }

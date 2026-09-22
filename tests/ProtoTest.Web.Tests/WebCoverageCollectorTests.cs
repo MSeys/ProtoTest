@@ -1,5 +1,7 @@
 namespace ProtoTest.Web.Tests;
 
+using ProtoTest.Core.Internal;
+
 using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 using ProtoTest.Web.Internal;

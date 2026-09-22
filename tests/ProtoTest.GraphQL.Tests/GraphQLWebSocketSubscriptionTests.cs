@@ -96,6 +96,38 @@ public sealed class GraphQLWebSocketSubscriptionTests
     }
 
     [Test]
+    public async Task WithSubscriptionTransport_CalledTwice_KeepsTheFirstRegistration()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddGraphQL(graphQL =>
+        {
+            graphQL.AddClient("Default", "https://example.test/graphql", http =>
+                http.ConfigurePrimaryHttpMessageHandler(() => new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        "event: complete\ndata:\n\n",
+                        Encoding.UTF8,
+                        "text/event-stream")
+                })))
+                .WithSubscriptionTransport(GraphQLSubscriptionTransport.Sse)
+                .WithSubscriptionTransport(GraphQLSubscriptionTransport.WebSocket);
+        });
+        await using var host = builder.Build();
+        await host.StartTestAsync("first-transport-wins", "3", Method());
+        try
+        {
+            await using var subscription = await Proto.Context.GraphQL()
+                .Subscription("finished")
+                .Select(new { id = Gql.Field })
+                .SubscribeAsync();
+
+            Assert.That(await subscription.NextAsync(), Is.Null);
+            Assert.That(subscription.Transport, Is.EqualTo(GraphQLSubscriptionTransport.Sse));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
     public async Task SseSubscription_ShouldRejectAFrameLargerThanTheConfiguredResponseLimit()
     {
         var builder = new ProtoHostBuilder();

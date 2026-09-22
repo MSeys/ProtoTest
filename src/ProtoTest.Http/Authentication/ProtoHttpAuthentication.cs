@@ -43,7 +43,7 @@ public sealed class ProtoCompositeHttpAuthenticator(
 /// to its named client. <see cref="Protocols"/> keeps protocol hooks from picking up each other's
 /// authenticators when a test needs different authentication per protocol.
 /// </summary>
-public interface IProtoHttpAuthMetadata
+internal interface IProtoHttpAuthMetadata
 {
     int Order { get; }
 
@@ -56,3 +56,4 @@ public interface IProtoHttpAuthMetadata
 
     IProtoHttpAuthenticator Create(ProtoExecutionContext context);
 }
+

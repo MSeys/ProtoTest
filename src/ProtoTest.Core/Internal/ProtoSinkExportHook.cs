@@ -10,7 +10,7 @@ internal sealed class ProtoSinkExportHook(
 {
     // AfterRun executes in descending order. Reports are generated after the gates and before the
     // run-scoped resources are released and the trace archive is written.
-    public int Order => int.MinValue + 2;
+    public int Order => ProtoHookOrder.ReportSinks;
 
     public async Task AfterRunAsync(CancellationToken cancellationToken = default)
     {
@@ -47,3 +47,4 @@ internal sealed class ProtoSinkExportHook(
         }
     }
 }
+

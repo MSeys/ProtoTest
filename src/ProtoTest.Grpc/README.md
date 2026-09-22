@@ -11,7 +11,7 @@ var reply = await Proto.Context.Grpc().UnaryAsync(
     Projects.GetProject,
     new GetProjectRequest { ProjectId = 42 });
 
-reply.ShouldMatchShape(Proto.Context, new { id = 42, status = "Active" });
+reply.ShouldMatchShape(new { id = 42, status = "Active" });
 ```
 
 Requests, responses and status checks are recorded in the test trace. Streaming capture keeps only a bounded number of messages.

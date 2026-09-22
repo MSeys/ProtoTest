@@ -20,6 +20,7 @@ using ProtoTest.Web;
 [Application(NorthstarTargets.Api)]
 [NorthstarTenant(PlanIds.Growth)]
 [Auth<NorthstarAuthenticator>]
+[WebSession("Default", DiscoverRoutes = true)]
 [LoginAs<NorthstarConsoleLogin>("owner")]
 [RequiresCapability(
     ProtoCapabilityKinds.Server,
@@ -61,6 +62,7 @@ public sealed class ApiThenBrowserJourney
 [Application(NorthstarTargets.Api)]
 [NorthstarTenant(PlanIds.Growth)]
 [Auth<NorthstarAuthenticator>]
+[WebSession("Default", DiscoverRoutes = true)]
 [LoginAs<NorthstarConsoleLogin>("owner")]
 [RequiresCapability(
     ProtoCapabilityKinds.Server,

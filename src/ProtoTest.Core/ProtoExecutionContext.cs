@@ -206,6 +206,17 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         return _clients.TryGet<TClient>(name);
     }
 
+    /// <summary>Registers a non-owning lookup alias for a client already registered under a scoped name.</summary>
+    internal void RegisterClientAlias(Type clientType, string name, object client)
+        => _clients.RegisterAlias(clientType, name, client);
+
+    /// <summary>Looks up a client without knowing its compile-time type; used by the initializer hook.</summary>
+    internal object? TryClient(Type clientType, string name)
+        => _clients.TryGet(clientType, name);
+
+    /// <summary>The registered clients in registration order; used by the completion phase.</summary>
+    internal IReadOnlyList<object> RegisteredClients => _clients.Snapshot();
+
     /// <summary>Gets a snapshot of the resources owned by this test, in registration order.</summary>
     public IReadOnlyList<ProtoResourceSnapshot> Resources => _resources.Snapshot();
 

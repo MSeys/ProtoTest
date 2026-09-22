@@ -178,7 +178,7 @@ It returns the JSON paths that matched and throws the same exceptions the protoc
 
 ## Evidence in the trace
 
-The protocol assertions run through the shared `ProtoShapeAssertion.Assert`, which records one `assert.json.shape` operation per assertion with:
+The protocol assertions and Sheets model rows run through the shared `ProtoShapeAssertion.Assert`, which records one `assert.json.shape` operation per assertion with:
 
 - `expected.type`, `shape.expected` and `shape.actual` — the described shape and the sanitized actual JSON;
 - `matched.property_count` and `matched.properties`, or `shape.mismatches` and `shape.mismatch_count` on failure;

@@ -71,7 +71,7 @@ One `ProtoTest:Grpc` section serves every named client; each registration binds 
 public static ProtoGrpcClient Grpc(this ProtoExecutionContext context, string? clientName = null);
 ```
 
-Inside an `[Application]` the default or bound client is used unless a name is given, exactly like `Rest()` and `GraphQL()`; resolution tries the explicit name, then the application-qualified name (`{application}:{name}`). When no initialized client matches, the application's in-process transport backs a fallback client, registered so every call shares one channel, and a `grpc.client.resolve` event is written; otherwise the accessor throws naming the client, `AddAspNetCoreServer`, and `ProtoTest:Applications:{application}:Grpc:Address`. A call that reaches the channel with no address to resolve throws `InvalidOperationException`; a call after the client was disposed throws `ObjectDisposedException`.
+Inside an `[Application]` the default or bound client is used unless a name is given, exactly like `Rest()` and `GraphQL()`; resolution tries the application-qualified name (`{application}:{name}`), then the requested name itself, so a host-registered client stays reachable from inside an application. When no initialized client matches, the application's in-process transport backs a fallback client, registered so every call shares one channel, and a `grpc.client.resolve` event is written; otherwise the accessor throws naming the client, `AddAspNetCoreServer`, and `ProtoTest:Applications:{application}:Grpc:Address`. A call that reaches the channel with no address to resolve throws `InvalidOperationException`; a call after the client was disposed throws `ObjectDisposedException`.
 
 The call helpers, all constrained to `where TRequest : class, TResponse : class`:
 
@@ -115,22 +115,15 @@ A reply is a protobuf message, and `ShouldMatchShape` matches it with the same [
 ```csharp
 public static void ShouldMatchShape<TResponse>(this TResponse response, object expectedShape,
     JsonSerializerOptions? options = null) where TResponse : IMessage;
-
-public static void ShouldMatchShape<TResponse>(this TResponse response, ProtoExecutionContext context,
-    object expectedShape, JsonSerializerOptions? options = null) where TResponse : IMessage;
 ```
 
-The reply is compared through its JSON form: field names are camelCase, enums are their names, and fields left at their default value are still present, so `quantity = 0` can be asserted. Every mismatch is reported at once. The context overload records an `assert.json.shape` operation with a `grpc.contract.shape` observation; without it, the reply is still matched, untraced.
+The reply is compared through its JSON form: field names are camelCase, enums are their names, and fields left at their default value are still present, so `quantity = 0` can be asserted. Every mismatch is reported at once. The assertion records an `assert.json.shape` operation with a `grpc.contract.shape` observation on the ambient test context, like the other integrations' data-object assertions.
 
-A failed call throws `RpcException`, and both polarities of the status assertion exist, each with a context overload:
+A failed call throws `RpcException`, and both polarities of the status assertion exist:
 
 ```csharp
 public static RpcException ShouldHaveStatus(this RpcException exception, StatusCode expected);
-public static RpcException ShouldHaveStatus(this RpcException exception, StatusCode expected,
-    ProtoExecutionContext? context = null);
 public static RpcException ShouldNotHaveStatus(this RpcException exception, StatusCode unexpected);
-public static RpcException ShouldNotHaveStatus(this RpcException exception, StatusCode unexpected,
-    ProtoExecutionContext? context = null);
 ```
 
 ```csharp
@@ -141,12 +134,12 @@ try
 }
 catch (RpcException exception)
 {
-    exception.ShouldHaveStatus(StatusCode.NotFound, Proto.Context);
-    exception.ShouldNotHaveStatus(StatusCode.Internal, Proto.Context);
+    exception.ShouldHaveStatus(StatusCode.NotFound);
+    exception.ShouldNotHaveStatus(StatusCode.Internal);
 }
 ```
 
-With the test context the assertion records an `assert.grpc.status` operation with expected and actual `rpc.grpc.status_code`/`rpc.grpc.status` and a `Result` Checks section; a mismatch throws `GrpcAssertionException`. Without the context the assertion is still made, untraced. gRPC deliberately exposes these as methods rather than REST's `Should`/`ShouldNot` facade, because C# has no extension properties.
+The assertion records an `assert.grpc.status` operation on the ambient test context with expected and actual `rpc.grpc.status_code`/`rpc.grpc.status` and a `Result` Checks section; a mismatch throws `GrpcAssertionException`. gRPC deliberately exposes these as methods rather than REST's `Should`/`ShouldNot` facade, because C# has no extension properties.
 
 ## Quick start
 
@@ -161,7 +154,7 @@ public sealed class OrderTests
             Orders.GetOrder,
             new GetOrderRequest { Id = 42 });
 
-        reply.ShouldMatchShape(Proto.Context, new { id = 42, status = "PENDING" });
+        reply.ShouldMatchShape(new { id = 42, status = "PENDING" });
     }
 }
 ```

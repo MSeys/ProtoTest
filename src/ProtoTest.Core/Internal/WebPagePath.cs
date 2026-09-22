@@ -1,4 +1,4 @@
-namespace ProtoTest.Web.Internal;
+namespace ProtoTest.Core.Internal;
 
 /// <summary>
 /// Page identity for web coverage: the absolute path of an HTTP(S) address, without query or fragment,
@@ -59,15 +59,22 @@ internal static class WebPagePath
     }
 
     /// <summary>
-    /// Maps one route-definition segment to its pattern: a star, a bare Remix splat and a bracketed
-    /// catch-all become <c>{...}</c>; <c>:name</c>, <c>:name?</c>, <c>[...]</c> and <c>$name</c> become
-    /// <c>{name}</c>; a Vue trailing splat (<c>:rest*</c>) and a regex catch-all
+    /// Maps one route-definition segment to its pattern: a star, a bare Remix splat, a bracketed
+    /// catch-all and an ASP.NET Core catch-all (<c>{*rest}</c>, <c>{**rest}</c>) become <c>{...}</c>;
+    /// <c>:name</c>, <c>:name?</c>, <c>[...]</c>, <c>$name</c> and an ASP.NET Core parameter
+    /// (<c>{id}</c>) become <c>{name}</c>; a Vue trailing splat (<c>:rest*</c>) and a regex catch-all
     /// (<c>:pathMatch(.*)*</c>, <c>:catchAll(.*)</c>) become <c>{...}</c>; a regex-constrained
     /// parameter (<c>:id(\d+)</c>) drops the constraint and becomes <c>{id}</c>; anything else is a
     /// literal.
     /// </summary>
     internal static string MapDynamicSegment(string segment)
     {
+        if (segment.StartsWith('{') && segment.EndsWith('}') && segment.Length > 2)
+        {
+            var inner = segment[1..^1];
+            return inner.StartsWith('*') ? "{...}" : "{" + inner + "}";
+        }
+
         if (segment == "*" || segment == "$") return "{...}";
         if (segment.StartsWith('$') && segment.Length > 1) return "{" + segment[1..] + "}";
         if (segment.StartsWith('[') && segment.EndsWith(']'))

@@ -18,6 +18,7 @@ using System.Net;
 [Application(NorthstarTargets.Api)]
 [NorthstarTenant]
 [Auth<NorthstarAuthenticator>]
+[WebSession("Default", DiscoverRoutes = true)]
 public sealed class DiagnosticsShowcase
 {
     [ProtoTest]

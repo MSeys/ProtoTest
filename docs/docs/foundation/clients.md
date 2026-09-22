@@ -27,6 +27,7 @@ An initializer creates one named client for a test and registers it:
 public interface IProtoClientInitializer
 {
     string Name { get; }
+    string? Protocol => null;
     Type ClientType { get; }
     Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default);
 }
@@ -81,11 +82,15 @@ public static class ScenarioProbeExtensions
 
 ## When clients are created and released
 
-Before any of your hooks or attributes run, ProtoTest's client hook groups every registered initializer by client type and name, tries each group in registration order, and creates its client. The trace records one `client.initialize` operation per group — not one per attempt — and the winning initializer is written as the client entity's `client.initializer` state. A candidate that returns `false` is not traced individually; an initializer that throws fails the `client.initialize` operation.
+Before any of your hooks or attributes run, ProtoTest's client hook groups initializers by protocol, client type and name, then tries each group in registration order. The trace records one `client.initialize` operation per group — not one per attempt — and the winning initializer is written as the client entity's `client.initializer` state. A candidate that returns `false` is not traced individually; an initializer that throws fails the `client.initialize` operation.
+
+Integrations such as REST and GraphQL set `Protocol`, so they can each register an `HttpClient` named `Default`. Their clients are stored under names such as `Rest:Default` and `GraphQL:Default`; the integration accessors resolve those names for you. A client with an unambiguous name can also be looked up by its bare name. If several protocols use that name, use the scoped name with `Client<T>` or use the integration accessor.
 
 If no initializer in a group succeeds, the test fails in setup with *"No registered initializer could create a client of type 'X' with name 'Y'."*
 
 If a client implements `IDisposable` or `IAsyncDisposable`, it's disposed when the test ends — in reverse order of registration. Client resources are framework-managed: a successful release is recorded as the client entity's `resource.state = released` rather than a `resource.release` operation, and a **failed** release writes a `resource.release` event so the failure is explainable.
+
+A client that implements `IProtoClientCompletion` also gets `CompleteAsync()` after normal teardown hooks, before disposal and report publication. A bare-name alias does not cause completion to run twice.
 
 ## Sharing one client across tests
 
@@ -118,7 +123,7 @@ With `disposeWithContext: false` the test registers the client as shared and doe
 
 ## Fallback chains
 
-Several initializers can offer the same client type and name. They're tried **in registration order**, and the first to return `true` wins. Returning `false` means "not me" — and the initializer must leave the context untouched when it does.
+Several initializers can offer the same protocol, client type and name. They're tried **in registration order**, and the first to return `true` wins. Returning `false` means "not me" — and the initializer must leave the context untouched when it does. An initializer without `Protocol` can serve as a fallback for matching protocol chains.
 
 This is how a client bound to an application is served by a real URL when the application has a `BaseUrl`, and by the [in-process ASP.NET Core server](../integrations/aspnetcore.md) otherwise:
 

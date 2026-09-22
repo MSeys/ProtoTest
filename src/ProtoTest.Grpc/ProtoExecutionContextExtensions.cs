@@ -13,10 +13,11 @@ public static class ProtoExecutionContextExtensions
     {
         ArgumentNullException.ThrowIfNull(context);
         var application = ProtoApplicationResolution.ResolveApplicationName(context);
-        var selected = clientName ?? ProtoApplicationResolution.ResolveClientName(context, "Grpc", fallback: "Default");
-        var resolvedName = application is null ? selected : $"{application}:{selected}";
+        var (requested, resolvedName) = ProtoClientResolution.ResolveNames(context, "Grpc", clientName);
+        var lookup = ProtoClientResolution.Find<ProtoGrpcClient>(context, "Grpc", requested, resolvedName);
+        var client = lookup.Client;
+        resolvedName = lookup.ResolvedName;
 
-        var client = context.TryClient<ProtoGrpcClient>(resolvedName);
         if (client is null)
         {
             // No initialized client (for example a target resolved only at call time): back it with the
@@ -32,16 +33,16 @@ public static class ProtoExecutionContextExtensions
             }
 
             client = ProtoGrpcClient.ForTransport(context, resolvedName, transport);
-            context.RegisterClient(client, resolvedName);
+            context.RegisterClient(client, ProtoClientResolution.ScopedName("Grpc", resolvedName));
 
             context.Trace.WriteEvent(
                 "grpc.client.resolve",
-                $"gRPC client · {selected}",
+                $"gRPC client · {requested}",
                 "ProtoTest.Grpc",
                 outcome: ProtoTraceOutcome.Succeeded,
                 attributes: new Dictionary<string, string?>
                 {
-                    ["client.name"] = selected,
+                    ["client.name"] = requested,
                     ["application.name"] = application,
                     ["client.source_name"] = resolvedName
                 });

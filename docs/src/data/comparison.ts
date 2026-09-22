@@ -151,7 +151,7 @@ using ProtoTest.Json;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 
-[RestClient(SampleAppTargets.Api)]
+[Application(SampleAppTargets.Api)]
 [SampleEnvironment]
 [Auth<SampleUserAuthenticator>]
 public sealed class BillingTests
@@ -347,11 +347,11 @@ export const withProtoTest: ComparisonFile[] = [
     folds: [
       {
         line: 9,
-        label: '[RestClient]',
+        label: '[Application]',
         source: 'Setup.cs',
         from: 15,
         to: 18,
-        summary: 'Registers the client and its collectors once, for the whole suite.',
+        summary: 'Names the application; its REST client and collectors are registered once, for the whole suite.',
         reuse: 'written once',
       },
       {

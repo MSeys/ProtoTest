@@ -28,50 +28,27 @@ public sealed class ProtoRestBuilder
     /// <summary>
     /// Registers a named REST client. Inside <c>AddApplication</c> the client belongs to that
     /// application and takes its base address from <c>ProtoTest:Applications:{app}</c>, optionally
-    /// combined with the endpoint named after the client.
+    /// combined with a named endpoint. The name may be omitted for an application's only REST client.
     /// </summary>
     public IProtoTargetBuilder AddClient(
-        string name = "Default",
+        string? name = null,
         string? baseUrl = null,
         Action<IHttpClientBuilder>? configure = null,
         string? endpoint = null)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        var applicationName = _application?.ApplicationName;
-        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
-        _application?.RegisterClient(ProtocolName, name);
-
-        return ProtoHttpClientRegistration.AddClient(
-            Services,
-            ProtocolName,
-            "REST",
-            registeredName,
-            baseUrl,
-            configure,
-            applicationName,
-            endpoint ?? (applicationName is null ? null : name),
-            // Under an application with no configured URL, the client reuses the application's
-            // in-process transport (see AddAspNetCoreServer) or its BaseUrl.
-            allowMissingBaseUrl: applicationName is not null && baseUrl is null);
-    }
+        => ProtoHttpClientRegistration.AddNamedClient(
+            Services, ProtocolName, "REST", _application, name, baseUrl, configure, endpoint);
 
     /// <summary>Adds a client whose absolute base address is resolved from per-test context.</summary>
     public IProtoTargetBuilder AddClient(
-        string name,
+        string? name,
         Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> baseAddressResolver,
         Action<IHttpClientBuilder>? configure = null)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        var applicationName = _application?.ApplicationName;
-        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
-        _application?.RegisterClient(ProtocolName, name);
-        return ProtoHttpClientRegistration.AddClient(
-            Services, ProtocolName, registeredName, baseAddressResolver, configure, applicationName);
-    }
+        => ProtoHttpClientRegistration.AddResolvedClient(
+            Services, ProtocolName, _application, name, baseAddressResolver, configure);
 
     /// <summary>Adds a client whose absolute base address is read from per-test context.</summary>
     public IProtoTargetBuilder AddClient(
-        string name,
+        string? name,
         Func<ProtoExecutionContext, Uri> baseAddressResolver,
         Action<IHttpClientBuilder>? configure = null)
     {
@@ -80,21 +57,6 @@ public sealed class ProtoRestBuilder
             name,
             (context, _) => ValueTask.FromResult(baseAddressResolver(context)),
             configure);
-    }
-
-    /// <summary>
-    /// Uses the transport of an HTTP client registered by another integration, such as an in-process
-    /// ASP.NET Core server, optionally rooted at a path.
-    /// </summary>
-    public IProtoTargetBuilder AddClientFrom(string name, string sourceClientName, string? basePath = null)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(sourceClientName);
-        var applicationName = _application?.ApplicationName;
-        var registeredName = ProtoHttpClientRegistration.Qualify(name, applicationName);
-        _application?.RegisterClient(ProtocolName, name);
-        return ProtoHttpClientRegistration.AddClientFrom(
-            Services, ProtocolName, registeredName, sourceClientName, basePath, applicationName);
     }
 
     /// <summary>Enables automatic request, response, and expected-shape test attachments.</summary>

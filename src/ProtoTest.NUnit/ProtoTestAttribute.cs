@@ -14,17 +14,14 @@ public class ProtoTestAttribute : TestAttribute, ITestAction
 
     public void BeforeTest(ITest test)
     {
-        var method = test.Method!.MethodInfo;
-        var attributes = ProtoAttributeResolver.Resolve(method);
-        var skipReason = ProtoTestSkip.GetReason(attributes, ProtoTestAssembly.Host);
-        if (skipReason is not null)
+        var preparation = ProtoTestAdapter.Prepare(test.Method!.MethodInfo, ProtoTestAssembly.Host);
+        if (!preparation.CanRun)
         {
-            // Skipping before the lifecycle starts keeps the trace honest: nothing ran, so nothing failed.
-            Assert.Ignore(skipReason);
+            Assert.Ignore(preparation.SkipReason!);
         }
 
-        ProtoTestAssembly.Host
-            .StartTestAsync(ProtoTestName.FromMethod(method), method, attributes, NUnitAttachmentPublisher.Instance)
+        preparation
+            .StartAsync(ProtoTestAssembly.Host, NUnitAttachmentPublisher.Instance)
             .GetAwaiter()
             .GetResult();
     }
@@ -35,17 +32,18 @@ public class ProtoTestAttribute : TestAttribute, ITestAction
         var result = nunitResult.Outcome.Status switch
         {
             TestStatus.Passed => ProtoTestResult.Passed,
-            TestStatus.Failed => ProtoTestResult.Failed(new ProtoTraceError(
-                $"NUnit.{nunitResult.Outcome.Label ?? TestStatus.Failed.ToString()}",
+            TestStatus.Failed => ProtoTestResult.Failed(
+                "NUnit",
+                nunitResult.Outcome.Label ?? TestStatus.Failed.ToString(),
                 string.IsNullOrWhiteSpace(nunitResult.Message)
                     ? "NUnit reported a failed test without a failure message."
                     : nunitResult.Message,
-                nunitResult.StackTrace)),
+                nunitResult.StackTrace),
             TestStatus.Skipped => ProtoTestResult.Skipped,
             TestStatus.Inconclusive => ProtoTestResult.Skipped,
             // NUnit's Warning means the test ran and passed with warnings attached; Partial is the
             // outcome that keeps the warning visible instead of reading it as an unknown state.
-            TestStatus.Warning => new ProtoTestResult(ProtoTraceOutcome.Partial),
+            TestStatus.Warning => ProtoTestResult.Partial,
             _ => ProtoTestResult.Unknown
         };
 

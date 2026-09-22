@@ -7,13 +7,12 @@ using ProtoTest.Web.Playwright;
 [TestFixture]
 public sealed class RequiresPlaywrightBrowserTests
 {
-    // Compile-time guard: every documented form, including Session, stays a valid attribute usage.
+    // Compile-time guard: every documented form stays a valid attribute usage.
     [RequiresPlaywrightBrowser]
     [RequiresPlaywrightBrowser(PlaywrightBrowser.Firefox)]
     [RequiresPlaywrightBrowser(browser: PlaywrightBrowser.Firefox)]
     [RequiresPlaywrightBrowser(channel: "msedge", Reason = "No Edge in this environment.")]
-    [RequiresPlaywrightBrowser(Session = "Admin")]
-    private sealed class SessionAttributeSyntax;
+    private sealed class AttributeSyntax;
 
     [Test]
     public void MissingBrowserReason_ShouldNamePlaywrightAndTheInstallOptions()
@@ -107,64 +106,6 @@ public sealed class RequiresPlaywrightBrowserTests
         Assert.That(reason ?? string.Empty, Does.Not.Contain("prototest-no-such-channel"),
             "explicit configuration wins over the application's code defaults");
     }
-
-    [Test]
-    public async Task Attribute_ShouldApplyASessionLevelInstallBrowsersOverTheProtocolSection()
-    {
-        await using var host = new ProtoHostBuilder()
-            .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
-                new Dictionary<string, string?>
-                {
-                    ["ProtoTest:Web:Playwright:Channel"] = "prototest-no-such-channel",
-                    ["ProtoTest:Web:Sessions:Default:InstallBrowsers"] = "true"
-                }))
-            .Build();
-
-        var reason = new RequiresPlaywrightBrowserAttribute { Session = "Default" }.GetSkipReason(host);
-
-        Assert.That(reason, Is.Null, "the session's InstallBrowsers overrides the protocol section");
-    }
-
-    [Test]
-    public async Task Attribute_ShouldApplyASessionLevelChannelOverTheProtocolSection()
-    {
-        await using var host = new ProtoHostBuilder()
-            .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
-                new Dictionary<string, string?>
-                {
-                    ["ProtoTest:Web:Playwright:Channel"] = "prototest-no-such-channel",
-                    ["ProtoTest:Web:Sessions:Default:Channel"] = "msedge"
-                }))
-            .Build();
-
-        var reason = new RequiresPlaywrightBrowserAttribute { Session = "Default" }.GetSkipReason(host);
-
-        // Whether msedge exists is environment-specific; the protocol section's unknown channel losing is not.
-        Assert.That(reason ?? string.Empty, Does.Not.Contain("prototest-no-such-channel"),
-            "the session's channel wins over the protocol section");
-    }
-
-    [Test]
-    public async Task Attribute_ShouldReportAnUnknownSessionLevelChannel()
-    {
-        await using var host = new ProtoHostBuilder()
-            .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
-                new Dictionary<string, string?>
-                {
-                    ["ProtoTest:Web:Sessions:Default:Channel"] = "prototest-no-such-channel"
-                }))
-            .Build();
-
-        var reason = new RequiresPlaywrightBrowserAttribute { Session = "Default" }.GetSkipReason(host);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(reason, Is.Not.Null);
-            Assert.That(reason, Does.Contain("prototest-no-such-channel"),
-                "the probe follows the session's channel, not the protocol default");
-        });
-    }
-
     [Test]
     public async Task Attribute_ShouldFollowWhetherChromiumIsInstalled()
     {

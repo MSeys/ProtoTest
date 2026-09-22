@@ -24,6 +24,7 @@ using ProtoTest.Web;
 [Application(NorthstarTargets.Api)]
 [NorthstarTenant(PlanIds.Growth)]
 [Auth<NorthstarAuthenticator>]
+[WebSession("Default", DiscoverRoutes = true)]
 [LoginAs<NorthstarConsoleLogin>("owner")]
 [RequiresCapability(
     ProtoCapabilityKinds.Server,

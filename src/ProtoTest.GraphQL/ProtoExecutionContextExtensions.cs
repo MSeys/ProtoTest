@@ -16,12 +16,11 @@ public static class ProtoExecutionContextExtensions
     {
         ArgumentNullException.ThrowIfNull(context);
         var state = context.TryResolve<GraphQLContextState>();
-        var resolution = ProtoHttpClientResolver.Resolve(
-            context, "GraphQL", clientName, defaultEndpointName: "GraphQL");
+        var resolution = ProtoHttpClientResolver.Resolve(context, "GraphQL", clientName);
 
         var authenticatorFactory = state?.AuthenticatorFactory;
         var transportRegistration = context.Services.GetServices<GraphQLSubscriptionTransportRegistration>()
-            .LastOrDefault(item => string.Equals(item.TargetName, resolution.ResolvedName, StringComparison.OrdinalIgnoreCase)
+            .FirstOrDefault(item => string.Equals(item.TargetName, resolution.ResolvedName, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(item.TargetName, resolution.RequestedName, StringComparison.OrdinalIgnoreCase));
 
         var configuration = context.Services.GetService<IConfiguration>();
@@ -41,7 +40,6 @@ public static class ProtoExecutionContextExtensions
             {
                 ["client.name"] = resolution.RequestedName,
                 ["application.name"] = resolution.ApplicationName,
-                ["client.source_name"] = resolution.SourceName,
                 ["auth.configured"] = (authenticatorFactory is not null).ToString().ToLowerInvariant(),
                 ["endpoint.resolver"] = resolution.EndpointResolver
             });

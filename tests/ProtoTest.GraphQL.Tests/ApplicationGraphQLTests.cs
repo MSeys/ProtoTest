@@ -22,7 +22,7 @@ public sealed class ApplicationGraphQLTests
                 ["ProtoTest:Applications:ControlPlane:BaseUrl"] = "https://app.test",
                 ["ProtoTest:Applications:ControlPlane:Endpoints:GraphQL"] = "/graphql"
             }));
-        builder.AddApplication("ControlPlane", app => app.AddGraphQL(graphql => graphql.AddClient("ControlPlane")));
+        builder.AddApplication("ControlPlane", app => app.AddGraphQL(graphql => graphql.AddClient("ControlPlane", endpoint: "GraphQL")));
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("graphql application", TestMethod(), [new ApplicationAttribute("ControlPlane")]);
@@ -58,12 +58,12 @@ public sealed class ApplicationGraphQLTests
         builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>
             {
-                // The client is named "Api", so only GraphQL's own default endpoint yields "/graphql".
-                ["ProtoTest:Applications:ControlPlane:Endpoints:GraphQL"] = "/graphql"
+            // The client is named "Api" and names the endpoint key explicitly.
+            ["ProtoTest:Applications:ControlPlane:Endpoints:GraphQL"] = "/graphql"
             }));
         builder.AddApplication("ControlPlane", app =>
         {
-            app.AddGraphQL(graphql => graphql.AddClient("Api"));
+            app.AddGraphQL(graphql => graphql.AddClient("Api", endpoint: "GraphQL"));
             // Stands in for AddAspNetCoreServer: the transport the client has no URL to bypass.
             app.Services.AddSingleton(new ProtoApplicationTransport("ControlPlane", "ControlPlane"));
             app.Services.AddSingleton<IProtoClientInitializer>(

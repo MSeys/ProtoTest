@@ -12,7 +12,7 @@ using ProtoTest.Messaging;
 /// messages. The connection is shared by the run and is thread-safe; channels are not, so each side
 /// serializes its own.
 /// </summary>
-public sealed class RabbitMqMessageBroker : IProtoMessageBroker, IDisposable
+internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IDisposable
 {
     private readonly RabbitMqOptions _options;
     private readonly ProtoLock _gate = new();
@@ -121,3 +121,4 @@ public sealed class RabbitMqMessageBroker : IProtoMessageBroker, IDisposable
         }
     }
 }
+

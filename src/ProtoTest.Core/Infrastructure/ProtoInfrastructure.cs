@@ -34,7 +34,7 @@ public interface IProtoSettingsInfrastructure : IProtoInfrastructure
 /// host exposes started values through <see cref="ProtoInfrastructureSettings"/>, and the in-process
 /// application receives them as host settings automatically.
 /// </summary>
-public sealed record ProtoInfrastructureRegistration(
+internal sealed record ProtoInfrastructureRegistration(
     IProtoInfrastructure Infrastructure,
     IReadOnlyList<string> Settings);
 
@@ -76,3 +76,4 @@ public sealed class ProtoInfrastructureSettings
         }
     }
 }
+

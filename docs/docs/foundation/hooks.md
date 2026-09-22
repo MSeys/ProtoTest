@@ -97,18 +97,20 @@ Lower runs earlier on the way in and later on the way out, so a hook with `Order
 
 ProtoTest's built-in hooks sit at the extremes on purpose:
 
+The built-in orders are named in `ProtoHookOrder`, so a hook can sit relative to them without spelling out raw values:
+
 | Hook | `Order` | Why |
 | --- | --- | --- |
-| Client initializer (test) | `int.MinValue` | runs first on the way in, so your hooks can use clients |
-| Trace export (run) | `int.MinValue` | runs last on the way out, after reports and resources |
-| Run resources (run) | `int.MinValue + 1` | releases run-scoped resources before the trace archive is written |
-| Report sinks (run) | `int.MinValue + 2` | exports reports before resources are released, so the report is a snapshot of the run |
-| Run gates (run) | `int.MinValue + 3` | evaluates first on the way out, before reports export |
-| HTTP auth (test) | `100` | applies `[Auth<T>]` after your hooks, so it can override the request |
+| Client initializer (test) | `ProtoHookOrder.First` | runs first on the way in, so your hooks can use clients |
+| Trace export (run) | `ProtoHookOrder.First` | runs last on the way out, after reports and resources |
+| Run resources (run) | `ProtoHookOrder.RunResources` | releases run-scoped resources before the trace archive is written |
+| Report sinks (run) | `ProtoHookOrder.ReportSinks` | exports reports before resources are released, so the report is a snapshot of the run |
+| Run gates (run) | `ProtoHookOrder.RunGates` | evaluates first on the way out, before reports export |
+| HTTP auth (test) | `ProtoHookOrder.Authentication` | applies `[Auth<T>]` after your hooks, so it can override the request |
 
 The hook that creates clients runs **first** on the way in, so your hooks can use them. The run hooks that export reports, release resources and write the trace archive run **last** on the way out, in the reverse order above.
 
-Integrations add their own test hooks too — the HTTP integrations apply `[Auth<T>]` from a hook with `Order = 100`.
+Integrations add their own test hooks too — the HTTP integrations apply `[Auth<T>]` from a hook at `ProtoHookOrder.Authentication`.
 
 Remember that **all test hooks run before any [attribute](./attributes.md)**. See [Host and lifecycle](./lifecycle.md) for the full sequence and failure rules.
 

@@ -11,7 +11,7 @@ public static class ProtoHttpClientRegistration
 {
     /// <summary>Qualifies a client name with its application, so per-application clients never collide.</summary>
     public static string Qualify(string name, string? applicationName)
-        => applicationName is null ? name : $"{applicationName}:{name}";
+        => ProtoClientResolution.Qualify(name, applicationName);
 
     /// <summary>Registers a named HTTP client with an explicit or application-resolved base URL.</summary>
     public static IProtoTargetBuilder AddClient(
@@ -74,44 +74,55 @@ public static class ProtoHttpClientRegistration
     }
 
     /// <summary>
-    /// Registers a target whose transport comes from another HTTP client, such as one registered by
-    /// an in-process ASP.NET Core server, optionally rooted at a path. Every HTTP-based protocol's
-    /// <c>AddClientFrom</c> overload uses this so aliasing behaves identically.
+    /// The protocol builders' shared first step for a named client: default the name, qualify it with
+    /// the application, register it with that application, and hand off to
+    /// <see cref="AddClient(IServiceCollection, string, string, string, string?, Action{IHttpClientBuilder}?, string?, string?, bool)"/>.
     /// </summary>
-    public static IProtoTargetBuilder AddClientFrom(
+    internal static IProtoTargetBuilder AddNamedClient(
         IServiceCollection services,
         string protocolName,
-        string name,
-        string sourceClientName,
-        string? basePath = null,
-        string? application = null)
+        string protocolLabel,
+        IProtoApplicationBuilder? application,
+        string? name,
+        string? baseUrl,
+        Action<IHttpClientBuilder>? configure,
+        string? endpoint)
     {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentException.ThrowIfNullOrWhiteSpace(protocolName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(sourceClientName);
+        var clientName = name ?? "Default";
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
+        var applicationName = application?.ApplicationName;
+        var registeredName = Qualify(clientName, applicationName);
+        application?.RegisterClient(protocolName, clientName);
 
-        // Application clients register in the test context under their qualified name, so an alias
-        // inside AddApplication resolves the source as {application}:{source} first and falls back to
-        // the raw name for a source registered directly.
-        var qualifiedSourceName = Qualify(sourceClientName, application);
-        services.AddSingleton(new ProtoApplicationTarget(name, application ?? name));
-        services.AddSingleton(new ProtoHttpClientAliasRegistration(
+        return AddClient(
+            services,
             protocolName,
-            name,
-            qualifiedSourceName,
-            (context, _) =>
-            {
-                var source = context.TryClient<HttpClient>(qualifiedSourceName)
-                    ?? (string.Equals(qualifiedSourceName, sourceClientName, StringComparison.Ordinal)
-                        ? null
-                        : context.TryClient<HttpClient>(sourceClientName))
-                    ?? context.Client<HttpClient>(sourceClientName);
-                var baseAddress = source.BaseAddress
-                    ?? throw new InvalidOperationException($"HTTP client '{sourceClientName}' has no base address.");
-                return ValueTask.FromResult(
-                    string.IsNullOrWhiteSpace(basePath) ? baseAddress : new Uri(baseAddress, basePath));
-            }));
-        return new ProtoTargetBuilder(name, services);
+            protocolLabel,
+            registeredName,
+            baseUrl,
+            configure,
+            applicationName,
+            endpoint,
+            // Under an application with no configured URL, the client reuses the application's
+            // in-process transport (see AddAspNetCoreServer) or its BaseUrl.
+            allowMissingBaseUrl: applicationName is not null && baseUrl is null);
+    }
+
+    /// <summary>The same shared first step for a client whose base address comes from per-test context.</summary>
+    internal static IProtoTargetBuilder AddResolvedClient(
+        IServiceCollection services,
+        string protocolName,
+        IProtoApplicationBuilder? application,
+        string? name,
+        Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> baseAddressResolver,
+        Action<IHttpClientBuilder>? configure)
+    {
+        var clientName = name ?? "Default";
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
+        var applicationName = application?.ApplicationName;
+        var registeredName = Qualify(clientName, applicationName);
+        application?.RegisterClient(protocolName, clientName);
+
+        return AddClient(services, protocolName, registeredName, baseAddressResolver, configure, applicationName);
     }
 }

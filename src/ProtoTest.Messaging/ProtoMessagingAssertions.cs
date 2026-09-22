@@ -12,20 +12,19 @@ using ProtoTest.Json;
 public static class ProtoMessagingAssertions
 {
     /// <summary>
-    /// Matches a message payload against an expected shape and records the assertion on
-    /// <paramref name="context"/> as an <c>assert.json.shape</c> operation with a
+    /// Matches a message payload against an expected shape and records the assertion on the ambient
+    /// <see cref="Proto.Context"/> as an <c>assert.json.shape</c> operation with a
     /// <c>messaging.contract.shape</c> observation. A mismatch fails the operation and rethrows the
     /// shape exception; a payload that is empty or not Json fails with a message naming the destination.
     /// </summary>
     public static ProtoMessage ShouldMatchShape(
         this ProtoMessage message,
-        ProtoExecutionContext context,
         object expectedShape,
         JsonSerializerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(message);
-        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(expectedShape);
+        var context = Proto.Context;
         var targetName = context.TryService<IProtoMessageBroker>()?.Name ?? message.Destination;
         try
         {

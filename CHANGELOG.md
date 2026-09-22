@@ -2,8 +2,31 @@
 
 All notable changes to ProtoTest are documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+All ProtoTest packages share one version; breaking API changes are called out below.
+
+## [Unreleased]
+
+### Breaking
+
+- `AddClientFrom` was removed from the REST and GraphQL builders. Register clients under an
+  application and configure its base URL or endpoints, or use an `AddClient` resolver when the
+  address depends on test context.
+- Several registration, observation and runner implementation types are now internal. Use the
+  public builder, response and runner APIs instead of constructing those implementation types.
+- `ProtoTest:Web:Sessions:{name}` settings no longer configure sessions. Put addresses under
+  `ProtoTest:Applications:{application}` and select the session with `[WebSession]` or `Web()`;
+  backend options remain under `ProtoTest:Web:Playwright` or `ProtoTest:Web:Selenium`.
+
+### Changed
+
+- REST, GraphQL and gRPC clients use protocol-scoped names, so the same logical name can be used
+  by more than one integration.
+- REST, GraphQL and gRPC now use one registration path per integration for host and application setup;
+  messaging keeps its registration state with the host services rather than in a global table.
+- Web sessions are created when requested and complete through the shared client lifecycle.
+- Trace snapshots can safely read observations, attachments and findings while other test work records them.
+- CI builds the sample UI once and releases the same packages that passed verification.
 
 ## [1.0.1] - 2026-09-20
 

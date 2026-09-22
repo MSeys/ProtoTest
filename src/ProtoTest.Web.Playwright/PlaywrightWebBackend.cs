@@ -33,6 +33,9 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         Page = page;
         _options = options;
         _sessionName = sessionName;
+        // Playwright's default is 30 seconds; the assertion polling contract needs one read or action to
+        // give up inside its own budget, and Selenium already fails after ActionTimeout.
+        Page.SetDefaultTimeout((float)_options.ActionTimeout.TotalMilliseconds);
         WireDiagnostics();
     }
 
@@ -266,12 +269,12 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     {
         ArgumentNullException.ThrowIfNull(trigger);
         cancellationToken.ThrowIfCancellationRequested();
-        var options = new PageRunAndWaitForDownloadOptions();
-        if (timeout is { } wait)
+        var options = new PageRunAndWaitForDownloadOptions
         {
-            options.Timeout = (float)wait.TotalMilliseconds;
-        }
-
+            // A download keeps Playwright's own 30-second default; the session timeout bounds element
+            // waits, not a file the application is still producing.
+            Timeout = (float)(timeout ?? TimeSpan.FromSeconds(30)).TotalMilliseconds
+        };
         var download = await Page.RunAndWaitForDownloadAsync(() => trigger(cancellationToken), options);
         var fileName = download.SuggestedFilename;
         var path = await download.PathAsync();
@@ -322,9 +325,10 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
 
     /// <summary>
     /// Runs one action against the resolved locator, translating Playwright's strict-mode violation into
-    /// the same <see cref="WebElementResolutionException"/> Selenium raises for multiple matches. Without
-    /// the translation, polling assertions would see a raw <c>PlaywrightException</c> instead of the
-    /// documented resolution failure.
+    /// the same <see cref="WebElementResolutionException"/> Selenium raises for multiple matches, and its
+    /// auto-wait timeout into the same <see cref="WebActionabilityException"/> Selenium raises after
+    /// <see cref="PlaywrightWebOptions.ActionTimeout"/>. Without the translation, polling assertions and
+    /// wait conditions would see a raw <c>PlaywrightException</c> instead of the documented failures.
     /// </summary>
     private async ValueTask ExecuteResolvedAsync(WebElementReference element, Func<ILocator, Task> action)
     {
@@ -332,6 +336,12 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         try
         {
             await action(locator);
+        }
+        catch (TimeoutException)
+        {
+            throw new WebActionabilityException(
+                $"Element '{element.ComponentPath}.{element.Name}' did not become actionable within " +
+                $"{_options.ActionTimeout}. Locator: {element.Locator.Describe()}.");
         }
         catch (PlaywrightException exception) when (IsStrictViolation(exception))
         {
@@ -345,6 +355,12 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         try
         {
             return await read(locator);
+        }
+        catch (TimeoutException)
+        {
+            throw new WebElementResolutionException(
+                $"Element '{element.ComponentPath}.{element.Name}' was not present within " +
+                $"{_options.ActionTimeout}. Locator: {element.Locator.Describe()}.");
         }
         catch (PlaywrightException exception) when (IsStrictViolation(exception))
         {
@@ -656,7 +672,7 @@ internal sealed class PlaywrightWebBackendFactory(Action<PlaywrightWebOptions>? 
         string sessionName,
         CancellationToken cancellationToken = default)
     {
-        var options = WebBackendOptions.Resolve(context, sessionName, configure);
+        var options = WebBackendOptions.Resolve(context, configure, PlaywrightWebOptions.Validate);
         return await PlaywrightWebBackend.CreateAsync(
             context,
             context.Service<PlaywrightBrowserPool>(),

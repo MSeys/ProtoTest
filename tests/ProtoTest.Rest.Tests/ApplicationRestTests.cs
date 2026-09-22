@@ -24,8 +24,8 @@ public sealed class ApplicationRestTests
             }));
         builder.AddApplication("ControlPlane", app => app.AddRest(rest =>
         {
-            rest.AddClient("Orders");
-            rest.AddClient("Billing");
+            rest.AddClient("Orders", endpoint: "Orders");
+            rest.AddClient("Billing", endpoint: "Billing");
         }));
         await using var host = builder.Build();
         await host.StartAsync();
@@ -54,7 +54,7 @@ public sealed class ApplicationRestTests
                 ["ProtoTest:Applications:ControlPlane:BaseUrl"] = "https://app.test",
                 ["ProtoTest:Applications:ControlPlane:Endpoints:Orders"] = "/api/orders"
             }));
-        builder.AddApplication("ControlPlane", app => app.AddRest(rest => rest.AddClient("Orders")));
+        builder.AddApplication("ControlPlane", app => app.AddRest(rest => rest.AddClient("Orders", endpoint: "Orders")));
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("rest application", TestMethod(), [new ApplicationAttribute("ControlPlane")]);
@@ -83,7 +83,7 @@ public sealed class ApplicationRestTests
             }));
         builder.AddApplication("ControlPlane", app =>
         {
-            app.AddRest(rest => rest.AddClient("Orders"));
+            app.AddRest(rest => rest.AddClient("Orders", endpoint: "Orders"));
             // Stands in for AddAspNetCoreServer: the transport the client has no URL to bypass.
             app.Services.AddSingleton(new ProtoApplicationTransport("ControlPlane", "ControlPlane"));
             app.Services.AddSingleton<IProtoClientInitializer>(
@@ -136,7 +136,7 @@ public sealed class ApplicationRestTests
     }
 
     [Test]
-    public async Task AddClientFrom_UnderAnApplication_ShouldResolveTheApplicationScopedSourceClient()
+    public async Task Rest_NamedClient_UnderAnApplication_ShouldUseItsOwnBaseAddress()
     {
         var handler = new TestHttpMessageHandler
         {
@@ -146,20 +146,15 @@ public sealed class ApplicationRestTests
         builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>
             {
-                ["ProtoTest:Applications:ControlPlane:BaseUrl"] = "https://app.test",
-                ["ProtoTest:Applications:ControlPlane:Endpoints:Orders"] = "/api/orders"
+                ["ProtoTest:Applications:ControlPlane:BaseUrl"] = "https://app.test"
             }));
         builder.AddApplication("ControlPlane", app => app.AddRest(rest =>
-        {
-            // The source client registers under the application, i.e. as "ControlPlane:Orders".
-            rest.AddClient("Orders", "https://source.example/api/", http =>
-                http.ConfigurePrimaryHttpMessageHandler(() => handler));
-            rest.AddClientFrom("OrdersV2", "Orders", "/v2/");
-        }));
+            rest.AddClient("OrdersV2", "https://source.example/v2/", http =>
+                http.ConfigurePrimaryHttpMessageHandler(() => handler))));
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync(
-            "rest application alias", TestMethod(), [new ApplicationAttribute("ControlPlane")]);
+            "rest application named client", TestMethod(), [new ApplicationAttribute("ControlPlane")]);
 
         using var response = await context.Rest("OrdersV2").GetAsync("orders/42");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -267,41 +262,6 @@ public sealed class ApplicationRestTests
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
         Assert.That(handler.LastRequest!.RequestUri, Is.EqualTo(new Uri("https://first.example/orders/42")));
-    }
-
-    [Test]
-    public async Task Rest_ShouldKeepTheFirstAliasForARepeatedClientName()
-    {
-        var sourceAHandler = new TestHttpMessageHandler
-        {
-            ResponseFactory = () => new HttpResponseMessage(System.Net.HttpStatusCode.OK)
-        };
-        var sourceBHandler = new TestHttpMessageHandler
-        {
-            ResponseFactory = () => new HttpResponseMessage(System.Net.HttpStatusCode.OK)
-        };
-        var builder = new ProtoHostBuilder();
-        builder.AddRest(rest =>
-        {
-            rest.AddClient("SourceA", "https://source-a.example/", http =>
-                http.ConfigurePrimaryHttpMessageHandler(() => sourceAHandler));
-            rest.AddClient("SourceB", "https://source-b.example/", http =>
-                http.ConfigurePrimaryHttpMessageHandler(() => sourceBHandler));
-            rest.AddClientFrom("Orders", "SourceA");
-            rest.AddClientFrom("Orders", "SourceB");
-        });
-        await using var host = builder.Build();
-        await host.StartAsync();
-        var context = await host.StartTestAsync("rest alias first wins", TestMethod());
-
-        using var response = await context.Rest("Orders").GetAsync("orders/42");
-        await host.CompleteTestAsync(ProtoTestResult.Passed);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(sourceAHandler.LastRequest!.RequestUri, Is.EqualTo(new Uri("https://source-a.example/orders/42")));
-            Assert.That(sourceBHandler.LastRequest, Is.Null);
-        });
     }
 
     [Test]

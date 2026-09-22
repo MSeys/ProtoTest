@@ -57,7 +57,7 @@ public sealed class PlaywrightConformanceTests
             .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
-                    ["ProtoTest:Web:Sessions:Default:Context:Locale"] = "nl-BE"
+                    ["ProtoTest:Web:Playwright:Context:Locale"] = "nl-BE"
                 }))
             .AddWeb(options =>
             {
@@ -193,14 +193,47 @@ public sealed class PlaywrightConformanceTests
     }
 
     [Test]
+    public async Task MissingElementRead_ShouldFailThroughThePollingContract()
+    {
+        var host = new ProtoHostBuilder()
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Off;
+                options.ActionTimeout = TimeSpan.FromMilliseconds(300);
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("playwright missing element", TestMethod());
+        var web = context.Web();
+        var backend = await OpenBrowserAsync(web);
+        await backend.Page.SetContentAsync("<!doctype html><html><body><p class=\"dup\">one</p></body></html>");
+        var page = web.Page<DuplicatePage>();
+
+        // A direct read reports the documented resolution failure instead of a raw Playwright timeout.
+        var read = Assert.ThrowsAsync<WebElementResolutionException>(async () => await page.Missing.TextAsync());
+
+        // A positive assertion polls within its own budget and fails with the documented observation.
+        var assertion = Assert.ThrowsAsync<WebAssertionException>(async () =>
+            await page.Missing.Should.HaveTextAsync("one", TimeSpan.FromMilliseconds(200)));
+
+        // Absence satisfies a negated assertion, exactly as it does on Selenium.
+        await page.Missing.ShouldNot.HaveTextAsync("one", TimeSpan.FromMilliseconds(200));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(read!.Message, Does.Contain("was not present"));
+            Assert.That(assertion!.Message, Does.Contain("was not present"));
+        });
+    }
+
+    [Test]
     public async Task VueRouteDiscovery_ShouldReadRoutesFromARealPage()
     {
         var host = new ProtoHostBuilder()
-            .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
-                new Dictionary<string, string?>
-                {
-                    ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
-                }))
             .AddWeb(options =>
             {
                 options.Headless = true;
@@ -211,7 +244,7 @@ public sealed class PlaywrightConformanceTests
         await using var ownedHost = host;
         await host.StartAsync();
         var context = await host.StartTestAsync("vue discovery conformance", TestMethod());
-        var web = context.Web();
+        var web = context.Web(discoverRoutes: true);
         var backend = await OpenBrowserAsync(web);
         await backend.Page.RouteAsync("**/*", route => route.FulfillAsync(new RouteFulfillOptions
         {
@@ -476,11 +509,6 @@ public sealed class PlaywrightConformanceTests
     public async Task VueRouteDiscovery_ShouldResolveRelativeChildRoutesFromTheVueTwoTable()
     {
         var host = new ProtoHostBuilder()
-            .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
-                new Dictionary<string, string?>
-                {
-                    ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
-                }))
             .AddWeb(options =>
             {
                 options.Headless = true;
@@ -491,7 +519,7 @@ public sealed class PlaywrightConformanceTests
         await using var ownedHost = host;
         await host.StartAsync();
         var context = await host.StartTestAsync("vue child routes", TestMethod());
-        var web = context.Web();
+        var web = context.Web(discoverRoutes: true);
         var backend = await OpenBrowserAsync(web);
         await backend.Page.RouteAsync("**/*", route => route.FulfillAsync(new RouteFulfillOptions
         {
@@ -517,11 +545,6 @@ public sealed class PlaywrightConformanceTests
     public async Task VueRouteDiscovery_ShouldBeANoOpOnAPageWithoutAVueApp()
     {
         var host = new ProtoHostBuilder()
-            .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
-                new Dictionary<string, string?>
-                {
-                    ["ProtoTest:Web:Sessions:Default:DiscoverRoutes"] = "true"
-                }))
             .AddWeb(options =>
             {
                 options.Headless = true;
@@ -532,7 +555,7 @@ public sealed class PlaywrightConformanceTests
         await using var ownedHost = host;
         await host.StartAsync();
         var context = await host.StartTestAsync("vue discovery absent", TestMethod());
-        var web = context.Web();
+        var web = context.Web(discoverRoutes: true);
         var backend = await OpenBrowserAsync(web);
         await backend.Page.RouteAsync("**/*", route => route.FulfillAsync(new RouteFulfillOptions
         {
@@ -675,6 +698,7 @@ public sealed class PlaywrightConformanceTests
     public sealed class DuplicatePage : WebPage
     {
         public WebElement Duplicate => Element(By.Css("p.dup"));
+        public WebElement Missing => Element(By.Css("p.missing"));
     }
 
     public sealed class DownloadPage : WebPage

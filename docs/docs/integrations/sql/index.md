@@ -33,7 +33,7 @@ public static IProtoHostBuilder AddSql(
     Action<SqlOptions>? configure = null);
 ```
 
-It registers the `SQL` store capability, the factory and `ProtoSqlSession` as scoped services (so each test gets its own), the options, the test hook that opens and releases the connection, and the run hook that guards the isolation declarations. Calling it twice on one host is a no-op: the first registration's factory and options win. The options singleton is built by running `configure` and is then bound from `ProtoTest:Sql`, so configuration layers over code.
+It registers the `SQL` store capability, the factory and `ProtoSqlSession` as scoped services (so each test gets its own), the options, the test hook that opens and releases the connection, and the run hook that guards the isolation declarations. Calling it twice on one host is a no-op: the first registration's factory and options win. A host that registered its own `SqlOptions` keeps them — the options registration is `TryAdd`, so the rest of the integration composes around the host's instance instead of switching itself off. The options singleton is built by running `configure` and is then bound from `ProtoTest:Sql`, so configuration layers over code.
 
 The factory runs inside the test's scope, so it can resolve services — the demo reads a container's connection string from infrastructure settings:
 

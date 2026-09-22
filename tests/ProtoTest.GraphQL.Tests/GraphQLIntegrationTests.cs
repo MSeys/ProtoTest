@@ -159,7 +159,7 @@ public sealed class GraphQLIntegrationTests
                 ["ProtoTest:Applications:Catalog:Endpoints:GraphQL"] = "/graphql"
             }));
         builder.AddApplication("Catalog", app => app.AddGraphQL(graphQL => graphQL
-            .AddClient("Api", configure: http => http.ConfigurePrimaryHttpMessageHandler(() => handler))
+            .AddClient("Api", configure: http => http.ConfigurePrimaryHttpMessageHandler(() => handler), endpoint: "GraphQL")
             .WithSchemaCoverage(schema)));
         await using var host = builder.Build();
         await host.StartTestAsync("application coverage", "11", TestMethod(), [new ApplicationAttribute("Catalog")]);
@@ -514,7 +514,7 @@ public sealed class GraphQLIntegrationTests
     }
 
     [Test]
-    public async Task AddClientFrom_ShouldReuseTheSourceClientThroughTheAlias()
+    public async Task NamedClients_ShouldRouteEachNameToItsOwnBaseAddress()
     {
         Uri? requestedUri = null;
         var handler = new StubHandler(request =>
@@ -530,23 +530,22 @@ public sealed class GraphQLIntegrationTests
         {
             graphQL.AddClient("Catalog", "https://source.example/api/", http =>
                 http.ConfigurePrimaryHttpMessageHandler(() => handler));
-            graphQL.AddClientFrom("CatalogV2", "Catalog", "v2/");
-            graphQL.AddClientFrom("CatalogAlias", "Catalog");
+            graphQL.AddClient("CatalogV2", "https://source.example/v2/", http =>
+                http.ConfigurePrimaryHttpMessageHandler(() => handler));
         });
         await using var host = builder.Build();
-        await host.StartTestAsync("alias client", "13", TestMethod());
+        await host.StartTestAsync("named clients", "13", TestMethod());
         try
         {
-            // A path-rooted alias keeps its prefix; without one the default GraphQL endpoint is used.
             using var versioned = await Proto.Context.GraphQL("CatalogV2")
                 .Query(null, query => query.Field("ping"))
                 .ExecuteAsync();
-            Assert.That(requestedUri, Is.EqualTo(new Uri("https://source.example/api/v2/")));
+            Assert.That(requestedUri, Is.EqualTo(new Uri("https://source.example/v2/")));
 
-            using var aliased = await Proto.Context.GraphQL("CatalogAlias")
+            using var catalog = await Proto.Context.GraphQL("Catalog")
                 .Query(null, query => query.Field("ping"))
                 .ExecuteAsync();
-            Assert.That(requestedUri, Is.EqualTo(new Uri("https://source.example/graphql")));
+            Assert.That(requestedUri, Is.EqualTo(new Uri("https://source.example/api/")));
         }
         finally { await host.CompleteTestAsync(); }
     }

@@ -4,12 +4,14 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using Northstar.ProtoTest;
 using ProtoTest.Core;
 
 /// <summary>
 /// Starts the sample application as a standalone process over the suite's store, so browser tests have a
-/// real address. It is run-scoped infrastructure: the host starts it, exposes its address as the web
-/// session's base URL, and releases it with the run - the journey file only contains the journey.
+/// real address. It is run-scoped infrastructure: the host starts it, exposes its address as the
+/// application's base URL so every client and session follows it, and releases it with the run - the
+/// journey file only contains the journey.
 /// </summary>
 internal sealed class StandaloneSampleApp(
     string connectionString,
@@ -33,7 +35,7 @@ internal sealed class StandaloneSampleApp(
 
     public IReadOnlyDictionary<string, string> Settings => new Dictionary<string, string>
     {
-        ["ProtoTest:Web:Sessions:Default:BaseUrl"] = _baseUrl
+        [$"ProtoTest:Applications:{NorthstarTargets.Api}:BaseUrl"] = _baseUrl
     };
 
     public async ValueTask StartAsync(CancellationToken cancellationToken = default)

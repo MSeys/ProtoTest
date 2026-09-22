@@ -9,4 +9,10 @@ public sealed class SpreadsheetAssertionException : ProtoAssertionException
         : base(message)
     {
     }
+
+    /// <summary>Wraps a shared shape assertion failure, keeping its mismatch details inspectable.</summary>
+    public SpreadsheetAssertionException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
 }

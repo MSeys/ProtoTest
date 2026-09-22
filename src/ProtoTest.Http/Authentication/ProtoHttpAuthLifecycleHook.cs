@@ -14,7 +14,7 @@ public abstract class ProtoHttpAuthLifecycleHook(string protocolName) : IProtoTe
         ? throw new ArgumentException("A protocol name is required.", nameof(protocolName))
         : protocolName;
 
-    public int Order => 100;
+    public int Order => ProtoHookOrder.Authentication;
 
     /// <summary>Stores the resolved authenticator factory as protocol-specific context state.</summary>
     protected abstract void SetContext(
@@ -78,3 +78,4 @@ public abstract class ProtoHttpAuthLifecycleHook(string protocolName) : IProtoTe
            ?? metadata.GetType().FullName
            ?? metadata.GetType().Name;
 }
+

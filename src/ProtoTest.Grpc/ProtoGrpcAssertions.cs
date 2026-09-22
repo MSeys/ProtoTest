@@ -16,34 +16,21 @@ public static class ProtoGrpcAssertions
     private static readonly JsonFormatter Formatter = new(
         JsonFormatter.Settings.Default.WithFormatDefaultValues(true).WithFormatEnumsAsIntegers(false));
 
-    /// <summary>Matches one protobuf reply against an expected shape.</summary>
-    public static void ShouldMatchShape<TResponse>(
-        this TResponse response,
-        object expectedShape,
-        JsonSerializerOptions? options = null)
-        where TResponse : IMessage
-    {
-        ArgumentNullException.ThrowIfNull(response);
-        ArgumentNullException.ThrowIfNull(expectedShape);
-        _ = JsonShapeMatcher.AssertMatch(Formatter.Format(response), expectedShape, options);
-    }
-
     /// <summary>
-    /// Matches one protobuf reply against an expected shape and records the assertion on
-    /// <paramref name="context"/> as an <c>assert.json.shape</c> operation with a
+    /// Matches one protobuf reply against an expected shape and records the assertion on the ambient
+    /// <see cref="Proto.Context"/> as an <c>assert.json.shape</c> operation with a
     /// <c>grpc.contract.shape</c> observation. A mismatch fails the operation and rethrows the shape
     /// exception, so the evidence is in the trace even when the test fails.
     /// </summary>
     public static void ShouldMatchShape<TResponse>(
         this TResponse response,
-        ProtoExecutionContext context,
         object expectedShape,
         JsonSerializerOptions? options = null)
         where TResponse : IMessage
     {
         ArgumentNullException.ThrowIfNull(response);
-        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(expectedShape);
+        var context = Proto.Context;
         ProtoShapeAssertion.Assert(
             new ProtoShapeAssertionContext(
                 context,
@@ -60,26 +47,15 @@ public static class ProtoGrpcAssertions
                 new GrpcShapeMatchData(typeof(TResponse), matched)));
     }
 
-    /// <summary>Asserts the status of a failed call, untraced.</summary>
+    /// <summary>Asserts the status of a failed call, traced on the ambient context.</summary>
     public static global::Grpc.Core.RpcException ShouldHaveStatus(
         this global::Grpc.Core.RpcException exception,
         global::Grpc.Core.StatusCode expected)
-        => AssertStatus(exception, expected, context: null, negated: false);
+        => AssertStatus(exception, expected, negated: false);
 
     /// <summary>
-    /// Asserts the status of a failed call and records the check on <paramref name="context"/> as an
-    /// <c>assert.grpc.status</c> operation with a Checks section. A mismatch fails the operation and
-    /// rethrows a <see cref="GrpcAssertionException"/>; without a context the assertion is still made,
-    /// untraced.
-    /// </summary>
-    public static global::Grpc.Core.RpcException ShouldHaveStatus(
-        this global::Grpc.Core.RpcException exception,
-        global::Grpc.Core.StatusCode expected,
-        ProtoExecutionContext? context = null)
-        => AssertStatus(exception, expected, context, negated: false);
-
-    /// <summary>
-    /// Asserts that a failed call does <em>not</em> carry <paramref name="unexpected"/>, untraced.
+    /// Asserts that a failed call does <em>not</em> carry <paramref name="unexpected"/>, traced on the
+    /// ambient context.
     /// </summary>
     /// <remarks>
     /// Deliberate deviation: C# has no extension properties, so gRPC cannot expose the
@@ -90,32 +66,17 @@ public static class ProtoGrpcAssertions
     public static global::Grpc.Core.RpcException ShouldNotHaveStatus(
         this global::Grpc.Core.RpcException exception,
         global::Grpc.Core.StatusCode unexpected)
-        => AssertStatus(exception, unexpected, context: null, negated: true);
-
-    /// <summary>
-    /// Asserts that a failed call does <em>not</em> carry <paramref name="unexpected"/> and records the
-    /// check as an <c>assert.grpc.status</c> operation with a Checks section. A mismatch fails the
-    /// operation and rethrows a <see cref="GrpcAssertionException"/>; without a context the assertion
-    /// is still made, untraced.
-    /// </summary>
-    /// <remarks>
-    /// Deliberate deviation: see <c>ShouldNotHaveStatus</c> for why gRPC has no Should facade.
-    /// </remarks>
-    public static global::Grpc.Core.RpcException ShouldNotHaveStatus(
-        this global::Grpc.Core.RpcException exception,
-        global::Grpc.Core.StatusCode unexpected,
-        ProtoExecutionContext? context = null)
-        => AssertStatus(exception, unexpected, context, negated: true);
+        => AssertStatus(exception, unexpected, negated: true);
 
     private static global::Grpc.Core.RpcException AssertStatus(
         global::Grpc.Core.RpcException exception,
         global::Grpc.Core.StatusCode expected,
-        ProtoExecutionContext? context,
         bool negated)
     {
         ArgumentNullException.ThrowIfNull(exception);
+        var context = Proto.Context;
         var actual = exception.StatusCode;
-        using var operation = context?.Trace
+        using var operation = context.Trace
             .Operation(
                 "assert.grpc.status",
                 $"Assert status · {ProtoAssertion.Describe($"{(int)expected} {expected}", negated)}",
@@ -127,7 +88,7 @@ public static class ProtoGrpcAssertions
             .With("assertion.negated", negated ? "true" : null)
             .Begin();
         var passed = ProtoAssertion.IsSatisfied(actual == expected, negated);
-        operation?.AddSection(new ProtoTraceSection(
+        operation.AddSection(new ProtoTraceSection(
             "Result",
             ProtoTraceSectionKind.Checks,
             [
@@ -148,19 +109,19 @@ public static class ProtoGrpcAssertions
                     $"Expected gRPC status {ProtoAssertion.Describe($"{(int)expected} ({expected})", negated)}, " +
                     $"but received {(int)actual} ({actual}).");
             }
-            operation?.Succeed();
+            operation.Succeed();
             return exception;
         }
         catch (Exception failure)
         {
-            operation?.Fail(failure);
+            operation.Fail(failure);
             throw;
         }
     }
 }
 
 /// <summary>Shape-match data attached to a <c>grpc.contract.shape</c> observation.</summary>
-public sealed record GrpcShapeMatchData(Type MessageType, IReadOnlyList<string> MatchedProperties);
+internal sealed record GrpcShapeMatchData(Type MessageType, IReadOnlyList<string> MatchedProperties);
 
 /// <summary>Represents a failed gRPC assertion.</summary>
 public sealed class GrpcAssertionException : ProtoAssertionException
@@ -175,3 +136,4 @@ public sealed class GrpcAssertionException : ProtoAssertionException
     {
     }
 }
+

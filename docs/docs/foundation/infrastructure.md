@@ -80,7 +80,7 @@ The demo also registers a settings-only resource with no keys:
 builder.AddInfrastructure(new StandaloneSampleApp(fallbackDatabase, databaseProvider));
 ```
 
-It starts the sample application as a standalone process and fills `ProtoTest:Web:Sessions:Default:BaseUrl` from its `Settings`, so the [web sessions](../integrations/web/index.md) have an address. A settings-only infrastructure fills its dictionary whether or not keys were passed.
+It starts the sample application as a standalone process and fills `ProtoTest:Applications:{application}:BaseUrl` from its `Settings`, so the [web sessions](../integrations/web/index.md) have an address. A settings-only infrastructure fills its dictionary whether or not keys were passed.
 
 ## When it starts
 
@@ -122,7 +122,7 @@ Precedence is decided by each reader. The in-process web host and the RabbitMQ a
 | --- | --- | --- |
 | In-process application (`AddAspNetCoreServer`) | infrastructure settings first, then `configureWebHost` | explicit `configureWebHost` |
 | RabbitMQ adapter (`UseRabbitMq`) | `ProtoTest:Messaging:RabbitMq:ConnectionString` first, then infrastructure settings | explicit configuration |
-| Web session base URL | infrastructure-provided `ProtoTest:Web:Sessions:{name}:BaseUrl` first, then configuration | the started instance's address |
+| Web session application address | infrastructure-provided `ProtoTest:Applications:{application}:BaseUrl` first, then configuration | the started instance's address |
 
 The web session is the deliberate exception: the address of the process the run started wins over a configured one, so a standalone instance is always the one the browser drives.
 

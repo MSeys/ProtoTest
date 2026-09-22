@@ -47,7 +47,7 @@ builder.AddGraphQL(graphQL =>
     graphQL.AddClient("Api", "https://api.example.test/graphql"));
 
 builder.AddApplication("Api", app => app.AddGraphQL(graphQL =>
-    graphQL.AddClient("GraphQL")));       // BaseUrl + Endpoints:GraphQL
+    graphQL.AddClient("GraphQL", endpoint: "GraphQL")));       // BaseUrl + Endpoints:GraphQL
 ```
 
 Repeated registration never errors: the lifecycle hook, WebSocket factory and keyed options register once, while every `AddGraphQL` callback still runs and composes more clients.
@@ -56,30 +56,31 @@ Repeated registration never errors: the lifecycle hook, WebSocket factory and ke
 
 | Overload | Base address |
 | --- | --- |
-| `AddClient(name = "Default", baseUrl = null, configure = null, endpoint = "GraphQL")` | the explicit `baseUrl`, else the application's `BaseUrl` joined with `Endpoints:{endpoint}` |
+| `AddClient(name = null, baseUrl = null, configure = null, endpoint = null)` | the explicit `baseUrl`, else the application's `BaseUrl` joined with `Endpoints:{endpoint}` |
 | `AddClient(name, Func<ProtoExecutionContext, Uri> resolver, configure = null)` | resolved per request from the running test |
 | `AddClient(name, Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> resolver, configure = null)` | async per-request resolution |
-| `AddClientFrom(name, sourceClientName, endpointPath = "/graphql")` | another integration's registered client, rooted at `endpointPath` |
 
-The **endpoint default rule** for GraphQL is `"GraphQL"`: it names the key under `ProtoTest:Applications:{application}:Endpoints` to append to the application's `BaseUrl` and applies whether the client is registered on the host or under an application. `AddClientFrom`'s `endpointPath` is non-nullable and defaults to `/graphql` — REST's `basePath` equivalent is nullable.
+The name may be omitted when the application has one GraphQL client; pass one only to address several targets.
+
+There is **no endpoint default**: `endpoint` names the key under `ProtoTest:Applications:{application}:Endpoints` to append to the application's `BaseUrl`, for host-level and application clients alike. Without it the base URL is used as-is.
 
 An invalid base URL throws `ArgumentException`. A base URL that isn't absolute HTTP(S) fails when the request is sent or the subscription starts.
 
 ### Reusing another client
 
-When GraphQL is served by the same [in-process ASP.NET Core server](../aspnetcore.md) as the application, a plain `AddClient` reuses its transport automatically and appends the `GraphQL` endpoint path:
+When GraphQL is served by the same [in-process ASP.NET Core server](../aspnetcore.md) as the application, a plain `AddClient` reuses its transport automatically and appends the named endpoint path:
 
 ```csharp
 builder.AddApplication("Api", app => app
     .AddAspNetCoreServer<Program>()
-    .AddGraphQL(graphQL => graphQL.AddClient("GraphQL")));
+    .AddGraphQL(graphQL => graphQL.AddClient("GraphQL", endpoint: "GraphQL")));
 ```
 
-Set `ProtoTest:Applications:Api:Endpoints:GraphQL` to change the path. The key has no default: when it is unset, the client uses the application's `BaseUrl` as-is. If you must reuse a *differently named* client, `AddClientFrom(name, sourceClientName, endpointPath)` does that explicitly.
+Set `ProtoTest:Applications:Api:Endpoints:GraphQL` to change the path. The key has no default: when it is unset, the client uses the application's `BaseUrl` as-is. A configured `BaseUrl` takes precedence and leaves the in-process server unstarted.
 
 ### Target options
 
-`AddClient` / `AddClientFrom` return a target builder with GraphQL-specific extensions:
+`AddClient` returns a target builder with GraphQL-specific extensions:
 
 | Extension | Effect |
 | --- | --- |
@@ -142,11 +143,11 @@ public sealed class ViewerTests
 - **Subscriptions** — WebSocket or SSE, connection payloads, custom sockets: [Subscriptions](./subscriptions.md).
 - **Schema coverage** — point a client at your SDL: [Schema coverage](./coverage.md).
 - **Multiple clients** — pass `.GraphQL("Reporting")`, or bind one with `[Application("Api", "GraphQL:Reporting")]`.
-- **In-process server** — a client with no URL reuses the application's transport; `AddClientFrom` points at another client explicitly.
+- **In-process server** — a client with no URL reuses the application's transport automatically; a configured `BaseUrl` takes precedence.
 
 ## Tracing and coverage
 
-Queries and mutations record a `graphql.operation` operation (`GraphQL · {type} {name}`) under `client:HttpClient:{target}`, with a `graphql.endpoint.resolve` child, the operation type and name, header count, response status and error count; assertions record `assert.http.status`, `assert.graphql.*` and `assert.json.shape` as children. Deserialization records `graphql.response.deserialize`. Observations: `graphql.response` for every response, `graphql.failure` when sending fails, and `graphql.contract.shape` when a shape assertion matches. Subscriptions add `graphql.subscription.start|next|complete` events.
+Queries and mutations record a `graphql.operation` operation (`GraphQL · {type} {name}`) under the protocol-scoped client entity (`client:HttpClient:GraphQL:{target}`), with a `graphql.endpoint.resolve` child, the operation type and name, header count, response status and error count; assertions record `assert.http.status`, `assert.graphql.*` and `assert.json.shape` as children. Deserialization records `graphql.response.deserialize`. Observations: `graphql.response` for every response, `graphql.failure` when sending fails, and `graphql.contract.shape` when a shape assertion matches. Subscriptions add `graphql.subscription.start|next|complete` events.
 
 `GraphQLCoverageCollector` reports operation-level hits; `GraphQLSchemaCoverageCollector` walks the SDL — see [Schema coverage](./coverage.md) and [Coverage](../../observability/coverage.md).
 

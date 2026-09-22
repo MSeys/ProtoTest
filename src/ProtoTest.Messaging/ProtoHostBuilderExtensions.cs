@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 using ProtoTest.Messaging.Internal;
-using System.Runtime.CompilerServices;
 
 public sealed class ProtoMessagingBuilder
 {
@@ -44,8 +43,6 @@ public sealed class ProtoMessagingBuilder
 
 public static class ProtoHostBuilderExtensions
 {
-    private static readonly ConditionalWeakTable<IProtoHostBuilder, MessagingRegistration> Registrations = new();
-
     /// <summary>
     /// Adds the messaging capability: publish and await messages over a broker. Without an adapter the
     /// run uses the in-memory broker, so the API works anywhere; a real adapter replaces it, registers
@@ -62,9 +59,25 @@ public static class ProtoHostBuilderExtensions
         Action<ProtoMessagingBuilder>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        var registration = Registrations.GetValue(builder, static _ => new MessagingRegistration());
+        BrokerHolder? newHolder = null;
         builder.ConfigureServices(services =>
         {
+            var registration = services.FirstOrDefault(
+                descriptor => descriptor.ServiceType == typeof(MessagingRegistration))?
+                .ImplementationInstance as MessagingRegistration;
+
+            var messaging = new ProtoMessagingBuilder(services);
+            configure?.Invoke(messaging);
+
+            if (registration is null)
+            {
+                registration = new MessagingRegistration();
+                services.AddSingleton(registration);
+                services.AddSingleton<IProtoClientInitializer>(
+                    _ => new ProtoMessageClientInitializer("Default"));
+                newHolder = registration.Holder;
+            }
+
             services.TryAddSingleton(serviceProvider =>
             {
                 var options = new MessagingOptions();
@@ -73,8 +86,6 @@ public static class ProtoHostBuilderExtensions
             });
 
             services.TryAddSingleton(registration.Holder);
-            var messaging = new ProtoMessagingBuilder(services);
-            configure?.Invoke(messaging);
 
             if (messaging.AdapterFactory is { } adapterFactory)
             {
@@ -109,17 +120,13 @@ public static class ProtoHostBuilderExtensions
 
         });
 
-        // Once per host builder, not once per call: TryAdd would be skipped entirely as soon as another
-        // integration registered an initializer of its own, leaving the tests without a message client.
-        if (Interlocked.Exchange(ref registration.ResourceRegistered, 1) == 0)
+        if (newHolder is not null)
         {
-            builder.ConfigureServices(services => services.AddSingleton<IProtoClientInitializer>(
-                _ => new ProtoMessageClientInitializer("Default")));
             builder.AddResource(new ProtoResource(
                 "messaging:broker",
                 "broker",
                 "Messaging broker",
-                _ => registration.Holder.ReleaseAsync(),
+                _ => newHolder.ReleaseAsync(),
                 ProtoResourceScope.Run));
         }
 
@@ -130,6 +137,5 @@ public static class ProtoHostBuilderExtensions
     {
         public BrokerHolder Holder { get; } = new();
         public bool AdapterConfigured { get; set; }
-        public int ResourceRegistered;
     }
 }

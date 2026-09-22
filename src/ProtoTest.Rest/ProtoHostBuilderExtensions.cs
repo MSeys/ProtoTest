@@ -17,21 +17,9 @@ public static class ProtoHostBuilderExtensions
         // call composes more clients. A call whose configure throws does not poison the builder.
         builder.ConfigureServices(services =>
         {
-            services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, RestLifecycleHook>());
-            ProtoHttpOptionsRegistration.TryAddResponseOptions(
-                services,
-                ProtoRestBuilder.ProtocolName,
-                ProtoRestBuilder.ResponsesConfigurationSectionName);
+            RegisterInfrastructure(services);
+            configure?.Invoke(new ProtoRestBuilder(services));
         });
-
-        if (configure != null)
-        {
-            builder.ConfigureServices(services =>
-            {
-                var restBuilder = new ProtoRestBuilder(services);
-                configure(restBuilder);
-            });
-        }
 
         return builder.AddCapability(new ProtoCapabilityDescriptor(
             "REST", ProtoCapabilityKinds.Protocol, "ProtoTest.Rest"));
@@ -47,13 +35,18 @@ public static class ProtoHostBuilderExtensions
         Action<ProtoRestBuilder>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(application);
-        application.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, RestLifecycleHook>());
-        ProtoHttpOptionsRegistration.TryAddResponseOptions(
-            application.Services,
-            ProtoRestBuilder.ProtocolName,
-            ProtoRestBuilder.ResponsesConfigurationSectionName);
+        RegisterInfrastructure(application.Services);
         configure?.Invoke(new ProtoRestBuilder(application.Services, application));
         return application.AddCapability(new ProtoCapabilityDescriptor(
             "REST", ProtoCapabilityKinds.Protocol, "ProtoTest.Rest"));
+    }
+
+    private static void RegisterInfrastructure(IServiceCollection services)
+    {
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, RestLifecycleHook>());
+        ProtoHttpOptionsRegistration.TryAddResponseOptions(
+            services,
+            ProtoRestBuilder.ProtocolName,
+            ProtoRestBuilder.ResponsesConfigurationSectionName);
     }
 }

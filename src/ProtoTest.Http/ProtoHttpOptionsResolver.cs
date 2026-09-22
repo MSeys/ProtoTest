@@ -7,7 +7,7 @@ using ProtoTest.Core;
 /// Resolves the response and attachment options a protocol registered under its own key, so REST and
 /// GraphQL never share configuration even though they use the same base option types.
 /// </summary>
-public static class ProtoHttpOptionsResolver
+internal static class ProtoHttpOptionsResolver
 {
     /// <summary>
     /// Resolves the response options registered for <paramref name="protocolName"/>, or defaults when
@@ -36,3 +36,4 @@ public static class ProtoHttpOptionsResolver
         return context.Services.GetKeyedService<ProtoHttpAttachmentOptions>(protocolName);
     }
 }
+

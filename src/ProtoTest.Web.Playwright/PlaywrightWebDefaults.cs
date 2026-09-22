@@ -41,10 +41,9 @@ internal static class PlaywrightWebDefaults
 
     /// <summary>
     /// Resolves the probe's options: application code defaults first, then the host's
-    /// <c>ProtoTest:Web:Playwright</c> section, then - when a session is named - that session's
-    /// <c>ProtoTest:Web:Sessions:{name}</c> section, mirroring the order the backend binds.
+    /// <c>ProtoTest:Web:Playwright</c> section, mirroring the order the backend binds.
     /// </summary>
-    internal static PlaywrightWebOptions Resolve(IConfiguration configuration, string? sessionName = null)
+    internal static PlaywrightWebOptions Resolve(IConfiguration configuration)
     {
         var options = new PlaywrightWebOptions();
         if (ApplicationDefaults.TryGetValue(configuration, out var defaults))
@@ -55,11 +54,6 @@ internal static class PlaywrightWebDefaults
         }
 
         Apply(options, Section(configuration, PlaywrightWebOptions.ConfigurationSectionName));
-        if (!string.IsNullOrWhiteSpace(sessionName))
-        {
-            Apply(options, Section(configuration, $"ProtoTest:Web:Sessions:{sessionName}"));
-        }
-
         return options;
     }
 

@@ -16,11 +16,10 @@ public static class ProtoHostBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.ConfigureServices(services =>
-            services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, GrpcLifecycleHook>()));
-        if (configure is not null)
         {
-            builder.ConfigureServices(services => configure(new ProtoGrpcBuilder(services)));
-        }
+            RegisterInfrastructure(services);
+            configure?.Invoke(new ProtoGrpcBuilder(services));
+        });
 
         return builder.AddCapability(new ProtoCapabilityDescriptor(
             "gRPC", ProtoCapabilityKinds.Protocol, "ProtoTest.Grpc"));
@@ -37,9 +36,12 @@ public static class ProtoHostBuilderExtensions
         Action<ProtoGrpcBuilder>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(application);
-        application.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, GrpcLifecycleHook>());
+        RegisterInfrastructure(application.Services);
         configure?.Invoke(new ProtoGrpcBuilder(application.Services, application));
         return application.AddCapability(new ProtoCapabilityDescriptor(
             "gRPC", ProtoCapabilityKinds.Protocol, "ProtoTest.Grpc"));
     }
+
+    private static void RegisterInfrastructure(IServiceCollection services)
+        => services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, GrpcLifecycleHook>());
 }

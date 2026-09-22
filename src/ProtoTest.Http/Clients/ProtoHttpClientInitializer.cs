@@ -18,6 +18,10 @@ public sealed class ProtoHttpClientInitializer(
 {
     public string Name { get; } = name;
 
+    public string Protocol => protocolName;
+
+    private string ScopedName => ProtoClientResolution.ScopedName(Protocol, Name);
+
     public static string GetFactoryName(string protocolName, string clientName)
         => $"ProtoTest.{protocolName}:{clientName}";
 
@@ -72,7 +76,7 @@ public sealed class ProtoHttpClientInitializer(
     {
         var client = context.Service<IHttpClientFactory>().CreateClient(GetFactoryName(protocolName, Name));
         client.BaseAddress = baseAddress;
-        context.RegisterClient(client, Name);
+        context.RegisterClient(client, ScopedName);
         return client;
     }
 
@@ -98,7 +102,7 @@ public sealed class ProtoHttpClientInitializer(
 
         context.Trace.SetEntityState(
             ProtoTraceEntityKinds.Client,
-            $"client:{typeof(HttpClient).FullName}:{Name}",
+            $"client:{typeof(HttpClient).FullName}:{ScopedName}",
             $"HTTP client {Name}",
             state,
             scope: context.TestName);

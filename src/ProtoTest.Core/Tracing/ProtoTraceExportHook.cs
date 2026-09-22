@@ -5,7 +5,7 @@ internal sealed class ProtoTraceExportHook(
     ProtoTraceOptions options) : IProtoRunHook
 {
     // AfterRun executes in descending order. Trace export runs last so generated sink artifacts can be bundled.
-    public int Order => int.MinValue;
+    public int Order => ProtoHookOrder.First;
 
     public Task BeforeRunAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
@@ -23,3 +23,4 @@ internal sealed class ProtoTraceExportHook(
             cancellationToken);
     }
 }
+

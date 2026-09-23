@@ -1,4 +1,4 @@
-import type { ChangeSource, Item, Outcome, Phase, Span, TestTrace } from "./model";
+import { checkItems, type ChangeSource, type Item, type Outcome, type Phase, type Span, type TestTrace } from "./model";
 
 export function formatDuration(ms: number): string {
   if (ms <= 0) return "0 ms";
@@ -37,6 +37,43 @@ export function tone(outcome: Outcome): "success" | "warning" | "danger" | "neut
 
 export function outcomeLabel(outcome: Outcome): string {
   return outcome.charAt(0).toLocaleUpperCase() + outcome.slice(1);
+}
+
+/** A test the reader should look at: anything short of pass and skip. */
+export function needsAttention(test: TestTrace): boolean {
+  return test.outcome !== "succeeded" && test.outcome !== "skipped";
+}
+
+/** Why a test needs attention, in the words of the check that decided it. */
+export function failureReason(test: TestTrace): { title: string; detail: string } {
+  const failure = test.failure;
+  if (!failure) {
+    return {
+      title: test.outcome === "partial" ? "Finished with a partial result" : "No failing operation recorded",
+      detail: ""
+    };
+  }
+  const mismatch = failure.mismatches[0];
+  const detail = mismatch
+    ? `${mismatch.path}: expected ${JSON.stringify(mismatch.expected)}, got ${JSON.stringify(mismatch.actual)}${failure.mismatches.length > 1 ? `, and ${failure.mismatches.length - 1} more` : ""}`
+    : failure.span.error?.message.split(/\r?\n/)[0] ?? failure.check?.detail ?? "";
+  return { title: failure.span.name, detail };
+}
+
+/** Where a moment sits on a test's or run's bar, as a clamped percentage. */
+export function timelinePercent(at: number, start: number, total: number): number {
+  return Math.min(100, Math.max(0, ((at - start) / Math.max(total, 1)) * 100));
+}
+
+/** One or many: the word a count reads with. */
+export function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
+  return count === 1 ? singular : pluralForm;
+}
+
+/** A value as the literal it would be in JSON; `undefined` stays the word it is. */
+export function jsonLiteral(value: unknown): string {
+  if (value === undefined) return "undefined";
+  return JSON.stringify(value) ?? String(value);
 }
 
 export const sourceLabels: Record<ChangeSource, string> = {
@@ -146,11 +183,15 @@ export function spanFacts(span: Span): string {
   }
   if (span.kind === "graphql.operation") return attributes["graphql.operation.type"] ?? "";
   if (span.kind.startsWith("assert.")) {
-    const check = span.sections.flatMap(section => section.kind === "checks" ? section.items : [])[0];
-    return check?.value ?? "";
+    return firstCheckValue(span);
   }
   if (span.kind.startsWith("hook.") || span.kind.startsWith("attribute.")) return "";
   return "";
+}
+
+/** A check's verdict value, or an empty string when it recorded none. */
+export function firstCheckValue(span: Span): string {
+  return checkItems(span)[0]?.value ?? "";
 }
 
 export function isCheck(span: Span): boolean {

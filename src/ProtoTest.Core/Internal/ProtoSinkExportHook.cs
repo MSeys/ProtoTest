@@ -1,7 +1,5 @@
 namespace ProtoTest.Core.Internal;
 
-using System.Runtime.ExceptionServices;
-
 internal sealed class ProtoSinkExportHook(
     IEnumerable<IProtoCollector> collectors,
     IEnumerable<IProtoReportSource> reportSources,
@@ -36,15 +34,7 @@ internal sealed class ProtoSinkExportHook(
             }
         }
 
-        if (exceptions.Count == 1)
-        {
-            ExceptionDispatchInfo.Capture(exceptions[0]).Throw();
-        }
-
-        if (exceptions.Count > 1)
-        {
-            throw new AggregateException("One or more report sinks failed to export.", exceptions);
-        }
+        LifecycleExceptionHelper.ThrowIfAny("One or more report sinks failed to export.", exceptions);
     }
 }
 

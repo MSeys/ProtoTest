@@ -12,11 +12,12 @@ internal static class HtmlReportAssets
 {
     internal static readonly string Mark = Read("ProtoTest.Reporting.BrandMark.svg");
     internal static readonly string Tokens = Read("ProtoTest.Reporting.Tokens.css");
+    internal static readonly string Chrome = Read("ProtoTest.Reporting.Chrome.css");
     internal static readonly string Sheet = Read("ProtoTest.Reporting.Report.css");
     internal static readonly string Script = Read("ProtoTest.Reporting.Report.js");
 
-    /// <summary>The one shared token file first, then the report's sheet, so the report cannot drift.</summary>
-    internal static readonly string Styles = $"<style>{Tokens}{Sheet}</style>";
+    /// <summary>The shared tokens and chrome first, then the report's sheet, so the report cannot drift.</summary>
+    internal static readonly string Styles = $"<style>{Tokens}{Chrome}{Sheet}</style>";
 
     /// <summary>
     /// The inline mark takes its colours from the page's surface tokens. A favicon is an image and cannot see

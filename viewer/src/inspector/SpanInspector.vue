@@ -2,12 +2,13 @@
 import { computed } from "vue";
 import type { Artifact, Item, Span, TestTrace } from "../trace/model";
 import { shapeMismatches } from "../trace/model";
-import { formatBytes, formatDuration, formatOffset, isCheck, itemKindLabel, itemTitle, shortType, sourceLabels, tone } from "../trace/format";
+import { formatBytes, formatDuration, formatOffset, firstCheckValue, isCheck, itemKindLabel, itemTitle, jsonLiteral, shortType, sourceLabels, tone } from "../trace/format";
 import { shapeTreeOf } from "../trace/shapes";
 import SectionView from "./SectionView.vue";
 import ShapeResultTree from "./ShapeResultTree.vue";
 import JsonView from "./JsonView.vue";
 import SourceView from "./SourceView.vue";
+import { isJsonLike } from "./json";
 import { sourceLocation } from "../trace/sources";
 
 /*
@@ -43,15 +44,6 @@ const attributeGroups = computed(() => {
 // Where in the suite's code this operation started, when the trace recorded it.
 const location = computed(() => sourceLocation(props.span.attributes));
 const attributeCount = computed(() => Object.keys(props.span.attributes).length);
-
-function isJson(value: string | null): boolean {
-  const trimmed = value?.trim() ?? "";
-  return trimmed.startsWith("{") || trimmed.startsWith("[");
-}
-
-function value(input: unknown): string {
-  return input === undefined ? "missing" : JSON.stringify(input) ?? String(input);
-}
 </script>
 
 <template>
@@ -80,7 +72,7 @@ function value(input: unknown): string {
         <thead><tr><th>Property</th><th>Expected</th><th>Actual</th></tr></thead>
         <tbody>
           <tr v-for="mismatch in mismatches" :key="mismatch.path" :title="mismatch.reason">
-            <td>{{ mismatch.path }}</td><td class="expected">{{ value(mismatch.expected) }}</td><td class="actual">{{ value(mismatch.actual) }}</td>
+            <td>{{ mismatch.path }}</td><td class="expected">{{ mismatch.expected === undefined ? "missing" : jsonLiteral(mismatch.expected) }}</td><td class="actual">{{ mismatch.actual === undefined ? "missing" : jsonLiteral(mismatch.actual) }}</td>
           </tr>
         </tbody>
       </table>
@@ -91,7 +83,7 @@ function value(input: unknown): string {
       <button v-for="check in checks" :key="check.id" type="button" class="link-row" :class="tone(check.status)" @click="emit('select', check)">
         <i class="status" :class="tone(check.status)" />
         <span>{{ check.name }}</span>
-        <small>{{ check.sections.flatMap(section => section.items)[0]?.value ?? "" }}</small>
+        <small>{{ firstCheckValue(check) }}</small>
       </button>
     </section>
 
@@ -160,7 +152,7 @@ function value(input: unknown): string {
           <template v-for="[key, attribute] in entries" :key="key">
             <dt>{{ key }}</dt>
             <dd>
-              <JsonView v-if="isJson(attribute)" :value="attribute" :open-depth="0" />
+              <JsonView v-if="isJsonLike(attribute)" :value="attribute" :open-depth="0" />
               <span v-else-if="attribute === null" class="null">null</span>
               <template v-else>{{ attribute }}</template>
             </dd>

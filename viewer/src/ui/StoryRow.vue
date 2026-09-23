@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import type { Span, TestTrace } from "../trace/model";
 import type { StoryRow } from "../trace/story";
-import { formatDuration, itemKindLabel, kindLabel, spanFacts, tone } from "../trace/format";
+import { formatDuration, itemKindLabel, kindLabel, plural, spanFacts, timelinePercent, tone } from "../trace/format";
 import KindChip from "./KindChip.vue";
 
 const props = defineProps<{
@@ -27,10 +27,9 @@ const duration = computed(() => props.row.type === "group"
   ? props.row.spans.reduce((sum, span) => sum + span.duration, 0)
   : props.row.span.duration);
 const bar = computed(() => {
-  const total = Math.max(props.test.duration, 1);
   return {
-    left: `${Math.min(100, Math.max(0, ((start.value - props.test.start) / total) * 100))}%`,
-    width: `${Math.max(0.8, ((end.value - start.value) / total) * 100)}%`
+    left: `${timelinePercent(start.value, props.test.start, props.test.duration)}%`,
+    width: `${Math.max(0.8, ((end.value - start.value) / Math.max(props.test.duration, 1)) * 100)}%`
   };
 });
 
@@ -39,7 +38,7 @@ const facts = computed(() => {
   if (props.row.type === "group") {
     const clients = props.row.spans.flatMap(span => [span, ...span.children]).filter(span => span.kind === "client.initialize").length;
     const changed = props.row.spans.reduce((sum, span) => sum + countChanges(span), 0);
-    return [clients ? `${clients} client${clients === 1 ? "" : "s"} initialized` : "", changed ? `${changed} state change${changed === 1 ? "" : "s"}` : ""]
+    return [clients ? `${clients} ${plural(clients, "client")} initialized` : "", changed ? `${changed} ${plural(changed, "state change")}` : ""]
       .filter(Boolean).join(", ");
   }
   const own = spanFacts(props.row.span);
@@ -100,8 +99,8 @@ function pick() {
       <span v-else class="checks" />
 
       <span class="marks">
-        <span v-if="artifacts" :title="`${artifacts} artifact${artifacts === 1 ? '' : 's'}`">⧉ {{ artifacts }}</span>
-        <span v-if="observations" :title="`${observations} observation${observations === 1 ? '' : 's'}`">◎ {{ observations }}</span>
+        <span v-if="artifacts" :title="`${artifacts} ${plural(artifacts, 'artifact')}`">⧉ {{ artifacts }}</span>
+        <span v-if="observations" :title="`${observations} ${plural(observations, 'observation')}`">◎ {{ observations }}</span>
       </span>
       <span class="waterfall" aria-hidden="true"><i :style="bar" /></span>
       <span class="duration">{{ formatDuration(duration) }}</span>

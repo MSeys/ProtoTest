@@ -46,10 +46,12 @@
 .dot.covered { background: var(--success); }
 .dot.partial { background: var(--warning); }
 .dot.uncovered { background: var(--danger); }
+.dot.notApplicable { background: var(--dim); }
 
 .badge.covered { background: var(--success-soft); color: var(--success); }
 .badge.partial { background: var(--warning-soft); color: var(--warning); }
 .badge.uncovered { background: var(--danger-soft); color: var(--danger); }
+.badge.notApplicable { background: var(--surface-2); color: var(--muted); }
 
 @container (max-width: 460px) {
   .noteText { display: none; }

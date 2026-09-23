@@ -374,14 +374,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         PublishOwnedResources();
         try
         {
-            if (_scope is IAsyncDisposable asyncDisposable)
-            {
-                await asyncDisposable.DisposeAsync();
-            }
-            else
-            {
-                _scope.Dispose();
-            }
+            await LifecycleExceptionHelper.DisposeAsyncOrSync(_scope);
         }
         catch (Exception exception)
         {
@@ -419,13 +412,6 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
             return;
         }
 
-        if (client is IAsyncDisposable asyncDisposable)
-        {
-            await asyncDisposable.DisposeAsync();
-        }
-        else if (client is IDisposable disposable)
-        {
-            disposable.Dispose();
-        }
+        await LifecycleExceptionHelper.DisposeAsyncOrSync(client);
     }
 }

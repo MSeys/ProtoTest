@@ -401,14 +401,7 @@ public sealed class ProtoHost : IAsyncDisposable
 
         try
         {
-            if (_rootServiceProvider is IAsyncDisposable asyncDisposable)
-            {
-                await asyncDisposable.DisposeAsync();
-            }
-            else if (_rootServiceProvider is IDisposable disposable)
-            {
-                disposable.Dispose();
-            }
+            await LifecycleExceptionHelper.DisposeAsyncOrSync(_rootServiceProvider);
         }
         catch (Exception exception)
         {

@@ -10,6 +10,12 @@ export interface JsonContext {
 
 export const jsonContextKey: InjectionKey<JsonContext> = Symbol("json");
 
+/** Whether a string looks like a JSON document: an object or array literal. */
+export function isJsonLike(value: string | null | undefined): boolean {
+  const trimmed = value?.trim() ?? "";
+  return trimmed.startsWith("{") || trimmed.startsWith("[");
+}
+
 /** A value as JSON when it is JSON: an object or array itself, or a string that holds one. Undefined otherwise. */
 export function parseEmbedded(value: string): unknown {
   const trimmed = value.trim();

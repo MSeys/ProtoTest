@@ -77,15 +77,7 @@ internal sealed class ProtoTestLifecycle
         catch
         {
             // Execution has not begun, so no teardown will dispose the scope: release it here.
-            if (scope is IAsyncDisposable asyncDisposable)
-            {
-                asyncDisposable.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            }
-            else
-            {
-                scope.Dispose();
-            }
-
+            LifecycleExceptionHelper.DisposeOrSync(scope);
             throw;
         }
 
@@ -126,44 +118,32 @@ internal sealed class ProtoTestLifecycle
         {
             foreach (var hook in _hooks)
             {
-                using var operation = state.Context!.Trace
-                    .Operation("hook.before", $"Before · {hook.GetType().Name}", "ProtoTest.Core")
-                    .During(ProtoTracePhase.Setup)
-                    .With("hook.type", hook.GetType().FullName)
-                    .With("hook.order", hook.Order.ToString())
-                    .Begin();
-                try
-                {
-                    await hook.BeforeTestAsync(state.Context);
-                    state.CompletedHooks.Add(hook);
-                    operation.Succeed();
-                }
-                catch (Exception exception)
-                {
-                    operation.Fail(exception);
-                    throw;
-                }
+                await RunSetupStepAsync(
+                    state.Context!,
+                    "hook.before",
+                    $"Before · {hook.GetType().Name}",
+                    new Dictionary<string, string?>
+                    {
+                        ["hook.type"] = hook.GetType().FullName,
+                        ["hook.order"] = hook.Order.ToString()
+                    },
+                    () => hook.BeforeTestAsync(state.Context!),
+                    () => state.CompletedHooks.Add(hook));
             }
 
             foreach (var attribute in state.Attributes)
             {
-                using var operation = state.Context!.Trace
-                    .Operation("attribute.before", $"Before · {attribute.GetType().Name}", "ProtoTest.Core")
-                    .During(ProtoTracePhase.Setup)
-                    .With("attribute.type", attribute.GetType().FullName)
-                    .With("attribute.order", attribute.Order.ToString())
-                    .Begin();
-                try
-                {
-                    await attribute.BeforeTestAsync(state.Context);
-                    state.CompletedAttributes.Add(attribute);
-                    operation.Succeed();
-                }
-                catch (Exception exception)
-                {
-                    operation.Fail(exception);
-                    throw;
-                }
+                await RunSetupStepAsync(
+                    state.Context!,
+                    "attribute.before",
+                    $"Before · {attribute.GetType().Name}",
+                    new Dictionary<string, string?>
+                    {
+                        ["attribute.type"] = attribute.GetType().FullName,
+                        ["attribute.order"] = attribute.Order.ToString()
+                    },
+                    () => attribute.BeforeTestAsync(state.Context!),
+                    () => state.CompletedAttributes.Add(attribute));
             }
 
             state.SetupOperation.Succeed();
@@ -196,6 +176,32 @@ internal sealed class ProtoTestLifecycle
         }
     }
 
+    private static async Task RunSetupStepAsync(
+        ProtoExecutionContext context,
+        string kind,
+        string name,
+        IReadOnlyDictionary<string, string?> attributes,
+        Func<Task> step,
+        Action onCompleted)
+    {
+        using var operation = context.Trace
+            .Operation(kind, name, "ProtoTest.Core")
+            .During(ProtoTracePhase.Setup)
+            .With(attributes)
+            .Begin();
+        try
+        {
+            await step();
+            onCompleted();
+            operation.Succeed();
+        }
+        catch (Exception exception)
+        {
+            operation.Fail(exception);
+            throw;
+        }
+    }
+
     private static async Task TeardownAsync(
         ContextState state,
         List<Exception> exceptions,
@@ -203,6 +209,7 @@ internal sealed class ProtoTestLifecycle
         bool isRollback)
     {
         var context = state.Context!;
+        var phase = isRollback ? ProtoTracePhase.Rollback : ProtoTracePhase.Teardown;
         state.ExecutionOperation?.Complete(result);
         state.ExecutionOperation?.Dispose();
         if (context.Trace is ProtoTestTraceRecorder testTrace)
@@ -215,7 +222,7 @@ internal sealed class ProtoTestLifecycle
                 isRollback ? "test.rollback" : "test.teardown",
                 isRollback ? "Rollback" : "Teardown",
                 "ProtoTest.Core")
-            .During(isRollback ? ProtoTracePhase.Rollback : ProtoTracePhase.Teardown)
+            .During(phase)
             .With("hook.completed_count", state.CompletedHooks.Count.ToString())
             .With("attribute.completed_count", state.CompletedAttributes.Count.ToString())
             .With("attachment.count", context.Attachments.Count.ToString())
@@ -229,7 +236,7 @@ internal sealed class ProtoTestLifecycle
                 context,
                 "attribute.after",
                 $"After · {attribute.GetType().Name}",
-                isRollback ? ProtoTracePhase.Rollback : ProtoTracePhase.Teardown,
+                phase,
                 () => attribute.AfterTestAsync(context),
                 exceptions,
                 new Dictionary<string, string?>
@@ -245,7 +252,7 @@ internal sealed class ProtoTestLifecycle
                 context,
                 "hook.after",
                 $"After · {hook.GetType().Name}",
-                isRollback ? ProtoTracePhase.Rollback : ProtoTracePhase.Teardown,
+                phase,
                 () => hook.AfterTestAsync(context),
                 exceptions,
                 new Dictionary<string, string?>
@@ -263,7 +270,7 @@ internal sealed class ProtoTestLifecycle
                     context,
                     "attachment.publish",
                     $"Publish · {attachment.Name}",
-                    isRollback ? ProtoTracePhase.Rollback : ProtoTracePhase.Teardown,
+                    phase,
                     async () => await state.AttachmentPublisher.PublishAsync(attachment),
                     exceptions,
                     new Dictionary<string, string?>
@@ -280,8 +287,8 @@ internal sealed class ProtoTestLifecycle
             context,
             "context.dispose",
             "Dispose execution context",
-            isRollback ? ProtoTracePhase.Rollback : ProtoTracePhase.Teardown,
-            () => context.DisposeAsync(isRollback ? ProtoTracePhase.Rollback : ProtoTracePhase.Teardown).AsTask(),
+            phase,
+            () => context.DisposeAsync(phase).AsTask(),
             exceptions,
             new Dictionary<string, string?>
             {

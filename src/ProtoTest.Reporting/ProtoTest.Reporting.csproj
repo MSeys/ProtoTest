@@ -19,6 +19,8 @@
     <EmbeddedResource Include="..\..\assets\brand\prototest-mark.svg" LogicalName="ProtoTest.Reporting.BrandMark.svg" />
     <!-- The one shared design token file, also imported by the viewer and the docs. -->
     <EmbeddedResource Include="..\..\design\prototest-tokens.css" LogicalName="ProtoTest.Reporting.Tokens.css" />
+    <!-- The shared surface chrome, also imported by the viewer, so report and viewer cannot drift. -->
+    <EmbeddedResource Include="..\..\design\prototest-chrome.css" LogicalName="ProtoTest.Reporting.Chrome.css" />
     <!-- The report's own sheet and script are real files, edited with tooling, embedded as-is. -->
     <EmbeddedResource Include="Sinks\HtmlReportAssets\report.css" LogicalName="ProtoTest.Reporting.Report.css" />
     <EmbeddedResource Include="Sinks\HtmlReportAssets\report.js" LogicalName="ProtoTest.Reporting.Report.js" />

@@ -2,6 +2,8 @@
 import { computed, provide, ref, watch } from "vue";
 import JsonNode from "./JsonNode.vue";
 import { jsonContextKey, jsonPath, parseEmbedded } from "./json";
+import { plural } from "../trace/format";
+import { useClipboard } from "../ui/useClipboard";
 
 /*
  * A recorded document, read as JSON: keys, strings, numbers and literals in the code palette, every object and
@@ -26,7 +28,7 @@ const isDocument = computed(() => parsed.value !== null && typeof parsed.value =
 const size = computed(() => {
   if (!isDocument.value) return "";
   const count = Array.isArray(parsed.value) ? parsed.value.length : Object.keys(parsed.value as object).length;
-  return Array.isArray(parsed.value) ? `${count} ${count === 1 ? "item" : "items"}` : `${count} ${count === 1 ? "field" : "fields"}`;
+  return Array.isArray(parsed.value) ? `${count} ${plural(count, "item")}` : `${count} ${plural(count, "field")}`;
 });
 
 const mode = ref<"default" | "all" | "none">("default");
@@ -53,14 +55,10 @@ function setAll(value: "all" | "none") {
 const marks = computed(() => new Set(props.marks.map(jsonPath)));
 provide(jsonContextKey, { isOpen, toggle, get marks() { return marks.value; } });
 
-const copied = ref(false);
-async function copy() {
+const { copied, copy } = useClipboard();
+async function copyDocument() {
   const text = isDocument.value ? JSON.stringify(parsed.value, null, 2) : String(parsed.value ?? "");
-  try {
-    await navigator.clipboard.writeText(text);
-    copied.value = true;
-    setTimeout(() => { copied.value = false; }, 1400);
-  } catch { /* the clipboard can be unavailable; the text stays selectable */ }
+  await copy(text);
 }
 </script>
 
@@ -74,7 +72,7 @@ async function copy() {
           <button type="button" @click="setAll('all')">Expand all</button>
           <button type="button" @click="setAll('none')">Collapse all</button>
         </template>
-        <button type="button" @click="copy">{{ copied ? "Copied" : "Copy" }}</button>
+        <button type="button" @click="copyDocument">{{ copied ? "Copied" : "Copy" }}</button>
       </span>
     </header>
     <div class="body">

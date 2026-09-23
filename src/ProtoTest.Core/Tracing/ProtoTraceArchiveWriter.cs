@@ -9,8 +9,9 @@ internal static class ProtoTraceArchiveWriter
     /// <summary>
     /// The archive layout: a manifest naming the two v2 documents, plus the artifact files they declare.
     /// 2.0 dropped the run.json compatibility view; a reader that finds no spans entry has an older trace.
+    /// Checked against design/prototrace-wire.contract.json.
     /// </summary>
-    private const string ArchiveFormatVersion = "2.0";
+    internal const string ArchiveFormatVersion = "2.0";
 
     private static readonly JsonSerializerOptions SerializerOptions = CreateSerializerOptions();
 

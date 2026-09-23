@@ -1,7 +1,6 @@
 namespace ProtoTest.Sql;
 
 using System.Data.Common;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
@@ -44,12 +43,7 @@ public static class ProtoHostBuilderExtensions
                 services.AddScoped(services =>
                     new ProtoSqlSession(services.GetRequiredService<DbConnection>()));
                 services.TryAddSingleton(provider =>
-                {
-                    var options = new SqlOptions();
-                    configure?.Invoke(options);
-                    options.BindFromConfiguration(provider.GetRequiredService<IConfiguration>());
-                    return options;
-                });
+                    ProtoOptionsRegistration.Resolve<SqlOptions>(provider, configure));
                 services.AddSingleton<IProtoTestHook>(provider =>
                     new SqlConnectionHook(provider.GetRequiredService<SqlOptions>()));
                 services.AddSingleton<IProtoRunHook>(provider =>

@@ -4,8 +4,8 @@ using ProtoTest.Core;
 
 /// <summary>
 /// Captures the failure artifacts both backends produce — screenshot, DOM and location — with one
-/// naming rule and one diagnostic path. Each capture is isolated so a failing artifact never replaces
-/// the original web error.
+/// naming rule, one set of descriptions and one location format. Each capture is isolated so a failing
+/// artifact never replaces the original web error.
 /// </summary>
 internal static class WebFailureArtifacts
 {
@@ -16,20 +16,49 @@ internal static class WebFailureArtifacts
         string sessionName,
         WebFailureContext failure,
         int sequence,
-        Func<string, ValueTask<ProtoTestAttachment?>> screenshot,
-        Func<string, ValueTask<ProtoTestAttachment?>> dom,
-        Func<string, ValueTask<ProtoTestAttachment?>> location)
+        Func<ValueTask<byte[]?>> screenshot,
+        Func<ValueTask<string?>> dom,
+        Func<ValueTask<(string? Url, string? Title)>> location)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(failure);
+        ArgumentException.ThrowIfNullOrWhiteSpace(backendName);
         ArgumentException.ThrowIfNullOrWhiteSpace(sessionName);
         // The per-failure sequence keeps a repeated failure of the same element's artifacts distinct.
         var prefix =
             $"{WebNames.SafeName(sessionName)}-{WebNames.SafeName(failure.Element?.Name ?? failure.Operation)}-{sequence}";
         var attachments = new List<ProtoTestAttachment>(3);
-        await CaptureAsync(context, traceSource, backendName, attachments, prefix, "screenshot", screenshot);
-        await CaptureAsync(context, traceSource, backendName, attachments, prefix, "dom", dom);
-        await CaptureAsync(context, traceSource, backendName, attachments, prefix, "location", location);
+        await CaptureAsync(context, traceSource, backendName, attachments, "screenshot", async () =>
+        {
+            var bytes = await screenshot();
+            return bytes is null
+                ? null
+                : ProtoTestAttachment.FromBytes(
+                    $"web-{prefix}-failure.png",
+                    bytes,
+                    "image/png",
+                    $"{backendName} page at web operation failure.");
+        });
+        await CaptureAsync(context, traceSource, backendName, attachments, "dom", async () =>
+        {
+            var content = await dom();
+            return content is null
+                ? null
+                : ProtoTestAttachment.FromText(
+                    $"web-{prefix}-page.html",
+                    content,
+                    "text/html",
+                    "DOM snapshot at web operation failure.");
+        });
+        await CaptureAsync(context, traceSource, backendName, attachments, "location", async () =>
+        {
+            var (url, title) = await location();
+            return ProtoTestAttachment.FromText(
+                $"web-{prefix}-location.txt",
+                $"URL: {url}{Environment.NewLine}Title: {title}",
+                "text/plain",
+                "Browser location at web operation failure.");
+        });
         return attachments;
     }
 
@@ -38,13 +67,12 @@ internal static class WebFailureArtifacts
         string traceSource,
         string backendName,
         List<ProtoTestAttachment> attachments,
-        string prefix,
         string artifact,
-        Func<string, ValueTask<ProtoTestAttachment?>> capture)
+        Func<ValueTask<ProtoTestAttachment?>> capture)
     {
         try
         {
-            if (await capture(prefix) is { } attachment)
+            if (await capture() is { } attachment)
             {
                 attachments.Add(attachment);
             }

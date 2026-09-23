@@ -94,7 +94,11 @@ internal static class SeleniumLocatorTranslator
 
     private static string Role(RoleWebLocator locator)
     {
-        var roleName = RoleName(locator.Role);
+        var roleName = WebRoleMap.AriaName(locator.Role);
+        // The implicit markup mirrors the browser's accessible-role computation where HTML carries the
+        // role: a plain table is a table, not a grid, and a <dialog>, <nav>, <progress>, <output> or a
+        // search/range/number input is the role it stands for. A role without implicit markup matches
+        // its explicit role attribute only.
         var rolePredicate = locator.Role switch
         {
             WebRole.Button => "self::button or @role='button' or (self::input and (@type='button' or @type='submit' or @type='reset'))",
@@ -106,12 +110,19 @@ internal static class SeleniumLocatorTranslator
             WebRole.Image => "self::img or @role='img'",
             WebRole.Row => "self::tr or @role='row'",
             WebRole.Table => "self::table or @role='table'",
-            WebRole.Grid => "self::table or @role='grid'",
+            WebRole.Grid => "@role='grid'",
             WebRole.List => "self::ul or self::ol or @role='list'",
             WebRole.ListItem => "self::li or @role='listitem'",
             WebRole.Option => "self::option or @role='option'",
             WebRole.Combobox => "self::select or @role='combobox'",
             WebRole.RowGroup => "self::tbody or self::thead or self::tfoot or @role='rowgroup'",
+            WebRole.Dialog => "self::dialog or @role='dialog'",
+            WebRole.Navigation => "self::nav or @role='navigation'",
+            WebRole.ProgressBar => "self::progress or @role='progressbar'",
+            WebRole.Searchbox => "(self::input and @type='search') or @role='searchbox'",
+            WebRole.Slider => "(self::input and @type='range') or @role='slider'",
+            WebRole.SpinButton => "(self::input and @type='number') or @role='spinbutton'",
+            WebRole.Status => "self::output or @role='status'",
             _ => $"@role={WebXPath.Literal(roleName)}"
         };
         if (locator.Name is null) return $".//*[{rolePredicate}]";
@@ -134,19 +145,4 @@ internal static class SeleniumLocatorTranslator
                $".//label[{comparison}]//*[self::input or self::textarea or self::select] | " +
                $".//*[@id=//label[{comparison}]/@for]";
     }
-
-    private static string RoleName(WebRole role)
-        => role switch
-        {
-            WebRole.ListItem => "listitem",
-            WebRole.MenuItem => "menuitem",
-            WebRole.ProgressBar => "progressbar",
-            WebRole.RowGroup => "rowgroup",
-            WebRole.SpinButton => "spinbutton",
-            WebRole.TabList => "tablist",
-            WebRole.TabPanel => "tabpanel",
-            WebRole.TreeItem => "treeitem",
-            WebRole.Image => "img",
-            _ => role.ToString().ToLowerInvariant()
-        };
 }

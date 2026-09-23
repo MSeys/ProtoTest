@@ -16,7 +16,7 @@ When an action or assertion fails, the backend captures the page at that moment:
 | --- | --- | --- |
 | Screenshot | `web-{session}-{element}-{n}-failure.png` (full page) | `web-{session}-{element}-{n}-failure.png` |
 | Page HTML | `web-{session}-{element}-{n}-page.html` | `web-{session}-{element}-{n}-page.html` |
-| Location | `web-{session}-{element}-{n}-location.txt` (URL; the raw address when sanitizing does not apply) | `web-{session}-{element}-{n}-location.txt` (URL and title) |
+| Location | `web-{session}-{element}-{n}-location.txt` (URL and title) | `web-{session}-{element}-{n}-location.txt` (URL and title) |
 
 The name parts are lowercased and sanitized (non-letters/digits become `-`), `{element}` falls back to the operation name when the failure is not element-bound, and `{n}` is a per-test sequence so a failure repeated on the same element keeps both sets of artifacts. Captures run in order screenshot, DOM, location.
 

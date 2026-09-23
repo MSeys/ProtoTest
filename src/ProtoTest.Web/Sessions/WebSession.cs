@@ -87,8 +87,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
                 return (TPage)existing;
             }
 
-            var page = new TPage();
-            page.Initialize(this, new ComponentScope([], typeof(TPage).Name));
+            var page = new ComponentScope([], typeof(TPage).Name).Create<TPage>(this);
             _pages[typeof(TPage)] = page;
             return page;
         }

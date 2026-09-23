@@ -6,6 +6,7 @@ using System.Xml.Linq;
 using System.Xml.XPath;
 using ProtoTest.Core;
 using ProtoTest.Web.Internal;
+using ProtoTest.Web.Playwright;
 using ProtoTest.Web.Selenium;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,7 +51,8 @@ public sealed class WebModelTests
             Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.Table)),
                 Does.Contain("self::table").And.Contain("@role='table'"));
             Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.Grid)),
-                Does.Contain("self::table").And.Contain("@role='grid'"));
+                Does.Contain("@role='grid'").And.Not.Contain("self::table"),
+                "a plain table is a table, not a grid, on both backends");
             Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.List)),
                 Does.Contain("self::ul").And.Contain("self::ol").And.Contain("@role='list'"));
             Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.ListItem)),
@@ -75,6 +77,13 @@ public sealed class WebModelTests
               <div role="table"><div role="row">ARIA</div></div>
               <ul><li>alpha</li></ul>
               <select><option>en</option></select>
+              <dialog open="open">Dialog</dialog>
+              <nav>Nav</nav>
+              <progress value="1" max="2"></progress>
+              <output>42</output>
+              <input type="search" />
+              <input type="range" min="0" max="1" />
+              <input type="number" />
             </body></html>
             """);
 
@@ -82,6 +91,13 @@ public sealed class WebModelTests
         var tables = document.XPathSelectElements(XPath(By.Role(WebRole.Table)));
         var lists = document.XPathSelectElements(XPath(By.Role(WebRole.List)));
         var options = document.XPathSelectElements(XPath(By.Role(WebRole.Option)));
+        var dialogs = document.XPathSelectElements(XPath(By.Role(WebRole.Dialog)));
+        var navigation = document.XPathSelectElements(XPath(By.Role(WebRole.Navigation)));
+        var progress = document.XPathSelectElements(XPath(By.Role(WebRole.ProgressBar)));
+        var status = document.XPathSelectElements(XPath(By.Role(WebRole.Status)));
+        var searchboxes = document.XPathSelectElements(XPath(By.Role(WebRole.Searchbox)));
+        var sliders = document.XPathSelectElements(XPath(By.Role(WebRole.Slider)));
+        var spinButtons = document.XPathSelectElements(XPath(By.Role(WebRole.SpinButton)));
 
         Assert.Multiple(() =>
         {
@@ -90,6 +106,32 @@ public sealed class WebModelTests
             Assert.That(tables.Select(element => element.Name.LocalName), Is.EqualTo(new[] { "table", "div" }));
             Assert.That(lists.Select(element => element.Name.LocalName), Is.EqualTo(new[] { "ul" }));
             Assert.That(options.Select(element => element.Value), Is.EqualTo(new[] { "en" }));
+            Assert.That(dialogs.Select(element => element.Name.LocalName), Is.EqualTo(new[] { "dialog" }));
+            Assert.That(navigation.Select(element => element.Name.LocalName), Is.EqualTo(new[] { "nav" }));
+            Assert.That(progress.Select(element => element.Name.LocalName), Is.EqualTo(new[] { "progress" }));
+            Assert.That(status.Select(element => element.Name.LocalName), Is.EqualTo(new[] { "output" }));
+            Assert.That(searchboxes.Single().Attribute("type")?.Value, Is.EqualTo("search"));
+            Assert.That(sliders.Single().Attribute("type")?.Value, Is.EqualTo("range"));
+            Assert.That(spinButtons.Single().Attribute("type")?.Value, Is.EqualTo("number"));
+        });
+    }
+
+    [Test]
+    public void RoleVocabulary_ShouldCoverEveryWebRoleOnBothBackends()
+    {
+        Assert.Multiple(() =>
+        {
+            foreach (var role in Enum.GetValues<WebRole>())
+            {
+                Assert.That(
+                    SeleniumLocatorTranslator.DiagnosticSelector(By.Role(role)),
+                    Does.Contain($"@role='{WebRoleMap.AriaName(role)}'"),
+                    $"Selenium must always accept the explicit ARIA name for {role}");
+                Assert.That(
+                    PlaywrightWebBackend.MapRole(role).ToString().ToLowerInvariant(),
+                    Is.EqualTo(WebRoleMap.AriaName(role)),
+                    $"Playwright's native mapping for {role} must be the shared ARIA name");
+            }
         });
     }
 

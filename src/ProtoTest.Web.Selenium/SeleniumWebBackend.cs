@@ -164,23 +164,10 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
                 _sessionName,
                 failure,
                 Interlocked.Increment(ref _failureSequence),
-                prefix => Driver is ITakesScreenshot screenshots
-                    ? ValueTask.FromResult<ProtoTestAttachment?>(ProtoTestAttachment.FromBytes(
-                        $"web-{prefix}-failure.png",
-                        screenshots.GetScreenshot().AsByteArray,
-                        "image/png",
-                        "Selenium page at web operation failure."))
-                    : ValueTask.FromResult<ProtoTestAttachment?>(null),
-                prefix => ValueTask.FromResult<ProtoTestAttachment?>(ProtoTestAttachment.FromText(
-                    $"web-{prefix}-page.html",
-                    Driver.PageSource,
-                    "text/html",
-                    "DOM snapshot at web operation failure.")),
-                prefix => ValueTask.FromResult<ProtoTestAttachment?>(ProtoTestAttachment.FromText(
-                    $"web-{prefix}-location.txt",
-                    $"URL: {Location()}{Environment.NewLine}Title: {Driver.Title}",
-                    "text/plain",
-                    "Browser location at web operation failure."))),
+                () => ValueTask.FromResult<byte[]?>(
+                    Driver is ITakesScreenshot screenshots ? screenshots.GetScreenshot().AsByteArray : null),
+                () => ValueTask.FromResult<string?>(Driver.PageSource),
+                () => ValueTask.FromResult<(string? Url, string? Title)>((Location(), Driver.Title))),
             cancellationToken);
     }
 

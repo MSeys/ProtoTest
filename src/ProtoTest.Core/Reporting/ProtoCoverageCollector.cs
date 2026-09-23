@@ -3,17 +3,38 @@ namespace ProtoTest.Core;
 /// <summary>
 /// Thread-safe base for collectors that aggregate observations as coverage items.
 /// </summary>
-public abstract class ProtoCoverageCollector(string targetName) : IProtoCollector, IProtoReportSource
+public abstract class ProtoCoverageCollector : IProtoCollector, IProtoReportSource
 {
-    public string TargetName { get; } = targetName ?? throw new ArgumentNullException(nameof(targetName));
+    private readonly string? _kind;
+
+    /// <summary>Creates a collector for one target, accepting every observation kind it sees.</summary>
+    protected ProtoCoverageCollector(string targetName)
+        : this(targetName, kind: null, identifierComparer: null)
+    {
+    }
+
+    /// <summary>
+    /// Creates a collector for one target and, when <paramref name="kind"/> is given, one observation
+    /// kind. <paramref name="identifierComparer"/> chooses whether identifiers are case-sensitive:
+    /// GraphQL operation names are, most coverage identifiers are not.
+    /// </summary>
+    protected ProtoCoverageCollector(string targetName, string? kind, StringComparer? identifierComparer = null)
+    {
+        TargetName = targetName ?? throw new ArgumentNullException(nameof(targetName));
+        _kind = kind;
+        _items = new Dictionary<string, ProtoReportItem>(identifierComparer ?? StringComparer.OrdinalIgnoreCase);
+    }
+
+    public string TargetName { get; }
     public abstract string Category { get; }
 
     protected readonly ProtoLock _lock = new();
 
-    protected readonly Dictionary<string, ProtoReportItem> _items = new(StringComparer.OrdinalIgnoreCase);
+    protected readonly Dictionary<string, ProtoReportItem> _items;
 
     public virtual bool CanCollect(ProtoObservation observation)
-        => string.Equals(TargetName, observation.TargetName, StringComparison.OrdinalIgnoreCase);
+        => string.Equals(TargetName, observation.TargetName, StringComparison.OrdinalIgnoreCase)
+           && (_kind is null || string.Equals(observation.Kind, _kind, StringComparison.Ordinal));
 
     public virtual void Collect(ProtoObservation observation)
     {

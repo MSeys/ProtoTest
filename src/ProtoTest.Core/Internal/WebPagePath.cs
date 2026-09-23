@@ -163,6 +163,14 @@ internal static class WebPagePath
         return pathIndex == pathSegments.Length;
     }
 
+    /// <summary>
+    /// Whether a page pattern is a catch-all (<c>{...}</c>), matching the rest of a path. Only a
+    /// trailing catch-all is a match, so a literal segment after it can never be satisfied.
+    /// </summary>
+    public static bool IsCatchAll(string? pattern)
+        => pattern is not null
+           && Normalize(pattern)?.Split('/', StringSplitOptions.RemoveEmptyEntries).Contains("{...}") == true;
+
     private static string StripQueryAndFragment(string value)
     {
         var separator = value.IndexOfAny(['?', '#']);

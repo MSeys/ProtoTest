@@ -2,7 +2,6 @@ namespace ProtoTest.Messaging;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 using ProtoTest.Messaging.Internal;
 
@@ -72,11 +71,7 @@ public static class ProtoHostBuilderExtensions
             }
 
             services.TryAddSingleton(serviceProvider =>
-            {
-                var options = new MessagingOptions();
-                options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
-                return options;
-            });
+                ProtoOptionsRegistration.Resolve<MessagingOptions>(serviceProvider));
 
             services.TryAddSingleton(registration.Holder);
 

@@ -295,21 +295,9 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
             _sessionName,
             failure,
             Interlocked.Increment(ref _failureSequence),
-            async prefix => ProtoTestAttachment.FromBytes(
-                $"web-{prefix}-failure.png",
-                await Page.ScreenshotAsync(new PageScreenshotOptions { FullPage = true }),
-                "image/png",
-                "Playwright page at web operation failure."),
-            async prefix => ProtoTestAttachment.FromText(
-                $"web-{prefix}-page.html",
-                await Page.ContentAsync(),
-                "text/html",
-                "DOM snapshot at web operation failure."),
-            prefix => ValueTask.FromResult<ProtoTestAttachment?>(ProtoTestAttachment.FromText(
-                $"web-{prefix}-location.txt",
-                CurrentLocation(),
-                "text/plain",
-                "URL at web operation failure.")));
+            async () => await Page.ScreenshotAsync(new PageScreenshotOptions { FullPage = true }),
+            async () => await Page.ContentAsync(),
+            async () => (CurrentLocation(), await Page.TitleAsync()));
     }
 
     /// <summary>
@@ -453,7 +441,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         return left.And(Apply(scope, locator.Right));
     }
 
-    private static AriaRole MapRole(WebRole role) => role switch
+    internal static AriaRole MapRole(WebRole role) => role switch
     {
         WebRole.Alert => AriaRole.Alert,
         WebRole.Button => AriaRole.Button,

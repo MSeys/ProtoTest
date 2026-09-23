@@ -5,24 +5,23 @@ using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core.Internal;
 using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 
 /// <summary>
 /// Owns the ProtoTest service provider and exposes the public run and test lifecycle API.
-/// Lifecycle execution is delegated to focused internal components.
+/// The run state machine lives here; hook sequencing and the test lifecycle are delegated to focused
+/// internal components.
 /// </summary>
 public sealed class ProtoHost : IAsyncDisposable
 {
-    private const int StartCreated = 0;
-    private const int StartInProgress = 1;
-    private const int StartCompleted = 2;
-    private const int StopInProgress = 3;
-
     private readonly IServiceProvider _rootServiceProvider;
-    private readonly ProtoRunLifecycle _runLifecycle;
+    private readonly ProtoRunHooks _runHooks;
     private readonly ProtoTestLifecycle _testLifecycle;
     private readonly ProtoTraceSession _trace;
-    private readonly ProtoLock _startGate = new();
-    private int _startState;
+    private readonly ProtoLock _runGate = new();
+    private readonly List<IProtoRunHook> _startedHooks = [];
+    private RunState _state;
+    private Exception? _stopFailure;
 
     public ProtoHost(IServiceProvider rootServiceProvider)
     {
@@ -34,7 +33,7 @@ public sealed class ProtoHost : IAsyncDisposable
             ?? new NumericProtoTestIdGenerator();
         _trace = _rootServiceProvider.GetService<ProtoTraceSession>() ?? new ProtoTraceSession();
 
-        _runLifecycle = new ProtoRunLifecycle(runHooks);
+        _runHooks = new ProtoRunHooks(runHooks);
         _testLifecycle = new ProtoTestLifecycle(this, _rootServiceProvider, testHooks, testIdGenerator, _trace);
         ProtoHostRegistry.Register(this);
     }
@@ -106,30 +105,29 @@ public sealed class ProtoHost : IAsyncDisposable
     /// </summary>
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
-        lock (_startGate)
+        lock (_runGate)
         {
-            if (_startState == StartCompleted)
+            switch (_state)
             {
-                return;
+                case RunState.Started:
+                    return;
+                case RunState.Starting:
+                    throw new InvalidOperationException(ProtoHostGuards.StartupInProgress);
+                case RunState.Stopping:
+                    throw new InvalidOperationException(
+                        "ProtoHost shutdown is in progress; start it after the stop completes.");
+                case RunState.Stopped:
+                case RunState.Disposed:
+                    throw new InvalidOperationException("A ProtoHost cannot be started after it has stopped.");
+                default:
+                    _state = RunState.Starting;
+                    break;
             }
-
-            if (_startState == StartInProgress)
-            {
-                throw new InvalidOperationException("ProtoHost startup is already in progress.");
-            }
-
-            if (_startState == StopInProgress)
-            {
-                throw new InvalidOperationException(
-                    "ProtoHost shutdown is in progress; start it after the stop completes.");
-            }
-
-            _startState = StartInProgress;
         }
 
         try
         {
-            await _runLifecycle.StartAsync(cancellationToken);
+            await _runHooks.RunBeforeAsync(_startedHooks, cancellationToken);
 
             // A retry after a failed start re-owns the run-scoped resources the rollback released.
             if (_rootServiceProvider.GetService<ProtoRunResourceStore>() is { } runResources)
@@ -192,21 +190,22 @@ public sealed class ProtoHost : IAsyncDisposable
             }
 
             _trace.StartListening();
-            lock (_startGate)
+            lock (_runGate)
             {
-                _startState = StartCompleted;
+                _state = RunState.Started;
             }
         }
         catch (Exception exception)
         {
-            // Nothing that did start may leak: the run hooks run in reverse, which releases the run's
-            // resources (the infrastructure started so far) in reverse registration order, and the
-            // lifecycle returns to Created so a retry is possible.
+            // Nothing that did start may leak: the completed run hooks run in reverse, which releases
+            // the run's resources (the infrastructure started so far) in reverse registration order,
+            // and the state returns to Created so a retry is possible.
             var failures = new List<Exception> { exception };
-            await _runLifecycle.RollbackStartAsync(failures, cancellationToken);
-            lock (_startGate)
+            await _runHooks.RunAfterAsync(_startedHooks, failures, cancellationToken);
+            _startedHooks.Clear();
+            lock (_runGate)
             {
-                _startState = StartCreated;
+                _state = RunState.Created;
             }
 
             // The released infrastructure's connection strings must not survive into a retry or outlive
@@ -227,56 +226,63 @@ public sealed class ProtoHost : IAsyncDisposable
     /// </summary>
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
-        int? previousStartState = null;
-        lock (_startGate)
+        lock (_runGate)
         {
-            // The start path is not finished until it records StartCompleted, including the infrastructure
-            // it starts after the run hooks: stopping here would tear down the run mid-start.
-            if (_startState == StartInProgress)
+            switch (_state)
             {
-                throw new InvalidOperationException(
-                    "ProtoHost startup is still in progress; stop it after startup completes.");
-            }
+                case RunState.Disposed:
+                    return;
+                case RunState.Stopped:
+                    // A stop that failed is remembered, not silently turned into a success: the run's
+                    // hooks were attempted once and the caller must still see why they did not finish.
+                    if (_stopFailure is not null)
+                    {
+                        ExceptionDispatchInfo.Capture(_stopFailure).Throw();
+                    }
 
-            // A stop rejected by the lifecycle (or a second stop) must not touch the start state it did
-            // not change.
-            if (_startState is not StopInProgress)
-            {
-                previousStartState = _startState;
-                _startState = StopInProgress;
+                    return;
+                case RunState.Created:
+                    throw new InvalidOperationException("A ProtoHost must be started before it can be stopped.");
+                case RunState.Starting:
+                    throw new InvalidOperationException(ProtoHostGuards.StartupStillInProgressStop);
+                case RunState.Stopping:
+                    throw new InvalidOperationException("ProtoHost shutdown is already in progress.");
+                default:
+                    _state = RunState.Stopping;
+                    break;
             }
         }
 
+        var exceptions = new List<Exception>();
         try
         {
-            await _runLifecycle.StopAsync(cancellationToken);
+            await _runHooks.RunAfterAsync(_startedHooks, exceptions, cancellationToken);
         }
         finally
         {
-            if (_runLifecycle.IsStopped)
+            _startedHooks.Clear();
+            lock (_runGate)
             {
-                lock (_startGate)
+                _state = RunState.Stopped;
+                _stopFailure = exceptions.Count switch
                 {
-                    _startState = StartCreated;
-                }
-
-                // The infrastructure those keys pointed at is gone; a retry or an in-process application
-                // must not keep reading a released instance's connection string.
-                if (InfrastructureSettings is { } settings)
-                {
-                    settings.Clear();
-                }
-
-                _trace.CompleteRun();
+                    0 => null,
+                    1 => exceptions[0],
+                    _ => new AggregateException("One or more run hooks failed during shutdown.", exceptions)
+                };
             }
-            else if (previousStartState is { } restored)
+
+            // The run is over: the released infrastructure's connection strings must not stay readable,
+            // and the trace is complete even when a hook failed to shut down.
+            if (InfrastructureSettings is { } settings)
             {
-                lock (_startGate)
-                {
-                    _startState = restored;
-                }
+                settings.Clear();
             }
+
+            _trace.CompleteRun();
         }
+
+        LifecycleExceptionHelper.ThrowIfAny("One or more run hooks failed during shutdown.", exceptions);
     }
 
     /// <summary>
@@ -289,7 +295,7 @@ public sealed class ProtoHost : IAsyncDisposable
         IEnumerable<ProtoAttribute>? attributes = null,
         IProtoTestAttachmentPublisher? attachmentPublisher = null)
     {
-        _runLifecycle.EnsureTestCanStart();
+        EnsureTestCanStart();
         return _testLifecycle.StartAsync(
             testName, ProtoTestId.Parse(testId), testMethod, attributes, attachmentPublisher);
     }
@@ -303,8 +309,29 @@ public sealed class ProtoHost : IAsyncDisposable
         IEnumerable<ProtoAttribute>? attributes = null,
         IProtoTestAttachmentPublisher? attachmentPublisher = null)
     {
-        _runLifecycle.EnsureTestCanStart();
+        EnsureTestCanStart();
         return _testLifecycle.StartAsync(testName, testMethod, attributes, attachmentPublisher);
+    }
+
+    /// <summary>
+    /// Rejects a test that would read half a run: starting before the run's hooks and infrastructure
+    /// finished, or after the run began shutting down, is a mistake rather than a wait.
+    /// </summary>
+    private void EnsureTestCanStart()
+    {
+        lock (_runGate)
+        {
+            switch (_state)
+            {
+                case RunState.Starting:
+                    throw new InvalidOperationException(
+                        "A test cannot start while the ProtoHost is starting; start it after startup completes.");
+                case RunState.Stopping:
+                case RunState.Stopped:
+                case RunState.Disposed:
+                    throw new InvalidOperationException("A test cannot start after the ProtoHost begins shutting down.");
+            }
+        }
     }
 
     /// <summary>
@@ -338,25 +365,39 @@ public sealed class ProtoHost : IAsyncDisposable
     {
         var exceptions = new List<Exception>();
 
-        // The start path runs to StartCompleted: disposing mid-start would stop a run whose infrastructure
+        // The start path runs to Started: disposing mid-start would stop a run whose infrastructure
         // is still coming up and then let the start record itself as completed on a disposed host.
-        lock (_startGate)
+        lock (_runGate)
         {
-            if (_startState == StartInProgress)
+            switch (_state)
             {
-                throw new InvalidOperationException(
-                    "ProtoHost startup is still in progress; dispose it after startup completes.");
+                case RunState.Starting:
+                    throw new InvalidOperationException(ProtoHostGuards.StartupStillInProgressDispose);
+                case RunState.Stopping:
+                    // Accepting the transition here would let the in-flight stop write Stopped over
+                    // Disposed once it finishes; the caller must dispose after the stop completes.
+                    throw new InvalidOperationException(
+                        "ProtoHost shutdown is still in progress; dispose it after the stop completes.");
+                case RunState.Disposed:
+                    LifecycleExceptionHelper.ThrowIfAny("One or more run hooks failed during disposal.", exceptions);
+                    return;
             }
         }
 
         // Completing the run here means `await using var host = ...` alone still runs AfterRun
         // hooks (report sinks, trace export). StopAsync is idempotent, so an explicit stop first
         // makes this a no-op.
-        if (_runLifecycle.IsStarted)
+        bool started;
+        lock (_runGate)
+        {
+            started = _state == RunState.Started;
+        }
+
+        if (started)
         {
             try
             {
-                await _runLifecycle.StopAsync(default);
+                await StopAsync(default);
             }
             catch (Exception exception)
             {
@@ -364,18 +405,21 @@ public sealed class ProtoHost : IAsyncDisposable
             }
         }
 
-        if (!_runLifecycle.TryMarkDisposed())
+        lock (_runGate)
         {
-            LifecycleExceptionHelper.ThrowIfAny(
-                "One or more run hooks failed during disposal.", exceptions);
-            return;
-        }
+            // A stop may have started between the check above and here; the same guards apply.
+            if (_state is RunState.Starting)
+            {
+                throw new InvalidOperationException(ProtoHostGuards.StartupStillInProgressDispose);
+            }
 
-        // The host is finished: a later StartAsync must reach the lifecycle and be rejected there
-        // rather than reading StartCompleted and reporting a start that cannot happen.
-        lock (_startGate)
-        {
-            _startState = StartCreated;
+            if (_state is RunState.Stopping)
+            {
+                throw new InvalidOperationException(
+                    "ProtoHost shutdown is still in progress; dispose it after the stop completes.");
+            }
+
+            _state = RunState.Disposed;
         }
 
         // Run-scoped resources outlive the run itself, so they are released once the reports are
@@ -416,5 +460,20 @@ public sealed class ProtoHost : IAsyncDisposable
 
         LifecycleExceptionHelper.ThrowIfAny(
             "One or more resources failed to dispose.", exceptions);
+    }
+
+    /// <summary>
+    /// The run's single state machine. Created can start; Starting rejects a second start, a stop and a
+    /// disposal; Started is the only state a stop tears down; Stopped keeps a failed stop's failure for
+    /// the retry that asks again; Disposed is final.
+    /// </summary>
+    private enum RunState
+    {
+        Created,
+        Starting,
+        Started,
+        Stopping,
+        Stopped,
+        Disposed
     }
 }

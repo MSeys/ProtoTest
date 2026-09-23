@@ -44,4 +44,28 @@ public static class ProtoOptionsRegistration
     }
 
     private sealed record ConfigureCallback<TOptions>(Action<TOptions> Callback);
+
+    /// <summary>
+    /// Builds an options instance for a service provider: the factory runs, then the code callback, and
+    /// the type's known configuration section binds over the result - configuration wins over code.
+    /// </summary>
+    public static TOptions Resolve<TOptions>(
+        IServiceProvider services,
+        Func<TOptions> factory,
+        Action<TOptions>? configure = null)
+        where TOptions : class, IProtoConfigurableOptions
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(factory);
+        var options = factory();
+        configure?.Invoke(options);
+        options.BindFromConfiguration(services.GetRequiredService<IConfiguration>());
+        return options;
+    }
+
+    /// <summary>The <see cref="Resolve{TOptions}(IServiceProvider, Func{TOptions}, Action{TOptions})"/>
+    /// form for an options type with a parameterless constructor.</summary>
+    public static TOptions Resolve<TOptions>(IServiceProvider services, Action<TOptions>? configure = null)
+        where TOptions : class, IProtoConfigurableOptions, new()
+        => Resolve(services, () => new TOptions(), configure);
 }

@@ -114,16 +114,12 @@ public sealed class WebCoverageCollector : ProtoCoverageCollector
         foreach (var pattern in _inventory)
         {
             if (!WebPagePath.Matches(pattern, path)) continue;
-            if (!IsCatchAll(pattern)) return pattern;
+            if (!WebPagePath.IsCatchAll(pattern)) return pattern;
             catchAll ??= pattern;
         }
 
         return catchAll ?? path;
     }
-
-    private static bool IsCatchAll(string pattern)
-        => pattern.Split('/', StringSplitOptions.RemoveEmptyEntries)
-            .Any(segment => segment == "{...}");
 
     private void AddInventory(string? path)
     {

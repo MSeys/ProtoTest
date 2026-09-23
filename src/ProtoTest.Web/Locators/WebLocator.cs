@@ -145,9 +145,13 @@ public static class By
 
     /// <summary>Addresses a one-based cell number within the current table row.</summary>
     public static WebLocator TableCellNumber(int number)
+        => new TableCellWebLocator(ZeroBased(number));
+
+    /// <summary>Converts a one-based number to the zero-based index the locators and collections use.</summary>
+    internal static int ZeroBased(int number)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(number, 1);
-        return new TableCellWebLocator(number - 1);
+        return number - 1;
     }
 
     /// <summary>Addresses a cell by the text of its conventional table header.</summary>

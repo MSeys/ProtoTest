@@ -7,22 +7,17 @@ using ProtoTest.Core;
 /// Base fixture for global assembly setup in xUnit v2.
 /// Initializes, starts, and disposes the root <see cref="ProtoHost"/>.
 /// </summary>
-public abstract class ProtoTestAssembly : IAsyncLifetime
+public abstract class ProtoTestAssembly
+    : ProtoTestAssemblyHost<ProtoTestAssembly>, IProtoTestAssemblyHost<ProtoTestAssembly>, IAsyncLifetime
 {
-    private static readonly ProtoTestHostLifetime Lifetime = new(
-        "Ensure your collection fixture inherits from ProtoTestAssembly.");
-
-    /// <summary>
-    /// Gets the global <see cref="ProtoHost"/> instance.
-    /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown when accessed before host initialization.</exception>
-    public static ProtoHost Host => Lifetime.Host;
+    static string IProtoTestAssemblyHost<ProtoTestAssembly>.UninitializedHint =>
+        "Ensure your collection fixture inherits from ProtoTestAssembly.";
 
     /// <inheritdoc />
-    public Task InitializeAsync() => Lifetime.StartAsync(Configure);
+    public Task InitializeAsync() => StartAsync(Configure);
 
     /// <inheritdoc />
-    public Task DisposeAsync() => Lifetime.StopAsync();
+    public Task DisposeAsync() => StopAsync();
 
     /// <summary>
     /// Configures the <see cref="IProtoHostBuilder"/> with custom services, collectors, and hooks.

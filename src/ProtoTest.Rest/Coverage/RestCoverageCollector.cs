@@ -2,11 +2,8 @@
 
 using ProtoTest.Core;
 
-public sealed class RestCoverageCollector(string targetName) : ProtoCoverageCollector(targetName)
+/// <summary>Aggregates REST calls as route coverage from the client's observations.</summary>
+public sealed class RestCoverageCollector(string targetName) : ProtoCoverageCollector(targetName, "http.response")
 {
     public override string Category => "REST";
-
-    public override bool CanCollect(ProtoObservation observation)
-        => base.CanCollect(observation)
-           && string.Equals(observation.Kind, "http.response", StringComparison.Ordinal);
 }

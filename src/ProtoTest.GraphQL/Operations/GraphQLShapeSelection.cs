@@ -8,8 +8,6 @@ using ProtoTest.Json;
 
 internal static class GraphQLShapeSelection
 {
-    private static readonly JsonSerializerOptions Naming = new(JsonSerializerDefaults.Web);
-
     public static void AddArguments(
         GraphQLOperationBuilder operation,
         GraphQLFieldBuilder field,
@@ -104,13 +102,9 @@ internal static class GraphQLShapeSelection
             yield break;
         }
 
-        foreach (var property in type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
-                     .Where(property => property.GetIndexParameters().Length == 0
-                         && property.GetCustomAttribute<JsonIgnoreAttribute>() is null))
+        foreach (var property in ProtoJsonPropertyProjection.Read(type, value, JsonNamingPolicy.CamelCase))
         {
-            var name = property.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name
-                ?? Naming.PropertyNamingPolicy!.ConvertName(property.Name);
-            yield return (name, value is null ? null : property.GetValue(value), property.PropertyType);
+            yield return (property.Name, property.Value, property.Type);
         }
     }
 
@@ -136,16 +130,7 @@ internal static class GraphQLShapeSelection
             || typeof(IJsonValueMatcher).IsAssignableFrom(type)
             || typeof(GraphQLFieldSelection).IsAssignableFrom(type)
             || type == typeof(object) && value is null
-            || type.IsPrimitive
-            || type.IsEnum
-            || type == typeof(string)
-            || type == typeof(decimal)
-            || type == typeof(DateTime)
-            || type == typeof(DateTimeOffset)
-            || type == typeof(DateOnly)
-            || type == typeof(TimeOnly)
-            || type == typeof(Guid)
-            || type == typeof(Uri);
+            || JsonScalarTypes.IsScalar(type);
 
     private sealed record SelectionNode(string Name, IReadOnlyList<SelectionNode> Children);
 }

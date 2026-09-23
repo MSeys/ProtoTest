@@ -19,7 +19,7 @@ public class Setup : ProtoTestAssembly
             AdapterTestSupport.ConfigureHost(builder);
             builder.ConfigureServices(services =>
             {
-                services.AddScoped<ITestService, TestService>();
+                services.AddScoped<ITestService>(_ => new ProbeTestService("TUnit_Integration_Success"));
             });
         });
     }
@@ -31,7 +31,3 @@ public class Setup : ProtoTestAssembly
     }
 }
 
-public class TestService : ITestService
-{
-    public string GetMessage() => "TUnit_Integration_Success";
-}

@@ -2,9 +2,9 @@ namespace ProtoTest.TUnit.Tests;
 
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using ProtoTest.Core;
 using global::TUnit.Core.Executors;
 using global::TUnit.Core.Interfaces;
+using ProtoTest.Core;
 
 public sealed class OutcomeTests
 {

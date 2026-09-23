@@ -14,7 +14,7 @@ public sealed class MessagingTests
         builder.AddMessaging();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging publish", TestMethod());
+        var context = await host.StartTestAsync("messaging publish", TestMethods.Placeholder);
         var messages = context.Messaging();
 
         await messages.PublishAsync("invoices", "{\"id\":1}", contentType: "application/json");
@@ -42,7 +42,7 @@ public sealed class MessagingTests
         builder.AddMessaging();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging timeout", TestMethod());
+        var context = await host.StartTestAsync("messaging timeout", TestMethods.Placeholder);
         var messages = context.Messaging();
 
         var timeout = Assert.ThrowsAsync<TimeoutException>(async () =>
@@ -60,11 +60,11 @@ public sealed class MessagingTests
         await using var host = builder.Build();
         await host.StartAsync();
 
-        var first = await host.StartTestAsync("messaging first", TestMethod());
+        var first = await host.StartTestAsync("messaging first", TestMethods.Placeholder);
         await first.Messaging().PublishAsync("invoices", "{\"id\":1}");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
-        var second = await host.StartTestAsync("messaging second", TestMethod());
+        var second = await host.StartTestAsync("messaging second", TestMethods.Placeholder);
         var timeout = Assert.ThrowsAsync<TimeoutException>(async () =>
             await second.Messaging().AwaitAsync(
                 "invoices",
@@ -82,7 +82,7 @@ public sealed class MessagingTests
         builder.AddMessaging();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging consumers", TestMethod());
+        var context = await host.StartTestAsync("messaging consumers", TestMethods.Placeholder);
         var broker = context.Service<IProtoMessageBroker>();
         var messages = context.Messaging();
 
@@ -126,7 +126,7 @@ public sealed class MessagingTests
         builder.AddMessaging();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging throwing predicate", TestMethod());
+        var context = await host.StartTestAsync("messaging throwing predicate", TestMethods.Placeholder);
         var broker = context.Service<IProtoMessageBroker>();
         var messages = context.Messaging();
 
@@ -168,7 +168,7 @@ public sealed class MessagingTests
         builder.AddMessaging();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging consumption", TestMethod());
+        var context = await host.StartTestAsync("messaging consumption", TestMethods.Placeholder);
         var messages = context.Messaging();
 
         await messages.PublishAsync("invoices", "{\"id\":1}");
@@ -192,7 +192,7 @@ public sealed class MessagingTests
         builder.AddMessaging();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging concurrent awaits", TestMethod());
+        var context = await host.StartTestAsync("messaging concurrent awaits", TestMethods.Placeholder);
         var broker = context.Service<IProtoMessageBroker>();
         var consumer = await broker.CreateConsumerAsync();
         context.RegisterResource(
@@ -203,7 +203,6 @@ public sealed class MessagingTests
 
         var first = consumer.AwaitAsync("invoices", _ => true, TimeSpan.FromSeconds(2)).AsTask();
         var second = consumer.AwaitAsync("invoices", _ => true, TimeSpan.FromSeconds(2)).AsTask();
-        await Task.Delay(100);
         await context.Messaging().PublishAsync("invoices", "{\"id\":1}");
         await context.Messaging().PublishAsync("invoices", "{\"id\":2}");
 
@@ -221,7 +220,7 @@ public sealed class MessagingTests
         builder.AddMessaging();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging boundary", TestMethod());
+        var context = await host.StartTestAsync("messaging boundary", TestMethods.Placeholder);
         var broker = context.Service<IProtoMessageBroker>();
         var messages = context.Messaging();
 
@@ -272,7 +271,7 @@ public sealed class MessagingTests
         Assert.That(host.HasCapability(ProtoCapabilityKinds.Broker), Is.True);
 
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging lifecycle", TestMethod());
+        var context = await host.StartTestAsync("messaging lifecycle", TestMethods.Placeholder);
         _ = context.Messaging();
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         Assert.That(adapter.Disposed, Is.False);
@@ -313,10 +312,5 @@ public sealed class MessagingTests
         }
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(MessagingTests).GetMethod(nameof(Placeholder), BindingFlags.Static | BindingFlags.NonPublic)!;
 
-    private static void Placeholder()
-    {
-    }
 }

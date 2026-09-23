@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.OpenApi.Tests;
+namespace ProtoTest.OpenApi.Tests;
 
 using Microsoft.OpenApi.Models;
 using NUnit.Framework;

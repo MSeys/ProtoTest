@@ -1,9 +1,9 @@
 namespace ProtoTest.Sheets.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
-using System.Reflection;
 
 [TestFixture]
 public sealed class RegistrationIdempotencyTests
@@ -28,18 +28,12 @@ public sealed class RegistrationIdempotencyTests
         });
 
         await host.StartAsync();
-        var context = await host.StartTestAsync("sheets idempotent", TestMethod());
+        var context = await host.StartTestAsync("sheets idempotent", TestMethods.Placeholder);
         Assert.That(context.Service<SheetsOptions>(), Is.Not.Null);
         _ = context.Sheets();
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(RegistrationIdempotencyTests).GetMethod(
-            nameof(Placeholder), BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void Placeholder()
-    {
-    }
 }

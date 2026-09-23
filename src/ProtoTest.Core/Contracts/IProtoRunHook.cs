@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Core;
+namespace ProtoTest.Core;
 
 /// <summary>
 /// Defines lifecycle hooks that run once per test suite execution (before all tests start and after all tests finish).

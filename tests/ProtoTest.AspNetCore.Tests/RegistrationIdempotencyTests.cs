@@ -29,7 +29,7 @@ public sealed class RegistrationIdempotencyTests
         });
 
         await host.StartAsync();
-        await host.StartTestAsync("aspnet idempotent", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("aspnet idempotent", TestMethods.Placeholder);
 
         var client = Proto.Context.Client<HttpClient>("Default");
         var response = await client.GetAsync("/ping");

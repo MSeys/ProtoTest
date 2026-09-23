@@ -130,7 +130,7 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
             },
             async (_, ct) =>
             {
-                var result = await WebPolling.PollAsync(
+                var result = await ProtoPolling.PollAsync(
                     async token =>
                     {
                         try
@@ -145,7 +145,7 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
                     },
                     satisfied => satisfied,
                     waitTimeout,
-                    WebPolling.DefaultInterval,
+                    ProtoPolling.DefaultInterval,
                     ct);
 
                 if (!result.Satisfied)
@@ -181,7 +181,7 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
             attributes,
             async (backend, ct) =>
             {
-                var result = await WebPolling.PollAsync(
+                var result = await ProtoPolling.PollAsync(
                     async token =>
                     {
                         try
@@ -196,7 +196,7 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
                     },
                     observation => ProtoAssertion.IsSatisfied(observation.Holds, negated),
                     assertionTimeout,
-                    WebPolling.DefaultInterval,
+                    ProtoPolling.DefaultInterval,
                     ct);
 
                 if (!result.Satisfied)

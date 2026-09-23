@@ -12,7 +12,7 @@ public class ProtoTestFixture : ProtoTestAssembly
         AdapterTestSupport.ConfigureHost(builder);
         builder.ConfigureServices(services =>
         {
-            services.AddScoped<ITestService, TestService>();
+            services.AddScoped<ITestService>(_ => new ProbeTestService("ProtoTest_Xunit_Success"));
         });
     }
 }
@@ -23,7 +23,3 @@ public class ProtoTestCollection : ICollectionFixture<ProtoTestFixture>
     public const string Name = "ProtoTest Collection";
 }
 
-public class TestService : ITestService
-{
-    public string GetMessage() => "ProtoTest_Xunit_Success";
-}

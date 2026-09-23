@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text.Json;
 using global::Google.Protobuf;
 using ProtoTest.Core;
+using ProtoTest.Http;
 using ProtoTest.Json;
 
 /// <summary>
@@ -34,7 +35,7 @@ public static class ProtoGrpcAssertions
         ProtoShapeAssertion.Assert(
             new ProtoShapeAssertionContext(
                 context,
-                "ProtoTest.Grpc",
+                ProtoGrpcBuilder.Protocol.TraceSource,
                 "Assert gRPC response shape",
                 ExtraAttributes: new Dictionary<string, string?> { ["rpc.message.type"] = typeof(TResponse).FullName }),
             Formatter.Format(response),
@@ -74,49 +75,26 @@ public static class ProtoGrpcAssertions
         bool negated)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        var context = Proto.Context;
         var actual = exception.StatusCode;
-        using var operation = context.Trace
-            .Operation(
-                "assert.grpc.status",
-                $"Assert status · {ProtoAssertion.Describe($"{(int)expected} {expected}", negated)}",
-                "ProtoTest.Grpc")
-            .With("expected.rpc.grpc.status_code", ((int)expected).ToString(CultureInfo.InvariantCulture))
-            .With("expected.rpc.grpc.status", expected.ToString())
-            .With("actual.rpc.grpc.status_code", ((int)actual).ToString(CultureInfo.InvariantCulture))
-            .With("actual.rpc.grpc.status", actual.ToString())
-            .With("assertion.negated", negated ? "true" : null)
-            .Begin();
-        var passed = ProtoAssertion.IsSatisfied(actual == expected, negated);
-        operation.AddSection(new ProtoTraceSection(
-            "Result",
-            ProtoTraceSectionKind.Checks,
-            [
-                new(
-                    "status",
-                    ((int)actual).ToString(CultureInfo.InvariantCulture),
-                    passed
-                        ? null
-                        : $"expected {ProtoAssertion.Describe(((int)expected).ToString(CultureInfo.InvariantCulture), negated)}",
-                    passed ? ProtoTraceSectionTone.Success : ProtoTraceSectionTone.Error)
-            ]));
-
-        try
-        {
-            if (!passed)
+        ProtoStatusAssertion.Assert(
+            Proto.Context,
+            ProtoGrpcBuilder.Protocol.TraceSource,
+            (int)expected,
+            (int)actual,
+            negated,
+            () => new GrpcAssertionException(
+                $"Expected gRPC status {ProtoAssertion.Describe($"{(int)expected} ({expected})", negated)}, " +
+                $"but received {(int)actual} ({actual})."),
+            operationKind: "assert.grpc.status",
+            expectedDescription: $"{(int)expected} {expected}",
+            expectedAttribute: "expected.rpc.grpc.status_code",
+            actualAttribute: "actual.rpc.grpc.status_code",
+            extraAttributes: new Dictionary<string, string?>
             {
-                throw new GrpcAssertionException(
-                    $"Expected gRPC status {ProtoAssertion.Describe($"{(int)expected} ({expected})", negated)}, " +
-                    $"but received {(int)actual} ({actual}).");
-            }
-            operation.Succeed();
-            return exception;
-        }
-        catch (Exception failure)
-        {
-            operation.Fail(failure);
-            throw;
-        }
+                ["expected.rpc.grpc.status"] = expected.ToString(),
+                ["actual.rpc.grpc.status"] = actual.ToString()
+            });
+        return exception;
     }
 }
 

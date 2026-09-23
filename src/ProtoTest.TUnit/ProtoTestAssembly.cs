@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.TUnit;
+namespace ProtoTest.TUnit;
 
 using ProtoTest.Core;
 

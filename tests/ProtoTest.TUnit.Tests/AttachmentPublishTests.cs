@@ -1,7 +1,7 @@
 namespace ProtoTest.TUnit.Tests;
 
-using ProtoTest.Core;
 using global::TUnit.Core;
+using ProtoTest.Core;
 
 public class AttachmentPublishTests
 {

@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using ProtoTest.Json;
 
 internal sealed record GraphQLRequestContent(
     HttpContent Content,
@@ -14,7 +15,7 @@ internal sealed record GraphQLRequestContent(
     string? VariablesJson,
     bool RequiresPreflight)
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions SerializerOptions = ProtoJsonDefaults.Web;
 
     public static GraphQLRequestContent Create(
         string document,
@@ -88,22 +89,13 @@ internal sealed record GraphQLRequestContent(
         }
 
         var properties = new Dictionary<string, object?>();
-        foreach (var property in value.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public)
-                     .Where(property => property.GetIndexParameters().Length == 0
-                         && property.GetCustomAttribute<JsonIgnoreAttribute>() is null))
+        foreach (var property in ProtoJsonPropertyProjection.Read(value, JsonNamingPolicy.CamelCase))
         {
-            var name = property.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name
-                ?? JsonNamingPolicy.CamelCase.ConvertName(property.Name);
-            properties[name] = Normalize(property.GetValue(value), $"{path}.{name}", uploads);
+            properties[property.Name] = Normalize(property.Value, $"{path}.{property.Name}", uploads);
         }
+
         return properties;
     }
 
-    private static bool IsScalar(Type type)
-    {
-        type = Nullable.GetUnderlyingType(type) ?? type;
-        return type.IsPrimitive || type.IsEnum || type == typeof(string) || type == typeof(decimal)
-            || type == typeof(DateTime) || type == typeof(DateTimeOffset) || type == typeof(DateOnly)
-            || type == typeof(TimeOnly) || type == typeof(Guid) || type == typeof(Uri);
-    }
+    private static bool IsScalar(Type type) => JsonScalarTypes.IsScalar(type);
 }

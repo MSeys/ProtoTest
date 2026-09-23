@@ -33,12 +33,11 @@ public static class ProtoHostBuilderExtensions
                 // The marker, not the presence of SqlOptions, decides whether SQL already registered: a
                 // host that registered its own options keeps them (the options registration is TryAdd)
                 // instead of silently disabling the connection, session, hooks and guard.
-                if (services.Any(descriptor => descriptor.ServiceType == typeof(SqlRegistration)))
+                if (!ProtoRegistrationGuard.TryRegisterOnce<SqlRegistration>(services))
                 {
                     return;
                 }
 
-                services.AddSingleton<SqlRegistration>();
                 services.AddScoped(connectionFactory);
                 services.AddScoped(services =>
                     new ProtoSqlSession(services.GetRequiredService<DbConnection>()));

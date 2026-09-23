@@ -1,8 +1,8 @@
 namespace ProtoTest.Core.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
-using System.Reflection;
 
 [TestFixture]
 public class ProtoClientInitializerTests
@@ -37,7 +37,7 @@ public class ProtoClientInitializerTests
             });
 
         await using var host = builder.Build();
-        await host.StartTestAsync("InitializerOrder", "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("InitializerOrder", "00001", TestMethods.Placeholder);
 
         try
         {
@@ -71,7 +71,7 @@ public class ProtoClientInitializerTests
             });
 
         await using var host = builder.Build();
-        await host.StartTestAsync("InitializerTypes", "00002", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("InitializerTypes", "00002", TestMethods.Placeholder);
 
         try
         {

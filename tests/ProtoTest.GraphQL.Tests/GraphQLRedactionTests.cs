@@ -19,7 +19,7 @@ public sealed class GraphQLRedactionTests
             outgoing = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
             return Json("""{"data":{"login":{"token":"server-secret"}}}""");
         });
-        await host.StartTestAsync("inline redaction", "1", Method());
+        await host.StartTestAsync("inline redaction", "1", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -63,7 +63,7 @@ public sealed class GraphQLRedactionTests
             outgoing = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
             return Json("""{"data":{"login":{"token":"server-secret"}}}""");
         });
-        await host.StartTestAsync("variable redaction", "2", Method());
+        await host.StartTestAsync("variable redaction", "2", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -102,7 +102,7 @@ public sealed class GraphQLRedactionTests
     public async Task NonSensitiveLiteral_ShouldBeLeftUntouched()
     {
         await using var host = CreateHost(_ => Json("""{"data":{"search":[]}}"""));
-        await host.StartTestAsync("non-sensitive literal", "3", Method());
+        await host.StartTestAsync("non-sensitive literal", "3", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -127,7 +127,7 @@ public sealed class GraphQLRedactionTests
     {
         const string document = """"mutation { login(password: """hunter2""", note: "say \"hi\"") { token } }"""";
         await using var host = CreateHost(_ => Json("""{"data":{"login":{"token":"server-secret"}}}"""));
-        await host.StartTestAsync("escaped literals", "4", Method());
+        await host.StartTestAsync("escaped literals", "4", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -178,9 +178,6 @@ public sealed class GraphQLRedactionTests
     private static HttpResponseMessage Json(string content)
         => new(HttpStatusCode.OK) { Content = new StringContent(content) };
 
-    private static MethodInfo Method() => typeof(GraphQLRedactionTests)
-        .GetMethod(nameof(Dummy), BindingFlags.NonPublic | BindingFlags.Static)!;
-    private static void Dummy() { }
 
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
     {

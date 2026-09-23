@@ -1,11 +1,11 @@
 namespace ProtoTest.Web;
 
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
 using ProtoTest.Web.Playwright;
-using System.Runtime.CompilerServices;
 
 /// <summary>
 /// Playwright registration for <see cref="IProtoHostBuilder"/>. Reference the ProtoTest.Web.Playwright
@@ -19,7 +19,6 @@ public static class PlaywrightWebHostBuilderExtensions
     // callback succeeded, so a throwing configure does not poison a later call.
     private static readonly ConditionalWeakTable<IProtoHostBuilder, object> HostDefaults = new();
     private static readonly ConditionalWeakTable<IProtoApplicationBuilder, object> ApplicationDefaults = new();
-    private static readonly object Registration = new();
 
     /// <summary>Adds a Playwright-backed web host.</summary>
     /// <param name="builder">The host builder.</param>
@@ -32,7 +31,7 @@ public static class PlaywrightWebHostBuilderExtensions
         var defaults = PlaywrightWebDefaults.Create(configure);
         // Test-scoped so a browser process is shared by the sessions of one test and disposed with it.
         builder.ConfigureServices(services => services.TryAddScoped<PlaywrightBrowserPool>());
-        if (HostDefaults.TryAdd(builder, Registration))
+        if (ProtoRegistrationGuard.TryRegisterOnce(HostDefaults, builder))
         {
             // Code-configured launch options feed the code-driven default section, so a skip condition can
             // see them; it is inserted first, so real configuration and session sections still win.
@@ -57,7 +56,7 @@ public static class PlaywrightWebHostBuilderExtensions
         // are injected into the host's configuration when the run starts.
         application.Services.TryAddScoped<PlaywrightBrowserPool>();
         application.Services.AddWebBackend(new PlaywrightWebBackendFactory(configure));
-        if (ApplicationDefaults.TryAdd(application, Registration))
+        if (ProtoRegistrationGuard.TryRegisterOnce(ApplicationDefaults, application))
         {
             application.Services.AddSingleton<IProtoRunHook>(services =>
                 new PlaywrightDefaultsRunHook(

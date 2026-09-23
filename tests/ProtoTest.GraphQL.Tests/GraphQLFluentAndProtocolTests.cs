@@ -20,7 +20,7 @@ public sealed class GraphQLFluentAndProtocolTests
             document = ReadDocument(request);
             return Json("""{"data":{"placed":{"id":"1","customer":{"name":"Ada"}}}}""");
         });
-        await host.StartTestAsync("fluent", "1", Method());
+        await host.StartTestAsync("fluent", "1", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -51,7 +51,7 @@ public sealed class GraphQLFluentAndProtocolTests
             document = ReadDocument(request);
             return Json("""{"data":{"search":[]}}""");
         });
-        await host.StartTestAsync("literals", "2", Method());
+        await host.StartTestAsync("literals", "2", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -74,7 +74,7 @@ public sealed class GraphQLFluentAndProtocolTests
             document = ReadDocument(request);
             return Json("""{"data":{"orders":{"nodes":[],"pageInfo":{"hasNextPage":false,"hasPreviousPage":true,"startCursor":null,"endCursor":null}}}}""");
         });
-        await host.StartTestAsync("paging", "3", Method());
+        await host.StartTestAsync("paging", "3", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -97,7 +97,7 @@ public sealed class GraphQLFluentAndProtocolTests
     public async Task InvalidGraphQLResponse_ShouldProduceProtocolDiagnostic(string payload, string expectedMessage)
     {
         await using var host = CreateHost(_ => Json(payload));
-        await host.StartTestAsync("protocol", "4", Method());
+        await host.StartTestAsync("protocol", "4", TestMethods.Placeholder);
         try
         {
             var exception = Assert.ThrowsAsync<GraphQLProtocolException>(() => Proto.Context.GraphQL()
@@ -112,7 +112,7 @@ public sealed class GraphQLFluentAndProtocolTests
     public async Task ShouldMatchShape_WithoutData_ShouldThrowTheGraphQlAssertion()
     {
         await using var host = CreateHost(_ => Json("""{"errors":[{"message":"boom"}]}"""));
-        await host.StartTestAsync("shape-no-data", "10", Method());
+        await host.StartTestAsync("shape-no-data", "10", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -130,7 +130,7 @@ public sealed class GraphQLFluentAndProtocolTests
     public async Task ShouldMatchShape_WithoutData_ShouldRecordTheFailedAssertionInTheTrace()
     {
         await using var host = CreateHost(_ => Json("""{"errors":[{"message":"boom"}]}"""));
-        await host.StartTestAsync("shape-no-data trace", "13", Method());
+        await host.StartTestAsync("shape-no-data trace", "13", TestMethods.Placeholder);
         using var response = await Proto.Context.GraphQL()
             .Query(null, query => query.Field("value"))
             .ExecuteAsync();
@@ -158,7 +158,7 @@ public sealed class GraphQLFluentAndProtocolTests
         {
             Content = new StringContent("""{"data":{"value":42},"extensions":{"traceId":"abc"}}""")
         });
-        await host.StartTestAsync("response", "5", Method());
+        await host.StartTestAsync("response", "5", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -182,7 +182,7 @@ public sealed class GraphQLFluentAndProtocolTests
         {
             Content = new StringContent("""{"data":{"value":1}}""")
         });
-        await host.StartTestAsync("negated status pass", "11", Method());
+        await host.StartTestAsync("negated status pass", "11", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -201,7 +201,7 @@ public sealed class GraphQLFluentAndProtocolTests
         {
             Content = new StringContent("""{"data":{"value":1}}""")
         });
-        await host.StartTestAsync("negated status fail", "12", Method());
+        await host.StartTestAsync("negated status fail", "12", TestMethods.Placeholder);
         using var response = await Proto.Context.GraphQL()
             .Query(null, query => query.Field("value"))
             .ExecuteAsync();
@@ -239,7 +239,7 @@ public sealed class GraphQLFluentAndProtocolTests
             authorizations.Add(request.Headers.Authorization);
             return Json("""{"data":{"value":1}}""");
         });
-        await host.StartTestAsync("auth", "6", Method());
+        await host.StartTestAsync("auth", "6", TestMethods.Placeholder);
         try
         {
             using var authenticated = await Proto.Context.GraphQL()
@@ -286,7 +286,7 @@ public sealed class GraphQLFluentAndProtocolTests
                     "text/event-stream")
             };
         });
-        await host.StartTestAsync("subscription", "7", Method());
+        await host.StartTestAsync("subscription", "7", TestMethods.Placeholder);
         try
         {
             await using var subscription = await Proto.Context.GraphQL()
@@ -316,7 +316,7 @@ public sealed class GraphQLFluentAndProtocolTests
     public async Task ExecuteAsync_ShouldDirectSubscriptionsToStreamingApi()
     {
         await using var host = CreateHost(_ => Json("""{"data":{"value":1}}"""));
-        await host.StartTestAsync("subscription-api", "8", Method());
+        await host.StartTestAsync("subscription-api", "8", TestMethods.Placeholder);
         try
         {
             var exception = Assert.ThrowsAsync<InvalidOperationException>(() => Proto.Context.GraphQL()
@@ -332,7 +332,7 @@ public sealed class GraphQLFluentAndProtocolTests
     public async Task Header_WithAnInvalidName_ShouldThrowInsteadOfBeingSilentlyDropped()
     {
         await using var host = CreateHost(_ => Json("""{"data":{"value":1}}"""));
-        await host.StartTestAsync("invalid header", "10", Method());
+        await host.StartTestAsync("invalid header", "10", TestMethods.Placeholder);
         try
         {
             var exception = Assert.ThrowsAsync<InvalidOperationException>(() => Proto.Context.GraphQL()
@@ -359,7 +359,7 @@ public sealed class GraphQLFluentAndProtocolTests
                 System.Text.Encoding.UTF8,
                 "text/event-stream")
         });
-        await host.StartTestAsync("subscription-error", "9", Method());
+        await host.StartTestAsync("subscription-error", "9", TestMethods.Placeholder);
         try
         {
             await using var subscription = await Proto.Context.GraphQL()
@@ -390,9 +390,6 @@ public sealed class GraphQLFluentAndProtocolTests
         return envelope.RootElement.GetProperty("query").GetString()!;
     }
 
-    private static MethodInfo Method() => typeof(GraphQLFluentAndProtocolTests)
-        .GetMethod(nameof(Dummy), BindingFlags.NonPublic | BindingFlags.Static)!;
-    private static void Dummy() { }
     private sealed record ValueData(int Value);
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
     {

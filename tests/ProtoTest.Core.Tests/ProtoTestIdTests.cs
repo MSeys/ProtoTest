@@ -1,7 +1,7 @@
 namespace ProtoTest.Core.Tests;
 
-using NUnit.Framework;
 using System.Reflection;
+using NUnit.Framework;
 
 [TestFixture]
 public sealed class ProtoTestIdTests
@@ -42,7 +42,7 @@ public sealed class ProtoTestIdTests
                 options.SequenceDigits = 3;
             });
         await using var host = builder.Build();
-        var method = (MethodInfo)MethodInfo.GetCurrentMethod()!;
+        var method = TestMethods.Placeholder;
 
         var first = await host.StartTestAsync("First", method);
         await host.CompleteTestAsync();

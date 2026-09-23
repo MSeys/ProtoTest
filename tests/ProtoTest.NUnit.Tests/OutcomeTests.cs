@@ -1,7 +1,7 @@
 namespace ProtoTest.NUnit.Tests;
 
-using global::NUnit.Framework.Internal;
 using global::NUnit.Framework.Interfaces;
+using global::NUnit.Framework.Internal;
 using ProtoTest.Core;
 
 [TestFixture]

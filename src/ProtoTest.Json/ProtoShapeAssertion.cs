@@ -165,7 +165,7 @@ public static class ProtoShapeAssertion
         }
 
         var type = expected.GetType();
-        if (type.IsPrimitive || type.IsEnum || expected is string or decimal or DateTime or DateTimeOffset or DateOnly or TimeOnly or Guid or Uri)
+        if (JsonScalarTypes.IsScalar(type))
         {
             return expected;
         }

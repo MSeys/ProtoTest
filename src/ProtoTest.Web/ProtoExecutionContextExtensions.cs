@@ -1,9 +1,8 @@
 namespace ProtoTest.Web;
 
-using ProtoTest.Web.Internal;
-
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
+using ProtoTest.Web.Internal;
 
 public static class ProtoExecutionContextExtensions
 {

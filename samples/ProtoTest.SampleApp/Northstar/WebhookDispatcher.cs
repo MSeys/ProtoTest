@@ -1,8 +1,8 @@
 namespace ProtoTest.SampleApp.Northstar;
 
-using ProtoTest.SampleApp.Domain;
 using System.Security.Cryptography;
 using System.Text;
+using ProtoTest.SampleApp.Domain;
 
 /// <summary>Drains the webhook outbox with retries and HMAC-SHA256 request signing.</summary>
 internal sealed class WebhookDispatcher(

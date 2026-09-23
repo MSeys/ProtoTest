@@ -7,19 +7,14 @@ using ProtoTest.Core;
 /// Resolves the ordered authenticator attributes that apply to a protocol before each test, builds a
 /// composite authenticator when more than one applies, and records the resolved configuration as the
 /// protocol's auth entity state. The client a test uses is chosen separately by <c>[Application]</c>.
+/// The state is stored under the protocol's key, so protocols sharing this hook never overwrite each
+/// other.
 /// </summary>
-public abstract class ProtoHttpAuthLifecycleHook(string protocolName) : IProtoTestHook
+public sealed class ProtoHttpAuthLifecycleHook(ProtoProtocol protocol) : IProtoTestHook
 {
-    private readonly string _protocolName = string.IsNullOrWhiteSpace(protocolName)
-        ? throw new ArgumentException("A protocol name is required.", nameof(protocolName))
-        : protocolName;
+    private readonly ProtoProtocol _protocol = protocol ?? throw new ArgumentNullException(nameof(protocol));
 
     public int Order => ProtoHookOrder.Authentication;
-
-    /// <summary>Stores the resolved authenticator factory as protocol-specific context state.</summary>
-    protected abstract void SetContext(
-        ProtoExecutionContext context,
-        Func<ProtoExecutionContext, IProtoHttpAuthenticator>? authenticatorFactory);
 
     public Task BeforeTestAsync(ProtoExecutionContext context)
     {
@@ -36,14 +31,19 @@ public abstract class ProtoHttpAuthLifecycleHook(string protocolName) : IProtoTe
         var auth = methodAuth.Length > 0 ? methodAuth : classAuth;
         var orderedAuth = auth.OrderBy(attribute => attribute.Order).ToArray();
 
-        SetContext(context, orderedAuth.Length == 0
-            ? null
-            : executionContext => CreateAuthenticator(orderedAuth, executionContext));
+        context.SetContext(
+            _protocol.Key,
+            new ProtoHttpContextState
+            {
+                AuthenticatorFactory = orderedAuth.Length == 0
+                    ? null
+                    : executionContext => CreateAuthenticator(orderedAuth, executionContext)
+            });
 
         context.Trace.SetEntityState(
             ProtoTraceEntityKinds.Auth,
-            _protocolName,
-            $"{_protocolName} authentication",
+            _protocol.Key,
+            $"{_protocol.Key} authentication",
             new Dictionary<string, string?>
             {
                 ["auth.source"] = methodAuth.Length > 0 ? "method" : classAuth.Length > 0 ? "class" : "none",
@@ -61,7 +61,7 @@ public abstract class ProtoHttpAuthLifecycleHook(string protocolName) : IProtoTe
     private IEnumerable<IProtoHttpAuthMetadata> Applicable(IEnumerable<object> attributes)
         => attributes
             .OfType<IProtoHttpAuthMetadata>()
-            .Where(metadata => metadata.AppliesTo(_protocolName));
+            .Where(metadata => metadata.AppliesTo(_protocol.Key));
 
     private IProtoHttpAuthenticator CreateAuthenticator(
         IReadOnlyList<IProtoHttpAuthMetadata> attributes,
@@ -70,7 +70,7 @@ public abstract class ProtoHttpAuthLifecycleHook(string protocolName) : IProtoTe
         var authenticators = attributes.Select(attribute => attribute.Create(context)).ToArray();
         return authenticators.Length == 1
             ? authenticators[0]
-            : new ProtoCompositeHttpAuthenticator(authenticators, $"ProtoTest.{_protocolName}");
+            : new ProtoCompositeHttpAuthenticator(authenticators, _protocol.TraceSource);
     }
 
     private static string AuthTypeName(IProtoHttpAuthMetadata metadata)
@@ -78,4 +78,3 @@ public abstract class ProtoHttpAuthLifecycleHook(string protocolName) : IProtoTe
            ?? metadata.GetType().FullName
            ?? metadata.GetType().Name;
 }
-

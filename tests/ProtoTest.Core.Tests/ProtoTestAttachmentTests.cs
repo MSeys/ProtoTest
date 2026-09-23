@@ -1,9 +1,9 @@
 namespace ProtoTest.Core.Tests;
 
-using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 using System.Reflection;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
+using NUnit.Framework;
 
 [TestFixture]
 public sealed class ProtoTestAttachmentTests
@@ -40,7 +40,7 @@ public sealed class ProtoTestAttachmentTests
         var context = await host.StartTestAsync(
             "Attachments",
             "00001",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!,
+            TestMethods.Placeholder,
             attachmentPublisher: publisher);
         context.AddAttachment("body", "response", "application/json");
 
@@ -68,7 +68,7 @@ public sealed class ProtoTestAttachmentTests
         var context = await host.StartTestAsync(
             "Attachments",
             "00001",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!,
+            TestMethods.Placeholder,
             attachmentPublisher: new ThrowingPublisher());
         var dependency = context.Service<DisposableDependency>();
         context.AddAttachment("body", "response");
@@ -84,7 +84,7 @@ public sealed class ProtoTestAttachmentTests
             "Attachments",
             new ServiceCollection().BuildServiceProvider().CreateScope(),
             "00001",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
     private sealed class AttachmentAfterHook : IProtoTestHook
     {

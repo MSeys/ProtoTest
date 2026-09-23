@@ -1,8 +1,7 @@
 namespace ProtoTest.Data;
 
-using ProtoTest.Data.Internal;
-
 using System.Linq.Expressions;
+using ProtoTest.Data.Internal;
 
 /// <summary>Configures defaults for a particular object type.</summary>
 public sealed class ProtoDataTypeConfiguration<T>

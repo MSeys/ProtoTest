@@ -1,7 +1,7 @@
 namespace ProtoTest.Core.Tests;
 
-using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 
 [TestFixture]
 [NonParallelizable]
@@ -18,7 +18,7 @@ public class ProtoFindingTests
         await host.StartAsync();
 
         // Act
-        var context = await host.StartTestAsync("Checkout", "00042", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = await host.StartTestAsync("Checkout", "00042", TestMethods.Placeholder);
         context.AddFinding("Orphaned invoices were left behind.", ProtoReportStatus.Error, category: "Data isolation");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
@@ -48,7 +48,7 @@ public class ProtoFindingTests
         await host.StartAsync();
 
         // Act
-        var context = await host.StartTestAsync("Checkout", "00043", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = await host.StartTestAsync("Checkout", "00043", TestMethods.Placeholder);
         context.AddFinding("Something is off.", ProtoReportStatus.Error);
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         var exception = Assert.ThrowsAsync<ProtoRunGateException>(() => host.StopAsync());
@@ -66,7 +66,7 @@ public class ProtoFindingTests
         await host.StartAsync();
 
         // Act
-        var context = await host.StartTestAsync("Checkout", "00044", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = await host.StartTestAsync("Checkout", "00044", TestMethods.Placeholder);
         context.AddFinding("Worth a look.", ProtoReportStatus.Warning, tags: ["baseline"]);
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
@@ -87,22 +87,10 @@ public class ProtoFindingTests
         // Arrange
         using var provider = new ServiceCollection().BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var context = new ProtoExecutionContext("Test", scope, "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = new ProtoExecutionContext("Test", scope, "00001", TestMethods.Placeholder);
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => context.AddFinding("   "));
     }
 
-    private sealed class CapturingSink : IProtoSink
-    {
-        private ProtoReportItem[] _items = [];
-
-        public IReadOnlyList<ProtoReportItem> Items => _items;
-
-        public Task ExportAsync(IEnumerable<ProtoReportItem> items, CancellationToken cancellationToken = default)
-        {
-            _items = [.. items];
-            return Task.CompletedTask;
-        }
-    }
 }

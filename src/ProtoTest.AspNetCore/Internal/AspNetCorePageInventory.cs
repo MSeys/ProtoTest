@@ -1,7 +1,5 @@
 namespace ProtoTest.AspNetCore.Internal;
 
-using ProtoTest.Core.Internal;
-
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Metadata;
@@ -12,6 +10,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ProtoTest.Core.Internal;
 
 /// <summary>
 /// Best-effort inventory of an in-process application's page-like GET routes. Each route becomes a

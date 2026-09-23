@@ -1,12 +1,12 @@
-﻿namespace ProtoTest.AspNetCore;
+namespace ProtoTest.AspNetCore;
 
-using Microsoft.AspNetCore.Mvc.Testing;
+using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.AspNetCore.Internal;
 using ProtoTest.Core;
-using System.Runtime.CompilerServices;
 
 /// <summary>
 /// Provides extension methods for <see cref="IProtoHostBuilder"/> to configure ASP.NET Core test hosts.

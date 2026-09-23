@@ -36,7 +36,7 @@ public sealed class RabbitMqTests
         await using var host = builder.Build();
         Assert.That(host.HasCapability(ProtoCapabilityKinds.Broker), Is.True);
         await host.StartAsync();
-        var context = await host.StartTestAsync("rabbit options", TestMethod());
+        var context = await host.StartTestAsync("rabbit options", TestMethods.Placeholder);
 
         var options = context.Service<RabbitMqOptions>();
         var unreachable = Assert.ThrowsAsync<InvalidOperationException>(async () =>
@@ -77,7 +77,7 @@ public sealed class RabbitMqTests
                 options.ConnectionString = connectionString));
             await using var host = builder.Build();
             await host.StartAsync();
-            var context = await host.StartTestAsync("rabbit round trip", TestMethod());
+            var context = await host.StartTestAsync("rabbit round trip", TestMethods.Placeholder);
             var messages = context.Messaging();
 
             await messages.PublishAsync(exchange, "{\"id\":1}", contentType: "application/json");
@@ -123,7 +123,7 @@ public sealed class RabbitMqTests
                 options.ConnectionString = connectionString));
             await using var host = builder.Build();
             await host.StartAsync();
-            var context = await host.StartTestAsync("rabbit direct round trip", TestMethod());
+            var context = await host.StartTestAsync("rabbit direct round trip", TestMethods.Placeholder);
             var messages = context.Messaging();
 
             await messages.PublishAsync(exchange, "{\"id\":1}", contentType: "application/json");
@@ -169,7 +169,7 @@ public sealed class RabbitMqTests
                 options.ConnectionString = connectionString));
             await using var host = builder.Build();
             await host.StartAsync();
-            var context = await host.StartTestAsync("rabbit headers round trip", TestMethod());
+            var context = await host.StartTestAsync("rabbit headers round trip", TestMethods.Placeholder);
             var messages = context.Messaging();
 
             await messages.PublishAsync(
@@ -212,7 +212,7 @@ public sealed class RabbitMqTests
                 options.ConnectionString = connectionString));
             await using var host = builder.Build();
             await host.StartAsync();
-            var context = await host.StartTestAsync("rabbit consumer isolation", TestMethod());
+            var context = await host.StartTestAsync("rabbit consumer isolation", TestMethods.Placeholder);
             var broker = context.Service<IProtoMessageBroker>();
             var messages = context.Messaging();
 
@@ -268,7 +268,7 @@ public sealed class RabbitMqTests
             options.ConnectionString = connectionString));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("rabbit missing exchange", TestMethod());
+        var context = await host.StartTestAsync("rabbit missing exchange", TestMethods.Placeholder);
         var exchange = $"prototest.tests.{Guid.NewGuid():N}";
         var consumer = await context.Service<IProtoMessageBroker>().CreateConsumerAsync();
         context.RegisterResource("messaging:consumer:missing", "consumer", "Missing exchange consumer",
@@ -312,7 +312,7 @@ public sealed class RabbitMqTests
             }));
             await using var host = builder.Build();
             await host.StartAsync();
-            var context = await host.StartTestAsync("rabbit non matching stream", TestMethod());
+            var context = await host.StartTestAsync("rabbit non matching stream", TestMethods.Placeholder);
             var messages = context.Messaging();
 
             // A backlog that would take seconds to drain at one slow predicate per message: the deadline
@@ -362,7 +362,7 @@ public sealed class RabbitMqTests
         builder.AddMessaging(messaging => messaging.UseRabbitMq());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("rabbit disposed consumer", TestMethod());
+        var context = await host.StartTestAsync("rabbit disposed consumer", TestMethods.Placeholder);
         var consumer = await context.Service<IProtoMessageBroker>().CreateConsumerAsync();
         await consumer.DisposeAsync();
 
@@ -406,10 +406,5 @@ public sealed class RabbitMqTests
         => new ConnectionFactory { Uri = new Uri(connectionString) }
             .CreateConnection("ProtoTest.Messaging.RabbitMq.Tests");
 
-    private static MethodInfo TestMethod()
-        => typeof(RabbitMqTests).GetMethod(nameof(Placeholder), BindingFlags.Static | BindingFlags.NonPublic)!;
 
-    private static void Placeholder()
-    {
-    }
 }

@@ -14,7 +14,7 @@ public sealed class ProtoDataValueIdentityTests
             .AddDataProvisioner<InvoiceLine, InvoiceLineProvisioner>();
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("snake case value identity", TestMethod());
+        await host.StartTestAsync("snake case value identity", TestMethods.Placeholder);
 
         await Proto.Context.Data().For<InvoiceLine>()
             .With(line => line.Number, "INV-1")
@@ -45,7 +45,7 @@ public sealed class ProtoDataValueIdentityTests
             .AddDataProvisioner<Envelope<InvoiceLine>, EnvelopeProvisioner>();
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("generic value identity", TestMethod());
+        await host.StartTestAsync("generic value identity", TestMethods.Placeholder);
 
         await Proto.Context.Data().For<Envelope<InvoiceLine>>()
             .With(envelope => envelope.Value, new InvoiceLine(Guid.NewGuid(), "INV-1"))
@@ -65,14 +65,7 @@ public sealed class ProtoDataValueIdentityTests
         await host.StopAsync();
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(ProtoDataValueIdentityTests).GetMethod(
-            nameof(Placeholder),
-            BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void Placeholder()
-    {
-    }
 
     public sealed record InvoiceLine(Guid Id, string Number);
 

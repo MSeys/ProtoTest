@@ -1,10 +1,10 @@
 namespace ProtoTest.Sql.Tests;
 
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Sql.EntityFrameworkCore;
-using System.Reflection;
 
 [TestFixture]
 [NonParallelizable]
@@ -18,7 +18,7 @@ public sealed class SqlConnectionFailureTests
         await host.StartAsync();
 
         var exception = Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await host.StartTestAsync("failing open", TestMethod()));
+            async () => await host.StartTestAsync("failing open", TestMethods.Placeholder));
 
         Assert.Multiple(() =>
         {
@@ -37,7 +37,7 @@ public sealed class SqlConnectionFailureTests
         await host.StartAsync();
 
         var exception = Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await host.StartTestAsync("failing begin", TestMethod()));
+            async () => await host.StartTestAsync("failing begin", TestMethods.Placeholder));
 
         Assert.Multiple(() =>
         {
@@ -48,9 +48,6 @@ public sealed class SqlConnectionFailureTests
         await host.StopAsync();
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(SqlConnectionFailureTests).GetMethod(
-            nameof(SampleTest), BindingFlags.NonPublic | BindingFlags.Static)!;
 
     private static void SampleTest()
     {

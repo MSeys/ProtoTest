@@ -2,10 +2,9 @@ namespace ProtoTest.GraphQL;
 
 using System.Collections;
 using System.Globalization;
-using System.Reflection;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using ProtoTest.Json;
 
 internal static class GraphQLLiteral
 {
@@ -56,16 +55,14 @@ internal static class GraphQLLiteral
                 {
                     text.Append('{');
                     first = true;
-                    foreach (var property in type.GetProperties().Where(p => p.GetIndexParameters().Length == 0
-                                 && p.GetCustomAttribute<JsonIgnoreAttribute>() is null))
+                    foreach (var property in ProtoJsonPropertyProjection.Read(value, JsonNamingPolicy.CamelCase))
                     {
                         if (!first) text.Append(", ");
                         first = false;
-                        var name = property.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name
-                            ?? JsonNamingPolicy.CamelCase.ConvertName(property.Name);
-                        text.Append(name).Append(": ");
-                        Write(text, property.GetValue(value));
+                        text.Append(property.Name).Append(": ");
+                        Write(text, property.Value);
                     }
+
                     text.Append('}');
                 }
                 break;

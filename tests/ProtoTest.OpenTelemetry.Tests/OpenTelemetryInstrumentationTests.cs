@@ -24,7 +24,7 @@ public sealed class OpenTelemetryInstrumentationTests
             var host = new ProtoHostBuilder().Build();
             await using var ownedHost = host;
             await host.StartAsync();
-            var context = await host.StartTestAsync("exported test", TestMethod());
+            var context = await host.StartTestAsync("exported test", TestMethods.Placeholder);
             context.Trace.WriteEvent("orders.requested", "Order requested", "ProtoTest.OpenTelemetry.Tests");
 
             using (var operation = context.Trace
@@ -80,7 +80,7 @@ public sealed class OpenTelemetryInstrumentationTests
         {
             var host = new ProtoHostBuilder().Build();
             await using var ownedHost = host;
-            var context = await host.StartTestAsync("failing test", TestMethod());
+            var context = await host.StartTestAsync("failing test", TestMethods.Placeholder);
 
             var failure = new InvalidOperationException("payment declined");
             using (var operation = context.Trace.Operation("payments.charge", "Charge card", "Tests").Begin())
@@ -110,7 +110,7 @@ public sealed class OpenTelemetryInstrumentationTests
         builder.ConfigureTracing(options => options.ActivitySources.Add(sourceName));
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("tag cap test", TestMethod());
+        await host.StartTestAsync("tag cap test", TestMethods.Placeholder);
 
         using (var source = new ActivitySource(sourceName))
         using (var activity = source.StartActivity("app.operation"))
@@ -145,7 +145,7 @@ public sealed class OpenTelemetryInstrumentationTests
         {
             var host = new ProtoHostBuilder().Build();
             await using var ownedHost = host;
-            await host.StartTestAsync("quiet test", TestMethod());
+            await host.StartTestAsync("quiet test", TestMethods.Placeholder);
             await host.CompleteTestAsync(ProtoTestResult.Passed);
             provider.ForceFlush();
         }
@@ -155,8 +155,5 @@ public sealed class OpenTelemetryInstrumentationTests
 
     private static string? Tag(Activity activity, string name) => activity.GetTagItem(name) as string;
 
-    private static MethodInfo TestMethod()
-        => typeof(OpenTelemetryInstrumentationTests).GetMethod(nameof(Placeholder), BindingFlags.Static | BindingFlags.NonPublic)!;
 
-    private static void Placeholder() { }
 }

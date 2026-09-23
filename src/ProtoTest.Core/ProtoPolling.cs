@@ -1,20 +1,22 @@
-namespace ProtoTest.Web.Internal;
+namespace ProtoTest.Core;
 
 using System.Diagnostics;
 
 /// <summary>
-/// Shared bounded polling used by web assertions and synchronization waits.
+/// Shared bounded polling: repeatedly probes until the observation satisfies the predicate or the
+/// timeout elapses, returning the last observation and whether it was satisfied. The caller decides
+/// what a timeout means, so the same loop serves assertions, synchronization waits and readiness
+/// probes without owning their failure semantics.
 /// </summary>
-internal static class WebPolling
+public static class ProtoPolling
 {
     /// <summary>The default interval between probes when a caller does not specify one.</summary>
     public static readonly TimeSpan DefaultInterval = TimeSpan.FromMilliseconds(50);
 
     /// <summary>
-    /// Repeatedly probes until <paramref name="isSatisfied"/> returns true or <paramref name="timeout"/>
-    /// elapses. Returns the last observation and whether it was satisfied; the caller decides what to throw.
+    /// Probes until <paramref name="isSatisfied"/> returns true or <paramref name="timeout"/> elapses.
     /// </summary>
-    public static async ValueTask<WebPollResult<T>> PollAsync<T>(
+    public static async ValueTask<ProtoPollResult<T>> PollAsync<T>(
         Func<CancellationToken, ValueTask<T>> probe,
         Func<T, bool> isSatisfied,
         TimeSpan timeout,
@@ -33,12 +35,12 @@ internal static class WebPolling
             var observation = await probe(cancellationToken).ConfigureAwait(false);
             if (isSatisfied(observation))
             {
-                return new WebPollResult<T>(observation, Satisfied: true, stopwatch.Elapsed);
+                return new ProtoPollResult<T>(observation, Satisfied: true, stopwatch.Elapsed);
             }
 
             if (stopwatch.Elapsed >= timeout)
             {
-                return new WebPollResult<T>(observation, Satisfied: false, stopwatch.Elapsed);
+                return new ProtoPollResult<T>(observation, Satisfied: false, stopwatch.Elapsed);
             }
 
             var remaining = timeout - stopwatch.Elapsed;
@@ -48,5 +50,5 @@ internal static class WebPolling
     }
 }
 
-/// <summary>The outcome of a <see cref="WebPolling.PollAsync{T}"/> call.</summary>
-internal readonly record struct WebPollResult<T>(T Value, bool Satisfied, TimeSpan Elapsed);
+/// <summary>The outcome of a <see cref="ProtoPolling.PollAsync{T}"/> call.</summary>
+public readonly record struct ProtoPollResult<T>(T Value, bool Satisfied, TimeSpan Elapsed);

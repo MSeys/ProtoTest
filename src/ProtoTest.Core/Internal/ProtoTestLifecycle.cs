@@ -1,7 +1,7 @@
 namespace ProtoTest.Core.Internal;
 
-using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 
 internal sealed class ProtoTestLifecycle
 {
@@ -183,24 +183,15 @@ internal sealed class ProtoTestLifecycle
         IReadOnlyDictionary<string, string?> attributes,
         Func<Task> step,
         Action onCompleted)
-    {
-        using var operation = context.Trace
+        => await context.Trace
             .Operation(kind, name, "ProtoTest.Core")
             .During(ProtoTracePhase.Setup)
             .With(attributes)
-            .Begin();
-        try
-        {
-            await step();
-            onCompleted();
-            operation.Succeed();
-        }
-        catch (Exception exception)
-        {
-            operation.Fail(exception);
-            throw;
-        }
-    }
+            .RunAsync(async _ =>
+            {
+                await step();
+                onCompleted();
+            });
 
     private static async Task TeardownAsync(
         ContextState state,
@@ -351,19 +342,16 @@ internal sealed class ProtoTestLifecycle
         List<Exception> exceptions,
         IReadOnlyDictionary<string, string?>? attributes = null)
     {
-        using var operation = context.Trace
-            .Operation(kind, name, "ProtoTest.Core")
-            .During(phase)
-            .With(attributes)
-            .Begin();
         try
         {
-            await action();
-            operation.Succeed();
+            await context.Trace
+                .Operation(kind, name, "ProtoTest.Core")
+                .During(phase)
+                .With(attributes)
+                .RunAsync(() => new ValueTask(action()));
         }
         catch (Exception exception)
         {
-            operation.Fail(exception);
             exceptions.Add(exception);
         }
     }

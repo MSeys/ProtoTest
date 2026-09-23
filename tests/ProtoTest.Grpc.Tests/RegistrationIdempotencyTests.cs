@@ -1,9 +1,9 @@
 namespace ProtoTest.Grpc.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
-using System.Reflection;
 
 [TestFixture]
 public sealed class RegistrationIdempotencyTests
@@ -31,7 +31,7 @@ public sealed class RegistrationIdempotencyTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc idempotent", TestMethod());
+        var context = await host.StartTestAsync("grpc idempotent", TestMethods.Placeholder);
 
         Assert.Multiple(() =>
         {
@@ -79,7 +79,7 @@ public sealed class RegistrationIdempotencyTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc options compose", TestMethod());
+        var context = await host.StartTestAsync("grpc options compose", TestMethods.Placeholder);
 
         var options = context.Service<GrpcAttachmentOptions>();
         Assert.Multiple(() =>
@@ -91,11 +91,5 @@ public sealed class RegistrationIdempotencyTests
         await host.StopAsync();
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(RegistrationIdempotencyTests).GetMethod(
-            nameof(Placeholder), BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void Placeholder()
-    {
-    }
 }

@@ -1,7 +1,7 @@
 namespace ProtoTest.Web.Selenium;
 
-using System.Diagnostics;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.Json;
 using OpenQA.Selenium;
 using ProtoTest.Core;

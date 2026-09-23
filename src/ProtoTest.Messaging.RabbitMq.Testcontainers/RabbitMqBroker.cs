@@ -1,9 +1,8 @@
 namespace ProtoTest.Messaging.RabbitMq.Testcontainers;
 
-using ProtoTest.Testcontainers;
-
 // global:: because this assembly's own namespace ends in Testcontainers.
 using global::Testcontainers.RabbitMq;
+using ProtoTest.Testcontainers;
 
 /// <summary>
 /// A RabbitMQ container owned by the whole run: started once for the suite and released when the host

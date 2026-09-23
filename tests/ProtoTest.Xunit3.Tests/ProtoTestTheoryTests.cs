@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Xunit3.Tests;
+namespace ProtoTest.Xunit3.Tests;
 
 using ProtoTest.AdapterContract;
 using ProtoTest.Core;

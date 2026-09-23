@@ -1,5 +1,7 @@
 namespace ProtoTest.Rest.Tests;
 
+using System.Net.Http.Headers;
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
@@ -7,8 +9,6 @@ using ProtoTest.Core;
 using ProtoTest.GraphQL;
 using ProtoTest.Http;
 using ProtoTest.Http.Authenticators;
-using System.Net.Http.Headers;
-using System.Reflection;
 
 [TestFixture]
 public class RestConfigurationAndAuthenticationTests
@@ -27,7 +27,7 @@ public class RestConfigurationAndAuthenticationTests
         await using var host = builder.Build();
 
         // Act
-        await host.StartTestAsync("ConfiguredClient", "00001", (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("ConfiguredClient", "00001", TestMethods.Placeholder);
 
         try
         {
@@ -56,7 +56,7 @@ public class RestConfigurationAndAuthenticationTests
         await using var host = builder.Build();
 
         // Act
-        await host.StartTestAsync("ExplicitClient", "00002", (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("ExplicitClient", "00002", TestMethods.Placeholder);
 
         try
         {
@@ -82,7 +82,7 @@ public class RestConfigurationAndAuthenticationTests
         try
         {
             var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
-                await host.StartTestAsync("MissingClient", "00003", (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!));
+                await host.StartTestAsync("MissingClient", "00003", TestMethods.Placeholder));
             Assert.That(exception!.Message, Does.Contain("Orders"));
             Assert.That(exception.Message, Does.Contain(nameof(HttpClient)));
         }
@@ -116,7 +116,7 @@ public class RestConfigurationAndAuthenticationTests
         await host.StartTestAsync(
             "AttachmentConfiguration",
             "00004",
-            (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         try
         {
@@ -147,7 +147,7 @@ public class RestConfigurationAndAuthenticationTests
         await host.StartTestAsync(
             "ResponseConfiguration",
             "00006",
-            (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         try
         {
@@ -185,7 +185,7 @@ public class RestConfigurationAndAuthenticationTests
         await host.StartTestAsync(
             "ProtocolOptionsIsolation",
             "00007",
-            (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         try
         {
@@ -227,7 +227,7 @@ public class RestConfigurationAndAuthenticationTests
         await host.StartTestAsync(
             "RestOptionsRegistration",
             "00008",
-            (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         try
         {
@@ -263,7 +263,7 @@ public class RestConfigurationAndAuthenticationTests
         await host.StartTestAsync(
             "NamedClient",
             "00005",
-            (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         try
         {
@@ -362,7 +362,7 @@ public class RestConfigurationAndAuthenticationTests
             "Authenticator unit test",
             services.CreateScope(),
             "00000",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
         await authenticator.AuthenticateAsync(
             new ProtoHttpAuthenticationContext(request, context, "Default"));
     }

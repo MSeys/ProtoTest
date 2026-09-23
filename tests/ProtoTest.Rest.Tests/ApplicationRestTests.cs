@@ -4,9 +4,9 @@ using System.Net.Http;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Http;
-using NUnit.Framework;
 
 [TestFixture]
 public sealed class ApplicationRestTests
@@ -30,7 +30,7 @@ public sealed class ApplicationRestTests
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync(
-            "rest application", TestMethod(), [new ApplicationAttribute("ControlPlane", "Rest:Billing")]);
+            "rest application", TestMethods.Placeholder, [new ApplicationAttribute("ControlPlane", "Rest:Billing")]);
 
         Assert.That(context.Client<HttpClient>("ControlPlane:Billing").BaseAddress,
             Is.EqualTo(new Uri("https://app.test/api/billing")));
@@ -57,7 +57,7 @@ public sealed class ApplicationRestTests
         builder.AddApplication("ControlPlane", app => app.AddRest(rest => rest.AddClient("Orders", endpoint: "Orders")));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("rest application", TestMethod(), [new ApplicationAttribute("ControlPlane")]);
+        var context = await host.StartTestAsync("rest application", TestMethods.Placeholder, [new ApplicationAttribute("ControlPlane")]);
 
         context.Rest("Orders");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -92,7 +92,7 @@ public sealed class ApplicationRestTests
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync(
-            "rest transport fallback", TestMethod(), [new ApplicationAttribute("ControlPlane")]);
+            "rest transport fallback", TestMethods.Placeholder, [new ApplicationAttribute("ControlPlane")]);
 
         using var response = await context.Rest().GetAsync("orders/42");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -127,7 +127,7 @@ public sealed class ApplicationRestTests
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync(
-            "rest custom endpoint fallback", TestMethod(), [new ApplicationAttribute("ControlPlane")]);
+            "rest custom endpoint fallback", TestMethods.Placeholder, [new ApplicationAttribute("ControlPlane")]);
 
         using var response = await context.Rest().GetAsync("orders/42");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -154,7 +154,7 @@ public sealed class ApplicationRestTests
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync(
-            "rest application named client", TestMethod(), [new ApplicationAttribute("ControlPlane")]);
+            "rest application named client", TestMethods.Placeholder, [new ApplicationAttribute("ControlPlane")]);
 
         using var response = await context.Rest("OrdersV2").GetAsync("orders/42");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -186,7 +186,7 @@ public sealed class ApplicationRestTests
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync(
-            "rest explicit host client", TestMethod(), [new ApplicationAttribute("ControlPlane")]);
+            "rest explicit host client", TestMethods.Placeholder, [new ApplicationAttribute("ControlPlane")]);
 
         using var response = await context.Rest("HostOrders").GetAsync("orders/42");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -228,7 +228,7 @@ public sealed class ApplicationRestTests
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync(
-            "rest resolver under application", TestMethod(), [new ApplicationAttribute("ControlPlane")]);
+            "rest resolver under application", TestMethods.Placeholder, [new ApplicationAttribute("ControlPlane")]);
 
         using var response = await context.Rest("Environment").GetAsync("orders/42");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -256,7 +256,7 @@ public sealed class ApplicationRestTests
         });
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("rest resolver first wins", TestMethod());
+        var context = await host.StartTestAsync("rest resolver first wins", TestMethods.Placeholder);
 
         using var response = await context.Rest("Environment").GetAsync("orders/42");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -289,7 +289,7 @@ public sealed class ApplicationRestTests
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync(
-            "rest repeated endpoint", TestMethod(), [new ApplicationAttribute("ControlPlane")]);
+            "rest repeated endpoint", TestMethods.Placeholder, [new ApplicationAttribute("ControlPlane")]);
 
         using var response = await context.Rest().GetAsync("orders/42");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -298,12 +298,7 @@ public sealed class ApplicationRestTests
         Assert.That(handler.LastRequest!.RequestUri, Is.EqualTo(new Uri("http://transport.test/api/v1/orders/42")));
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(ApplicationRestTests).GetMethod(nameof(Placeholder), BindingFlags.Static | BindingFlags.NonPublic)!;
 
-    private static void Placeholder()
-    {
-    }
 
     private sealed class StubTransportInitializer(string name, string baseAddress, HttpMessageHandler handler)
         : IProtoClientInitializer<HttpClient>

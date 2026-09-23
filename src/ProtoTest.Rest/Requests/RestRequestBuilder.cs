@@ -150,7 +150,7 @@ public sealed class RestRequestBuilder
         ArgumentNullException.ThrowIfNull(method);
         var attachmentOptions = _context.ResolveAttachmentOptions(ProtoRestBuilder.ProtocolName);
         using var traceOperation = _context.Trace
-            .Operation("http.request", $"REST · {method.Method.ToUpperInvariant()} {routeTemplate}", "ProtoTest.Rest")
+            .Operation("http.request", $"REST · {method.Method.ToUpperInvariant()} {routeTemplate}", ProtoRestBuilder.Protocol.TraceSource)
             .ForClient(typeof(HttpClient), _targetName)
             .With("http.request.method", method.Method.ToUpperInvariant())
             .With("http.route", routeTemplate)
@@ -181,11 +181,11 @@ public sealed class RestRequestBuilder
         }
 
         using var request = new HttpRequestMessage(method, requestUri);
-        var restState = _context.TryResolve<RestContextState>();
+        var restState = _context.TryResolve<ProtoHttpContextState>(ProtoRestBuilder.Protocol.Key);
         if (restState is null)
         {
-            restState = new RestContextState();
-            _context.SetContext(restState);
+            restState = new ProtoHttpContextState();
+            _context.SetContext(ProtoRestBuilder.Protocol.Key, restState);
         }
         var attachmentNumber = attachmentOptions is null
             ? (int?)null
@@ -328,7 +328,7 @@ public sealed class RestRequestBuilder
 
             _context.RecordObservation(new ProtoObservation(
                 TargetName: _targetName,
-                Kind: "http.response",
+                Kind: ProtoRestBuilder.Protocol.ResponseObservationKind,
                 Identifier: routeIdentifier,
                 Data: new RestResponseData(
                     Method: method.Method,
@@ -349,14 +349,14 @@ public sealed class RestRequestBuilder
                 responseMessage,
                 bodyString,
                 stopwatch.Elapsed,
-                _context,
-                _targetName,
-                routeIdentifier,
-                attachmentOptions,
-                attachmentPrefix,
-                bodyBytes,
-                traceOperation.Id
-            );
+                new ProtoHttpResponseContext(
+                    Execution: _context,
+                    TargetName: _targetName,
+                    Identifier: routeIdentifier,
+                    AttachmentOptions: attachmentOptions,
+                    AttachmentPrefix: attachmentPrefix,
+                    RequestTraceId: traceOperation.Id),
+                bodyBytes);
         }
         catch (Exception exception)
         {
@@ -398,7 +398,7 @@ public sealed class RestRequestBuilder
             _context.Trace.WriteEvent(
                 "http.header.configure",
                 $"Header · {name}",
-                "ProtoTest.Rest",
+                ProtoRestBuilder.Protocol.TraceSource,
                 outcome: ProtoTraceOutcome.Succeeded,
                 attributes: new Dictionary<string, string?>
                 {

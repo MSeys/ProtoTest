@@ -1,8 +1,8 @@
 namespace ProtoTest.Core.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
-using System.Reflection;
 
 [TestFixture]
 public sealed class ProtoHostStartStopTests
@@ -135,7 +135,7 @@ public sealed class ProtoHostStartStopTests
         builder.ConfigureTracing(options => options.Enabled = false);
         builder.ConfigureServices(services => services.AddSingleton<IProtoRunHook>(hook));
         await using var host = builder.Build();
-        var method = (MethodInfo)MethodInfo.GetCurrentMethod()!;
+        var method = TestMethods.Placeholder;
 
         var start = host.StartAsync();
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));

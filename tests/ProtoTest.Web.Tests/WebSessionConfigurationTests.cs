@@ -15,7 +15,7 @@ public sealed class WebSessionConfigurationTests
         builder.AddInfrastructure(new FakeSettingsInfrastructure());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("web base url", TestMethod());
+        var context = await host.StartTestAsync("web base url", TestMethods.Placeholder);
 
         var web = context.Web();
 
@@ -44,10 +44,5 @@ public sealed class WebSessionConfigurationTests
         public ValueTask ReleaseAsync(ProtoResourceReleaseContext context) => ValueTask.CompletedTask;
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(WebSessionConfigurationTests).GetMethod(nameof(Placeholder), BindingFlags.Static | BindingFlags.NonPublic)!;
 
-    private static void Placeholder()
-    {
-    }
 }

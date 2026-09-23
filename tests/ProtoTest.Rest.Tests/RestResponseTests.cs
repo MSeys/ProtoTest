@@ -21,7 +21,7 @@ public class RestResponseTests
             "TestContext",
             services.BuildServiceProvider().CreateScope(),
             "00001",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!
+            TestMethods.Placeholder
         );
     }
 
@@ -117,12 +117,12 @@ public class RestResponseTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("rest negated status", TestMethod());
+        var context = await host.StartTestAsync("rest negated status", TestMethods.Placeholder);
         var response = new RestResponse(
             new HttpResponseMessage(HttpStatusCode.OK),
             "{}",
             TimeSpan.Zero,
-            context);
+            new ProtoHttpResponseContext(Execution: context));
 
         var exception = Assert.Throws<RestStatusAssertionException>(
             () => response.ShouldNot.HaveHttpStatus(HttpStatusCode.OK));
@@ -164,10 +164,10 @@ public class RestResponseTests
             rawResponse,
             json,
             TimeSpan.FromMilliseconds(10),
-            context: _context,
-            targetName: "MyApiTarget",
-            routeIdentifier: "GET /api/test"
-        );
+            new ProtoHttpResponseContext(
+                Execution: _context,
+                TargetName: "MyApiTarget",
+                Identifier: "GET /api/test"));
 
         // Act
         response.ShouldMatchShape(expectedShape);
@@ -190,11 +190,12 @@ public class RestResponseTests
             new HttpResponseMessage(HttpStatusCode.OK),
             """{"id":42,"name":"ProtoTest"}""",
             TimeSpan.Zero,
-            _context,
-            "Orders",
-            "GET /orders/42",
-            new ProtoHttpAttachmentOptions(),
-            "rest-01");
+            new ProtoHttpResponseContext(
+                Execution: _context,
+                TargetName: "Orders",
+                Identifier: "GET /orders/42",
+                AttachmentOptions: new ProtoHttpAttachmentOptions(),
+                AttachmentPrefix: "rest-01"));
 
         response.ShouldMatchShape(new { id = 42 });
         response.ShouldMatchShape(new { name = "ProtoTest" });
@@ -235,14 +236,7 @@ public class RestResponseTests
         }
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(RestResponseTests).GetMethod(
-            nameof(Placeholder),
-            BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void Placeholder()
-    {
-    }
 
     private class SampleDto
     {

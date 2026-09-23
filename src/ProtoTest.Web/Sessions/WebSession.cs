@@ -1,11 +1,9 @@
 namespace ProtoTest.Web;
 
-using ProtoTest.Core.Internal;
-
-using ProtoTest.Web.Internal;
-
 using System.Runtime.CompilerServices;
 using ProtoTest.Core;
+using ProtoTest.Core.Internal;
+using ProtoTest.Web.Internal;
 
 /// <summary>Test-scoped entry point for pages, operations, and explicit native backend access.</summary>
 public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
@@ -390,28 +388,18 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        using var operation = _context.Trace
+        await _context.Trace
             .Operation("web.flow", $"WEB flow · {name}", TraceSource)
             .With("web.session", Name)
             .With("web.backend", BackendName)
             .With("web.flow.step_count", steps.Count.ToString())
-            .Begin();
-        try
-        {
-            foreach (var step in steps)
-                await step(cancellationToken);
-            operation.Succeed();
-        }
-        catch (OperationCanceledException exception)
-        {
-            operation.Cancel(exception);
-            throw;
-        }
-        catch (Exception exception)
-        {
-            operation.Fail(exception);
-            throw;
-        }
+            .RunAsync(async _ =>
+            {
+                foreach (var step in steps)
+                {
+                    await step(cancellationToken);
+                }
+            });
     }
 
     internal Task<IWebBackend> GetOrCreateBackendAsync(CancellationToken cancellationToken)

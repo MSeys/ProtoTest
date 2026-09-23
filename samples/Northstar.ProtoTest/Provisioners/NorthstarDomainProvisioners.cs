@@ -1,12 +1,12 @@
 namespace Northstar.ProtoTest;
 
-using Microsoft.Extensions.DependencyInjection;
 using global::ProtoTest.AspNetCore;
 using global::ProtoTest.Core;
 using global::ProtoTest.Data;
 using global::ProtoTest.SampleApp;
 using global::ProtoTest.SampleApp.Contracts;
 using global::ProtoTest.SampleApp.Domain;
+using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
 /// Resolves the Northstar domain a provisioner should write through: the application's own store when

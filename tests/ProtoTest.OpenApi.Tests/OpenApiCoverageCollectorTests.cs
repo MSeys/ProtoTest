@@ -1,12 +1,12 @@
-﻿namespace ProtoTest.OpenApi.Tests;
+namespace ProtoTest.OpenApi.Tests;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi.Readers;
 using NUnit.Framework;
 using ProtoTest.Core;
-using ProtoTest.Rest;
 using ProtoTest.OpenApi;
+using ProtoTest.Rest;
 
 [TestFixture]
 public class OpenApiCoverageCollectorTests
@@ -294,7 +294,7 @@ public class OpenApiCoverageCollectorTests
             .AddCollector<RestCoverageCollector>()
             .AddCollector<OpenApiCoverageCollector>()));
         await using var host = builder.Build();
-        await host.StartTestAsync("application coverage", "10", TestMethod(), [new ApplicationAttribute("TestApi")]);
+        await host.StartTestAsync("application coverage", "10", TestMethods.Placeholder, [new ApplicationAttribute("TestApi")]);
         try
         {
             // Act
@@ -453,14 +453,6 @@ public class OpenApiCoverageCollectorTests
             "Only the method the spec describes becomes an endpoint hit.");
         var endpoint = collector.GetReportItems().Single();
         Assert.That(endpoint.Count, Is.EqualTo(1));
-    }
-
-    private static System.Reflection.MethodInfo TestMethod()
-        => typeof(OpenApiCoverageCollectorTests).GetMethod(
-            nameof(TestPlaceholder), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
-
-    private static void TestPlaceholder()
-    {
     }
 
     private sealed class StubHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler

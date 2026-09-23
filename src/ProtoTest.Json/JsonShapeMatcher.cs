@@ -127,16 +127,11 @@ public static class JsonShapeMatcher
             return true;
         }
         var type = value.GetType();
-        if (type.IsPrimitive || type.IsEnum || value is string or decimal or DateTime or DateTimeOffset or DateOnly or TimeOnly or Guid or Uri)
+        if (JsonScalarTypes.IsScalar(type))
         { properties = []; return false; }
-        properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            // [JsonIgnore] is honored the same way GraphQL selection honors it: the property is not
-            // part of the expected shape, so JSON that omits it still matches.
-            .Where(p => p.GetIndexParameters().Length == 0
-                && p.GetCustomAttribute<JsonIgnoreAttribute>() is null)
-            .Select(p => new KeyValuePair<string, object?>(
-                p.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name ?? options?.PropertyNamingPolicy?.ConvertName(p.Name) ?? p.Name,
-                p.GetValue(value))).ToArray();
+        properties = ProtoJsonPropertyProjection.Read(type, value, options?.PropertyNamingPolicy)
+            .Select(property => new KeyValuePair<string, object?>(property.Name, property.Value))
+            .ToArray();
         return true;
     }
 
@@ -162,7 +157,7 @@ public static class JsonShapeMatcher
             return actual.ValueKind == JsonValueKind.String
                 ? Enum.TryParse(expectedType, actual.GetString(), true, out var parsed) && Equals(parsed, expected)
                 : actual.ValueKind == JsonValueKind.Number && actual.TryGetInt64(out var enumValue) && enumValue == Convert.ToInt64(expected, CultureInfo.InvariantCulture);
-        if (IsNumeric(expectedType))
+        if (JsonScalarTypes.IsNumeric(expectedType))
             return actual.ValueKind == JsonValueKind.Number && NumbersEqual(actual, expected);
         if (expectedType == typeof(Guid))
             return actual.ValueKind == JsonValueKind.String && Guid.TryParse(actual.GetString(), out var guid) && guid == (Guid)expected;
@@ -176,12 +171,6 @@ public static class JsonShapeMatcher
             return actual.ValueKind == JsonValueKind.String && TimeOnly.TryParse(actual.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.None, out var timeOnly) && timeOnly == (TimeOnly)expected;
         return Equals(actualValue, expected);
     }
-
-    private static bool IsNumeric(Type type)
-        => Type.GetTypeCode(type) is TypeCode.Byte or TypeCode.SByte
-            or TypeCode.UInt16 or TypeCode.UInt32 or TypeCode.UInt64
-            or TypeCode.Int16 or TypeCode.Int32 or TypeCode.Int64
-            or TypeCode.Decimal or TypeCode.Double or TypeCode.Single;
 
     /// <summary>
     /// Compares a JSON number against an expected numeric value without ever throwing: decimal first

@@ -27,7 +27,7 @@ public sealed class GraphQLIntegrationTests
             };
         });
         await using var host = CreateHost(handler);
-        await host.StartTestAsync("query", "1", TestMethod());
+        await host.StartTestAsync("query", "1", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -126,7 +126,7 @@ public sealed class GraphQLIntegrationTests
             .AddClient("Catalog")
             .WithSchemaCoverage());
         await using var host = builder.Build();
-        await host.StartTestAsync("schema-config", "7", TestMethod());
+        await host.StartTestAsync("schema-config", "7", TestMethods.Placeholder);
         try
         {
             var collector = Proto.Context.Services.GetServices<IProtoCollector>()
@@ -162,7 +162,7 @@ public sealed class GraphQLIntegrationTests
             .AddClient("Api", configure: http => http.ConfigurePrimaryHttpMessageHandler(() => handler), endpoint: "GraphQL")
             .WithSchemaCoverage(schema)));
         await using var host = builder.Build();
-        await host.StartTestAsync("application coverage", "11", TestMethod(), [new ApplicationAttribute("Catalog")]);
+        await host.StartTestAsync("application coverage", "11", TestMethods.Placeholder, [new ApplicationAttribute("Catalog")]);
         try
         {
             // Act
@@ -196,7 +196,7 @@ public sealed class GraphQLIntegrationTests
             Content = new StringContent("""{"data":{"product":null},"errors":[{"message":"Missing","path":["product"],"extensions":{"code":"NOT_FOUND"}}]}""")
         });
         await using var host = CreateHost(handler);
-        await host.StartTestAsync("errors", "2", TestMethod());
+        await host.StartTestAsync("errors", "2", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -222,7 +222,7 @@ public sealed class GraphQLIntegrationTests
             }));
         builder.AddGraphQL(graphQL => graphQL.AddClient("Catalog"));
         await using var host = builder.Build();
-        await host.StartTestAsync("configured", "3", TestMethod());
+        await host.StartTestAsync("configured", "3", TestMethods.Placeholder);
         try
         {
             Assert.That(Proto.Context.Client<HttpClient>("Catalog").BaseAddress,
@@ -246,7 +246,7 @@ public sealed class GraphQLIntegrationTests
             _ => new Uri("https://dynamic.example/graphql"),
             http => http.ConfigurePrimaryHttpMessageHandler(() => handler)));
         await using var host = builder.Build();
-        await host.StartTestAsync("dynamic", "4", TestMethod());
+        await host.StartTestAsync("dynamic", "4", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL("Catalog")
@@ -272,7 +272,7 @@ public sealed class GraphQLIntegrationTests
                 http.ConfigurePrimaryHttpMessageHandler(() => handler));
         });
         await using var host = builder.Build();
-        await host.StartTestAsync("limited", "5", TestMethod());
+        await host.StartTestAsync("limited", "5", TestMethods.Placeholder);
         try
         {
             Assert.ThrowsAsync<ProtoResponseTooLargeException>(async () => await Proto.Context.GraphQL()
@@ -293,7 +293,7 @@ public sealed class GraphQLIntegrationTests
             "https://user:secret@example.test/graphql",
             http => http.ConfigurePrimaryHttpMessageHandler(() => handler)));
         await using var host = builder.Build();
-        await host.StartTestAsync("failure data", "19", TestMethod());
+        await host.StartTestAsync("failure data", "19", TestMethods.Placeholder);
         try
         {
             Assert.ThrowsAsync<HttpRequestException>(async () => await Proto.Context.GraphQL()
@@ -326,7 +326,7 @@ public sealed class GraphQLIntegrationTests
         await host.StartTestAsync(
             "graphql response configuration",
             "13",
-            (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         try
         {
@@ -356,7 +356,7 @@ public sealed class GraphQLIntegrationTests
                 http.ConfigurePrimaryHttpMessageHandler(() => handler));
         });
         await using var host = builder.Build();
-        await host.StartTestAsync("attachments", "6", TestMethod());
+        await host.StartTestAsync("attachments", "6", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -407,7 +407,7 @@ public sealed class GraphQLIntegrationTests
         await host.StartTestAsync(
             "graphql attachment configuration",
             "12",
-            (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         try
         {
@@ -444,7 +444,7 @@ public sealed class GraphQLIntegrationTests
         await host.StartTestAsync(
             "graphql protocol options isolation",
             "16",
-            (System.Reflection.MethodInfo)System.Reflection.MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         try
         {
@@ -477,7 +477,7 @@ public sealed class GraphQLIntegrationTests
             Content = new StringContent("""{"data":{"ping":"pong"}}""")
         });
         await using var host = CreateHost(handler);
-        await host.StartTestAsync("header trace", "14", TestMethod());
+        await host.StartTestAsync("header trace", "14", TestMethods.Placeholder);
 
         try
         {
@@ -523,7 +523,7 @@ public sealed class GraphQLIntegrationTests
                 http.ConfigurePrimaryHttpMessageHandler(() => handler));
         });
         await using var host = builder.Build();
-        await host.StartTestAsync("variables truncation", "17", TestMethod());
+        await host.StartTestAsync("variables truncation", "17", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -563,7 +563,7 @@ public sealed class GraphQLIntegrationTests
                 http.ConfigurePrimaryHttpMessageHandler(() => handler));
         });
         await using var host = builder.Build();
-        await host.StartTestAsync("named clients", "13", TestMethod());
+        await host.StartTestAsync("named clients", "13", TestMethods.Placeholder);
         try
         {
             using var versioned = await Proto.Context.GraphQL("CatalogV2")
@@ -588,7 +588,7 @@ public sealed class GraphQLIntegrationTests
                 """{"errors":[{"message":42,"path":["a",{"bad":true},null,1.5,2]},{"path":"not-an-array"},7]}""")
         });
         await using var host = CreateHost(handler);
-        await host.StartTestAsync("malformed errors", "18", TestMethod());
+        await host.StartTestAsync("malformed errors", "18", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -621,8 +621,6 @@ public sealed class GraphQLIntegrationTests
         return builder.Build();
     }
 
-    private static MethodInfo TestMethod() => typeof(GraphQLIntegrationTests).GetMethod(nameof(Dummy), BindingFlags.NonPublic | BindingFlags.Static)!;
-    private static void Dummy() { }
 
     private static IEnumerable<ProtoReportItem> Flatten(IEnumerable<ProtoReportItem> items)
     {

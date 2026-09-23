@@ -1,7 +1,7 @@
 namespace ProtoTest.Xunit.Tests;
 
-using ProtoTest.Core;
 using global::Xunit;
+using ProtoTest.Core;
 
 [Collection(ProtoTestCollection.Name)]
 public sealed class AttachmentPublishTests

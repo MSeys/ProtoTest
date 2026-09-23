@@ -1,11 +1,10 @@
 namespace ProtoTest.Data;
 
-using ProtoTest.Data.Internal;
-
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
-using System.Runtime.CompilerServices;
+using ProtoTest.Data.Internal;
 
 public static class ProtoHostBuilderExtensions
 {

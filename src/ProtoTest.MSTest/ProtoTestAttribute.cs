@@ -10,6 +10,8 @@ using ProtoTest.Core;
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
 public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerLineNumber = -1) : TestMethodAttribute(callerFilePath, callerLineNumber)
 {
+    private const string FrameworkName = "MSTest";
+
     public override async Task<TestResult[]> ExecuteAsync(ITestMethod testMethod)
     {
         var methodInfo = testMethod.MethodInfo;
@@ -34,33 +36,23 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
 
         var attachmentPublisher = new MSTestAttachmentPublisher();
         TestResult[]? results = null;
-        var lifecycleStarted = false;
+        var scope = await ProtoTestScope.StartAsync(preparation, ProtoTestAssembly.Host, attachmentPublisher);
         try
         {
-            await preparation.StartAsync(ProtoTestAssembly.Host, attachmentPublisher);
-            lifecycleStarted = true;
-
             results = await base.ExecuteAsync(testMethod);
+            scope.Result = ToProtoTestResult(results);
             return results;
         }
         finally
         {
-            try
+            await scope.DisposeAsync();
+
+            // The lifecycle spans every data row, so attach the collected files to the first
+            // result rather than duplicating them onto each row.
+            if (results is { Length: > 0 } && attachmentPublisher.Files.Count > 0)
             {
-                if (lifecycleStarted)
-                {
-                    await ProtoTestAssembly.Host.CompleteTestAsync(ToProtoTestResult(results));
-                }
-            }
-            finally
-            {
-                // The lifecycle spans every data row, so attach the collected files to the first
-                // result rather than duplicating them onto each row.
-                if (results is { Length: > 0 } && attachmentPublisher.Files.Count > 0)
-                {
-                    var primary = results[0];
-                    primary.ResultFiles = [.. primary.ResultFiles ?? [], .. attachmentPublisher.Files];
-                }
+                var primary = results[0];
+                primary.ResultFiles = [.. primary.ResultFiles ?? [], .. attachmentPublisher.Files];
             }
         }
     }
@@ -85,7 +77,7 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
             if (failed.TestFailureException is not null)
                 return ProtoTestResult.Failed(failed.TestFailureException);
             return ProtoTestResult.Failed(
-                "MSTest", failed.Outcome.ToString(), $"MSTest completed with outcome {failed.Outcome}.");
+                FrameworkName, failed.Outcome.ToString(), $"{FrameworkName} completed with outcome {failed.Outcome}.");
         }
 
         var interrupted = results.FirstOrDefault(result => result.Outcome is
@@ -95,7 +87,7 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
             // A timeout or abort means the test never finished; recording it as cancelled keeps it
             // distinct from a failing assertion, matching how the other adapters report interruption.
             return ProtoTestResult.Cancelled(
-                "MSTest", interrupted.Outcome.ToString(), $"MSTest completed with outcome {interrupted.Outcome}.");
+                FrameworkName, interrupted.Outcome.ToString(), $"{FrameworkName} completed with outcome {interrupted.Outcome}.");
         }
 
         return ProtoTestResult.Unknown;

@@ -58,7 +58,7 @@ public static class ProtoShapeAssertion
         {
             // Describing the expected shape can itself fail (a hostile or cyclic shape); it must run
             // inside the traced operation so the failure is recorded rather than escaping untraced.
-            var expectedShapeJson = JsonDiagnosticSanitizer.Serialize(DescribeExpectedValue(expectedShape), diagnosticOptions);
+            var expectedShapeJson = JsonDiagnosticSanitizer.Serialize(DescribeExpectedValue(expectedShape, options), diagnosticOptions);
             var actualShapeJson = actualJson is null
                 ? null
                 : JsonDiagnosticSanitizer.Sanitize(actualJson, diagnosticOptions);
@@ -134,17 +134,20 @@ public static class ProtoShapeAssertion
 
     /// <summary>
     /// Expands a shape into a serializable value: value constraints become their description, and nested
-    /// objects and arrays are expanded so the trace records the shape the test actually declared.
-    /// Dictionaries are described as objects, the depth is capped, and the total number of expanded
-    /// containers is capped, so cyclic or pathologically deep shapes cannot exhaust the stack or hang.
+    /// objects and arrays are expanded so the trace records the shape the test actually declared. The
+    /// expansion follows the matcher's own rules - the same scalar types, the wire names naming policy
+    /// and <c>[JsonPropertyName]</c> give, and <c>[JsonIgnore]</c> properties left out - so the recorded
+    /// expected shape is the shape the assertion compared. Dictionaries are described as objects, the
+    /// depth is capped, and the total number of expanded containers is capped, so cyclic or
+    /// pathologically deep shapes cannot exhaust the stack or hang.
     /// </summary>
-    private static object? DescribeExpectedValue(object? expected)
+    private static object? DescribeExpectedValue(object? expected, JsonSerializerOptions? options)
     {
         var budget = MaxDescriptionNodes;
-        return DescribeExpectedValue(expected, depth: 0, ref budget);
+        return DescribeExpectedValue(expected, depth: 0, ref budget, options);
     }
 
-    private static object? DescribeExpectedValue(object? expected, int depth, ref int budget)
+    private static object? DescribeExpectedValue(object? expected, int depth, ref int budget, JsonSerializerOptions? options)
     {
         if (expected is null)
         {
@@ -162,7 +165,7 @@ public static class ProtoShapeAssertion
         }
 
         var type = expected.GetType();
-        if (type.IsPrimitive || type.IsEnum || expected is string or decimal or DateTime or DateTimeOffset or Guid)
+        if (type.IsPrimitive || type.IsEnum || expected is string or decimal or DateTime or DateTimeOffset or DateOnly or TimeOnly or Guid or Uri)
         {
             return expected;
         }
@@ -179,7 +182,7 @@ public static class ProtoShapeAssertion
             var described = new Dictionary<string, object?>(StringComparer.Ordinal);
             foreach (DictionaryEntry entry in dictionary)
             {
-                described[Convert.ToString(entry.Key, CultureInfo.InvariantCulture) ?? string.Empty] = DescribeExpectedValue(entry.Value, depth + 1, ref budget);
+                described[Convert.ToString(entry.Key, CultureInfo.InvariantCulture) ?? string.Empty] = DescribeExpectedValue(entry.Value, depth + 1, ref budget, options);
             }
 
             return described;
@@ -190,18 +193,25 @@ public static class ProtoShapeAssertion
             var described = new List<object?>();
             foreach (var item in values)
             {
-                described.Add(DescribeExpectedValue(item, depth + 1, ref budget));
+                described.Add(DescribeExpectedValue(item, depth + 1, ref budget, options));
             }
 
             return described.ToArray();
         }
 
-        var describedProperties = new Dictionary<string, object?>(StringComparer.Ordinal);
-        foreach (var property in type.GetProperties().Where(property => property.GetIndexParameters().Length == 0))
+        // The matcher's own property rules: wire names from [JsonPropertyName] or the naming policy,
+        // and [JsonIgnore] properties left out, so what the trace shows is what the assertion compared.
+        if (JsonShapeMatcher.TryProperties(expected, options, out var properties))
         {
-            describedProperties[property.Name] = DescribeExpectedValue(property.GetValue(expected), depth + 1, ref budget);
+            var describedProperties = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var (name, value) in properties)
+            {
+                describedProperties[name] = DescribeExpectedValue(value, depth + 1, ref budget, options);
+            }
+
+            return describedProperties;
         }
 
-        return describedProperties;
+        return expected;
     }
 }

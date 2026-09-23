@@ -67,7 +67,7 @@ There is **no endpoint default**: `endpoint` names the key under `ProtoTest:Appl
 | | `MaxDiagnosticBodyLength` | `65536` |
 | | `SensitiveHeaders` | `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` |
 | | `SensitiveQueryParameters` | `access_token`, `refresh_token`, `token`, `apiKey`, `api_key`, `key` |
-| | `SensitiveJsonProperties` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key` |
+| | `SensitiveJsonProperties` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret` |
 
 Set them in code with `ConfigureResponses(...)` and `CaptureAttachments(...)`, or in configuration. Code callbacks run in registration order and repeated calls compose; the known section is then bound over the result, so **configuration wins over code**. Both option types are shared with GraphQL — each protocol owns its own keyed instance and section. The types themselves default to the shared `ProtoTest:Http:Responses` and `ProtoTest:Http:Attachments` sections when a protocol does not name its own; every protocol that ships here names one.
 

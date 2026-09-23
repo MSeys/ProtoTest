@@ -8,7 +8,7 @@
     "typecheck": "vue-tsc --noEmit",
     "build": "npm run lint:css && vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "lint:css": "stylelint \"src/**/*.{css,vue}\""
+    "lint:css": "stylelint \"src/**/*.{css,vue}\" \"../src/ProtoTest.Reporting/Sinks/HtmlReportAssets/*.css\""
   },
   "dependencies": {
     "prismjs": "^1.30.0",

@@ -111,7 +111,7 @@ public static class JsonShapeMatcher
             matched.Add(path);
     }
 
-    private static bool TryProperties(object value, JsonSerializerOptions? options, out IReadOnlyList<KeyValuePair<string, object?>> properties)
+    internal static bool TryProperties(object value, JsonSerializerOptions? options, out IReadOnlyList<KeyValuePair<string, object?>> properties)
     {
         if (value is IDictionary dictionary)
         {

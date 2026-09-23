@@ -13,22 +13,13 @@ using System.Reflection;
 [NonParallelizable]
 public sealed class RegistrationIdempotencyTests
 {
-    // Keeping the in-memory database alive through a keeper connection keeps the schema available to
-    // the scoped connection the test opens and the scoped one the context uses.
-    private const string ConnectionString = "Data Source=file:sqlidempotent;Mode=Memory;Cache=Shared;Pooling=False";
-
-    private SqliteConnection _keeper = null!;
+    private SqliteKeeper _database = null!;
 
     [SetUp]
-    public void SetUp()
-    {
-        _keeper = new SqliteConnection(ConnectionString);
-        _keeper.Open();
-        Execute(_keeper, "CREATE TABLE IF NOT EXISTS Widgets (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL);");
-    }
+    public void SetUp() => _database = new SqliteKeeper("sqlidempotent");
 
     [TearDown]
-    public void TearDown() => _keeper.Dispose();
+    public void TearDown() => _database.Dispose();
 
     [Test]
     public async Task AddSql_CalledTwice_ShouldKeepTheFirstRegistrationAndRun()
@@ -36,7 +27,7 @@ public sealed class RegistrationIdempotencyTests
         var builder = new ProtoHostBuilder();
         IServiceCollection? services = null;
         builder.ConfigureServices(collection => services = collection);
-        builder.AddSql(_ => new SqliteConnection(ConnectionString));
+        builder.AddSql(_ => new SqliteConnection(_database.ConnectionString));
         builder.AddSql(_ => throw new InvalidOperationException("The second SQL connection factory must not register."));
 
         Assert.Multiple(() =>
@@ -70,7 +61,7 @@ public sealed class RegistrationIdempotencyTests
         var hostOptions = new SqlOptions();
         var builder = new ProtoHostBuilder()
             .ConfigureServices(services => services.AddSingleton(hostOptions))
-            .AddSql(_ => new SqliteConnection(ConnectionString));
+            .AddSql(_ => new SqliteConnection(_database.ConnectionString));
 
         await using var host = builder.Build();
         await host.StartAsync();
@@ -94,7 +85,7 @@ public sealed class RegistrationIdempotencyTests
         var builder = new ProtoHostBuilder();
         IServiceCollection? services = null;
         builder.ConfigureServices(collection => services = collection);
-        builder.AddSql(_ => new SqliteConnection(ConnectionString));
+        builder.AddSql(_ => new SqliteConnection(_database.ConnectionString));
         builder.AddEntityFrameworkCore<WidgetDbContext>((provider, options) =>
             options.UseSqlite(provider.GetRequiredService<DbConnection>()));
         builder.AddEntityFrameworkCore<WidgetDbContext>((_, _) =>
@@ -122,7 +113,7 @@ public sealed class RegistrationIdempotencyTests
         var builder = new ProtoHostBuilder();
         IServiceCollection? services = null;
         builder.ConfigureServices(collection => services = collection);
-        builder.AddSql(_ => new SqliteConnection(ConnectionString));
+        builder.AddSql(_ => new SqliteConnection(_database.ConnectionString));
         builder.AddEntityFrameworkCore<WidgetDbContext>((provider, options) =>
             options.UseSqlite(provider.GetRequiredService<DbConnection>()));
         builder.AddEntityFrameworkCore<OrderDbContext>((provider, options) =>
@@ -148,7 +139,7 @@ public sealed class RegistrationIdempotencyTests
         var builder = new ProtoHostBuilder();
         builder.ConfigureServices(services => services.AddDbContext<WidgetDbContext>(
             (provider, options) => options.UseSqlite(provider.GetRequiredService<DbConnection>())));
-        builder.AddSql(_ => new SqliteConnection(ConnectionString));
+        builder.AddSql(_ => new SqliteConnection(_database.ConnectionString));
         builder.AddEntityFrameworkCore<WidgetDbContext>((_, _) => { });
 
         await using var host = builder.Build();
@@ -165,7 +156,7 @@ public sealed class RegistrationIdempotencyTests
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
-        Assert.That(CountWidgets(_keeper), Is.Zero, "Saving through an enlisted context must roll back with the test.");
+        Assert.That(SqliteKeeper.CountWidgets(_database.Connection), Is.Zero, "Saving through an enlisted context must roll back with the test.");
         await host.StopAsync();
     }
 
@@ -173,7 +164,7 @@ public sealed class RegistrationIdempotencyTests
     public async Task AddEntityFrameworkCore_CalledBeforeTheHostAddDbContext_ShouldStillEnlistAndRollBack()
     {
         var builder = new ProtoHostBuilder();
-        builder.AddSql(_ => new SqliteConnection(ConnectionString));
+        builder.AddSql(_ => new SqliteConnection(_database.ConnectionString));
         builder.AddEntityFrameworkCore<WidgetDbContext>((provider, options) =>
             options.UseSqlite(provider.GetRequiredService<DbConnection>()));
         builder.ConfigureServices(services => services.AddDbContext<WidgetDbContext>(
@@ -193,19 +184,19 @@ public sealed class RegistrationIdempotencyTests
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
-        Assert.That(CountWidgets(_keeper), Is.Zero, "Saving through an enlisted context must roll back with the test.");
+        Assert.That(SqliteKeeper.CountWidgets(_database.Connection), Is.Zero, "Saving through an enlisted context must roll back with the test.");
         await host.StopAsync();
     }
 
     [Test]
     public async Task AddEntityFrameworkCore_WhenTheHostContextUsesItsOwnConnection_ShouldDiagnoseTheOrder()
     {
-        using var hostConnection = new SqliteConnection(ConnectionString);
+        using var hostConnection = new SqliteConnection(_database.ConnectionString);
         hostConnection.Open();
         var builder = new ProtoHostBuilder();
         // Isolation None means no transaction is begun; the connection check must still run, or a
         // host AddDbContext after AddEntityFrameworkCore would silently point at another database.
-        builder.AddSql(_ => new SqliteConnection(ConnectionString), sql => sql.Isolation = SqlIsolation.None);
+        builder.AddSql(_ => new SqliteConnection(_database.ConnectionString), sql => sql.Isolation = SqlIsolation.None);
         builder.ConfigureServices(services => services.AddDbContext<WidgetDbContext>(
             (provider, options) => options.UseSqlite(hostConnection)));
         builder.AddEntityFrameworkCore<WidgetDbContext>((_, _) => { });
@@ -231,7 +222,7 @@ public sealed class RegistrationIdempotencyTests
         var builder = new ProtoHostBuilder();
         builder.ConfigureServices(services => services.AddDbContext<WidgetDbContext>(
             (provider, options) => options.UseSqlite(provider.GetRequiredService<DbConnection>())));
-        builder.AddSql(_ => new SqliteConnection(ConnectionString));
+        builder.AddSql(_ => new SqliteConnection(_database.ConnectionString));
         builder.AddEntityFrameworkCore<WidgetDbContext>((_, _) => { });
         builder.AddEntityFrameworkCore<WidgetDbContext>((_, _) => { });
 
@@ -249,20 +240,6 @@ public sealed class RegistrationIdempotencyTests
 
     private static void SampleTest()
     {
-    }
-
-    private static void Execute(DbConnection connection, string sql)
-    {
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.ExecuteNonQuery();
-    }
-
-    private static int CountWidgets(DbConnection connection)
-    {
-        using var command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM Widgets;";
-        return Convert.ToInt32(command.ExecuteScalar());
     }
 }
 

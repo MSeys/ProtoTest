@@ -1,7 +1,9 @@
 const decoder = new TextDecoder();
-const EOCD = 0x06054b50;
-const CENTRAL_FILE = 0x02014b50;
-const LOCAL_FILE = 0x04034b50;
+
+/** ZIP record signatures, shared with the test ZIP builder so the format exists once. */
+export const EOCD = 0x06054b50;
+export const CENTRAL_FILE = 0x02014b50;
+export const LOCAL_FILE = 0x04034b50;
 
 export interface ZipEntry {
   method: number;

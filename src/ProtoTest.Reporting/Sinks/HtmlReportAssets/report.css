@@ -84,6 +84,8 @@ main { width: min(1240px, 100% - var(--space-7)); margin: 0 auto var(--space-7);
 }
 .coverage-ring::before { content: ""; position: absolute; inset: 6px; border-radius: inherit; background: var(--bg); }
 .coverage-ring span, .coverage-ring em { position: relative; z-index: 1; }
+/* The value is nudged up an optical half step so it centres inside the ring; no token is that small. */
+/* stylelint-disable-next-line declaration-property-value-disallowed-list */
 .coverage-ring span { margin-top: -10px; font: var(--weight-bold) var(--text-title)/1 var(--font-mono); }
 .coverage-ring small { color: var(--muted); font-size: var(--text-meta); }
 .coverage-ring em { position: absolute; top: 48px; color: var(--dim); font-size: var(--text-micro); font-style: normal; letter-spacing: .08em; text-transform: uppercase; }
@@ -236,7 +238,9 @@ main { width: min(1240px, 100% - var(--space-7)); margin: 0 auto var(--space-7);
   color: var(--text-on-sunken);
   font: var(--text-micro)/1.6 var(--font-mono);
 }
-/* Children hang off a drawn guide, the same branch language the viewer's tree uses. */
+/* Children hang off a drawn guide, the same branch language the viewer's tree uses. The guide is
+   nudged 6px to line up with the chevron above it, an optical adjustment below the smallest token. */
+/* stylelint-disable-next-line declaration-property-value-disallowed-list */
 .children { margin-left: 6px; padding-left: var(--space-3); display: grid; gap: 1px; border-left: 1px solid var(--border); }
 .report-item.child > summary, .report-item.child > .item-summary { min-height: 28px; }
 .empty-state { padding: var(--space-7) var(--space-4); display: grid; gap: var(--space-1); text-align: center; }

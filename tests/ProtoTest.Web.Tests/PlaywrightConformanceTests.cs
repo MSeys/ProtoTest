@@ -51,6 +51,39 @@ public sealed class PlaywrightConformanceTests
     }
 
     [Test]
+    public async Task SelectOption_ShouldMatchTheValueAttributeNotTheLabel()
+    {
+        var host = new ProtoHostBuilder()
+            .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["ProtoTest:Web:Playwright:ActionTimeout"] = "00:00:00.500"
+                }))
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Off;
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("Playwright select semantics", TestMethod());
+        var web = context.Web();
+        var backend = await OpenBrowserAsync(web);
+        await backend.Page.SetContentAsync(ConformanceMarkup.Html);
+        var page = web.Page<ConformancePage>();
+
+        await page.Language.SelectOptionAsync("nl");
+        var failure = Assert.ThrowsAsync<WebActionabilityException>(async () =>
+            await page.Language.SelectOptionAsync("Nederlands"));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.That(failure!.Message, Does.Contain("did not become actionable"),
+            "the option label must not satisfy a value-based selection");
+    }
+
+    [Test]
     public async Task EscapeHatchLocatorsFlowsAndConfiguredContext_ShouldRunAgainstARealBrowser()
     {
         var host = new ProtoHostBuilder()

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type { TestTrace } from "../trace/model";
-import { formatDuration, pad, testCodeName, testGroup, testMatches, testTitle, tone } from "../trace/format";
+import { failureReason, formatDuration, needsAttention, pad, testCodeName, testGroup, testMatches, testTitle, tone } from "../trace/format";
 import TextInput from "./TextInput.vue";
 import FilterChip from "./FilterChip.vue";
 import EmptyState from "./EmptyState.vue";
@@ -20,7 +20,6 @@ function toggleOrder() {
   try { localStorage.setItem("prototrace.rail-order", runOrder.value ? "run" : "class"); } catch { /* storage may be disabled */ }
 }
 
-const needsAttention = (test: TestTrace) => test.outcome !== "succeeded" && test.outcome !== "skipped";
 const problems = computed(() => props.tests.filter(needsAttention).length);
 
 const groups = computed(() => {
@@ -37,7 +36,7 @@ const groups = computed(() => {
 /** A test that did not pass says why in the list, so the reader can pick the right one without opening it. */
 function reason(test: TestTrace): string {
   if (!needsAttention(test) || !test.failure) return "";
-  return test.failure.span.name;
+  return failureReason(test).title;
 }
 </script>
 

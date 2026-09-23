@@ -1,9 +1,7 @@
 import type { WireManifest, WireSpans, WireState } from "./wire";
+import { openZip, type Zip } from "../artifacts/zip";
 
 const decoder = new TextDecoder();
-const EOCD = 0x06054b50;
-const CENTRAL_FILE = 0x02014b50;
-const LOCAL_FILE = 0x04034b50;
 const MAX_ARCHIVE_BYTES = 250 * 1024 * 1024;
 const MAX_ENTRIES = 50_000;
 
@@ -19,13 +17,6 @@ export class TraceOpenError extends Error {
   }
 }
 
-interface ZipEntry {
-  method: number;
-  compressedSize: number;
-  uncompressedSize: number;
-  localOffset: number;
-}
-
 export interface TraceArchive {
   spans: WireSpans;
   state: WireState;
@@ -38,15 +29,30 @@ export interface TraceArchive {
 export async function openTraceArchive(buffer: ArrayBuffer): Promise<TraceArchive> {
   if (buffer.byteLength > MAX_ARCHIVE_BYTES) throw new TraceOpenError("unsupported", "This trace is larger than the 250 MiB the viewer reads.");
   const bytes = new Uint8Array(buffer);
-  const view = new DataView(buffer);
-  const entries = readDirectory(bytes, view);
-  const manifest = await readJson<WireManifest>(bytes, view, entries, "manifest.json");
+  const zip = openZip(bytes, {
+    maxEntries: MAX_ENTRIES,
+    maxBytes: MAX_ARCHIVE_BYTES,
+    createError: (problem, message) => new TraceOpenError(problem, message),
+    vocabulary: {
+      notArchive: "This file is not a ProtoTrace archive.",
+      tooManyEntries: "This trace contains too many files.",
+      directoryDamaged: "The trace's ZIP directory is damaged.",
+      duplicate: name => `The trace contains duplicate entries named ${name}.`,
+      missing: name => `The trace is missing ${name}.`,
+      tooLarge: name => `${name} is too large to read.`,
+      damaged: name => `${name} is damaged.`,
+      invalidSize: name => `${name} has an invalid size.`,
+      unsupportedCompression: "This trace uses a ZIP compression this browser cannot read.",
+      decompressionFailed: name => `${name} could not be decompressed.`
+    }
+  });
+  const manifest = await readJson<WireManifest>(zip, "manifest.json");
   if (!manifest.spansEntry || !manifest.stateEntry) {
     if (manifest.runEntry) throw new TraceOpenError("legacy", "This trace was written by an older ProtoTest version.");
     throw new TraceOpenError("corrupt", "The trace manifest names no documents.");
   }
-  const spans = await readJson<WireSpans>(bytes, view, entries, manifest.spansEntry);
-  const state = await readJson<WireState>(bytes, view, entries, manifest.stateEntry);
+  const spans = await readJson<WireSpans>(zip, manifest.spansEntry);
+  const state = await readJson<WireState>(zip, manifest.stateEntry);
   if (!Array.isArray(spans.resourceSpans)) throw new TraceOpenError("corrupt", "spans.json has no resource groups.");
   if (!spans.formatVersion?.startsWith("2.")) throw new TraceOpenError("unsupported", `Span format ${spans.formatVersion} is not supported.`);
   // The state document carries its own version, and only the viewer knows what it can read: accept the
@@ -60,113 +66,23 @@ export async function openTraceArchive(buffer: ArrayBuffer): Promise<TraceArchiv
     state,
     async readFile(archivePath, mediaType) {
       if (!declared.has(archivePath)) throw new Error("The requested file is not declared by this trace.");
-      const content = await readEntry(bytes, view, entries, archivePath);
+      const content = await zip.read(archivePath);
       const copy = content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength) as ArrayBuffer;
       return new Blob([copy], { type: mediaType });
     },
     async readSource(path) {
       const archivePath = manifest.sources?.[path];
-      if (!archivePath || !entries.has(archivePath)) return undefined;
-      return decoder.decode(await readEntry(bytes, view, entries, archivePath));
+      if (!archivePath || !zip.entries.has(archivePath)) return undefined;
+      return decoder.decode(await zip.read(archivePath));
     }
   };
 }
 
-async function readJson<T>(bytes: Uint8Array, view: DataView, entries: Map<string, ZipEntry>, name: string): Promise<T> {
-  const content = await readEntry(bytes, view, entries, name);
+async function readJson<T>(zip: Zip, name: string): Promise<T> {
+  const content = await zip.read(name);
   try {
     return JSON.parse(decoder.decode(content)) as T;
   } catch {
     throw new TraceOpenError("corrupt", `${name} is not valid JSON.`);
   }
-}
-
-function readDirectory(bytes: Uint8Array, view: DataView): Map<string, ZipEntry> {
-  let eocd = -1;
-  for (let offset = bytes.length - 22; offset >= Math.max(0, bytes.length - 65_557); offset--) {
-    if (view.getUint32(offset, true) === EOCD) { eocd = offset; break; }
-  }
-  if (eocd < 0) throw new TraceOpenError("corrupt", "This file is not a ProtoTrace archive.");
-  const count = view.getUint16(eocd + 10, true);
-  if (count > MAX_ENTRIES) throw new TraceOpenError("unsupported", "This trace contains too many files.");
-  let offset = view.getUint32(eocd + 16, true);
-  const entries = new Map<string, ZipEntry>();
-  for (let index = 0; index < count; index++) {
-    if (!contains(bytes, offset, 46)) throw new TraceOpenError("corrupt", "The trace's ZIP directory is damaged.");
-    if (view.getUint32(offset, true) !== CENTRAL_FILE) throw new TraceOpenError("corrupt", "The trace's ZIP directory is damaged.");
-    const nameLength = view.getUint16(offset + 28, true);
-    const extraLength = view.getUint16(offset + 30, true);
-    const commentLength = view.getUint16(offset + 32, true);
-    const recordLength = 46 + nameLength + extraLength + commentLength;
-    if (!contains(bytes, offset, recordLength)) throw new TraceOpenError("corrupt", "The trace's ZIP directory is damaged.");
-    const name = decoder.decode(bytes.subarray(offset + 46, offset + 46 + nameLength));
-    if (entries.has(name)) throw new TraceOpenError("corrupt", `The trace contains duplicate entries named ${name}.`);
-    entries.set(name, {
-      method: view.getUint16(offset + 10, true),
-      compressedSize: view.getUint32(offset + 20, true),
-      uncompressedSize: view.getUint32(offset + 24, true),
-      localOffset: view.getUint32(offset + 42, true)
-    });
-    offset += recordLength;
-  }
-  return entries;
-}
-
-async function readEntry(bytes: Uint8Array, view: DataView, entries: Map<string, ZipEntry>, name: string): Promise<Uint8Array> {
-  const entry = entries.get(name);
-  if (!entry) throw new TraceOpenError("corrupt", `The trace is missing ${name}.`);
-  if (entry.uncompressedSize > MAX_ARCHIVE_BYTES) throw new TraceOpenError("unsupported", `${name} is too large to read.`);
-  const offset = entry.localOffset;
-  if (!contains(bytes, offset, 30)) throw new TraceOpenError("corrupt", `${name} is damaged.`);
-  if (view.getUint32(offset, true) !== LOCAL_FILE) throw new TraceOpenError("corrupt", `${name} is damaged.`);
-  const start = offset + 30 + view.getUint16(offset + 26, true) + view.getUint16(offset + 28, true);
-  if (!contains(bytes, start, entry.compressedSize)) throw new TraceOpenError("corrupt", `${name} is damaged.`);
-  const compressed = bytes.slice(start, start + entry.compressedSize);
-  if (entry.method === 0) {
-    if (compressed.byteLength !== entry.uncompressedSize) throw new TraceOpenError("corrupt", `${name} has an invalid size.`);
-    return compressed;
-  }
-  if (entry.method !== 8 || typeof DecompressionStream === "undefined")
-    throw new TraceOpenError("unsupported", "This trace uses a ZIP compression this browser cannot read.");
-
-  // Stream the inflation so a header that understates the size cannot decompress past the cap, and
-  // turn any decompression failure into the designed corrupt state instead of a raw runtime error.
-  const reader = new Blob([compressed]).stream()
-    .pipeThrough(new DecompressionStream("deflate-raw"))
-    .getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > MAX_ARCHIVE_BYTES) {
-        await reader.cancel();
-        throw new TraceOpenError("unsupported", `${name} is too large to read.`);
-      }
-      chunks.push(value);
-    }
-  } catch (error) {
-    if (error instanceof TraceOpenError) throw error;
-    throw new TraceOpenError("corrupt", `${name} could not be decompressed.`);
-  }
-  const decompressed = new Uint8Array(total);
-  let written = 0;
-  for (const chunk of chunks) {
-    decompressed.set(chunk, written);
-    written += chunk.byteLength;
-  }
-  if (decompressed.byteLength !== entry.uncompressedSize)
-    throw new TraceOpenError("corrupt", `${name} has an invalid size.`);
-  return decompressed;
-}
-
-function contains(bytes: Uint8Array, offset: number, length: number): boolean {
-  return Number.isSafeInteger(offset)
-    && Number.isSafeInteger(length)
-    && offset >= 0
-    && length >= 0
-    && offset <= bytes.length
-    && length <= bytes.length - offset;
 }

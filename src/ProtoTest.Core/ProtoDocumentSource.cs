@@ -3,6 +3,10 @@ namespace ProtoTest.Core;
 /// <summary>Loads a text document from inline content, a local file, or an HTTP(S) URL.</summary>
 public static class ProtoDocumentSource
 {
+    // One client for every retrieval: creating and disposing one per document exhausts sockets across
+    // runs that load several documents, and a caller can still pass its own.
+    private static readonly HttpClient SharedClient = new();
+
     public static string LoadText(string source, string? baseUrl = null, HttpClient? httpClient = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
@@ -11,19 +15,13 @@ public static class ProtoDocumentSource
         if (LooksLikeInlineDocument(source)) return source;
         if (!TryResolveHttpUri(source, baseUrl, out var uri)) return source;
 
-        var ownsClient = httpClient is null;
-        httpClient ??= new HttpClient();
         try
         {
-            return httpClient.GetStringAsync(uri).GetAwaiter().GetResult();
+            return (httpClient ?? SharedClient).GetStringAsync(uri).GetAwaiter().GetResult();
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
         {
             throw new InvalidOperationException($"Failed to retrieve document from '{uri}'.", exception);
-        }
-        finally
-        {
-            if (ownsClient) httpClient.Dispose();
         }
     }
 

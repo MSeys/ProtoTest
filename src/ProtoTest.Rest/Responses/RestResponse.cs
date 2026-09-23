@@ -10,15 +10,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
-public sealed class RestResponse : IDisposable, IProtoBinaryContent
+public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
 {
-    private readonly ProtoExecutionContext? _context;
-    private readonly string? _targetName;
-    private readonly string? _routeIdentifier;
-    private readonly ProtoHttpAttachmentOptions? _attachmentOptions;
-    private readonly string? _attachmentPrefix;
-    private readonly string? _requestTraceId;
-    private int _shapeAssertionSequence;
     private RestAssertions? _should;
     private RestAssertions? _shouldNot;
 
@@ -38,21 +31,10 @@ public sealed class RestResponse : IDisposable, IProtoBinaryContent
         string? attachmentPrefix = null,
         ReadOnlyMemory<byte>? contentBytes = null,
         string? requestTraceId = null)
+        : base(rawResponse, content, elapsedTime, context, targetName, routeIdentifier, attachmentOptions, attachmentPrefix, requestTraceId)
     {
-        RawResponse = rawResponse ?? throw new ArgumentNullException(nameof(rawResponse));
-        Content = content ?? string.Empty;
-        ElapsedTime = elapsedTime;
         ContentBytes = contentBytes ?? System.Text.Encoding.UTF8.GetBytes(Content);
-        _context = context;
-        _targetName = targetName;
-        _routeIdentifier = routeIdentifier;
-        _attachmentOptions = attachmentOptions;
-        _attachmentPrefix = attachmentPrefix;
-        _requestTraceId = requestTraceId;
     }
-
-    public HttpResponseMessage RawResponse { get; }
-    public HttpStatusCode StatusCode => RawResponse.StatusCode;
 
     /// <summary>Positive assertions on this response, such as <c>Should.HaveHttpStatus(...)</c>.</summary>
     public RestAssertions Should => _should ??= new RestAssertions(this, negated: false);
@@ -66,8 +48,6 @@ public sealed class RestResponse : IDisposable, IProtoBinaryContent
     public bool IsSuccessStatusCode => RawResponse.IsSuccessStatusCode;
     public HttpResponseHeaders Headers => RawResponse.Headers;
     public HttpContentHeaders ContentHeaders => RawResponse.Content.Headers;
-    public TimeSpan ElapsedTime { get; }
-    public string Content { get; }
     public ReadOnlyMemory<byte> ContentBytes { get; }
 
     string? IProtoBinaryContent.MediaType => ContentHeaders.ContentType?.MediaType;
@@ -77,12 +57,6 @@ public sealed class RestResponse : IDisposable, IProtoBinaryContent
     string? IProtoBinaryContent.FileName => RawResponse.Content.Headers.ContentDisposition is { } disposition
         ? (disposition.FileNameStar ?? disposition.FileName)?.Trim('"')
         : null;
-
-    /// <summary>
-    /// Releases the underlying HTTP response. Callers own a returned <see cref="RestResponse"/>
-    /// and should dispose it when access to <see cref="RawResponse"/> is no longer required.
-    /// </summary>
-    public void Dispose() => RawResponse.Dispose();
 
     public T? ReadAsJson<T>(JsonSerializerOptions? options = null)
     {
@@ -94,7 +68,7 @@ public sealed class RestResponse : IDisposable, IProtoBinaryContent
         }
         catch (Exception exception)
         {
-            _context?.Trace.WriteEvent(
+            Context?.Trace.WriteEvent(
                 "http.response.deserialize",
                 $"Deserialize response · {typeof(T).Name}",
                 "ProtoTest.Rest",
@@ -105,7 +79,7 @@ public sealed class RestResponse : IDisposable, IProtoBinaryContent
                     ["content.length"] = ContentBytes.Length.ToString()
                 },
                 exception: exception,
-                parentId: _requestTraceId);
+                parentId: RequestTraceId);
             throw;
         }
     }
@@ -134,22 +108,18 @@ public sealed class RestResponse : IDisposable, IProtoBinaryContent
 
     internal RestResponse AssertHttpStatus(HttpStatusCode expectedStatusCode, bool negated)
     {
-        ProtoStatusAssertion.Assert(
-            _context,
+        AssertStatus(
             "ProtoTest.Rest",
             expectedStatusCode,
-            StatusCode,
             negated,
             // The failure message must not exceed either limit: the response section applies even
             // when the protocol never opted into attachment capture, and the attachment options
             // keep their own redaction rules when capture is on.
-            failureFactory: () => new RestStatusAssertionException(
+            () => new RestStatusAssertionException(
                 expectedStatusCode,
                 StatusCode,
                 ProtoHttpDiagnosticSanitizer.SanitizeBody(Content, ResolveStatusDiagnosticOptions()),
-                negated),
-            parentOperationId: _requestTraceId,
-            requestIdentifier: _routeIdentifier);
+                negated));
         return this;
     }
 
@@ -158,17 +128,17 @@ public sealed class RestResponse : IDisposable, IProtoBinaryContent
         // The resolved ProtoTest:Rest:Responses section bounds the failure body even when the protocol
         // never opted into attachment capture; attachment options, when present, keep their own
         // redaction rules and may tighten the limit further.
-        var responseLimit = _context?.ResolveResponseOptions(ProtoRestBuilder.ProtocolName).MaxDiagnosticBodyLength
+        var responseLimit = Context?.ResolveResponseOptions(ProtoRestBuilder.ProtocolName).MaxDiagnosticBodyLength
             ?? new ProtoHttpResponseOptions().MaxDiagnosticBodyLength;
-        if (_attachmentOptions is null)
+        if (AttachmentOptions is null)
             return new ProtoHttpAttachmentOptions { MaxDiagnosticBodyLength = responseLimit };
-        if (responseLimit >= _attachmentOptions.MaxDiagnosticBodyLength)
-            return _attachmentOptions;
+        if (responseLimit >= AttachmentOptions.MaxDiagnosticBodyLength)
+            return AttachmentOptions;
 
         return new ProtoHttpAttachmentOptions
         {
-            RedactSensitiveData = _attachmentOptions.RedactSensitiveData,
-            SensitiveJsonProperties = [.. _attachmentOptions.SensitiveJsonProperties],
+            RedactSensitiveData = AttachmentOptions.RedactSensitiveData,
+            SensitiveJsonProperties = [.. AttachmentOptions.SensitiveJsonProperties],
             MaxDiagnosticBodyLength = responseLimit
         };
     }
@@ -176,39 +146,24 @@ public sealed class RestResponse : IDisposable, IProtoBinaryContent
     public RestResponse ShouldMatchShape(object expectedShape, JsonSerializerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
-        string? attachmentName = null;
-        if (_context is not null && _attachmentOptions?.CaptureExpectedShapes == true)
-        {
-            var assertionNumber = Interlocked.Increment(ref _shapeAssertionSequence);
-            var assertionSuffix = assertionNumber == 1 ? string.Empty : $"-{assertionNumber:00}";
-            attachmentName = $"{_attachmentPrefix}-expected-shape{assertionSuffix}";
-        }
-
-        ProtoShapeAssertion.Assert(
-            new ProtoShapeAssertionContext(
-                _context,
-                "ProtoTest.Rest",
-                "Assert response shape",
-                ParentOperationId: _requestTraceId,
-                ExtraAttributes: new Dictionary<string, string?>
-                {
-                    ["actual.media_type"] = RawResponse.Content.Headers.ContentType?.MediaType,
-                    ["request.identifier"] = _routeIdentifier
-                },
-                CaptureExpectedShape: attachmentName is not null,
-                AttachmentName: attachmentName,
-                AttachmentDescription: _routeIdentifier),
+        AssertShape(
+            "ProtoTest.Rest",
+            "Assert response shape",
             Content,
             expectedShape,
             options,
-            _attachmentOptions,
-            matched => _context is not null && !string.IsNullOrEmpty(_targetName) && !string.IsNullOrEmpty(_routeIdentifier)
+            new Dictionary<string, string?>
+            {
+                ["actual.media_type"] = RawResponse.Content.Headers.ContentType?.MediaType,
+                ["request.identifier"] = Identifier
+            },
+            matched => Context is not null && !string.IsNullOrEmpty(TargetName) && !string.IsNullOrEmpty(Identifier)
                 ? new ProtoObservation(
-                    TargetName: _targetName,
+                    TargetName: TargetName,
                     Kind: "http.contract.shape",
-                    Identifier: _routeIdentifier,
+                    Identifier: Identifier,
                     Data: new RestShapeMatchData(
-                        RequestIdentifier: _routeIdentifier,
+                        RequestIdentifier: Identifier,
                         MatchedProperties: matched,
                         TargetType: expectedShape.GetType(),
                         StatusCode: (int)StatusCode))

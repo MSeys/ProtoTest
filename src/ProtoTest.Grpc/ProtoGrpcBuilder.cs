@@ -1,8 +1,6 @@
 namespace ProtoTest.Grpc;
 
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
 using ProtoTest.Http;
 
@@ -74,17 +72,13 @@ public sealed class ProtoGrpcBuilder
         return AddClient(name, (context, _) => ValueTask.FromResult(addressResolver(context)), configure);
     }
 
-    /// <summary>Enables automatic request and response message attachments, sanitized and redacted.</summary>
+    /// <summary>
+    /// Enables automatic request and response message attachments, sanitized and redacted. Repeated
+    /// calls compose: every callback runs in registration order and configuration binds over the result.
+    /// </summary>
     public ProtoGrpcBuilder CaptureAttachments(Action<GrpcAttachmentOptions>? configure = null)
     {
-        Services.RemoveAll<GrpcAttachmentOptions>();
-        Services.AddSingleton(serviceProvider =>
-        {
-            var options = new GrpcAttachmentOptions();
-            configure?.Invoke(options);
-            options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
-            return options;
-        });
+        ProtoOptionsRegistration.Configure(Services, () => new GrpcAttachmentOptions(), configure);
         return this;
     }
 }

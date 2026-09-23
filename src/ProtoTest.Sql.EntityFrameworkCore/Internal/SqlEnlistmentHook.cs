@@ -13,7 +13,7 @@ internal sealed class SqlEnlistmentHook<TContext> : IProtoTestHook
     where TContext : DbContext
 {
     // Runs after the connection hook, which opens the connection and starts the transaction.
-    public int Order => -999;
+    public int Order => SqlHookOrders.Enlistment;
 
     public async Task BeforeTestAsync(ProtoExecutionContext context)
     {

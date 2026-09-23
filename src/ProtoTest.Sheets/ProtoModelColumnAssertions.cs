@@ -92,7 +92,7 @@ public sealed class ProtoModelColumnAssertions<TValue>
         if (mismatch is not { } difference)
         {
             return $"{SheetAssertion.Describe(
-                Subject, $"match the expected {Count(expected.Count)}", _negated)} but it did.";
+                Subject, $"match the expected {SheetAssertionText.Count(expected.Count)}", _negated)} but it did.";
         }
 
         var expectation = difference.IsCountMismatch
@@ -103,6 +103,4 @@ public sealed class ProtoModelColumnAssertions<TValue>
             : $"it was {difference.Actual}";
         return $"{SheetAssertion.Describe(Subject, expectation, _negated)} but {actual}.";
     }
-
-    private static string Count(int count) => $"{count} {(count == 1 ? "value" : "values")}";
 }

@@ -21,13 +21,11 @@ public static class ProtoMessagingBuilderExtensions
         // The first RabbitMQ registration wins, like every other option; a repeated call cannot replace it.
         messaging.Services.TryAddSingleton(serviceProvider =>
         {
-            var options = new RabbitMqOptions();
-            configure?.Invoke(options);
-            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-            options.BindFromConfiguration(configuration);
+            var options = ProtoOptionsRegistration.Resolve<RabbitMqOptions>(serviceProvider, configure);
 
             // Precedence: an explicitly configured connection string wins, then a started broker
             // container, then whatever the registration or the defaults chose.
+            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
             var configured = configuration[RabbitMqOptions.ConnectionStringSetting];
             if (!string.IsNullOrWhiteSpace(configured))
             {

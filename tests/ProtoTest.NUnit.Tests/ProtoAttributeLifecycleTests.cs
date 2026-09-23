@@ -1,12 +1,12 @@
 namespace ProtoTest.NUnit.Tests;
 
+using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 
 [TestFixture]
 [Tracking("ClassLevel", Order = 1)]
 public class ProtoAttributeLifecycleTests
 {
-
     [ProtoTest]
     [Tracking("MethodLevel", Order = 2)]
     public void ProtoTest_ShouldExecuteClassAndMethodAttributesInOrder()
@@ -17,30 +17,7 @@ public class ProtoAttributeLifecycleTests
         // Assert
         // Note: The AfterTest hooks execute after this test body completes,
         // so we check the Before execution log here within the test body.
-        var expectedBeforeSequence = new[]
-        {
-            "Hook:Before",
-            "ClassLevel:Before",
-            "MethodLevel:Before",
-            "TestExecution"
-        };
-
+        string[] expectedBeforeSequence = [.. AdapterTestSupport.ExpectedBeforeSequence, "TestExecution"];
         Assert.That(Proto.Context.Resolve<ExecutionLogState>().Log, Is.EqualTo(expectedBeforeSequence));
-    }
-}
-
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
-public class TrackingAttribute(string name) : ProtoAttribute
-{
-    public override Task BeforeTestAsync(ProtoExecutionContext context)
-    {
-        Proto.Context.Resolve<ExecutionLogState>().Log.Add($"{name}:Before");
-        return Task.CompletedTask;
-    }
-
-    public override Task AfterTestAsync(ProtoExecutionContext context)
-    {
-        Proto.Context.Resolve<ExecutionLogState>().Log.Add($"{name}:After");
-        return Task.CompletedTask;
     }
 }

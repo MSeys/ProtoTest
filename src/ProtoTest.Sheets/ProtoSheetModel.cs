@@ -243,9 +243,19 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
             : $"date:{cell.Date!.Value.ToString("O", CultureInfo.InvariantCulture)}";
 
     private static PropertyInfo PropertyOf<TValue>(Expression<Func<TRow, TValue>> property)
-        => property.Body is MemberExpression { Member: PropertyInfo info }
+    {
+        ArgumentNullException.ThrowIfNull(property);
+        Expression body = property.Body;
+        // A cast, such as row => (long)row.Count, is a Convert node around the property access.
+        if (body is UnaryExpression { NodeType: ExpressionType.Convert } conversion)
+        {
+            body = conversion.Operand;
+        }
+
+        return body is MemberExpression { Member: PropertyInfo info }
             ? info
             : throw new ArgumentException("Use a property access like row => row.Amount.", nameof(property));
+    }
 
     private static bool TryConvert(Type type, ProtoCell cell)
     {

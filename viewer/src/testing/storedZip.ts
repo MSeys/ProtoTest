@@ -1,8 +1,6 @@
-const encoder = new TextEncoder();
+import { CENTRAL_FILE, EOCD, LOCAL_FILE } from "../artifacts/zip";
 
-const LOCAL_FILE = 0x04034b50;
-const CENTRAL_FILE = 0x02014b50;
-const EOCD = 0x06054b50;
+const encoder = new TextEncoder();
 
 export interface StoredZipEntry {
   data: string | Uint8Array;

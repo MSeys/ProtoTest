@@ -53,36 +53,19 @@ internal sealed class ProtoRunTraceWriter : IProtoTraceWriter
         string? data = null,
         string? metadata = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(targetName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
-        ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
         lock (_recordGate)
         {
-            _observations.Add(new ProtoTraceObservationRecord(
-                $"observation-{_observations.Count + 1}",
-                null,
-                DateTimeOffset.UtcNow,
-                targetName,
-                kind,
-                identifier,
-                data,
-                metadata));
+            _observations.Add(ProtoTraceRecords.Observation(
+                $"observation-{_observations.Count + 1}", null, targetName, kind, identifier, data, metadata));
         }
     }
 
     public void Attachment(string name, string mediaType, string? description = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(mediaType);
         lock (_recordGate)
         {
-            _attachments.Add(new ProtoTraceAttachmentRecord(
-                $"attachment-{_attachments.Count + 1}",
-                null,
-                DateTimeOffset.UtcNow,
-                name,
-                mediaType,
-                description));
+            _attachments.Add(ProtoTraceRecords.Attachment(
+                $"attachment-{_attachments.Count + 1}", null, name, mediaType, description));
         }
     }
 
@@ -94,40 +77,18 @@ internal sealed class ProtoRunTraceWriter : IProtoTraceWriter
         IReadOnlyList<string>? tags = null,
         IReadOnlyDictionary<string, object>? metadata = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        ArgumentException.ThrowIfNullOrWhiteSpace(status);
-        ArgumentException.ThrowIfNullOrWhiteSpace(category);
         lock (_recordGate)
         {
-            _findings.Add(new ProtoTraceFindingRecord(
-                $"finding-{_findings.Count + 1}",
-                null,
-                DateTimeOffset.UtcNow,
-                message,
-                status,
-                category,
-                targetName,
-                tags,
-                metadata));
+            _findings.Add(ProtoTraceRecords.Finding(
+                $"finding-{_findings.Count + 1}", null, message, status, category, targetName, tags, metadata));
         }
     }
 
     public string? CaptureActivity(Activity activity)
     {
         ArgumentNullException.ThrowIfNull(activity);
-        var attributes = new Dictionary<string, string?>(StringComparer.Ordinal)
-        {
-            ["activity.source"] = activity.Source.Name
-        };
-        foreach (var tag in activity.TagObjects)
-        {
-            // The same cap the test recorder and the OpenTelemetry export apply to tag values.
-            var value = tag.Value?.ToString();
-            if (value is { Length: > ProtoTestTraceRecorder.MaxTagValueLength }) continue;
-            attributes[tag.Key] = value;
-        }
-
-        var failed = activity.Status == ActivityStatusCode.Error;
+        var attributes = ProtoTraceActivity.Attributes(activity);
+        var failed = ProtoTraceActivity.IsFailure(activity);
         var id = $"run-{Interlocked.Increment(ref _sequence)}";
         _entries.Enqueue(new ProtoTraceEntry(
             id,
@@ -141,9 +102,7 @@ internal sealed class ProtoRunTraceWriter : IProtoTraceWriter
             activity.Duration,
             failed ? ProtoTraceOutcome.Failed : ProtoTraceOutcome.Succeeded,
             attributes,
-            failed && activity.StatusDescription is { Length: > 0 } description
-                ? new ProtoTraceError("ActivityError", description)
-                : null));
+            ProtoTraceActivity.Error(activity)));
         return id;
     }
 

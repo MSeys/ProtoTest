@@ -83,8 +83,7 @@ The rule of thumb: **infrastructure registers once, clients compose, config call
 | `AddSink<TSink>` | the first registration of the sink type wins; a repeated generic call appends its `configure` callback |
 | `AddInfrastructure`, `AddResource` | the same instance is a no-op (`AddInfrastructure` also merges the repeated call's settings keys); a different instance under the same id throws *"already owned by the run"* |
 | `AddClient` | clients compose and the first registration that initializes for a type and name wins |
-| `ConfigureResponses`, `CaptureAttachments` (REST, GraphQL) | callbacks compose; the known configuration section is bound over the result |
-| `CaptureAttachments` (gRPC, Messaging) | the last call replaces the previous options; the known section still binds over them |
+| `ConfigureResponses`, `CaptureAttachments` (all protocols) | callbacks compose; the known configuration section is bound over the result |
 | `AddSql`, `AddSheets`, `AddEntityFrameworkCore` | the first call wins; later calls are no-ops |
 | `AddData` | composes onto one registry; every call's callback runs |
 | `AddCollector<TCollector>` | the same collector type for the same target registers once |

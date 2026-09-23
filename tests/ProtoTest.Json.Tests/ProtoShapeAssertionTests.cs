@@ -254,6 +254,75 @@ public sealed class ProtoShapeAssertionTests
         await host.StopAsync();
     }
 
+    [Test]
+    public async Task Assert_ShouldDescribeScalarTypesAsTheMatcherComparesThem()
+    {
+        var builder = new ProtoHostBuilder();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("scalar shape description", TestMethod());
+
+        ProtoShapeAssertion.Assert(
+            new ProtoShapeAssertionContext(context, "ProtoTest.Tests", "Assert shape"),
+            """{"day":"2026-09-23","link":"https://example.test/"}""",
+            new ScalarShape(),
+            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        var operation = host.Trace.Snapshot().Tests.Single().Entries
+            .Single(entry => entry.Kind == "assert.json.shape");
+        Assert.Multiple(() =>
+        {
+            Assert.That(operation.Attributes["shape.expected"], Does.Contain("\"day\":\"2026-09-23\""),
+                "a DateOnly is a scalar on the describing side too, not an expanded object");
+            Assert.That(operation.Attributes["shape.expected"], Does.Contain("\"link\":\"https://example.test/\""));
+            Assert.That(operation.Attributes["shape.expected"], Does.Not.Contain("dayNumber"));
+        });
+        await host.StopAsync();
+    }
+
+    [Test]
+    public async Task Assert_ShouldDescribePropertiesWithTheMatchersWireNames()
+    {
+        var builder = new ProtoHostBuilder();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("wire name shape description", TestMethod());
+
+        ProtoShapeAssertion.Assert(
+            new ProtoShapeAssertionContext(context, "ProtoTest.Tests", "Assert shape"),
+            """{"display_name":"Proto"}""",
+            new WireShape());
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        var operation = host.Trace.Snapshot().Tests.Single().Entries
+            .Single(entry => entry.Kind == "assert.json.shape");
+        Assert.Multiple(() =>
+        {
+            Assert.That(operation.Attributes["shape.expected"], Does.Contain("\"display_name\""),
+                "the recorded expected shape uses the name the assertion compared");
+            Assert.That(operation.Attributes["shape.expected"], Does.Not.Contain("Secret"),
+                "[JsonIgnore] properties are left out of the description like they are out of the match");
+            Assert.That(operation.Attributes["shape.expected"], Does.Not.Contain("hidden"));
+        });
+        await host.StopAsync();
+    }
+
+    private sealed class ScalarShape
+    {
+        public DateOnly Day { get; init; } = new(2026, 9, 23);
+        public Uri Link { get; init; } = new("https://example.test/");
+    }
+
+    private sealed class WireShape
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("display_name")]
+        public string DisplayName { get; init; } = "Proto";
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string Secret { get; init; } = "hidden";
+    }
+
     private sealed class NodeShape
     {
         public string Name { get; set; } = string.Empty;

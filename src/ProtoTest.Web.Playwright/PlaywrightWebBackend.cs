@@ -190,7 +190,9 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     public async ValueTask SelectOptionAsync(WebElementReference element, string value, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await ExecuteResolvedAsync(element, locator => locator.SelectOptionAsync(value));
+        // Value only, so the label of another option can never satisfy the selection: that is the
+        // documented contract and the behavior Selenium already implements.
+        await ExecuteResolvedAsync(element, locator => locator.SelectOptionAsync(new SelectOptionValue { Value = value }));
     }
 
     public async ValueTask PressAsync(WebElementReference element, WebKey key, CancellationToken cancellationToken = default)
@@ -222,9 +224,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         cancellationToken.ThrowIfCancellationRequested();
         var locator = Resolve(element);
         var count = await locator.CountAsync();
-        if (count > 1)
-            throw new WebElementResolutionException(
-                $"Expected at most one element for {element.Locator.Describe()} in {element.ComponentPath}, but found {count}.");
+        if (count > 1) throw WebBackendErrors.MultipleMatch(element.Locator, element.ComponentPath, count);
         return count == 1 && await locator.IsVisibleAsync();
     }
 
@@ -233,7 +233,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         cancellationToken.ThrowIfCancellationRequested();
         var locator = Resolve(element);
         var count = await locator.CountAsync();
-        if (count > 1) throw MultipleMatch(element, count);
+        if (count > 1) throw WebBackendErrors.MultipleMatch(element.Locator, element.ComponentPath, count);
         return count == 1 && await locator.IsEnabledAsync();
     }
 
@@ -242,7 +242,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         cancellationToken.ThrowIfCancellationRequested();
         var locator = Resolve(element);
         var count = await locator.CountAsync();
-        if (count > 1) throw MultipleMatch(element, count);
+        if (count > 1) throw WebBackendErrors.MultipleMatch(element.Locator, element.ComponentPath, count);
         return count == 1 && await locator.IsCheckedAsync();
     }
 
@@ -295,21 +295,9 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
             _sessionName,
             failure,
             Interlocked.Increment(ref _failureSequence),
-            async prefix => ProtoTestAttachment.FromBytes(
-                $"web-{prefix}-failure.png",
-                await Page.ScreenshotAsync(new PageScreenshotOptions { FullPage = true }),
-                "image/png",
-                "Playwright page at web operation failure."),
-            async prefix => ProtoTestAttachment.FromText(
-                $"web-{prefix}-page.html",
-                await Page.ContentAsync(),
-                "text/html",
-                "DOM snapshot at web operation failure."),
-            prefix => ValueTask.FromResult<ProtoTestAttachment?>(ProtoTestAttachment.FromText(
-                $"web-{prefix}-location.txt",
-                CurrentLocation(),
-                "text/plain",
-                "URL at web operation failure.")));
+            async () => await Page.ScreenshotAsync(new PageScreenshotOptions { FullPage = true }),
+            async () => await Page.ContentAsync(),
+            async () => (CurrentLocation(), await Page.TitleAsync()));
     }
 
     /// <summary>
@@ -339,13 +327,11 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         }
         catch (TimeoutException)
         {
-            throw new WebActionabilityException(
-                $"Element '{element.ComponentPath}.{element.Name}' did not become actionable within " +
-                $"{_options.ActionTimeout}. Locator: {element.Locator.Describe()}.");
+            throw WebBackendErrors.NotActionable(element, _options.ActionTimeout);
         }
         catch (PlaywrightException exception) when (IsStrictViolation(exception))
         {
-            throw MultipleMatch(element);
+            throw WebBackendErrors.MultipleMatch(element.Locator, element.ComponentPath, null);
         }
     }
 
@@ -358,13 +344,11 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         }
         catch (TimeoutException)
         {
-            throw new WebElementResolutionException(
-                $"Element '{element.ComponentPath}.{element.Name}' was not present within " +
-                $"{_options.ActionTimeout}. Locator: {element.Locator.Describe()}.");
+            throw WebBackendErrors.NotPresent(element, _options.ActionTimeout);
         }
         catch (PlaywrightException exception) when (IsStrictViolation(exception))
         {
-            throw MultipleMatch(element);
+            throw WebBackendErrors.MultipleMatch(element.Locator, element.ComponentPath, null);
         }
     }
 
@@ -457,7 +441,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         return left.And(Apply(scope, locator.Right));
     }
 
-    private static AriaRole MapRole(WebRole role) => role switch
+    internal static AriaRole MapRole(WebRole role) => role switch
     {
         WebRole.Alert => AriaRole.Alert,
         WebRole.Button => AriaRole.Button,
@@ -497,12 +481,6 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     };
 
     private static string MapKey(WebKey key) => WebKeyMap.Get(key).Playwright;
-
-    private static WebElementResolutionException MultipleMatch(WebElementReference element, int count)
-        => new($"Expected at most one element for {element.Locator.Describe()} in {element.ComponentPath}, but found {count}.");
-
-    private static WebElementResolutionException MultipleMatch(WebElementReference element)
-        => new($"Expected at most one element for {element.Locator.Describe()} in {element.ComponentPath}, but Playwright reported a strict mode violation (more than one element matched).");
 
     private static string CssIdentifier(string value)
     {
@@ -598,10 +576,13 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
             },
             parentId: correlationId);
 
-    private static string? SafeUrl(string? value)
+    internal static string? SafeUrl(string? value)
     {
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)) return value;
-        return new UriBuilder(uri) { Query = string.Empty, Fragment = string.Empty }.Uri.ToString();
+        if (value is null) return null;
+        var withoutUserInfo = ProtoUriSanitizer.WithoutUserInfo(value);
+        return Uri.TryCreate(withoutUserInfo, UriKind.Absolute, out var uri)
+            ? new UriBuilder(uri) { Query = string.Empty, Fragment = string.Empty }.Uri.ToString()
+            : withoutUserInfo;
     }
 
     private static string? Truncate(string? value)

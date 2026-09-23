@@ -7,6 +7,12 @@ namespace ProtoTest.Core;
 /// </summary>
 internal static class ProtoTraceWire
 {
+    /// <summary>The document format the viewer reads; checked against design/prototrace-wire.contract.json.</summary>
+    internal const string SpanFormatVersion = "2.0";
+
+    /// <summary>The state document format; checked against design/prototrace-wire.contract.json.</summary>
+    internal const string StateFormatVersion = "1.1";
+
     public static object Spans(ProtoTraceRun run)
     {
         var groups = new List<object>();
@@ -33,14 +39,14 @@ internal static class ProtoTraceWire
             run.Record,
             run.Artifacts));
 
-        return new { formatVersion = "2.0", resourceSpans = groups };
+        return new { formatVersion = SpanFormatVersion, resourceSpans = groups };
     }
 
     public static object State(ProtoTraceRun run) => new
     {
         // 1.1: tracked values carry the generic kind "value" with the domain type in the id
         // (`{type}:{identity}`); 1.0 wrote the domain type as the kind.
-        formatVersion = "1.1",
+        formatVersion = StateFormatVersion,
         run = new { items = Items(run.Entities, run.Values) },
         tests = run.Tests.Select(test => new
         {
@@ -305,6 +311,10 @@ internal static class ProtoTraceWire
 
     private static string Key(string kind, string id) => $"{kind}\u001f{id}";
 
-    private static string Lower<T>(T value) where T : struct, Enum
+    /// <summary>
+    /// The lowercase token for an enum the wire and its readers share, so a value the viewer normalizes
+    /// cannot drift from the one the writer emits.
+    /// </summary>
+    internal static string Lower<T>(T value) where T : struct, Enum
         => value.ToString().ToLowerInvariant();
 }

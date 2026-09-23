@@ -215,8 +215,7 @@ public sealed class GraphQLRequestBuilder
         var identifier = $"{operation.Type} {operation.Name ?? "<anonymous>"}";
         var operationScope = _context.Trace
             .Operation("graphql.operation", $"GraphQL · {identifier}", "ProtoTest.GraphQL")
-            .For(ProtoTraceEntityKinds.Client, $"client:{typeof(HttpClient).FullName}:{_targetName}")
-            .With("client.name", _targetName)
+            .ForClient(typeof(HttpClient), _targetName)
             .With("graphql.operation.type", operation.Type)
             .With("graphql.operation.name", operation.Name);
         if (_headers.Count > 0)
@@ -233,11 +232,13 @@ public sealed class GraphQLRequestBuilder
             .Begin();
         try
         {
-            endpoint = _baseAddressResolver is not null
-                ? await _baseAddressResolver(_context, cancellationToken)
-                : _client.BaseAddress ?? throw new InvalidOperationException($"GraphQL client '{_targetName}' has no endpoint.");
-            if (!endpoint.IsAbsoluteUri || !ProtoHttpUri.IsHttpUri(endpoint))
-                throw new InvalidOperationException("A per-test GraphQL endpoint must be an absolute HTTP or HTTPS URI.");
+            endpoint = await ProtoHttpEndpoint.ResolveBaseAddressAsync(
+                _client,
+                ProtoGraphQLBuilder.ProtocolName,
+                _targetName,
+                _baseAddressResolver,
+                _context,
+                cancellationToken);
             resolveOperation.SetAttribute("server.address", endpoint.GetLeftPart(UriPartial.Authority));
             resolveOperation.Succeed();
         }
@@ -246,62 +247,38 @@ public sealed class GraphQLRequestBuilder
             stopwatch.Stop();
             resolveOperation.Fail(exception);
             traceOperation.Fail(exception);
-            TryRecordFailure(operation, identifier, stopwatch.Elapsed, exception);
+            TryRecordFailure(operation, identifier, null, stopwatch.Elapsed, exception, cancellationToken);
             throw;
         }
-        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-        request.Headers.Accept.Add(GraphQLMediaType);
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json", 0.9));
-        var requestContent = GraphQLRequestContent.Create(operation.DocumentText, operation.Name, _variables);
-        var requestEnvelope = requestContent.DiagnosticJson;
-        var variablesJson = requestContent.VariablesJson;
-        request.Content = requestContent.Content;
-        ApplyHeaders(request);
-        if (requestContent.RequiresPreflight)
-            request.Headers.TryAddWithoutValidation("GraphQL-preflight", "1");
-
-        var attachmentOptions = _context.ResolveAttachmentOptions(ProtoGraphQLBuilder.ProtocolName);
-
         try
         {
-            var requestNumber = attachmentOptions is null
-                ? (int?)null
-                : (_context.TryResolve<GraphQLContextState>() ?? throw new InvalidOperationException("GraphQL context state was not initialized.")).NextRequestNumber();
-            var attachmentPrefix = requestNumber is null ? null : $"graphql-{requestNumber:00}";
-            if (attachmentOptions?.CaptureRequestBodies == true)
-                _context.AddAttachment(
-                    $"{attachmentPrefix}-request",
-                    JsonDiagnosticSanitizer.Sanitize(
-                        GraphQLDocumentRedactor.RedactEnvelope(requestEnvelope, attachmentOptions),
-                        attachmentOptions),
-                    "application/json",
-                    identifier);
-
-            _resolvedAuthenticator = await ProtoHttpAuthenticationApplier.ApplyAsync(
-                _authenticatorFactory,
-                _resolvedAuthenticator,
-                request,
-                _context,
-                _targetName,
+            var prepared = await PrepareRequestAsync(
+                operation,
+                identifier,
+                endpoint,
                 traceOperation,
+                subscription: false,
                 cancellationToken);
+            using var request = prepared.Request;
+            var attachmentOptions = prepared.AttachmentOptions;
 
             HttpResponseMessage? rawResponse = null;
             try
             {
-                rawResponse = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-                await ProtoHttpResponseBuffer.BufferAsync(
-                    rawResponse,
+                var exchange = await ProtoHttpExchange.SendAsync(
+                    _client,
+                    request,
                     ResolveResponseOptions().MaxResponseBodyBytes,
                     cancellationToken);
-                var content = await rawResponse.Content.ReadAsStringAsync(cancellationToken);
+                rawResponse = exchange.Response;
+                var content = exchange.Body;
                 stopwatch.Stop();
                 var response = new GraphQLResponse(rawResponse, content, stopwatch.Elapsed, _context, _targetName, identifier, operation,
-                    attachmentOptions, attachmentPrefix, traceOperation.Id, _simpleRootField);
+                    attachmentOptions, prepared.AttachmentPrefix, traceOperation.Id, _simpleRootField);
 
                 if (attachmentOptions?.CaptureResponses == true)
                     _context.AddAttachment(
-                        $"{attachmentPrefix}-response",
+                        $"{prepared.AttachmentPrefix}-response",
                         JsonDiagnosticSanitizer.Sanitize(
                             GraphQLDocumentRedactor.Redact(content, attachmentOptions),
                             attachmentOptions),
@@ -320,7 +297,7 @@ public sealed class GraphQLRequestBuilder
                         response.Errors.Count,
                         response.Errors.Select(error => error.Code).Where(code => code is not null).Cast<string>().ToArray(),
                         stopwatch.Elapsed,
-                        variablesJson is null ? null : JsonDiagnosticSanitizer.Sanitize(variablesJson, attachmentOptions))));
+                        prepared.VariablesJson)));
                 traceOperation
                     .SetAttribute("http.response.status_code", ((int)rawResponse.StatusCode).ToString())
                     .SetAttribute("graphql.error.count", response.Errors.Count.ToString());
@@ -337,7 +314,7 @@ public sealed class GraphQLRequestBuilder
         {
             stopwatch.Stop();
             traceOperation.Fail(exception);
-            TryRecordFailure(operation, identifier, stopwatch.Elapsed, exception);
+            TryRecordFailure(operation, identifier, endpoint, stopwatch.Elapsed, exception, cancellationToken);
             throw;
         }
     }
@@ -351,56 +328,29 @@ public sealed class GraphQLRequestBuilder
 
         var identifier = $"subscription {operation.Name ?? "<anonymous>"}";
         var stopwatch = Stopwatch.StartNew();
-        var endpoint = _baseAddressResolver is not null
-            ? await _baseAddressResolver(_context, cancellationToken)
-            : _client.BaseAddress ?? throw new InvalidOperationException($"GraphQL client '{_targetName}' has no endpoint.");
-        if (!endpoint.IsAbsoluteUri || !ProtoHttpUri.IsHttpUri(endpoint))
-            throw new InvalidOperationException("A per-test GraphQL endpoint must be an absolute HTTP or HTTPS URI.");
+        var endpoint = await ProtoHttpEndpoint.ResolveBaseAddressAsync(
+            _client,
+            ProtoGraphQLBuilder.ProtocolName,
+            _targetName,
+            _baseAddressResolver,
+            _context,
+            cancellationToken);
 
-        var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+        HttpRequestMessage? request = null;
         HttpResponseMessage? rawResponse = null;
         WebSocket? rawSocket = null;
         try
         {
-            if (_subscriptionTransport == GraphQLSubscriptionTransport.Sse)
-                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
-            var requestContent = GraphQLRequestContent.Create(operation.DocumentText, operation.Name, _variables);
-            request.Content = requestContent.Content;
-            ApplyHeaders(request);
-            if (requestContent.RequiresPreflight)
-                request.Headers.TryAddWithoutValidation("GraphQL-preflight", "1");
-
-            // A subscription has no request operation to attach the outcome to; an auth failure still
-            // surfaces through the subscription's error path.
-            _resolvedAuthenticator = await ProtoHttpAuthenticationApplier.ApplyAsync(
-                _authenticatorFactory,
-                _resolvedAuthenticator,
-                request,
-                _context,
-                _targetName,
-                requestOperation: null,
+            var prepared = await PrepareRequestAsync(
+                operation,
+                identifier,
+                endpoint,
+                authOperation: null,
+                subscription: true,
                 cancellationToken);
-
-            var attachmentOptions = _context.ResolveAttachmentOptions(ProtoGraphQLBuilder.ProtocolName);
-            var requestNumber = attachmentOptions is null
-                ? (int?)null
-                : (_context.TryResolve<GraphQLContextState>()
-                    ?? throw new InvalidOperationException("GraphQL context state was not initialized.")).NextRequestNumber();
-            var attachmentPrefix = requestNumber is null ? null : $"graphql-{requestNumber:00}";
-            if (attachmentOptions?.CaptureRequestBodies == true)
-                _context.AddAttachment(
-                    $"{attachmentPrefix}-request",
-                    JsonDiagnosticSanitizer.Sanitize(
-                        GraphQLDocumentRedactor.RedactEnvelope(requestContent.DiagnosticJson, attachmentOptions),
-                        attachmentOptions),
-                    "application/json",
-                    identifier);
-
-            var variablesJson = requestContent.VariablesJson is null
-                ? null
-                : JsonDiagnosticSanitizer.Sanitize(
-                    requestContent.VariablesJson,
-                    attachmentOptions);
+            request = prepared.Request;
+            var attachmentOptions = prepared.AttachmentOptions;
+            var requestContent = prepared.Content;
 
             if (_subscriptionTransport == GraphQLSubscriptionTransport.WebSocket)
             {
@@ -437,8 +387,8 @@ public sealed class GraphQLRequestBuilder
                     identifier,
                     operation,
                     attachmentOptions,
-                    attachmentPrefix,
-                    variablesJson,
+                    prepared.AttachmentPrefix,
+                    prepared.VariablesJson,
                     _simpleRootField);
                 rawSocket = null;
                 return webSocketSubscription;
@@ -461,8 +411,8 @@ public sealed class GraphQLRequestBuilder
                 identifier,
                 operation,
                 attachmentOptions,
-                attachmentPrefix,
-                variablesJson,
+                prepared.AttachmentPrefix,
+                prepared.VariablesJson,
                 _simpleRootField);
             rawResponse = null;
             return subscription;
@@ -470,10 +420,90 @@ public sealed class GraphQLRequestBuilder
         catch (Exception exception)
         {
             stopwatch.Stop();
-            request.Dispose();
+            request?.Dispose();
             rawResponse?.Dispose();
             rawSocket?.Dispose();
-            TryRecordFailure(operation, identifier, stopwatch.Elapsed, exception);
+            TryRecordFailure(operation, identifier, endpoint, stopwatch.Elapsed, exception, cancellationToken);
+            throw;
+        }
+    }
+
+    private sealed record PreparedGraphQLRequest(
+        HttpRequestMessage Request,
+        GraphQLRequestContent Content,
+        string? VariablesJson,
+        ProtoHttpAttachmentOptions? AttachmentOptions,
+        string? AttachmentPrefix);
+
+    /// <summary>
+    /// Builds the request both execution paths send: the content envelope, headers and preflight flag,
+    /// the authenticator, and the request-body attachment with the per-client sequence. A subscription
+    /// adds its transport's Accept header; a query or mutation always asks for the GraphQL response
+    /// media type.
+    /// </summary>
+    private async Task<PreparedGraphQLRequest> PrepareRequestAsync(
+        GraphQLBuiltOperation operation,
+        string identifier,
+        Uri endpoint,
+        ProtoTraceOperation? authOperation,
+        bool subscription,
+        CancellationToken cancellationToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+        try
+        {
+            if (!subscription)
+            {
+                request.Headers.Accept.Add(GraphQLMediaType);
+                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json", 0.9));
+            }
+            else if (_subscriptionTransport == GraphQLSubscriptionTransport.Sse)
+            {
+                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+            }
+
+            var requestContent = GraphQLRequestContent.Create(operation.DocumentText, operation.Name, _variables);
+            request.Content = requestContent.Content;
+            ProtoHttpHeaders.Apply(request, _headers);
+            if (requestContent.RequiresPreflight)
+                request.Headers.TryAddWithoutValidation("GraphQL-preflight", "1");
+
+            // A subscription has no request operation to attach the outcome to; an auth failure still
+            // surfaces through the subscription's error path.
+            _resolvedAuthenticator = await ProtoHttpAuthenticationApplier.ApplyAsync(
+                _authenticatorFactory,
+                _resolvedAuthenticator,
+                request,
+                _context,
+                _targetName,
+                authOperation,
+                cancellationToken);
+
+            var attachmentOptions = _context.ResolveAttachmentOptions(ProtoGraphQLBuilder.ProtocolName);
+            var requestNumber = attachmentOptions is null
+                ? (int?)null
+                : (_context.TryResolve<GraphQLContextState>()
+                    ?? throw new InvalidOperationException("GraphQL context state was not initialized.")).NextRequestNumber();
+            var attachmentPrefix = requestNumber is null ? null : $"graphql-{requestNumber:00}";
+            if (attachmentOptions?.CaptureRequestBodies == true)
+            {
+                _context.AddAttachment(
+                    $"{attachmentPrefix}-request",
+                    JsonDiagnosticSanitizer.Sanitize(
+                        GraphQLDocumentRedactor.RedactEnvelope(requestContent.DiagnosticJson, attachmentOptions),
+                        attachmentOptions),
+                    "application/json",
+                    identifier);
+            }
+
+            var variablesJson = requestContent.VariablesJson is null
+                ? null
+                : JsonDiagnosticSanitizer.Sanitize(requestContent.VariablesJson, attachmentOptions);
+            return new PreparedGraphQLRequest(request, requestContent, variablesJson, attachmentOptions, attachmentPrefix);
+        }
+        catch
+        {
+            request.Dispose();
             throw;
         }
     }
@@ -670,22 +700,6 @@ public sealed class GraphQLRequestBuilder
         }
     }
 
-    /// <summary>
-    /// Adds the configured headers to the request, mirroring REST: a header that can be added to
-    /// neither the request nor its content is an error rather than a silent drop.
-    /// </summary>
-    private void ApplyHeaders(HttpRequestMessage request)
-    {
-        foreach (var (name, value) in _headers)
-        {
-            if (!request.Headers.TryAddWithoutValidation(name, value)
-                && (request.Content is null || !request.Content.Headers.TryAddWithoutValidation(name, value)))
-            {
-                throw new InvalidOperationException($"Header '{name}' could not be added to the GraphQL request.");
-            }
-        }
-    }
-
     private void TraceConfiguration(string kind, string name, IReadOnlyDictionary<string, string?> attributes)
         => _context.Trace.WriteEvent(
             kind,
@@ -697,11 +711,15 @@ public sealed class GraphQLRequestBuilder
     private void TryRecordFailure(
         GraphQLBuiltOperation operation,
         string identifier,
+        Uri? requestUri,
         TimeSpan duration,
-        Exception exception)
+        Exception exception,
+        CancellationToken cancellationToken)
     {
         try
         {
+            var attachmentOptions = _context.ResolveAttachmentOptions(ProtoGraphQLBuilder.ProtocolName);
+            var diagnostics = ProtoHttpFailureDiagnostics.From(requestUri, exception, cancellationToken, attachmentOptions);
             _context.RecordObservation(new ProtoObservation(
                 _targetName,
                 "graphql.failure",
@@ -709,9 +727,11 @@ public sealed class GraphQLRequestBuilder
                 new GraphQLFailureData(
                     operation.Type,
                     operation.Name,
+                    diagnostics.RequestUri,
                     duration,
-                    exception.GetType().FullName ?? exception.GetType().Name,
-                    exception.Message)));
+                    diagnostics.ExceptionType,
+                    diagnostics.Message,
+                    diagnostics.IsCanceled)));
         }
         catch
         {

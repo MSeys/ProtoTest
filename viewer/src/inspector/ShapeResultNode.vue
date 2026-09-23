@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type { ShapeCheckNode } from "../trace/shapes";
+import { jsonLiteral } from "../trace/format";
 
 defineOptions({ name: "ShapeResultNode" });
 const props = defineProps<{ node: ShapeCheckNode }>();
@@ -11,9 +12,8 @@ const diagnostic = computed(() => {
   return /^values? did not match\.?$/i.test(reason) ? "" : reason;
 });
 function literal(value: unknown): string {
-  if (value === undefined) return "undefined";
   if (value !== null && typeof value === "object") return Array.isArray(value) ? "[…]" : "{…}";
-  return JSON.stringify(value) ?? String(value);
+  return jsonLiteral(value);
 }
 </script>
 

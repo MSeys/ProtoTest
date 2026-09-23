@@ -151,8 +151,7 @@ public sealed class RestRequestBuilder
         var attachmentOptions = _context.ResolveAttachmentOptions(ProtoRestBuilder.ProtocolName);
         using var traceOperation = _context.Trace
             .Operation("http.request", $"REST · {method.Method.ToUpperInvariant()} {routeTemplate}", "ProtoTest.Rest")
-            .For(ProtoTraceEntityKinds.Client, $"client:{typeof(HttpClient).FullName}:{_targetName}")
-            .With("client.name", _targetName)
+            .ForClient(typeof(HttpClient), _targetName)
             .With("http.request.method", method.Method.ToUpperInvariant())
             .With("http.route", routeTemplate)
             .With(_requestAttributes)
@@ -213,14 +212,7 @@ public sealed class RestRequestBuilder
                 }
             }
 
-            foreach (var (key, value) in _headers)
-            {
-                if (!request.Headers.TryAddWithoutValidation(key, value)
-                    && (request.Content is null || !request.Content.Headers.TryAddWithoutValidation(key, value)))
-                {
-                    throw new InvalidOperationException($"Header '{key}' could not be added to the REST request.");
-                }
-            }
+            ProtoHttpHeaders.Apply(request, _headers);
 
             _resolvedAuthenticator = await ProtoHttpAuthenticationApplier.ApplyAsync(
                 _authenticatorFactory,
@@ -267,16 +259,15 @@ public sealed class RestRequestBuilder
         HttpResponseMessage? responseMessage = null;
         try
         {
-            responseMessage = await _httpClient.SendAsync(
-                request,
-                HttpCompletionOption.ResponseHeadersRead,
-                ct);
             var responseOptions = _context.ResolveResponseOptions(ProtoRestBuilder.ProtocolName);
-            var bodyBytes = await ProtoHttpResponseBuffer.BufferAsync(
-                responseMessage,
+            var exchange = await ProtoHttpExchange.SendAsync(
+                _httpClient,
+                request,
                 responseOptions.MaxResponseBodyBytes,
                 ct);
-            var bodyString = await responseMessage.Content.ReadAsStringAsync(ct);
+            responseMessage = exchange.Response;
+            var bodyBytes = exchange.BodyBytes;
+            var bodyString = exchange.Body;
             stopwatch.Stop();
             var responseMediaType = responseMessage.Content.Headers.ContentType?.MediaType;
             var diagnosticBody = ProtoHttpDiagnosticSanitizer.SanitizeBody(
@@ -437,6 +428,7 @@ public sealed class RestRequestBuilder
     {
         try
         {
+            var diagnostics = ProtoHttpFailureDiagnostics.From(requestUri, exception, cancellationToken, attachmentOptions);
             _context.RecordObservation(new ProtoObservation(
                 TargetName: _targetName,
                 Kind: "http.failure",
@@ -444,11 +436,11 @@ public sealed class RestRequestBuilder
                 Data: new RestFailureData(
                     method.Method,
                     routeTemplate,
-                    ProtoHttpDiagnosticSanitizer.SanitizeUri(requestUri, attachmentOptions),
+                    diagnostics.RequestUri,
                     duration,
-                    exception.GetType().FullName ?? exception.GetType().Name,
-                    ProtoHttpDiagnosticSanitizer.SanitizeBody(exception.Message, attachmentOptions),
-                    cancellationToken.IsCancellationRequested || exception is OperationCanceledException)));
+                    diagnostics.ExceptionType,
+                    diagnostics.Message,
+                    diagnostics.IsCanceled)));
         }
         catch
         {

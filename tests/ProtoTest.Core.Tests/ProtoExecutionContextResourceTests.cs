@@ -97,6 +97,21 @@ public sealed class ProtoExecutionContextResourceTests
     }
 
     [Test]
+    public async Task ClientCompletion_ShouldRunInReverseRegistrationOrder()
+    {
+        using var rootProvider = new ServiceCollection().BuildServiceProvider();
+        await using var context = CreateContext(rootProvider);
+        var completed = new List<string>();
+        context.RegisterClient(new OrderingCompletion("first", completed), "First", disposeWithContext: false);
+        context.RegisterClient(new OrderingCompletion("second", completed), "Second", disposeWithContext: false);
+
+        await new ProtoClientCompletionHook().AfterTestAsync(context);
+
+        Assert.That(completed, Is.EqualTo(new[] { "second", "first" }),
+            "the completion hook relies on the registry snapshot being in registration order");
+    }
+
+    [Test]
     public async Task ClientResolution_ShouldSkipExcludedClientAtEveryLookupName()
     {
         using var rootProvider = new ServiceCollection().BuildServiceProvider();
@@ -143,6 +158,15 @@ public sealed class ProtoExecutionContextResourceTests
         public ValueTask CompleteAsync()
         {
             CompletionCount++;
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class OrderingCompletion(string name, List<string> completed) : IProtoClientCompletion
+    {
+        public ValueTask CompleteAsync()
+        {
+            completed.Add(name);
             return ValueTask.CompletedTask;
         }
     }

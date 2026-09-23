@@ -91,4 +91,21 @@ public sealed class WebPagePathTests
             Assert.That(WebPagePath.NormalizeRoute("/files/$id"), Is.EqualTo("/files/{id}"));
         });
     }
+
+    [Test]
+    public void NormalizeRoute_WithAnAbsoluteAddress_ShouldKeepTheAuthorityAndMapThePath()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                WebPagePath.NormalizeRoute("https://example.test/users/:id"),
+                Is.EqualTo("/users/{id}"));
+            Assert.That(
+                WebPagePath.NormalizeRoute("https://example.test/docs/[slug]?tab=all#top"),
+                Is.EqualTo("/docs/{slug}"));
+            Assert.That(
+                WebPagePath.NormalizeRoute("https://example.test"),
+                Is.EqualTo("/"));
+        });
+    }
 }

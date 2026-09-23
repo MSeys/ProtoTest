@@ -6,50 +6,12 @@ using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 using ProtoTest.Http;
 
-public sealed class GraphQLCoverageCollector(string targetName) : ProtoCoverageCollector(targetName)
+public sealed class GraphQLCoverageCollector(string targetName)
+    : ProtoCoverageCollector(targetName, "graphql.response", StringComparer.Ordinal)
 {
     // GraphQL names are case-sensitive: "query FindProducts" and "query findproducts" are distinct
-    // operations and must stay distinct coverage items.
-    private readonly Dictionary<string, ProtoReportItem> _operationItems = new(StringComparer.Ordinal);
-
+    // operations and must stay distinct coverage items, which the ordinal identifier comparer keeps.
     public override string Category => "GraphQL operation";
-
-    public override bool CanCollect(ProtoObservation observation)
-        => base.CanCollect(observation) && observation.Kind == "graphql.response";
-
-    public override void Collect(ProtoObservation observation)
-    {
-        ArgumentNullException.ThrowIfNull(observation);
-        lock (_lock)
-        {
-            if (!_operationItems.TryGetValue(observation.Identifier, out var item))
-            {
-                item = new ProtoReportItem(
-                    TargetName,
-                    Category,
-                    observation.Identifier,
-                    Kind: ProtoReportItemKinds.Coverage,
-                    Status: ProtoReportStatus.Neutral,
-                    IsCovered: false);
-            }
-
-            _operationItems[observation.Identifier] = item with
-            {
-                Status = ProtoReportStatus.Success,
-                Count = item.Count + 1,
-                IsCovered = true,
-                Metadata = MergeMetadata(item.Metadata, observation.Metadata)
-            };
-        }
-    }
-
-    public override IEnumerable<ProtoReportItem> GetReportItems()
-    {
-        lock (_lock)
-        {
-            return [.. _operationItems.Values];
-        }
-    }
 }
 
 public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector

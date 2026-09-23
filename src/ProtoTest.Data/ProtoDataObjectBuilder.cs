@@ -191,7 +191,7 @@ public sealed class ProtoDataObjectBuilder<T>
         var context = Proto.Context;
         using var operation = context.Trace
             .Operation("data.create_many", $"Create {count} · {typeof(T).Name} → {typeof(TResult).Name}", TraceSource)
-            .With("data.input_type", typeof(T).FullName)
+            .With("data.type", typeof(T).FullName)
             .With("data.result_type", typeof(TResult).FullName)
             .With("data.count", count.ToString())
             .Begin();

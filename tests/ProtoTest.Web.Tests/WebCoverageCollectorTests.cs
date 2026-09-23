@@ -130,6 +130,32 @@ public sealed class WebCoverageCollectorTests
     }
 
     [Test]
+    public void Collector_ShouldMapConfiguredRouteSyntaxToTheSamePatternAsDiscovery()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Web:Pages:0"] = "/users/:id",
+                ["ProtoTest:Web:Pages:1"] = "/docs/:pathMatch(.*)*"
+            })
+            .Build();
+        var collector = new WebCoverageCollector("Web", configuration);
+
+        collector.Collect(new ProtoObservation("Web", "web.page.verified", "/users/42"));
+        collector.Collect(new ProtoObservation("Web", "web.page.verified", "/docs/getting-started/install"));
+
+        var items = collector.GetReportItems().ToDictionary(item => item.Identifier, StringComparer.Ordinal);
+        Assert.Multiple(() =>
+        {
+            Assert.That(items.Keys, Is.EquivalentTo(new[] { "/users/{id}", "/docs/{...}" }));
+            Assert.That(items["/users/{id}"].IsCovered, Is.True,
+                "a configured :id pattern matches the concrete path like a discovered route");
+            Assert.That(items["/docs/{...}"].IsCovered, Is.True,
+                "a configured regex catch-all matches the rest of the path");
+        });
+    }
+
+    [Test]
     public void Collector_ShouldPreferAnExactEntryAndANonCatchAllPattern()
     {
         var configuration = new ConfigurationBuilder()

@@ -520,6 +520,18 @@ public sealed class SheetsTests
     }
 
     [Test]
+    public async Task Model_Column_ShouldAcceptACastExpression()
+    {
+        var (host, context) = Start("sheets model cast");
+        var model = context.Sheets().Open(_path).Model<SalesRow>();
+
+        var counts = model.Column(row => (long)row.Count);
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.That(counts.Values, Is.EqualTo(new long?[] { 12, 9 }));
+    }
+
+    [Test]
     public async Task Model_ShouldFailOnAnEmptyCellForANonNullableValueAndProjectOptionalDefaults()
     {
         var (host, context) = Start("sheets model empty");

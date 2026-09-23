@@ -29,10 +29,8 @@ public abstract class WebComponent
         where TComponent : WebComponent, new()
     {
         var componentName = string.IsNullOrWhiteSpace(name) ? typeof(TComponent).Name : name;
-        var roots = root is null ? Scope.Roots : [.. Scope.Roots, root];
-        var component = new TComponent();
-        component.Initialize(Session, new ComponentScope(roots, $"{Scope.Path}.{componentName}"));
-        return component;
+        var scope = root is null ? Scope : Scope.WithRoot(root);
+        return scope.Under(componentName).Create<TComponent>(Session);
     }
 
     protected WebComponentCollection<TComponent> Components<TComponent>(
@@ -84,4 +82,32 @@ public abstract class WebPage : WebComponent
         => Web.DownloadAsync(trigger, name, timeout, cancellationToken);
 }
 
-internal sealed record ComponentScope(IReadOnlyList<WebLocator> Roots, string Path);
+/// <summary>
+/// The scope a component resolves inside: the locator roots from its parents and the dotted path the
+/// traces name it by. Creating a component goes through <see cref="Create{TComponent}"/>, so every
+/// construction site builds the scope the same way.
+/// </summary>
+internal sealed record ComponentScope(IReadOnlyList<WebLocator> Roots, string Path)
+{
+    /// <summary>A scope one locator root deeper, such as a component addressed inside its parent.</summary>
+    public ComponentScope WithRoot(WebLocator root)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        return this with { Roots = [.. Roots, root] };
+    }
+
+    /// <summary>A scope one path segment deeper, so a child's trace names its parent chain.</summary>
+    public ComponentScope Under(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return this with { Path = $"{Path}.{name}" };
+    }
+
+    /// <summary>Creates and initializes a component in this scope.</summary>
+    public TComponent Create<TComponent>(WebSession session) where TComponent : WebComponent, new()
+    {
+        var component = new TComponent();
+        component.Initialize(session, this);
+        return component;
+    }
+}

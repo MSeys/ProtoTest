@@ -40,7 +40,7 @@ ProtoMessagingBuilder UseRabbitMq(this ProtoMessagingBuilder messaging,
 
 `UseBroker` is the adapter seam; `UseRabbitMq` is the built-in implementation of it. `AddMessaging` registers the options, the `ProtoMessageClient` initializer for every test, the run-scoped `messaging:broker` resource, and — only when an adapter is configured — the `Messaging` capability with kind `broker`.
 
-A repeated `AddMessaging` is not a no-op: its `configure` callback always runs, so a later call can add an adapter to an adapter-less first call or refresh attachment options. Infrastructure stays idempotent — one options object, one broker holder, one initializer, one capability and one run resource — and the first adapter configured wins. A call whose `configure` throws leaves no guard behind, so a later successful call still composes.
+A repeated `AddMessaging` is not a no-op: its `configure` callback always runs, so a later call can add an adapter to an adapter-less first call or extend attachment options. Infrastructure stays idempotent — one options object, one broker holder, one initializer, one capability and one run resource — and the first adapter configured wins. A call whose `configure` throws leaves no guard behind, so a later successful call still composes.
 
 :::tip[The in-memory broker is a test double, not a broker capability]
 A configured adapter is what makes the `Broker` capability true. The in-memory default registers none, so `[RequiresCapability(ProtoCapabilityKinds.Broker)]` skips where no real broker is configured instead of passing against the double (see [skip conditions](../../foundation/skip-conditions.md)).
@@ -56,7 +56,7 @@ A configured adapter is what makes the `Broker` capability true. The in-memory d
 | `ProtoTest:Messaging:Attachments:CaptureReceivedPayloads` | `MessagingAttachmentOptions.CaptureReceivedPayloads` | `bool` | `true` |
 | `ProtoTest:Messaging:Attachments:RedactSensitiveData` | `JsonDiagnosticOptions.RedactSensitiveData` | `bool` | `true` |
 | `ProtoTest:Messaging:Attachments:MaxDiagnosticBodyLength` | `JsonDiagnosticOptions.MaxDiagnosticBodyLength` | `int` | 65536 (64 KiB) |
-| `ProtoTest:Messaging:Attachments:SensitiveJsonProperties` | `JsonDiagnosticOptions.SensitiveJsonProperties` | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key` |
+| `ProtoTest:Messaging:Attachments:SensitiveJsonProperties` | `JsonDiagnosticOptions.SensitiveJsonProperties` | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret` |
 | `ProtoTest:Messaging:RabbitMq:ConnectionString` | `RabbitMqOptions.ConnectionString` | `string` | `amqp://guest:guest@localhost:5672/` |
 | `ProtoTest:Messaging:RabbitMq:PollInterval` | `RabbitMqOptions.PollInterval` | `TimeSpan` | 25 ms |
 

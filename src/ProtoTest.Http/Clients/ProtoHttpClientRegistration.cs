@@ -13,6 +13,25 @@ public static class ProtoHttpClientRegistration
     public static string Qualify(string name, string? applicationName)
         => ProtoClientResolution.Qualify(name, applicationName);
 
+    /// <summary>
+    /// The first step every protocol's <c>AddClient</c> shares: default the client name, qualify it
+    /// with the application and record it there, so the application knows its clients and the names
+    /// never collide.
+    /// </summary>
+    public static (string ClientName, string RegisteredName, string? ApplicationName) RegisterClientName(
+        IProtoApplicationBuilder? application,
+        string protocolName,
+        string? name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(protocolName);
+        var clientName = name ?? "Default";
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
+        var applicationName = application?.ApplicationName;
+        var registeredName = ProtoClientResolution.Qualify(clientName, applicationName);
+        application?.RegisterClient(protocolName, clientName);
+        return (clientName, registeredName, applicationName);
+    }
+
     /// <summary>Registers a named HTTP client with an explicit or application-resolved base URL.</summary>
     public static IProtoTargetBuilder AddClient(
         IServiceCollection services,
@@ -88,11 +107,7 @@ public static class ProtoHttpClientRegistration
         Action<IHttpClientBuilder>? configure,
         string? endpoint)
     {
-        var clientName = name ?? "Default";
-        ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
-        var applicationName = application?.ApplicationName;
-        var registeredName = Qualify(clientName, applicationName);
-        application?.RegisterClient(protocolName, clientName);
+        var (_, registeredName, applicationName) = RegisterClientName(application, protocolName, name);
 
         return AddClient(
             services,
@@ -117,12 +132,7 @@ public static class ProtoHttpClientRegistration
         Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> baseAddressResolver,
         Action<IHttpClientBuilder>? configure)
     {
-        var clientName = name ?? "Default";
-        ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
-        var applicationName = application?.ApplicationName;
-        var registeredName = Qualify(clientName, applicationName);
-        application?.RegisterClient(protocolName, clientName);
-
+        var (_, registeredName, applicationName) = RegisterClientName(application, protocolName, name);
         return AddClient(services, protocolName, registeredName, baseAddressResolver, configure, applicationName);
     }
 }

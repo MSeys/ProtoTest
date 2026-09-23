@@ -23,8 +23,7 @@ public static class ProtoHostBuilderExtensions
             RegisterInfrastructure(services);
             configure?.Invoke(new ProtoGraphQLBuilder(services));
         });
-        return builder.AddCapability(new ProtoCapabilityDescriptor(
-            "GraphQL", ProtoCapabilityKinds.Protocol, "ProtoTest.GraphQL"));
+        return builder.AddCapability(ProtoGraphQLBuilder.Protocol.Capability);
     }
 
     /// <summary>
@@ -39,13 +38,20 @@ public static class ProtoHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(application);
         RegisterInfrastructure(application.Services);
         configure?.Invoke(new ProtoGraphQLBuilder(application.Services, application));
-        return application.AddCapability(new ProtoCapabilityDescriptor(
-            "GraphQL", ProtoCapabilityKinds.Protocol, "ProtoTest.GraphQL"));
+        return application.AddCapability(ProtoGraphQLBuilder.Protocol.Capability);
     }
+
+    /// <summary>Marks one successful AddGraphQL call, so the hook is registered once.</summary>
+    private sealed class GraphQLRegistration;
 
     private static void RegisterInfrastructure(IServiceCollection services)
     {
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, GraphQLLifecycleHook>());
+        if (!ProtoRegistrationGuard.TryRegisterOnce<GraphQLRegistration>(services))
+        {
+            return;
+        }
+
+        services.AddSingleton<IProtoTestHook>(new ProtoHttpAuthLifecycleHook(ProtoGraphQLBuilder.Protocol));
         services.TryAddSingleton<IGraphQLWebSocketFactory, ClientGraphQLWebSocketFactory>();
         ProtoHttpOptionsRegistration.TryAddResponseOptions(
             services,

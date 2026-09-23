@@ -13,8 +13,8 @@ public class AuthAttributeTests
         // Arrange
         using var provider = new ServiceCollection().BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var rest = new CaptureHook("Rest");
-        var graphql = new CaptureHook("GraphQL");
+        var rest = Hook("Rest");
+        var graphql = Hook("GraphQL");
         var context = new ProtoExecutionContext("Test", scope, "00001", Method(nameof(GraphQLOnly)));
 
         // Act
@@ -24,8 +24,8 @@ public class AuthAttributeTests
         // Assert
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(rest.Factory, Is.Null);
-            Assert.That(graphql.Factory, Is.Not.Null);
+            Assert.That(Factory(context, "Rest"), Is.Null);
+            Assert.That(Factory(context, "GraphQL"), Is.Not.Null);
         }
     }
 
@@ -35,8 +35,8 @@ public class AuthAttributeTests
         // Arrange
         using var provider = new ServiceCollection().BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var rest = new CaptureHook("Rest");
-        var graphql = new CaptureHook("GraphQL");
+        var rest = Hook("Rest");
+        var graphql = Hook("GraphQL");
         var context = new ProtoExecutionContext("Test", scope, "00001", Method(nameof(EveryProtocol)));
 
         // Act
@@ -46,8 +46,8 @@ public class AuthAttributeTests
         // Assert
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(rest.Factory, Is.Not.Null);
-            Assert.That(graphql.Factory, Is.Not.Null);
+            Assert.That(Factory(context, "Rest"), Is.Not.Null);
+            Assert.That(Factory(context, "GraphQL"), Is.Not.Null);
         }
     }
 
@@ -57,15 +57,15 @@ public class AuthAttributeTests
         // Arrange
         using var provider = new ServiceCollection().BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var hook = new CaptureHook("Rest");
+        var hook = Hook("Rest");
         var context = new ProtoExecutionContext("Test", scope, "00001", Method(nameof(EveryProtocol), typeof(MethodOverrideCases)));
 
         // Act
         await hook.BeforeTestAsync(context);
 
         // Assert: the method attribute replaces the class-level one rather than merging.
-        Assert.That(hook.Factory, Is.Not.Null);
-        var authenticator = hook.Factory!(context);
+        Assert.That(Factory(context, "Rest"), Is.Not.Null);
+        var authenticator = Factory(context, "Rest")!(context);
         Assert.That(authenticator, Is.TypeOf<RecordingAuthenticator>());
     }
 
@@ -74,15 +74,15 @@ public class AuthAttributeTests
     {
         using var provider = new ServiceCollection().BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var hook = new CaptureHook("Rest");
+        var hook = Hook("Rest");
         // The method is declared in the base class; the [Auth] lives on the derived class that runs it.
         var method = typeof(DerivedAuthCases).GetMethod(nameof(DerivedAuthCases.InheritedTest))!;
         var context = new ProtoExecutionContext("Test", scope, "00002", method);
 
         await hook.BeforeTestAsync(context);
 
-        Assert.That(hook.Factory, Is.Not.Null);
-        var authenticator = hook.Factory!(context);
+        Assert.That(Factory(context, "Rest"), Is.Not.Null);
+        var authenticator = Factory(context, "Rest")!(context);
         Assert.That(authenticator, Is.TypeOf<RecordingAuthenticator>());
     }
 
@@ -91,15 +91,15 @@ public class AuthAttributeTests
     {
         using var provider = new ServiceCollection().BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var hook = new CaptureHook("Rest");
+        var hook = Hook("Rest");
         // The [Auth] is on the base class; the derived class inherits the test method and the attribute.
         var method = typeof(DerivedNoAuthCases).GetMethod(nameof(BaseWithAuthCases.InheritedTest))!;
         var context = new ProtoExecutionContext("Test", scope, "00003", method);
 
         await hook.BeforeTestAsync(context);
 
-        Assert.That(hook.Factory, Is.Not.Null);
-        var authenticator = hook.Factory!(context);
+        Assert.That(Factory(context, "Rest"), Is.Not.Null);
+        var authenticator = Factory(context, "Rest")!(context);
         Assert.That(authenticator, Is.TypeOf<RecordingAuthenticator>());
     }
 
@@ -152,15 +152,13 @@ public class AuthAttributeTests
     {
     }
 
-    private sealed class CaptureHook(string protocolName) : ProtoHttpAuthLifecycleHook(protocolName)
-    {
-        public Func<ProtoExecutionContext, IProtoHttpAuthenticator>? Factory { get; private set; }
+    private static ProtoHttpAuthLifecycleHook Hook(string protocolName)
+        => new(new ProtoProtocol(protocolName, protocolName, $"ProtoTest.{protocolName}", "test.response", "Test"));
 
-        protected override void SetContext(
-            ProtoExecutionContext context,
-            Func<ProtoExecutionContext, IProtoHttpAuthenticator>? authenticatorFactory)
-            => Factory = authenticatorFactory;
-    }
+    private static Func<ProtoExecutionContext, IProtoHttpAuthenticator>? Factory(
+        ProtoExecutionContext context,
+        string protocolName)
+        => context.TryResolve<ProtoHttpContextState>(protocolName)?.AuthenticatorFactory;
 
     public sealed class RecordingAuthenticator : IProtoHttpAuthenticator
     {

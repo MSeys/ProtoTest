@@ -122,7 +122,7 @@ public class RestResponseTests
             new HttpResponseMessage(HttpStatusCode.OK),
             "{}",
             TimeSpan.Zero,
-            context);
+            new ProtoHttpResponseContext(Execution: context));
 
         var exception = Assert.Throws<RestStatusAssertionException>(
             () => response.ShouldNot.HaveHttpStatus(HttpStatusCode.OK));
@@ -164,10 +164,10 @@ public class RestResponseTests
             rawResponse,
             json,
             TimeSpan.FromMilliseconds(10),
-            context: _context,
-            targetName: "MyApiTarget",
-            routeIdentifier: "GET /api/test"
-        );
+            new ProtoHttpResponseContext(
+                Execution: _context,
+                TargetName: "MyApiTarget",
+                Identifier: "GET /api/test"));
 
         // Act
         response.ShouldMatchShape(expectedShape);
@@ -190,11 +190,12 @@ public class RestResponseTests
             new HttpResponseMessage(HttpStatusCode.OK),
             """{"id":42,"name":"ProtoTest"}""",
             TimeSpan.Zero,
-            _context,
-            "Orders",
-            "GET /orders/42",
-            new ProtoHttpAttachmentOptions(),
-            "rest-01");
+            new ProtoHttpResponseContext(
+                Execution: _context,
+                TargetName: "Orders",
+                Identifier: "GET /orders/42",
+                AttachmentOptions: new ProtoHttpAttachmentOptions(),
+                AttachmentPrefix: "rest-01"));
 
         response.ShouldMatchShape(new { id = 42 });
         response.ShouldMatchShape(new { name = "ProtoTest" });

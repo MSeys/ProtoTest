@@ -103,23 +103,20 @@ public sealed class ProtoGrpcClientInitializer(
     /// </summary>
     private void TraceConfiguration(ProtoExecutionContext context, Uri? address, string source)
     {
-        var state = new Dictionary<string, string?>
-        {
-            ["client.name"] = Name,
-            ["client.protocol"] = protocolName,
-            ["client.type"] = typeof(ProtoGrpcClient).FullName,
-            ["client.endpoint_source"] = source
-        };
+        var details = new Dictionary<string, string?>();
         if (address is not null)
         {
-            state["client.address"] = ProtoUriSanitizer.WithoutUserInfo(address.ToString());
+            details["client.address"] = ProtoUriSanitizer.WithoutUserInfo(address.ToString());
         }
 
-        context.Trace.SetEntityState(
-            ProtoTraceEntityKinds.Client,
-            ProtoClientTrace.Id(typeof(ProtoGrpcClient), ScopedName),
+        ProtoClientTraceState.SetConfiguration(
+            context,
+            typeof(ProtoGrpcClient),
+            protocolName,
+            Name,
+            ScopedName,
             $"gRPC client {Name}",
-            state,
-            scope: context.TestName);
+            source,
+            details);
     }
 }

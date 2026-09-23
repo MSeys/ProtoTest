@@ -25,15 +25,14 @@ internal static class ProtoGrpcAuthenticationApplier
             return;
         }
 
-        var authenticator = factory(context)
-            ?? throw new InvalidOperationException("The authenticator factory returned null.");
-        callOperation?
-            .SetAttribute("auth.outcome", "applied")
-            .SetAttribute("auth.type", authenticator.GetType().FullName);
-
         using var request = new HttpRequestMessage();
-        await authenticator.AuthenticateAsync(
-            new ProtoHttpAuthenticationContext(request, context, clientName),
+        await ProtoHttpAuthenticationApplier.ApplyAsync(
+            factory,
+            authenticator: null,
+            request,
+            context,
+            clientName,
+            callOperation,
             cancellationToken);
         foreach (var header in request.Headers)
         {

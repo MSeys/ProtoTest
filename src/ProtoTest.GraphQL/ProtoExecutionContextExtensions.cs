@@ -15,8 +15,8 @@ public static class ProtoExecutionContextExtensions
     public static GraphQLRequestBuilder GraphQL(this ProtoExecutionContext context, string? clientName = null)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var state = context.TryResolve<GraphQLContextState>();
-        var resolution = ProtoHttpClientResolver.Resolve(context, "GraphQL", clientName);
+        var state = context.TryResolve<ProtoHttpContextState>(ProtoGraphQLBuilder.Protocol.Key);
+        var resolution = ProtoHttpClientResolver.Resolve(context, ProtoGraphQLBuilder.Protocol.Key, clientName);
 
         var authenticatorFactory = state?.AuthenticatorFactory;
         var transportRegistration = context.Services.GetServices<GraphQLSubscriptionTransportRegistration>()
@@ -34,7 +34,7 @@ public static class ProtoExecutionContextExtensions
         context.Trace.WriteEvent(
             "graphql.builder.create",
             $"GraphQL builder · {resolution.RequestedName}",
-            "ProtoTest.GraphQL",
+            ProtoGraphQLBuilder.Protocol.TraceSource,
             outcome: ProtoTraceOutcome.Succeeded,
             attributes: new Dictionary<string, string?>
             {

@@ -15,6 +15,10 @@ public sealed class ProtoGraphQLBuilder : ProtoHttpProtocolBuilder<ProtoGraphQLB
     /// <summary>Configuration section backing <see cref="ProtoHttpProtocolBuilder{TBuilder}.CaptureAttachments"/>.</summary>
     public const string AttachmentsConfigurationSectionName = "ProtoTest:GraphQL:Attachments";
 
+    /// <summary>The protocol's identity: names, trace source, observation kind and coverage category.</summary>
+    internal static readonly ProtoProtocol Protocol = new(
+        ProtocolName, "GraphQL", "ProtoTest.GraphQL", "graphql.response", "GraphQL operation");
+
     internal ProtoGraphQLBuilder(IServiceCollection services, IProtoApplicationBuilder? application = null)
         : base(
             services,

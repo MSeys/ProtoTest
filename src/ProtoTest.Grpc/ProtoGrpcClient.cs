@@ -20,7 +20,7 @@ public sealed class ProtoGrpcClient : IDisposable
     private const int MaxCapturedStreamMessages = 10;
 
     private static readonly ProtoAttachmentFailure AttachmentFailure =
-        new("grpc.attachment.failed", "ProtoTest.Grpc", "gRPC attachment");
+        new("grpc.attachment.failed", ProtoGrpcBuilder.Protocol.TraceSource, "gRPC attachment");
 
     private static readonly JsonFormatter AttachmentFormatter = new(
         JsonFormatter.Settings.Default.WithFormatDefaultValues(true).WithFormatEnumsAsIntegers(false));
@@ -70,7 +70,7 @@ public sealed class ProtoGrpcClient : IDisposable
         ArgumentNullException.ThrowIfNull(method);
         var callNumber = Interlocked.Increment(ref _callSequence);
         using var operation = _context.Trace
-            .Operation("grpc.call", $"gRPC · {method.FullName}", "ProtoTest.Grpc")
+            .Operation("grpc.call", $"gRPC · {method.FullName}", ProtoGrpcBuilder.Protocol.TraceSource)
             .For(ProtoTraceEntityKinds.Client, ProtoClientTrace.Id(typeof(ProtoGrpcClient), _targetName))
             .With("rpc.system", "grpc")
             .With("rpc.service", method.ServiceName)
@@ -142,7 +142,7 @@ public sealed class ProtoGrpcClient : IDisposable
         ArgumentNullException.ThrowIfNull(requests);
         var callNumber = Interlocked.Increment(ref _callSequence);
         using var operation = _context.Trace
-            .Operation("grpc.call", $"gRPC · {method.FullName}", "ProtoTest.Grpc")
+            .Operation("grpc.call", $"gRPC · {method.FullName}", ProtoGrpcBuilder.Protocol.TraceSource)
             .For(ProtoTraceEntityKinds.Client, ProtoClientTrace.Id(typeof(ProtoGrpcClient), _targetName))
             .With("rpc.system", "grpc")
             .With("rpc.service", method.ServiceName)
@@ -221,7 +221,7 @@ public sealed class ProtoGrpcClient : IDisposable
         ArgumentNullException.ThrowIfNull(method);
         var callNumber = Interlocked.Increment(ref _callSequence);
         using var operation = _context.Trace
-            .Operation("grpc.call", $"gRPC · {method.FullName}", "ProtoTest.Grpc")
+            .Operation("grpc.call", $"gRPC · {method.FullName}", ProtoGrpcBuilder.Protocol.TraceSource)
             .For(ProtoTraceEntityKinds.Client, ProtoClientTrace.Id(typeof(ProtoGrpcClient), _targetName))
             .With("rpc.system", "grpc")
             .With("rpc.service", method.ServiceName)
@@ -424,7 +424,7 @@ public sealed class ProtoGrpcClient : IDisposable
     {
         // User metadata first, then authenticators: an authenticator may intentionally override.
         var callMetadata = BuildRawMetadata(metadata);
-        var state = _context.TryResolve<GrpcContextState>();
+        var state = _context.TryResolve<ProtoHttpContextState>(ProtoGrpcBuilder.Protocol.Key);
         await ProtoGrpcAuthenticationApplier.ApplyAsync(
             state?.AuthenticatorFactory,
             callMetadata,
@@ -483,7 +483,7 @@ public sealed class ProtoGrpcClient : IDisposable
     private ProtoObservation Observation(string service, string name, string status)
         => new(
             _targetName,
-            "grpc.response",
+            ProtoGrpcBuilder.Protocol.ResponseObservationKind,
             $"{service}/{name}",
             Data: null,
             Metadata: new Dictionary<string, object>

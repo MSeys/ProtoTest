@@ -117,15 +117,31 @@ deleted per-adapter policy and duplicated plumbing).
 
 ## Stage 3 — Integration contract
 
-- `ProtoProtocol` descriptor: name, trace source, observation kinds, capability label, coverage
-  category, consumed by registration, coverage and tracing (`INT-F3`, `INT-F9`, `INT-F32`).
-- `AddProtocol` helper and shared registration idiom (`INT-F17`).
-- Shared client registration/initializer base for HTTP and gRPC (`INT-F8`); one transport resolver
-  (`INT-F13`); one application resolver (`INT-F48`).
-- Shared per-protocol context state (`INT-F6`); shared HTTP/gRPC auth applier (`INT-F7`).
-- gRPC builder inherits the protocol builder (`INT-F8`).
-- Assertions: generic facade base (`INT-F5`); instance-based gRPC/messaging assertions (`INT-F29`);
-  one status assertion (`INT-F40`); `ProtoHttpResponseContext` (`INT-F41`, `INT-F42`).
+Done: the `ProtoProtocol` descriptor (`INT-F3`, `INT-F9`, `INT-F32`); one keyed
+`ProtoHttpContextState` and a concrete `ProtoHttpAuthLifecycleHook` replacing the per-protocol state
+and hooks (`INT-F6`); the shared HTTP/gRPC auth applier (`INT-F7`); `RegisterClientName` and
+`ProtoClientTraceState` sharing the client registration and configuration tracing (`INT-F8`); the
+shared status assertion and assertion facade (`INT-F40`, `INT-F5`); `ProtoHttpResponseContext`
+(`INT-F41`).
+
+Closed as no-change, with the reason recorded here:
+
+- `INT-F48` application resolver: the two lookups answer different questions (which application the
+  test selected vs. which application a registered target belongs to).
+- `INT-F17` AddProtocol helper: after the descriptor, capability property and `RegisterClientName`,
+  each integration's wrapper is four lines; a helper would add indirection for no net lines.
+- `INT-F29` instance-based gRPC/messaging assertions: C# has no extension properties, and the
+  static-extension idiom is deliberate and documented in the code.
+- `INT-F42` AssertShape context: the response base computes part of the shape context (the attachment
+  name and capture flag), so callers cannot supply the whole record; the current split is the right
+  seam.
+- `INT-F13` transport resolver: both protocols already resolve through
+  `ProtoApplicationResolution.ResolveTransportClient`; what differs (endpoint-rooted HTTP address vs.
+  gRPC channel forwarding) is protocol-specific policy, not duplication.
+- gRPC builder inheriting the HTTP protocol builder: the base is named for HTTP and carries
+  response/URL options gRPC has no use for; sharing the client naming covers the real overlap.
+
+Expected: net-negative.
 - Coverage collectors consume the descriptor (`INT-F9`).
 
 Expected: net-negative.
@@ -233,7 +249,7 @@ Record `git diff --shortstat` for the stage's commits after the suite is green.
 | 0 — Guardrails and test hygiene | Complete | +5314 / −4843 (net +471) | Net-positive by design: the guardrails and the shared support are the investment every later stage spends. Done: analyzers + `EnforceCodeStyleInBuild` + `TreatWarningsAsErrors`, `.editorconfig` + format gate (`eng/lint.ps1`), central package management, `global.json`, `.gitattributes`, CI runs the full suite on Windows; `tests/ProtoTest.TestSupport`; 34 `TestMethod()` reflection helpers and 81 `GetCurrentMethod()` casts replaced by `TestMethods.Placeholder`; sink fakes deduplicated; `ProbeTestService` replaces five copies; `SheetsTests` disposes its hosts; the giant fixtures are partial classes split by concern; gRPC cancellation fix with a regression test. Deferred to Stage 11: `AssemblyInfo` parallelization (changing the semantics is behavioural and belongs in its own pass), `AdapterContract`/`AdapterTestSupport` merge and the naming/AAA convention (cosmetic), the intentional RabbitMQ slow-predicate sleep. |
 | 1 — Core primitives | Complete | +915 / −403 (net +512) | Net-positive by design: the primitives every later stage spends. Done: `ProtoRunStateMachine`; `ProtoFlow` with named steps, timeout, retry and fail-fast/collect plus `ProtoTraceScope.RunAsync` adoption; `ProtoPolling` (WebPolling deleted); `JsonScalarTypes`, `ProtoJsonDefaults`, `ProtoJsonPropertyProjection`, `JsonDiagnosticSanitizer.LooksLikeJson`; `ProtoAttachmentCapture`; `ProtoRegistrationGuard`; `ProtoClientOwnership`. `ProtoProtocol` moved to Stage 3 where its readers land. |
 | 2 — Lifecycle and adapters | Complete | +307 / −137 (net +170) | Net-positive by design: `ProtoTestScope`, `ProtoTestAsync` and the attachment publisher base are new Core primitives, plus two tests pinning the shared policy. The five adapters now share one teardown policy (fixes MSTest replacing the reported result), one publisher shape, one sync bridge and one xUnit v3 before/after; the `lifecycleStarted` guards and per-adapter completion try/catch are gone. `ADP-1` and `ADP-7` moved to Stage 11 as decisions. |
-| 3 — Integration contract | Not started | | |
+| 3 — Integration contract | Complete | +509 / −389 (net +120) | Net-positive: the descriptors, keyed state, shared facade/context records and client-trace helper are new shared code. Every trace-source literal, observation kind, coverage category and capability now reads from `ProtoProtocol`; one auth hook and one context state serve REST, GraphQL and gRPC; gRPC's status assertion and auth applier delegate to the shared ones; REST and GraphQL share the assertion facade; `ProtoHttpResponseContext` replaced the positional parameter lists. Six findings closed as no-change with reasons in the stage notes. |
 | 4 — HTTP execution | Not started | | |
 | 5 — gRPC and Messaging | Not started | | |
 | 6 — Data and diagnostics | Not started | | |
@@ -242,4 +258,4 @@ Record `git diff --shortstat` for the stage's commits after the suite is green.
 | 9 — Reporting, OpenApi, AspNetCore | Not started | | |
 | 10 — Samples, templates, docs | Not started | | |
 | 11 — Deferred test hygiene | Not started | | |
-| **Cumulative** | | **+1153** | Target: clearly negative by Stage 6 |
+| **Cumulative** | | **+1273** | Target: clearly negative by Stage 6 |

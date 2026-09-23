@@ -19,14 +19,9 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
         HttpResponseMessage rawResponse,
         string content,
         TimeSpan elapsedTime,
-        ProtoExecutionContext? context = null,
-        string? targetName = null,
-        string? routeIdentifier = null,
-        ProtoHttpAttachmentOptions? attachmentOptions = null,
-        string? attachmentPrefix = null,
-        ReadOnlyMemory<byte>? contentBytes = null,
-        string? requestTraceId = null)
-        : base(rawResponse, content, elapsedTime, context, targetName, routeIdentifier, attachmentOptions, attachmentPrefix, requestTraceId)
+        ProtoHttpResponseContext? context = null,
+        ReadOnlyMemory<byte>? contentBytes = null)
+        : base(rawResponse, content, elapsedTime, context)
     {
         ContentBytes = contentBytes ?? System.Text.Encoding.UTF8.GetBytes(Content);
     }
@@ -66,7 +61,7 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
             Context?.Trace.WriteEvent(
                 "http.response.deserialize",
                 $"Deserialize response · {typeof(T).Name}",
-                "ProtoTest.Rest",
+                ProtoRestBuilder.Protocol.TraceSource,
                 outcome: ProtoTraceOutcome.Failed,
                 attributes: new Dictionary<string, string?>
                 {
@@ -104,7 +99,7 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
     internal RestResponse AssertHttpStatus(HttpStatusCode expectedStatusCode, bool negated)
     {
         AssertStatus(
-            "ProtoTest.Rest",
+            ProtoRestBuilder.Protocol.TraceSource,
             expectedStatusCode,
             negated,
             // The failure message must not exceed either limit: the response section applies even
@@ -142,7 +137,7 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
         AssertShape(
-            "ProtoTest.Rest",
+            ProtoRestBuilder.Protocol.TraceSource,
             "Assert response shape",
             Content,
             expectedShape,

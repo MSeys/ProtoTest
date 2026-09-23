@@ -7,11 +7,14 @@ using ProtoTest.Core;
 using ProtoTest.Http;
 
 public sealed class GraphQLCoverageCollector(string targetName)
-    : ProtoCoverageCollector(targetName, "graphql.response", StringComparer.Ordinal)
+    : ProtoCoverageCollector(
+        targetName,
+        ProtoGraphQLBuilder.Protocol.ResponseObservationKind,
+        StringComparer.Ordinal)
 {
     // GraphQL names are case-sensitive: "query FindProducts" and "query findproducts" are distinct
     // operations and must stay distinct coverage items, which the ordinal identifier comparer keeps.
-    public override string Category => "GraphQL operation";
+    public override string Category => ProtoGraphQLBuilder.Protocol.CoverageCategory;
 }
 
 public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector

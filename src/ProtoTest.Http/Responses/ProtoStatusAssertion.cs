@@ -4,10 +4,10 @@ using System.Net;
 using ProtoTest.Core;
 
 /// <summary>
-/// The HTTP status assertion REST and GraphQL responses share. It records the same
-/// <c>assert.http.status</c> operation and Checks section for either protocol and lets the caller
+/// The status assertion HTTP and gRPC responses share. It records one operation and Checks section for
+/// either protocol, names the expected status through the caller's description, and lets the caller
 /// supply the failure its own exception type. One implementation is what keeps a status assertion
-/// reading the same in both traces.
+/// reading the same in every trace.
 /// </summary>
 public static class ProtoStatusAssertion
 {
@@ -50,21 +50,59 @@ public static class ProtoStatusAssertion
         Func<Exception> failureFactory,
         string? parentOperationId = null,
         string? requestIdentifier = null)
+        => Assert(
+            context,
+            source,
+            (int)expected,
+            (int)actual,
+            negated,
+            failureFactory,
+            operationKind: "assert.http.status",
+            expectedDescription: $"{(int)expected} {expected}",
+            expectedAttribute: "expected.status_code",
+            actualAttribute: "actual.status_code",
+            parentOperationId: parentOperationId,
+            requestIdentifier: requestIdentifier);
+
+    /// <summary>
+    /// Asserts two integer status codes (a gRPC status code, for example) with the caller's operation
+    /// kind, attribute names and expected description, so a protocol with its own status vocabulary
+    /// reuses the algorithm instead of copying it.
+    /// </summary>
+    public static void Assert(
+        ProtoExecutionContext? context,
+        string source,
+        int expected,
+        int actual,
+        bool negated,
+        Func<Exception> failureFactory,
+        string operationKind,
+        string expectedDescription,
+        string expectedAttribute,
+        string actualAttribute,
+        IReadOnlyDictionary<string, string?>? extraAttributes = null,
+        string? parentOperationId = null,
+        string? requestIdentifier = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
         ArgumentNullException.ThrowIfNull(failureFactory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationKind);
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedDescription);
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedAttribute);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actualAttribute);
 
         var statusSatisfied = ProtoAssertion.IsSatisfied(actual == expected, negated);
         using var operation = context is null
             ? null
             : context.Trace
                 .Operation(
-                    "assert.http.status",
-                    $"Assert status · {ProtoAssertion.Describe($"{(int)expected} {expected}", negated)}",
+                    operationKind,
+                    $"Assert status · {ProtoAssertion.Describe(expectedDescription, negated)}",
                     source)
-                .With("expected.status_code", ((int)expected).ToString())
-                .With("actual.status_code", ((int)actual).ToString())
+                .With(expectedAttribute, expected.ToString())
+                .With(actualAttribute, actual.ToString())
                 .With("assertion.negated", negated ? "true" : null)
+                .With(extraAttributes)
                 .With("request.identifier", requestIdentifier)
                 .Parent(parentOperationId)
                 .Begin();
@@ -74,10 +112,10 @@ public static class ProtoStatusAssertion
             [
                 new(
                     "status",
-                    ((int)actual).ToString(),
+                    actual.ToString(),
                     statusSatisfied
                         ? null
-                        : $"expected {ProtoAssertion.Describe(((int)expected).ToString(), negated)}",
+                        : $"expected {ProtoAssertion.Describe(expected.ToString(), negated)}",
                     statusSatisfied ? ProtoTraceSectionTone.Success : ProtoTraceSectionTone.Error)
             ]));
         try

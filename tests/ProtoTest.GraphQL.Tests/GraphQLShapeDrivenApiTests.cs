@@ -21,7 +21,7 @@ public sealed class GraphQLShapeDrivenApiTests
             document = Document(request);
             return Json("""{"data":{"orders":{"nodes":[{"id":42,"product":"notebook","total":25}],"pageInfo":{"hasNextPage":false},"totalCount":1}}}""");
         });
-        await host.StartTestAsync("shape-query", "1", Method());
+        await host.StartTestAsync("shape-query", "1", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -43,7 +43,7 @@ public sealed class GraphQLShapeDrivenApiTests
                 Assert.That(document, Does.Contain("orders(first: 10"));
                 Assert.That(document, Does.Contain("query Orders"));
                 Assert.That(document, Does.Contain("where: {product: {contains: \"note\"}}"));
-                Assert.That(document, Does.Contain("order: [{total: DESC}]") );
+                Assert.That(document, Does.Contain("order: [{total: DESC}]"));
                 Assert.That(document, Does.Contain("nodes {"));
                 Assert.That(document, Does.Contain("pageInfo {"));
                 Assert.That(document, Does.Not.Contain("contains\n"));
@@ -62,7 +62,7 @@ public sealed class GraphQLShapeDrivenApiTests
     public async Task ExpectAsync_ShouldSupportScalarRootFields()
     {
         await using var host = CreateHost(_ => Json("""{"data":{"ping":"pong"}}"""));
-        await host.StartTestAsync("scalar", "2", Method());
+        await host.StartTestAsync("scalar", "2", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL().Query("ping").ExpectAsync("pong");
@@ -82,7 +82,7 @@ public sealed class GraphQLShapeDrivenApiTests
             document = Document(request);
             return Json("""{"data":{"createOrder":{"id":7,"product":"notebook"}}}""");
         });
-        await host.StartTestAsync("shape-mutation", "3", Method());
+        await host.StartTestAsync("shape-mutation", "3", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -115,7 +115,7 @@ public sealed class GraphQLShapeDrivenApiTests
             body = request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             return Json("""{"data":{"uploadDocument":{"fileName":"example.txt"}}}""");
         });
-        await host.StartTestAsync("upload", "4", Method());
+        await host.StartTestAsync("upload", "4", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -147,7 +147,7 @@ public sealed class GraphQLShapeDrivenApiTests
             body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
             return Json("""{"data":{"importDocuments":2}}""");
         });
-        await host.StartTestAsync("nested-upload", "5", Method());
+        await host.StartTestAsync("nested-upload", "5", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -190,7 +190,7 @@ public sealed class GraphQLShapeDrivenApiTests
             document = Document(request);
             return Json("""{"data":{"orders":{"nodes":[],"pageInfo":{"hasNextPage":false}}}}""");
         });
-        await host.StartTestAsync("typed", "6", Method());
+        await host.StartTestAsync("typed", "6", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -223,7 +223,7 @@ public sealed class GraphQLShapeDrivenApiTests
             document = Document(request);
             return Json("""{"data":{"viewer":{"displayName":"Ada"}}}""");
         });
-        await host.StartTestAsync("markers", "7", Method());
+        await host.StartTestAsync("markers", "7", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -246,7 +246,7 @@ public sealed class GraphQLShapeDrivenApiTests
     public async Task Select_ShouldExplainWhenNoShapeDrivenOperationWasStarted()
     {
         await using var host = CreateHost(_ => Json("""{"data":{"id":1}}"""));
-        await host.StartTestAsync("invalid-shape", "8", Method());
+        await host.StartTestAsync("invalid-shape", "8", TestMethods.Placeholder);
         try
         {
             Assert.That(() => Proto.Context.GraphQL().Select(new { id = Gql.Field }),
@@ -264,7 +264,7 @@ public sealed class GraphQLShapeDrivenApiTests
             document = Document(request);
             return Json("""{"data":{"orders":{"nodes":[]}}}""");
         });
-        await host.StartTestAsync("empty-array-shape", "9", Method());
+        await host.StartTestAsync("empty-array-shape", "9", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -290,7 +290,7 @@ public sealed class GraphQLShapeDrivenApiTests
             requestBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
             return Json("""{"data":{"viewer":{"displayName":"Ada"}}}""");
         });
-        await host.StartTestAsync("shape keeps variables", "10", Method());
+        await host.StartTestAsync("shape keeps variables", "10", TestMethods.Placeholder);
         try
         {
             // The plain argument is inlined as a literal, so the shape contributes no variables and the
@@ -322,7 +322,7 @@ public sealed class GraphQLShapeDrivenApiTests
             requestBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
             return Json("""{"data":{"orders":{"nodes":[]}}}""");
         });
-        await host.StartTestAsync("shape merges variables", "12", Method());
+        await host.StartTestAsync("shape merges variables", "12", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -353,7 +353,7 @@ public sealed class GraphQLShapeDrivenApiTests
             document = Document(request);
             return Json("""{"data":{"orders":{"nodes":[]}}}""");
         });
-        await host.StartTestAsync("dictionary shape", "11", Method());
+        await host.StartTestAsync("dictionary shape", "11", TestMethods.Placeholder);
         try
         {
             using var response = await Proto.Context.GraphQL()
@@ -390,9 +390,6 @@ public sealed class GraphQLShapeDrivenApiTests
 
     private static HttpResponseMessage Json(string content)
         => new(HttpStatusCode.OK) { Content = new StringContent(content) };
-    private static MethodInfo Method() => typeof(GraphQLShapeDrivenApiTests)
-        .GetMethod(nameof(Dummy), BindingFlags.NonPublic | BindingFlags.Static)!;
-    private static void Dummy() { }
 
     private sealed record OrdersSelection(IReadOnlyList<OrderSelection> Nodes, PageInfoSelection PageInfo);
     private sealed record OrderSelection(int Id, string Product);

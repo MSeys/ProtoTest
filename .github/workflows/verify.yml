@@ -52,7 +52,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Build.props', '**/Directory.Packages.props', 'global.json') }}
           restore-keys: ${{ runner.os }}-nuget-
 
       # The browser binaries plus the operating-system libraries they need on a clean image. The
@@ -72,6 +72,10 @@ jobs:
       - name: Restore, build, and test every runner
         shell: pwsh
         run: ./eng/test.ps1 -Configuration Release
+
+      - name: Verify formatting and analyzers
+        shell: pwsh
+        run: ./eng/lint.ps1 -NoRestore
 
       - name: Validate NuGet packages
         shell: pwsh
@@ -238,6 +242,7 @@ jobs:
           npm run build
 
   windows-build-test:
+    needs: sample-ui
     runs-on: windows-latest
     timeout-minutes: 45
 
@@ -255,27 +260,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Build.props') }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Build.props', '**/Directory.Packages.props', 'global.json') }}
           restore-keys: ${{ runner.os }}-nuget-
 
-      # The scripts are Windows-authored; this job proves the build and a representative test slice on
-      # the same shell the scripts use, so Windows-only path and process behaviour cannot regress unseen.
-      - name: Restore and build
-        shell: pwsh
-        run: |
-          dotnet restore ProtoTest.slnx
-          dotnet build ProtoTest.slnx --configuration Release --no-restore
+      - uses: actions/download-artifact@v4
+        with:
+          name: sample-app-ui
+          path: samples/ProtoTest.SampleApp/Ui/dist
 
-      - name: Run a representative test slice
+      # The scripts are Windows-authored; this job proves the build and the full suite on the same
+      # shell the scripts use, so Windows-only path and process behaviour cannot regress unseen.
+      # Browser and broker suites skip themselves when no browser or broker is installed here.
+      - name: Run the full test suite
         shell: pwsh
-        run: |
-          $projects = @(
-            "tests/ProtoTest.Sheets.Tests/ProtoTest.Sheets.Tests.csproj",
-            "tests/ProtoTest.Data.Tests/ProtoTest.Data.Tests.csproj",
-            "tests/ProtoTest.Sql.Tests/ProtoTest.Sql.Tests.csproj",
-            "tests/ProtoTest.Reporting.Tests/ProtoTest.Reporting.Tests.csproj"
-          )
-          foreach ($project in $projects) {
-            dotnet test $project --configuration Release --no-build --no-restore --verbosity minimal
-            if ($LASTEXITCODE -ne 0) { throw "$project failed with exit code $LASTEXITCODE." }
-          }
+        run: ./eng/test.ps1 -Configuration Release

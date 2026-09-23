@@ -1,9 +1,9 @@
 namespace ProtoTest.Core.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core.Internal;
-using System.Reflection;
 
 [TestFixture]
 public sealed class ProtoExecutionContextResourceTests
@@ -43,7 +43,7 @@ public sealed class ProtoExecutionContextResourceTests
         var shared = new DisposableClient();
         var context = CreateContext(rootProvider);
         context.RegisterClient(owned, "Owned");
-        context.RegisterClient(shared, "Shared", disposeWithContext: false);
+        context.RegisterClient(shared, "Shared", ProtoClientOwnership.Caller);
 
         Assert.That(context.Client<DisposableClient>("Shared"), Is.SameAs(shared));
         await context.DisposeAsync();
@@ -88,7 +88,7 @@ public sealed class ProtoExecutionContextResourceTests
         using var rootProvider = new ServiceCollection().BuildServiceProvider();
         await using var context = CreateContext(rootProvider);
         var client = new CompletingClient();
-        context.RegisterClient(client, "Rest:Api", disposeWithContext: false);
+        context.RegisterClient(client, "Rest:Api", ProtoClientOwnership.Caller);
         context.RegisterClientAlias(typeof(CompletingClient), "Api", client);
 
         await new ProtoClientCompletionHook().AfterTestAsync(context);
@@ -102,8 +102,8 @@ public sealed class ProtoExecutionContextResourceTests
         using var rootProvider = new ServiceCollection().BuildServiceProvider();
         await using var context = CreateContext(rootProvider);
         var completed = new List<string>();
-        context.RegisterClient(new OrderingCompletion("first", completed), "First", disposeWithContext: false);
-        context.RegisterClient(new OrderingCompletion("second", completed), "Second", disposeWithContext: false);
+        context.RegisterClient(new OrderingCompletion("first", completed), "First", ProtoClientOwnership.Caller);
+        context.RegisterClient(new OrderingCompletion("second", completed), "Second", ProtoClientOwnership.Caller);
 
         await new ProtoClientCompletionHook().AfterTestAsync(context);
 
@@ -117,7 +117,7 @@ public sealed class ProtoExecutionContextResourceTests
         using var rootProvider = new ServiceCollection().BuildServiceProvider();
         await using var context = CreateContext(rootProvider);
         var transport = new DisposableClient();
-        context.RegisterClient(transport, "Rest:App:Api", disposeWithContext: false);
+        context.RegisterClient(transport, "Rest:App:Api", ProtoClientOwnership.Caller);
         context.RegisterClientAlias(typeof(DisposableClient), "App:Api", transport);
         context.RegisterClientAlias(typeof(DisposableClient), "Rest:Api", transport);
         context.RegisterClientAlias(typeof(DisposableClient), "Api", transport);
@@ -133,7 +133,7 @@ public sealed class ProtoExecutionContextResourceTests
             "Test",
             rootProvider.CreateScope(),
             "00001",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
     private class DisposableClient : IDisposable
     {

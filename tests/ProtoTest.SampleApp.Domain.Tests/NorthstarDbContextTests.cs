@@ -1,10 +1,10 @@
 namespace ProtoTest.SampleApp.Domain.Tests;
 
+using System.Diagnostics;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.SampleApp.Contracts;
-using System.Diagnostics;
 
 [TestFixture]
 public sealed class NorthstarDbContextTests

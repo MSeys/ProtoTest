@@ -90,7 +90,7 @@ public sealed class ProtoXunitTestCase : XunitTestCase
 }
 
 [EditorBrowsable(EditorBrowsableState.Never)]
-internal sealed class ProtoXunitTheoryTestCase : XunitTheoryTestCase
+public sealed class ProtoXunitTheoryTestCase : XunitTheoryTestCase
 {
     [Obsolete("Called by the de-serializer; should only be called by deriving classes for de-serialization purposes")]
     public ProtoXunitTheoryTestCase()
@@ -281,9 +281,10 @@ internal sealed class ProtoXunitTestRunner : XunitTestRunner
     protected override async Task<decimal> InvokeTestMethodAsync(ExceptionAggregator aggregator)
     {
         var host = ProtoTestAssembly.Host;
+        ProtoTestScope scope;
         try
         {
-            await _preparation.StartAsync(host, Xunit2AttachmentPublisher.Instance);
+            scope = await ProtoTestScope.StartAsync(_preparation, host, Xunit2AttachmentPublisher.Instance);
         }
         catch (Exception exception)
         {
@@ -295,17 +296,10 @@ internal sealed class ProtoXunitTestRunner : XunitTestRunner
         var executionTime = await base.InvokeTestMethodAsync(aggregator);
 
         var failure = aggregator.ToException();
-        var result = CancellationTokenSource.IsCancellationRequested
+        scope.Result = CancellationTokenSource.IsCancellationRequested
             ? ProtoTestResult.Cancelled(failure)
             : failure is null ? ProtoTestResult.Passed : ProtoTestResult.Failed(failure);
-        try
-        {
-            await host.CompleteTestAsync(result);
-        }
-        catch (Exception exception)
-        {
-            aggregator.Add(exception);
-        }
+        await scope.DisposeAsync();
 
         return executionTime;
     }

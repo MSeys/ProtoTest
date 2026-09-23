@@ -1,11 +1,11 @@
 namespace ProtoTest.Reporting.Tests;
 
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using ProtoTest.Core;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using ProtoTest.Core;
 
 [TestFixture]
 public sealed class ReportSinkTests
@@ -533,16 +533,6 @@ public sealed class ReportSinkTests
         public IEnumerable<ProtoReportItem> GetReportItems() => items;
     }
 
-    private sealed class CapturingSink : IProtoSink
-    {
-        public IReadOnlyList<ProtoReportItem> Items { get; private set; } = [];
-
-        public Task ExportAsync(IEnumerable<ProtoReportItem> items, CancellationToken cancellationToken = default)
-        {
-            Items = [.. items];
-            return Task.CompletedTask;
-        }
-    }
 
     private sealed class ThrowingSink : IProtoSink
     {

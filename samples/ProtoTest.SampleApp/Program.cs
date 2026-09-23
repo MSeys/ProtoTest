@@ -1,11 +1,11 @@
 namespace ProtoTest.SampleApp;
 
+using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Domain;
 using ProtoTest.SampleApp.Northstar;
-using System.Data.Common;
 
 public class Program
 {

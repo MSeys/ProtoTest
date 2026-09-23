@@ -1,14 +1,14 @@
 namespace ProtoTest.Sql.Tests;
 
+using System.Data;
+using System.Data.Common;
+using System.Reflection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Sql.EntityFrameworkCore;
-using System.Data;
-using System.Data.Common;
-using System.Reflection;
 
 [TestFixture]
 [NonParallelizable]
@@ -28,7 +28,7 @@ public sealed class SqlIsolationTests
         // Arrange
         await using var host = CreateHost();
         await host.StartAsync();
-        await host.StartTestAsync("raw rollback", TestMethod());
+        await host.StartTestAsync("raw rollback", TestMethods.Placeholder);
 
         // Act
         var connection = Proto.Context.SqlConnection();
@@ -53,7 +53,7 @@ public sealed class SqlIsolationTests
         // Arrange
         await using var host = CreateHost();
         await host.StartAsync();
-        await host.StartTestAsync("ef rollback", TestMethod());
+        await host.StartTestAsync("ef rollback", TestMethods.Placeholder);
 
         // Act
         var context = Proto.Context.Sql<WidgetDbContext>();
@@ -75,7 +75,7 @@ public sealed class SqlIsolationTests
         // Arrange
         await using var host = CreateHost();
         await host.StartAsync();
-        await host.StartTestAsync("owned connection", TestMethod());
+        await host.StartTestAsync("owned connection", TestMethods.Placeholder);
 
         // Act
         var owned = Proto.Context.Resources.Single(resource => resource.Kind == "database");
@@ -101,7 +101,7 @@ public sealed class SqlIsolationTests
         // Arrange
         await using var host = CreateHost();
         await host.StartAsync();
-        await host.StartTestAsync("sql traced lifecycle", TestMethod());
+        await host.StartTestAsync("sql traced lifecycle", TestMethods.Placeholder);
 
         // Act
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -138,7 +138,7 @@ public sealed class SqlIsolationTests
         // Arrange
         await using var host = CreateHost();
         await host.StartAsync();
-        await host.StartTestAsync("ef traced enlistment", TestMethod());
+        await host.StartTestAsync("ef traced enlistment", TestMethods.Placeholder);
 
         // Act
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -163,7 +163,7 @@ public sealed class SqlIsolationTests
         // Arrange
         await using var host = CreateHost(SqlIsolation.None);
         await host.StartAsync();
-        await host.StartTestAsync("no transaction trace", TestMethod());
+        await host.StartTestAsync("no transaction trace", TestMethods.Placeholder);
 
         // Act
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -186,7 +186,7 @@ public sealed class SqlIsolationTests
         // Arrange
         await using var host = CreateHost(SqlIsolation.None);
         await host.StartAsync();
-        await host.StartTestAsync("no isolation", TestMethod());
+        await host.StartTestAsync("no isolation", TestMethods.Placeholder);
 
         // Act
         var connection = Proto.Context.SqlConnection();
@@ -243,7 +243,7 @@ public sealed class SqlIsolationTests
         // Arrange
         await using var host = CreateHost();
         await host.StartAsync();
-        await host.StartTestAsync("session accessors", TestMethod());
+        await host.StartTestAsync("session accessors", TestMethods.Placeholder);
 
         // Act
         var session = Proto.Context.SqlSession();
@@ -272,7 +272,7 @@ public sealed class SqlIsolationTests
         // Arrange
         await using var host = CreateHost(SqlIsolation.None);
         await host.StartAsync();
-        await host.StartTestAsync("no transaction", TestMethod());
+        await host.StartTestAsync("no transaction", TestMethods.Placeholder);
 
         // Act and assert
         Assert.Multiple(() =>
@@ -302,7 +302,7 @@ public sealed class SqlIsolationTests
 
         // Act: the isolation guard passes because the named application is declared as sharing.
         await host.StartAsync();
-        await host.StartTestAsync("configured sql", TestMethod());
+        await host.StartTestAsync("configured sql", TestMethods.Placeholder);
 
         var options = Proto.Context.Service<SqlOptions>();
 
@@ -324,7 +324,7 @@ public sealed class SqlIsolationTests
         var connection = new FailingDbConnection { FailRollback = true };
         await using var host = new ProtoHostBuilder().AddSql(_ => connection).Build();
         await host.StartAsync();
-        await host.StartTestAsync("rollback failure", TestMethod());
+        await host.StartTestAsync("rollback failure", TestMethods.Placeholder);
 
         var exception = Assert.ThrowsAsync<AggregateException>(
             async () => await host.CompleteTestAsync(ProtoTestResult.Passed));
@@ -346,8 +346,6 @@ public sealed class SqlIsolationTests
                 options.UseSqlite(services.GetRequiredService<DbConnection>()))
             .Build();
 
-    private static MethodInfo TestMethod()
-        => typeof(SqlIsolationTests).GetMethod(nameof(SampleTest), BindingFlags.NonPublic | BindingFlags.Static)!;
 
     private static void SampleTest()
     {

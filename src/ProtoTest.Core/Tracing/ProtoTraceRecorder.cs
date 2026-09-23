@@ -1,12 +1,11 @@
 namespace ProtoTest.Core;
 
-using ProtoTest.Core.Internal;
-
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Text;
+using ProtoTest.Core.Internal;
 
 internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
 {

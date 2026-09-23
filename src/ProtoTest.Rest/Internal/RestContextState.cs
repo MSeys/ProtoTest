@@ -1,7 +1,7 @@
+namespace ProtoTest.Rest.Internal;
+
 using ProtoTest.Core;
 using ProtoTest.Http;
-
-namespace ProtoTest.Rest.Internal;
 
 /// <summary>
 /// Per-test REST state. Kept protocol-local (rather than shared with GraphQL) because both protocol

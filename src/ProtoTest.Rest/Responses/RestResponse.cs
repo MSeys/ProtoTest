@@ -1,24 +1,19 @@
 namespace ProtoTest.Rest;
 
+using System.Dynamic;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text.Json;
 using ProtoTest.Core;
 using ProtoTest.Http;
 using ProtoTest.Json;
 using ProtoTest.Rest.Exceptions;
 using ProtoTest.Rest.Internal;
-using System.Dynamic;
-using System.Net;
-using System.Net.Http.Headers;
-using System.Text.Json;
 
 public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
 {
     private RestAssertions? _should;
     private RestAssertions? _shouldNot;
-
-    private static readonly JsonSerializerOptions DefaultJsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
 
     internal RestResponse(
         HttpResponseMessage rawResponse,
@@ -64,7 +59,7 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
         {
             return string.IsNullOrWhiteSpace(Content)
                 ? default
-                : JsonSerializer.Deserialize<T>(Content, options ?? DefaultJsonOptions);
+                : JsonSerializer.Deserialize<T>(Content, options ?? ProtoJsonDefaults.Reader);
         }
         catch (Exception exception)
         {

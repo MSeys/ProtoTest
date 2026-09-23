@@ -2,15 +2,16 @@ namespace ProtoTest.Xunit3;
 
 using ProtoTest.Core;
 
-internal sealed class Xunit3AttachmentPublisher : IProtoTestAttachmentPublisher
+internal sealed class Xunit3AttachmentPublisher : ProtoTestAttachmentPublisher
 {
     public static Xunit3AttachmentPublisher Instance { get; } = new();
 
-    public async ValueTask PublishAsync(
+    protected override async ValueTask PublishFileAsync(
+        string path,
         ProtoTestAttachment attachment,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
-        var content = await attachment.ReadAllBytesAsync(cancellationToken);
+        var content = await File.ReadAllBytesAsync(path, cancellationToken);
         Xunit.TestContext.Current.AddAttachment(
             attachment.Name,
             content,

@@ -1,8 +1,7 @@
 namespace ProtoTest.Core;
 
-using ProtoTest.Core.Internal;
-
 using System.Text;
+using ProtoTest.Core.Internal;
 
 /// <summary>
 /// A file or in-memory artifact associated with one test execution.

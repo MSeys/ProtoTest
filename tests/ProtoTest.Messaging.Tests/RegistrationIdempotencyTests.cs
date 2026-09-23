@@ -1,9 +1,9 @@
 namespace ProtoTest.Messaging.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
-using System.Reflection;
 
 [TestFixture]
 public sealed class RegistrationIdempotencyTests
@@ -19,7 +19,7 @@ public sealed class RegistrationIdempotencyTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging beside another client", TestMethod());
+        var context = await host.StartTestAsync("messaging beside another client", TestMethods.Placeholder);
 
         Assert.That(context.Messaging(), Is.Not.Null);
     }
@@ -64,7 +64,7 @@ public sealed class RegistrationIdempotencyTests
             .ToArray();
         Assert.That(owned, Is.EqualTo(new[] { "messaging:broker" }));
 
-        var context = await host.StartTestAsync("messaging idempotent", TestMethod());
+        var context = await host.StartTestAsync("messaging idempotent", TestMethods.Placeholder);
         var messages = context.Messaging();
         await messages.PublishAsync("invoices", "{\"id\":1}");
         var received = await messages.AwaitAsync(
@@ -90,7 +90,7 @@ public sealed class RegistrationIdempotencyTests
             "an adapter added by the second call makes the Broker capability true");
 
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging late adapter", TestMethod());
+        var context = await host.StartTestAsync("messaging late adapter", TestMethods.Placeholder);
         var messages = context.Messaging();
         await messages.PublishAsync("invoices", "{\"id\":1}");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -124,7 +124,7 @@ public sealed class RegistrationIdempotencyTests
         });
 
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging adapter idempotent", TestMethod());
+        var context = await host.StartTestAsync("messaging adapter idempotent", TestMethods.Placeholder);
         _ = context.Messaging();
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
@@ -198,11 +198,5 @@ public sealed class RegistrationIdempotencyTests
         }
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(RegistrationIdempotencyTests).GetMethod(
-            nameof(Placeholder), BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void Placeholder()
-    {
-    }
 }

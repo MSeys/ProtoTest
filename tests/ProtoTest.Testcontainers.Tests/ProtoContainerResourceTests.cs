@@ -181,7 +181,7 @@ public sealed class ProtoContainerResourceTests
         await using (var host = builder.Build())
         {
             await host.StartAsync();
-            var context = await host.StartTestAsync("release container", TestMethod());
+            var context = await host.StartTestAsync("release container", TestMethods.Placeholder);
             context.RegisterResource(ProtoResource.From(
                 "container:release-again",
                 "test",
@@ -210,7 +210,8 @@ public sealed class ProtoContainerResourceTests
         await resource.DisposeAsync();
 
         Assert.ThrowsAsync<ObjectDisposedException>(async () => await resource.StartAsync());
-        Assert.That(container.StartCount, Is.Zero, "A released resource must not start.");    }
+        Assert.That(container.StartCount, Is.Zero, "A released resource must not start.");
+    }
 
     [Test]
     public async Task StartAsync_ShouldNotLeakAContainerWhenDisposedWhileStarting()
@@ -262,12 +263,7 @@ public sealed class ProtoContainerResourceTests
         Assert.That(fresh.DisposeCount, Is.EqualTo(1));
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(ProtoContainerResourceTests).GetMethod(nameof(Placeholder), BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void Placeholder()
-    {
-    }
 
     private sealed class FakeResource(
         Func<FakeContainer> build,

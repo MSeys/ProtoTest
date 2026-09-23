@@ -1,18 +1,37 @@
-﻿namespace ProtoTest.Xunit3;
+namespace ProtoTest.Xunit3;
 
 using System.Reflection;
 using ProtoTest.Core;
 using Xunit.v3;
 
 /// <summary>
-/// Internal utility class providing shared context lifecycle management for xUnit v3 test attributes.
+/// The before/after implementation the xUnit v3 attributes share: one lifecycle, one skip path and one
+/// result mapping, with the scope each attribute keeps for the test it wraps.
+/// </summary>
+internal interface IProtoTestXunit3Attribute : IBeforeAfterTestAttribute
+{
+    /// <summary>The lifecycle scope started before the test; completed after it.</summary>
+    ProtoTestScope? Scope { get; set; }
+
+    void IBeforeAfterTestAttribute.Before(MethodInfo methodUnderTest, IXunitTest test)
+        => Scope = ProtoTestLifecycleHandler.Before(methodUnderTest);
+
+    void IBeforeAfterTestAttribute.After(MethodInfo methodUnderTest, IXunitTest test)
+    {
+        ProtoTestLifecycleHandler.After(Scope);
+        Scope = null;
+    }
+}
+
+/// <summary>
+/// Shared context lifecycle management for the xUnit v3 test attributes.
 /// </summary>
 internal static class ProtoTestLifecycleHandler
 {
-    /// <summary>
-    /// Starts the test context and executes before-test hooks.
-    /// </summary>
-    internal static void Before(MethodInfo methodUnderTest)
+    private const string DefaultErrorType = "xUnit.TestFailure";
+
+    /// <summary>Starts the test context and executes before-test hooks.</summary>
+    internal static ProtoTestScope Before(MethodInfo methodUnderTest)
     {
         var preparation = ProtoTestAdapter.Prepare(methodUnderTest, ProtoTestAssembly.Host);
         if (!preparation.CanRun)
@@ -20,30 +39,27 @@ internal static class ProtoTestLifecycleHandler
             global::Xunit.Assert.Skip(preparation.SkipReason!);
         }
 
-        preparation
-            .StartAsync(ProtoTestAssembly.Host, Xunit3AttachmentPublisher.Instance)
-            .GetAwaiter()
-            .GetResult();
+        return ProtoTestAsync.RunSync(() => new ValueTask<ProtoTestScope>(ProtoTestScope.StartAsync(
+            preparation, ProtoTestAssembly.Host, Xunit3AttachmentPublisher.Instance)));
     }
 
-    /// <summary>
-    /// Executes after-test hooks and cleans up the active <see cref="ProtoExecutionContext"/> using the
-    /// state xUnit recorded for the test that just finished.
-    /// </summary>
-    internal static void After(MethodInfo methodUnderTest)
-        => Complete(methodUnderTest, global::Xunit.TestContext.Current.TestState);
+    /// <summary>Completes the active lifecycle with the state xUnit recorded for the test that just finished.</summary>
+    internal static void After(ProtoTestScope? scope)
+        => Complete(scope, global::Xunit.TestContext.Current.TestState);
 
     /// <summary>
-    /// Completes the active lifecycle with the outcome mapped from an xUnit test result state. xUnit owns
-    /// the ambient state, so this overload exists so the mapping can be exercised directly.
+    /// Completes the lifecycle with an explicit state. xUnit owns the ambient state during a real run,
+    /// so this overload exists so the mapping can be exercised directly.
     /// </summary>
-    internal static void Complete(MethodInfo methodUnderTest, global::Xunit.TestResultState? state)
+    internal static void Complete(ProtoTestScope? scope, global::Xunit.TestResultState? state)
     {
-        var result = MapResult(state);
-        ProtoTestAssembly.Host
-            .CompleteTestAsync(result)
-            .GetAwaiter()
-            .GetResult();
+        if (scope is null)
+        {
+            return;
+        }
+
+        scope.Result = MapResult(state);
+        ProtoTestAsync.RunSync(() => scope.DisposeAsync());
     }
 
     /// <summary>Maps an xUnit test result state onto the outcome ProtoTest records.</summary>
@@ -53,7 +69,7 @@ internal static class ProtoTestLifecycleHandler
             global::Xunit.TestResult.Passed => ProtoTestResult.Passed,
             global::Xunit.TestResult.Skipped or global::Xunit.TestResult.NotRun => ProtoTestResult.Skipped,
             global::Xunit.TestResult.Failed => ProtoTestResult.Failed(new ProtoTraceError(
-                state.ExceptionTypes?.FirstOrDefault() ?? "xUnit.TestFailure",
+                state.ExceptionTypes?.FirstOrDefault() ?? DefaultErrorType,
                 state.ExceptionMessages?.FirstOrDefault() ?? "The xUnit test failed.",
                 state.ExceptionStackTraces?.FirstOrDefault())),
             _ => ProtoTestResult.Unknown

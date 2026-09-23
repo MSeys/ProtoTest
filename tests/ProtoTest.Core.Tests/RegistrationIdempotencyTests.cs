@@ -240,29 +240,7 @@ public sealed class RegistrationIdempotencyTests
         public ValueTask ReleaseAsync(ProtoResourceReleaseContext context) => ValueTask.CompletedTask;
     }
 
-    private sealed class CountingSink : IProtoSink
-    {
-        public int ExportCount { get; private set; }
 
-        public Task ExportAsync(IEnumerable<ProtoReportItem> items, CancellationToken cancellationToken = default)
-        {
-            ExportCount++;
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class ConfigurableSink : IProtoSink
-    {
-        public List<string> Configured { get; } = [];
-
-        public int ExportCount { get; private set; }
-
-        public Task ExportAsync(IEnumerable<ProtoReportItem> items, CancellationToken cancellationToken = default)
-        {
-            ExportCount++;
-            return Task.CompletedTask;
-        }
-    }
 
     private sealed class SinkProbe(IEnumerable<IProtoSink> sinks) : IProtoRunHook
     {

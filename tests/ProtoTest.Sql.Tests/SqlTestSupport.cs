@@ -1,8 +1,8 @@
 namespace ProtoTest.Sql.Tests;
 
-using Microsoft.Data.Sqlite;
 using System.Data;
 using System.Data.Common;
+using Microsoft.Data.Sqlite;
 
 /// <summary>
 /// An in-memory SQLite database kept alive for one test by its keeper connection. Pooling is off so the

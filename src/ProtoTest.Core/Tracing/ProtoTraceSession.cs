@@ -1,11 +1,10 @@
 namespace ProtoTest.Core;
 
-using ProtoTest.Core.Internal;
-
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using ProtoTest.Core.Internal;
 
 internal sealed class ProtoTraceSession : IProtoTraceSource
 {

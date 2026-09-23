@@ -1,0 +1,3 @@
+# Normalize line endings to LF in the repository and the working tree, so a Windows checkout and a
+# Linux CI checkout format identically.
+* text=auto eol=lf

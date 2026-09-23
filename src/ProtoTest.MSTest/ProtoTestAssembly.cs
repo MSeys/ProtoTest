@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.MSTest;
+namespace ProtoTest.MSTest;
 
 using ProtoTest.Core;
 

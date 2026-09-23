@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Xunit;
+namespace ProtoTest.Xunit;
 
 using global::Xunit;
 using ProtoTest.Core;

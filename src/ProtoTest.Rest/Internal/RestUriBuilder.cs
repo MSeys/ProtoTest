@@ -1,10 +1,12 @@
-﻿namespace ProtoTest.Rest.Internal;
+namespace ProtoTest.Rest.Internal;
 
 using System.Collections;
 using System.Globalization;
 using System.Reflection;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using ProtoTest.Http;
+using ProtoTest.Json;
 
 internal static partial class RestUriBuilder
 {
@@ -127,12 +129,10 @@ internal static partial class RestUriBuilder
             return result;
         }
 
-        return values.GetType()
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(property => property.GetIndexParameters().Length == 0)
+        return ProtoJsonPropertyProjection.Read(values, JsonNamingPolicy.CamelCase)
             .ToDictionary(
                 property => property.Name,
-                property => property.GetValue(values),
+                property => property.Value,
                 StringComparer.OrdinalIgnoreCase);
     }
 

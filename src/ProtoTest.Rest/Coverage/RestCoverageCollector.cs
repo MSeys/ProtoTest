@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Rest;
+namespace ProtoTest.Rest;
 
 using ProtoTest.Core;
 

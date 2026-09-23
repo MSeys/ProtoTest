@@ -2,6 +2,7 @@ namespace ProtoTest.Xunit3.Tests;
 
 using ProtoTest.Core;
 using Xunit;
+using Xunit.v3;
 
 public sealed class OutcomeTests
 {
@@ -37,8 +38,9 @@ public sealed class OutcomeTests
     {
         var method = typeof(Subjects).GetMethod(subjectName)!;
 
-        new ProtoTestFactAttribute().Before(method, null!);
-        ProtoTestLifecycleHandler.Complete(method, state);
+        var attribute = new ProtoTestFactAttribute();
+        ((IBeforeAfterTestAttribute)attribute).Before(method, null!);
+        ProtoTestLifecycleHandler.Complete(((IProtoTestXunit3Attribute)attribute).Scope, state);
 
         var name = ProtoTestName.FromMethod(method);
         return ProtoTestAssembly.Host.Trace.Snapshot().Tests.Last(test => test.Name == name);

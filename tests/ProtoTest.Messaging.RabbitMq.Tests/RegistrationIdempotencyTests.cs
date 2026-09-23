@@ -1,10 +1,10 @@
 namespace ProtoTest.Messaging.RabbitMq.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Messaging;
-using System.Reflection;
 
 [TestFixture]
 public sealed class RegistrationIdempotencyTests
@@ -42,7 +42,7 @@ public sealed class RegistrationIdempotencyTests
         Assert.That(owned, Is.EqualTo(new[] { "messaging:broker" }));
 
         // No publish happens, so no connection is attempted; the first call's options must still win.
-        var context = await host.StartTestAsync("rabbitmq idempotent", TestMethod());
+        var context = await host.StartTestAsync("rabbitmq idempotent", TestMethods.Placeholder);
         Assert.That(
             context.Service<RabbitMqOptions>().ConnectionString,
             Is.EqualTo("amqp://127.0.0.1:1/"));
@@ -50,11 +50,5 @@ public sealed class RegistrationIdempotencyTests
         await host.StopAsync();
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(RegistrationIdempotencyTests).GetMethod(
-            nameof(Placeholder), BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void Placeholder()
-    {
-    }
 }

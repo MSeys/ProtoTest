@@ -2,14 +2,14 @@ namespace ProtoTest.TUnit;
 
 using ProtoTest.Core;
 
-internal sealed class TUnitAttachmentPublisher(TestContext context)
-    : IProtoTestAttachmentPublisher
+internal sealed class TUnitAttachmentPublisher(TestContext context) : ProtoTestAttachmentPublisher
 {
-    public async ValueTask PublishAsync(
+    protected override ValueTask PublishFileAsync(
+        string path,
         ProtoTestAttachment attachment,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
-        var path = await attachment.MaterializeFileAsync(cancellationToken);
         context.Output.AttachArtifact(path, attachment.Name, attachment.Description ?? string.Empty);
+        return ValueTask.CompletedTask;
     }
 }

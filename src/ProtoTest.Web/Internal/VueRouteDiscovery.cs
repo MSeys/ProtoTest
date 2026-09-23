@@ -1,8 +1,7 @@
 namespace ProtoTest.Web.Internal;
 
-using ProtoTest.Core.Internal;
-
 using System.Text.Json;
+using ProtoTest.Core.Internal;
 
 /// <summary>
 /// Best-effort Vue Router route discovery for the page inventory. The script answers with a JSON array

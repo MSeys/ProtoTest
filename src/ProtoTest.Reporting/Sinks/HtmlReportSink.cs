@@ -1,7 +1,7 @@
 namespace ProtoTest.Reporting;
 
-using ProtoTest.Core;
 using System.Text;
+using ProtoTest.Core;
 
 /// <summary>
 /// Writes a self-contained HTML report. The document itself is built by <see cref="HtmlReportRenderer"/> and

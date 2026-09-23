@@ -1,8 +1,8 @@
 namespace ProtoTest.Http.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
-using System.Reflection;
 
 [TestFixture]
 public class AuthAttributeTests

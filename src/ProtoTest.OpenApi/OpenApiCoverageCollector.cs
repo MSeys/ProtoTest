@@ -1,11 +1,11 @@
-﻿namespace ProtoTest.OpenApi;
+namespace ProtoTest.OpenApi;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.OpenApi.Models;
 using ProtoTest.Core;
+using ProtoTest.Http;
 using ProtoTest.OpenApi.Internal;
 using ProtoTest.Rest;
-using ProtoTest.Http;
 
 public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
 {

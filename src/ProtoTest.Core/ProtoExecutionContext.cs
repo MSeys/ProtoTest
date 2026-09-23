@@ -1,9 +1,9 @@
 namespace ProtoTest.Core;
 
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core.Internal;
-using System.Reflection;
 
 /// <summary>
 /// Provides the public per-test façade for metadata, services, state, clients, attachments, and observations.
@@ -143,31 +143,35 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     }
 
     /// <summary>
-    /// Registers a named client for this test. The client is owned by the test and released in reverse
-    /// registration order when the test completes; pass <paramref name="disposeWithContext"/> as
-    /// <see langword="false"/> for shared clients whose lifetime is managed elsewhere.
+    /// Registers a named client for this test. A <see cref="ProtoClientOwnership.Context"/> client is
+    /// released in reverse registration order when the test completes; a
+    /// <see cref="ProtoClientOwnership.Caller"/> client is shared and its lifetime is managed elsewhere.
     /// </summary>
-    public void RegisterClient<TClient>(TClient client, string name = "Default", bool disposeWithContext = true)
+    public void RegisterClient<TClient>(
+        TClient client,
+        string name = "Default",
+        ProtoClientOwnership ownership = ProtoClientOwnership.Context)
         where TClient : class
     {
         ArgumentNullException.ThrowIfNull(client);
+        var owned = ownership is ProtoClientOwnership.Context;
         _clients.Register(client, name);
         var clientId = ProtoClientTrace.Id(typeof(TClient), name);
         RegisterOwned(new ProtoResource(
             clientId,
             "client",
-            $"{(disposeWithContext ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
-            context => ReleaseClientAsync(client, disposeWithContext)));
+            $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
+            context => ReleaseClientAsync(client, owned)));
         Trace.SetEntityState(
             ProtoTraceEntityKinds.Client,
             clientId,
-            $"{(disposeWithContext ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
+            $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
             new Dictionary<string, string?>
             {
                 ["client.name"] = name,
                 ["client.type"] = typeof(TClient).FullName,
                 ["instance.type"] = client.GetType().FullName,
-                ["client.owned"] = disposeWithContext ? "true" : "false"
+                ["client.owned"] = owned ? "true" : "false"
             },
             scope: TestName,
             change: "created");

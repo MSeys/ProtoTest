@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using global::Grpc.Core;
-using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -21,21 +20,6 @@ using ProtoTest.Http.Authenticators;
 [TestFixture]
 public sealed class GrpcIntegrationTests
 {
-    private static readonly Marshaller<EchoRequest> RequestMarshaller = Marshallers.Create<EchoRequest>(
-        (request, context) => context.Complete(request.ToByteArray()),
-        context => EchoRequest.Parser.ParseFrom(context.PayloadAsNewBuffer()));
-    private static readonly Marshaller<EchoReply> ReplyMarshaller = Marshallers.Create<EchoReply>(
-        (reply, context) => context.Complete(reply.ToByteArray()),
-        context => EchoReply.Parser.ParseFrom(context.PayloadAsNewBuffer()));
-    private static readonly Method<EchoRequest, EchoReply> SayMethod = new(
-        MethodType.Unary, "prototest.echo.Echo", "Say", RequestMarshaller, ReplyMarshaller);
-    private static readonly Method<EchoRequest, EchoReply> StreamMethod = new(
-        MethodType.ServerStreaming, "prototest.echo.Echo", "Stream", RequestMarshaller, ReplyMarshaller);
-    private static readonly Method<EchoRequest, EchoReply> CollectMethod = new(
-        MethodType.ClientStreaming, "prototest.echo.Echo", "Collect", RequestMarshaller, ReplyMarshaller);
-    private static readonly Method<EchoRequest, EchoReply> ChatMethod = new(
-        MethodType.DuplexStreaming, "prototest.echo.Echo", "Chat", RequestMarshaller, ReplyMarshaller);
-
     private static WebApplication _server = null!;
     private static string _address = null!;
 
@@ -65,11 +49,11 @@ public sealed class GrpcIntegrationTests
         builder.AddGrpc(grpc => grpc.AddClient("Echo", _address).AddCollector<GrpcCoverageCollector>());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc unary", TestMethod());
+        var context = await host.StartTestAsync("grpc unary", TestMethods.Placeholder);
         var client = context.Grpc("Echo");
 
         var reply = await client.UnaryAsync(
-            SayMethod,
+            EchoMethods.Say,
             new EchoRequest { Message = "hello" },
             metadata => metadata.Add("authorization", "Bearer secret"));
         reply.ShouldMatchShape(new { message = "hello" });
@@ -125,13 +109,13 @@ public sealed class GrpcIntegrationTests
         builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc host client", TestMethod());
+        var context = await host.StartTestAsync("grpc host client", TestMethods.Placeholder);
         context.SetContext(new ProtoApplicationState("Api", new Dictionary<string, string>()));
 
         // The host registered "Echo"; inside application "Api" the qualified name "Api:Echo" does not
         // exist, so the explicit name must fall back to the host client instead of the transport.
         var client = context.Grpc("Echo");
-        var reply = await client.UnaryAsync(SayMethod, new EchoRequest { Message = "host" });
+        var reply = await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "host" });
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         Assert.That(reply.Message, Is.EqualTo("host"),
@@ -148,7 +132,7 @@ public sealed class GrpcIntegrationTests
         var context = await host.StartTestAsync("grpc auth", AuthenticatedTestMethod());
         var client = context.Grpc("Echo");
 
-        var reply = await client.UnaryAsync(SayMethod, new EchoRequest { Message = "auth" });
+        var reply = await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "auth" });
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         var call = host.Trace.Snapshot().Tests.Single().Entries.Single(entry => entry.Kind == "grpc.call");
@@ -171,7 +155,7 @@ public sealed class GrpcIntegrationTests
         var context = await host.StartTestAsync("grpc raw stream auth", AuthenticatedTestMethod());
         var client = context.Grpc("Echo");
 
-        using var call = client.ServerStreaming(StreamMethod, new EchoRequest { Message = "a, b" });
+        using var call = client.ServerStreaming(EchoMethods.Stream, new EchoRequest { Message = "a, b" });
         var replies = new List<string>();
         await foreach (var reply in call.ResponseStream.ReadAllAsync())
         {
@@ -197,10 +181,10 @@ public sealed class GrpcIntegrationTests
         builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc stream", TestMethod());
+        var context = await host.StartTestAsync("grpc stream", TestMethods.Placeholder);
         var client = context.Grpc("Echo");
 
-        var replies = await client.ServerStreamingAsync(StreamMethod, new EchoRequest { Message = "a, b, c" });
+        var replies = await client.ServerStreamingAsync(EchoMethods.Stream, new EchoRequest { Message = "a, b, c" });
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         Assert.That(replies.Select(reply => reply.Message), Is.EqualTo(new[] { "a", "b", "c" }));
@@ -213,11 +197,11 @@ public sealed class GrpcIntegrationTests
         builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc client stream", TestMethod());
+        var context = await host.StartTestAsync("grpc client stream", TestMethods.Placeholder);
         var client = context.Grpc("Echo");
 
         var reply = await client.ClientStreamingAsync(
-            CollectMethod,
+            EchoMethods.Collect,
             [new EchoRequest { Message = "x" }, new EchoRequest { Message = "y" }]);
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -231,10 +215,10 @@ public sealed class GrpcIntegrationTests
         builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc duplex", TestMethod());
+        var context = await host.StartTestAsync("grpc duplex", TestMethods.Placeholder);
         var client = context.Grpc("Echo");
 
-        using var call = client.DuplexStreaming(ChatMethod);
+        using var call = client.DuplexStreaming(EchoMethods.Chat);
         await call.RequestStream.WriteAsync(new EchoRequest { Message = "one" });
         await call.RequestStream.WriteAsync(new EchoRequest { Message = "two" });
         await call.RequestStream.CompleteAsync();
@@ -255,10 +239,10 @@ public sealed class GrpcIntegrationTests
         builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc async duplex", TestMethod());
+        var context = await host.StartTestAsync("grpc async duplex", TestMethods.Placeholder);
         var client = context.Grpc("Echo");
 
-        using var call = await client.OpenDuplexStreamingAsync(ChatMethod);
+        using var call = await client.OpenDuplexStreamingAsync(EchoMethods.Chat);
         await call.RequestStream.WriteAsync(new EchoRequest { Message = "one" });
         await call.RequestStream.WriteAsync(new EchoRequest { Message = "two" });
         await call.RequestStream.CompleteAsync();
@@ -283,11 +267,11 @@ public sealed class GrpcIntegrationTests
         });
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc attachments", TestMethod());
+        var context = await host.StartTestAsync("grpc attachments", TestMethods.Placeholder);
         var client = context.Grpc("Echo");
 
         await client.UnaryAsync(
-            SayMethod,
+            EchoMethods.Say,
             new EchoRequest { Message = "hello", Password = "hunter2" });
 
         var request = context.Attachments.Single(item =>
@@ -321,10 +305,10 @@ public sealed class GrpcIntegrationTests
         });
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc attachment cap", TestMethod());
+        var context = await host.StartTestAsync("grpc attachment cap", TestMethods.Placeholder);
         var client = context.Grpc("Echo");
 
-        await client.UnaryAsync(SayMethod, new EchoRequest { Message = new string('m', 300) });
+        await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = new string('m', 300) });
 
         var request = context.Attachments.Single(item =>
             item.Name.Contains("grpc-Echo-prototest.echo.Echo-Say-request-", StringComparison.Ordinal));
@@ -349,10 +333,10 @@ public sealed class GrpcIntegrationTests
         builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc no attachments", TestMethod());
+        var context = await host.StartTestAsync("grpc no attachments", TestMethods.Placeholder);
         var client = context.Grpc("Echo");
 
-        await client.UnaryAsync(SayMethod, new EchoRequest { Message = "plain" });
+        await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "plain" });
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         Assert.That(context.Attachments, Is.Empty);
@@ -369,11 +353,11 @@ public sealed class GrpcIntegrationTests
         });
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc repeated attachments", TestMethod());
+        var context = await host.StartTestAsync("grpc repeated attachments", TestMethods.Placeholder);
         var client = context.Grpc("Echo");
 
-        var first = await client.UnaryAsync(SayMethod, new EchoRequest { Message = "one" });
-        var second = await client.UnaryAsync(SayMethod, new EchoRequest { Message = "two" });
+        var first = await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "one" });
+        var second = await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "two" });
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         var names = context.Attachments.Select(item => item.Name).ToArray();
@@ -402,10 +386,10 @@ public sealed class GrpcIntegrationTests
         });
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc two clients", TestMethod());
+        var context = await host.StartTestAsync("grpc two clients", TestMethods.Placeholder);
 
-        await context.Grpc("Echo").UnaryAsync(SayMethod, new EchoRequest { Message = "one" });
-        await context.Grpc("Mirror").UnaryAsync(SayMethod, new EchoRequest { Message = "two" });
+        await context.Grpc("Echo").UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "one" });
+        await context.Grpc("Mirror").UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "two" });
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         var names = context.Attachments.Select(item => item.Name).ToArray();
@@ -433,11 +417,11 @@ public sealed class GrpcIntegrationTests
         });
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc unformattable attachment", TestMethod());
+        var context = await host.StartTestAsync("grpc unformattable attachment", TestMethods.Placeholder);
         var client = context.Grpc("Echo");
 
         var reply = await client.UnaryAsync(
-            SayMethod,
+            EchoMethods.Say,
             new EchoRequest
             {
                 Message = "any",
@@ -470,16 +454,16 @@ public sealed class GrpcIntegrationTests
         });
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc streaming attachments", TestMethod());
+        var context = await host.StartTestAsync("grpc streaming attachments", TestMethods.Placeholder);
         var client = context.Grpc("Echo");
 
         var request = new EchoRequest
         {
             Message = string.Join(", ", Enumerable.Range(1, 12).Select(index => $"m{index}"))
         };
-        var replies = await client.ServerStreamingAsync(StreamMethod, request);
+        var replies = await client.ServerStreamingAsync(EchoMethods.Stream, request);
         await client.ClientStreamingAsync(
-            CollectMethod,
+            EchoMethods.Collect,
             Enumerable.Range(1, 12).Select(index => new EchoRequest { Message = $"m{index}" }));
 
         var streamAttachment = context.Attachments.Single(item =>
@@ -520,11 +504,11 @@ public sealed class GrpcIntegrationTests
             options => options.SensitiveMetadataKeys.Add("x-custom-secret")));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc metadata redaction", TestMethod());
+        var context = await host.StartTestAsync("grpc metadata redaction", TestMethods.Placeholder);
         var client = context.Grpc("Echo");
 
         await client.UnaryAsync(
-            SayMethod,
+            EchoMethods.Say,
             new EchoRequest { Message = "metadata" },
             metadata =>
             {
@@ -558,7 +542,7 @@ public sealed class GrpcIntegrationTests
         var context = await host.StartTestAsync("grpc transport", ApplicationTransportTestMethod());
         var client = context.Grpc();
 
-        var reply = await client.UnaryAsync(SayMethod, new EchoRequest { Message = "transport" });
+        var reply = await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "transport" });
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         Assert.Multiple(() =>
@@ -597,7 +581,7 @@ public sealed class GrpcIntegrationTests
         // pumps: if the blocking part ran there, the async authenticator's continuation would be posted
         // back to the blocked thread and the call would deadlock.
         var call = RunWithNonPumpingContext(
-            () => client.ServerStreaming(StreamMethod, new EchoRequest { Message = "a, b" }),
+            () => client.ServerStreaming(EchoMethods.Stream, new EchoRequest { Message = "a, b" }),
             TimeSpan.FromSeconds(20));
         var replies = new List<string>();
         using (call)
@@ -610,7 +594,7 @@ public sealed class GrpcIntegrationTests
 
         // The async raw variant never blocks the caller and works with the same authenticator.
         using var asyncCall = await client.OpenServerStreamingAsync(
-            StreamMethod,
+            EchoMethods.Stream,
             new EchoRequest { Message = "c" });
         var asyncReplies = new List<string>();
         await foreach (var reply in asyncCall.ResponseStream.ReadAllAsync())
@@ -685,8 +669,6 @@ public sealed class GrpcIntegrationTests
         return port;
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(GrpcIntegrationTests).GetMethod(nameof(Placeholder), BindingFlags.Static | BindingFlags.NonPublic)!;
 
     [Auth<BearerTokenAuthenticator>("shared-token")]
     private static void AuthenticatedPlaceholder()
@@ -712,7 +694,4 @@ public sealed class GrpcIntegrationTests
     private static MethodInfo ApplicationTransportTestMethod()
         => typeof(GrpcIntegrationTests).GetMethod(nameof(ApplicationTransportPlaceholder), BindingFlags.Static | BindingFlags.NonPublic)!;
 
-    private static void Placeholder()
-    {
-    }
 }

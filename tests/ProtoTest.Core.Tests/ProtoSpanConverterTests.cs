@@ -52,7 +52,7 @@ public sealed class ProtoSpanConverterTests
         await host.StartAsync();
         var session = (ProtoTraceSession)host.Trace;
 
-        await host.StartTestAsync("released writer", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("released writer", TestMethods.Placeholder);
         using (var applicationSource = new ActivitySource(Source))
         using (var span = applicationSource.StartActivity("invoice.pay", ActivityKind.Server))
         {

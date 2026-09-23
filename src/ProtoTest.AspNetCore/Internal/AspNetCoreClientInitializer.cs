@@ -1,11 +1,10 @@
 namespace ProtoTest.AspNetCore.Internal;
 
-using ProtoTest.Core.Internal;
-
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Mvc.Testing.Handlers;
 using ProtoTest.Core;
+using ProtoTest.Core.Internal;
 
 /// <summary>
 /// Initializes an in-process ASP.NET Core test server and a per-test client for it.
@@ -49,13 +48,13 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
                 server = _sharedServer ??= AspNetCoreServer<TProgram>.Start(CombinedConfigure(context));
             }
 
-            context.RegisterClient(server.Factory, FactoryName(Name), disposeWithContext: false);
+            context.RegisterClient(server.Factory, FactoryName(Name), ProtoClientOwnership.Caller);
         }
         else
         {
             server = AspNetCoreServer<TProgram>.Start(CombinedConfigure(context));
             context.RegisterClient(server, FactoryName(Name));
-            context.RegisterClient(server.Factory, FactoryName(Name), disposeWithContext: false);
+            context.RegisterClient(server.Factory, FactoryName(Name), ProtoClientOwnership.Caller);
         }
 
         var clientOptions = new WebApplicationFactoryClientOptions();

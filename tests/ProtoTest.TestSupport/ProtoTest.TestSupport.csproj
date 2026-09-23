@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ProtoTest.Core\ProtoTest.Core.csproj" />
+  </ItemGroup>
+
+</Project>

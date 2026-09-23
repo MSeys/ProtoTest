@@ -1,7 +1,7 @@
 namespace ProtoTest.Core.Tests;
 
-using NUnit.Framework;
 using System.Reflection;
+using NUnit.Framework;
 
 [TestFixture]
 public sealed class ProtoAttributeResolverTests

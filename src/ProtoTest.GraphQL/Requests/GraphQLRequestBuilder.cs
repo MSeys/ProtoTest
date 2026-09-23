@@ -9,8 +9,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
-using ProtoTest.Http;
 using ProtoTest.GraphQL.Internal;
+using ProtoTest.Http;
 using ProtoTest.Json;
 
 public sealed class GraphQLRequestBuilder

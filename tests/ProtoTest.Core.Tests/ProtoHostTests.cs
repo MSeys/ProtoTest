@@ -1,8 +1,8 @@
-﻿namespace ProtoTest.Core.Tests;
+namespace ProtoTest.Core.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
-using System.Reflection;
 
 [TestFixture]
 [NonParallelizable]
@@ -22,7 +22,7 @@ public class ProtoHostTests
 
         // Act
         // 1. Create the test execution scope
-        await host.StartTestAsync("TestSequence", "00123", (MethodInfo)MethodInfo.GetCurrentMethod()!, [testAttribute]);
+        await host.StartTestAsync("TestSequence", "00123", TestMethods.Placeholder, [testAttribute]);
 
         // 3. Test execution body
         executionLog.Add("TestBody");
@@ -84,7 +84,7 @@ public class ProtoHostTests
 
         Assert.Throws<InvalidOperationException>(() => _ = Proto.Host);
 
-        await first.StartTestAsync("First", "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await first.StartTestAsync("First", "00001", TestMethods.Placeholder);
         Assert.That(Proto.Host, Is.SameAs(first));
         await first.CompleteTestAsync();
     }
@@ -100,7 +100,7 @@ public class ProtoHostTests
         await using var host = new ProtoHost(rootProvider);
 
         // Act
-        await host.StartTestAsync("TestDisposal", "00456", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("TestDisposal", "00456", TestMethods.Placeholder);
 
         // Resolve dependency while context is active on the current thread
         var dependency = ProtoHost.CurrentContext.Services.GetRequiredService<DisposableDependency>();

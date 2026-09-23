@@ -3,8 +3,8 @@ namespace ProtoTest.GraphQL;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
-using ProtoTest.Http;
 using ProtoTest.GraphQL.Internal;
+using ProtoTest.Http;
 
 public static class ProtoHostBuilderExtensions
 {

@@ -5,6 +5,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
 
+    <!-- Analyzers and style rules are part of the build, not advice. -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+
     <Version>1.0.1</Version>
     <Authors>Matthias Seys</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -25,7 +31,7 @@
 
   <!-- Source stepping: SourceLink points the PDBs at this repository, untracked sources ride along. -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.401" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- One mark for the whole family: on nuget.org every ProtoTest package reads as part of the same set. -->

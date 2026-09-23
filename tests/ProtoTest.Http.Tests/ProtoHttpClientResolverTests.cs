@@ -12,7 +12,7 @@ public sealed class ProtoHttpClientResolverTests
     public async Task Resolve_ShouldRootTheRestTransportFallbackAtTheRegisteredEndpoint()
     {
         await using var host = BuildHost("Orders", "Rest", "Orders", "Orders", "/api/orders").Build();
-        await host.StartTestAsync("rest fallback", "01", TestMethod(), [new ApplicationAttribute("Orders")]);
+        await host.StartTestAsync("rest fallback", "01", TestMethods.Placeholder, [new ApplicationAttribute("Orders")]);
 
         try
         {
@@ -39,7 +39,7 @@ public sealed class ProtoHttpClientResolverTests
     public async Task Resolve_ShouldRootTheTransportFallbackAtTheEndpointTheClientRegistered()
     {
         await using var host = BuildHost("Headless", "GraphQL", "Api", "Api", "/graphql").Build();
-        await host.StartTestAsync("graphql fallback", "02", TestMethod(), [new ApplicationAttribute("Headless")]);
+        await host.StartTestAsync("graphql fallback", "02", TestMethods.Placeholder, [new ApplicationAttribute("Headless")]);
 
         try
         {
@@ -70,7 +70,7 @@ public sealed class ProtoHttpClientResolverTests
                 new StubTransportInitializer("GraphQL", "Api", "http://graphql.test/"));
         });
         await using var host = builder.Build();
-        await host.StartTestAsync("scoped clients", "03", TestMethod());
+        await host.StartTestAsync("scoped clients", "03", TestMethods.Placeholder);
 
         try
         {
@@ -112,12 +112,7 @@ public sealed class ProtoHttpClientResolverTests
         return builder;
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(ProtoHttpClientResolverTests).GetMethod(nameof(Placeholder), BindingFlags.Static | BindingFlags.NonPublic)!;
 
-    private static void Placeholder()
-    {
-    }
 
     private sealed class StubTransportInitializer(string? protocol, string name, string baseAddress) : IProtoClientInitializer<HttpClient>
     {

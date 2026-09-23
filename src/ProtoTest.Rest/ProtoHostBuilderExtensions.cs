@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Rest;
+namespace ProtoTest.Rest;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;

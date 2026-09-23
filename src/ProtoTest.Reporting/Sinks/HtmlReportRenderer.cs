@@ -1,10 +1,10 @@
 namespace ProtoTest.Reporting;
 
-using ProtoTest.Core;
 using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using ProtoTest.Core;
 
 /// <summary>
 /// Builds the self-contained report document. The sink owns the file and the options; the markup, the

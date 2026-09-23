@@ -1,8 +1,8 @@
 namespace ProtoTest.Core.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
-using System.Reflection;
 
 [TestFixture]
 public class ProtoGatewayTests
@@ -29,7 +29,7 @@ public class ProtoGatewayTests
     public async Task Service_ShouldResolveRegisteredService()
     {
         // Arrange
-        await _host.StartTestAsync("HelperTest", "00789", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await _host.StartTestAsync("HelperTest", "00789", TestMethods.Placeholder);
 
         try
         {
@@ -50,7 +50,7 @@ public class ProtoGatewayTests
     public async Task TryService_ShouldReturnNull_WhenServiceIsNotRegistered()
     {
         // Arrange
-        await _host.StartTestAsync("HelperTest", "00789", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await _host.StartTestAsync("HelperTest", "00789", TestMethods.Placeholder);
 
         try
         {
@@ -70,7 +70,7 @@ public class ProtoGatewayTests
     public async Task ContextAndSetContext_ShouldManageTestState()
     {
         // Arrange
-        await _host.StartTestAsync("HelperTest", "00789", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await _host.StartTestAsync("HelperTest", "00789", TestMethods.Placeholder);
 
         try
         {

@@ -1,8 +1,8 @@
 namespace ProtoTest.SampleApp.Domain;
 
-using Microsoft.EntityFrameworkCore;
 using System.Text;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using ProtoTest.SampleApp.Contracts;
 
 internal sealed record DispatchJob(
@@ -764,7 +764,7 @@ internal sealed class NorthstarStore(
             var declined = string.Equals(method, PaymentMethods.Declined, StringComparison.OrdinalIgnoreCase);
             var payment = new Payment
             {
-                    Amount = invoice.Total,
+                Amount = invoice.Total,
                 Status = declined ? PaymentStatuses.Failed : PaymentStatuses.Succeeded,
                 Method = method,
                 FailureReason = declined ? "card_declined" : null,

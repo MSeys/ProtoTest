@@ -1,8 +1,7 @@
 namespace ProtoTest.Data;
 
-using ProtoTest.Data.Internal;
-
 using System.Reflection;
+using ProtoTest.Data.Internal;
 
 /// <summary>Configures value providers and member defaults used by ProtoTest.Data.</summary>
 public sealed class ProtoDataConfiguration

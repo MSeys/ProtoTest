@@ -11,6 +11,9 @@ using ProtoTest.Json;
 /// </summary>
 public sealed class ProtoMessageClient
 {
+    private static readonly ProtoAttachmentFailure AttachmentFailure =
+        new("messaging.attachment.failed", "ProtoTest.Messaging", "Messaging attachment");
+
     private readonly ProtoExecutionContext _context;
     private readonly IProtoMessageBroker _broker;
     private readonly IProtoMessageConsumer _consumer;
@@ -152,39 +155,19 @@ public sealed class ProtoMessageClient
         string? payload,
         string? contentType,
         string description)
-    {
-        try
-        {
-            _context.AddAttachment(
-                name,
-                JsonDiagnosticSanitizer.Sanitize(payload ?? string.Empty, options),
-                ResolveMediaType(payload, contentType),
-                description);
-        }
-        catch (Exception exception)
-        {
-            _context.Trace.WriteEvent(
-                "messaging.attachment.failed",
-                $"Messaging attachment · {name}",
-                "ProtoTest.Messaging",
-                outcome: ProtoTraceOutcome.Failed,
-                attributes: new Dictionary<string, string?> { ["attachment.name"] = name },
-                exception: exception,
-                parentId: operation.Id);
-        }
-    }
+        => ProtoAttachmentCapture.TryAdd(
+            _context,
+            operation,
+            AttachmentFailure,
+            name,
+            () => JsonDiagnosticSanitizer.Sanitize(payload ?? string.Empty, options),
+            ResolveMediaType(payload, contentType),
+            description);
 
     /// <summary>An explicit content type wins; otherwise Json payloads are <c>application/json</c> and everything else is text.</summary>
     private static string ResolveMediaType(string? payload, string? contentType)
     {
         if (!string.IsNullOrWhiteSpace(contentType)) return contentType;
-        return LooksLikeJson(payload) ? "application/json" : "text/plain";
-    }
-
-    private static bool LooksLikeJson(string? payload)
-    {
-        if (string.IsNullOrWhiteSpace(payload)) return false;
-        var trimmed = payload.AsSpan().TrimStart();
-        return !trimmed.IsEmpty && trimmed[0] is '{' or '[';
+        return JsonDiagnosticSanitizer.LooksLikeJson(payload) ? "application/json" : "text/plain";
     }
 }

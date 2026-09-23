@@ -1,7 +1,7 @@
 namespace ProtoTest.SampleApp.Northstar;
 
-using HotChocolate.Subscriptions;
 using HotChocolate;
+using HotChocolate.Subscriptions;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.SampleApp.Domain;

@@ -12,12 +12,8 @@ public class Setup : ProtoTestAssembly
         AdapterTestSupport.ConfigureHost(builder);
         builder.ConfigureServices(services =>
         {
-            services.AddScoped<ITestService, TestService>();
+            services.AddScoped<ITestService>(_ => new ProbeTestService("ProtoTest_NUnit_Success"));
         });
     }
 }
 
-public class TestService : ITestService
-{
-    public string GetMessage() => "ProtoTest_NUnit_Success";
-}

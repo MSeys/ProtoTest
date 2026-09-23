@@ -1,9 +1,8 @@
 namespace ProtoTest.Web.Internal;
 
-using ProtoTest.Core.Internal;
-
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using ProtoTest.Core.Internal;
 
 /// <summary>
 /// Best-effort page inventory from a frontend source folder, so pages that exist in a

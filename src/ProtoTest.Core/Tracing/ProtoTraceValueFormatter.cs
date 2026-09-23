@@ -1,9 +1,9 @@
 namespace ProtoTest.Core;
 
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using System.Reflection;
 
 /// <summary>
 /// Serializes a value into compact, cycle-safe, redacted JSON for trace attributes. Shared so every

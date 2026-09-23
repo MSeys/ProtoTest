@@ -21,7 +21,7 @@ public sealed class ProtoHttpOptionsResolverTests
             "unkeyed response options",
             services.CreateScope(),
             "00001",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         var options = context.ResolveResponseOptions("GraphQL");
 
@@ -39,7 +39,7 @@ public sealed class ProtoHttpOptionsResolverTests
             "unkeyed attachment options",
             services.CreateScope(),
             "00002",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         Assert.That(context.ResolveAttachmentOptions("GraphQL"), Is.Null);
     }
@@ -59,7 +59,7 @@ public sealed class ProtoHttpOptionsResolverTests
             "composed response options",
             provider.CreateScope(),
             "00003",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         var options = context.ResolveResponseOptions("Rest");
 
@@ -85,7 +85,7 @@ public sealed class ProtoHttpOptionsResolverTests
             "composed attachment options",
             provider.CreateScope(),
             "00004",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         var options = context.ResolveAttachmentOptions("GraphQL");
 
@@ -110,7 +110,7 @@ public sealed class ProtoHttpOptionsResolverTests
             "configured after try-add",
             provider.CreateScope(),
             "00005",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         var options = context.ResolveResponseOptions("Rest");
 

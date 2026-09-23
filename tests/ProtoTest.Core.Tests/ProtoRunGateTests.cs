@@ -373,16 +373,4 @@ public class ProtoRunGateTests
         public override string Category => "Endpoints";
     }
 
-    private sealed class CapturingSink : IProtoSink
-    {
-        private ProtoReportItem[] _items = [];
-
-        public IReadOnlyList<ProtoReportItem> Items => _items;
-
-        public Task ExportAsync(IEnumerable<ProtoReportItem> items, CancellationToken cancellationToken = default)
-        {
-            _items = [.. items];
-            return Task.CompletedTask;
-        }
-    }
 }

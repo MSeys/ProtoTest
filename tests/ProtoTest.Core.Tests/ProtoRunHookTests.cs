@@ -1,8 +1,8 @@
 namespace ProtoTest.Core.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
-using System.Reflection;
 
 [TestFixture]
 public class ProtoRunHookTests
@@ -44,7 +44,7 @@ public class ProtoRunHookTests
         services.AddScoped<DisposableDependency>();
         services.AddSingleton<IProtoTestHook, ThrowingAfterHook>();
         await using var host = new ProtoHost(services.BuildServiceProvider());
-        await host.StartTestAsync("FailureTest", "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("FailureTest", "00001", TestMethods.Placeholder);
         var dependency = ProtoHost.CurrentContext.Service<DisposableDependency>();
 
         // Act & Assert

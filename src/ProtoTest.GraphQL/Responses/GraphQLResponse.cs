@@ -209,7 +209,7 @@ public sealed class GraphQLResponse : ProtoHttpResponse
         try
         {
             var result = SelectedData.HasValue
-                ? SelectedData.Value.Deserialize<T>(options ?? new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ? SelectedData.Value.Deserialize<T>(options ?? ProtoJsonDefaults.Reader)
                 : default;
             operation.Succeed();
             return result;

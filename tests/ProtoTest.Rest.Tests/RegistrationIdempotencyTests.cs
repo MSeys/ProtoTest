@@ -1,12 +1,12 @@
 namespace ProtoTest.Rest.Tests;
 
+using System.Net.Http;
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Http;
-using System.Net.Http;
-using System.Reflection;
 
 [TestFixture]
 public sealed class RegistrationIdempotencyTests
@@ -39,7 +39,7 @@ public sealed class RegistrationIdempotencyTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("rest idempotent", TestMethod());
+        var context = await host.StartTestAsync("rest idempotent", TestMethods.Placeholder);
 
         Assert.Multiple(() =>
         {
@@ -60,7 +60,7 @@ public sealed class RegistrationIdempotencyTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("rest duplicate client", TestMethod());
+        var context = await host.StartTestAsync("rest duplicate client", TestMethods.Placeholder);
 
         Assert.That(context.Client<HttpClient>("Orders").BaseAddress, Is.EqualTo(new Uri("https://first.test")));
         context.Rest("Orders");
@@ -143,7 +143,7 @@ public sealed class RegistrationIdempotencyTests
         await host.StartAsync();
         var context = await host.StartTestAsync(
             "rest application idempotent",
-            TestMethod(),
+            TestMethods.Placeholder,
             [new ApplicationAttribute("ControlPlane")]);
 
         Assert.Multiple(() =>
@@ -177,7 +177,7 @@ public sealed class RegistrationIdempotencyTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("rest options compose", TestMethod());
+        var context = await host.StartTestAsync("rest options compose", TestMethods.Placeholder);
 
         var responses = context.ResolveResponseOptions(ProtoRestBuilder.ProtocolName);
         var attachments = context.ResolveAttachmentOptions(ProtoRestBuilder.ProtocolName);
@@ -194,11 +194,5 @@ public sealed class RegistrationIdempotencyTests
         await host.StopAsync();
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(RegistrationIdempotencyTests).GetMethod(
-            nameof(Placeholder), BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void Placeholder()
-    {
-    }
 }

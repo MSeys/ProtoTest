@@ -34,52 +34,45 @@ internal sealed class WebSynchronizationMiddleware(
                      item.Timing == timing && item.Operations.Contains(operationContext.Kind)))
         {
             var condition = (IWebWaitCondition)operationContext.Execution.Services.GetRequiredService(registration.ConditionType);
-            using var trace = operationContext.Execution.Trace
+            string? lastObserved = null;
+            await operationContext.Execution.Trace
                 .Operation("web.wait", $"Wait · {condition.Name}", "ProtoTest.Web")
                 .With("web.wait.timing", timing.ToString())
                 .With("web.wait.condition", condition.GetType().FullName)
                 .With("web.wait.timeout", registration.Timeout.ToString())
                 .With("web.operation", operationContext.Kind.ToString())
-                .Begin();
-            string? lastObserved = null;
-            try
-            {
-                var result = await WebPolling.PollAsync(
-                    async token =>
-                    {
-                        var observation = await condition.ObserveAsync(
-                            new WebWaitContext(operationContext, operationContext.Backend),
-                            token);
-                        lastObserved = observation.LastObserved;
-                        return observation;
-                    },
-                    observation => observation.Satisfied,
-                    registration.Timeout,
-                    registration.PollInterval,
-                    cancellationToken);
-
-                trace.SetAttribute("web.wait.last_observed", result.Value.LastObserved);
-                if (!result.Satisfied)
+                .RunAsync(async trace =>
                 {
-                    throw new WebWaitTimeoutException(
-                        $"Wait '{condition.Name}' timed out after {registration.Timeout}. " +
-                        $"Last observed: {result.Value.LastObserved ?? "no observation"}.");
-                }
+                    try
+                    {
+                        var result = await ProtoPolling.PollAsync(
+                            async token =>
+                            {
+                                var observation = await condition.ObserveAsync(
+                                    new WebWaitContext(operationContext, operationContext.Backend),
+                                    token);
+                                lastObserved = observation.LastObserved;
+                                return observation;
+                            },
+                            observation => observation.Satisfied,
+                            registration.Timeout,
+                            registration.PollInterval,
+                            cancellationToken);
 
-                trace.Succeed();
-            }
-            catch (OperationCanceledException exception)
-            {
-                trace.SetAttribute("web.wait.last_observed", lastObserved);
-                trace.Cancel(exception);
-                throw;
-            }
-            catch (Exception exception)
-            {
-                trace.SetAttribute("web.wait.last_observed", lastObserved);
-                trace.Fail(exception);
-                throw;
-            }
+                        trace.SetAttribute("web.wait.last_observed", result.Value.LastObserved);
+                        if (!result.Satisfied)
+                        {
+                            throw new WebWaitTimeoutException(
+                                $"Wait '{condition.Name}' timed out after {registration.Timeout}. " +
+                                $"Last observed: {result.Value.LastObserved ?? "no observation"}.");
+                        }
+                    }
+                    catch
+                    {
+                        trace.SetAttribute("web.wait.last_observed", lastObserved);
+                        throw;
+                    }
+                });
         }
     }
 }

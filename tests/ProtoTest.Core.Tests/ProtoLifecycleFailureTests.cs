@@ -1,8 +1,8 @@
 namespace ProtoTest.Core.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
-using System.Reflection;
 
 [TestFixture]
 public sealed class ProtoLifecycleFailureTests
@@ -22,7 +22,7 @@ public sealed class ProtoLifecycleFailureTests
         ];
 
         Assert.ThrowsAsync<InvalidOperationException>(async () => await host.StartTestAsync(
-            "Failure", "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!, attributes));
+            "Failure", "00001", TestMethods.Placeholder, attributes));
 
         Assert.That(events, Is.EqualTo(new[]
         {
@@ -50,7 +50,7 @@ public sealed class ProtoLifecycleFailureTests
             new TrackingAttribute("FirstAttribute", events, failAfter: true) { Order = 10 },
             new TrackingAttribute("SecondAttribute", events, failAfter: true) { Order = 20 }
         ];
-        await host.StartTestAsync("Failure", "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!, attributes);
+        await host.StartTestAsync("Failure", "00001", TestMethods.Placeholder, attributes);
         events.Clear();
 
         var exception = Assert.ThrowsAsync<AggregateException>(async () => await host.CompleteTestAsync());
@@ -73,7 +73,7 @@ public sealed class ProtoLifecycleFailureTests
         builder.ConfigureTracing(options => options.Enabled = false);
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("Failure", "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = await host.StartTestAsync("Failure", "00001", TestMethods.Placeholder);
         context.AddAttachment(CreateUnreadableAttachment());
 
         // Act: a non-IO failure while capturing artifacts is a teardown failure like any other.
@@ -98,7 +98,7 @@ public sealed class ProtoLifecycleFailureTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("Failure", "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = await host.StartTestAsync("Failure", "00001", TestMethods.Placeholder);
         context.AddAttachment(ProtoTestAttachment.FromText("good.txt", "content", "text/plain"));
         context.AddAttachment(CreateUnreadableAttachment());
 
@@ -128,7 +128,7 @@ public sealed class ProtoLifecycleFailureTests
         var services = new ServiceCollection();
         services.AddSingleton<IProtoTestHook>(new TrackingHook("FailingHook", 10, events, failAfter: true));
         await using var host = new ProtoHost(services.BuildServiceProvider());
-        await host.StartTestAsync("Failure", "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("Failure", "00001", TestMethods.Placeholder);
         var assertion = new InvalidOperationException("the assertion failed");
 
         // Act: the original result is a failed assertion; teardown fails too.
@@ -163,7 +163,7 @@ public sealed class ProtoLifecycleFailureTests
         var services = new ServiceCollection();
         services.AddSingleton<IProtoTestHook>(new TrackingHook("FailingHook", 10, events, failAfter: true));
         await using var host = new ProtoHost(services.BuildServiceProvider());
-        await host.StartTestAsync("Failure", "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("Failure", "00001", TestMethods.Placeholder);
 
         var exception = Assert.ThrowsAsync<InvalidOperationException>(
             async () => await host.CompleteTestAsync(ProtoTestResult.Passed));

@@ -1,5 +1,6 @@
 namespace ProtoTest.Demo;
 
+using System.Net;
 using Northstar.ProtoTest;
 using ProtoTest.Core;
 using ProtoTest.Data;
@@ -8,7 +9,6 @@ using ProtoTest.Json;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
-using System.Net;
 
 /// <summary>A new customer signs up, is constrained by the free plan, and upgrades to grow.</summary>
 [Application(NorthstarTargets.Api)]

@@ -1,8 +1,8 @@
 namespace ProtoTest.TUnit.Tests;
 
+using global::TUnit.Assertions.Enums;
 using ProtoTest.AdapterContract;
 using ProtoTest.Core;
-using global::TUnit.Assertions.Enums;
 
 /// <summary>
 /// Tests the lifecycle execution order of class-level and method-level <see cref="ProtoAttribute"/> instances in TUnit.

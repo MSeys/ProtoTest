@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Rest;
+namespace ProtoTest.Rest;
 
 /// <summary>
 /// Data payload sent when an HTTP request/response is recorded.

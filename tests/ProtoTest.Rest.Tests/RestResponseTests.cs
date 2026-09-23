@@ -21,7 +21,7 @@ public class RestResponseTests
             "TestContext",
             services.BuildServiceProvider().CreateScope(),
             "00001",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!
+            TestMethods.Placeholder
         );
     }
 
@@ -117,7 +117,7 @@ public class RestResponseTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("rest negated status", TestMethod());
+        var context = await host.StartTestAsync("rest negated status", TestMethods.Placeholder);
         var response = new RestResponse(
             new HttpResponseMessage(HttpStatusCode.OK),
             "{}",
@@ -235,14 +235,7 @@ public class RestResponseTests
         }
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(RestResponseTests).GetMethod(
-            nameof(Placeholder),
-            BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void Placeholder()
-    {
-    }
 
     private class SampleDto
     {

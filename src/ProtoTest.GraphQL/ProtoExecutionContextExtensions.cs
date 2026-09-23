@@ -1,10 +1,10 @@
 namespace ProtoTest.GraphQL;
 
-using ProtoTest.Core;
-using ProtoTest.Http;
-using ProtoTest.GraphQL.Internal;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using ProtoTest.Core;
+using ProtoTest.GraphQL.Internal;
+using ProtoTest.Http;
 
 public static class ProtoExecutionContextExtensions
 {

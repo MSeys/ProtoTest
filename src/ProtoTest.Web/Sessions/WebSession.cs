@@ -4,27 +4,25 @@ using ProtoTest.Core.Internal;
 
 using ProtoTest.Web.Internal;
 
-using System.Globalization;
 using System.Runtime.CompilerServices;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 
 /// <summary>Test-scoped entry point for pages, operations, and explicit native backend access.</summary>
 public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
 {
-    private const string TraceSource = "ProtoTest.Web";
+    internal const string TraceSource = "ProtoTest.Web";
     private readonly ProtoExecutionContext _context;
     private readonly IWebBackendFactory _factory;
     private readonly ProtoLock _backendGate = new();
     private readonly ProtoLock _pageGate = new();
     private readonly Dictionary<Type, WebPage> _pages = [];
-    private readonly AsyncLocal<string?> _activeNestingScope = new();
+    private readonly WebOperationRunner _operations;
+    private readonly WebAssertionPoller _assertions;
+    private readonly WebDownloadCapture _downloads;
+    private readonly WebRouteDiscovery _routeDiscovery;
     private Task<IWebBackend>? _backendTask;
     private int _completeStarted;
     private int _disposeStarted;
-    private int _downloadSequence;
-    private int _routeDiscoveryStarted;
 
     internal WebSession(
         ProtoExecutionContext context,
@@ -42,6 +40,14 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         DiscoverRoutes = discoverRoutes;
         Application = string.IsNullOrWhiteSpace(application) ? name : application;
         BaseUrl = ResolveBaseUrl(context, Application, endpoint);
+        _operations = new WebOperationRunner(
+            context,
+            Name,
+            TraceSource,
+            cancellationToken => new ValueTask<IWebBackend>(GetOrCreateBackendAsync(cancellationToken)));
+        _assertions = new WebAssertionPoller(this, _operations);
+        _downloads = new WebDownloadCapture(context, Name, TraceSource, _operations);
+        _routeDiscovery = new WebRouteDiscovery(context, Name, TraceSource, discoverRoutes);
     }
 
     public string Name { get; }
@@ -67,6 +73,9 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
     public string BackendName => _backendTask is { IsCompletedSuccessfully: true }
         ? _backendTask.Result.Name
         : _factory.Name;
+
+    /// <summary>The polling engine behind element assertions and <c>WaitUntilAsync</c>.</summary>
+    internal WebAssertionPoller Assertions => _assertions;
 
     /// <summary>Returns the page for this session, creating it on first use and reusing it afterwards.</summary>
     public TPage Page<TPage>() where TPage : WebPage, new()
@@ -106,7 +115,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
     {
         var target = ResolveTarget(address);
         var safeAddress = ProtoUriSanitizer.Sanitize(target);
-        await ExecuteVoidAsync(
+        await _operations.ExecuteVoidAsync(
             "web.navigate",
             $"WEB · Navigate · {safeAddress}",
             WebOperationKind.Navigate,
@@ -124,7 +133,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
             "web.page.visited",
             currentAddress is null ? PagePathFrom(target.ToString()) : PagePathFrom(currentAddress),
             "navigate");
-        await DiscoverRoutesAsync(backend, cancellationToken);
+        await _routeDiscovery.DiscoverAsync(backend, cancellationToken);
     }
 
     private Uri ResolveTarget(Uri address)
@@ -158,7 +167,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
     }
 
     internal ValueTask ClickAsync(WebElementReference element, CancellationToken cancellationToken)
-        => ExecuteVoidAsync(
+        => _operations.ExecuteVoidAsync(
             "web.click",
             $"WEB · Click · {element.Name}",
             WebOperationKind.Click,
@@ -172,7 +181,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         var attributes = ElementAttributes(element);
         attributes["web.value"] = "[REDACTED]";
         attributes["web.value.length"] = value.Length.ToString();
-        return ExecuteVoidAsync(
+        return _operations.ExecuteVoidAsync(
             "web.fill",
             $"WEB · Fill · {element.Name}",
             WebOperationKind.Fill,
@@ -183,7 +192,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
     }
 
     internal ValueTask CheckAsync(WebElementReference element, bool isChecked, CancellationToken cancellationToken)
-        => ExecuteVoidAsync(
+        => _operations.ExecuteVoidAsync(
             "web.check",
             $"WEB · {(isChecked ? "Check" : "Uncheck")} · {element.Name}",
             WebOperationKind.Check,
@@ -196,7 +205,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
     {
         var attributes = ElementAttributes(element);
         attributes["web.option"] = value;
-        return ExecuteVoidAsync(
+        return _operations.ExecuteVoidAsync(
             "web.select_option",
             $"WEB · Select option · {element.Name}",
             WebOperationKind.SelectOption,
@@ -210,7 +219,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
     {
         var attributes = ElementAttributes(element);
         attributes["web.key"] = key.ToString();
-        return ExecuteVoidAsync(
+        return _operations.ExecuteVoidAsync(
             "web.press",
             $"WEB · Press {key} · {element.Name}",
             WebOperationKind.Press,
@@ -221,7 +230,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
     }
 
     internal ValueTask<int> CountAsync(WebElementReference elements, CancellationToken cancellationToken)
-        => ExecuteAsync(
+        => _operations.ExecuteAsync(
             "web.count",
             $"WEB · Count · {elements.Name}",
             WebOperationKind.Count,
@@ -231,7 +240,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
             cancellationToken);
 
     internal ValueTask<string> ReadTextAsync(WebElementReference element, CancellationToken cancellationToken)
-        => ExecuteAsync(
+        => _operations.ExecuteAsync(
             "web.read_text",
             $"WEB · Read text · {element.Name}",
             WebOperationKind.ReadText,
@@ -241,7 +250,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
             cancellationToken);
 
     internal ValueTask<string?> ReadValueAsync(WebElementReference element, CancellationToken cancellationToken)
-        => ExecuteAsync(
+        => _operations.ExecuteAsync(
             "web.read_value",
             $"WEB · Read value · {element.Name}",
             WebOperationKind.ReadValue,
@@ -251,7 +260,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
             cancellationToken);
 
     internal ValueTask<bool> IsVisibleAsync(WebElementReference element, CancellationToken cancellationToken)
-        => ExecuteAsync(
+        => _operations.ExecuteAsync(
             "web.is_visible",
             $"WEB · Is visible · {element.Name}",
             WebOperationKind.IsVisible,
@@ -261,7 +270,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
             cancellationToken);
 
     internal ValueTask<bool> IsEnabledAsync(WebElementReference element, CancellationToken cancellationToken)
-        => ExecuteAsync(
+        => _operations.ExecuteAsync(
             "web.is_enabled",
             $"WEB · Is enabled · {element.Name}",
             WebOperationKind.IsEnabled,
@@ -271,7 +280,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
             cancellationToken);
 
     internal ValueTask<bool> IsCheckedAsync(WebElementReference element, CancellationToken cancellationToken)
-        => ExecuteAsync(
+        => _operations.ExecuteAsync(
             "web.is_checked",
             $"WEB · Is checked · {element.Name}",
             WebOperationKind.IsChecked,
@@ -279,98 +288,6 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
             ElementAttributes(element),
             (backend, ct) => backend.IsCheckedAsync(element, ct),
             cancellationToken);
-
-    internal ValueTask ShouldBeVisibleAsync(
-        WebElementReference element,
-        bool negated,
-        TimeSpan? timeout,
-        CancellationToken cancellationToken)
-        => AssertUntilAsync(
-            element,
-            negated,
-            "be visible",
-            timeout,
-            async (backend, ct) => await backend.IsVisibleAsync(element, ct)
-                ? (true, "visible")
-                : (false, "not visible"),
-            cancellationToken);
-
-    internal ValueTask ShouldBeEnabledAsync(
-        WebElementReference element,
-        bool negated,
-        TimeSpan? timeout,
-        CancellationToken cancellationToken)
-        => AssertUntilAsync(
-            element,
-            negated,
-            "be enabled",
-            timeout,
-            async (backend, ct) => await backend.IsEnabledAsync(element, ct)
-                ? (true, "enabled")
-                : (false, "disabled or absent"),
-            cancellationToken);
-
-    internal ValueTask ShouldBeCheckedAsync(
-        WebElementReference element,
-        bool negated,
-        TimeSpan? timeout,
-        CancellationToken cancellationToken)
-        => AssertUntilAsync(
-            element,
-            negated,
-            "be checked",
-            timeout,
-            async (backend, ct) => await backend.IsCheckedAsync(element, ct)
-                ? (true, "checked")
-                : (false, "unchecked or absent"),
-            cancellationToken);
-
-    internal ValueTask ShouldHaveTextAsync(
-        WebElementReference element,
-        string expected,
-        bool contains,
-        bool negated,
-        TimeSpan? timeout,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(expected);
-        return AssertUntilAsync(
-            element,
-            negated,
-            contains ? $"contain text \"{expected}\"" : $"have text \"{expected}\"",
-            timeout,
-            async (backend, ct) =>
-            {
-                var actual = await backend.ReadTextAsync(element, ct);
-                var holds = contains
-                    ? actual.Contains(expected, StringComparison.Ordinal)
-                    : string.Equals(actual, expected, StringComparison.Ordinal);
-                return (holds, $"text was \"{actual}\"");
-            },
-            cancellationToken);
-    }
-
-    internal ValueTask ShouldHaveValueAsync(
-        WebElementReference element,
-        string expected,
-        bool negated,
-        TimeSpan? timeout,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(expected);
-        return AssertUntilAsync(
-            element,
-            negated,
-            "have the expected value",
-            timeout,
-            async (backend, ct) =>
-            {
-                var actual = await backend.ReadValueAsync(element, ct);
-                return (string.Equals(actual, expected, StringComparison.Ordinal),
-                    $"value length was {actual?.Length ?? 0} (value redacted)");
-            },
-            cancellationToken);
-    }
 
     /// <summary>
     /// Polls <paramref name="condition"/> until it holds or <paramref name="timeout"/> elapses. Use it to
@@ -386,55 +303,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         TimeSpan? timeout = null,
         [CallerArgumentExpression(nameof(condition))] string? description = null,
         CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(condition);
-        var waitTimeout = timeout ?? TimeSpan.FromSeconds(5);
-        if (waitTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout));
-        var expectation = string.IsNullOrWhiteSpace(description) ? "the condition to hold" : description;
-
-        return ExecuteVoidAsync(
-            "web.wait.until",
-            $"Wait · {Shorten(expectation)}",
-            WebOperationKind.Assert,
-            element: null,
-            new Dictionary<string, string?>
-            {
-                ["web.session"] = Name,
-                ["web.expectation"] = expectation,
-                ["web.wait.timeout"] = waitTimeout.ToString()
-            },
-            async (_, ct) =>
-            {
-                var result = await WebPolling.PollAsync(
-                    async token =>
-                    {
-                        try
-                        {
-                            return await condition(token);
-                        }
-                        catch (Exception exception) when (
-                            exception is WebElementResolutionException or WebActionabilityException)
-                        {
-                            return false;
-                        }
-                    },
-                    satisfied => satisfied,
-                    waitTimeout,
-                    WebPolling.DefaultInterval,
-                    ct);
-
-                if (!result.Satisfied)
-                {
-                    throw new WebAssertionException(
-                        $"Expected {expectation} within {waitTimeout}, but it did not hold.");
-                }
-            },
-            cancellationToken,
-            opensNestingScope: true);
-    }
-
-    private static string Shorten(string value)
-        => value.Length <= 80 ? value : $"{value[..77]}...";
+        => _assertions.WaitUntilAsync(condition, timeout, description, cancellationToken);
 
     /// <summary>
     /// Runs <paramref name="trigger"/> — typically a click that starts a download — and captures the
@@ -456,166 +325,14 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         string? name = null,
         TimeSpan? timeout = null,
         CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(trigger);
-        if (timeout is { } wait && wait <= TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(nameof(timeout));
-        }
-
-        var requestedName = string.IsNullOrWhiteSpace(name) ? null : name;
-        return ExecuteAsync(
-            "web.download",
-            requestedName is null ? "WEB · Download" : $"WEB · Download · {requestedName}",
-            WebOperationKind.Download,
-            element: null,
-            new Dictionary<string, string?>
-            {
-                ["web.download.requested_name"] = requestedName,
-                ["web.download.timeout"] = timeout?.ToString()
-            },
-            async (backend, ct) =>
-            {
-                if (backend is not IWebBackendDownloads downloads)
-                {
-                    throw new WebBackendCapabilityException(
-                        $"Web backend '{backend.Name}' cannot capture browser downloads. Use a backend " +
-                        $"that provides the {nameof(IWebBackendDownloads)} capability (Playwright does), " +
-                        "or fetch the file over HTTP instead.");
-                }
-
-                var captured = await downloads.DownloadAsync(trigger, timeout, ct);
-                if (requestedName is null)
-                {
-                    return captured;
-                }
-
-                // An explicit name wins for the record and the attachment. A known extension refines
-                // the media type guess; an unknown or missing one keeps the suggested file's type.
-                var mediaType = WebMediaTypes.Guess(requestedName);
-                return captured with
-                {
-                    FileName = requestedName,
-                    MediaType = mediaType == WebMediaTypes.Default ? captured.MediaType : mediaType
-                };
-            },
-            cancellationToken,
-            opensNestingScope: true,
-            afterCapture: RegisterDownload);
-    }
-
-    /// <summary>
-    /// Records the captured file on the download operation and registers it as an attachment. The
-    /// artifact registers on its own: a failed attachment is traced and never replaces the download.
-    /// </summary>
-    private void RegisterDownload(WebDownload download, ProtoTraceOperation operation)
-    {
-        var attributes = new Dictionary<string, string?>
-        {
-            ["web.download.name"] = download.FileName,
-            ["web.download.media_type"] = download.MediaType,
-            ["web.download.size"] = download.Size.ToString(CultureInfo.InvariantCulture)
-        };
-        foreach (var (key, value) in attributes)
-        {
-            operation.SetAttribute(key, value);
-        }
-
-        var attachmentName = DownloadAttachmentName(download.FileName);
-        try
-        {
-            _context.AddAttachment(ProtoTestAttachment.FromBytes(
-                attachmentName,
-                download.Content,
-                download.MediaType,
-                $"Downloaded file captured by Web session '{Name}'."));
-        }
-        catch (Exception exception)
-        {
-            _context.Trace.WriteEvent(
-                "web.download.attachment_failed",
-                $"Web download attachment failed · {attachmentName}",
-                TraceSource,
-                outcome: ProtoTraceOutcome.Failed,
-                attributes: new Dictionary<string, string?> { ["web.artifact"] = attachmentName },
-                exception: exception,
-                parentId: operation.Id);
-        }
-    }
-
-    private string DownloadAttachmentName(string fileName)
-    {
-        var sequence = Interlocked.Increment(ref _downloadSequence);
-        var name = Path.GetFileName(fileName);
-        var extension = Path.GetExtension(name);
-        var stem = WebNames.SafeName(Path.GetFileNameWithoutExtension(name));
-        if (stem.Length == 0) stem = "download";
-        var safeExtension = extension.Length > 1 ? WebNames.SafeName(extension[1..]) : string.Empty;
-        var suffix = safeExtension.Length > 0 ? $".{safeExtension}" : string.Empty;
-        return $"web-{WebNames.SafeName(Name)}-download-{sequence}-{stem}{suffix}";
-    }
-
-    private async ValueTask AssertUntilAsync(
-        WebElementReference element,
-        bool negated,
-        string expectation,
-        TimeSpan? timeout,
-        Func<IWebBackend, CancellationToken, ValueTask<(bool Holds, string Observation)>> inspect,
-        CancellationToken cancellationToken)
-    {
-        var assertionTimeout = timeout ?? TimeSpan.FromSeconds(5);
-        if (assertionTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout));
-        var describedExpectation = ProtoAssertion.Describe(expectation, negated);
-        var attributes = ElementAttributes(element);
-        attributes["web.expectation"] = describedExpectation;
-        attributes["web.assert.negated"] = negated ? "true" : "false";
-        attributes["web.assert.timeout"] = assertionTimeout.ToString();
-        await ExecuteVoidAsync(
-            "assert.web",
-            $"Assert · {element.Name} should {describedExpectation}",
-            WebOperationKind.Assert,
-            element,
-            attributes,
-            async (backend, ct) =>
-            {
-                var result = await WebPolling.PollAsync(
-                    async token =>
-                    {
-                        try
-                        {
-                            return await inspect(backend, token);
-                        }
-                        catch (Exception exception) when (
-                            exception is WebElementResolutionException or WebActionabilityException)
-                        {
-                            return (Holds: false, Observation: exception.Message);
-                        }
-                    },
-                    observation => ProtoAssertion.IsSatisfied(observation.Holds, negated),
-                    assertionTimeout,
-                    WebPolling.DefaultInterval,
-                    ct);
-
-                if (!result.Satisfied)
-                {
-                    throw new WebAssertionException(
-                        $"Element '{element.ComponentPath}.{element.Name}' should {describedExpectation} within {assertionTimeout}. " +
-                        $"Last observed: {result.Value.Observation ?? "no observation"}.");
-                }
-            },
-            cancellationToken);
-
-        // A passing assertion is what makes a page covered; the address is the page it was checked on.
-        var backend = await GetOrCreateBackendAsync(cancellationToken);
-        RecordPageObservation("web.page.verified", PagePathFrom(TryCurrentAddress(backend)), "assert");
-    }
+        => _downloads.DownloadAsync(trigger, name, timeout, cancellationToken);
 
     /// <summary>
     /// The coverage path of an observed address. When the session targets an application (it has a
     /// <see cref="BaseUrl"/>), a page on another origin — an identity provider, a payment gateway — is
     /// not this application's page, so it contributes nothing to its coverage.
     /// </summary>
-    private string? PagePathFrom(string? address)
+    internal string? PagePathFrom(string? address)
     {
         if (address is null) return null;
         if (BaseUrl is null || !Uri.TryCreate(address, UriKind.Absolute, out var uri))
@@ -632,174 +349,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
            && string.Equals(left.IdnHost, right.IdnHost, StringComparison.OrdinalIgnoreCase)
            && left.Port == right.Port;
 
-    private async ValueTask ExecuteVoidAsync(
-        string kind,
-        string name,
-        WebOperationKind operationKind,
-        WebElementReference? element,
-        Dictionary<string, string?> attributes,
-        Func<IWebBackend, CancellationToken, ValueTask> execute,
-        CancellationToken cancellationToken,
-        bool opensNestingScope = false)
-        => await ExecuteAsync<object?>(
-            kind,
-            name,
-            operationKind,
-            element,
-            attributes,
-            async (backend, ct) =>
-            {
-                await execute(backend, ct);
-                return null;
-            },
-            cancellationToken,
-            opensNestingScope);
-
-    private async ValueTask<TResult> ExecuteAsync<TResult>(
-        string kind,
-        string name,
-        WebOperationKind operationKind,
-        WebElementReference? element,
-        Dictionary<string, string?> attributes,
-        Func<IWebBackend, CancellationToken, ValueTask<TResult>> execute,
-        CancellationToken cancellationToken,
-        bool opensNestingScope = false,
-        Action<TResult, ProtoTraceOperation>? afterCapture = null)
-    {
-        var backend = await GetOrCreateBackendAsync(cancellationToken);
-        attributes["web.backend"] = backend.Name;
-        attributes["web.session"] = Name;
-        using var operation = _context.Trace
-            .Operation(kind, name, TraceSource)
-            .With(attributes)
-            .Begin();
-        var backendContext = new WebBackendOperationContext(
-            operation.Id, Name, operationKind, OperationName(name), element, _activeNestingScope.Value);
-        // An explicit nesting scope is the only way an operation becomes nested: a second top-level
-        // operation started while another one is still in flight is never misclassified, and a
-        // fire-and-forget operation cannot leave a stale correlation behind because the scope is
-        // restored when this operation returns.
-        using var nesting = opensNestingScope
-            ? new NestingScope(this, operation.Id)
-            : null;
-        var webOperation = new WebOperationContext(
-            _context, operationKind, OperationName(name), backend.Name, Name, operation.Id, element, backend);
-        try
-        {
-            WebOperationDelegate pipeline = async (context, ct) =>
-            {
-                using var backendOperation = _context.Trace
-                    .Operation("web.backend.execute", $"{backend.Name} · {operationKind}", TraceSource)
-                    .With("web.backend", backend.Name)
-                    .With("web.session", Name)
-                    .With("web.correlation_id", operation.Id)
-                    .Parent(operation.Id)
-                    .Begin();
-                Exception? failure = null;
-                var outcome = ProtoTraceOutcome.Unknown;
-                try
-                {
-                    await backend.BeginOperationAsync(backendContext, ct);
-                    context.Result = await execute(backend, ct);
-                    outcome = ProtoTraceOutcome.Succeeded;
-                    backendOperation.Succeed();
-                }
-                catch (OperationCanceledException exception)
-                {
-                    failure = exception;
-                    outcome = ProtoTraceOutcome.Cancelled;
-                    backendOperation.Cancel(exception);
-                    throw;
-                }
-                catch (Exception exception)
-                {
-                    failure = exception;
-                    outcome = ProtoTraceOutcome.Failed;
-                    backendOperation.Fail(exception);
-                    throw;
-                }
-                finally
-                {
-                    await backend.EndOperationAsync(backendContext, outcome, failure, CancellationToken.None);
-                }
-            };
-
-            foreach (var middleware in _context.Services.GetServices<IWebOperationMiddleware>().Reverse())
-            {
-                var next = pipeline;
-                pipeline = (context, ct) => middleware.InvokeAsync(context, next, ct);
-            }
-
-            await pipeline(webOperation, cancellationToken);
-
-            var result = (TResult)webOperation.Result!;
-            afterCapture?.Invoke(result, operation);
-            operation.Succeed();
-            return result;
-        }
-        catch (OperationCanceledException exception)
-        {
-            operation.Cancel(exception);
-            throw;
-        }
-        catch (Exception exception)
-        {
-            await CaptureFailureAsync(backend, new WebFailureContext(operationKind.ToString(), element, exception), operation.Id);
-            operation.Fail(exception);
-            throw;
-        }
-    }
-
-    private static string OperationName(string traceName)
-        => traceName.StartsWith("WEB · ", StringComparison.Ordinal) ? traceName[6..] : traceName;
-
-    private async ValueTask CaptureFailureAsync(IWebBackend backend, WebFailureContext failure, string parentId)
-    {
-        if (backend is not IWebBackendDiagnostics diagnostics)
-        {
-            return;
-        }
-
-        IReadOnlyList<ProtoTestAttachment> attachments;
-        try
-        {
-            attachments = await diagnostics.CaptureFailureAsync(failure);
-        }
-        catch (Exception captureException)
-        {
-            _context.Trace.WriteEvent(
-                "web.diagnostics.failed",
-                "Web diagnostics capture failed",
-                TraceSource,
-                outcome: ProtoTraceOutcome.Failed,
-                exception: captureException,
-                parentId: parentId);
-            return;
-        }
-
-        // Each artifact registers on its own: one failing attachment (for example a collision) must not
-        // drop the rest of the failure evidence.
-        foreach (var attachment in attachments)
-        {
-            try
-            {
-                _context.AddAttachment(attachment);
-            }
-            catch (Exception attachmentException)
-            {
-                _context.Trace.WriteEvent(
-                    "web.diagnostics.artifact_failed",
-                    $"Web diagnostic failed · {attachment.Name}",
-                    TraceSource,
-                    outcome: ProtoTraceOutcome.Failed,
-                    attributes: new Dictionary<string, string?> { ["web.artifact"] = attachment.Name },
-                    exception: attachmentException,
-                    parentId: parentId);
-            }
-        }
-    }
-
-    private static Dictionary<string, string?> ElementAttributes(WebElementReference element)
+    internal static Dictionary<string, string?> ElementAttributes(WebElementReference element)
         => new()
         {
             ["web.component"] = element.ComponentPath,
@@ -808,7 +358,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
             ["web.component.roots"] = string.Join(" > ", element.ComponentRoots.Select(root => root.Describe()))
         };
 
-    private void RecordPageObservation(string kind, string? path, string source)
+    internal void RecordPageObservation(string kind, string? path, string source)
     {
         if (path is null) return;
         _context.RecordObservation(new ProtoObservation(
@@ -822,7 +372,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
             }));
     }
 
-    private static string? TryCurrentAddress(IWebBackend backend)
+    internal static string? TryCurrentAddress(IWebBackend backend)
     {
         try
         {
@@ -832,45 +382,6 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         {
             // Reading the address is best-effort; a backend that cannot report one still passes the test.
             return null;
-        }
-    }
-
-    /// <summary>
-    /// Opt-in Vue Router discovery (<c>DiscoverRoutes</c> on <c>[WebSession]</c> or
-    /// <c>Proto.Context.Web(...)</c>). It runs once per
-    /// session after a navigation, answers with nothing when Vue or its router is absent, and never fails
-    /// the test; a genuine backend failure is recorded on the trace instead.
-    /// </summary>
-    private async ValueTask DiscoverRoutesAsync(IWebBackend backend, CancellationToken cancellationToken)
-    {
-        if (Volatile.Read(ref _routeDiscoveryStarted) != 0) return;
-        if (!DiscoverRoutes) return;
-        if (backend is not IWebBackendJavaScript javascript) return;
-        try
-        {
-            var json = await javascript.EvaluateJsonAsync(VueRouteDiscovery.Script, cancellationToken);
-            if (json is null) return;
-            Interlocked.Exchange(ref _routeDiscoveryStarted, 1);
-            WebPageInventory.Record(
-                _context,
-                "Web",
-                VueRouteDiscovery.Parse(json),
-                "vue-router",
-                new Dictionary<string, object> { ["web.session"] = Name });
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            // Discovery stays unlatched, so a later navigation can try again; the failure is traced.
-            _context.Trace.WriteEvent(
-                "web.page.discovery.failed",
-                "Vue route discovery failed",
-                TraceSource,
-                outcome: ProtoTraceOutcome.Unknown,
-                exception: exception);
         }
     }
 
@@ -904,7 +415,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         }
     }
 
-    private Task<IWebBackend> GetOrCreateBackendAsync(CancellationToken cancellationToken)
+    internal Task<IWebBackend> GetOrCreateBackendAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         lock (_backendGate)
@@ -967,24 +478,5 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         await CompleteAsync();
         if (_backendTask is { } backendTask)
             await (await backendTask).DisposeAsync();
-    }
-
-    /// <summary>
-    /// Sets the correlation id nested operations resolve while the scope is open and restores the
-    /// previous value on dispose, so no flow-local state outlives the operation that owns it.
-    /// </summary>
-    private sealed class NestingScope : IDisposable
-    {
-        private readonly WebSession _session;
-        private readonly string? _previous;
-
-        public NestingScope(WebSession session, string correlationId)
-        {
-            _session = session;
-            _previous = session._activeNestingScope.Value;
-            session._activeNestingScope.Value = correlationId;
-        }
-
-        public void Dispose() => _session._activeNestingScope.Value = _previous;
     }
 }

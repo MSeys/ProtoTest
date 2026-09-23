@@ -224,9 +224,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         cancellationToken.ThrowIfCancellationRequested();
         var locator = Resolve(element);
         var count = await locator.CountAsync();
-        if (count > 1)
-            throw new WebElementResolutionException(
-                $"Expected at most one element for {element.Locator.Describe()} in {element.ComponentPath}, but found {count}.");
+        if (count > 1) throw WebBackendErrors.MultipleMatch(element.Locator, element.ComponentPath, count);
         return count == 1 && await locator.IsVisibleAsync();
     }
 
@@ -235,7 +233,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         cancellationToken.ThrowIfCancellationRequested();
         var locator = Resolve(element);
         var count = await locator.CountAsync();
-        if (count > 1) throw MultipleMatch(element, count);
+        if (count > 1) throw WebBackendErrors.MultipleMatch(element.Locator, element.ComponentPath, count);
         return count == 1 && await locator.IsEnabledAsync();
     }
 
@@ -244,7 +242,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         cancellationToken.ThrowIfCancellationRequested();
         var locator = Resolve(element);
         var count = await locator.CountAsync();
-        if (count > 1) throw MultipleMatch(element, count);
+        if (count > 1) throw WebBackendErrors.MultipleMatch(element.Locator, element.ComponentPath, count);
         return count == 1 && await locator.IsCheckedAsync();
     }
 
@@ -341,13 +339,11 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         }
         catch (TimeoutException)
         {
-            throw new WebActionabilityException(
-                $"Element '{element.ComponentPath}.{element.Name}' did not become actionable within " +
-                $"{_options.ActionTimeout}. Locator: {element.Locator.Describe()}.");
+            throw WebBackendErrors.NotActionable(element, _options.ActionTimeout);
         }
         catch (PlaywrightException exception) when (IsStrictViolation(exception))
         {
-            throw MultipleMatch(element);
+            throw WebBackendErrors.MultipleMatch(element.Locator, element.ComponentPath, null);
         }
     }
 
@@ -360,13 +356,11 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         }
         catch (TimeoutException)
         {
-            throw new WebElementResolutionException(
-                $"Element '{element.ComponentPath}.{element.Name}' was not present within " +
-                $"{_options.ActionTimeout}. Locator: {element.Locator.Describe()}.");
+            throw WebBackendErrors.NotPresent(element, _options.ActionTimeout);
         }
         catch (PlaywrightException exception) when (IsStrictViolation(exception))
         {
-            throw MultipleMatch(element);
+            throw WebBackendErrors.MultipleMatch(element.Locator, element.ComponentPath, null);
         }
     }
 
@@ -499,12 +493,6 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     };
 
     private static string MapKey(WebKey key) => WebKeyMap.Get(key).Playwright;
-
-    private static WebElementResolutionException MultipleMatch(WebElementReference element, int count)
-        => new($"Expected at most one element for {element.Locator.Describe()} in {element.ComponentPath}, but found {count}.");
-
-    private static WebElementResolutionException MultipleMatch(WebElementReference element)
-        => new($"Expected at most one element for {element.Locator.Describe()} in {element.ComponentPath}, but Playwright reported a strict mode violation (more than one element matched).");
 
     private static string CssIdentifier(string value)
     {

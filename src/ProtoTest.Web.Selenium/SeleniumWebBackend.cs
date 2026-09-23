@@ -289,9 +289,7 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
         }
 
         Record(operation, reference, attempt, "failed", lastObserved, stopwatch.Elapsed);
-        throw new WebActionabilityException(
-            $"Element '{reference.ComponentPath}.{reference.Name}' did not become actionable within {_options.ActionTimeout}. " +
-            $"Locator: {reference.Locator.Describe()}. Last observed: {lastObserved}.");
+        throw WebBackendErrors.NotActionable(reference, _options.ActionTimeout, lastObserved);
     }
 
     private IWebElement ResolvePresent(WebElementReference reference, CancellationToken cancellationToken)
@@ -308,9 +306,7 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
             catch (StaleElementReferenceException) { }
             WaitForNextPoll(cancellationToken);
         }
-        throw new WebElementResolutionException(
-            $"Element '{reference.ComponentPath}.{reference.Name}' was not present within {_options.ActionTimeout}. " +
-            $"Locator: {reference.Locator.Describe()}.");
+        throw WebBackendErrors.NotPresent(reference, _options.ActionTimeout);
     }
 
     private ISearchContext ResolveScope(WebElementReference reference)
@@ -328,8 +324,7 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
         {
             0 => throw new NoSuchElementException($"No element matched {locator.Describe()} in {componentPath}."),
             1 => matches[0],
-            _ => throw new WebElementResolutionException(
-                $"Expected one element for {locator.Describe()} in {componentPath}, but found {matches.Count}.")
+            _ => throw WebBackendErrors.MultipleMatch(locator, componentPath, matches.Count)
         };
     }
 

@@ -190,7 +190,9 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     public async ValueTask SelectOptionAsync(WebElementReference element, string value, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await ExecuteResolvedAsync(element, locator => locator.SelectOptionAsync(value));
+        // Value only, so the label of another option can never satisfy the selection: that is the
+        // documented contract and the behavior Selenium already implements.
+        await ExecuteResolvedAsync(element, locator => locator.SelectOptionAsync(new SelectOptionValue { Value = value }));
     }
 
     public async ValueTask PressAsync(WebElementReference element, WebKey key, CancellationToken cancellationToken = default)
@@ -598,10 +600,13 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
             },
             parentId: correlationId);
 
-    private static string? SafeUrl(string? value)
+    internal static string? SafeUrl(string? value)
     {
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)) return value;
-        return new UriBuilder(uri) { Query = string.Empty, Fragment = string.Empty }.Uri.ToString();
+        if (value is null) return null;
+        var withoutUserInfo = ProtoUriSanitizer.WithoutUserInfo(value);
+        return Uri.TryCreate(withoutUserInfo, UriKind.Absolute, out var uri)
+            ? new UriBuilder(uri) { Query = string.Empty, Fragment = string.Empty }.Uri.ToString()
+            : withoutUserInfo;
     }
 
     private static string? Truncate(string? value)

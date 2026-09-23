@@ -2,6 +2,7 @@ namespace ProtoTest.Rest.Exceptions;
 
 using System.Net;
 using ProtoTest.Core;
+using ProtoTest.Http;
 
 /// <summary>
 /// Represents a failed assertion against an HTTP response status code. A negated assertion states
@@ -22,7 +23,7 @@ public sealed class RestStatusAssertionException : ProtoAssertionException
         HttpStatusCode actualStatusCode,
         string? responseBody,
         bool negated)
-        : base(BuildMessage(expectedStatusCode, actualStatusCode, responseBody, negated))
+        : base(ProtoStatusAssertion.DescribeFailure(expectedStatusCode, actualStatusCode, negated, responseBody))
     {
         ExpectedStatusCode = expectedStatusCode;
         ActualStatusCode = actualStatusCode;
@@ -36,22 +37,4 @@ public sealed class RestStatusAssertionException : ProtoAssertionException
 
     /// <summary>Whether the failed assertion asked for a status other than <see cref="ExpectedStatusCode"/>.</summary>
     public bool Negated { get; }
-
-    private static string BuildMessage(
-        HttpStatusCode expectedStatusCode,
-        HttpStatusCode actualStatusCode,
-        string? responseBody,
-        bool negated)
-    {
-        var expectation = ProtoAssertion.Describe(
-            $"{(int)expectedStatusCode} ({expectedStatusCode})",
-            negated);
-        var message =
-            $"Expected HTTP status {expectation}, " +
-            $"but received {(int)actualStatusCode} ({actualStatusCode}).";
-
-        return string.IsNullOrEmpty(responseBody)
-            ? message
-            : $"{message}{Environment.NewLine}Response body:{Environment.NewLine}{responseBody}";
-    }
 }

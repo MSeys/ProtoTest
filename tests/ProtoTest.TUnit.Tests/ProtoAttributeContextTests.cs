@@ -1,9 +1,18 @@
 namespace ProtoTest.TUnit.Tests;
 
+using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 
 public class ProtoAttributeContextTests
 {
+    [Test]
+    public async Task ProtoTest_ShouldResolveRegisteredService()
+    {
+        var service = Proto.Context.Service<ITestService>();
+
+        await Assert.That(service.GetMessage()).IsEqualTo("TUnit_Integration_Success");
+    }
+
     [Test]
     [SetContextUser("TUnitUser")]
     public async Task ProtoTest_ShouldAccessContextSetByProtoAttribute()
@@ -16,16 +25,3 @@ public class ProtoAttributeContextTests
         await Assert.That(userState.Username).IsEqualTo("TUnitUser");
     }
 }
-
-// Custom ProtoAttribute that sets context before the test runs
-[AttributeUsage(AttributeTargets.Method)]
-public class SetContextUserAttribute(string username) : ProtoAttribute
-{
-    public override Task BeforeTestAsync(ProtoExecutionContext context)
-    {
-        Proto.Context.SetContext(new UserState(username));
-        return Task.CompletedTask;
-    }
-}
-
-public sealed record UserState(string Username) : IProtoContext;

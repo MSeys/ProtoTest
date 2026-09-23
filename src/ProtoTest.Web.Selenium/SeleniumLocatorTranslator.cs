@@ -17,13 +17,27 @@ internal static class SeleniumLocatorTranslator
         => locator switch
         {
             CssWebLocator css => SeleniumBy.CssSelector(css.Selector),
-            NthWebLocator nth => Translate(nth.Source, documentScoped),
+            // An index cannot be expressed in a CSS selector; execution resolves that case in the
+            // backend before translation, so this is the best-effort diagnostic form.
+            NthWebLocator { Source: CssWebLocator css } => SeleniumBy.CssSelector(css.Selector),
+            NthWebLocator nth => SeleniumBy.XPath(Indexed(nth, documentScoped)),
             AndWebLocator and => SeleniumBy.XPath(Compound(and, documentScoped)),
             _ => SeleniumBy.XPath(XPath(locator, documentScoped))
         };
 
     internal static string DiagnosticSelector(WebLocator locator, bool documentScoped = false)
         => Translate(locator, documentScoped).ToString();
+
+    /// <summary>
+    /// An index inside an XPath composition filters the source's matches, so nesting and <c>And()</c>
+    /// address the same element Playwright's <c>Nth()</c> would instead of dropping the index.
+    /// </summary>
+    private static string Indexed(NthWebLocator locator, bool documentScoped)
+    {
+        if (locator.Source is CssWebLocator)
+            throw new WebBackendCapabilityException("Selenium cannot apply At() to a CSS escape-hatch locator inside an XPath composition.");
+        return $"({XPath(locator.Source, documentScoped)})[{locator.Index + 1}]";
+    }
 
     private static string Compound(AndWebLocator locator, bool documentScoped)
     {
@@ -49,7 +63,7 @@ internal static class SeleniumLocatorTranslator
                 ? $"(//*[self::th or self::td])[{value.Index + 1}]"
                 : $"./*[self::th or self::td][position()={value.Index + 1}]",
             TableCellByHeaderWebLocator value => WebXPath.TableCellByHeader(value, documentScoped),
-            NthWebLocator value => XPath(value.Source, documentScoped),
+            NthWebLocator value => Indexed(value, documentScoped),
             HasTextWebLocator => throw new WebBackendCapabilityException("HasText is a filter and must be composed with another locator using And()."),
             CssWebLocator => throw new WebBackendCapabilityException("CSS locators are translated directly and cannot be embedded in XPath."),
             AndWebLocator value => Compound(value, documentScoped),

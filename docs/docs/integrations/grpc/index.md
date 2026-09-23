@@ -45,7 +45,7 @@ The channel address comes from, in order: the explicit argument to `AddClient`, 
 .AddGrpc(grpc => grpc.AddClient("Api", context => context.Configuration.GetValue<Uri>("Api:Grpc")))
 ```
 
-A repeated `AddGrpc` is not a no-op: its `configure` callback always runs, so more clients compose, while the lifecycle hook and the capability stay registered once. A call whose `configure` throws leaves no guard behind. `CaptureAttachments` uses `RemoveAll` + `AddSingleton`, so a repeated call replaces the options.
+A repeated `AddGrpc` is not a no-op: its `configure` callback always runs, so more clients compose, while the lifecycle hook and the capability stay registered once. A call whose `configure` throws leaves no guard behind. `CaptureAttachments` callbacks also compose: every callback runs in registration order and the known section binds over the result.
 
 ## Options and keys
 

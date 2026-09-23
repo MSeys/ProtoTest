@@ -12,6 +12,23 @@ using ProtoTest.Core;
 public static class ProtoStatusAssertion
 {
     /// <summary>
+    /// Builds the failure message both status assertions share, appending the sanitized response body
+    /// when there is one, so a failed status reads the same whichever protocol produced it.
+    /// </summary>
+    public static string DescribeFailure(
+        HttpStatusCode expected,
+        HttpStatusCode actual,
+        bool negated,
+        string? responseBody)
+    {
+        var expectation = ProtoAssertion.Describe($"{(int)expected} ({expected})", negated);
+        var message = $"Expected HTTP status {expectation}, but received {(int)actual} ({actual}).";
+        return string.IsNullOrEmpty(responseBody)
+            ? message
+            : $"{message}{Environment.NewLine}Response body:{Environment.NewLine}{responseBody}";
+    }
+
+    /// <summary>
     /// Asserts <paramref name="actual"/> against <paramref name="expected"/>, honoring
     /// <paramref name="negated"/>, and throws the exception <paramref name="failureFactory"/> builds
     /// when the assertion does not hold.

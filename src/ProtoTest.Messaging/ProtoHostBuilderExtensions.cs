@@ -24,19 +24,12 @@ public sealed class ProtoMessagingBuilder
     }
 
     /// <summary>
-    /// Enables automatic published and received payload attachments, sanitized and redacted. Code
-    /// configuration runs first and the known configuration section binds over it afterwards.
+    /// Enables automatic published and received payload attachments, sanitized and redacted. Repeated
+    /// calls compose: every callback runs in registration order and configuration binds over the result.
     /// </summary>
     public ProtoMessagingBuilder CaptureAttachments(Action<MessagingAttachmentOptions>? configure = null)
     {
-        Services.RemoveAll<MessagingAttachmentOptions>();
-        Services.TryAddSingleton(serviceProvider =>
-        {
-            var options = new MessagingAttachmentOptions();
-            configure?.Invoke(options);
-            options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
-            return options;
-        });
+        ProtoOptionsRegistration.Configure(Services, () => new MessagingAttachmentOptions(), configure);
         return this;
     }
 }
@@ -50,7 +43,7 @@ public static class ProtoHostBuilderExtensions
     /// </summary>
     /// <remarks>
     /// A repeated call is not a no-op: its <c>configure</c> callback always runs, so a later call can add
-    /// an adapter to an adapter-less first call or refresh attachment options. Infrastructure is
+    /// an adapter to an adapter-less first call or extend attachment options. Infrastructure is
     /// idempotent (one holder, initializer, capability and run resource) and the first adapter wins; a
     /// call whose configure throws leaves no guard behind, so a later successful call still composes.
     /// </remarks>

@@ -66,6 +66,31 @@ public sealed class RegistrationIdempotencyTests
         });
     }
 
+    [Test]
+    public async Task CaptureAttachments_CalledTwice_ShouldComposeBothCallbacks()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddGrpc(grpc =>
+        {
+            grpc.AddClient("Echo", "http://127.0.0.1:1");
+            grpc.CaptureAttachments(options => options.CaptureRequestBodies = false);
+        });
+        builder.AddGrpc(grpc => grpc.CaptureAttachments(options => options.MaxDiagnosticBodyLength = 128));
+
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("grpc options compose", TestMethod());
+
+        var options = context.Service<GrpcAttachmentOptions>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(options.CaptureRequestBodies, Is.False, "the first callback still applies");
+            Assert.That(options.MaxDiagnosticBodyLength, Is.EqualTo(128), "the second callback also applies");
+        });
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
+
     private static MethodInfo TestMethod()
         => typeof(RegistrationIdempotencyTests).GetMethod(
             nameof(Placeholder), BindingFlags.NonPublic | BindingFlags.Static)!;

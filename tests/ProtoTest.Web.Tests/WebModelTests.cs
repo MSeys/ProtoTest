@@ -314,6 +314,95 @@ public sealed class WebModelTests
     }
 
     [Test]
+    public async Task SeleniumNestedAt_ShouldApplyEveryIndexInOrder()
+    {
+        var first = new FakeElement("first");
+        var second = new FakeElement("second");
+        var driver = new StubWebDriver
+        {
+            Elements = by => by.ToString().Contains("data-testid='row'", StringComparison.Ordinal)
+                ? [first, second]
+                : []
+        };
+        var host = new ProtoHostBuilder().AddWeb(() => driver).Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web nested at", TestMethod());
+        var backend = await context.Web().GetBackendAsync<SeleniumWebBackend>();
+
+        var text = await backend.ReadTextAsync(
+            new WebElementReference([], "Page", "Row", By.At(By.At(By.TestId("row"), 1), 0)));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(text, Is.EqualTo("second"),
+                "the inner At(1) picks the second match and the outer At(0) picks it from the one-element source");
+            Assert.That(driver.FindAllQueries, Has.Count.EqualTo(1),
+                "the source is queried once and both indexes apply to the same result");
+        });
+    }
+
+    [Test]
+    public async Task SeleniumNestedAt_WithAnOutOfRangeIndex_ShouldCountZero()
+    {
+        var driver = new StubWebDriver { Elements = _ => [new FakeElement("only")] };
+        var host = new ProtoHostBuilder().AddWeb(() => driver).Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web nested at count", TestMethod());
+        var backend = await context.Web().GetBackendAsync<SeleniumWebBackend>();
+
+        var count = await backend.CountAsync(
+            new WebElementReference([], "Page", "Row", By.At(By.At(By.TestId("row"), 0), 1)));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.That(count, Is.EqualTo(0), "the outer index addresses the one-element result of the inner index");
+    }
+
+    [Test]
+    public void SeleniumTranslator_ShouldIndexAtInsideXPathCompositions()
+    {
+        var document = XDocument.Parse(
+            """
+            <html><body>
+              <div data-testid="row">first</div>
+              <div data-testid="row">second</div>
+            </body></html>
+            """);
+
+        var locator = By.At(By.TestId("row"), 1).And(By.HasText("second", exact: true));
+        var selector = SeleniumLocatorTranslator.DiagnosticSelector(locator);
+        var elements = document.XPathSelectElements(XPath(locator));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(selector, Does.Contain("(.//*[@data-testid='row'])[2]"));
+            Assert.That(elements.Single().Value, Is.EqualTo("second"));
+        });
+    }
+
+    [Test]
+    public async Task SeleniumReadMissing_ShouldThrowTheSharedResolutionException()
+    {
+        var driver = new StubWebDriver();
+        var host = new ProtoHostBuilder()
+            .AddWeb(() => driver, options => options.ActionTimeout = TimeSpan.FromMilliseconds(150))
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web read missing", TestMethod());
+        var backend = await context.Web().GetBackendAsync<SeleniumWebBackend>();
+
+        var failure = Assert.ThrowsAsync<WebElementResolutionException>(async () =>
+            await backend.ReadTextAsync(new WebElementReference([], "Page", "Missing", By.TestId("missing"))));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.That(failure!.Message, Does.Contain("was not present"),
+            "a read of an element that never appears reports the same failure Playwright does");
+    }
+
+    [Test]
     public async Task FormOperations_ShouldUseTheSharedOperationPipeline()
     {
         var factory = new FakeBackendFactory();
@@ -1868,6 +1957,32 @@ public sealed class WebModelTests
         }
     }
 
+    private sealed class FakeElement(string text) : OpenQA.Selenium.IWebElement
+    {
+        public string TagName => "div";
+        public string Text { get; } = text;
+        public bool Enabled => true;
+        public bool Selected => false;
+        public System.Drawing.Point Location => default;
+        public System.Drawing.Size Size => default;
+        public bool Displayed => true;
+        public void Clear() { }
+        public void SendKeys(string value) { }
+        public void Submit() { }
+        public void Click() { }
+        public string GetAttribute(string attributeName) => string.Empty;
+        public string GetCssValue(string propertyName) => string.Empty;
+        public string? GetDomAttribute(string attributeName) => null;
+        public string? GetDomProperty(string propertyName) => null;
+        public string? GetProperty(string propertyName) => null;
+        public OpenQA.Selenium.ISearchContext GetShadowRoot() => throw new NotSupportedException();
+        public OpenQA.Selenium.IWebElement FindElement(OpenQA.Selenium.By by)
+            => throw new OpenQA.Selenium.NoSuchElementException();
+        public System.Collections.ObjectModel.ReadOnlyCollection<OpenQA.Selenium.IWebElement> FindElements(
+            OpenQA.Selenium.By by) => new([]);
+        public void Dispose() { }
+    }
+
     private sealed class StubWebDriver : OpenQA.Selenium.IWebDriver, OpenQA.Selenium.ITakesScreenshot
     {
         private string _url = "https://example.test/";
@@ -1875,6 +1990,9 @@ public sealed class WebModelTests
         public bool QuitCalled { get; private set; }
         public bool ThrowOnUrl { get; set; }
         public List<OpenQA.Selenium.By> FindAllQueries { get; } = [];
+
+        /// <summary>Supplies the elements a lookup returns; empty when unset.</summary>
+        public Func<OpenQA.Selenium.By, IReadOnlyList<OpenQA.Selenium.IWebElement>>? Elements { get; set; }
         public string Url
         {
             get => ThrowOnUrl ? throw new InvalidOperationException("url unavailable") : _url;
@@ -1892,7 +2010,7 @@ public sealed class WebModelTests
         public System.Collections.ObjectModel.ReadOnlyCollection<OpenQA.Selenium.IWebElement> FindElements(OpenQA.Selenium.By by)
         {
             FindAllQueries.Add(by);
-            return new([]);
+            return new((Elements?.Invoke(by) ?? []).ToList());
         }
         public OpenQA.Selenium.IOptions Manage() => throw new NotSupportedException();
         public OpenQA.Selenium.INavigation Navigate() => new StubNavigation(this);

@@ -111,11 +111,33 @@ public sealed class GraphQLResponse : IDisposable
             HttpStatusCode,
             negated,
             failureFactory: () => new GraphQLAssertionException(
-                $"Expected GraphQL HTTP status {ProtoAssertion.Describe($"{(int)expected} ({expected})", negated)}, " +
-                $"but received {(int)HttpStatusCode} ({HttpStatusCode})."),
+                ProtoStatusAssertion.DescribeFailure(
+                    expected,
+                    HttpStatusCode,
+                    negated,
+                    ProtoHttpDiagnosticSanitizer.SanitizeBody(Content, ResolveStatusDiagnosticOptions()))),
             parentOperationId: _requestTraceId,
             requestIdentifier: _identifier);
         return this;
+    }
+
+    private ProtoHttpAttachmentOptions ResolveStatusDiagnosticOptions()
+    {
+        // The resolved ProtoTest:GraphQL:Responses section bounds the failure body even when the protocol
+        // never opted into attachment capture; attachment options, when present, keep their own
+        // redaction rules and may tighten the limit further.
+        var responseLimit = _context.ResolveResponseOptions(ProtoGraphQLBuilder.ProtocolName).MaxDiagnosticBodyLength;
+        if (_attachmentOptions is null)
+            return new ProtoHttpAttachmentOptions { MaxDiagnosticBodyLength = responseLimit };
+        if (responseLimit >= _attachmentOptions.MaxDiagnosticBodyLength)
+            return _attachmentOptions;
+
+        return new ProtoHttpAttachmentOptions
+        {
+            RedactSensitiveData = _attachmentOptions.RedactSensitiveData,
+            SensitiveJsonProperties = [.. _attachmentOptions.SensitiveJsonProperties],
+            MaxDiagnosticBodyLength = responseLimit
+        };
     }
 
     public GraphQLResponse ShouldHaveNoErrors()

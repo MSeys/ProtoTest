@@ -282,6 +282,29 @@ public sealed class MessagingAttachmentTests
         });
     }
 
+    [Test]
+    public async Task CaptureAttachments_CalledTwice_ShouldComposeBothCallbacks()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging(messaging =>
+            messaging.CaptureAttachments(options => options.CapturePublishedPayloads = false));
+        builder.AddMessaging(messaging =>
+            messaging.CaptureAttachments(options => options.MaxDiagnosticBodyLength = 128));
+
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("messaging options compose", TestMethod());
+
+        var options = context.Service<MessagingAttachmentOptions>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(options.CapturePublishedPayloads, Is.False, "the first callback still applies");
+            Assert.That(options.MaxDiagnosticBodyLength, Is.EqualTo(128), "the second callback also applies");
+        });
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
+
     private sealed class FailingBroker : IProtoMessageBroker
     {
         public string Name => "Failing";

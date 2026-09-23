@@ -1,5 +1,6 @@
 ﻿namespace ProtoTest.Xunit3.Tests;
 
+using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 using Xunit;
 

@@ -41,21 +41,37 @@ internal static class WebPagePath
     /// <summary>
     /// Normalizes a route definition: like <see cref="Normalize"/>, but dynamic segments are mapped
     /// first, so a Vue <c>:id</c>, a React <c>*</c> and a Next/Nuxt/Remix <c>[…]</c> file segment become
-    /// the same <c>{name}</c> or <c>{...}</c> pattern the inventory matches.
+    /// the same <c>{name}</c> or <c>{...}</c> pattern the inventory matches. An absolute address keeps
+    /// its scheme and authority; only its path is mapped.
     /// </summary>
     public static string? NormalizeRoute(string? route)
     {
         if (string.IsNullOrWhiteSpace(route)) return null;
         var value = StripQueryAndFragment(route.Trim());
         if (value.Length == 0) return null;
-        var segments = value
+
+        var schemeIndex = value.IndexOf("://", StringComparison.Ordinal);
+        if (schemeIndex >= 0)
+        {
+            var pathStart = value.IndexOf('/', schemeIndex + 3);
+            return pathStart < 0 ? Normalize(value) : Normalize(value[..pathStart] + MapRouteSegments(value[pathStart..]));
+        }
+
+        return Normalize(MapRouteSegments(value));
+    }
+
+    /// <summary>
+    /// Maps the segments of a route path, keeping the root route visible: the root has no segments and
+    /// <see cref="Normalize"/> returns <see langword="null"/> for an empty value, which would silently
+    /// drop it from discovery.
+    /// </summary>
+    private static string MapRouteSegments(string path)
+    {
+        var segments = path
             .Split('/', StringSplitOptions.RemoveEmptyEntries)
-            .Select(MapDynamicSegment)
-            .Where(segment => segment.Length > 0);
+            .Select(MapDynamicSegment);
         var joined = string.Join('/', segments);
-        // The root route "/" has no segments; it is a page, not an empty definition. Normalize returns
-        // null for an empty value, which would silently drop it from discovery.
-        return joined.Length == 0 ? Normalize("/") : Normalize(joined);
+        return joined.Length == 0 ? "/" : "/" + joined;
     }
 
     /// <summary>

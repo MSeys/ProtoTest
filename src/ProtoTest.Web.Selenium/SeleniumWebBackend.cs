@@ -86,18 +86,13 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
             cancellationToken), cancellationToken);
 
     public async ValueTask<int> CountAsync(WebElementReference elements, CancellationToken cancellationToken = default)
-        => await Task.Run(() =>
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var scope = ResolveScope(elements);
-            var documentScoped = scope is IWebDriver;
-            if (elements.Locator is NthWebLocator nth)
-            {
-                var matches = scope.FindElements(SeleniumLocatorTranslator.Translate(nth.Source, documentScoped));
-                return matches.Count > nth.Index ? 1 : 0;
-            }
-            return scope.FindElements(SeleniumLocatorTranslator.Translate(elements.Locator, documentScoped)).Count;
-        }, cancellationToken);
+        => await Task.Run(
+            () => ResolveMany(
+                ResolveScope(elements),
+                elements.Locator,
+                elements.ComponentPath,
+                throwOnMissing: false).Count,
+            cancellationToken);
 
     public async ValueTask<string> ReadTextAsync(WebElementReference element, CancellationToken cancellationToken = default)
         => await Task.Run(() => ResolvePresent(element, cancellationToken).Text, cancellationToken);
@@ -313,7 +308,7 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
             catch (StaleElementReferenceException) { }
             WaitForNextPoll(cancellationToken);
         }
-        throw new WebActionabilityException(
+        throw new WebElementResolutionException(
             $"Element '{reference.ComponentPath}.{reference.Name}' was not present within {_options.ActionTimeout}. " +
             $"Locator: {reference.Locator.Describe()}.");
     }
@@ -328,18 +323,7 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
 
     private static IWebElement ResolveSingle(ISearchContext scope, WebLocator locator, string componentPath)
     {
-        var documentScoped = scope is IWebDriver;
-        if (locator is NthWebLocator nth)
-        {
-            var indexedMatches = scope.FindElements(SeleniumLocatorTranslator.Translate(nth.Source, documentScoped));
-            if (indexedMatches.Count <= nth.Index)
-                throw new NoSuchElementException(
-                    $"No element exists at zero-based index {nth.Index} for {nth.Source.Describe()} in {componentPath}; found {indexedMatches.Count}.");
-            return indexedMatches[nth.Index];
-        }
-
-        var seleniumBy = SeleniumLocatorTranslator.Translate(locator, documentScoped);
-        var matches = scope.FindElements(seleniumBy);
+        var matches = ResolveMany(scope, locator, componentPath);
         return matches.Count switch
         {
             0 => throw new NoSuchElementException($"No element matched {locator.Describe()} in {componentPath}."),
@@ -347,6 +331,33 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
             _ => throw new WebElementResolutionException(
                 $"Expected one element for {locator.Describe()} in {componentPath}, but found {matches.Count}.")
         };
+    }
+
+    /// <summary>
+    /// Resolves a locator to every element it matches. An <c>At(index)</c> is applied to the matches of
+    /// its source, recursively, so nesting addresses a position within the source's matches rather than
+    /// silently dropping the inner index.
+    /// </summary>
+    private static IReadOnlyList<IWebElement> ResolveMany(
+        ISearchContext scope,
+        WebLocator locator,
+        string componentPath,
+        bool throwOnMissing = true)
+    {
+        if (locator is NthWebLocator nth)
+        {
+            var source = ResolveMany(scope, nth.Source, componentPath, throwOnMissing);
+            if (source.Count <= nth.Index)
+            {
+                if (!throwOnMissing) return [];
+                throw new NoSuchElementException(
+                    $"No element exists at zero-based index {nth.Index} for {nth.Source.Describe()} in {componentPath}; found {source.Count}.");
+            }
+
+            return [source[nth.Index]];
+        }
+
+        return scope.FindElements(SeleniumLocatorTranslator.Translate(locator, scope is IWebDriver));
     }
 
     private static bool IsReadOnly(IWebElement element)

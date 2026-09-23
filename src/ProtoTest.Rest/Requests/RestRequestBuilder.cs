@@ -213,14 +213,7 @@ public sealed class RestRequestBuilder
                 }
             }
 
-            foreach (var (key, value) in _headers)
-            {
-                if (!request.Headers.TryAddWithoutValidation(key, value)
-                    && (request.Content is null || !request.Content.Headers.TryAddWithoutValidation(key, value)))
-                {
-                    throw new InvalidOperationException($"Header '{key}' could not be added to the REST request.");
-                }
-            }
+            ProtoHttpHeaders.Apply(request, _headers);
 
             _resolvedAuthenticator = await ProtoHttpAuthenticationApplier.ApplyAsync(
                 _authenticatorFactory,
@@ -437,6 +430,7 @@ public sealed class RestRequestBuilder
     {
         try
         {
+            var diagnostics = ProtoHttpFailureDiagnostics.From(requestUri, exception, cancellationToken, attachmentOptions);
             _context.RecordObservation(new ProtoObservation(
                 TargetName: _targetName,
                 Kind: "http.failure",
@@ -444,11 +438,11 @@ public sealed class RestRequestBuilder
                 Data: new RestFailureData(
                     method.Method,
                     routeTemplate,
-                    ProtoHttpDiagnosticSanitizer.SanitizeUri(requestUri, attachmentOptions),
+                    diagnostics.RequestUri,
                     duration,
-                    exception.GetType().FullName ?? exception.GetType().Name,
-                    ProtoHttpDiagnosticSanitizer.SanitizeBody(exception.Message, attachmentOptions),
-                    cancellationToken.IsCancellationRequested || exception is OperationCanceledException)));
+                    diagnostics.ExceptionType,
+                    diagnostics.Message,
+                    diagnostics.IsCanceled)));
         }
         catch
         {

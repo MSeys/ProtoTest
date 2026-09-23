@@ -385,7 +385,7 @@ Discovered paths join `ProtoTest:Web:Pages` in the same inventory and start out 
 
 A verification on a concrete path covers the inventory pattern it matches: `/users/42` marks `/users/{id}` covered and increments its count, so a detail page verified once is done, not one per id. Page identity is the absolute HTTP/HTTPS path, with query and fragment dropped, a leading slash and no trailing slash except `/`. Percent-encoding is decoded per segment, so `/a%20b` and `/a b` are one page; an encoded slash (`%2F`) stays inside its segment, so one segment never becomes two.
 
-Patterns come from route definitions: `:name`, `:name?`, `[...]` and `$name` become `{name}`; `*`, a bare `$`, `[...slug]`, `[[...slug]]`, `:rest*` and regex catch-alls such as `:pathMatch(.*)*` become `{...}`. `{name}` matches exactly one segment, `{...}` matches the rest and must be last, and matching is segment-wise and case-insensitive.
+Patterns come from route definitions: `:name`, `:name?`, `[...]` and `$name` become `{name}`; `*`, a bare `$`, `[...slug]`, `[[...slug]]`, `:rest*` and regex catch-alls such as `:pathMatch(.*)*` become `{...}`. Configured `ProtoTest:Web:Pages` entries accept the same syntax, so `/users/:id` in configuration is the same pattern as a Vue route definition. `{name}` matches exactly one segment, `{...}` matches the rest and must be last, and matching is segment-wise and case-insensitive.
 
 The collector resolves an observed path to its item in this order:
 
@@ -457,7 +457,7 @@ React has no generic runtime route table to read, and ProtoTest deliberately doe
 - **Vue discovery** latches after the first non-null route table, so a router that later adds routes in the same session is not re-read.
 - **Page origin:** an external redirect contributes no visited or verified coverage, and a backend that cannot report an address still passes the test.
 - **Playwright:** the browser pool is scoped to one test — identical launch options share a process only inside that test. Reads and actions use Playwright's own auto-waiting, bounded by `ActionTimeout` (5 s by default); a timeout becomes the same resolution or actionability exception Selenium raises. `InstallBrowsers` does nothing when `Channel` is set, trace groups are serialized by a semaphore and skipped when `TraceRetention = Off`, console/page-error/request-failure text is truncated at 4096 characters, and the skip probe starts the Playwright driver.
-- **Selenium:** one driver per session, no pooling, so sessions do not share cookies or storage; native failures surface as `WebActionabilityException` after `ActionTimeout`; `SelectOptionAsync` matches the `value` DOM property exactly and requires a single match.
+- **Selenium:** one driver per session, no pooling, so sessions do not share cookies or storage; native failures surface as `WebActionabilityException` after `ActionTimeout`; `SelectOptionAsync` requires exactly one option carrying the requested `value`.
 
 ## Next
 

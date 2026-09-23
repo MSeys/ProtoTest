@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { Change, Item, Span, TestTrace } from "../trace/model";
-import { formatOffset, sourceLabels } from "../trace/format";
+import { formatOffset, jsonLiteral, sourceLabels } from "../trace/format";
 import JsonView from "./JsonView.vue";
+import { isJsonLike } from "./json";
 
 /*
  * One tracked item: what it is now, how it got there, and which operations touched it. Each change reads the
@@ -34,15 +35,6 @@ function differences(change: Change, index: number): Difference[] {
     .filter(([key, value]) => !(key in known) || known[key] !== value)
     .map(([key, value]) => ({ key, before: known[key], after: value, added: !(key in known) }));
 }
-
-function isJson(value: string | null | undefined): boolean {
-  const trimmed = value?.trim() ?? "";
-  return trimmed.startsWith("{") || trimmed.startsWith("[");
-}
-
-function literal(value: string | null | undefined): string {
-  return value === null || value === undefined ? "null" : value;
-}
 </script>
 
 <template>
@@ -53,8 +45,8 @@ function literal(value: string | null | undefined): string {
         <template v-for="[key, value] in state" :key="key">
           <dt>{{ key }}</dt>
           <dd>
-            <JsonView v-if="isJson(value)" :value="value" :open-depth="0" />
-            <template v-else>{{ literal(value) }}</template>
+            <JsonView v-if="isJsonLike(value)" :value="value" :open-depth="0" />
+            <template v-else>{{ jsonLiteral(value ?? null) }}</template>
           </dd>
         </template>
       </dl>
@@ -78,13 +70,13 @@ function literal(value: string | null | undefined): string {
                 <span class="mark" :aria-label="difference.added ? 'added' : 'changed'">{{ difference.added ? "+" : "~" }}</span>
                 <span class="key">{{ difference.key }}</span>
                 <span class="values">
-                  <template v-if="isJson(difference.after)">
+                  <template v-if="isJsonLike(difference.after)">
                     <JsonView :value="difference.after" :open-depth="0" />
                   </template>
                   <template v-else>
-                    <code v-if="!difference.added" class="before">{{ literal(difference.before) }}</code>
+                    <code v-if="!difference.added" class="before">{{ jsonLiteral(difference.before ?? null) }}</code>
                     <b v-if="!difference.added" class="arrow">→</b>
-                    <code class="after">{{ literal(difference.after) }}</code>
+                    <code class="after">{{ jsonLiteral(difference.after ?? null) }}</code>
                   </template>
                 </span>
               </div>

@@ -159,7 +159,7 @@ Every builder operation is traced with source `ProtoTest.Data`:
 | `data.explain`, `data.build` | carry `data.type`, `data.object_sequence`, `data.member_count` and `data.construction_source` (`Reflection` or the factory source) |
 | `data.create`, `data.create_many` | parent the `data.provision` operation; `data.create` adds `data.identity` |
 | `data.build_many` | adds `data.type` and `data.count` |
-| `data.create_many` | adds `data.input_type`, `data.result_type` and `data.count` |
+| `data.create_many` | adds `data.type`, `data.result_type` and `data.count` |
 | `data.provision` | adds `data.input_type`, `data.result_type`, `data.provisioner`, `data.identity`, `data.owned` and `data.value_id` |
 | `data.cleanup` | runs in the release phase with `data.type`, `data.identity`, `data.provisioner` |
 

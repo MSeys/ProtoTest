@@ -284,6 +284,35 @@ public sealed class GraphQLIntegrationTests
     }
 
     [Test]
+    public async Task SendFailure_ShouldRecordSanitizedFailureData()
+    {
+        var handler = new StubHandler(_ => throw new HttpRequestException("connection refused"));
+        var builder = new ProtoHostBuilder();
+        builder.AddGraphQL(graphQL => graphQL.AddClient(
+            "Default",
+            "https://user:secret@example.test/graphql",
+            http => http.ConfigurePrimaryHttpMessageHandler(() => handler)));
+        await using var host = builder.Build();
+        await host.StartTestAsync("failure data", "19", TestMethod());
+        try
+        {
+            Assert.ThrowsAsync<HttpRequestException>(async () => await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync());
+
+            var failure = (GraphQLFailureData)Proto.Context.RecordedObservations.Single().Data!;
+            Assert.Multiple(() =>
+            {
+                Assert.That(failure.RequestUri, Is.EqualTo("https://example.test/graphql"),
+                    "credentials are removed from the recorded address");
+                Assert.That(failure.Message, Is.EqualTo("connection refused"));
+                Assert.That(failure.IsCanceled, Is.False);
+            });
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
     public async Task ConfigureResponses_ShouldLetKnownConfigurationSectionOverrideCodeDefaults()
     {
         var builder = new ProtoHostBuilder();

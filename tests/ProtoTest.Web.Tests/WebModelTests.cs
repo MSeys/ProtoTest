@@ -6,6 +6,7 @@ using System.Xml.Linq;
 using System.Xml.XPath;
 using ProtoTest.Core;
 using ProtoTest.Web.Internal;
+using ProtoTest.Web.Playwright;
 using ProtoTest.Web.Selenium;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,7 +51,8 @@ public sealed class WebModelTests
             Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.Table)),
                 Does.Contain("self::table").And.Contain("@role='table'"));
             Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.Grid)),
-                Does.Contain("self::table").And.Contain("@role='grid'"));
+                Does.Contain("@role='grid'").And.Not.Contain("self::table"),
+                "a plain table is a table, not a grid, on both backends");
             Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.List)),
                 Does.Contain("self::ul").And.Contain("self::ol").And.Contain("@role='list'"));
             Assert.That(SeleniumLocatorTranslator.DiagnosticSelector(By.Role(WebRole.ListItem)),
@@ -75,6 +77,13 @@ public sealed class WebModelTests
               <div role="table"><div role="row">ARIA</div></div>
               <ul><li>alpha</li></ul>
               <select><option>en</option></select>
+              <dialog open="open">Dialog</dialog>
+              <nav>Nav</nav>
+              <progress value="1" max="2"></progress>
+              <output>42</output>
+              <input type="search" />
+              <input type="range" min="0" max="1" />
+              <input type="number" />
             </body></html>
             """);
 
@@ -82,6 +91,13 @@ public sealed class WebModelTests
         var tables = document.XPathSelectElements(XPath(By.Role(WebRole.Table)));
         var lists = document.XPathSelectElements(XPath(By.Role(WebRole.List)));
         var options = document.XPathSelectElements(XPath(By.Role(WebRole.Option)));
+        var dialogs = document.XPathSelectElements(XPath(By.Role(WebRole.Dialog)));
+        var navigation = document.XPathSelectElements(XPath(By.Role(WebRole.Navigation)));
+        var progress = document.XPathSelectElements(XPath(By.Role(WebRole.ProgressBar)));
+        var status = document.XPathSelectElements(XPath(By.Role(WebRole.Status)));
+        var searchboxes = document.XPathSelectElements(XPath(By.Role(WebRole.Searchbox)));
+        var sliders = document.XPathSelectElements(XPath(By.Role(WebRole.Slider)));
+        var spinButtons = document.XPathSelectElements(XPath(By.Role(WebRole.SpinButton)));
 
         Assert.Multiple(() =>
         {
@@ -90,6 +106,32 @@ public sealed class WebModelTests
             Assert.That(tables.Select(element => element.Name.LocalName), Is.EqualTo(new[] { "table", "div" }));
             Assert.That(lists.Select(element => element.Name.LocalName), Is.EqualTo(new[] { "ul" }));
             Assert.That(options.Select(element => element.Value), Is.EqualTo(new[] { "en" }));
+            Assert.That(dialogs.Select(element => element.Name.LocalName), Is.EqualTo(new[] { "dialog" }));
+            Assert.That(navigation.Select(element => element.Name.LocalName), Is.EqualTo(new[] { "nav" }));
+            Assert.That(progress.Select(element => element.Name.LocalName), Is.EqualTo(new[] { "progress" }));
+            Assert.That(status.Select(element => element.Name.LocalName), Is.EqualTo(new[] { "output" }));
+            Assert.That(searchboxes.Single().Attribute("type")?.Value, Is.EqualTo("search"));
+            Assert.That(sliders.Single().Attribute("type")?.Value, Is.EqualTo("range"));
+            Assert.That(spinButtons.Single().Attribute("type")?.Value, Is.EqualTo("number"));
+        });
+    }
+
+    [Test]
+    public void RoleVocabulary_ShouldCoverEveryWebRoleOnBothBackends()
+    {
+        Assert.Multiple(() =>
+        {
+            foreach (var role in Enum.GetValues<WebRole>())
+            {
+                Assert.That(
+                    SeleniumLocatorTranslator.DiagnosticSelector(By.Role(role)),
+                    Does.Contain($"@role='{WebRoleMap.AriaName(role)}'"),
+                    $"Selenium must always accept the explicit ARIA name for {role}");
+                Assert.That(
+                    PlaywrightWebBackend.MapRole(role).ToString().ToLowerInvariant(),
+                    Is.EqualTo(WebRoleMap.AriaName(role)),
+                    $"Playwright's native mapping for {role} must be the shared ARIA name");
+            }
         });
     }
 
@@ -311,6 +353,95 @@ public sealed class WebModelTests
                 Does.StartWith("By.XPath: (//*[self::th or self::td])[1]"),
                 "a driver-rooted cell lookup cannot use ./* and widens to the document");
         });
+    }
+
+    [Test]
+    public async Task SeleniumNestedAt_ShouldApplyEveryIndexInOrder()
+    {
+        var first = new FakeElement("first");
+        var second = new FakeElement("second");
+        var driver = new StubWebDriver
+        {
+            Elements = by => by.ToString().Contains("data-testid='row'", StringComparison.Ordinal)
+                ? [first, second]
+                : []
+        };
+        var host = new ProtoHostBuilder().AddWeb(() => driver).Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web nested at", TestMethod());
+        var backend = await context.Web().GetBackendAsync<SeleniumWebBackend>();
+
+        var text = await backend.ReadTextAsync(
+            new WebElementReference([], "Page", "Row", By.At(By.At(By.TestId("row"), 1), 0)));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(text, Is.EqualTo("second"),
+                "the inner At(1) picks the second match and the outer At(0) picks it from the one-element source");
+            Assert.That(driver.FindAllQueries, Has.Count.EqualTo(1),
+                "the source is queried once and both indexes apply to the same result");
+        });
+    }
+
+    [Test]
+    public async Task SeleniumNestedAt_WithAnOutOfRangeIndex_ShouldCountZero()
+    {
+        var driver = new StubWebDriver { Elements = _ => [new FakeElement("only")] };
+        var host = new ProtoHostBuilder().AddWeb(() => driver).Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web nested at count", TestMethod());
+        var backend = await context.Web().GetBackendAsync<SeleniumWebBackend>();
+
+        var count = await backend.CountAsync(
+            new WebElementReference([], "Page", "Row", By.At(By.At(By.TestId("row"), 0), 1)));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.That(count, Is.EqualTo(0), "the outer index addresses the one-element result of the inner index");
+    }
+
+    [Test]
+    public void SeleniumTranslator_ShouldIndexAtInsideXPathCompositions()
+    {
+        var document = XDocument.Parse(
+            """
+            <html><body>
+              <div data-testid="row">first</div>
+              <div data-testid="row">second</div>
+            </body></html>
+            """);
+
+        var locator = By.At(By.TestId("row"), 1).And(By.HasText("second", exact: true));
+        var selector = SeleniumLocatorTranslator.DiagnosticSelector(locator);
+        var elements = document.XPathSelectElements(XPath(locator));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(selector, Does.Contain("(.//*[@data-testid='row'])[2]"));
+            Assert.That(elements.Single().Value, Is.EqualTo("second"));
+        });
+    }
+
+    [Test]
+    public async Task SeleniumReadMissing_ShouldThrowTheSharedResolutionException()
+    {
+        var driver = new StubWebDriver();
+        var host = new ProtoHostBuilder()
+            .AddWeb(() => driver, options => options.ActionTimeout = TimeSpan.FromMilliseconds(150))
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web read missing", TestMethod());
+        var backend = await context.Web().GetBackendAsync<SeleniumWebBackend>();
+
+        var failure = Assert.ThrowsAsync<WebElementResolutionException>(async () =>
+            await backend.ReadTextAsync(new WebElementReference([], "Page", "Missing", By.TestId("missing"))));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.That(failure!.Message, Does.Contain("was not present"),
+            "a read of an element that never appears reports the same failure Playwright does");
     }
 
     [Test]
@@ -1868,6 +1999,32 @@ public sealed class WebModelTests
         }
     }
 
+    private sealed class FakeElement(string text) : OpenQA.Selenium.IWebElement
+    {
+        public string TagName => "div";
+        public string Text { get; } = text;
+        public bool Enabled => true;
+        public bool Selected => false;
+        public System.Drawing.Point Location => default;
+        public System.Drawing.Size Size => default;
+        public bool Displayed => true;
+        public void Clear() { }
+        public void SendKeys(string value) { }
+        public void Submit() { }
+        public void Click() { }
+        public string GetAttribute(string attributeName) => string.Empty;
+        public string GetCssValue(string propertyName) => string.Empty;
+        public string? GetDomAttribute(string attributeName) => null;
+        public string? GetDomProperty(string propertyName) => null;
+        public string? GetProperty(string propertyName) => null;
+        public OpenQA.Selenium.ISearchContext GetShadowRoot() => throw new NotSupportedException();
+        public OpenQA.Selenium.IWebElement FindElement(OpenQA.Selenium.By by)
+            => throw new OpenQA.Selenium.NoSuchElementException();
+        public System.Collections.ObjectModel.ReadOnlyCollection<OpenQA.Selenium.IWebElement> FindElements(
+            OpenQA.Selenium.By by) => new([]);
+        public void Dispose() { }
+    }
+
     private sealed class StubWebDriver : OpenQA.Selenium.IWebDriver, OpenQA.Selenium.ITakesScreenshot
     {
         private string _url = "https://example.test/";
@@ -1875,6 +2032,9 @@ public sealed class WebModelTests
         public bool QuitCalled { get; private set; }
         public bool ThrowOnUrl { get; set; }
         public List<OpenQA.Selenium.By> FindAllQueries { get; } = [];
+
+        /// <summary>Supplies the elements a lookup returns; empty when unset.</summary>
+        public Func<OpenQA.Selenium.By, IReadOnlyList<OpenQA.Selenium.IWebElement>>? Elements { get; set; }
         public string Url
         {
             get => ThrowOnUrl ? throw new InvalidOperationException("url unavailable") : _url;
@@ -1892,7 +2052,7 @@ public sealed class WebModelTests
         public System.Collections.ObjectModel.ReadOnlyCollection<OpenQA.Selenium.IWebElement> FindElements(OpenQA.Selenium.By by)
         {
             FindAllQueries.Add(by);
-            return new([]);
+            return new((Elements?.Invoke(by) ?? []).ToList());
         }
         public OpenQA.Selenium.IOptions Manage() => throw new NotSupportedException();
         public OpenQA.Selenium.INavigation Navigate() => new StubNavigation(this);

@@ -12,11 +12,10 @@ using System.Reflection;
 public static class ProtoTraceValueFormatter
 {
     private const int MaximumLength = 64 * 1024;
-    private static readonly HashSet<string> SensitiveNames = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "password", "token", "access_token", "refresh_token", "secret", "apiKey", "api_key",
-        "authorization", "cookie", "connectionString", "clientSecret"
-    };
+
+    // The one default list, shared with the JSON diagnostics axis (attachments and observations).
+    private static readonly HashSet<string> SensitiveNames =
+        new(ProtoRedactionDefaults.SensitivePropertyNames, StringComparer.OrdinalIgnoreCase);
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {

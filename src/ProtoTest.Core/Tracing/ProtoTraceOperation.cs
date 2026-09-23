@@ -10,14 +10,14 @@ internal sealed record ProtoTraceCompletion(
 public sealed class ProtoTraceOperation : IDisposable
 {
     private readonly ProtoTestTraceRecorder? _recorder;
-    private readonly ProtoTestTraceRecorder.TraceEntryState? _entry;
+    private readonly TraceEntryState? _entry;
     private readonly Action<ProtoTraceCompletion>? _complete;
     private readonly List<ProtoTraceSection>? _sections;
     private int _completed;
 
     internal ProtoTraceOperation(
         ProtoTestTraceRecorder recorder,
-        ProtoTestTraceRecorder.TraceEntryState entry)
+        TraceEntryState entry)
     {
         _recorder = recorder;
         _entry = entry;

@@ -209,8 +209,13 @@ public sealed class GraphQLFluentAndProtocolTests
         var exception = Assert.Throws<GraphQLAssertionException>(
             () => response.ShouldNot.HaveHttpStatus(HttpStatusCode.OK));
 
-        Assert.That(exception!.Message, Does.Contain("Expected GraphQL HTTP status not 200 (OK), but received 200 (OK)"));
-        await host.CompleteTestAsync(ProtoTestResult.Failed(exception));
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("Expected HTTP status not 200 (OK), but received 200 (OK)"));
+            Assert.That(exception!.Message, Does.Contain("Response body:"),
+                "a failed status reports the sanitized body the same way REST does");
+        });
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
         var operation = host.Trace.Snapshot().Tests.Single().Entries
             .Single(entry => entry.Kind == "assert.http.status");
         Assert.Multiple(() =>

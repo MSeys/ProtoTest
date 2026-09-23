@@ -2,6 +2,7 @@ namespace ProtoTest.Xunit.Tests;
 
 using global::Xunit.Abstractions;
 using global::Xunit.Sdk;
+using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 using ProtoTest.Xunit.Sdk;
 
@@ -12,7 +13,7 @@ public sealed class ProtoTestFactOutcomeTests
     public void ProtoTestFact_ShouldRunInsideAContextWithHooksApplied()
     {
         Assert.Equal(["Hook:Before"], Proto.Context.Resolve<ExecutionLogState>().Log);
-        Assert.Equal("ProtoTest_Xunit_Success", Proto.Context.Service<ITestService>().GetValue());
+        Assert.Equal("ProtoTest_Xunit_Success", Proto.Context.Service<ITestService>().GetMessage());
     }
 
     [ProtoTestTheory]

@@ -1,0 +1,31 @@
+/* The chrome every ProtoTest surface shares: box model, type on the blueprint grid, scrollbars,
+   controls, headings and the eyebrow. Tokens come from prototest-tokens.css; the viewer imports this
+   sheet and the HTML report embeds it, so the two surfaces cannot drift apart. Each surface keeps its
+   own layout — the viewer's full-height shell, the report's stacked page. */
+
+* { box-sizing: border-box; }
+
+body {
+  color: var(--text);
+  font: var(--text-body)/var(--leading) var(--font-ui);
+  background-color: var(--bg);
+  background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: var(--grid-size) var(--grid-size);
+  -webkit-font-smoothing: antialiased;
+}
+
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { min-height: 36px; border: 2px solid transparent; border-radius: var(--radius-chip); background: var(--border-strong); background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background-color: var(--blueprint); }
+*::-webkit-scrollbar-corner { background: transparent; }
+
+button, input { color: inherit; font: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--blueprint); outline-offset: 2px; border-radius: var(--radius-chip); }
+
+h1, h2, h3 { margin: 0; font-family: var(--font-display); font-weight: var(--weight-bold); letter-spacing: -.01em; }
+p { margin: 0; }
+a { color: var(--blueprint); }
+.eyebrow { margin: 0; color: var(--dim); font-size: var(--text-meta); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; }

@@ -1,0 +1,7 @@
+{
+  "comment": "The wire facts the C# writer and the viewer reader must agree on. Both test suites assert against this file; changing a value here is a format change, so regenerate the demo archives with eng/generate-recipe-traces.ps1.",
+  "archiveFormatVersion": "2.0",
+  "spanFormatVersion": "2.0",
+  "stateFormatVersion": "1.1",
+  "valueSourceTokens": ["testside", "observed", "applicationside"]
+}

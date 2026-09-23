@@ -102,7 +102,7 @@ public sealed class ProtoHttpClientInitializer(
 
         context.Trace.SetEntityState(
             ProtoTraceEntityKinds.Client,
-            $"client:{typeof(HttpClient).FullName}:{ScopedName}",
+            ProtoClientTrace.Id(typeof(HttpClient), ScopedName),
             $"HTTP client {Name}",
             state,
             scope: context.TestName);

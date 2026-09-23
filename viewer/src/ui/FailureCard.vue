@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { Failure, Outcome, Span } from "../trace/model";
-import { kindLabel, tone } from "../trace/format";
+import { jsonLiteral, kindLabel, tone } from "../trace/format";
 import KindChip from "./KindChip.vue";
 import ShapeResultTree from "../inspector/ShapeResultTree.vue";
 import { shapeTreeOf } from "../trace/shapes";
@@ -22,8 +22,7 @@ const message = computed(() => {
 });
 
 function value(input: unknown): string {
-  if (input === undefined) return "missing";
-  return typeof input === "string" ? JSON.stringify(input) : JSON.stringify(input) ?? String(input);
+  return input === undefined ? "missing" : jsonLiteral(input);
 }
 </script>
 

@@ -86,18 +86,13 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
             cancellationToken), cancellationToken);
 
     public async ValueTask<int> CountAsync(WebElementReference elements, CancellationToken cancellationToken = default)
-        => await Task.Run(() =>
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var scope = ResolveScope(elements);
-            var documentScoped = scope is IWebDriver;
-            if (elements.Locator is NthWebLocator nth)
-            {
-                var matches = scope.FindElements(SeleniumLocatorTranslator.Translate(nth.Source, documentScoped));
-                return matches.Count > nth.Index ? 1 : 0;
-            }
-            return scope.FindElements(SeleniumLocatorTranslator.Translate(elements.Locator, documentScoped)).Count;
-        }, cancellationToken);
+        => await Task.Run(
+            () => ResolveMany(
+                ResolveScope(elements),
+                elements.Locator,
+                elements.ComponentPath,
+                throwOnMissing: false).Count,
+            cancellationToken);
 
     public async ValueTask<string> ReadTextAsync(WebElementReference element, CancellationToken cancellationToken = default)
         => await Task.Run(() => ResolvePresent(element, cancellationToken).Text, cancellationToken);
@@ -169,23 +164,10 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
                 _sessionName,
                 failure,
                 Interlocked.Increment(ref _failureSequence),
-                prefix => Driver is ITakesScreenshot screenshots
-                    ? ValueTask.FromResult<ProtoTestAttachment?>(ProtoTestAttachment.FromBytes(
-                        $"web-{prefix}-failure.png",
-                        screenshots.GetScreenshot().AsByteArray,
-                        "image/png",
-                        "Selenium page at web operation failure."))
-                    : ValueTask.FromResult<ProtoTestAttachment?>(null),
-                prefix => ValueTask.FromResult<ProtoTestAttachment?>(ProtoTestAttachment.FromText(
-                    $"web-{prefix}-page.html",
-                    Driver.PageSource,
-                    "text/html",
-                    "DOM snapshot at web operation failure.")),
-                prefix => ValueTask.FromResult<ProtoTestAttachment?>(ProtoTestAttachment.FromText(
-                    $"web-{prefix}-location.txt",
-                    $"URL: {Location()}{Environment.NewLine}Title: {Driver.Title}",
-                    "text/plain",
-                    "Browser location at web operation failure."))),
+                () => ValueTask.FromResult<byte[]?>(
+                    Driver is ITakesScreenshot screenshots ? screenshots.GetScreenshot().AsByteArray : null),
+                () => ValueTask.FromResult<string?>(Driver.PageSource),
+                () => ValueTask.FromResult<(string? Url, string? Title)>((Location(), Driver.Title))),
             cancellationToken);
     }
 
@@ -294,9 +276,7 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
         }
 
         Record(operation, reference, attempt, "failed", lastObserved, stopwatch.Elapsed);
-        throw new WebActionabilityException(
-            $"Element '{reference.ComponentPath}.{reference.Name}' did not become actionable within {_options.ActionTimeout}. " +
-            $"Locator: {reference.Locator.Describe()}. Last observed: {lastObserved}.");
+        throw WebBackendErrors.NotActionable(reference, _options.ActionTimeout, lastObserved);
     }
 
     private IWebElement ResolvePresent(WebElementReference reference, CancellationToken cancellationToken)
@@ -313,9 +293,7 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
             catch (StaleElementReferenceException) { }
             WaitForNextPoll(cancellationToken);
         }
-        throw new WebActionabilityException(
-            $"Element '{reference.ComponentPath}.{reference.Name}' was not present within {_options.ActionTimeout}. " +
-            $"Locator: {reference.Locator.Describe()}.");
+        throw WebBackendErrors.NotPresent(reference, _options.ActionTimeout);
     }
 
     private ISearchContext ResolveScope(WebElementReference reference)
@@ -328,25 +306,40 @@ public sealed class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWe
 
     private static IWebElement ResolveSingle(ISearchContext scope, WebLocator locator, string componentPath)
     {
-        var documentScoped = scope is IWebDriver;
-        if (locator is NthWebLocator nth)
-        {
-            var indexedMatches = scope.FindElements(SeleniumLocatorTranslator.Translate(nth.Source, documentScoped));
-            if (indexedMatches.Count <= nth.Index)
-                throw new NoSuchElementException(
-                    $"No element exists at zero-based index {nth.Index} for {nth.Source.Describe()} in {componentPath}; found {indexedMatches.Count}.");
-            return indexedMatches[nth.Index];
-        }
-
-        var seleniumBy = SeleniumLocatorTranslator.Translate(locator, documentScoped);
-        var matches = scope.FindElements(seleniumBy);
+        var matches = ResolveMany(scope, locator, componentPath);
         return matches.Count switch
         {
             0 => throw new NoSuchElementException($"No element matched {locator.Describe()} in {componentPath}."),
             1 => matches[0],
-            _ => throw new WebElementResolutionException(
-                $"Expected one element for {locator.Describe()} in {componentPath}, but found {matches.Count}.")
+            _ => throw WebBackendErrors.MultipleMatch(locator, componentPath, matches.Count)
         };
+    }
+
+    /// <summary>
+    /// Resolves a locator to every element it matches. An <c>At(index)</c> is applied to the matches of
+    /// its source, recursively, so nesting addresses a position within the source's matches rather than
+    /// silently dropping the inner index.
+    /// </summary>
+    private static IReadOnlyList<IWebElement> ResolveMany(
+        ISearchContext scope,
+        WebLocator locator,
+        string componentPath,
+        bool throwOnMissing = true)
+    {
+        if (locator is NthWebLocator nth)
+        {
+            var source = ResolveMany(scope, nth.Source, componentPath, throwOnMissing);
+            if (source.Count <= nth.Index)
+            {
+                if (!throwOnMissing) return [];
+                throw new NoSuchElementException(
+                    $"No element exists at zero-based index {nth.Index} for {nth.Source.Describe()} in {componentPath}; found {source.Count}.");
+            }
+
+            return [source[nth.Index]];
+        }
+
+        return scope.FindElements(SeleniumLocatorTranslator.Translate(locator, scope is IWebDriver));
     }
 
     private static bool IsReadOnly(IWebElement element)

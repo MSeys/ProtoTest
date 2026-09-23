@@ -1,6 +1,7 @@
 namespace ProtoTest.MSTest.Tests;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 
 [TestClass]
@@ -18,26 +19,7 @@ public class ProtoAttributeLifecycleTests
         logState.Log.Add("TestExecution");
 
         // Assert
-        var expectedBeforeSequence = new[]
-        {
-            "Hook:Before",
-            "ClassLevel:Before",
-            "MethodLevel:Before",
-            "TestExecution"
-        };
-
+        string[] expectedBeforeSequence = [.. AdapterTestSupport.ExpectedBeforeSequence, "TestExecution"];
         CollectionAssert.AreEqual(expectedBeforeSequence, logState.Log);
     }
-}
-
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
-public class TrackingAttribute(string name) : ProtoAttribute
-{
-    public override Task BeforeTestAsync(ProtoExecutionContext context)
-    {
-        TrackingHook.GetOrCreateLog(context).Add($"{name}:Before");
-        return Task.CompletedTask;
-    }
-
-    public override Task AfterTestAsync(ProtoExecutionContext context) => Task.CompletedTask;
 }

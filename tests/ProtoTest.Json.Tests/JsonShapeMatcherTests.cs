@@ -183,6 +183,33 @@ public sealed class JsonShapeMatcherTests
     }
 
     [Test]
+    public void DiagnosticSanitizer_ShouldRedactEverySharedDefaultSensitiveProperty()
+    {
+        // The state axis (ProtoTraceValueFormatter) and the diagnostics axis (this sanitizer) both read
+        // ProtoRedactionDefaults; a name only one of them redacted would leak on the other.
+        const string body =
+            """{"authorization":"Bearer x","cookie":"session=1","connectionString":"Host=db","clientSecret":"s3"}""";
+
+        var sanitized = JsonDiagnosticSanitizer.Sanitize(body);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                ProtoTest.Core.ProtoRedactionDefaults.SensitivePropertyNames,
+                Is.SupersetOf(new[]
+                {
+                    "password", "token", "access_token", "refresh_token", "secret", "apiKey", "api_key",
+                    "authorization", "cookie", "connectionString", "clientSecret"
+                }));
+            Assert.That(sanitized, Does.Not.Contain("Bearer x"));
+            Assert.That(sanitized, Does.Not.Contain("session=1"));
+            Assert.That(sanitized, Does.Not.Contain("Host=db"));
+            Assert.That(sanitized, Does.Not.Contain("s3"));
+            Assert.That(sanitized, Does.Contain("[REDACTED]"));
+        });
+    }
+
+    [Test]
     public void DiagnosticSerializer_ShouldUseCamelCaseAndRedactSensitiveValues()
     {
         var result = JsonDiagnosticSanitizer.Serialize(new { PropertyPath = "$.user", Token = "secret" });

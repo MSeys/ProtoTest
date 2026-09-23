@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { Change, Item, Span, TestTrace } from "../trace/model";
-import { formatOffset, itemKindLabel, itemTitle, sourceLabels } from "../trace/format";
+import { formatOffset, itemKindLabel, itemTitle, sourceLabels, timelinePercent } from "../trace/format";
 import EmptyState from "../ui/EmptyState.vue";
 import Panel from "../ui/Panel.vue";
 
@@ -32,17 +32,15 @@ const groups = computed(() => {
 });
 
 function position(at: number): string {
-  const total = Math.max(props.test.duration, 1);
-  return `${Math.min(100, Math.max(0, ((at - props.test.start) / total) * 100))}%`;
+  return `${timelinePercent(at, props.test.start, props.test.duration)}%`;
 }
 
 function lifeline(item: Item) {
   const start = Math.max(item.firstSeen, props.test.start);
   const end = Math.max(start, Math.min(item.lastSeen || props.test.end, props.test.end));
-  const total = Math.max(props.test.duration, 1);
   return {
     left: position(start),
-    width: `${Math.max(0.6, ((end - start) / total) * 100)}%`
+    width: `${Math.max(0.6, ((end - start) / Math.max(props.test.duration, 1)) * 100)}%`
   };
 }
 

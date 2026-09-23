@@ -113,7 +113,9 @@ Playwright maps `WebRole` to Playwright's own ARIA role resolution, which unders
 - `Checkbox` / `Radio` → `input[type=checkbox|radio]` or the matching `role`
 - `Textbox` → `textarea`, text-like inputs (no type, `text`, `email`, `password`, `tel`, `url`) or `role='textbox'`
 - `Heading` → `h1`…`h6` or `role='heading'`
-- `Image` → `img`; `Row` → `tr`; `Table`/`Grid` → `table`; `List` → `ul|ol`; `ListItem` → `li`; `Option` → `option`; `Combobox` → `select`; `RowGroup` → `tbody|thead|tfoot`
+- `Image` → `img`; `Row` → `tr`; `Table` → `table`; `List` → `ul|ol`; `ListItem` → `li`; `Option` → `option`; `Combobox` → `select`; `RowGroup` → `tbody|thead|tfoot`
+- `Dialog` → `dialog`; `Navigation` → `nav`; `ProgressBar` → `progress`; `Status` → `output`; `Searchbox`/`Slider`/`SpinButton` → `input[type=search|range|number]`
+- `Grid` matches `role='grid'` only: a plain `table` is a `Table`, not a `Grid`, on both backends
 - anything else → `@role='<lowercased name>'`
 
 When a name is given, Selenium's predicate matches it against `aria-label`, `title`, `alt`, the normalized element text, or `value` — exact or `contains`, per the `exact` flag.

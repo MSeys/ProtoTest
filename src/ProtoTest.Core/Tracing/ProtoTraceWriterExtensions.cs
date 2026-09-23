@@ -33,24 +33,9 @@ public static class ProtoTraceWriterExtensions
         string? entityKind = null,
         string? entityId = null)
     {
-        ArgumentNullException.ThrowIfNull(trace);
         ArgumentNullException.ThrowIfNull(action);
-        using var operation = trace.StartOperation(kind, name, source, phase, attributes, parentId, entityKind, entityId);
-        try
-        {
-            await action();
-            operation.Succeed();
-        }
-        catch (OperationCanceledException exception)
-        {
-            operation.Cancel(exception);
-            throw;
-        }
-        catch (Exception exception)
-        {
-            operation.Fail(exception);
-            throw;
-        }
+        await trace.ExecuteAsync(
+            kind, name, source, _ => action(), phase, attributes, parentId, entityKind, entityId);
     }
 
     /// <summary>Wraps <paramref name="action"/> in a traced operation, returning its result on success.</summary>
@@ -66,25 +51,9 @@ public static class ProtoTraceWriterExtensions
         string? entityKind = null,
         string? entityId = null)
     {
-        ArgumentNullException.ThrowIfNull(trace);
         ArgumentNullException.ThrowIfNull(action);
-        using var operation = trace.StartOperation(kind, name, source, phase, attributes, parentId, entityKind, entityId);
-        try
-        {
-            var result = await action();
-            operation.Succeed();
-            return result;
-        }
-        catch (OperationCanceledException exception)
-        {
-            operation.Cancel(exception);
-            throw;
-        }
-        catch (Exception exception)
-        {
-            operation.Fail(exception);
-            throw;
-        }
+        return await trace.ExecuteAsync<TResult>(
+            kind, name, source, _ => action(), phase, attributes, parentId, entityKind, entityId);
     }
 
     /// <summary>
@@ -104,24 +73,21 @@ public static class ProtoTraceWriterExtensions
         string? entityKind = null,
         string? entityId = null)
     {
-        ArgumentNullException.ThrowIfNull(trace);
         ArgumentNullException.ThrowIfNull(action);
-        using var operation = trace.StartOperation(kind, name, source, phase, attributes, parentId, entityKind, entityId);
-        try
-        {
-            await action(operation);
-            operation.Succeed();
-        }
-        catch (OperationCanceledException exception)
-        {
-            operation.Cancel(exception);
-            throw;
-        }
-        catch (Exception exception)
-        {
-            operation.Fail(exception);
-            throw;
-        }
+        await trace.ExecuteAsync<object?>(
+            kind,
+            name,
+            source,
+            async operation =>
+            {
+                await action(operation);
+                return null;
+            },
+            phase,
+            attributes,
+            parentId,
+            entityKind,
+            entityId);
     }
 
     /// <summary>

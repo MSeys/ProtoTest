@@ -1,6 +1,5 @@
 namespace ProtoTest.Http;
 
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
@@ -25,12 +24,10 @@ public static class ProtoHttpOptionsRegistration
         ArgumentException.ThrowIfNullOrWhiteSpace(protocolName);
         ArgumentException.ThrowIfNullOrWhiteSpace(configurationSectionName);
         services.TryAddKeyedSingleton<ProtoHttpResponseOptions>(protocolName, (serviceProvider, _) =>
-        {
-            var options = new ProtoHttpResponseOptions(configurationSectionName);
-            ApplyCodeConfiguration(serviceProvider, protocolName, options);
-            options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
-            return options;
-        });
+            ProtoOptionsRegistration.Resolve(
+                serviceProvider,
+                () => new ProtoHttpResponseOptions(configurationSectionName),
+                options => ApplyCodeConfiguration(serviceProvider, protocolName, options)));
     }
 
     /// <summary>
@@ -77,12 +74,10 @@ public static class ProtoHttpOptionsRegistration
         string configurationSectionName)
     {
         services.TryAddKeyedSingleton<ProtoHttpAttachmentOptions>(protocolName, (serviceProvider, _) =>
-        {
-            var options = new ProtoHttpAttachmentOptions(configurationSectionName);
-            ApplyCodeConfiguration(serviceProvider, protocolName, options);
-            options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
-            return options;
-        });
+            ProtoOptionsRegistration.Resolve(
+                serviceProvider,
+                () => new ProtoHttpAttachmentOptions(configurationSectionName),
+                options => ApplyCodeConfiguration(serviceProvider, protocolName, options)));
     }
 
     private static void ApplyCodeConfiguration<TOptions>(

@@ -6,217 +6,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Text;
-
-internal sealed class ProtoTraceSession : IProtoTraceSource
-{
-    internal const string CurrentFormatVersion = "1.9";
-    private readonly ConcurrentDictionary<string, ProtoTestTraceRecorder> _tests = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, ProtoTestTraceRecorder> _testsByTraceId = new(StringComparer.Ordinal);
-    private readonly ConcurrentQueue<ProtoTraceArtifactSource> _runArtifacts = new();
-    private readonly ProtoRunTraceWriter _runWriter = new();
-    private readonly ProtoSpanConverter _converter = new();
-    private readonly DateTimeOffset _startedAtUtc = DateTimeOffset.UtcNow;
-    private readonly string _runId = Guid.NewGuid().ToString("N");
-    private DateTimeOffset? _completedAtUtc;
-    private readonly ProtoTraceOptions _options;
-    private ActivityListener? _activityListener;
-    private int _listening;
-    private int _runArtifactSequence;
-
-    public ProtoTraceSession(ProtoTraceOptions? options = null)
-    {
-        _options = options ?? new ProtoTraceOptions();
-    }
-
-    /// <summary>
-    /// Starts capturing spans from the watched activity sources. Application instrumentation is ordinary
-    /// OpenTelemetry: ProtoTest listens, it does not ask the application to know about ProtoTest.
-    /// </summary>
-    public void StartListening()
-    {
-        if (_options.ActivitySources.Count == 0 || Interlocked.Exchange(ref _listening, 1) != 0)
-        {
-            return;
-        }
-
-        var listener = new ActivityListener
-        {
-            // ProtoTest's own activities are not captured through the listener (their writer already
-            // records them semantically); sampling them keeps the W3C trace context alive so application
-            // spans can be linked back to the test that caused them.
-            ShouldListenTo = source => source.Name == ProtoTestDiagnostics.ActivitySourceName
-                || _options.ActivitySources.Contains(source.Name),
-            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
-            ActivityStopped = OnActivityStopped
-        };
-        ActivitySource.AddActivityListener(listener);
-        _activityListener = listener;
-    }
-
-    public void StopListening()
-    {
-        _activityListener?.Dispose();
-        _activityListener = null;
-        Interlocked.Exchange(ref _listening, 0);
-    }
-
-    private void OnActivityStopped(Activity activity)
-    {
-        if (activity.Source.Name == ProtoTestDiagnostics.ActivitySourceName)
-        {
-            return;
-        }
-
-        try
-        {
-            // A span that carries a test's trace id belongs to that test even though the callback runs
-            // outside its flow - the whole point of propagating context across the app boundary.
-            var writer = FindWriter(activity.TraceId)
-                ?? (IProtoTraceWriter?)ProtoHost.CurrentContextOrNull?.Trace
-                ?? _runWriter;
-            var operationId = writer.CaptureActivity(activity);
-            _converter.Observe(writer, activity, operationId);
-        }
-        catch
-        {
-            // Capturing telemetry must never break the application.
-        }
-    }
-
-    /// <inheritdoc />
-    public IProtoTraceWriter? FindWriter(ActivityTraceId traceId)
-        => _testsByTraceId.TryGetValue(traceId.ToHexString(), out var recorder) ? recorder : null;
-
-    private void RegisterTrace(ActivityTraceId traceId, ProtoTestTraceRecorder recorder)
-        => _testsByTraceId.TryAdd(traceId.ToHexString(), recorder);
-
-    public ProtoTestTraceRecorder StartTest(string name, ProtoTestId testId, MethodInfo method)
-    {
-        var recorder = new ProtoTestTraceRecorder(
-            testId.Value, name, method, _options, RegisterTrace, _converter.Forget);
-        if (!_tests.TryAdd(testId.Value, recorder))
-        {
-            throw new InvalidOperationException($"A trace already exists for test ID '{testId.Value}'.");
-        }
-        return recorder;
-    }
-
-    /// <summary>Gets the writer for operations that belong to the run rather than to one test.</summary>
-    public IProtoTraceWriter RunWriter => _runWriter;
-
-    /// <summary>Gets how many completed or active tests still hold observed converter state; used by tests.</summary>
-    internal int TrackedWriterCount => _converter.TrackedWriterCount;
-
-    public void CompleteRun() => _completedAtUtc ??= DateTimeOffset.UtcNow;
-
-    public ProtoTraceRun Snapshot()
-    {
-        var tests = _tests.Values
-            .Select(test => test.Snapshot())
-            .OrderBy(test => test.StartedAtUtc)
-            .ThenBy(test => test.TestId, StringComparer.Ordinal)
-            .ToArray();
-        var entities = _runWriter.SnapshotEntities();
-        var values = _runWriter.SnapshotValues();
-
-        return new ProtoTraceRun(
-            CurrentFormatVersion,
-            _runId,
-            _startedAtUtc,
-            _completedAtUtc,
-            tests,
-            new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["runtime"] = RuntimeInformation.FrameworkDescription,
-                ["os"] = RuntimeInformation.OSDescription,
-                ["processArchitecture"] = RuntimeInformation.ProcessArchitecture.ToString(),
-                ["osArchitecture"] = RuntimeInformation.OSArchitecture.ToString()
-            },
-            _runArtifacts.Select(source => source.Artifact).ToArray(),
-            _runWriter.Snapshot(),
-            entities,
-            values,
-            DeriveVisibility(tests, entities, values),
-            _runWriter.SnapshotRecord());
-    }
-
-    /// <summary>
-    /// Visibility is derived from what the trace already contains, so it cannot drift from reality:
-    /// capabilities say what was composed, server and client entities say where the application ran, and
-    /// the value sources say how deep the integration reached.
-    /// </summary>
-    private static ProtoTraceVisibility DeriveVisibility(
-        IReadOnlyList<ProtoTestTrace> tests,
-        IReadOnlyList<ProtoTraceEntity> runEntities,
-        IReadOnlyList<ProtoTraceValue> runValues)
-    {
-        var capabilities = runEntities.Where(entity => entity.Kind == ProtoTraceEntityKinds.Capability).ToArray();
-        var testEntities = tests.SelectMany(test => test.Entities ?? []).ToArray();
-        var hasServer = capabilities.Any(capability => CapabilityKind(capability) == ProtoCapabilityKinds.Server)
-            || testEntities.Any(entity => entity.Kind == ProtoTraceEntityKinds.Server);
-        var hasClients = testEntities.Any(entity => entity.Kind == ProtoTraceEntityKinds.Client);
-        var hosting = hasServer ? "in-process" : hasClients ? "remote" : "unknown";
-
-        var backends = capabilities
-            .Where(capability => CapabilityKind(capability) is
-                ProtoCapabilityKinds.Server or ProtoCapabilityKinds.Store or
-                ProtoCapabilityKinds.Broker or ProtoCapabilityKinds.Data)
-            .Select(capability => capability.Name)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        var versions = tests.SelectMany(test => test.Values ?? [])
-            .Concat(runValues)
-            .SelectMany(value => value.Versions)
-            .ToArray();
-        var sources = new List<string>();
-        if (versions.Any(version => version.Source == ProtoTraceValueSource.TestSide)) sources.Add("test-side");
-        if (versions.Any(version => version.Source == ProtoTraceValueSource.Observed)) sources.Add("observed");
-        var applicationInstrumented = versions.Any(version => version.Source == ProtoTraceValueSource.ApplicationSide);
-        if (applicationInstrumented) sources.Add("application-side");
-
-        return new ProtoTraceVisibility(hosting, backends, sources, applicationInstrumented);
-    }
-
-    private static string? CapabilityKind(ProtoTraceEntity capability)
-        => capability.State.TryGetValue("capability.kind", out var kind) ? kind : null;
-
-    internal async Task CaptureRunArtifactsAsync(
-        IReadOnlyCollection<ProtoTestAttachment> attachments,
-        string sourceName,
-        CancellationToken cancellationToken)
-    {
-        foreach (var attachment in attachments)
-        {
-            var sequence = Interlocked.Increment(ref _runArtifactSequence);
-            var id = $"run-artifact-{sequence}";
-            var archivePath = $"resources/run/{ProtoPathSanitizer.FileName(sourceName, "artifact")}/{id}/{ProtoPathSanitizer.FileName(attachment.Name, "artifact")}";
-            var artifact = new ProtoTraceArtifact(id, attachment.Name, attachment.MediaType, attachment.Description, archivePath);
-            ReadOnlyMemory<byte> content = ReadOnlyMemory<byte>.Empty;
-            try
-            {
-                content = await attachment.ReadAllBytesAsync(cancellationToken);
-                artifact = artifact with { SizeBytes = content.Length };
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                artifact = artifact with { Error = exception.Message };
-            }
-            _runArtifacts.Enqueue(new ProtoTraceArtifactSource(artifact, content));
-        }
-    }
-
-    internal IReadOnlyList<ProtoTraceArtifactSource> SnapshotArtifactSources()
-        => _runArtifacts
-            .Concat(_tests.Values.SelectMany(test => test.SnapshotArtifactSources()))
-            .ToArray();
-
-}
-
-internal sealed record ProtoTraceArtifactSource(ProtoTraceArtifact Artifact, ReadOnlyMemory<byte> Content);
 
 internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
 {
@@ -454,9 +244,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         string? data = null,
         string? metadata = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(targetName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
-        ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+        ProtoTraceRecords.ValidateObservation(targetName, kind, identifier);
         if (!_options.Enabled) return;
         var entry = _current.Value;
         if (entry is not null)
@@ -467,15 +255,8 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         {
             lock (_orphanGate)
             {
-                _orphanObservations.Add(new ProtoTraceObservationRecord(
-                    string.Empty,
-                    null,
-                    DateTimeOffset.UtcNow,
-                    targetName,
-                    kind,
-                    identifier,
-                    data,
-                    metadata));
+                _orphanObservations.Add(ProtoTraceRecords.Observation(
+                    string.Empty, null, targetName, kind, identifier, data, metadata));
             }
         }
         WriteRecordActivityEvent("observation", kind, targetName, identifier);
@@ -483,8 +264,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
 
     public void Attachment(string name, string mediaType, string? description = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(mediaType);
+        ProtoTraceRecords.ValidateAttachment(name, mediaType);
         if (!_options.Enabled) return;
         var entry = _current.Value;
         if (entry is not null)
@@ -495,13 +275,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         {
             lock (_orphanGate)
             {
-                _orphanAttachments.Add(new ProtoTraceAttachmentRecord(
-                    string.Empty,
-                    null,
-                    DateTimeOffset.UtcNow,
-                    name,
-                    mediaType,
-                    description));
+                _orphanAttachments.Add(ProtoTraceRecords.Attachment(string.Empty, null, name, mediaType, description));
             }
         }
         WriteRecordActivityEvent("attachment", mediaType, name, name);
@@ -515,9 +289,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         IReadOnlyList<string>? tags = null,
         IReadOnlyDictionary<string, object>? metadata = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        ArgumentException.ThrowIfNullOrWhiteSpace(status);
-        ArgumentException.ThrowIfNullOrWhiteSpace(category);
+        ProtoTraceRecords.ValidateFinding(message, status, category);
         if (!_options.Enabled) return;
         var entry = _current.Value;
         if (entry is not null)
@@ -528,16 +300,8 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         {
             lock (_orphanGate)
             {
-                _orphanFindings.Add(new ProtoTraceFindingRecord(
-                    string.Empty,
-                    null,
-                    DateTimeOffset.UtcNow,
-                    message,
-                    status,
-                    category,
-                    targetName,
-                    tags,
-                    metadata));
+                _orphanFindings.Add(ProtoTraceRecords.Finding(
+                    string.Empty, null, message, status, category, targetName, tags, metadata));
             }
         }
         WriteRecordActivityEvent("finding", category, message, status);
@@ -547,20 +311,8 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
     {
         ArgumentNullException.ThrowIfNull(activity);
         if (!_options.Enabled) return null;
-        var attributes = new Dictionary<string, string?>(StringComparer.Ordinal)
-        {
-            ["activity.source"] = activity.Source.Name
-        };
-        foreach (var tag in activity.TagObjects)
-        {
-            // Application tags follow the same cap as the OpenTelemetry export: an oversized value
-            // would otherwise grow the archive without ever leaving it as an exported attribute.
-            var value = tag.Value?.ToString();
-            if (value is { Length: > MaxTagValueLength }) continue;
-            attributes[tag.Key] = value;
-        }
-
-        var failed = activity.Status == ActivityStatusCode.Error;
+        var attributes = ProtoTraceActivity.Attributes(activity);
+        var failed = ProtoTraceActivity.IsFailure(activity);
         var entry = new TraceEntryState(
             NextId(),
             _current.Value?.Id ?? Volatile.Read(ref _defaultParentId),
@@ -577,9 +329,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         entry.Complete(
             failed ? ProtoTraceOutcome.Failed : ProtoTraceOutcome.Succeeded,
             exception: null,
-            error: failed && activity.StatusDescription is { Length: > 0 } description
-                ? new ProtoTraceError("ActivityError", description)
-                : null,
+            error: ProtoTraceActivity.Error(activity),
             duration: activity.Duration);
         _entries.Enqueue(entry);
         _entriesById.TryAdd(entry.Id, entry);
@@ -636,19 +386,9 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
                 attachment.MediaType,
                 attachment.Description,
                 archivePath);
-            ReadOnlyMemory<byte> content = ReadOnlyMemory<byte>.Empty;
-            try
-            {
-                content = await attachment.ReadAllBytesAsync(cancellationToken);
-                artifact = artifact with { SizeBytes = content.Length };
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                artifact = artifact with { Error = exception.Message };
-            }
-
-            artifacts.Add(new ProtoTraceArtifactSource(artifact, content));
-            PatchAttachment(attachment.Name, id, archivePath, content.Length, artifact.Error);
+            var source = await ProtoArtifactCapture.CaptureAsync(artifact, attachment, cancellationToken);
+            artifacts.Add(source);
+            PatchAttachment(attachment.Name, id, archivePath, source.Content.Length, source.Artifact.Error);
         }
     }
 
@@ -867,7 +607,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
     /// <summary>The longest tag value kept in the trace or exported; a longer value is dropped by both.</summary>
     internal const int MaxTagValueLength = 2048;
 
-    private static bool ShouldExportTag(string key, string? value)
+    internal static bool ShouldExportTag(string key, string? value)
         => value is not null
            && value.Length <= MaxTagValueLength
            && key is not "context.value" and not "observation.data" and not "observation.metadata"
@@ -900,258 +640,5 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         }
     }
 
-    internal sealed class TraceEntryState
-    {
-        private readonly ProtoLock _gate = new();
-        private readonly long _startedTimestamp;
-        private readonly Dictionary<string, string?> _attributes;
-        private int _completed;
-        private int _count = 1;
-        private TimeSpan? _duration;
-        private ProtoTraceOutcome _outcome;
-        private ProtoTraceError? _error;
-        private readonly List<ProtoTraceSection> _sections = [];
-        private readonly List<ProtoTraceObservationRecord> _recordObservations = [];
-        private readonly List<ProtoTraceAttachmentRecord> _recordAttachments = [];
-        private readonly List<ProtoTraceFindingRecord> _recordFindings = [];
-        private readonly Activity? _activity;
-
-        public TraceEntryState(
-            string id,
-            string? parentId,
-            ProtoTraceEntryKind entryKind,
-            string kind,
-            string name,
-            string source,
-            ProtoTracePhase phase,
-            DateTimeOffset timestampUtc,
-            long startedTimestamp,
-            IReadOnlyDictionary<string, string?>? attributes,
-            TraceEntryState? parent,
-            Activity? activity = null,
-            string? entityKind = null,
-            string? entityId = null)
-        {
-            Id = id;
-            ParentId = parentId;
-            EntryKind = entryKind;
-            Kind = kind;
-            Name = name;
-            Source = source;
-            Phase = phase;
-            TimestampUtc = timestampUtc;
-            _startedTimestamp = startedTimestamp;
-            _attributes = attributes is null
-                ? new Dictionary<string, string?>(StringComparer.Ordinal)
-                : new Dictionary<string, string?>(attributes, StringComparer.Ordinal);
-            Parent = parent;
-            _activity = activity;
-            EntityKind = entityKind;
-            EntityId = entityId;
-        }
-
-        public string Id { get; }
-        public string? ParentId { get; }
-        public ProtoTraceEntryKind EntryKind { get; }
-        public string Kind { get; }
-        public string Name { get; }
-        public string Source { get; }
-        public ProtoTracePhase Phase { get; }
-        public DateTimeOffset TimestampUtc { get; }
-        public TraceEntryState? Parent { get; }
-        public string? EntityKind { get; }
-        public string? EntityId { get; }
-        public Activity? Activity => _activity;
-        public ProtoTraceOutcome Outcome { get { lock (_gate) return _outcome; } }
-        public int Count { get { lock (_gate) return _count; } }
-        public IReadOnlyDictionary<string, string?> Attributes { get { lock (_gate) return new Dictionary<string, string?>(_attributes); } }
-
-        public void SetAttribute(string name, string? value)
-        {
-            lock (_gate) _attributes[name] = value;
-        }
-
-        public void SetCount(int count)
-        {
-            lock (_gate)
-            {
-                _count = count;
-                if (_activity is { IsStopped: false })
-                {
-                    _activity.SetTag("prototest.entry.count", count);
-                }
-            }
-        }
-
-        public void AddSection(ProtoTraceSection section)
-        {
-            lock (_gate) _sections.Add(section);
-        }
-
-        public void AddObservation(
-            string targetName,
-            string kind,
-            string identifier,
-            string? data,
-            string? metadata)
-        {
-            lock (_gate)
-            {
-                _recordObservations.Add(new ProtoTraceObservationRecord(
-                    string.Empty,
-                    Id,
-                    DateTimeOffset.UtcNow,
-                    targetName,
-                    kind,
-                    identifier,
-                    data,
-                    metadata));
-            }
-        }
-
-        public void AddAttachment(string name, string mediaType, string? description)
-        {
-            lock (_gate)
-            {
-                _recordAttachments.Add(new ProtoTraceAttachmentRecord(
-                    string.Empty,
-                    Id,
-                    DateTimeOffset.UtcNow,
-                    name,
-                    mediaType,
-                    description));
-            }
-        }
-
-        public void AddFinding(
-            string message,
-            string status,
-            string category,
-            string? targetName,
-            IReadOnlyList<string>? tags,
-            IReadOnlyDictionary<string, object>? metadata)
-        {
-            lock (_gate)
-            {
-                _recordFindings.Add(new ProtoTraceFindingRecord(
-                    string.Empty,
-                    Id,
-                    DateTimeOffset.UtcNow,
-                    message,
-                    status,
-                    category,
-                    targetName,
-                    tags,
-                    metadata));
-            }
-        }
-
-        public void CollectRecord(
-            List<ProtoTraceObservationRecord> observations,
-            List<ProtoTraceAttachmentRecord> attachments,
-            List<ProtoTraceFindingRecord> findings)
-        {
-            lock (_gate)
-            {
-                observations.AddRange(_recordObservations);
-                attachments.AddRange(_recordAttachments);
-                findings.AddRange(_recordFindings);
-            }
-        }
-
-        public bool TryPatchAttachment(
-            string name,
-            string artifactId,
-            string? archivePath,
-            long sizeBytes,
-            string? error)
-        {
-            lock (_gate)
-            {
-                var index = _recordAttachments.FindLastIndex(attachment =>
-                    string.Equals(attachment.Name, name, StringComparison.Ordinal)
-                    && attachment.ArtifactId is null);
-                if (index < 0)
-                {
-                    return false;
-                }
-
-                _recordAttachments[index] = _recordAttachments[index] with
-                {
-                    ArtifactId = artifactId,
-                    ArchivePath = archivePath,
-                    SizeBytes = sizeBytes,
-                    Error = error
-                };
-                return true;
-            }
-        }
-
-        public void Complete(
-            ProtoTraceOutcome outcome,
-            Exception? exception,
-            ProtoTraceError? error = null,
-            TimeSpan? duration = null)
-        {
-            if (Interlocked.Exchange(ref _completed, 1) != 0) return;
-            lock (_gate)
-            {
-                _outcome = outcome;
-                _error = error ?? (exception is null ? null : ProtoTraceError.FromException(exception));
-                if (EntryKind == ProtoTraceEntryKind.Operation)
-                    _duration = duration ?? Stopwatch.GetElapsedTime(_startedTimestamp);
-            }
-            CompleteActivity(outcome, exception, error);
-        }
-
-        private void CompleteActivity(
-            ProtoTraceOutcome outcome,
-            Exception? exception,
-            ProtoTraceError? error)
-        {
-            if (_activity is null) return;
-            _activity.SetTag("prototest.outcome", outcome.ToString().ToLowerInvariant());
-            foreach (var (key, value) in Attributes)
-                if (ShouldExportTag(key, value)) _activity.SetTag(key, value);
-            var traceError = error ?? (exception is null ? null : ProtoTraceError.FromException(exception));
-            if (traceError is not null)
-            {
-                _activity.SetStatus(ActivityStatusCode.Error, traceError.Message);
-                _activity.AddEvent(new ActivityEvent("exception", tags: new ActivityTagsCollection
-                {
-                    ["exception.type"] = traceError.Type,
-                    ["exception.message"] = traceError.Message,
-                    ["exception.stacktrace"] = traceError.StackTrace
-                }));
-            }
-            else if (outcome == ProtoTraceOutcome.Succeeded) _activity.SetStatus(ActivityStatusCode.Ok);
-            _activity.Stop();
-        }
-
-        public void CompleteIfOpen(ProtoTraceOutcome outcome) => Complete(outcome, null);
-
-        public ProtoTraceEntry Snapshot()
-        {
-            lock (_gate)
-            {
-                return new ProtoTraceEntry(
-                    Id,
-                    ParentId,
-                    EntryKind,
-                    Kind,
-                    Name,
-                    Source,
-                    Phase,
-                    TimestampUtc,
-                    _duration,
-                    _outcome,
-                    new Dictionary<string, string?>(_attributes, StringComparer.Ordinal),
-                    _error,
-                    EntityKind,
-                    EntityId,
-                    _count,
-                    _sections.Count == 0 ? null : [.. _sections]);
-            }
-        }
-    }
 }
+

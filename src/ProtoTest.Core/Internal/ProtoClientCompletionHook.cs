@@ -33,7 +33,7 @@ internal sealed class ProtoClientCompletionHook : IProtoTestHook
 
         if (exceptions is not null)
         {
-            throw new AggregateException("One or more clients failed to complete.", exceptions);
+            LifecycleExceptionHelper.ThrowIfAny("One or more clients failed to complete.", exceptions);
         }
     }
 }

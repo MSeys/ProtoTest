@@ -2,7 +2,6 @@ namespace ProtoTest.Sheets;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 
 public static class ProtoHostBuilderExtensions
@@ -20,12 +19,7 @@ public static class ProtoHostBuilderExtensions
         builder.ConfigureServices(services =>
         {
             services.TryAddSingleton(serviceProvider =>
-            {
-                var options = new SheetsOptions();
-                configure?.Invoke(options);
-                options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
-                return options;
-            });
+                ProtoOptionsRegistration.Resolve<SheetsOptions>(serviceProvider, configure));
             services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoCollector>(new SheetsCoverageCollector("Sheets")));
         });
         return builder.AddCapability(new ProtoCapabilityDescriptor(

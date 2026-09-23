@@ -16,8 +16,7 @@ public class Setup : ProtoTestAssembly
     {
         await InitializeAsync(builder =>
         {
-            builder.AddTestHook<TrackingHook>();
-            builder.AddTestHook<AdapterContractHook>();
+            AdapterTestSupport.ConfigureHost(builder);
             builder.ConfigureServices(services =>
             {
                 services.AddScoped<ITestService, TestService>();
@@ -32,41 +31,7 @@ public class Setup : ProtoTestAssembly
     }
 }
 
-public interface ITestService
-{
-    string GetMessage();
-}
-
 public class TestService : ITestService
 {
     public string GetMessage() => "TUnit_Integration_Success";
-}
-
-public class ExecutionLogState : IProtoContext
-{
-    public List<string> Log { get; } = [];
-}
-
-public class TrackingHook : IProtoTestHook
-{
-    public int Order => 1;
-
-    public Task BeforeTestAsync(ProtoExecutionContext context)
-    {
-        GetOrCreateLog(context).Add("Hook:Before");
-        return Task.CompletedTask;
-    }
-
-    public Task AfterTestAsync(ProtoExecutionContext context) => Task.CompletedTask;
-
-    public static List<string> GetOrCreateLog(ProtoExecutionContext context)
-    {
-        var state = context.TryResolve<ExecutionLogState>();
-        if (state == null)
-        {
-            state = new ExecutionLogState();
-            context.SetContext(state);
-        }
-        return state.Log;
-    }
 }

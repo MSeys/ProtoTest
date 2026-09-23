@@ -8,6 +8,7 @@ internal sealed class ProtoClientRegistry
 {
     private readonly ProtoLock _gate = new();
     private readonly Dictionary<ClientKey, object> _clients = new(ClientKeyComparer.Instance);
+    private readonly List<ClientKey> _registrationOrder = [];
     private int _sealed;
 
     /// <summary>Stops further registrations once the execution context starts releasing resources.</summary>
@@ -32,6 +33,7 @@ internal sealed class ProtoClientRegistry
             }
 
             _clients[key] = client;
+            _registrationOrder.Add(key);
         }
     }
 
@@ -47,7 +49,10 @@ internal sealed class ProtoClientRegistry
         var key = BuildKey(clientType, name);
         lock (_gate)
         {
-            _clients.TryAdd(key, client);
+            if (_clients.TryAdd(key, client))
+            {
+                _registrationOrder.Add(key);
+            }
         }
     }
 
@@ -67,7 +72,9 @@ internal sealed class ProtoClientRegistry
         lock (_gate)
         {
             // Aliases are lookups, not additional clients. Complete each instance once.
-            return [.. _clients.Values.Distinct(ReferenceEqualityComparer.Instance)];
+            return [.. _registrationOrder
+                .Select(key => _clients[key])
+                .Distinct(ReferenceEqualityComparer.Instance)];
         }
     }
 

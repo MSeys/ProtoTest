@@ -1,6 +1,5 @@
 namespace ProtoTest.Grpc.Clients;
 
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Http;
@@ -32,9 +31,7 @@ internal static class ProtoGrpcClientRegistration
 
         services.AddSingleton<IProtoClientInitializer>(serviceProvider =>
         {
-            var options = new GrpcClientOptions();
-            configure?.Invoke(options);
-            options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
+            var options = ProtoOptionsRegistration.Resolve<GrpcClientOptions>(serviceProvider, configure);
             return new ProtoGrpcClientInitializer(
                 protocolName,
                 name,
@@ -62,9 +59,7 @@ internal static class ProtoGrpcClientRegistration
 
         services.AddSingleton<IProtoClientInitializer>(serviceProvider =>
         {
-            var options = new GrpcClientOptions();
-            configure?.Invoke(options);
-            options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
+            var options = ProtoOptionsRegistration.Resolve<GrpcClientOptions>(serviceProvider, configure);
             return new ProtoGrpcClientInitializer(
                 protocolName,
                 name,

@@ -1,6 +1,7 @@
 namespace ProtoTest.Xunit.Tests;
 
 using global::Xunit;
+using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 
 [Collection(ProtoTestCollection.Name)]
@@ -18,15 +19,3 @@ public class ProtoAttributeContextTests
         Assert.Equal("Xunit2User", userState.Username);
     }
 }
-
-[AttributeUsage(AttributeTargets.Method)]
-public class SetContextUserAttribute(string username) : ProtoAttribute
-{
-    public override Task BeforeTestAsync(ProtoExecutionContext context)
-    {
-        Proto.Context.SetContext(new UserState(username));
-        return Task.CompletedTask;
-    }
-}
-
-public sealed record UserState(string Username) : IProtoContext;

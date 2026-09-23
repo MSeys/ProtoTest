@@ -9,23 +9,20 @@ using ProtoTest.Core;
 /// </summary>
 [SetUpFixture]
 public abstract class ProtoTestAssembly
+    : ProtoTestAssemblyHost<ProtoTestAssembly>, IProtoTestAssemblyHost<ProtoTestAssembly>
 {
-    private static readonly ProtoTestHostLifetime Lifetime = new(
-        "Ensure your setup class inherits from ProtoTestAssembly.");
-
-    /// <summary>
-    /// Gets the global <see cref="ProtoHost"/> instance.
-    /// </summary>
-    public static ProtoHost Host => Lifetime.Host;
+    static string IProtoTestAssemblyHost<ProtoTestAssembly>.UninitializedHint =>
+        "Ensure your setup class inherits from ProtoTestAssembly.";
 
     [OneTimeSetUp]
-    public Task GlobalSetUp() => Lifetime.StartAsync(Configure);
+    public Task GlobalSetUp() => StartAsync(Configure);
 
     [OneTimeTearDown]
-    public Task GlobalTearDown() => Lifetime.StopAsync();
+    public Task GlobalTearDown() => StopAsync();
 
     /// <summary>
     /// Configures the <see cref="IProtoHostBuilder"/> with custom services, collectors, and hooks.
     /// </summary>
+    /// <param name="builder">The host builder instance.</param>
     protected abstract void Configure(IProtoHostBuilder builder);
 }

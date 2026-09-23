@@ -14,22 +14,13 @@ using System.Reflection;
 [NonParallelizable]
 public sealed class SqlIsolationTests
 {
-    // Pooling is off so the keeper connection alone decides when the in-memory database disappears;
-    // a pooled connection would outlive the test and leak both data and locks.
-    private const string ConnectionString = "Data Source=file:sqltests;Mode=Memory;Cache=Shared;Pooling=False";
-
-    private SqliteConnection _keeper = null!;
+    private SqliteKeeper _database = null!;
 
     [SetUp]
-    public void SetUp()
-    {
-        _keeper = new SqliteConnection(ConnectionString);
-        _keeper.Open();
-        Execute(_keeper, "CREATE TABLE IF NOT EXISTS Widgets (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL);");
-    }
+    public void SetUp() => _database = new SqliteKeeper("sqltests");
 
     [TearDown]
-    public void TearDown() => _keeper.Dispose();
+    public void TearDown() => _database.Dispose();
 
     [Test]
     public async Task RawCommands_ShouldRollBackWithTransaction()
@@ -48,11 +39,11 @@ public sealed class SqlIsolationTests
         }
 
         // Assert
-        Assert.That(CountWidgets(connection), Is.EqualTo(1));
+        Assert.That(SqliteKeeper.CountWidgets(connection), Is.EqualTo(1));
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
-        Assert.That(CountWidgets(_keeper), Is.Zero);
+        Assert.That(SqliteKeeper.CountWidgets(_database.Connection), Is.Zero);
         await host.StopAsync();
     }
 
@@ -74,7 +65,7 @@ public sealed class SqlIsolationTests
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
-        Assert.That(CountWidgets(_keeper), Is.Zero);
+        Assert.That(SqliteKeeper.CountWidgets(_database.Connection), Is.Zero);
         await host.StopAsync();
     }
 
@@ -208,7 +199,7 @@ public sealed class SqlIsolationTests
         // Assert
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
-        Assert.That(CountWidgets(_keeper), Is.EqualTo(1));
+        Assert.That(SqliteKeeper.CountWidgets(_database.Connection), Is.EqualTo(1));
         await host.StopAsync();
     }
 
@@ -218,7 +209,7 @@ public sealed class SqlIsolationTests
         // Arrange
         await using var host = new ProtoHostBuilder()
             .AddApplication("TestApp", _ => { })
-            .AddSql(_ => new SqliteConnection(ConnectionString))
+            .AddSql(_ => new SqliteConnection(_database.ConnectionString))
             .Build();
 
         // Act
@@ -234,7 +225,7 @@ public sealed class SqlIsolationTests
         // Arrange
         await using var host = new ProtoHostBuilder()
             .AddApplication("TestApp", _ => { })
-            .AddSql(_ => new SqliteConnection(ConnectionString), sql => sql.ShareConnectionWith("TestApp"))
+            .AddSql(_ => new SqliteConnection(_database.ConnectionString), sql => sql.ShareConnectionWith("TestApp"))
             .Build();
 
         // Act
@@ -306,7 +297,7 @@ public sealed class SqlIsolationTests
                     ["ProtoTest:Sql:SharedWithApplications:0"] = "Api"
                 }))
             .AddApplication("Api", _ => { })
-            .AddSql(_ => new SqliteConnection(ConnectionString))
+            .AddSql(_ => new SqliteConnection(_database.ConnectionString))
             .Build();
 
         // Act: the isolation guard passes because the named application is declared as sharing.
@@ -330,7 +321,7 @@ public sealed class SqlIsolationTests
     [Test]
     public async Task RollbackFailure_ShouldStillDisposeTheTransactionAndConnection()
     {
-        var connection = new FailingRollbackConnection();
+        var connection = new FailingDbConnection { FailRollback = true };
         await using var host = new ProtoHostBuilder().AddSql(_ => connection).Build();
         await host.StartAsync();
         await host.StartTestAsync("rollback failure", TestMethod());
@@ -348,9 +339,9 @@ public sealed class SqlIsolationTests
         await host.StopAsync();
     }
 
-    private static ProtoHost CreateHost(SqlIsolation isolation = SqlIsolation.Transaction)
+    private ProtoHost CreateHost(SqlIsolation isolation = SqlIsolation.Transaction)
         => new ProtoHostBuilder()
-            .AddSql(_ => new SqliteConnection(ConnectionString), sql => sql.Isolation = isolation)
+            .AddSql(_ => new SqliteConnection(_database.ConnectionString), sql => sql.Isolation = isolation)
             .AddEntityFrameworkCore<WidgetDbContext>((services, options) =>
                 options.UseSqlite(services.GetRequiredService<DbConnection>()))
             .Build();
@@ -360,20 +351,6 @@ public sealed class SqlIsolationTests
 
     private static void SampleTest()
     {
-    }
-
-    private static void Execute(DbConnection connection, string sql)
-    {
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.ExecuteNonQuery();
-    }
-
-    private static int CountWidgets(DbConnection connection)
-    {
-        using var command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM Widgets;";
-        return Convert.ToInt32(command.ExecuteScalar());
     }
 }
 
@@ -387,67 +364,4 @@ public sealed class Widget
     public int Id { get; set; }
 
     public string Name { get; set; } = string.Empty;
-}
-
-internal sealed class FailingRollbackConnection : DbConnection
-{
-    private ConnectionState _state = ConnectionState.Closed;
-
-    public FailingRollbackTransaction? Transaction { get; private set; }
-
-    public bool IsDisposed { get; private set; }
-
-    [System.Diagnostics.CodeAnalysis.AllowNull]
-    public override string ConnectionString { get; set; } = string.Empty;
-
-    public override string Database => "fake";
-
-    public override string DataSource => "fake";
-
-    public override string ServerVersion => "1";
-
-    public override ConnectionState State => _state;
-
-    public override void ChangeDatabase(string databaseName)
-    {
-    }
-
-    public override void Close() => _state = ConnectionState.Closed;
-
-    public override void Open() => _state = ConnectionState.Open;
-
-    protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel)
-    {
-        Transaction = new FailingRollbackTransaction(this);
-        return Transaction;
-    }
-
-    protected override DbCommand CreateDbCommand() => throw new NotSupportedException();
-
-    protected override void Dispose(bool disposing)
-    {
-        IsDisposed = true;
-        base.Dispose(disposing);
-    }
-}
-
-internal sealed class FailingRollbackTransaction(DbConnection connection) : DbTransaction
-{
-    public bool Disposed { get; private set; }
-
-    public override IsolationLevel IsolationLevel => IsolationLevel.ReadCommitted;
-
-    protected override DbConnection DbConnection { get; } = connection;
-
-    public override void Rollback() => throw new InvalidOperationException("rollback failed");
-
-    public override void Commit()
-    {
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        Disposed = true;
-        base.Dispose(disposing);
-    }
 }

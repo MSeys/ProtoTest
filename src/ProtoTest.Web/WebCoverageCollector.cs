@@ -12,7 +12,8 @@ using ProtoTest.Web.Internal;
 /// <c>ProtoTest:Web:Pages:Source</c>. A page is covered only when a <c>web.page.verified</c> observation
 /// was recorded for it; a page that was merely visited, or that only exists in the inventory, is
 /// reported uncovered. A concrete path that matches an inventory pattern lands on the pattern: verifying
-/// <c>/users/42</c> covers <c>/users/{id}</c>.
+/// <c>/users/42</c> covers <c>/users/{id}</c>, and configured entries accept the same route syntax as
+/// discovered routes, so <c>/users/:id</c> becomes the same pattern.
 /// </summary>
 public sealed class WebCoverageCollector : ProtoCoverageCollector
 {
@@ -34,9 +35,11 @@ public sealed class WebCoverageCollector : ProtoCoverageCollector
     public WebCoverageCollector(string targetName, IConfiguration? configuration = null) : base(targetName)
     {
         if (configuration is null) return;
+        // Configured entries accept the same route syntax as discovered routes, so "/users/:id" is the
+        // same pattern as a Vue route definition and matches a visit to "/users/42".
         foreach (var value in WebPageConfig.Read(configuration, "ProtoTest:Web:Pages", "Source", "Framework"))
         {
-            AddInventory(WebPagePath.Normalize(value));
+            AddInventory(WebPagePath.NormalizeRoute(value));
         }
 
         foreach (var value in WebPageSourceScanner.Discover(
@@ -111,16 +114,12 @@ public sealed class WebCoverageCollector : ProtoCoverageCollector
         foreach (var pattern in _inventory)
         {
             if (!WebPagePath.Matches(pattern, path)) continue;
-            if (!IsCatchAll(pattern)) return pattern;
+            if (!WebPagePath.IsCatchAll(pattern)) return pattern;
             catchAll ??= pattern;
         }
 
         return catchAll ?? path;
     }
-
-    private static bool IsCatchAll(string pattern)
-        => pattern.Split('/', StringSplitOptions.RemoveEmptyEntries)
-            .Any(segment => segment == "{...}");
 
     private void AddInventory(string? path)
     {

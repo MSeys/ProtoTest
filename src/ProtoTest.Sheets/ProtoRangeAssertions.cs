@@ -102,7 +102,7 @@ public sealed class ProtoRangeAssertions
         {
             return $"{SheetAssertion.Describe(
                 $"{_sheetName}!{mismatchedCell.Reference}",
-                $"be {Format(expectedValue)}", _negated)} but it was {mismatchedCell.Display()}.";
+                $"be {SheetAssertionText.Format(expectedValue)}", _negated)} but it was {mismatchedCell.Display()}.";
         }
 
         if (_negated)
@@ -117,6 +117,4 @@ public sealed class ProtoRangeAssertions
             $"have dimensions {expectedShape}", _negated)} " +
             $"but it was {_range.RowCount}x{_range.ColumnCount}.";
     }
-
-    private static string Format(string? value) => value is null ? "empty" : $"'{value}'";
 }

@@ -9,8 +9,14 @@ public class JsonDiagnosticOptions
 {
     public bool RedactSensitiveData { get; set; } = true;
     public int MaxDiagnosticBodyLength { get; set; } = 64 * 1024;
+
+    /// <summary>
+    /// The property names redacted by default. Shared with the trace's state value formatter through
+    /// <see cref="ProtoRedactionDefaults"/>, so diagnostics and state cannot disagree about what is
+    /// sensitive.
+    /// </summary>
     public List<string> SensitiveJsonProperties { get; set; } =
-        ["password", "token", "access_token", "refresh_token", "secret", "apiKey", "api_key"];
+        [.. ProtoRedactionDefaults.SensitivePropertyNames];
 }
 
 public static class JsonDiagnosticSanitizer

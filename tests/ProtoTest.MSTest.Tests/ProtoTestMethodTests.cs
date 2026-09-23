@@ -1,6 +1,7 @@
 namespace ProtoTest.MSTest.Tests;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 
 [TestClass]

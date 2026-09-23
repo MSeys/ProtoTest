@@ -123,6 +123,33 @@ internal sealed class ProtoXunitTheoryTestCase : XunitTheoryTestCase
             cancellationTokenSource).RunAsync();
 }
 
+internal static class ProtoXunitRunnerFactory
+{
+    /// <summary>The one place the runner's argument plumbing exists; both case runners return it.</summary>
+    internal static XunitTestRunner Create(
+        ITest test,
+        IMessageBus messageBus,
+        Type testClass,
+        object[] constructorArguments,
+        MethodInfo testMethod,
+        object[] testMethodArguments,
+        string skipReason,
+        IReadOnlyList<BeforeAfterTestAttribute> beforeAfterAttributes,
+        ExceptionAggregator aggregator,
+        CancellationTokenSource cancellationTokenSource)
+        => new ProtoXunitTestRunner(
+            test,
+            messageBus,
+            testClass,
+            constructorArguments,
+            testMethod,
+            testMethodArguments,
+            skipReason,
+            beforeAfterAttributes,
+            aggregator,
+            cancellationTokenSource);
+}
+
 internal sealed class ProtoXunitTestCaseRunner(
     IXunitTestCase testCase,
     string displayName,
@@ -153,7 +180,7 @@ internal sealed class ProtoXunitTestCaseRunner(
         IReadOnlyList<BeforeAfterTestAttribute> beforeAfterAttributes,
         ExceptionAggregator aggregator,
         CancellationTokenSource cancellationTokenSource)
-        => new ProtoXunitTestRunner(
+        => ProtoXunitRunnerFactory.Create(
             test,
             messageBus,
             testClass,
@@ -196,7 +223,7 @@ internal sealed class ProtoXunitTheoryTestCaseRunner(
         IReadOnlyList<BeforeAfterTestAttribute> beforeAfterAttributes,
         ExceptionAggregator aggregator,
         CancellationTokenSource cancellationTokenSource)
-        => new ProtoXunitTestRunner(
+        => ProtoXunitRunnerFactory.Create(
             test,
             messageBus,
             testClass,

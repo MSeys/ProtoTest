@@ -44,7 +44,7 @@ public sealed class ProtoColumnAssertions
         if (mismatch is not { } difference)
         {
             return $"{SheetAssertion.Describe(
-                $"column '{header}'", $"match the expected {Count(expected.Count)}", _negated)} but it did.";
+                $"column '{header}'", $"match the expected {SheetAssertionText.Count(expected.Count)}", _negated)} but it did.";
         }
 
         if (difference.IsCountMismatch)
@@ -56,10 +56,6 @@ public sealed class ProtoColumnAssertions
 
         return $"{SheetAssertion.Describe(
             $"column '{header}' row {_table.DataStartRow + difference.Index}",
-            $"be {Format(difference.Expected)}", _negated)} but it was {Format(difference.Actual)}.";
+            $"be {SheetAssertionText.Format(difference.Expected)}", _negated)} but it was {SheetAssertionText.Format(difference.Actual)}.";
     }
-
-    private static string Count(int count) => $"{count} {(count == 1 ? "value" : "values")}";
-
-    private static string Format(string? value) => value is null ? "empty" : $"'{value}'";
 }

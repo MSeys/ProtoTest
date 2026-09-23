@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type { Artifact, Run, TestTrace } from "../trace/model";
-import { formatDate, formatDuration, pad, phaseSegments, testCodeName, testGroup, testMatches, testTitle, tone } from "../trace/format";
+import { failureReason, formatDate, formatDuration, needsAttention, pad, phaseSegments, testCodeName, testGroup, testMatches, testTitle, timelinePercent, tone } from "../trace/format";
 import Panel from "../ui/Panel.vue";
 import TextInput from "../ui/TextInput.vue";
 import FilterChip from "../ui/FilterChip.vue";
@@ -26,7 +26,6 @@ const files = computed<FileEntry[]>(() => [
 const query = ref("");
 const filter = ref<"all" | "attention">("all");
 
-const needsAttention = (test: TestTrace) => test.outcome !== "succeeded" && test.outcome !== "skipped";
 const attention = computed(() => props.run.tests.filter(needsAttention)
   .sort((left, right) => (left.outcome === "failed" ? 0 : 1) - (right.outcome === "failed" ? 0 : 1) || left.number - right.number));
 
@@ -49,23 +48,11 @@ const visible = computed(() => props.run.tests.filter(test =>
 
 /** Each test's phases placed on the run's own time axis, so parallel and slow tests show as such. */
 function bars(test: TestTrace) {
-  const total = Math.max(props.run.duration, 1);
   return phaseSegments(test).map(segment => ({
     phase: segment.phase,
-    left: Math.max(0, ((segment.start - props.run.start) / total) * 100),
-    width: Math.max(0.4, (segment.duration / total) * 100)
+    left: timelinePercent(segment.start, props.run.start, props.run.duration),
+    width: Math.max(0.4, (segment.duration / Math.max(props.run.duration, 1)) * 100)
   }));
-}
-
-/** Why a test needs attention, in the words of the check that decided it. */
-function reason(test: TestTrace): { title: string; detail: string } {
-  const failure = test.failure;
-  if (!failure) return { title: test.outcome === "partial" ? "Finished with a partial result" : "No failing operation recorded", detail: "" };
-  const mismatch = failure.mismatches[0];
-  const detail = mismatch
-    ? `${mismatch.path}: expected ${JSON.stringify(mismatch.expected)}, got ${JSON.stringify(mismatch.actual)}${failure.mismatches.length > 1 ? `, and ${failure.mismatches.length - 1} more` : ""}`
-    : failure.span.error?.message.split(/\r?\n/)[0] ?? failure.check?.detail ?? "";
-  return { title: failure.span.name, detail };
 }
 </script>
 
@@ -101,8 +88,8 @@ function reason(test: TestTrace): { title: string; detail: string } {
           <b>{{ pad(test.number) }}</b>
           <span class="issue-main">
             <strong>{{ testTitle(test) }}</strong>
-            <span class="issue-reason">{{ reason(test).title }}</span>
-            <span v-if="reason(test).detail" class="issue-detail">{{ reason(test).detail }}</span>
+            <span class="issue-reason">{{ failureReason(test).title }}</span>
+            <span v-if="failureReason(test).detail" class="issue-detail">{{ failureReason(test).detail }}</span>
           </span>
           <span class="issue-kind">{{ test.outcome === "failed" ? "Failed" : "Partial" }}</span>
         </button>

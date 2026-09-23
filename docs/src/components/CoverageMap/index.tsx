@@ -3,7 +3,7 @@ import type {ReactNode} from 'react';
 import Frame from '@site/src/components/Frame';
 import styles from './styles.module.css';
 
-type State = 'covered' | 'partial' | 'uncovered';
+type State = 'covered' | 'partial' | 'uncovered' | 'notApplicable';
 
 interface Property {
   label: string;
@@ -56,10 +56,12 @@ const stateLabel: Record<State, string> = {
   covered: 'Covered',
   partial: 'Partial',
   uncovered: 'Uncovered',
+  notApplicable: 'Not applicable',
 };
 
+/** An empty set has nothing to cover, so it is not "covered": the report reads it as not applicable. */
 function resolve(...states: State[]): State {
-  if (states.length === 0) return 'covered';
+  if (states.length === 0) return 'notApplicable';
   if (states.every((state) => state === 'covered')) return 'covered';
   if (states.every((state) => state === 'uncovered')) return 'uncovered';
   return 'partial';
@@ -105,7 +107,7 @@ export default function CoverageMap(): ReactNode {
                 const properties = response.properties ?? [];
                 return (
                   response.state ??
-                  (properties.length === 0 ? 'covered' : resolve(...properties.map(propertyState)))
+                  (properties.length === 0 ? 'notApplicable' : resolve(...properties.map(propertyState)))
                 );
               }),
             );
@@ -119,7 +121,7 @@ export default function CoverageMap(): ReactNode {
                     const properties = response.properties ?? [];
                     const responseState =
                       response.state ??
-                      (properties.length === 0 ? 'covered' : resolve(...properties.map(propertyState)));
+                      (properties.length === 0 ? 'notApplicable' : resolve(...properties.map(propertyState)));
 
                     return (
                       <div key={response.label}>

@@ -9,7 +9,7 @@ using ProtoTest.Core;
 /// </summary>
 internal sealed class SqlConnectionHook(SqlOptions options) : IProtoTestHook
 {
-    public int Order => -1_000;
+    public int Order => SqlHookOrders.Connection;
 
     public async Task BeforeTestAsync(ProtoExecutionContext context)
     {

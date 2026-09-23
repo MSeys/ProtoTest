@@ -28,10 +28,7 @@ public sealed class WebComponentCollection<TComponent> where TComponent : WebCom
 
     /// <summary>Returns a lazy component by a one-based number, useful for legacy numbered UIs.</summary>
     public TComponent Number(int number, string? name = null)
-    {
-        ArgumentOutOfRangeException.ThrowIfLessThan(number, 1);
-        return Create(By.At(_items, number - 1), name ?? $"{_name}[{number}]");
-    }
+        => Create(By.At(_items, By.ZeroBased(number)), name ?? $"{_name}[{number}]");
 
     public TComponent First(string? name = null) => At(0, name ?? $"{_name}.First");
 
@@ -43,13 +40,7 @@ public sealed class WebComponentCollection<TComponent> where TComponent : WebCom
     }
 
     private TComponent Create(WebLocator root, string pathName)
-    {
-        var component = new TComponent();
-        component.Initialize(
-            _session,
-            new ComponentScope([.. _parent.Roots, root], $"{_parent.Path}.{pathName}"));
-        return component;
-    }
+        => _parent.WithRoot(root).Under(pathName).Create<TComponent>(_session);
 
     private WebElementReference Reference(WebLocator locator, string name)
         => new(_parent.Roots, _parent.Path, name, locator);

@@ -152,7 +152,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(client);
         _clients.Register(client, name);
-        var clientId = $"client:{typeof(TClient).FullName}:{name}";
+        var clientId = ProtoClientTrace.Id(typeof(TClient), name);
         RegisterOwned(new ProtoResource(
             clientId,
             "client",
@@ -176,7 +176,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     /// <summary>Retrieves a required named client.</summary>
     public TClient Client<TClient>(string name = "Default") where TClient : class
     {
-        var clientId = $"client:{typeof(TClient).FullName}:{name}";
+        var clientId = ProtoClientTrace.Id(typeof(TClient), name);
         try
         {
             return _clients.Get<TClient>(name);
@@ -374,14 +374,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         PublishOwnedResources();
         try
         {
-            if (_scope is IAsyncDisposable asyncDisposable)
-            {
-                await asyncDisposable.DisposeAsync();
-            }
-            else
-            {
-                _scope.Dispose();
-            }
+            await LifecycleExceptionHelper.DisposeAsyncOrSync(_scope);
         }
         catch (Exception exception)
         {
@@ -419,13 +412,6 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
             return;
         }
 
-        if (client is IAsyncDisposable asyncDisposable)
-        {
-            await asyncDisposable.DisposeAsync();
-        }
-        else if (client is IDisposable disposable)
-        {
-            disposable.Dispose();
-        }
+        await LifecycleExceptionHelper.DisposeAsyncOrSync(client);
     }
 }

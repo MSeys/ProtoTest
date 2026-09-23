@@ -17,13 +17,27 @@ internal static class SeleniumLocatorTranslator
         => locator switch
         {
             CssWebLocator css => SeleniumBy.CssSelector(css.Selector),
-            NthWebLocator nth => Translate(nth.Source, documentScoped),
+            // An index cannot be expressed in a CSS selector; execution resolves that case in the
+            // backend before translation, so this is the best-effort diagnostic form.
+            NthWebLocator { Source: CssWebLocator css } => SeleniumBy.CssSelector(css.Selector),
+            NthWebLocator nth => SeleniumBy.XPath(Indexed(nth, documentScoped)),
             AndWebLocator and => SeleniumBy.XPath(Compound(and, documentScoped)),
             _ => SeleniumBy.XPath(XPath(locator, documentScoped))
         };
 
     internal static string DiagnosticSelector(WebLocator locator, bool documentScoped = false)
         => Translate(locator, documentScoped).ToString();
+
+    /// <summary>
+    /// An index inside an XPath composition filters the source's matches, so nesting and <c>And()</c>
+    /// address the same element Playwright's <c>Nth()</c> would instead of dropping the index.
+    /// </summary>
+    private static string Indexed(NthWebLocator locator, bool documentScoped)
+    {
+        if (locator.Source is CssWebLocator)
+            throw new WebBackendCapabilityException("Selenium cannot apply At() to a CSS escape-hatch locator inside an XPath composition.");
+        return $"({XPath(locator.Source, documentScoped)})[{locator.Index + 1}]";
+    }
 
     private static string Compound(AndWebLocator locator, bool documentScoped)
     {
@@ -49,7 +63,7 @@ internal static class SeleniumLocatorTranslator
                 ? $"(//*[self::th or self::td])[{value.Index + 1}]"
                 : $"./*[self::th or self::td][position()={value.Index + 1}]",
             TableCellByHeaderWebLocator value => WebXPath.TableCellByHeader(value, documentScoped),
-            NthWebLocator value => XPath(value.Source, documentScoped),
+            NthWebLocator value => Indexed(value, documentScoped),
             HasTextWebLocator => throw new WebBackendCapabilityException("HasText is a filter and must be composed with another locator using And()."),
             CssWebLocator => throw new WebBackendCapabilityException("CSS locators are translated directly and cannot be embedded in XPath."),
             AndWebLocator value => Compound(value, documentScoped),
@@ -80,7 +94,11 @@ internal static class SeleniumLocatorTranslator
 
     private static string Role(RoleWebLocator locator)
     {
-        var roleName = RoleName(locator.Role);
+        var roleName = WebRoleMap.AriaName(locator.Role);
+        // The implicit markup mirrors the browser's accessible-role computation where HTML carries the
+        // role: a plain table is a table, not a grid, and a <dialog>, <nav>, <progress>, <output> or a
+        // search/range/number input is the role it stands for. A role without implicit markup matches
+        // its explicit role attribute only.
         var rolePredicate = locator.Role switch
         {
             WebRole.Button => "self::button or @role='button' or (self::input and (@type='button' or @type='submit' or @type='reset'))",
@@ -92,12 +110,19 @@ internal static class SeleniumLocatorTranslator
             WebRole.Image => "self::img or @role='img'",
             WebRole.Row => "self::tr or @role='row'",
             WebRole.Table => "self::table or @role='table'",
-            WebRole.Grid => "self::table or @role='grid'",
+            WebRole.Grid => "@role='grid'",
             WebRole.List => "self::ul or self::ol or @role='list'",
             WebRole.ListItem => "self::li or @role='listitem'",
             WebRole.Option => "self::option or @role='option'",
             WebRole.Combobox => "self::select or @role='combobox'",
             WebRole.RowGroup => "self::tbody or self::thead or self::tfoot or @role='rowgroup'",
+            WebRole.Dialog => "self::dialog or @role='dialog'",
+            WebRole.Navigation => "self::nav or @role='navigation'",
+            WebRole.ProgressBar => "self::progress or @role='progressbar'",
+            WebRole.Searchbox => "(self::input and @type='search') or @role='searchbox'",
+            WebRole.Slider => "(self::input and @type='range') or @role='slider'",
+            WebRole.SpinButton => "(self::input and @type='number') or @role='spinbutton'",
+            WebRole.Status => "self::output or @role='status'",
             _ => $"@role={WebXPath.Literal(roleName)}"
         };
         if (locator.Name is null) return $".//*[{rolePredicate}]";
@@ -120,19 +145,4 @@ internal static class SeleniumLocatorTranslator
                $".//label[{comparison}]//*[self::input or self::textarea or self::select] | " +
                $".//*[@id=//label[{comparison}]/@for]";
     }
-
-    private static string RoleName(WebRole role)
-        => role switch
-        {
-            WebRole.ListItem => "listitem",
-            WebRole.MenuItem => "menuitem",
-            WebRole.ProgressBar => "progressbar",
-            WebRole.RowGroup => "rowgroup",
-            WebRole.SpinButton => "spinbutton",
-            WebRole.TabList => "tablist",
-            WebRole.TabPanel => "tabpanel",
-            WebRole.TreeItem => "treeitem",
-            WebRole.Image => "img",
-            _ => role.ToString().ToLowerInvariant()
-        };
 }

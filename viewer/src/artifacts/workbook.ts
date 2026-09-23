@@ -1,19 +1,11 @@
+import { openZip, type Zip } from "./zip";
+
 const decoder = new TextDecoder();
-const EOCD = 0x06054b50;
-const CENTRAL_FILE = 0x02014b50;
-const LOCAL_FILE = 0x04034b50;
 const MAX_WORKBOOK_BYTES = 50 * 1024 * 1024;
 const MAX_ENTRIES = 10_000;
 const MAX_PREVIEW_ROWS = 500;
 const MAX_PREVIEW_COLUMNS = 100;
 const MAX_PREVIEW_CELLS = 50_000;
-
-interface ZipEntry {
-  method: number;
-  compressedSize: number;
-  uncompressedSize: number;
-  localOffset: number;
-}
 
 export interface WorkbookSheet {
   name: string;
@@ -32,17 +24,32 @@ export async function readWorkbook(blob: Blob): Promise<WorkbookPreview> {
   if (blob.size > MAX_WORKBOOK_BYTES) throw new Error("This workbook is too large to preview (50 MiB maximum).");
   const buffer = await blob.arrayBuffer();
   const bytes = new Uint8Array(buffer);
-  const view = new DataView(buffer);
-  const entries = readDirectory(bytes, view);
-  const workbook = parseXml(await readText(bytes, view, entries, "xl/workbook.xml"), "workbook.xml");
+  const zip = openZip(bytes, {
+    maxEntries: MAX_ENTRIES,
+    maxBytes: MAX_WORKBOOK_BYTES,
+    createError: (_kind, message) => new Error(message),
+    vocabulary: {
+      notArchive: "This artifact is not a readable .xlsx workbook.",
+      tooManyEntries: "This workbook contains too many files to preview.",
+      directoryDamaged: "The workbook ZIP directory is damaged.",
+      duplicate: name => `The workbook contains duplicate entries named ${name}.`,
+      missing: name => `The workbook is missing ${name}.`,
+      tooLarge: name => `${name} is too large to preview.`,
+      damaged: name => `${name} is damaged.`,
+      invalidSize: name => `${name} has an invalid size.`,
+      unsupportedCompression: "This browser cannot decompress the workbook.",
+      decompressionFailed: name => `${name} could not be decompressed.`
+    }
+  });
+  const workbook = parseXml(await readText(zip, "xl/workbook.xml"), "workbook.xml");
   const relationships = parseXml(
-    await readText(bytes, view, entries, "xl/_rels/workbook.xml.rels"),
+    await readText(zip, "xl/_rels/workbook.xml.rels"),
     "workbook relationships");
-  const sharedStrings = entries.has("xl/sharedStrings.xml")
-    ? readSharedStrings(parseXml(await readText(bytes, view, entries, "xl/sharedStrings.xml"), "shared strings"))
+  const sharedStrings = zip.entries.has("xl/sharedStrings.xml")
+    ? readSharedStrings(parseXml(await readText(zip, "xl/sharedStrings.xml"), "shared strings"))
     : [];
-  const dateStyles = entries.has("xl/styles.xml")
-    ? readDateStyles(parseXml(await readText(bytes, view, entries, "xl/styles.xml"), "styles"))
+  const dateStyles = zip.entries.has("xl/styles.xml")
+    ? readDateStyles(parseXml(await readText(zip, "xl/styles.xml"), "styles"))
     : new Set<number>();
 
   const targets = new Map<string, string>();
@@ -57,8 +64,8 @@ export async function readWorkbook(blob: Blob): Promise<WorkbookPreview> {
     const id = sheet.getAttribute("r:id")
       ?? sheet.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
     const target = id ? targets.get(id) : undefined;
-    if (!target || !entries.has(target)) continue;
-    const document = parseXml(await readText(bytes, view, entries, target), `${sheet.getAttribute("name") ?? "worksheet"}.xml`);
+    if (!target || !zip.entries.has(target)) continue;
+    const document = parseXml(await readText(zip, target), `${sheet.getAttribute("name") ?? "worksheet"}.xml`);
     sheets.push(readSheet(
       document,
       sheet.getAttribute("name") ?? `Sheet ${sheets.length + 1}`,
@@ -194,93 +201,6 @@ function workbookPath(target: string): string {
   return parts.join("/");
 }
 
-async function readText(bytes: Uint8Array, view: DataView, entries: Map<string, ZipEntry>, name: string): Promise<string> {
-  return decoder.decode(await readEntry(bytes, view, entries, name));
-}
-
-function readDirectory(bytes: Uint8Array, view: DataView): Map<string, ZipEntry> {
-  let eocd = -1;
-  for (let offset = bytes.length - 22; offset >= Math.max(0, bytes.length - 65_557); offset--) {
-    if (view.getUint32(offset, true) === EOCD) { eocd = offset; break; }
-  }
-  if (eocd < 0) throw new Error("This artifact is not a readable .xlsx workbook.");
-  const count = view.getUint16(eocd + 10, true);
-  if (count > MAX_ENTRIES) throw new Error("This workbook contains too many files to preview.");
-  let offset = view.getUint32(eocd + 16, true);
-  const entries = new Map<string, ZipEntry>();
-  for (let index = 0; index < count; index++) {
-    if (!contains(bytes, offset, 46)) throw new Error("The workbook ZIP directory is damaged.");
-    if (view.getUint32(offset, true) !== CENTRAL_FILE) throw new Error("The workbook ZIP directory is damaged.");
-    const nameLength = view.getUint16(offset + 28, true);
-    const extraLength = view.getUint16(offset + 30, true);
-    const commentLength = view.getUint16(offset + 32, true);
-    const recordLength = 46 + nameLength + extraLength + commentLength;
-    if (!contains(bytes, offset, recordLength)) throw new Error("The workbook ZIP directory is damaged.");
-    const name = decoder.decode(bytes.subarray(offset + 46, offset + 46 + nameLength));
-    if (entries.has(name)) throw new Error(`The workbook contains duplicate entries named ${name}.`);
-    entries.set(name, {
-      method: view.getUint16(offset + 10, true),
-      compressedSize: view.getUint32(offset + 20, true),
-      uncompressedSize: view.getUint32(offset + 24, true),
-      localOffset: view.getUint32(offset + 42, true)
-    });
-    offset += recordLength;
-  }
-  return entries;
-}
-
-async function readEntry(bytes: Uint8Array, view: DataView, entries: Map<string, ZipEntry>, name: string): Promise<Uint8Array> {
-  const entry = entries.get(name);
-  if (!entry) throw new Error(`The workbook is missing ${name}.`);
-  if (entry.uncompressedSize > MAX_WORKBOOK_BYTES) throw new Error(`${name} is too large to preview.`);
-  const offset = entry.localOffset;
-  if (!contains(bytes, offset, 30)) throw new Error(`${name} is damaged.`);
-  if (view.getUint32(offset, true) !== LOCAL_FILE) throw new Error(`${name} is damaged.`);
-  const start = offset + 30 + view.getUint16(offset + 26, true) + view.getUint16(offset + 28, true);
-  if (!contains(bytes, start, entry.compressedSize)) throw new Error(`${name} is damaged.`);
-  const compressed = bytes.slice(start, start + entry.compressedSize);
-  if (entry.method === 0) {
-    if (compressed.byteLength !== entry.uncompressedSize) throw new Error(`${name} has an invalid size.`);
-    return compressed;
-  }
-  if (entry.method !== 8 || typeof DecompressionStream === "undefined")
-    throw new Error("This browser cannot decompress the workbook.");
-  const reader = new Blob([compressed]).stream()
-    .pipeThrough(new DecompressionStream("deflate-raw"))
-    .getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  const tooLargeError = new Error(`${name} is too large to preview.`);
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > MAX_WORKBOOK_BYTES) {
-        await reader.cancel();
-        throw tooLargeError;
-      }
-      chunks.push(value);
-    }
-  } catch (error) {
-    if (error === tooLargeError) throw error;
-    throw new Error(`${name} could not be decompressed.`);
-  }
-  if (total !== entry.uncompressedSize) throw new Error(`${name} has an invalid size.`);
-  const decompressed = new Uint8Array(total);
-  let written = 0;
-  for (const chunk of chunks) {
-    decompressed.set(chunk, written);
-    written += chunk.byteLength;
-  }
-  return decompressed;
-}
-
-function contains(bytes: Uint8Array, offset: number, length: number): boolean {
-  return Number.isSafeInteger(offset)
-    && Number.isSafeInteger(length)
-    && offset >= 0
-    && length >= 0
-    && offset <= bytes.length
-    && length <= bytes.length - offset;
+async function readText(zip: Zip, name: string): Promise<string> {
+  return decoder.decode(await zip.read(name));
 }

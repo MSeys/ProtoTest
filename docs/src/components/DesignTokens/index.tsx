@@ -52,9 +52,9 @@ export function Phases(): ReactNode {
 
 const families: {family: string; token: string; means: string; kinds: string[]}[] = [
   {family: 'Action', token: '--type-action', means: 'What the test did', kinds: ['Call', 'Data', 'your own kinds']},
-  {family: 'Evidence', token: '--type-evidence', means: 'What it proved or produced', kinds: ['Assertion', 'Observation', 'Artifact']},
+  {family: 'Evidence', token: '--type-evidence', means: 'What it proved or produced', kinds: ['Check', 'Observation', 'Artifact']},
   {family: 'Verdict', token: '--type-verdict', means: 'What it decided', kinds: ['Finding', 'Gate']},
-  {family: 'Framework', token: '--type-framework', means: 'The machinery that carried it', kinds: ['Lifecycle', 'Extension', 'Client', 'Context', 'Authentication', 'Ownership']},
+  {family: 'Framework', token: '--type-framework', means: 'The machinery that carried it', kinds: ['Phase', 'Extension', 'Client', 'Context', 'Auth', 'Ownership']},
 ];
 
 export function TypeFamilies(): ReactNode {

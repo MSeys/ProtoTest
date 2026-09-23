@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import type { Artifact, Item, Span, TestTrace } from "../trace/model";
 import { formatDuration, formatOffset, itemKindLabel, itemTitle, kindLabel } from "../trace/format";
 import AppButton from "../ui/AppButton.vue";
 import KindChip from "../ui/KindChip.vue";
 import OutcomePill from "../ui/OutcomePill.vue";
+import { useClipboard } from "../ui/useClipboard";
 import SpanInspector from "./SpanInspector.vue";
 import ItemInspector from "./ItemInspector.vue";
 
@@ -22,14 +23,8 @@ const path = computed(() => {
   return trail;
 });
 /** The address already holds the test, the view and the selection; copying it shares exactly this place. */
-const copied = ref(false);
-async function copyLink() {
-  try {
-    await navigator.clipboard.writeText(location.href);
-    copied.value = true;
-    setTimeout(() => { copied.value = false; }, 1400);
-  } catch { /* the clipboard can be unavailable; the address bar still has the link */ }
-}
+const { copied, copy } = useClipboard();
+const copyLink = () => copy(location.href);
 
 const sources = computed(() => [...new Set(props.item?.changes.map(change => change.source) ?? [])]);
 

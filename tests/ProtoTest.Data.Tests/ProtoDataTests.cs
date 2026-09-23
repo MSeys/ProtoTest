@@ -525,6 +525,11 @@ public sealed class ProtoDataTests
         {
             Assert.That(invoices, Has.Count.EqualTo(3));
             Assert.That(group.Attributes["data.count"], Is.EqualTo("3"));
+            Assert.That(
+                group.Attributes["data.type"],
+                Is.EqualTo(typeof(StoredInvoice).FullName),
+                "the batch records the input type under the same key every other data operation uses");
+            Assert.That(group.Attributes["data.result_type"], Is.EqualTo(typeof(StoredInvoice).FullName));
             Assert.That(creates, Has.Length.EqualTo(3));
             Assert.That(creates, Has.All.Matches<ProtoTraceEntry>(entry => entry.ParentId == group.Id));
         });

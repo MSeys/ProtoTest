@@ -152,7 +152,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(client);
         _clients.Register(client, name);
-        var clientId = $"client:{typeof(TClient).FullName}:{name}";
+        var clientId = ProtoClientTrace.Id(typeof(TClient), name);
         RegisterOwned(new ProtoResource(
             clientId,
             "client",
@@ -176,7 +176,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     /// <summary>Retrieves a required named client.</summary>
     public TClient Client<TClient>(string name = "Default") where TClient : class
     {
-        var clientId = $"client:{typeof(TClient).FullName}:{name}";
+        var clientId = ProtoClientTrace.Id(typeof(TClient), name);
         try
         {
             return _clients.Get<TClient>(name);

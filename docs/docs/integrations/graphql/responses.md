@@ -70,7 +70,7 @@ T? ReadDataAs<T>(JsonSerializerOptions? options = null);   // case-insensitive b
 | `Data` | `JsonElement?` | the full `data` object |
 | `SelectedData` | `JsonElement?` | the root field's value for shape-driven operations, else the full `data` object |
 | `Extensions` | `JsonElement?` | |
-| `HttpStatusCode` | `HttpStatusCode` | |
+| `StatusCode` | `HttpStatusCode` | |
 | `Content` | `string` | the raw body |
 | `ElapsedTime` | `TimeSpan` | |
 | `RawResponse` | `HttpResponseMessage` | |

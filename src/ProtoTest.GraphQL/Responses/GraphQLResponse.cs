@@ -8,17 +8,10 @@ using ProtoTest.GraphQL.Internal;
 using ProtoTest.Http;
 using ProtoTest.Json;
 
-public sealed class GraphQLResponse : IDisposable
+public sealed class GraphQLResponse : ProtoHttpResponse
 {
     private readonly JsonDocument _document;
-    private readonly ProtoExecutionContext _context;
-    private readonly string _targetName;
-    private readonly string _identifier;
-    private readonly ProtoHttpAttachmentOptions? _attachmentOptions;
-    private readonly string? _attachmentPrefix;
-    private readonly string? _requestTraceId;
     private readonly string? _selectedRootField;
-    private int _shapeAssertionSequence;
     private GraphQLAssertions? _should;
     private GraphQLAssertions? _shouldNot;
 
@@ -34,16 +27,8 @@ public sealed class GraphQLResponse : IDisposable
         string? attachmentPrefix,
         string? requestTraceId = null,
         string? selectedRootField = null)
+        : base(rawResponse, content, elapsed, context, targetName, identifier, attachmentOptions, attachmentPrefix, requestTraceId)
     {
-        RawResponse = rawResponse;
-        Content = content;
-        ElapsedTime = elapsed;
-        _context = context;
-        _targetName = targetName;
-        _identifier = identifier;
-        _attachmentOptions = attachmentOptions;
-        _attachmentPrefix = attachmentPrefix;
-        _requestTraceId = requestTraceId;
         _selectedRootField = selectedRootField;
         try
         {
@@ -69,9 +54,6 @@ public sealed class GraphQLResponse : IDisposable
         Errors = ReadErrors(_document.RootElement);
     }
 
-    public HttpResponseMessage RawResponse { get; }
-    public HttpStatusCode HttpStatusCode => RawResponse.StatusCode;
-
     /// <summary>Positive assertions on this response, such as <c>Should.HaveHttpStatus(...)</c>.</summary>
     public GraphQLAssertions Should => _should ??= new GraphQLAssertions(this, negated: false);
 
@@ -81,8 +63,6 @@ public sealed class GraphQLResponse : IDisposable
     /// </summary>
     public GraphQLAssertions ShouldNot => _shouldNot ??= new GraphQLAssertions(this, negated: true);
 
-    public string Content { get; }
-    public TimeSpan ElapsedTime { get; }
     public IReadOnlyList<GraphQLError> Errors { get; }
     public bool HasErrors => Errors.Count > 0;
     public bool HasData => _document.RootElement.TryGetProperty("data", out var data) && data.ValueKind != JsonValueKind.Null;
@@ -104,20 +84,16 @@ public sealed class GraphQLResponse : IDisposable
 
     internal GraphQLResponse AssertHttpStatus(HttpStatusCode expected, bool negated)
     {
-        ProtoStatusAssertion.Assert(
-            _context,
+        AssertStatus(
             "ProtoTest.GraphQL",
             expected,
-            HttpStatusCode,
             negated,
-            failureFactory: () => new GraphQLAssertionException(
+            () => new GraphQLAssertionException(
                 ProtoStatusAssertion.DescribeFailure(
                     expected,
-                    HttpStatusCode,
+                    StatusCode,
                     negated,
-                    ProtoHttpDiagnosticSanitizer.SanitizeBody(Content, ResolveStatusDiagnosticOptions()))),
-            parentOperationId: _requestTraceId,
-            requestIdentifier: _identifier);
+                    ProtoHttpDiagnosticSanitizer.SanitizeBody(Content, ResolveStatusDiagnosticOptions()))));
         return this;
     }
 
@@ -126,16 +102,16 @@ public sealed class GraphQLResponse : IDisposable
         // The resolved ProtoTest:GraphQL:Responses section bounds the failure body even when the protocol
         // never opted into attachment capture; attachment options, when present, keep their own
         // redaction rules and may tighten the limit further.
-        var responseLimit = _context.ResolveResponseOptions(ProtoGraphQLBuilder.ProtocolName).MaxDiagnosticBodyLength;
-        if (_attachmentOptions is null)
+        var responseLimit = Context!.ResolveResponseOptions(ProtoGraphQLBuilder.ProtocolName).MaxDiagnosticBodyLength;
+        if (AttachmentOptions is null)
             return new ProtoHttpAttachmentOptions { MaxDiagnosticBodyLength = responseLimit };
-        if (responseLimit >= _attachmentOptions.MaxDiagnosticBodyLength)
-            return _attachmentOptions;
+        if (responseLimit >= AttachmentOptions.MaxDiagnosticBodyLength)
+            return AttachmentOptions;
 
         return new ProtoHttpAttachmentOptions
         {
-            RedactSensitiveData = _attachmentOptions.RedactSensitiveData,
-            SensitiveJsonProperties = [.. _attachmentOptions.SensitiveJsonProperties],
+            RedactSensitiveData = AttachmentOptions.RedactSensitiveData,
+            SensitiveJsonProperties = [.. AttachmentOptions.SensitiveJsonProperties],
             MaxDiagnosticBodyLength = responseLimit
         };
     }
@@ -184,12 +160,12 @@ public sealed class GraphQLResponse : IDisposable
             // A data-less response (errors-only, or "data": null) has nothing to match against; record
             // the failed assertion the same way a mismatch is recorded, then keep the GraphQL-specific
             // failure the docs promise.
-            using var operation = _context.Trace
+            using var operation = Context!.Trace
                 .Operation("assert.json.shape", "Assert GraphQL data shape", "ProtoTest.GraphQL")
                 .With("expected.type", expectedShape.GetType().FullName)
-                .With("graphql.operation", _identifier)
+                .With("graphql.operation", Identifier!)
                 .With("shape.result", "mismatched")
-                .Parent(_requestTraceId)
+                .Parent(RequestTraceId)
                 .Begin();
             var exception = new GraphQLAssertionException(
                 "Expected GraphQL data, but the response did not contain data.");
@@ -207,43 +183,28 @@ public sealed class GraphQLResponse : IDisposable
             throw exception;
         }
 
-        string? attachmentName = null;
-        if (_attachmentOptions?.CaptureExpectedShapes == true)
-        {
-            var assertionNumber = Interlocked.Increment(ref _shapeAssertionSequence);
-            var assertionSuffix = assertionNumber == 1 ? string.Empty : $"-{assertionNumber:00}";
-            attachmentName = $"{_attachmentPrefix}-expected-shape{assertionSuffix}";
-        }
-
-        ProtoShapeAssertion.Assert(
-            new ProtoShapeAssertionContext(
-                _context,
-                "ProtoTest.GraphQL",
-                "Assert GraphQL data shape",
-                ParentOperationId: _requestTraceId,
-                ExtraAttributes: new Dictionary<string, string?> { ["graphql.operation"] = _identifier },
-                CaptureExpectedShape: attachmentName is not null,
-                AttachmentName: attachmentName,
-                AttachmentDescription: _identifier),
+        AssertShape(
+            "ProtoTest.GraphQL",
+            "Assert GraphQL data shape",
             SelectedData?.GetRawText(),
             expectedShape,
             options,
-            _attachmentOptions,
+            new Dictionary<string, string?> { ["graphql.operation"] = Identifier! },
             matched => new ProtoObservation(
-                _targetName,
+                TargetName!,
                 "graphql.contract.shape",
-                _identifier,
-                new GraphQLShapeMatchData(_identifier, matched)));
+                Identifier!,
+                new GraphQLShapeMatchData(Identifier!, matched)));
 
         return this;
     }
 
     public T? ReadDataAs<T>(JsonSerializerOptions? options = null)
     {
-        using var operation = _context.Trace
+        using var operation = Context!.Trace
             .Operation("graphql.response.deserialize", $"Deserialize GraphQL data · {typeof(T).Name}", "ProtoTest.GraphQL")
             .With("target.type", typeof(T).FullName)
-            .Parent(_requestTraceId)
+            .Parent(RequestTraceId)
             .Begin();
         try
         {
@@ -260,10 +221,11 @@ public sealed class GraphQLResponse : IDisposable
         }
     }
 
-    public void Dispose()
+    /// <summary>Disposes the parsed document and then the underlying HTTP response.</summary>
+    public override void Dispose()
     {
         _document.Dispose();
-        RawResponse.Dispose();
+        base.Dispose();
     }
 
     private GraphQLResponse Assert(
@@ -272,10 +234,10 @@ public sealed class GraphQLResponse : IDisposable
         IReadOnlyDictionary<string, string?> attributes,
         Action assertion)
     {
-        using var operation = _context.Trace
+        using var operation = Context!.Trace
             .Operation(kind, name, "ProtoTest.GraphQL")
             .With(attributes)
-            .Parent(_requestTraceId)
+            .Parent(RequestTraceId)
             .Begin();
         try
         {

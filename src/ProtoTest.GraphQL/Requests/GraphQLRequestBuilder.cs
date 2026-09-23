@@ -215,8 +215,7 @@ public sealed class GraphQLRequestBuilder
         var identifier = $"{operation.Type} {operation.Name ?? "<anonymous>"}";
         var operationScope = _context.Trace
             .Operation("graphql.operation", $"GraphQL · {identifier}", "ProtoTest.GraphQL")
-            .For(ProtoTraceEntityKinds.Client, $"client:{typeof(HttpClient).FullName}:{_targetName}")
-            .With("client.name", _targetName)
+            .ForClient(typeof(HttpClient), _targetName)
             .With("graphql.operation.type", operation.Type)
             .With("graphql.operation.name", operation.Name);
         if (_headers.Count > 0)
@@ -266,12 +265,13 @@ public sealed class GraphQLRequestBuilder
             HttpResponseMessage? rawResponse = null;
             try
             {
-                rawResponse = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-                await ProtoHttpResponseBuffer.BufferAsync(
-                    rawResponse,
+                var exchange = await ProtoHttpExchange.SendAsync(
+                    _client,
+                    request,
                     ResolveResponseOptions().MaxResponseBodyBytes,
                     cancellationToken);
-                var content = await rawResponse.Content.ReadAsStringAsync(cancellationToken);
+                rawResponse = exchange.Response;
+                var content = exchange.Body;
                 stopwatch.Stop();
                 var response = new GraphQLResponse(rawResponse, content, stopwatch.Elapsed, _context, _targetName, identifier, operation,
                     attachmentOptions, prepared.AttachmentPrefix, traceOperation.Id, _simpleRootField);

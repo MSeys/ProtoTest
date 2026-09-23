@@ -117,7 +117,7 @@ public sealed class ProtoGrpcClientInitializer(
 
         context.Trace.SetEntityState(
             ProtoTraceEntityKinds.Client,
-            $"client:{typeof(ProtoGrpcClient).FullName}:{ScopedName}",
+            ProtoClientTrace.Id(typeof(ProtoGrpcClient), ScopedName),
             $"gRPC client {Name}",
             state,
             scope: context.TestName);

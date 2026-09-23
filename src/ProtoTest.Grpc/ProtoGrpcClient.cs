@@ -68,7 +68,7 @@ public sealed class ProtoGrpcClient : IDisposable
         var callNumber = Interlocked.Increment(ref _callSequence);
         using var operation = _context.Trace
             .Operation("grpc.call", $"gRPC · {method.FullName}", "ProtoTest.Grpc")
-            .For(ProtoTraceEntityKinds.Client, $"client:{typeof(ProtoGrpcClient).FullName}:{_targetName}")
+            .For(ProtoTraceEntityKinds.Client, ProtoClientTrace.Id(typeof(ProtoGrpcClient), _targetName))
             .With("rpc.system", "grpc")
             .With("rpc.service", method.ServiceName)
             .With("rpc.method", method.Name)
@@ -140,7 +140,7 @@ public sealed class ProtoGrpcClient : IDisposable
         var callNumber = Interlocked.Increment(ref _callSequence);
         using var operation = _context.Trace
             .Operation("grpc.call", $"gRPC · {method.FullName}", "ProtoTest.Grpc")
-            .For(ProtoTraceEntityKinds.Client, $"client:{typeof(ProtoGrpcClient).FullName}:{_targetName}")
+            .For(ProtoTraceEntityKinds.Client, ProtoClientTrace.Id(typeof(ProtoGrpcClient), _targetName))
             .With("rpc.system", "grpc")
             .With("rpc.service", method.ServiceName)
             .With("rpc.method", method.Name)
@@ -219,7 +219,7 @@ public sealed class ProtoGrpcClient : IDisposable
         var callNumber = Interlocked.Increment(ref _callSequence);
         using var operation = _context.Trace
             .Operation("grpc.call", $"gRPC · {method.FullName}", "ProtoTest.Grpc")
-            .For(ProtoTraceEntityKinds.Client, $"client:{typeof(ProtoGrpcClient).FullName}:{_targetName}")
+            .For(ProtoTraceEntityKinds.Client, ProtoClientTrace.Id(typeof(ProtoGrpcClient), _targetName))
             .With("rpc.system", "grpc")
             .With("rpc.service", method.ServiceName)
             .With("rpc.method", method.Name)

@@ -151,8 +151,7 @@ public sealed class RestRequestBuilder
         var attachmentOptions = _context.ResolveAttachmentOptions(ProtoRestBuilder.ProtocolName);
         using var traceOperation = _context.Trace
             .Operation("http.request", $"REST · {method.Method.ToUpperInvariant()} {routeTemplate}", "ProtoTest.Rest")
-            .For(ProtoTraceEntityKinds.Client, $"client:{typeof(HttpClient).FullName}:{_targetName}")
-            .With("client.name", _targetName)
+            .ForClient(typeof(HttpClient), _targetName)
             .With("http.request.method", method.Method.ToUpperInvariant())
             .With("http.route", routeTemplate)
             .With(_requestAttributes)
@@ -260,16 +259,15 @@ public sealed class RestRequestBuilder
         HttpResponseMessage? responseMessage = null;
         try
         {
-            responseMessage = await _httpClient.SendAsync(
-                request,
-                HttpCompletionOption.ResponseHeadersRead,
-                ct);
             var responseOptions = _context.ResolveResponseOptions(ProtoRestBuilder.ProtocolName);
-            var bodyBytes = await ProtoHttpResponseBuffer.BufferAsync(
-                responseMessage,
+            var exchange = await ProtoHttpExchange.SendAsync(
+                _httpClient,
+                request,
                 responseOptions.MaxResponseBodyBytes,
                 ct);
-            var bodyString = await responseMessage.Content.ReadAsStringAsync(ct);
+            responseMessage = exchange.Response;
+            var bodyBytes = exchange.BodyBytes;
+            var bodyString = exchange.Body;
             stopwatch.Stop();
             var responseMediaType = responseMessage.Content.Headers.ContentType?.MediaType;
             var diagnosticBody = ProtoHttpDiagnosticSanitizer.SanitizeBody(

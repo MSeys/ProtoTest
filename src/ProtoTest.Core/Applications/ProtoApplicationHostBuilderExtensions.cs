@@ -1,9 +1,8 @@
 namespace ProtoTest.Core;
 
-using ProtoTest.Core.Internal;
-
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using ProtoTest.Core.Internal;
 
 public static class ProtoApplicationHostBuilderExtensions
 {

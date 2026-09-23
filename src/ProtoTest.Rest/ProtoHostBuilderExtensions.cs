@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Rest;
+namespace ProtoTest.Rest;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -21,8 +21,7 @@ public static class ProtoHostBuilderExtensions
             configure?.Invoke(new ProtoRestBuilder(services));
         });
 
-        return builder.AddCapability(new ProtoCapabilityDescriptor(
-            "REST", ProtoCapabilityKinds.Protocol, "ProtoTest.Rest"));
+        return builder.AddCapability(ProtoRestBuilder.Protocol.Capability);
     }
 
     /// <summary>
@@ -37,13 +36,20 @@ public static class ProtoHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(application);
         RegisterInfrastructure(application.Services);
         configure?.Invoke(new ProtoRestBuilder(application.Services, application));
-        return application.AddCapability(new ProtoCapabilityDescriptor(
-            "REST", ProtoCapabilityKinds.Protocol, "ProtoTest.Rest"));
+        return application.AddCapability(ProtoRestBuilder.Protocol.Capability);
     }
+
+    /// <summary>Marks one successful AddRest call, so the hook is registered once.</summary>
+    private sealed class RestRegistration;
 
     private static void RegisterInfrastructure(IServiceCollection services)
     {
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, RestLifecycleHook>());
+        if (!ProtoRegistrationGuard.TryRegisterOnce<RestRegistration>(services))
+        {
+            return;
+        }
+
+        services.AddSingleton<IProtoTestHook>(new ProtoHttpAuthLifecycleHook(ProtoRestBuilder.Protocol));
         ProtoHttpOptionsRegistration.TryAddResponseOptions(
             services,
             ProtoRestBuilder.ProtocolName,

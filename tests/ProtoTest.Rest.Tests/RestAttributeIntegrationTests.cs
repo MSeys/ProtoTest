@@ -1,14 +1,14 @@
 namespace ProtoTest.Rest.Tests;
 
+using System.Net;
+using System.Net.Http.Headers;
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
-using ProtoTest.Http.Authenticators;
 using ProtoTest.Http;
-using System.Net.Http.Headers;
-using System.Net;
-using System.Reflection;
+using ProtoTest.Http.Authenticators;
 
 [TestFixture]
 public sealed class RestAttributeIntegrationTests

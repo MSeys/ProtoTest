@@ -1,10 +1,10 @@
 namespace ProtoTest.Core.Tests;
 
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO.Compression;
 using System.Reflection;
 using System.Text.Json;
-using System.Collections.Concurrent;
-using System.Diagnostics;
 using NUnit.Framework;
 
 [TestFixture]
@@ -18,7 +18,7 @@ public sealed class ProtoTracingTests
         await using var host = builder.Build();
 
         await host.StartAsync();
-        var context = await host.StartTestAsync("partial test", TestMethod());
+        var context = await host.StartTestAsync("partial test", TestMethods.Placeholder);
         context.Trace.WriteEvent(
             "probe.failed",
             "Non-blocking probe failed",
@@ -47,7 +47,7 @@ public sealed class ProtoTracingTests
         await using var host = builder.Build();
 
         await host.StartAsync();
-        var context = await host.StartTestAsync("located test", TestMethod());
+        var context = await host.StartTestAsync("located test", TestMethods.Placeholder);
         using (var operation = context.Trace.Operation("sample.operation", "Sample", "ProtoTest.Core.Tests").Begin())
         {
             operation.Succeed();
@@ -85,7 +85,7 @@ public sealed class ProtoTracingTests
         await using var host = builder.Build();
 
         await host.StartAsync();
-        var context = await host.StartTestAsync("unlocated test", TestMethod());
+        var context = await host.StartTestAsync("unlocated test", TestMethods.Placeholder);
         using (context.Trace.Operation("sample.operation", "Sample", "ProtoTest.Core.Tests").Begin())
         {
         }
@@ -108,7 +108,7 @@ public sealed class ProtoTracingTests
         await using var host = builder.Build();
 
         await host.StartAsync();
-        var context = await host.StartTestAsync("traced test", TestMethod());
+        var context = await host.StartTestAsync("traced test", TestMethods.Placeholder);
         context.AddAttachment(ProtoTestAttachment.FromText(
             "response.json",
             "{\"status\":\"ready\"}",
@@ -193,7 +193,7 @@ public sealed class ProtoTracingTests
         await using var host = builder.Build();
 
         await host.StartAsync();
-        var context = await host.StartTestAsync("observation test", TestMethod());
+        var context = await host.StartTestAsync("observation test", TestMethods.Placeholder);
         context.RecordObservation("Orders", "orders.seen", "42");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
@@ -219,7 +219,7 @@ public sealed class ProtoTracingTests
         builder.ConfigureTracing(options => options.OutputPath = TemporaryTracePath());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("coalescing", TestMethod());
+        var context = await host.StartTestAsync("coalescing", TestMethods.Placeholder);
 
         var attributes = new Dictionary<string, string?> { ["probe.key"] = "same" };
         context.Trace.WriteEvent(
@@ -250,7 +250,7 @@ public sealed class ProtoTracingTests
         builder.ConfigureTracing(options => options.OutputPath = TemporaryTracePath());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("operation link", TestMethod());
+        var context = await host.StartTestAsync("operation link", TestMethods.Placeholder);
 
         context.Trace.SetEntityState("entity", "order:1", "Order", change: "created");
         context.Trace.Value("value", "order:1", "Order 1", "created");
@@ -277,7 +277,7 @@ public sealed class ProtoTracingTests
         await using var host = builder.Build();
 
         await host.StartAsync();
-        await host.StartTestAsync("normal test", TestMethod());
+        await host.StartTestAsync("normal test", TestMethods.Placeholder);
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
 
@@ -290,7 +290,7 @@ public sealed class ProtoTracingTests
             Assert.That(hook.Attributes["hook.order"], Is.Not.Empty);
             Assert.That(setup.Attributes["hook.count"], Is.Not.Empty);
             Assert.That(setup.Attributes["attribute.count"], Is.EqualTo("0"));
-            Assert.That(setup.Attributes["test.method"], Is.EqualTo(nameof(Placeholder)));
+            Assert.That(setup.Attributes["test.method"], Is.EqualTo(TestMethods.Placeholder.Name));
             Assert.That(entries, Has.Some.Matches<ProtoTraceEntry>(entry => entry.Kind == "context.dispose"));
         });
     }
@@ -304,7 +304,7 @@ public sealed class ProtoTracingTests
         await using var host = builder.Build();
 
         await host.StartAsync();
-        await host.StartTestAsync("phase inheritance", TestMethod());
+        await host.StartTestAsync("phase inheritance", TestMethods.Placeholder);
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
         var entries = host.Trace.Snapshot().Tests.Single().Entries;
@@ -324,7 +324,7 @@ public sealed class ProtoTracingTests
         builder.ConfigureTracing(options => options.OutputPath = TemporaryTracePath());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("context trace", TestMethod());
+        var context = await host.StartTestAsync("context trace", TestMethods.Placeholder);
 
         context.SetContext(new DiagnosticContext("orders", "do-not-record"));
 
@@ -351,7 +351,7 @@ public sealed class ProtoTracingTests
         builder.ConfigureTracing(options => options.OutputPath = tracePath);
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("missing attachment", TestMethod());
+        var context = await host.StartTestAsync("missing attachment", TestMethods.Placeholder);
         context.AddAttachment(ProtoTestAttachment.FromFile(attachmentPath));
         File.Delete(attachmentPath);
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -376,7 +376,7 @@ public sealed class ProtoTracingTests
         builder.ConfigureTracing(options => options.OutputPath = tracePath);
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("snapshotted attachment", TestMethod());
+        var context = await host.StartTestAsync("snapshotted attachment", TestMethods.Placeholder);
         context.AddAttachmentFile(attachmentPath, "temporary.txt", "text/plain");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
@@ -397,7 +397,7 @@ public sealed class ProtoTracingTests
         builder.ConfigureTracing(options => options.OutputPath = TemporaryTracePath());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("context diagnostics", TestMethod());
+        var context = await host.StartTestAsync("context diagnostics", TestMethods.Placeholder);
         context.SetContext(new CallbackContext("configured", () => { }));
         _ = context.Resolve<CallbackContext>();
         await host.CompleteTestAsync(ProtoTestResult.Passed);
@@ -427,7 +427,7 @@ public sealed class ProtoTracingTests
         builder.ConfigureTracing(options => options.OutputPath = TemporaryTracePath());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("activity trace", TestMethod());
+        var context = await host.StartTestAsync("activity trace", TestMethods.Placeholder);
         using (var operation = context.Trace.Operation("sample.activity", "Sample activity", "ProtoTest.Core.Tests").Begin())
         {
             context.Trace.WriteEvent("sample.event", "Sample event", "ProtoTest.Core.Tests", outcome: ProtoTraceOutcome.Succeeded);
@@ -471,7 +471,7 @@ public sealed class ProtoTracingTests
         });
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("application trace context", TestMethod());
+        await host.StartTestAsync("application trace context", TestMethods.Placeholder);
 
         var parent = await testContext.Task.WaitAsync(TimeSpan.FromSeconds(10));
         using var applicationSource = new ActivitySource("ProtoTest.Core.Tests.Dummy");
@@ -503,7 +503,7 @@ public sealed class ProtoTracingTests
         builder.ConfigureTracing(options => options.OutputPath = TemporaryTracePath());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("handle trace", TestMethod());
+        var context = await host.StartTestAsync("handle trace", TestMethods.Placeholder);
 
         await context.Trace.ExecuteAsync(
             "sample.handle",
@@ -532,7 +532,7 @@ public sealed class ProtoTracingTests
         builder.ConfigureTracing(options => options.OutputPath = TemporaryTracePath());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("handle failure trace", TestMethod());
+        var context = await host.StartTestAsync("handle failure trace", TestMethods.Placeholder);
 
         Func<ProtoTraceOperation, ValueTask> fail = _ => throw new InvalidOperationException("boom");
         var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
@@ -555,7 +555,7 @@ public sealed class ProtoTracingTests
         builder.ConfigureTracing(options => options.OutputPath = TemporaryTracePath());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("fluent trace", TestMethod());
+        var context = await host.StartTestAsync("fluent trace", TestMethods.Placeholder);
 
         var result = await context.Trace
             .Operation("sample.fluent", "Fluent operation", "ProtoTest.Core.Tests")
@@ -580,7 +580,7 @@ public sealed class ProtoTracingTests
     public void Events_ShouldNotCoalesceAcrossPhases()
     {
         var recorder = new ProtoTestTraceRecorder(
-            "00001", "phase coalescing", TestMethod(), new ProtoTraceOptions { Enabled = true });
+            "00001", "phase coalescing", TestMethods.Placeholder, new ProtoTraceOptions { Enabled = true });
 
         // Same name, source and (absent) parent; only the resolved phase differs, so they are two facts.
         recorder.WriteEvent("probe.phase", "Phase probe", "ProtoTest.Core.Tests", phase: ProtoTracePhase.Setup);
@@ -605,7 +605,7 @@ public sealed class ProtoTracingTests
     {
         const int count = 300;
         var recorder = new ProtoTestTraceRecorder(
-            "00001", "concurrent records", TestMethod(), new ProtoTraceOptions { Enabled = true });
+            "00001", "concurrent records", TestMethods.Placeholder, new ProtoTraceOptions { Enabled = true });
 
         var writes = Task.WhenAll(
             Task.Run(() =>
@@ -679,7 +679,7 @@ public sealed class ProtoTracingTests
         await using var host = builder.Build();
 
         await host.StartAsync();
-        var context = await host.StartTestAsync("entity event", TestMethod());
+        var context = await host.StartTestAsync("entity event", TestMethods.Placeholder);
         using (var operation = context.Trace.Operation("sample.parent", "Parent", "ProtoTest.Core.Tests").Begin())
         {
             context.Trace.WriteEvent(
@@ -719,7 +719,7 @@ public sealed class ProtoTracingTests
         await using var host = builder.Build();
 
         await host.StartAsync();
-        var context = await host.StartTestAsync("state version", TestMethod());
+        var context = await host.StartTestAsync("state version", TestMethods.Placeholder);
         context.Trace.Value("value", "invoice:1", "Invoice 1", "created");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
@@ -730,12 +730,6 @@ public sealed class ProtoTracingTests
         Assert.That(state.RootElement.GetProperty("formatVersion").GetString(), Is.EqualTo("1.1"));
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(ProtoTracingTests).GetMethod(nameof(Placeholder), BindingFlags.Static | BindingFlags.NonPublic)!;
-
-    private static void Placeholder()
-    {
-    }
 
     private sealed record DiagnosticContext(string Name, string Token) : IProtoContext;
     private sealed record CallbackContext(string Name, Action Callback) : IProtoContext;

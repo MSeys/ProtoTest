@@ -15,7 +15,7 @@ public sealed class TargetedShapeProbeTests
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync(
-            "wide cyclic shape", "01", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+            "wide cyclic shape", "01", TestMethods.Placeholder);
 
         var node = new WideNode { Name = "root" };
         node.First = node;

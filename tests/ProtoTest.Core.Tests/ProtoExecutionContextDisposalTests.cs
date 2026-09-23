@@ -1,8 +1,8 @@
 namespace ProtoTest.Core.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
-using System.Reflection;
 
 [TestFixture]
 public class ProtoExecutionContextDisposalTests
@@ -18,7 +18,7 @@ public class ProtoExecutionContextDisposalTests
             "Test",
             scope,
             "00001",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         context.RegisterClient(new TrackingClient("first", disposalOrder), "First");
         context.RegisterClient(new TrackingClient("second", disposalOrder), "Second");

@@ -16,7 +16,7 @@ public sealed class ProtoGrpcAssertionsTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc traced shape", TestMethod());
+        var context = await host.StartTestAsync("grpc traced shape", TestMethods.Placeholder);
         var reply = new EchoReply { Message = "hello" };
 
         reply.ShouldMatchShape(new { message = "hello" });
@@ -46,7 +46,7 @@ public sealed class ProtoGrpcAssertionsTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("grpc traced shape mismatch", TestMethod());
+        await host.StartTestAsync("grpc traced shape mismatch", TestMethods.Placeholder);
         var reply = new EchoReply { Message = "hello" };
 
         var exception = Assert.Throws<JsonShapeMismatchException>(
@@ -73,7 +73,7 @@ public sealed class ProtoGrpcAssertionsTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("grpc status", TestMethod());
+        await host.StartTestAsync("grpc status", TestMethods.Placeholder);
         var exception = new RpcException(new Status(StatusCode.NotFound, "missing"));
 
         exception.ShouldHaveStatus(StatusCode.NotFound);
@@ -100,7 +100,7 @@ public sealed class ProtoGrpcAssertionsTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("grpc status mismatch", TestMethod());
+        await host.StartTestAsync("grpc status mismatch", TestMethods.Placeholder);
         var exception = new RpcException(new Status(StatusCode.NotFound, "missing"));
 
         var thrown = Assert.Throws<GrpcAssertionException>(() => exception.ShouldHaveStatus(StatusCode.OK));
@@ -120,7 +120,7 @@ public sealed class ProtoGrpcAssertionsTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("grpc negated status", TestMethod());
+        await host.StartTestAsync("grpc negated status", TestMethods.Placeholder);
         var exception = new RpcException(new Status(StatusCode.NotFound, "missing"));
 
         exception.ShouldNotHaveStatus(StatusCode.OK);
@@ -146,7 +146,7 @@ public sealed class ProtoGrpcAssertionsTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("grpc negated status fail", TestMethod());
+        await host.StartTestAsync("grpc negated status fail", TestMethods.Placeholder);
         var exception = new RpcException(new Status(StatusCode.NotFound, "missing"));
 
         var thrown = Assert.Throws<GrpcAssertionException>(
@@ -168,12 +168,5 @@ public sealed class ProtoGrpcAssertionsTests
         await host.StopAsync();
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(ProtoGrpcAssertionsTests).GetMethod(
-            nameof(Placeholder),
-            BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void Placeholder()
-    {
-    }
 }

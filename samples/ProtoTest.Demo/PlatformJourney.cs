@@ -1,5 +1,6 @@
 namespace ProtoTest.Demo;
 
+using System.Net;
 using Northstar.ProtoTest;
 using ProtoTest.Core;
 using ProtoTest.Data;
@@ -9,7 +10,6 @@ using ProtoTest.Json;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
-using System.Net;
 
 /// <summary>REST, GraphQL and webhooks describing the same platform.</summary>
 [Application(NorthstarTargets.Api)]

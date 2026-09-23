@@ -33,7 +33,7 @@ public sealed class ProtoHttpClientInitializerTests
         await using var host = BuildHost("GraphQL",
             new ProtoHttpClientInitializer("GraphQL", "Catalog", "https://explicit.example/graphql"),
             "https://configured.example/graphql");
-        await host.StartTestAsync("initializer", "1", TestMethod());
+        await host.StartTestAsync("initializer", "1", TestMethods.Placeholder);
         try
         {
             Assert.That(Proto.Context.Client<HttpClient>("Catalog").BaseAddress,
@@ -47,7 +47,7 @@ public sealed class ProtoHttpClientInitializerTests
     {
         await using var host = BuildHost("REST", new ProtoHttpClientInitializer("REST", "Catalog"),
             "https://configured.example/api/");
-        await host.StartTestAsync("initializer", "2", TestMethod());
+        await host.StartTestAsync("initializer", "2", TestMethods.Placeholder);
         try
         {
             Assert.That(Proto.Context.Client<HttpClient>("Catalog").BaseAddress,
@@ -68,7 +68,7 @@ public sealed class ProtoHttpClientInitializerTests
             services.AddSingleton<IProtoClientInitializer>(new ProtoHttpClientInitializer("REST", "Catalog"));
         });
         await using var host = builder.Build();
-        await host.StartTestAsync("initializer", "4", TestMethod());
+        await host.StartTestAsync("initializer", "4", TestMethods.Placeholder);
         try
         {
             Assert.That(Proto.Context.Client<HttpClient>("Catalog").BaseAddress,
@@ -82,7 +82,7 @@ public sealed class ProtoHttpClientInitializerTests
     {
         await using var host = BuildHost("GraphQL", new ProtoHttpClientInitializer("GraphQL", "Catalog"), "/graphql");
         var exception = Assert.ThrowsAsync<InvalidOperationException>(() =>
-            host.StartTestAsync("initializer", "3", TestMethod()));
+            host.StartTestAsync("initializer", "3", TestMethods.Placeholder));
         Assert.That(exception!.Message, Does.Contain("GraphQL client 'Catalog'"));
     }
 
@@ -108,7 +108,4 @@ public sealed class ProtoHttpClientInitializerTests
         return builder.Build();
     }
 
-    private static MethodInfo TestMethod() => typeof(ProtoHttpClientInitializerTests)
-        .GetMethod(nameof(Dummy), BindingFlags.NonPublic | BindingFlags.Static)!;
-    private static void Dummy() { }
 }

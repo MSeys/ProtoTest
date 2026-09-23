@@ -2,9 +2,11 @@ namespace ProtoTest.Grpc.Tests;
 
 using System.Collections.Concurrent;
 using System.Reflection;
+using global::Grpc.Core;
 using global::Grpc.Net.Client;
 using NUnit.Framework;
 using ProtoTest.Core;
+using ProtoTest.Grpc.Tests.Echo;
 
 [TestFixture]
 public sealed class ProtoGrpcClientChannelTests
@@ -16,7 +18,7 @@ public sealed class ProtoGrpcClientChannelTests
         builder.AddGrpc();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc channel race", TestMethod());
+        var context = await host.StartTestAsync("grpc channel race", TestMethods.Placeholder);
 
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var created = new ConcurrentQueue<GrpcChannel>();
@@ -52,7 +54,7 @@ public sealed class ProtoGrpcClientChannelTests
         builder.AddGrpc();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc disposed during create", TestMethod());
+        var context = await host.StartTestAsync("grpc disposed during create", TestMethods.Placeholder);
 
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         GrpcChannel? channel = null;
@@ -86,7 +88,7 @@ public sealed class ProtoGrpcClientChannelTests
         builder.AddGrpc();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc disposed guard", TestMethod());
+        var context = await host.StartTestAsync("grpc disposed guard", TestMethods.Placeholder);
 
         var created = new ConcurrentQueue<GrpcChannel>();
         var client = new ProtoGrpcClient(context, "Disposed", new GrpcClientOptions(), (_, _) =>
@@ -105,6 +107,51 @@ public sealed class ProtoGrpcClientChannelTests
         await host.CompleteTestAsync(ProtoTestResult.Passed);
     }
 
+    [Test]
+    public async Task UnaryAsync_WhenTheCallTokenIsCancelled_ShouldCancelTheInFlightCall()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddGrpc();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("grpc call cancellation", TestMethods.Placeholder);
+
+        var requestStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new ProtoGrpcClient(context, "Cancel", new GrpcClientOptions(), (_, _) =>
+            ValueTask.FromResult(GrpcChannel.ForAddress(
+                "http://127.0.0.1:1", new GrpcChannelOptions { HttpHandler = new BlockingHandler(requestStarted) })));
+
+        using var cancellation = new CancellationTokenSource();
+        var call = client.UnaryAsync(
+            EchoMethods.Say,
+            new EchoRequest { Message = "slow" },
+            cancellationToken: cancellation.Token);
+
+        await requestStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await cancellation.CancelAsync();
+
+        var exception = Assert.CatchAsync(async () => await call.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.That(
+            exception,
+            Is.InstanceOf<OperationCanceledException>().Or.InstanceOf<RpcException>(),
+            "the call must observe the cancellation token it was given");
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+    }
+
+    /// <summary>Accepts one request, reports that it arrived, then waits for the call to be cancelled.</summary>
+    private sealed class BlockingHandler(TaskCompletionSource requestStarted) : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            requestStarted.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return new HttpResponseMessage();
+        }
+    }
+
     private static bool CanCreateInvoker(GrpcChannel channel)
     {
         try
@@ -118,11 +165,5 @@ public sealed class ProtoGrpcClientChannelTests
         }
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(ProtoGrpcClientChannelTests).GetMethod(
-            nameof(Placeholder), BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void Placeholder()
-    {
-    }
 }

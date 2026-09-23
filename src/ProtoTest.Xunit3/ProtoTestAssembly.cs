@@ -1,7 +1,7 @@
-﻿namespace ProtoTest.Xunit3;
+namespace ProtoTest.Xunit3;
 
-using Xunit;
 using ProtoTest.Core;
+using Xunit;
 
 /// <summary>
 /// Base assembly fixture for xUnit v3.

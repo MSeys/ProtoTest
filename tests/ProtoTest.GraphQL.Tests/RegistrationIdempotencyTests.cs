@@ -1,11 +1,11 @@
 namespace ProtoTest.GraphQL.Tests;
 
+using System.Net.Http;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Http;
-using System.Net.Http;
-using System.Reflection;
 
 [TestFixture]
 public sealed class RegistrationIdempotencyTests
@@ -41,7 +41,7 @@ public sealed class RegistrationIdempotencyTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("graphql idempotent", TestMethod());
+        var context = await host.StartTestAsync("graphql idempotent", TestMethods.Placeholder);
 
         Assert.Multiple(() =>
         {
@@ -100,7 +100,7 @@ public sealed class RegistrationIdempotencyTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("graphql options compose", TestMethod());
+        var context = await host.StartTestAsync("graphql options compose", TestMethods.Placeholder);
 
         var responses = context.ResolveResponseOptions(ProtoGraphQLBuilder.ProtocolName);
         var attachments = context.ResolveAttachmentOptions(ProtoGraphQLBuilder.ProtocolName);
@@ -117,11 +117,5 @@ public sealed class RegistrationIdempotencyTests
         await host.StopAsync();
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(RegistrationIdempotencyTests).GetMethod(
-            nameof(Placeholder), BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void Placeholder()
-    {
-    }
 }

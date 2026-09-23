@@ -38,7 +38,7 @@ public static class ProtoExecutionContextExtensions
             context.Trace.WriteEvent(
                 "grpc.client.resolve",
                 $"gRPC client · {requested}",
-                "ProtoTest.Grpc",
+                ProtoGrpcBuilder.Protocol.TraceSource,
                 outcome: ProtoTraceOutcome.Succeeded,
                 attributes: new Dictionary<string, string?>
                 {

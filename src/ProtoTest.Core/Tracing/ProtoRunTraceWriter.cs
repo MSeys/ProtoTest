@@ -1,9 +1,8 @@
 namespace ProtoTest.Core;
 
-using ProtoTest.Core.Internal;
-
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using ProtoTest.Core.Internal;
 
 /// <summary>
 /// Records operations and events that belong to the run rather than to one test - run-scoped resources

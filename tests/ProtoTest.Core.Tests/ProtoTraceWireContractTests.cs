@@ -65,7 +65,8 @@ public sealed class ProtoTraceWireContractTests
                 state.GetProperty("formatVersion").GetString(),
                 Is.EqualTo(contract.GetProperty("stateFormatVersion").GetString()));
             Assert.That(spans.GetProperty("resourceSpans").GetArrayLength(), Is.GreaterThan(0));
-        });    }
+        });
+    }
 
     private static JsonElement Contract()
     {

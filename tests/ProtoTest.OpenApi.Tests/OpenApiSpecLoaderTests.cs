@@ -1,8 +1,8 @@
-﻿namespace ProtoTest.OpenApi.Tests;
+namespace ProtoTest.OpenApi.Tests;
 
+using System.Net;
 using NUnit.Framework;
 using ProtoTest.OpenApi.Internal;
-using System.Net;
 
 [TestFixture]
 public class OpenApiSpecLoaderTests

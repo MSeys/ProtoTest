@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Core;
+namespace ProtoTest.Core;
 
 /// <summary>
 /// Defines a contract for initializing and registering client instances (e.g., HttpClient, GrpcChannel)

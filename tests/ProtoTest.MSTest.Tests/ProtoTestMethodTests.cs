@@ -26,7 +26,7 @@ public class ProtoTestMethodTests
         Proto.Context.SetContext(contextState);
 
         // Act
-        await Task.Delay(10);
+        await Task.Yield();
         var retrieved = Proto.Context.Resolve<CustomState>();
 
         // Assert

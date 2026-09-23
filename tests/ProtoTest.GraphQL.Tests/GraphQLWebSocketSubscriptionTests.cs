@@ -25,7 +25,7 @@ public sealed class GraphQLWebSocketSubscriptionTests
         builder.AddGraphQL(graphQL => graphQL.AddClient("Default", "https://example.test/graphql"));
         builder.ConfigureServices(services => services.AddSingleton<IGraphQLWebSocketFactory>(factory));
         await using var host = builder.Build();
-        await host.StartTestAsync("websocket", "1", Method());
+        await host.StartTestAsync("websocket", "1", TestMethods.Placeholder);
         try
         {
             await using var subscription = await Proto.Context.GraphQL()
@@ -77,7 +77,7 @@ public sealed class GraphQLWebSocketSubscriptionTests
                 };
             }))));
         await using var host = builder.Build();
-        await host.StartTestAsync("sse-configuration", "2", Method());
+        await host.StartTestAsync("sse-configuration", "2", TestMethods.Placeholder);
         try
         {
             await using var subscription = await Proto.Context.GraphQL()
@@ -113,7 +113,7 @@ public sealed class GraphQLWebSocketSubscriptionTests
                 .WithSubscriptionTransport(GraphQLSubscriptionTransport.WebSocket);
         });
         await using var host = builder.Build();
-        await host.StartTestAsync("first-transport-wins", "3", Method());
+        await host.StartTestAsync("first-transport-wins", "3", TestMethods.Placeholder);
         try
         {
             await using var subscription = await Proto.Context.GraphQL()
@@ -149,7 +149,7 @@ public sealed class GraphQLWebSocketSubscriptionTests
                 })));
         });
         await using var host = builder.Build();
-        await host.StartTestAsync("sse-limit", "4", Method());
+        await host.StartTestAsync("sse-limit", "4", TestMethods.Placeholder);
         try
         {
             await using var subscription = await Proto.Context.GraphQL()
@@ -174,7 +174,7 @@ public sealed class GraphQLWebSocketSubscriptionTests
         builder.ConfigureServices(services => services.AddSingleton<IGraphQLWebSocketFactory>(
             new StubWebSocketFactory(socket)));
         await using var host = builder.Build();
-        await host.StartTestAsync("websocket-rejected", "3", Method());
+        await host.StartTestAsync("websocket-rejected", "3", TestMethods.Placeholder);
         try
         {
             var exception = Assert.ThrowsAsync<GraphQLProtocolException>(() => Proto.Context.GraphQL()
@@ -192,9 +192,6 @@ public sealed class GraphQLWebSocketSubscriptionTests
         finally { await host.CompleteTestAsync(); }
     }
 
-    private static MethodInfo Method() => typeof(GraphQLWebSocketSubscriptionTests)
-        .GetMethod(nameof(Dummy), BindingFlags.NonPublic | BindingFlags.Static)!;
-    private static void Dummy() { }
 
     private sealed class StubWebSocketFactory(StubWebSocket socket) : IGraphQLWebSocketFactory
     {

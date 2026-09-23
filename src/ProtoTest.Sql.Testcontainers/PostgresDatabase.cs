@@ -1,9 +1,8 @@
 namespace ProtoTest.Sql.Testcontainers;
 
-using ProtoTest.Testcontainers;
-
 // global:: because this assembly's own namespace ends in Testcontainers.
 using global::Testcontainers.PostgreSql;
+using ProtoTest.Testcontainers;
 
 /// <summary>
 /// A PostgreSQL container owned by the whole run: started once for the suite and released when the

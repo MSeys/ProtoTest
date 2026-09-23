@@ -13,7 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
     <ProjectReference Include="..\ProtoTest.Testcontainers\ProtoTest.Testcontainers.csproj" />
-    <PackageReference Include="Testcontainers.RabbitMq" Version="4.15.0" />
+    <PackageReference Include="Testcontainers.RabbitMq" />
   </ItemGroup>
 
 </Project>

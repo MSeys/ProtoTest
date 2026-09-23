@@ -86,26 +86,25 @@ public sealed class ProtoHttpClientInitializer(
     /// </summary>
     private void TraceConfiguration(ProtoExecutionContext context, HttpClient client, string source)
     {
-        var state = new Dictionary<string, string?>
+        var details = new Dictionary<string, string?>
         {
-            ["client.name"] = Name,
-            ["client.protocol"] = protocolName,
-            ["client.type"] = typeof(HttpClient).FullName,
             ["client.timeout_seconds"] = client.Timeout.TotalSeconds.ToString(
-                "0.###", System.Globalization.CultureInfo.InvariantCulture),
-            ["client.endpoint_source"] = source
+                "0.###", System.Globalization.CultureInfo.InvariantCulture)
         };
         if (client.BaseAddress is not null)
         {
-            state["client.base_address"] = SafeAddress(client.BaseAddress);
+            details["client.base_address"] = SafeAddress(client.BaseAddress);
         }
 
-        context.Trace.SetEntityState(
-            ProtoTraceEntityKinds.Client,
-            ProtoClientTrace.Id(typeof(HttpClient), ScopedName),
+        ProtoClientTraceState.SetConfiguration(
+            context,
+            typeof(HttpClient),
+            protocolName,
+            Name,
+            ScopedName,
             $"HTTP client {Name}",
-            state,
-            scope: context.TestName);
+            source,
+            details);
     }
 
     private static string SafeAddress(Uri address)

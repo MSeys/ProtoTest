@@ -13,8 +13,8 @@ public static class ProtoExecutionContextExtensions
     public static RestRequestBuilder Rest(this ProtoExecutionContext context, string? clientName = null)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var restState = context.TryResolve<RestContextState>();
-        var resolution = ProtoHttpClientResolver.Resolve(context, "Rest", clientName);
+        var restState = context.TryResolve<ProtoHttpContextState>(ProtoRestBuilder.Protocol.Key);
+        var resolution = ProtoHttpClientResolver.Resolve(context, ProtoRestBuilder.Protocol.Key, clientName);
 
         var authenticatorFactory = restState?.AuthenticatorFactory;
 

@@ -15,6 +15,15 @@ public interface ITestService
 }
 
 /// <summary>
+/// The probe service every adapter's DI registration is proved with; each adapter supplies its own
+/// message, so the class lives once instead of in five projects.
+/// </summary>
+public sealed class ProbeTestService(string message) : ITestService
+{
+    public string GetMessage() => message;
+}
+
+/// <summary>
 /// Shared lifecycle expectations and lookups. Named apart from <see cref="AdapterContract"/> because a
 /// test namespace such as <c>ProtoTest.Xunit.Tests</c> resolves the qualified name to the enclosing
 /// <c>ProtoTest.AdapterContract</c> namespace first.

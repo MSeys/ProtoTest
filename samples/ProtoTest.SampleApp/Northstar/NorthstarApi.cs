@@ -73,25 +73,25 @@ internal static class NorthstarApi
             return Results.Created($"/api/v1/projects/{project.Id}", project);
         });
 
-    api.MapGet("/projects/{projectId}", (HttpContext http, string projectId) =>
-        Results.Ok(Store(http).GetProject(Principal(http), projectId)));
+        api.MapGet("/projects/{projectId}", (HttpContext http, string projectId) =>
+            Results.Ok(Store(http).GetProject(Principal(http), projectId)));
 
-    api.MapGet("/reports/monthly.xlsx", (HttpContext http) =>
-    {
-        var projects = Store(http).ListProjects(Principal(http), cursor: null, limit: 100).Items;
-        return Results.File(
-            MonthlyReportWriter.Write(projects),
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "monthly.xlsx");
-    });
+        api.MapGet("/reports/monthly.xlsx", (HttpContext http) =>
+        {
+            var projects = Store(http).ListProjects(Principal(http), cursor: null, limit: 100).Items;
+            return Results.File(
+                MonthlyReportWriter.Write(projects),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "monthly.xlsx");
+        });
 
-    api.MapGet("/reports/monthly.html", (HttpContext http) =>
-    {
-        var principal = Principal(http);
-        var organization = Store(http).GetOrganization(principal);
-        var projects = Store(http).ListProjects(principal, cursor: null, limit: 100).Items;
-        return Results.Content(MonthlyReportHtml.Render(organization, projects), "text/html; charset=utf-8");
-    });
+        api.MapGet("/reports/monthly.html", (HttpContext http) =>
+        {
+            var principal = Principal(http);
+            var organization = Store(http).GetOrganization(principal);
+            var projects = Store(http).ListProjects(principal, cursor: null, limit: 100).Items;
+            return Results.Content(MonthlyReportHtml.Render(organization, projects), "text/html; charset=utf-8");
+        });
 
         api.MapPost("/projects/{projectId}/archive", (HttpContext http, string projectId) =>
             Results.Ok(Store(http).ArchiveProject(Principal(http), projectId)));

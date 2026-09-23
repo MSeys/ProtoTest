@@ -1,8 +1,8 @@
 namespace ProtoTest.AspNetCore.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
-using System.Reflection;
 
 [TestFixture]
 public sealed class ApplicationServicesTests
@@ -14,7 +14,7 @@ public sealed class ApplicationServicesTests
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>("Default")
             .Build();
-        await host.StartTestAsync("Scoped_Domain_Access", "00010", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("Scoped_Domain_Access", "00010", TestMethods.Placeholder);
 
         try
         {
@@ -47,7 +47,7 @@ public sealed class ApplicationServicesTests
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>("Default")
             .Build();
-        await host.StartTestAsync("Scoped_Server_Service", "00011", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("Scoped_Server_Service", "00011", TestMethods.Placeholder);
 
         try
         {
@@ -71,7 +71,7 @@ public sealed class ApplicationServicesTests
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>("Default")
             .Build();
-        await host.StartTestAsync("Scoped_Disposal", "00012", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("Scoped_Disposal", "00012", TestMethods.Placeholder);
 
         var probe = Proto.Context.ApplicationServices<SampleApi.Program>("Default")
             .GetRequiredService<SampleApi.IScopedProbe>();

@@ -1,8 +1,8 @@
-﻿namespace ProtoTest.Rest.Tests;
+namespace ProtoTest.Rest.Tests;
 
 using NUnit.Framework;
-using ProtoTest.Rest.Internal;
 using ProtoTest.Http;
+using ProtoTest.Rest.Internal;
 
 [TestFixture]
 public class RestUriBuilderTests

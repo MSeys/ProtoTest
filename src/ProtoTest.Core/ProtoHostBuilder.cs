@@ -1,10 +1,9 @@
 namespace ProtoTest.Core;
 
-using ProtoTest.Core.Internal;
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using ProtoTest.Core.Internal;
 
 /// <summary>
 /// Implements the builder pattern for configuring and constructing a <see cref="ProtoHost"/> instance.

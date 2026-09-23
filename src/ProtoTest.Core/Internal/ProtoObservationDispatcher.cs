@@ -1,7 +1,7 @@
 namespace ProtoTest.Core.Internal;
 
-using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.DependencyInjection;
 
 internal sealed class ProtoObservationDispatcher(IServiceProvider services)
 {

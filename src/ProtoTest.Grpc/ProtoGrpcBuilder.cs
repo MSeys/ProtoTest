@@ -6,6 +6,10 @@ using ProtoTest.Http;
 
 public sealed class ProtoGrpcBuilder
 {
+    /// <summary>The protocol's identity: names, trace source, observation kind and coverage category.</summary>
+    internal static readonly ProtoProtocol Protocol = new(
+        "Grpc", "gRPC", "ProtoTest.Grpc", "grpc.response", "gRPC");
+
     private readonly IProtoApplicationBuilder? _application;
 
     internal ProtoGrpcBuilder(IServiceCollection services, IProtoApplicationBuilder? application = null)
@@ -27,14 +31,11 @@ public sealed class ProtoGrpcBuilder
         string? address = null,
         Action<GrpcClientOptions>? configure = null)
     {
-        var clientName = name ?? "Default";
-        ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
-        var applicationName = _application?.ApplicationName;
-        var registeredName = ProtoHttpClientRegistration.Qualify(clientName, applicationName);
-        _application?.RegisterClient("Grpc", clientName);
+        var (_, registeredName, applicationName) =
+            ProtoHttpClientRegistration.RegisterClientName(_application, Protocol.Key, name);
         return Clients.ProtoGrpcClientRegistration.AddClient(
             Services,
-            "Grpc",
+            Protocol.Key,
             registeredName,
             address,
             configure,
@@ -48,14 +49,11 @@ public sealed class ProtoGrpcBuilder
         Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> addressResolver,
         Action<GrpcClientOptions>? configure = null)
     {
-        var clientName = name ?? "Default";
-        ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
-        var applicationName = _application?.ApplicationName;
-        var registeredName = ProtoHttpClientRegistration.Qualify(clientName, applicationName);
-        _application?.RegisterClient("Grpc", clientName);
+        var (_, registeredName, applicationName) =
+            ProtoHttpClientRegistration.RegisterClientName(_application, Protocol.Key, name);
         return Clients.ProtoGrpcClientRegistration.AddClient(
             Services,
-            "Grpc",
+            Protocol.Key,
             registeredName,
             addressResolver,
             configure,

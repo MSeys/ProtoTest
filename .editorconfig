@@ -1,0 +1,39 @@
+# ProtoTest repository conventions.
+# `dotnet format --verify-no-changes` enforces every rule at warning severity in CI.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml,md,csproj,props,targets,slnx}]
+indent_size = 2
+
+[*.cs]
+# Language conventions the codebase already follows; these fail the format gate when violated.
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_using_directive_placement = inside_namespace:warning
+dotnet_sort_system_directives_first = true
+
+# Preferred, not enforced: the style the codebase leans on.
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_expression_bodied_accessors = true:suggestion
+csharp_style_prefer_primary_constructors = true:suggestion
+csharp_prefer_braces = true:suggestion
+dotnet_style_readonly_field = true:suggestion
+dotnet_style_object_initializer = true:suggestion
+dotnet_style_collection_initializer = true:suggestion
+dotnet_style_prefer_conditional_expression_over_assignment = true:suggestion
+dotnet_style_prefer_conditional_expression_over_return = true:suggestion
+
+# The framework's own analyzers are clean today; keep them visible without failing the build yet.
+dotnet_diagnostic.IDE0005.severity = suggestion
+dotnet_diagnostic.CA1062.severity = none

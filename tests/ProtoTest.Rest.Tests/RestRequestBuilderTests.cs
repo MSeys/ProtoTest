@@ -24,7 +24,7 @@ public class RestRequestBuilderTests
         var services = new ServiceCollection();
         services.AddTransient<TestDummyAuthenticator>();
         services.AddKeyedSingleton(ProtoRestBuilder.ProtocolName, new ProtoHttpAttachmentOptions());
-        _context = new ProtoExecutionContext("", services.BuildServiceProvider().CreateScope(), "00000", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        _context = new ProtoExecutionContext("", services.BuildServiceProvider().CreateScope(), "00000", TestMethods.Placeholder);
     }
 
     [TearDown]

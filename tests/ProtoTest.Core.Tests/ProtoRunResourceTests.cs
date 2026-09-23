@@ -1,7 +1,7 @@
 namespace ProtoTest.Core.Tests;
 
-using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 
 [TestFixture]
 public class ProtoRunResourceTests
@@ -151,7 +151,7 @@ public class ProtoRunResourceTests
         // Arrange
         using var provider = new ServiceCollection().BuildServiceProvider();
         using var scope = provider.CreateScope();
-        var context = new ProtoExecutionContext("Test", scope, "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = new ProtoExecutionContext("Test", scope, "00001", TestMethods.Placeholder);
 
         // Act & Assert
         var exception = Assert.Throws<InvalidOperationException>(() => context.RegisterResource(

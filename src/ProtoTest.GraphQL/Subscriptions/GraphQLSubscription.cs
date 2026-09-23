@@ -219,12 +219,13 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
                 eventResponse,
                 payload,
                 _stopwatch.Elapsed,
-                _context,
-                _targetName,
-                _identifier,
+                new ProtoHttpResponseContext(
+                    Execution: _context,
+                    TargetName: _targetName,
+                    Identifier: _identifier,
+                    AttachmentOptions: _attachmentOptions,
+                    AttachmentPrefix: _attachmentPrefix is null ? null : $"{_attachmentPrefix}-event-{eventNumber:00}"),
                 _operation,
-                _attachmentOptions,
-                _attachmentPrefix is null ? null : $"{_attachmentPrefix}-event-{eventNumber:00}",
                 selectedRootField: _selectedRootField);
         }
         catch
@@ -242,7 +243,7 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
                 _identifier);
         _context.RecordObservation(new ProtoObservation(
             _targetName,
-            "graphql.response",
+            ProtoGraphQLBuilder.Protocol.ResponseObservationKind,
             _identifier,
             new GraphQLResponseData(
                 _operation.Type,
@@ -256,7 +257,7 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
         _context.Trace.WriteEvent(
             "graphql.subscription.next",
             $"Subscription event · {eventNumber}",
-            "ProtoTest.GraphQL",
+            ProtoGraphQLBuilder.Protocol.TraceSource,
             outcome: ProtoTraceOutcome.Succeeded,
             attributes: new Dictionary<string, string?>
             {
@@ -432,7 +433,7 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
         _context.Trace.WriteEvent(
             "graphql.subscription.complete",
             $"Subscription complete · {_operation.Name ?? "<anonymous>"}",
-            "ProtoTest.GraphQL",
+            ProtoGraphQLBuilder.Protocol.TraceSource,
             outcome: ProtoTraceOutcome.Succeeded,
             attributes: new Dictionary<string, string?>
             {

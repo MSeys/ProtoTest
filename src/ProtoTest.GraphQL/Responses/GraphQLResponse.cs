@@ -19,15 +19,10 @@ public sealed class GraphQLResponse : ProtoHttpResponse
         HttpResponseMessage rawResponse,
         string content,
         TimeSpan elapsed,
-        ProtoExecutionContext context,
-        string targetName,
-        string identifier,
+        ProtoHttpResponseContext context,
         GraphQLBuiltOperation operation,
-        ProtoHttpAttachmentOptions? attachmentOptions,
-        string? attachmentPrefix,
-        string? requestTraceId = null,
         string? selectedRootField = null)
-        : base(rawResponse, content, elapsed, context, targetName, identifier, attachmentOptions, attachmentPrefix, requestTraceId)
+        : base(rawResponse, content, elapsed, context)
     {
         _selectedRootField = selectedRootField;
         try
@@ -38,7 +33,7 @@ public sealed class GraphQLResponse : ProtoHttpResponse
         {
             throw new GraphQLProtocolException(
                 "The server did not return a valid JSON GraphQL response.",
-                JsonDiagnosticSanitizer.Sanitize(content, attachmentOptions),
+                JsonDiagnosticSanitizer.Sanitize(content, context.AttachmentOptions),
                 exception);
         }
 
@@ -48,7 +43,7 @@ public sealed class GraphQLResponse : ProtoHttpResponse
             _document.Dispose();
             throw new GraphQLProtocolException(
                 "The response did not contain a GraphQL 'data' or 'errors' member.",
-                JsonDiagnosticSanitizer.Sanitize(content, attachmentOptions));
+                JsonDiagnosticSanitizer.Sanitize(content, context.AttachmentOptions));
         }
 
         Errors = ReadErrors(_document.RootElement);
@@ -85,7 +80,7 @@ public sealed class GraphQLResponse : ProtoHttpResponse
     internal GraphQLResponse AssertHttpStatus(HttpStatusCode expected, bool negated)
     {
         AssertStatus(
-            "ProtoTest.GraphQL",
+            ProtoGraphQLBuilder.Protocol.TraceSource,
             expected,
             negated,
             () => new GraphQLAssertionException(
@@ -161,7 +156,7 @@ public sealed class GraphQLResponse : ProtoHttpResponse
             // the failed assertion the same way a mismatch is recorded, then keep the GraphQL-specific
             // failure the docs promise.
             using var operation = Context!.Trace
-                .Operation("assert.json.shape", "Assert GraphQL data shape", "ProtoTest.GraphQL")
+                .Operation("assert.json.shape", "Assert GraphQL data shape", ProtoGraphQLBuilder.Protocol.TraceSource)
                 .With("expected.type", expectedShape.GetType().FullName)
                 .With("graphql.operation", Identifier!)
                 .With("shape.result", "mismatched")
@@ -184,7 +179,7 @@ public sealed class GraphQLResponse : ProtoHttpResponse
         }
 
         AssertShape(
-            "ProtoTest.GraphQL",
+            ProtoGraphQLBuilder.Protocol.TraceSource,
             "Assert GraphQL data shape",
             SelectedData?.GetRawText(),
             expectedShape,
@@ -202,14 +197,14 @@ public sealed class GraphQLResponse : ProtoHttpResponse
     public T? ReadDataAs<T>(JsonSerializerOptions? options = null)
     {
         using var operation = Context!.Trace
-            .Operation("graphql.response.deserialize", $"Deserialize GraphQL data · {typeof(T).Name}", "ProtoTest.GraphQL")
+            .Operation("graphql.response.deserialize", $"Deserialize GraphQL data · {typeof(T).Name}", ProtoGraphQLBuilder.Protocol.TraceSource)
             .With("target.type", typeof(T).FullName)
             .Parent(RequestTraceId)
             .Begin();
         try
         {
             var result = SelectedData.HasValue
-                ? SelectedData.Value.Deserialize<T>(options ?? new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ? SelectedData.Value.Deserialize<T>(options ?? ProtoJsonDefaults.Reader)
                 : default;
             operation.Succeed();
             return result;
@@ -235,7 +230,7 @@ public sealed class GraphQLResponse : ProtoHttpResponse
         Action assertion)
     {
         using var operation = Context!.Trace
-            .Operation(kind, name, "ProtoTest.GraphQL")
+            .Operation(kind, name, ProtoGraphQLBuilder.Protocol.TraceSource)
             .With(attributes)
             .Parent(RequestTraceId)
             .Begin();

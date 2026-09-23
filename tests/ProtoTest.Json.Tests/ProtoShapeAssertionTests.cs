@@ -12,7 +12,7 @@ public sealed class ProtoShapeAssertionTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("shape assertion", TestMethod());
+        var context = await host.StartTestAsync("shape assertion", TestMethods.Placeholder);
 
         var matched = ProtoShapeAssertion.Assert(
             new ProtoShapeAssertionContext(
@@ -55,7 +55,7 @@ public sealed class ProtoShapeAssertionTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("shape mismatch", TestMethod());
+        var context = await host.StartTestAsync("shape mismatch", TestMethods.Placeholder);
 
         var exception = Assert.Throws<JsonShapeMismatchException>(() => ProtoShapeAssertion.Assert(
             new ProtoShapeAssertionContext(context, "ProtoTest.Tests", "Assert shape"),
@@ -85,7 +85,7 @@ public sealed class ProtoShapeAssertionTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("dictionary shape", TestMethod());
+        var context = await host.StartTestAsync("dictionary shape", TestMethods.Placeholder);
 
         var matched = ProtoShapeAssertion.Assert(
             new ProtoShapeAssertionContext(context, "ProtoTest.Tests", "Assert shape"),
@@ -112,7 +112,7 @@ public sealed class ProtoShapeAssertionTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("deep shape", TestMethod());
+        var context = await host.StartTestAsync("deep shape", TestMethods.Placeholder);
 
         var deep = new Dictionary<string, object?>();
         var cursor = deep;
@@ -158,7 +158,7 @@ public sealed class ProtoShapeAssertionTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("null shape", TestMethod());
+        var context = await host.StartTestAsync("null shape", TestMethods.Placeholder);
 
         var matched = ProtoShapeAssertion.Assert(
             new ProtoShapeAssertionContext(context, "ProtoTest.Tests", "Assert null shape"), "null", null);
@@ -188,7 +188,7 @@ public sealed class ProtoShapeAssertionTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("null actual", TestMethod());
+        var context = await host.StartTestAsync("null actual", TestMethods.Placeholder);
 
         var exception = Assert.Throws<JsonDocumentAssertionException>(() => ProtoShapeAssertion.Assert(
             new ProtoShapeAssertionContext(context, "ProtoTest.Tests", "Assert shape"), null, new { id = 1 }));
@@ -212,7 +212,7 @@ public sealed class ProtoShapeAssertionTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("sanitized actual", TestMethod());
+        var context = await host.StartTestAsync("sanitized actual", TestMethods.Placeholder);
 
         ProtoShapeAssertion.Assert(
             new ProtoShapeAssertionContext(context, "ProtoTest.Tests", "Assert shape"),
@@ -236,7 +236,7 @@ public sealed class ProtoShapeAssertionTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("non-string dictionary shape", TestMethod());
+        var context = await host.StartTestAsync("non-string dictionary shape", TestMethods.Placeholder);
 
         var matched = ProtoShapeAssertion.Assert(
             new ProtoShapeAssertionContext(context, "ProtoTest.Tests", "Assert shape"),
@@ -260,7 +260,7 @@ public sealed class ProtoShapeAssertionTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("scalar shape description", TestMethod());
+        var context = await host.StartTestAsync("scalar shape description", TestMethods.Placeholder);
 
         ProtoShapeAssertion.Assert(
             new ProtoShapeAssertionContext(context, "ProtoTest.Tests", "Assert shape"),
@@ -287,7 +287,7 @@ public sealed class ProtoShapeAssertionTests
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("wire name shape description", TestMethod());
+        var context = await host.StartTestAsync("wire name shape description", TestMethods.Placeholder);
 
         ProtoShapeAssertion.Assert(
             new ProtoShapeAssertionContext(context, "ProtoTest.Tests", "Assert shape"),
@@ -329,12 +329,5 @@ public sealed class ProtoShapeAssertionTests
         public NodeShape? Next { get; set; }
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(ProtoShapeAssertionTests).GetMethod(
-            nameof(Placeholder),
-            BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void Placeholder()
-    {
-    }
 }

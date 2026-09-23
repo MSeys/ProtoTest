@@ -1,8 +1,8 @@
 namespace ProtoTest.Web.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
-using System.Reflection;
 
 [TestFixture]
 public sealed class RegistrationIdempotencyTests
@@ -27,7 +27,7 @@ public sealed class RegistrationIdempotencyTests
         });
 
         await host.StartAsync();
-        await host.StartTestAsync("playwright idempotent", TestMethod());
+        await host.StartTestAsync("playwright idempotent", TestMethods.Placeholder);
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
     }
@@ -52,7 +52,7 @@ public sealed class RegistrationIdempotencyTests
         });
 
         await host.StartAsync();
-        await host.StartTestAsync("selenium idempotent", TestMethod());
+        await host.StartTestAsync("selenium idempotent", TestMethods.Placeholder);
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
     }
@@ -80,7 +80,7 @@ public sealed class RegistrationIdempotencyTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("playwright application idempotent", TestMethod());
+        await host.StartTestAsync("playwright application idempotent", TestMethods.Placeholder);
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
     }
@@ -97,7 +97,7 @@ public sealed class RegistrationIdempotencyTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("selenium application idempotent", TestMethod());
+        var context = await host.StartTestAsync("selenium application idempotent", TestMethods.Placeholder);
 
         var application = context.Service<ProtoApplicationClients>();
         Assert.That(application.Clients.Count(client => client.ProtocolName == "Web"), Is.EqualTo(1));
@@ -162,11 +162,5 @@ public sealed class RegistrationIdempotencyTests
         Assert.That(configureCalls, Is.EqualTo(2), "every call's configure callback runs");
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(RegistrationIdempotencyTests).GetMethod(
-            nameof(Placeholder), BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void Placeholder()
-    {
-    }
 }

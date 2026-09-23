@@ -15,7 +15,7 @@ public sealed class ProtoMessagingAssertionsTests
         builder.AddMessaging();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging shape", TestMethod());
+        var context = await host.StartTestAsync("messaging shape", TestMethods.Placeholder);
         var message = new ProtoMessage("invoice.paid", """{"id":42,"status":"paid"}""", ContentType: "application/json");
 
         message.ShouldMatchShape(new { id = 42, status = "paid" });
@@ -44,7 +44,7 @@ public sealed class ProtoMessagingAssertionsTests
         builder.AddMessaging();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging shape mismatch", TestMethod());
+        var context = await host.StartTestAsync("messaging shape mismatch", TestMethods.Placeholder);
         var message = new ProtoMessage("invoice.paid", """{"id":42}""");
 
         var exception = Assert.Throws<JsonShapeMismatchException>(
@@ -70,7 +70,7 @@ public sealed class ProtoMessagingAssertionsTests
         builder.AddMessaging();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging payload", TestMethod());
+        var context = await host.StartTestAsync("messaging payload", TestMethods.Placeholder);
 
         var empty = Assert.Throws<JsonDocumentAssertionException>(
             () => new ProtoMessage("invoice.paid", null).ShouldMatchShape(new { id = 42 }));
@@ -90,12 +90,5 @@ public sealed class ProtoMessagingAssertionsTests
         await host.StopAsync();
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(ProtoMessagingAssertionsTests).GetMethod(
-            nameof(Placeholder),
-            BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void Placeholder()
-    {
-    }
 }

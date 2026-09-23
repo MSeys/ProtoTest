@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.TUnit;
+namespace ProtoTest.TUnit;
 
 using global::TUnit.Core.Extensions;
 using global::TUnit.Core.Interfaces;
@@ -25,13 +25,12 @@ public class ProtoTestExecutor : ITestExecutor
             global::TUnit.Core.Skip.Test(preparation.SkipReason!);
         }
 
-        var lifecycleStarted = false;
+        var scope = await ProtoTestScope.StartAsync(
+            preparation, ProtoTestAssembly.Host, new TUnitAttachmentPublisher(context));
         var result = ProtoTestResult.Unknown;
         Exception? failure = null;
         try
         {
-            await preparation.StartAsync(ProtoTestAssembly.Host, new TUnitAttachmentPublisher(context));
-            lifecycleStarted = true;
             await action();
             result = ProtoTestResult.Passed;
         }
@@ -51,17 +50,10 @@ public class ProtoTestExecutor : ITestExecutor
             result = ProtoTestResult.Failed(exception);
             failure = exception;
         }
-
-        if (lifecycleStarted)
+        finally
         {
-            try
-            {
-                await ProtoTestAssembly.Host.CompleteTestAsync(result);
-            }
-            catch when (failure is not null)
-            {
-                // Teardown must never replace the original test failure.
-            }
+            scope.Result = result;
+            await scope.DisposeAsync();
         }
 
         if (failure is not null)

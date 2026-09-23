@@ -1,12 +1,13 @@
 namespace ProtoTest.Demo;
 
+using System.Data.Common;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Npgsql;
 using Northstar.ProtoTest;
+using Npgsql;
 using ProtoTest.AspNetCore;
 using ProtoTest.Core;
 using ProtoTest.GraphQL;
@@ -18,13 +19,12 @@ using ProtoTest.NUnit;
 using ProtoTest.OpenApi;
 using ProtoTest.Reporting;
 using ProtoTest.Rest;
-using ProtoTest.Sheets;
 using ProtoTest.SampleApp;
 using ProtoTest.SampleApp.Domain;
+using ProtoTest.Sheets;
 using ProtoTest.Sql;
 using ProtoTest.Sql.Testcontainers;
 using ProtoTest.Web;
-using System.Data.Common;
 
 [SetUpFixture]
 public sealed class Setup : ProtoTestAssembly

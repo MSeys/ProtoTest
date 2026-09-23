@@ -1,10 +1,10 @@
 namespace Northstar.ProtoTest;
 
-using Microsoft.Extensions.DependencyInjection;
 using global::ProtoTest.Core;
 using global::ProtoTest.Data;
 using global::ProtoTest.GraphQL;
 using global::ProtoTest.SampleApp.Contracts;
+using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>Options for the Northstar test-support surface: the scenario hook and its clients.</summary>
 public sealed class NorthstarTestSupportOptions

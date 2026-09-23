@@ -1,9 +1,9 @@
 namespace ProtoTest.Json;
 
-using ProtoTest.Core;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using ProtoTest.Core;
 
 public class JsonDiagnosticOptions
 {
@@ -76,8 +76,10 @@ public static class JsonDiagnosticSanitizer
             : $"{result[..limit]}{Environment.NewLine}… [{result.Length - limit} characters truncated]";
     }
 
-    private static bool LooksLikeJson(string content)
+    /// <summary>Whether the content starts with a JSON object or array, ignoring leading whitespace.</summary>
+    public static bool LooksLikeJson(string? content)
     {
+        if (string.IsNullOrWhiteSpace(content)) return false;
         var trimmed = content.AsSpan().TrimStart();
         return !trimmed.IsEmpty && trimmed[0] is '{' or '[';
     }

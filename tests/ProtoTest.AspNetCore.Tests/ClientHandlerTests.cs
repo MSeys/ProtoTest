@@ -14,7 +14,7 @@ public sealed class ClientHandlerTests
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>("Default")
             .Build();
-        await host.StartTestAsync("Client_Redirects", "00014", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("Client_Redirects", "00014", TestMethods.Placeholder);
 
         try
         {
@@ -42,7 +42,7 @@ public sealed class ClientHandlerTests
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>("Default")
             .Build();
-        await host.StartTestAsync("Client_Cookies", "00015", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("Client_Cookies", "00015", TestMethods.Placeholder);
 
         try
         {
@@ -73,7 +73,7 @@ public sealed class ClientHandlerTests
             .Build();
         await host.StartAsync();
         var context = await host.StartTestAsync(
-            "Client_TraceContext", "00016", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+            "Client_TraceContext", "00016", TestMethods.Placeholder);
 
         try
         {
@@ -107,7 +107,7 @@ public sealed class ClientHandlerTests
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>("Default")
             .Build();
-        await host.StartTestAsync("Client_ExistingTraceparent", "00017", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("Client_ExistingTraceparent", "00017", TestMethods.Placeholder);
 
         try
         {

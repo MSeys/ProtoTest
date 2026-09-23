@@ -463,7 +463,7 @@ public sealed class RestDiagnosticsAndExtensibilityTests
         Assert.That(response.ReadAsBytes(), Is.EqualTo(expected));
     }
 
-    private static MethodInfo CurrentMethod() => (MethodInfo)MethodInfo.GetCurrentMethod()!;
+    private static MethodInfo CurrentMethod() => TestMethods.Placeholder;
 
     private sealed class AuthTokenProvider
     {

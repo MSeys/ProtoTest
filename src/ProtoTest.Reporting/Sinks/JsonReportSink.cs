@@ -1,8 +1,8 @@
 namespace ProtoTest.Reporting;
 
-using ProtoTest.Core;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ProtoTest.Core;
 
 public sealed class JsonReportSink : FileReportSink<JsonReportSinkOptions>
 {

@@ -1,7 +1,7 @@
 namespace ProtoTest.Core.Tests;
 
-using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 
 [TestFixture]
 public class ProtoExecutionContextTests
@@ -27,7 +27,7 @@ public class ProtoExecutionContextTests
     public void SetAndGet_ShouldStoreAndRetrieveTypedContext()
     {
         // Arrange
-        var context = new ProtoExecutionContext("TestMethod", _scope, "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = new ProtoExecutionContext("TestMethod", _scope, "00001", TestMethods.Placeholder);
         var customState = new SampleContext("InitialData");
 
         // Act
@@ -42,7 +42,7 @@ public class ProtoExecutionContextTests
     public void GetRequired_ShouldReturnInstance_WhenContextExists()
     {
         // Arrange
-        var context = new ProtoExecutionContext("TestMethod", _scope, "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = new ProtoExecutionContext("TestMethod", _scope, "00001", TestMethods.Placeholder);
         var customState = new SampleContext("Active");
         context.SetContext(customState);
 
@@ -57,7 +57,7 @@ public class ProtoExecutionContextTests
     public void GetRequired_ShouldThrowInvalidOperationException_WhenContextIsMissing()
     {
         // Arrange
-        var context = new ProtoExecutionContext("TestMethod", _scope, "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = new ProtoExecutionContext("TestMethod", _scope, "00001", TestMethods.Placeholder);
 
         // Act & Assert
         var exception = Assert.Throws<InvalidOperationException>(() => context.Resolve<SampleContext>());
@@ -80,7 +80,7 @@ public class ProtoExecutionContextTests
             "TestMethod",
             scope,
             "00001",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         context.RecordObservation("Orders", "http.response", "GET /orders", data: 200);
 

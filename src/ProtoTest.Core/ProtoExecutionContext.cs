@@ -1,9 +1,9 @@
 namespace ProtoTest.Core;
 
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core.Internal;
-using System.Reflection;
 
 /// <summary>
 /// Provides the public per-test façade for metadata, services, state, clients, attachments, and observations.
@@ -99,15 +99,31 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
 
     /// <summary>Registers or replaces contextual state for this test.</summary>
     public void SetContext<T>(T context) where T : class, IProtoContext
+        => SetContextCore(null, context);
+
+    /// <summary>
+    /// Registers or replaces contextual state under a key, so two protocols can store the same state
+    /// type without overwriting each other's instance.
+    /// </summary>
+    public void SetContext<T>(string key, T context) where T : class, IProtoContext
     {
-        _state.Set(context);
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        SetContextCore(key, context);
+    }
+
+    private void SetContextCore<T>(string? key, T context) where T : class, IProtoContext
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        _state.Set(key, context);
+        var entityId = key is null ? typeof(T).FullName! : $"{key}:{typeof(T).FullName}";
         Trace.SetEntityState(
             ProtoTraceEntityKinds.Context,
-            typeof(T).FullName!,
-            $"Context · {typeof(T).Name}",
+            entityId,
+            key is null ? $"Context · {typeof(T).Name}" : $"Context · {key} · {typeof(T).Name}",
             new Dictionary<string, string?>
             {
                 ["context.type"] = typeof(T).FullName,
+                ["context.key"] = key,
                 ["context.value"] = ProtoTraceValueFormatter.Serialize(context)
             },
             scope: TestName,
@@ -117,57 +133,82 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     /// <summary>Retrieves contextual state when it is present.</summary>
     public T? TryResolve<T>() where T : class, IProtoContext
     {
-        return _state.TryGet<T>();
+        return _state.TryGet<T>(key: null);
+    }
+
+    /// <summary>Retrieves contextual state registered under a key when it is present.</summary>
+    public T? TryResolve<T>(string key) where T : class, IProtoContext
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        return _state.TryGet<T>(key);
     }
 
     /// <summary>Retrieves required contextual state.</summary>
-    public T Resolve<T>() where T : class, IProtoContext
+    public T Resolve<T>() where T : class, IProtoContext => ResolveCore<T>(key: null);
+
+    /// <summary>Retrieves required contextual state registered under a key.</summary>
+    public T Resolve<T>(string key) where T : class, IProtoContext
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        return ResolveCore<T>(key);
+    }
+
+    private T ResolveCore<T>(string? key) where T : class, IProtoContext
     {
         try
         {
-            return _state.Get<T>();
+            return _state.Get<T>(key);
         }
         catch (Exception exception)
         {
+            var entityId = key is null ? typeof(T).FullName : $"{key}:{typeof(T).FullName}";
             Trace.WriteEvent(
                 "context.resolve",
-                $"Resolve context · {typeof(T).Name}",
+                key is null ? $"Resolve context · {typeof(T).Name}" : $"Resolve context · {key} · {typeof(T).Name}",
                 "ProtoTest.Core",
                 outcome: ProtoTraceOutcome.Failed,
-                attributes: new Dictionary<string, string?> { ["context.type"] = typeof(T).FullName },
+                attributes: new Dictionary<string, string?>
+                {
+                    ["context.type"] = typeof(T).FullName,
+                    ["context.key"] = key
+                },
                 exception: exception,
                 entityKind: ProtoTraceEntityKinds.Context,
-                entityId: typeof(T).FullName);
+                entityId: entityId);
             throw;
         }
     }
 
     /// <summary>
-    /// Registers a named client for this test. The client is owned by the test and released in reverse
-    /// registration order when the test completes; pass <paramref name="disposeWithContext"/> as
-    /// <see langword="false"/> for shared clients whose lifetime is managed elsewhere.
+    /// Registers a named client for this test. A <see cref="ProtoClientOwnership.Context"/> client is
+    /// released in reverse registration order when the test completes; a
+    /// <see cref="ProtoClientOwnership.Caller"/> client is shared and its lifetime is managed elsewhere.
     /// </summary>
-    public void RegisterClient<TClient>(TClient client, string name = "Default", bool disposeWithContext = true)
+    public void RegisterClient<TClient>(
+        TClient client,
+        string name = "Default",
+        ProtoClientOwnership ownership = ProtoClientOwnership.Context)
         where TClient : class
     {
         ArgumentNullException.ThrowIfNull(client);
+        var owned = ownership is ProtoClientOwnership.Context;
         _clients.Register(client, name);
         var clientId = ProtoClientTrace.Id(typeof(TClient), name);
         RegisterOwned(new ProtoResource(
             clientId,
             "client",
-            $"{(disposeWithContext ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
-            context => ReleaseClientAsync(client, disposeWithContext)));
+            $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
+            context => ReleaseClientAsync(client, owned)));
         Trace.SetEntityState(
             ProtoTraceEntityKinds.Client,
             clientId,
-            $"{(disposeWithContext ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
+            $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
             new Dictionary<string, string?>
             {
                 ["client.name"] = name,
                 ["client.type"] = typeof(TClient).FullName,
                 ["instance.type"] = client.GetType().FullName,
-                ["client.owned"] = disposeWithContext ? "true" : "false"
+                ["client.owned"] = owned ? "true" : "false"
             },
             scope: TestName,
             change: "created");

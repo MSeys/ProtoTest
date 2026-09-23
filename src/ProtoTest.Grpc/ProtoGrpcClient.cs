@@ -19,6 +19,9 @@ public sealed class ProtoGrpcClient : IDisposable
 {
     private const int MaxCapturedStreamMessages = 10;
 
+    private static readonly ProtoAttachmentFailure AttachmentFailure =
+        new("grpc.attachment.failed", ProtoGrpcBuilder.Protocol.TraceSource, "gRPC attachment");
+
     private static readonly JsonFormatter AttachmentFormatter = new(
         JsonFormatter.Settings.Default.WithFormatDefaultValues(true).WithFormatEnumsAsIntegers(false));
 
@@ -67,7 +70,7 @@ public sealed class ProtoGrpcClient : IDisposable
         ArgumentNullException.ThrowIfNull(method);
         var callNumber = Interlocked.Increment(ref _callSequence);
         using var operation = _context.Trace
-            .Operation("grpc.call", $"gRPC · {method.FullName}", "ProtoTest.Grpc")
+            .Operation("grpc.call", $"gRPC · {method.FullName}", ProtoGrpcBuilder.Protocol.TraceSource)
             .For(ProtoTraceEntityKinds.Client, ProtoClientTrace.Id(typeof(ProtoGrpcClient), _targetName))
             .With("rpc.system", "grpc")
             .With("rpc.service", method.ServiceName)
@@ -95,7 +98,7 @@ public sealed class ProtoGrpcClient : IDisposable
         try
         {
             var response = await (await GetInvokerAsync(cancellationToken))
-                .AsyncUnaryCall(method, null, BuildCallOptions(callMetadata, deadline), request)
+                .AsyncUnaryCall(method, null, BuildCallOptions(callMetadata, deadline, cancellationToken), request)
                 .ConfigureAwait(false);
             operation.SetAttribute("grpc.response.count", "1");
             if (attachmentOptions?.CaptureResponses == true)
@@ -139,7 +142,7 @@ public sealed class ProtoGrpcClient : IDisposable
         ArgumentNullException.ThrowIfNull(requests);
         var callNumber = Interlocked.Increment(ref _callSequence);
         using var operation = _context.Trace
-            .Operation("grpc.call", $"gRPC · {method.FullName}", "ProtoTest.Grpc")
+            .Operation("grpc.call", $"gRPC · {method.FullName}", ProtoGrpcBuilder.Protocol.TraceSource)
             .For(ProtoTraceEntityKinds.Client, ProtoClientTrace.Id(typeof(ProtoGrpcClient), _targetName))
             .With("rpc.system", "grpc")
             .With("rpc.service", method.ServiceName)
@@ -169,7 +172,7 @@ public sealed class ProtoGrpcClient : IDisposable
         try
         {
             using var call = (await GetInvokerAsync(cancellationToken))
-                .AsyncClientStreamingCall(method, null, BuildCallOptions(callMetadata, deadline));
+                .AsyncClientStreamingCall(method, null, BuildCallOptions(callMetadata, deadline, cancellationToken));
             foreach (var request in requestList)
             {
                 await call.RequestStream.WriteAsync(request).ConfigureAwait(false);
@@ -218,7 +221,7 @@ public sealed class ProtoGrpcClient : IDisposable
         ArgumentNullException.ThrowIfNull(method);
         var callNumber = Interlocked.Increment(ref _callSequence);
         using var operation = _context.Trace
-            .Operation("grpc.call", $"gRPC · {method.FullName}", "ProtoTest.Grpc")
+            .Operation("grpc.call", $"gRPC · {method.FullName}", ProtoGrpcBuilder.Protocol.TraceSource)
             .For(ProtoTraceEntityKinds.Client, ProtoClientTrace.Id(typeof(ProtoGrpcClient), _targetName))
             .With("rpc.system", "grpc")
             .With("rpc.service", method.ServiceName)
@@ -247,7 +250,7 @@ public sealed class ProtoGrpcClient : IDisposable
         try
         {
             using var call = (await GetInvokerAsync(cancellationToken))
-                .AsyncServerStreamingCall(method, null, BuildCallOptions(callMetadata, deadline), request);
+                .AsyncServerStreamingCall(method, null, BuildCallOptions(callMetadata, deadline, cancellationToken), request);
             await foreach (var response in call.ResponseStream.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
                 responses.Add(response);
@@ -292,10 +295,11 @@ public sealed class ProtoGrpcClient : IDisposable
         Method<TRequest, TResponse> method,
         TRequest request,
         Action<Metadata>? metadata = null,
-        DateTime? deadline = null)
+        DateTime? deadline = null,
+        CancellationToken cancellationToken = default)
         where TRequest : class
         where TResponse : class
-        => RunOnPool(() => OpenServerStreamingAsync(method, request, metadata, deadline));
+        => RunOnPool(() => OpenServerStreamingAsync(method, request, metadata, deadline, cancellationToken));
 
     /// <summary>Opens a raw server-streaming call without blocking the caller.</summary>
     public async Task<AsyncServerStreamingCall<TResponse>> OpenServerStreamingAsync<TRequest, TResponse>(
@@ -312,7 +316,7 @@ public sealed class ProtoGrpcClient : IDisposable
         // still goes through the shared authenticator pipeline before the channel is awaited.
         var callMetadata = await PrepareMetadataAsync(metadata, operation: null, cancellationToken);
         var invoker = await GetInvokerAsync(cancellationToken);
-        return invoker.AsyncServerStreamingCall(method, null, BuildCallOptions(callMetadata, deadline), request);
+        return invoker.AsyncServerStreamingCall(method, null, BuildCallOptions(callMetadata, deadline, cancellationToken), request);
     }
 
     /// <summary>
@@ -325,10 +329,11 @@ public sealed class ProtoGrpcClient : IDisposable
     public AsyncDuplexStreamingCall<TRequest, TResponse> DuplexStreaming<TRequest, TResponse>(
         Method<TRequest, TResponse> method,
         Action<Metadata>? metadata = null,
-        DateTime? deadline = null)
+        DateTime? deadline = null,
+        CancellationToken cancellationToken = default)
         where TRequest : class
         where TResponse : class
-        => RunOnPool(() => OpenDuplexStreamingAsync(method, metadata, deadline));
+        => RunOnPool(() => OpenDuplexStreamingAsync(method, metadata, deadline, cancellationToken));
 
     /// <summary>Opens a raw duplex-streaming call without blocking the caller.</summary>
     public async Task<AsyncDuplexStreamingCall<TRequest, TResponse>> OpenDuplexStreamingAsync<TRequest, TResponse>(
@@ -342,7 +347,7 @@ public sealed class ProtoGrpcClient : IDisposable
         ArgumentNullException.ThrowIfNull(method);
         var callMetadata = await PrepareMetadataAsync(metadata, operation: null, cancellationToken);
         var invoker = await GetInvokerAsync(cancellationToken);
-        return invoker.AsyncDuplexStreamingCall(method, null, BuildCallOptions(callMetadata, deadline));
+        return invoker.AsyncDuplexStreamingCall(method, null, BuildCallOptions(callMetadata, deadline, cancellationToken));
     }
 
     /// <summary>
@@ -419,7 +424,7 @@ public sealed class ProtoGrpcClient : IDisposable
     {
         // User metadata first, then authenticators: an authenticator may intentionally override.
         var callMetadata = BuildRawMetadata(metadata);
-        var state = _context.TryResolve<GrpcContextState>();
+        var state = _context.TryResolve<ProtoHttpContextState>(ProtoGrpcBuilder.Protocol.Key);
         await ProtoGrpcAuthenticationApplier.ApplyAsync(
             state?.AuthenticatorFactory,
             callMetadata,
@@ -451,12 +456,13 @@ public sealed class ProtoGrpcClient : IDisposable
         return result;
     }
 
-    private CallOptions BuildCallOptions(Metadata metadata, DateTime? deadline)
+    private CallOptions BuildCallOptions(Metadata metadata, DateTime? deadline, CancellationToken cancellationToken)
         => new(
             headers: metadata,
             deadline: deadline ?? (_options.DefaultDeadline is { } defaultDeadline
                 ? DateTime.UtcNow + defaultDeadline
-                : null));
+                : null),
+            cancellationToken: cancellationToken);
 
     private void Fail(ProtoTraceOperation operation, string service, string name, RpcException exception)
     {
@@ -477,7 +483,7 @@ public sealed class ProtoGrpcClient : IDisposable
     private ProtoObservation Observation(string service, string name, string status)
         => new(
             _targetName,
-            "grpc.response",
+            ProtoGrpcBuilder.Protocol.ResponseObservationKind,
             $"{service}/{name}",
             Data: null,
             Metadata: new Dictionary<string, object>
@@ -509,20 +515,14 @@ public sealed class ProtoGrpcClient : IDisposable
         string attachmentName,
         object message,
         string description)
-    {
-        try
-        {
-            _context.AddAttachment(
-                attachmentName,
-                SanitizeForAttachment(options, FormatMessage(message)),
-                "application/json",
-                description);
-        }
-        catch (Exception exception)
-        {
-            ReportAttachmentFailure(operation, attachmentName, exception);
-        }
-    }
+        => ProtoAttachmentCapture.TryAdd(
+            _context,
+            operation,
+            AttachmentFailure,
+            attachmentName,
+            () => SanitizeForAttachment(options, FormatMessage(message)),
+            "application/json",
+            description);
 
     private void CaptureStream(
         ProtoTraceOperation operation,
@@ -530,31 +530,16 @@ public sealed class ProtoGrpcClient : IDisposable
         string attachmentName,
         IEnumerable<object> messages,
         string description)
-    {
-        try
-        {
-            var captured = messages.Take(MaxCapturedStreamMessages).Select(FormatMessage);
-            _context.AddAttachment(
-                attachmentName,
-                SanitizeForAttachment(options, $"[{string.Join(",", captured)}]"),
-                "application/json",
-                description);
-        }
-        catch (Exception exception)
-        {
-            ReportAttachmentFailure(operation, attachmentName, exception);
-        }
-    }
-
-    private void ReportAttachmentFailure(ProtoTraceOperation operation, string attachmentName, Exception exception)
-        => _context.Trace.WriteEvent(
-            "grpc.attachment.failed",
-            $"gRPC attachment · {attachmentName}",
-            "ProtoTest.Grpc",
-            outcome: ProtoTraceOutcome.Failed,
-            attributes: new Dictionary<string, string?> { ["attachment.name"] = attachmentName },
-            exception: exception,
-            parentId: operation.Id);
+        => ProtoAttachmentCapture.TryAdd(
+            _context,
+            operation,
+            AttachmentFailure,
+            attachmentName,
+            () => SanitizeForAttachment(
+                options,
+                $"[{string.Join(",", messages.Take(MaxCapturedStreamMessages).Select(FormatMessage))}]"),
+            "application/json",
+            description);
 
     /// <summary>
     /// The attachment name includes the sanitized client name, so two clients calling the same method in

@@ -33,13 +33,10 @@ public static class ProtoHostBuilderExtensions
             {
                 // A ProtoTest-owned marker gates duplicate registration; DbContextOptions alone is not
                 // that marker because the host may have registered the context before this call.
-                if (services.Any(descriptor =>
-                        descriptor.ServiceType == typeof(ProtoEntityFrameworkCoreRegistration<TContext>)))
+                if (!ProtoRegistrationGuard.TryRegisterOnce<ProtoEntityFrameworkCoreRegistration<TContext>>(services))
                 {
                     return;
                 }
-
-                services.AddSingleton<ProtoEntityFrameworkCoreRegistration<TContext>>();
 
                 // Entity Framework Core keeps the first DbContextOptions<TContext> registration and
                 // drops later options delegates, so this check makes the call order explicit: when the

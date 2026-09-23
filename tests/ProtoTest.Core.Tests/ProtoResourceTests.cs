@@ -1,7 +1,7 @@
 namespace ProtoTest.Core.Tests;
 
-using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 
 [TestFixture]
 public class ProtoResourceTests
@@ -151,7 +151,7 @@ public class ProtoResourceTests
         // Arrange
         var released = new List<string>();
         var context = CreateContext();
-        context.RegisterClient(new TrackedClient(released), "Shared", disposeWithContext: false);
+        context.RegisterClient(new TrackedClient(released), "Shared", ProtoClientOwnership.Caller);
 
         // Act
         await context.DisposeAsync();
@@ -198,8 +198,8 @@ public class ProtoResourceTests
         builder.AddSink(sink);
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("Ownership", "00009", (MethodInfo)MethodInfo.GetCurrentMethod()!);
-        context.RegisterClient(new TrackedClient([]), "Shared", disposeWithContext: false);
+        var context = await host.StartTestAsync("Ownership", "00009", TestMethods.Placeholder);
+        context.RegisterClient(new TrackedClient([]), "Shared", ProtoClientOwnership.Caller);
         context.RegisterResource(ProtoResource.From(
             "database:connection",
             "database",
@@ -230,7 +230,7 @@ public class ProtoResourceTests
         builder.AddSink(sink);
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("Broken", "00010", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = await host.StartTestAsync("Broken", "00010", TestMethods.Placeholder);
         context.RegisterClient(new FailingClient(), "Broken");
 
         // Act
@@ -249,20 +249,8 @@ public class ProtoResourceTests
     }
 
     private ProtoExecutionContext CreateContext()
-        => new("TestMethod", _scope, "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        => new("TestMethod", _scope, "00001", TestMethods.Placeholder);
 
-    private sealed class CapturingSink : IProtoSink
-    {
-        private ProtoReportItem[] _items = [];
-
-        public IReadOnlyList<ProtoReportItem> Items => _items;
-
-        public Task ExportAsync(IEnumerable<ProtoReportItem> items, CancellationToken cancellationToken = default)
-        {
-            _items = [.. items];
-            return Task.CompletedTask;
-        }
-    }
 
     private sealed class TrackedResource(string id, List<string> released) : IProtoResource
     {

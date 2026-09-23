@@ -1,0 +1,16 @@
+<Project>
+  <!--
+    MSBuild stops at the nearest Directory.Build.props, so this chains to the repository root one.
+    Test projects declare only what makes them a test project; the shared shape lives here.
+  -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="ProtoTest.TestSupport" />
+  </ItemGroup>
+</Project>

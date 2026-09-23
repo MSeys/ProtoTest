@@ -20,22 +20,17 @@ public abstract class ProtoHttpResponse : IDisposable
         HttpResponseMessage rawResponse,
         string content,
         TimeSpan elapsed,
-        ProtoExecutionContext? context = null,
-        string? targetName = null,
-        string? identifier = null,
-        ProtoHttpAttachmentOptions? attachmentOptions = null,
-        string? attachmentPrefix = null,
-        string? requestTraceId = null)
+        ProtoHttpResponseContext? context = null)
     {
         RawResponse = rawResponse ?? throw new ArgumentNullException(nameof(rawResponse));
         Content = content ?? string.Empty;
         ElapsedTime = elapsed;
-        Context = context;
-        TargetName = targetName;
-        Identifier = identifier;
-        AttachmentOptions = attachmentOptions;
-        AttachmentPrefix = attachmentPrefix;
-        RequestTraceId = requestTraceId;
+        Context = context?.Execution;
+        TargetName = context?.TargetName;
+        Identifier = context?.Identifier;
+        AttachmentOptions = context?.AttachmentOptions;
+        AttachmentPrefix = context?.AttachmentPrefix;
+        RequestTraceId = context?.RequestTraceId;
     }
 
     /// <summary>The response message this instance owns and disposes.</summary>

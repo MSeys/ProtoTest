@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Core;
+namespace ProtoTest.Core;
 
 /// <summary>
 /// Provides a static gateway to the active <see cref="ProtoExecutionContext"/>.

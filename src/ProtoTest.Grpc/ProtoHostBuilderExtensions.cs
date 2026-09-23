@@ -3,7 +3,7 @@ namespace ProtoTest.Grpc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
-using ProtoTest.Grpc.Authentication;
+using ProtoTest.Http;
 
 public static class ProtoHostBuilderExtensions
 {
@@ -21,8 +21,7 @@ public static class ProtoHostBuilderExtensions
             configure?.Invoke(new ProtoGrpcBuilder(services));
         });
 
-        return builder.AddCapability(new ProtoCapabilityDescriptor(
-            "gRPC", ProtoCapabilityKinds.Protocol, "ProtoTest.Grpc"));
+        return builder.AddCapability(ProtoGrpcBuilder.Protocol.Capability);
     }
 
     /// <summary>
@@ -38,10 +37,19 @@ public static class ProtoHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(application);
         RegisterInfrastructure(application.Services);
         configure?.Invoke(new ProtoGrpcBuilder(application.Services, application));
-        return application.AddCapability(new ProtoCapabilityDescriptor(
-            "gRPC", ProtoCapabilityKinds.Protocol, "ProtoTest.Grpc"));
+        return application.AddCapability(ProtoGrpcBuilder.Protocol.Capability);
     }
 
+    /// <summary>Marks one successful AddGrpc call, so the hook is registered once.</summary>
+    private sealed class GrpcRegistration;
+
     private static void RegisterInfrastructure(IServiceCollection services)
-        => services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoTestHook, GrpcLifecycleHook>());
+    {
+        if (!ProtoRegistrationGuard.TryRegisterOnce<GrpcRegistration>(services))
+        {
+            return;
+        }
+
+        services.AddSingleton<IProtoTestHook>(new ProtoHttpAuthLifecycleHook(ProtoGrpcBuilder.Protocol));
+    }
 }

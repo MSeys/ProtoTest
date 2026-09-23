@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.NUnit;
+namespace ProtoTest.NUnit;
 
 using global::NUnit.Framework;
 using ProtoTest.Core;

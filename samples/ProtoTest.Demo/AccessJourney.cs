@@ -1,5 +1,6 @@
 namespace ProtoTest.Demo;
 
+using System.Net;
 using Northstar.ProtoTest;
 using ProtoTest.Core;
 using ProtoTest.Data;
@@ -7,7 +8,6 @@ using ProtoTest.Http;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
-using System.Net;
 
 /// <summary>Who may do what: the role matrix, token scopes, tenant isolation and rate limits.</summary>
 [Application(NorthstarTargets.Api)]

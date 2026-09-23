@@ -24,7 +24,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("Playwright conformance", TestMethod());
+        var context = await host.StartTestAsync("Playwright conformance", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
         await backend.Page.SetContentAsync(ConformanceMarkup.Html);
@@ -68,7 +68,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("Playwright select semantics", TestMethod());
+        var context = await host.StartTestAsync("Playwright select semantics", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
         await backend.Page.SetContentAsync(ConformanceMarkup.Html);
@@ -101,7 +101,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("Playwright escape hatches", TestMethod());
+        var context = await host.StartTestAsync("Playwright escape hatches", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
         await backend.Page.SetContentAsync(ConformanceMarkup.EscapeHatchHtml);
@@ -149,7 +149,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("Playwright namespaced attribute", TestMethod());
+        var context = await host.StartTestAsync("Playwright namespaced attribute", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
         await backend.Page.SetContentAsync(ConformanceMarkup.NamespacedAttributeHtml);
@@ -176,7 +176,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("playwright page-scoped header cell", TestMethod());
+        var context = await host.StartTestAsync("playwright page-scoped header cell", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
         await backend.Page.SetContentAsync(ConformanceMarkup.Html);
@@ -202,7 +202,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("playwright strict read", TestMethod());
+        var context = await host.StartTestAsync("playwright strict read", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
         await backend.Page.SetContentAsync(
@@ -239,7 +239,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("playwright missing element", TestMethod());
+        var context = await host.StartTestAsync("playwright missing element", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
         await backend.Page.SetContentAsync("<!doctype html><html><body><p class=\"dup\">one</p></body></html>");
@@ -276,7 +276,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("vue discovery conformance", TestMethod());
+        var context = await host.StartTestAsync("vue discovery conformance", TestMethods.Placeholder);
         var web = context.Web(discoverRoutes: true);
         var backend = await OpenBrowserAsync(web);
         await backend.Page.RouteAsync("**/*", route => route.FulfillAsync(new RouteFulfillOptions
@@ -311,7 +311,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("playwright nested wait", TestMethod());
+        var context = await host.StartTestAsync("playwright nested wait", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
         await backend.Page.SetContentAsync("""
@@ -357,7 +357,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("playwright concurrent sessions", TestMethod());
+        var context = await host.StartTestAsync("playwright concurrent sessions", TestMethods.Placeholder);
         var web = context.Web();
         var other = context.Web("Other");
         const string markup = "<!doctype html><html><body><div role=\"status\">ready</div></body></html>";
@@ -408,7 +408,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("playwright nested wait in wait", TestMethod());
+        var context = await host.StartTestAsync("playwright nested wait in wait", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
         await backend.Page.SetContentAsync("<!doctype html><html><body><div role=\"status\">ready</div></body></html>");
@@ -459,7 +459,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("playwright negated nested wait", TestMethod());
+        var context = await host.StartTestAsync("playwright negated nested wait", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
         await backend.Page.SetContentAsync("""
@@ -520,7 +520,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("playwright blank location", TestMethod());
+        var context = await host.StartTestAsync("playwright blank location", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
         var failure = new WebFailureContext("Click", null, new InvalidOperationException("boom"));
@@ -551,7 +551,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("vue child routes", TestMethod());
+        var context = await host.StartTestAsync("vue child routes", TestMethods.Placeholder);
         var web = context.Web(discoverRoutes: true);
         var backend = await OpenBrowserAsync(web);
         await backend.Page.RouteAsync("**/*", route => route.FulfillAsync(new RouteFulfillOptions
@@ -587,7 +587,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("vue discovery absent", TestMethod());
+        var context = await host.StartTestAsync("vue discovery absent", TestMethods.Placeholder);
         var web = context.Web(discoverRoutes: true);
         var backend = await OpenBrowserAsync(web);
         await backend.Page.RouteAsync("**/*", route => route.FulfillAsync(new RouteFulfillOptions
@@ -625,7 +625,7 @@ public sealed class PlaywrightConformanceTests
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
-        var context = await host.StartTestAsync("playwright download", TestMethod());
+        var context = await host.StartTestAsync("playwright download", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
         await backend.Page.SetContentAsync(ConformanceMarkup.DownloadHtml);
@@ -685,10 +685,6 @@ public sealed class PlaywrightConformanceTests
             throw;
         }
     }
-    private static MethodInfo TestMethod()
-        => typeof(PlaywrightConformanceTests).GetMethod(nameof(Placeholder), BindingFlags.Static | BindingFlags.NonPublic)!;
-
-    private static void Placeholder() { }
 
     public sealed class ConformancePage : WebPage
     {

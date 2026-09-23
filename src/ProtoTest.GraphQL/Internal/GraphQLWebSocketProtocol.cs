@@ -3,12 +3,13 @@ namespace ProtoTest.GraphQL.Internal;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using ProtoTest.Json;
 
 internal static class GraphQLWebSocketProtocol
 {
     public static Task SendAsync(WebSocket socket, object message, CancellationToken cancellationToken)
     {
-        var payload = JsonSerializer.SerializeToUtf8Bytes(message, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var payload = JsonSerializer.SerializeToUtf8Bytes(message, ProtoJsonDefaults.Web);
         return socket.SendAsync(payload, WebSocketMessageType.Text, endOfMessage: true, cancellationToken);
     }
 

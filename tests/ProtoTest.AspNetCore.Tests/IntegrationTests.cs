@@ -2,9 +2,9 @@ namespace ProtoTest.AspNetCore.Tests;
 
 using System.Net;
 using System.Reflection;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
@@ -24,7 +24,7 @@ public class IntegrationTests
             .AddAspNetCoreServer<SampleApi.Program>("Default")
             .Build();
 
-        var context = await host.StartTestAsync("InMemory_Test", "00001", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = await host.StartTestAsync("InMemory_Test", "00001", TestMethods.Placeholder);
 
         try
         {
@@ -53,7 +53,7 @@ public class IntegrationTests
             .AddAspNetCoreServer<SampleApi.Program>("InventoryApi")
             .Build();
         await using var ownedHost = host;
-        await host.StartTestAsync("PageInventory_Test", "00011", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("PageInventory_Test", "00011", TestMethods.Placeholder);
 
         var pages = Proto.Context.RecordedObservations
             .Where(observation => observation.Kind == "web.page.available")
@@ -85,7 +85,7 @@ public class IntegrationTests
             .AddAspNetCoreServer<SampleApi.Program>("InventoryApi")
             .Build();
         await using var ownedHost = host;
-        var method = (MethodInfo)MethodInfo.GetCurrentMethod()!;
+        var method = TestMethods.Placeholder;
 
         await host.StartTestAsync("PageInventoryFilter_Test", "00012", method);
         var first = Proto.Context.RecordedObservations
@@ -117,7 +117,7 @@ public class IntegrationTests
             .AddAspNetCoreServer<SampleApi.Program>("ControllerInventory")
             .Build();
         await using var ownedHost = host;
-        await host.StartTestAsync("ControllerInventory_Test", "00014", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("ControllerInventory_Test", "00014", TestMethods.Placeholder);
 
         var pages = Proto.Context.RecordedObservations
             .Where(observation => observation.Kind == "web.page.available")
@@ -151,7 +151,7 @@ public class IntegrationTests
             .AddAspNetCoreServer<SampleApi.Program>("ScalarApi")
             .Build();
         await using var ownedHost = host;
-        await host.StartTestAsync("ScalarFilter_Test", "00015", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("ScalarFilter_Test", "00015", TestMethods.Placeholder);
 
         var pages = Proto.Context.RecordedObservations
             .Where(observation => observation.Kind == "web.page.available")
@@ -177,7 +177,7 @@ public class IntegrationTests
                 webHost => webHost.ConfigureTestServices(services => services.AddSingleton<EndpointDataSource>(flaky)))
             .Build();
         await using var ownedHost = host;
-        var method = (MethodInfo)MethodInfo.GetCurrentMethod()!;
+        var method = TestMethods.Placeholder;
 
         await host.StartTestAsync("PageInventoryRetry_First", "00016", method);
         var first = Proto.Context.RecordedObservations
@@ -221,7 +221,7 @@ public class IntegrationTests
                 lifetime: AspNetCoreServerLifetime.PerTest)
             .Build();
         await using var ownedHost = host;
-        var method = (MethodInfo)MethodInfo.GetCurrentMethod()!;
+        var method = TestMethods.Placeholder;
 
         await host.StartTestAsync("EmptyInventory_First", "00018", method);
         var first = Proto.Context.RecordedObservations
@@ -268,7 +268,7 @@ public class IntegrationTests
             .AddAspNetCoreServer<SampleApi.Program>("ExternalApi")
             .Build();
 
-        var context = await host.StartTestAsync("ExternalUrl_Test", "00002", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        var context = await host.StartTestAsync("ExternalUrl_Test", "00002", TestMethods.Placeholder);
 
         try
         {
@@ -296,7 +296,7 @@ public class IntegrationTests
             .AddAspNetCoreServer<SampleApi.Program>("OrderApi")
             .Build();
 
-        await host.StartTestAsync("LocalFallback_Test", "00004", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("LocalFallback_Test", "00004", TestMethods.Placeholder);
 
         try
         {
@@ -326,7 +326,7 @@ public class IntegrationTests
             .AddRest(rest => rest.AddClient("OrderApi"))
             .Build();
 
-        await host.StartTestAsync("RegistrationOrder_Test", "00005", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("RegistrationOrder_Test", "00005", TestMethods.Placeholder);
 
         try
         {
@@ -364,7 +364,7 @@ public class IntegrationTests
                 })
             .Build();
 
-        await host.StartTestAsync("FactoryConfiguration", "00003", (MethodInfo)MethodInfo.GetCurrentMethod()!);
+        await host.StartTestAsync("FactoryConfiguration", "00003", TestMethods.Placeholder);
 
         try
         {
@@ -397,7 +397,7 @@ public class IntegrationTests
         await host.StartTestAsync(
             "ConfiguredServices",
             "00006",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!);
+            TestMethods.Placeholder);
 
         try
         {
@@ -423,7 +423,7 @@ public class IntegrationTests
                 "SharedApi",
                 webHost => webHost.UseSetting("ProtoTest:Configured", "true"))
             .Build();
-        var method = (MethodInfo)MethodInfo.GetCurrentMethod()!;
+        var method = TestMethods.Placeholder;
 
         await host.StartTestAsync("First", "00007", method);
         var first = Proto.Context.ServerFactory<SampleApi.Program>("SharedApi");
@@ -467,7 +467,7 @@ public class IntegrationTests
                 lifetime: AspNetCoreServerLifetime.PerTest)
             .Build();
         await using var ownedHost = host;
-        var method = (MethodInfo)MethodInfo.GetCurrentMethod()!;
+        var method = TestMethods.Placeholder;
 
         await host.StartTestAsync("First", "00009", method);
         var first = Proto.Context.ServerFactory<SampleApi.Program>("IsolatedApi");

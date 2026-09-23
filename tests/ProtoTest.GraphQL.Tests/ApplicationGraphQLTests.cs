@@ -5,9 +5,9 @@ using System.Net.Http;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Http;
-using NUnit.Framework;
 
 [TestFixture]
 public sealed class ApplicationGraphQLTests
@@ -25,7 +25,7 @@ public sealed class ApplicationGraphQLTests
         builder.AddApplication("ControlPlane", app => app.AddGraphQL(graphql => graphql.AddClient("ControlPlane", endpoint: "GraphQL")));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("graphql application", TestMethod(), [new ApplicationAttribute("ControlPlane")]);
+        var context = await host.StartTestAsync("graphql application", TestMethods.Placeholder, [new ApplicationAttribute("ControlPlane")]);
 
         Assert.That(context.Client<HttpClient>("ControlPlane:ControlPlane").BaseAddress,
             Is.EqualTo(new Uri("https://app.test/graphql")));
@@ -58,8 +58,8 @@ public sealed class ApplicationGraphQLTests
         builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>
             {
-            // The client is named "Api" and names the endpoint key explicitly.
-            ["ProtoTest:Applications:ControlPlane:Endpoints:GraphQL"] = "/graphql"
+                // The client is named "Api" and names the endpoint key explicitly.
+                ["ProtoTest:Applications:ControlPlane:Endpoints:GraphQL"] = "/graphql"
             }));
         builder.AddApplication("ControlPlane", app =>
         {
@@ -72,7 +72,7 @@ public sealed class ApplicationGraphQLTests
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync(
-            "graphql transport fallback", TestMethod(), [new ApplicationAttribute("ControlPlane")]);
+            "graphql transport fallback", TestMethods.Placeholder, [new ApplicationAttribute("ControlPlane")]);
 
         using var response = await context.GraphQL()
             .Query(null, query => query.Field("ping"))
@@ -83,12 +83,7 @@ public sealed class ApplicationGraphQLTests
         Assert.That(context.Client<HttpClient>("ControlPlane:Api").BaseAddress, Is.Null);
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(ApplicationGraphQLTests).GetMethod(nameof(Placeholder), BindingFlags.Static | BindingFlags.NonPublic)!;
 
-    private static void Placeholder()
-    {
-    }
 
     private sealed class StubTransportInitializer(string name, string baseAddress, HttpMessageHandler handler)
         : IProtoClientInitializer<HttpClient>

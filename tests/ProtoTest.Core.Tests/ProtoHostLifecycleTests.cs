@@ -1,8 +1,8 @@
 namespace ProtoTest.Core.Tests;
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
-using System.Reflection;
 
 [TestFixture]
 public sealed class ProtoHostLifecycleTests
@@ -11,7 +11,7 @@ public sealed class ProtoHostLifecycleTests
     public async Task StartTest_ShouldRejectSecondActiveContext()
     {
         await using var host = CreateHost();
-        var method = (MethodInfo)MethodInfo.GetCurrentMethod()!;
+        var method = TestMethods.Placeholder;
 
         await host.StartTestAsync("First", "00001", method);
 
@@ -45,7 +45,7 @@ public sealed class ProtoHostLifecycleTests
         await host.StartTestAsync(
             "StatefulAttribute",
             "00001",
-            (MethodInfo)MethodInfo.GetCurrentMethod()!,
+            TestMethods.Placeholder,
             [attribute]);
         await host.CompleteTestAsync();
 
@@ -56,7 +56,7 @@ public sealed class ProtoHostLifecycleTests
     public async Task ParallelTests_ShouldKeepAmbientContextsIsolated()
     {
         await using var host = CreateHost();
-        var method = (MethodInfo)MethodInfo.GetCurrentMethod()!;
+        var method = TestMethods.Placeholder;
         var bothStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var startedCount = 0;
 

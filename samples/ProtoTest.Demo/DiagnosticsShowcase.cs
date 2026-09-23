@@ -1,5 +1,6 @@
 namespace ProtoTest.Demo;
 
+using System.Net;
 using Northstar.ProtoTest;
 using ProtoTest.Core;
 using ProtoTest.Data;
@@ -9,7 +10,6 @@ using ProtoTest.NUnit;
 using ProtoTest.Rest;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.Web;
-using System.Net;
 
 /// <summary>
 /// ProtoTest's own diagnostics: captured shape mismatches, recorded failures and the opt-in

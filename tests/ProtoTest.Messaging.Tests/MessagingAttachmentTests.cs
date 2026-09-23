@@ -17,7 +17,7 @@ public sealed class MessagingAttachmentTests
             options.MaxDiagnosticBodyLength = 160));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging attachments", TestMethod());
+        var context = await host.StartTestAsync("messaging attachments", TestMethods.Placeholder);
         var messages = context.Messaging();
 
         var payload = $"{{\"password\":\"hunter2\",\"note\":\"{new string('x', 300)}\"}}";
@@ -60,7 +60,7 @@ public sealed class MessagingAttachmentTests
         builder.AddMessaging(messaging => messaging.CaptureAttachments());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging repeated captures", TestMethod());
+        var context = await host.StartTestAsync("messaging repeated captures", TestMethods.Placeholder);
         var messages = context.Messaging();
 
         await messages.PublishAsync("invoices", "{\"id\":1}", contentType: "application/json");
@@ -93,7 +93,7 @@ public sealed class MessagingAttachmentTests
         builder.AddMessaging(messaging => messaging.CaptureAttachments());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging receive sequence", TestMethod());
+        var context = await host.StartTestAsync("messaging receive sequence", TestMethods.Placeholder);
         var messages = context.Messaging();
 
         await messages.PublishAsync("invoices", "{\"id\":1}", contentType: "application/json");
@@ -127,7 +127,7 @@ public sealed class MessagingAttachmentTests
         builder.AddMessaging();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging no attachments", TestMethod());
+        var context = await host.StartTestAsync("messaging no attachments", TestMethods.Placeholder);
         var messages = context.Messaging();
 
         await messages.PublishAsync("invoices", "{\"id\":1}", contentType: "application/json");
@@ -152,7 +152,7 @@ public sealed class MessagingAttachmentTests
         });
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging failed publish", TestMethod());
+        var context = await host.StartTestAsync("messaging failed publish", TestMethods.Placeholder);
         var messages = context.Messaging();
 
         var failure = Assert.ThrowsAsync<InvalidOperationException>(async () =>
@@ -169,7 +169,7 @@ public sealed class MessagingAttachmentTests
         builder.AddMessaging(messaging => messaging.CaptureAttachments());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging capture failure", TestMethod());
+        var context = await host.StartTestAsync("messaging capture failure", TestMethods.Placeholder);
         // Occupy the name the first capture will use, forcing the capture to fail.
         context.AddAttachment("message-publish-invoices-1-payload", "occupied");
         var messages = context.Messaging();
@@ -201,7 +201,7 @@ public sealed class MessagingAttachmentTests
         builder.AddMessaging(messaging => messaging.CaptureAttachments());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging receive off", TestMethod());
+        var context = await host.StartTestAsync("messaging receive off", TestMethods.Placeholder);
         var messages = context.Messaging();
 
         await messages.PublishAsync("invoices", "{\"id\":1}", contentType: "application/json");
@@ -229,7 +229,7 @@ public sealed class MessagingAttachmentTests
         builder.AddMessaging(messaging => messaging.CaptureAttachments());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging text payload", TestMethod());
+        var context = await host.StartTestAsync("messaging text payload", TestMethods.Placeholder);
         var messages = context.Messaging();
 
         await messages.PublishAsync("invoices", "not-json-payload");
@@ -262,7 +262,7 @@ public sealed class MessagingAttachmentTests
         builder.AddMessaging();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging trace redaction", TestMethod());
+        var context = await host.StartTestAsync("messaging trace redaction", TestMethods.Placeholder);
         var messages = context.Messaging();
 
         await messages.PublishAsync(
@@ -293,7 +293,7 @@ public sealed class MessagingAttachmentTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging options compose", TestMethod());
+        var context = await host.StartTestAsync("messaging options compose", TestMethods.Placeholder);
 
         var options = context.Service<MessagingAttachmentOptions>();
         Assert.Multiple(() =>
@@ -333,10 +333,5 @@ public sealed class MessagingAttachmentTests
         }
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(MessagingAttachmentTests).GetMethod(nameof(Placeholder), BindingFlags.Static | BindingFlags.NonPublic)!;
 
-    private static void Placeholder()
-    {
-    }
 }

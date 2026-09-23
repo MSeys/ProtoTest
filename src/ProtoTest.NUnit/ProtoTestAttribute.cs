@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.NUnit;
+namespace ProtoTest.NUnit;
 
 using global::NUnit.Framework;
 using global::NUnit.Framework.Interfaces;
@@ -10,6 +10,10 @@ using ProtoTest.Core;
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
 public class ProtoTestAttribute : TestAttribute, ITestAction
 {
+    private const string FrameworkName = "NUnit";
+
+    private ProtoTestScope? _scope;
+
     public ActionTargets Targets => ActionTargets.Test;
 
     public void BeforeTest(ITest test)
@@ -20,20 +24,30 @@ public class ProtoTestAttribute : TestAttribute, ITestAction
             Assert.Ignore(preparation.SkipReason!);
         }
 
-        preparation
-            .StartAsync(ProtoTestAssembly.Host, NUnitAttachmentPublisher.Instance)
-            .GetAwaiter()
-            .GetResult();
+        _scope = ProtoTestAsync.RunSync(() => new ValueTask<ProtoTestScope>(ProtoTestScope.StartAsync(
+            preparation, ProtoTestAssembly.Host, NUnitAttachmentPublisher.Instance)));
     }
 
     public void AfterTest(ITest test)
     {
+        if (_scope is null)
+        {
+            return;
+        }
+
+        _scope.Result = MapResult();
+        ProtoTestAsync.RunSync(() => _scope.DisposeAsync());
+        _scope = null;
+    }
+
+    private static ProtoTestResult MapResult()
+    {
         var nunitResult = TestContext.CurrentContext.Result;
-        var result = nunitResult.Outcome.Status switch
+        return nunitResult.Outcome.Status switch
         {
             TestStatus.Passed => ProtoTestResult.Passed,
             TestStatus.Failed => ProtoTestResult.Failed(
-                "NUnit",
+                FrameworkName,
                 nunitResult.Outcome.Label ?? TestStatus.Failed.ToString(),
                 string.IsNullOrWhiteSpace(nunitResult.Message)
                     ? "NUnit reported a failed test without a failure message."
@@ -46,12 +60,5 @@ public class ProtoTestAttribute : TestAttribute, ITestAction
             TestStatus.Warning => ProtoTestResult.Partial,
             _ => ProtoTestResult.Unknown
         };
-
-        // Execute async post-test hooks, dispose the context scope, and clear ambient state.
-        ProtoTestAssembly.Host
-            .CompleteTestAsync(result)
-            .GetAwaiter()
-            .GetResult();
     }
-
 }

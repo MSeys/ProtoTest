@@ -9,8 +9,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
-using ProtoTest.Http;
 using ProtoTest.GraphQL.Internal;
+using ProtoTest.Http;
 using ProtoTest.Json;
 
 public sealed class GraphQLRequestBuilder
@@ -214,7 +214,7 @@ public sealed class GraphQLRequestBuilder
             throw new InvalidOperationException("Subscriptions return a stream. Use SubscribeAsync instead of ExecuteAsync.");
         var identifier = $"{operation.Type} {operation.Name ?? "<anonymous>"}";
         var operationScope = _context.Trace
-            .Operation("graphql.operation", $"GraphQL · {identifier}", "ProtoTest.GraphQL")
+            .Operation("graphql.operation", $"GraphQL · {identifier}", ProtoGraphQLBuilder.Protocol.TraceSource)
             .ForClient(typeof(HttpClient), _targetName)
             .With("graphql.operation.type", operation.Type)
             .With("graphql.operation.name", operation.Name);
@@ -227,7 +227,7 @@ public sealed class GraphQLRequestBuilder
         var stopwatch = Stopwatch.StartNew();
         Uri endpoint;
         using var resolveOperation = _context.Trace
-            .Operation("graphql.endpoint.resolve", $"Resolve endpoint · {_targetName}", "ProtoTest.GraphQL")
+            .Operation("graphql.endpoint.resolve", $"Resolve endpoint · {_targetName}", ProtoGraphQLBuilder.Protocol.TraceSource)
             .With("client.name", _targetName)
             .Begin();
         try
@@ -273,8 +273,19 @@ public sealed class GraphQLRequestBuilder
                 rawResponse = exchange.Response;
                 var content = exchange.Body;
                 stopwatch.Stop();
-                var response = new GraphQLResponse(rawResponse, content, stopwatch.Elapsed, _context, _targetName, identifier, operation,
-                    attachmentOptions, prepared.AttachmentPrefix, traceOperation.Id, _simpleRootField);
+                var response = new GraphQLResponse(
+                    rawResponse,
+                    content,
+                    stopwatch.Elapsed,
+                    new ProtoHttpResponseContext(
+                        Execution: _context,
+                        TargetName: _targetName,
+                        Identifier: identifier,
+                        AttachmentOptions: attachmentOptions,
+                        AttachmentPrefix: prepared.AttachmentPrefix,
+                        RequestTraceId: traceOperation.Id),
+                    operation,
+                    _simpleRootField);
 
                 if (attachmentOptions?.CaptureResponses == true)
                     _context.AddAttachment(
@@ -287,7 +298,7 @@ public sealed class GraphQLRequestBuilder
 
                 _context.RecordObservation(new ProtoObservation(
                     _targetName,
-                    "graphql.response",
+                    ProtoGraphQLBuilder.Protocol.ResponseObservationKind,
                     identifier,
                     new GraphQLResponseData(
                         operation.Type,
@@ -482,7 +493,7 @@ public sealed class GraphQLRequestBuilder
             var attachmentOptions = _context.ResolveAttachmentOptions(ProtoGraphQLBuilder.ProtocolName);
             var requestNumber = attachmentOptions is null
                 ? (int?)null
-                : (_context.TryResolve<GraphQLContextState>()
+                : (_context.TryResolve<ProtoHttpContextState>(ProtoGraphQLBuilder.Protocol.Key)
                     ?? throw new InvalidOperationException("GraphQL context state was not initialized.")).NextRequestNumber();
             var attachmentPrefix = requestNumber is null ? null : $"graphql-{requestNumber:00}";
             if (attachmentOptions?.CaptureRequestBodies == true)
@@ -554,7 +565,7 @@ public sealed class GraphQLRequestBuilder
         _context.Trace.WriteEvent(
             "graphql.subscription.start",
             $"GraphQL subscription · {operation.Name ?? "<anonymous>"}",
-            "ProtoTest.GraphQL",
+            ProtoGraphQLBuilder.Protocol.TraceSource,
             outcome: ProtoTraceOutcome.Succeeded,
             attributes: attributes);
     }
@@ -704,7 +715,7 @@ public sealed class GraphQLRequestBuilder
         => _context.Trace.WriteEvent(
             kind,
             name,
-            "ProtoTest.GraphQL",
+            ProtoGraphQLBuilder.Protocol.TraceSource,
             outcome: ProtoTraceOutcome.Succeeded,
             attributes: attributes);
 

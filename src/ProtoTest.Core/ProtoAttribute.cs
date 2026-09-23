@@ -1,4 +1,4 @@
-﻿namespace ProtoTest.Core;
+namespace ProtoTest.Core;
 
 /// <summary>
 /// Base attribute for defining test-level or class-level lifecycle execution hooks.

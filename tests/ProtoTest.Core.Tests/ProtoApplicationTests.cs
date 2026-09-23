@@ -19,7 +19,7 @@ public sealed class ProtoApplicationTests
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync(
-            "application", TestMethod(), [new ApplicationAttribute("ControlPlane", "Rest:Billing")]);
+            "application", TestMethods.Placeholder, [new ApplicationAttribute("ControlPlane", "Rest:Billing")]);
 
         Assert.Multiple(() =>
         {
@@ -68,7 +68,7 @@ public sealed class ProtoApplicationTests
         builder.AddApplication("ControlPlane", app => app.RegisterClient("Rest", "Orders"));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("application", TestMethod(), [new ApplicationAttribute("ControlPlane")]);
+        var context = await host.StartTestAsync("application", TestMethods.Placeholder, [new ApplicationAttribute("ControlPlane")]);
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => ProtoApplicationResolution.ResolveClientName(context, "GraphQL"));
@@ -77,10 +77,5 @@ public sealed class ProtoApplicationTests
         await host.CompleteTestAsync(ProtoTestResult.Passed);
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(ProtoApplicationTests).GetMethod(nameof(Placeholder), BindingFlags.Static | BindingFlags.NonPublic)!;
 
-    private static void Placeholder()
-    {
-    }
 }

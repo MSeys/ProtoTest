@@ -1,13 +1,13 @@
 namespace ProtoTest.Sql.Tests;
 
+using System.Data;
+using System.Data.Common;
+using System.Reflection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Sql.EntityFrameworkCore;
-using System.Data;
-using System.Data.Common;
-using System.Reflection;
 
 [TestFixture]
 [NonParallelizable]
@@ -42,7 +42,7 @@ public sealed class RegistrationIdempotencyTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("sql idempotent", TestMethod());
+        await host.StartTestAsync("sql idempotent", TestMethods.Placeholder);
 
         var connection = Proto.Context.SqlConnection();
         Assert.Multiple(() =>
@@ -65,7 +65,7 @@ public sealed class RegistrationIdempotencyTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("sql composed options", TestMethod());
+        await host.StartTestAsync("sql composed options", TestMethods.Placeholder);
 
         Assert.Multiple(() =>
         {
@@ -96,7 +96,7 @@ public sealed class RegistrationIdempotencyTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("ef idempotent", TestMethod());
+        await host.StartTestAsync("ef idempotent", TestMethods.Placeholder);
 
         var context = Proto.Context.Sql<WidgetDbContext>();
         context.Widgets.Add(new Widget { Name = "gear" });
@@ -144,7 +144,7 @@ public sealed class RegistrationIdempotencyTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("ef host registered", TestMethod());
+        await host.StartTestAsync("ef host registered", TestMethods.Placeholder);
 
         var context = Proto.Context.Sql<WidgetDbContext>();
         Assert.That(context.Database.GetDbConnection(), Is.SameAs(Proto.Context.SqlConnection()),
@@ -172,7 +172,7 @@ public sealed class RegistrationIdempotencyTests
 
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("ef proto-first order", TestMethod());
+        await host.StartTestAsync("ef proto-first order", TestMethods.Placeholder);
 
         var context = Proto.Context.Sql<WidgetDbContext>();
         Assert.That(context.Database.GetDbConnection(), Is.SameAs(Proto.Context.SqlConnection()),
@@ -205,7 +205,7 @@ public sealed class RegistrationIdempotencyTests
         await host.StartAsync();
 
         var exception = Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await host.StartTestAsync("ef own connection", TestMethod()));
+            async () => await host.StartTestAsync("ef own connection", TestMethods.Placeholder));
 
         Assert.Multiple(() =>
         {
@@ -234,9 +234,6 @@ public sealed class RegistrationIdempotencyTests
             "One SQL connection hook plus one enlistment hook for the context.");
     }
 
-    private static MethodInfo TestMethod()
-        => typeof(RegistrationIdempotencyTests).GetMethod(
-            nameof(SampleTest), BindingFlags.NonPublic | BindingFlags.Static)!;
 
     private static void SampleTest()
     {

@@ -2,7 +2,7 @@
 
 ## Questions and usage help
 
-Start with the [documentation](https://prototest.dev/docs/) and [troubleshooting guide](https://prototest.dev/docs/getting-started/troubleshooting). If something remains unclear, open a [GitHub issue](https://github.com/MSeys/ProtoTest/issues/new) so the answer stays useful to other users.
+Start with the [documentation](https://prototest.dev/docs/) and [troubleshooting guide](https://prototest.dev/docs/getting-started/troubleshooting). If something remains unclear, ask in the [GitHub Discussions](https://github.com/MSeys/ProtoTest/discussions) so the answer stays useful to other users.
 
 ## Bugs and feature ideas
 

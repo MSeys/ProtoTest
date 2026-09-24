@@ -57,6 +57,15 @@ public sealed class Program
             .WithMetadata(new ProducesResponseTypeMetadata(StatusCodes.Status200OK, typeof(string), ["text/html"]));
         app.MapGet("/api/orders", () => Results.Ok(new[] { "order-1" }));
         app.MapGet("/orders/{id}", (string id) => Results.Ok(new { Id = id }));
+        app.MapPost("/benchmark/orders", (BenchmarkOrderRequest request) =>
+        {
+            var id = Guid.NewGuid().ToString("N");
+            return Results.Created(
+                $"/benchmark/orders/{id}",
+                new { id, product = request.Product, quantity = request.Quantity, status = "pending" });
+        });
+        app.MapGet("/benchmark/orders/{id}", (string id) =>
+            Results.Ok(new { id, product = "notebook", quantity = 2, status = "pending" }));
         app.MapGet("/cookies/set", (HttpContext context) =>
         {
             context.Response.Cookies.Append("prototest", "chocolate", new CookieOptions { Path = "/" });
@@ -87,3 +96,9 @@ public static class LatePageState
 {
     public static bool Enabled { get; set; }
 }
+
+/// <summary>
+/// The create request the overhead benchmark posts: one shared shape so the raw stack and the ProtoTest
+/// version of the short test send identical bodies.
+/// </summary>
+public sealed record BenchmarkOrderRequest(string Product, int Quantity);

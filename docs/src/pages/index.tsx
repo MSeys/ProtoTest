@@ -8,7 +8,8 @@ import TabbedCode, {type CodeTab} from '@site/src/components/TabbedCode';
 import Comparison from '@site/src/components/Comparison';
 import {comparisonConcerns, withoutProtoTest, withProtoTest} from '@site/src/data/comparison';
 import CoverageMap from '@site/src/components/CoverageMap';
-import TraceView from '@site/src/components/TraceView';
+import ReleaseFeed from '@site/src/components/ReleaseFeed';
+import ViewerWalkthrough from '@site/src/components/ViewerWalkthrough';
 import CapabilityIndex from '@site/src/components/CapabilityIndex';
 import VisibilityPanel from '@site/src/components/VisibilityPanel';
 import styles from './index.module.css';
@@ -294,7 +295,10 @@ function Hero() {
               wait for an event, inspect a database, drive a browser or verify a generated file.
             </p>
             <div className={styles.heroButtons}>
-              <Link className={`${styles.btn} ${styles.btnPrimary}`} to="/docs/getting-started/installation">
+              <Link className={`${styles.btn} ${styles.btnPrimary}`} href="https://trace.prototest.dev/?demo=1">
+                See a failing test's trace
+              </Link>
+              <Link className={`${styles.btn} ${styles.btnSecondary}`} to="/docs/getting-started/installation">
                 Get started
               </Link>
               <Link className={`${styles.btn} ${styles.btnSecondary}`} to="https://github.com/MSeys/ProtoTest">
@@ -339,20 +343,20 @@ function TraceSection() {
           <div className={styles.featureCopy}>
             <Heading as="h2">Following a failed test</Heading>
             <p>
-              This example uses a deliberately wrong REST expectation. The trace starts at the failed check,
-              shows the values that differed and keeps the setup, request and cleanup around it. Hooks, clients,
-              requests and checks are recorded under the phase where they ran.
+              Step through the three views of the bundled demo trace: the run first, then the failed test's
+              story, then the check itself - the values that differed, the exception and the line that made
+              the assertion.
             </p>
             <div className={styles.featureLinks}>
               <Link className={styles.featureLink} href="https://trace.prototest.dev/?demo=1">
-                Open a sample trace ↗
+                Open the failing trace ↗
               </Link>
               <Link className={styles.featureLink} to="/docs/observability/prototrace">
                 How ProtoTrace works →
               </Link>
             </div>
           </div>
-          <TraceView />
+          <ViewerWalkthrough />
         </div>
       </div>
     </section>
@@ -511,6 +515,7 @@ export default function Home(): ReactNode {
         <LayersSection />
         <CtaSection />
       </main>
+      <ReleaseFeed />
     </Layout>
   );
 }

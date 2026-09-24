@@ -8,6 +8,26 @@ Thanks for helping make integration tests easier to build and explain. Bug repor
 - For a substantial API, package or architecture change, open an issue first. A short design conversation can prevent a large patch from heading in the wrong direction.
 - Keep a contribution focused. Unrelated cleanup is easier to review separately.
 
+## Context lookups
+
+ProtoTest has three scopes, and each has exactly one way to reach it:
+
+- **Inside a test, on the test's flow** — use `Proto.Context`. This covers test bodies,
+  test-author entries (`context.Data().For<T>()`, `row.ShouldMatchShape(...)`,
+  `exception.ShouldHaveStatus(...)`) and the plumbing they call. Prefer passing the context down
+  from an entry when the callee is easy to construct directly in a test; do not thread it through
+  purely for style.
+- **Run scope** — use the host: the reference a hook receives at registration, or
+  `ProtoHost.CurrentHost`. There is no ambient run context: run hooks and report building run
+  outside any test.
+- **Off the test's flow** — telemetry callbacks and library threads (a message consumer's delivery
+  callbacks, a span processor's worker) use `ProtoHost.FindTraceWriter(activity)` and correlate by
+  W3C trace id. `Proto.Context` cannot answer there, because there is no flow-local test.
+
+An object whose lifetime spans tests (a broker, a browser pool, a run-scoped resource) must not hold
+a test context; it resolves per call, and only when it acts on the test's flow. Release callbacks get
+their trace writer from `ProtoResourceReleaseContext`.
+
 ## Build and test
 
 ProtoTest requires the .NET 8, 9 and 10 SDKs. Node.js 20 or newer is needed for the documentation and trace viewer.

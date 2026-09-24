@@ -243,7 +243,7 @@ public sealed class WebCoverageCollectorTests
     [Test]
     public void VueRouteDiscovery_ShouldNormalizeDynamicSegments()
     {
-        var parsed = VueRouteDiscovery.Parse("""["/users/:id","/orders/:id?","/legacy/*"]""").ToArray();
+        var parsed = VueRouteParser.Parse("""["/users/:id","/orders/:id?","/legacy/*"]""").ToArray();
 
         Assert.That(parsed, Is.EqualTo(new[] { "/users/{id}", "/orders/{id}", "/legacy/{...}" }));
     }
@@ -251,7 +251,7 @@ public sealed class WebCoverageCollectorTests
     [Test]
     public void VueRouteDiscovery_ShouldKeepTheRootRoute()
     {
-        var parsed = VueRouteDiscovery.Parse("""["/","/users/:id"]""").ToArray();
+        var parsed = VueRouteParser.Parse("""["/","/users/:id"]""").ToArray();
 
         Assert.That(parsed, Is.EqualTo(new[] { "/", "/users/{id}" }),
             "the root route is a page like any other, not an empty route definition");
@@ -260,7 +260,7 @@ public sealed class WebCoverageCollectorTests
     [Test]
     public void VueRouteDiscovery_ShouldMapRegexAndTrailingSplatsAndIgnoreRelativePaths()
     {
-        var parsed = VueRouteDiscovery.Parse(
+        var parsed = VueRouteParser.Parse(
             """["/docs/:pathMatch(.*)*","/files/:rest*","/items/:id(\\d+)","child",""]""").ToArray();
 
         Assert.That(parsed, Is.EqualTo(new[] { "/docs/{...}", "/files/{...}", "/items/{id}" }),

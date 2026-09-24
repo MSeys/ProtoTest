@@ -24,8 +24,8 @@ public static class ProtoHostBuilderExtensions
         where TCondition : class, IWebWaitCondition
     {
         ArgumentNullException.ThrowIfNull(builder);
-        var waitTimeout = timeout ?? TimeSpan.FromSeconds(5);
-        var waitPollInterval = pollInterval ?? TimeSpan.FromMilliseconds(50);
+        var waitTimeout = timeout ?? WebTiming.DefaultTimeout;
+        var waitPollInterval = pollInterval ?? WebTiming.DefaultPollInterval;
         if (waitTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout));
         if (waitPollInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(pollInterval));
         var selectedOperations = operations.Length == 0

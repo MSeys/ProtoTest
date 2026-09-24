@@ -26,8 +26,18 @@ using ProtoTest.Core.Internal;
 /// package.json walk is bounded to
 /// <see cref="MaxPackageJsonLevels"/> folders, and the file walk to <see cref="MaxSourceFiles"/>.
 /// </summary>
-internal static class WebPageSourceScanner
+internal sealed class WebPageSourceScanner : IWebPageSourceScanner
 {
+    private readonly Dictionary<WebPageFramework, IPageSourceStrategy> _strategies = new()
+    {
+        [WebPageFramework.Next] = new NextPageSourceStrategy(),
+        [WebPageFramework.Nuxt] = new NuxtPageSourceStrategy(),
+        [WebPageFramework.Remix] = new RemixPageSourceStrategy(),
+        [WebPageFramework.Vue] = new RouteLiteralPageSourceStrategy(),
+        [WebPageFramework.React] = new RouteLiteralPageSourceStrategy()
+    };
+
+    private readonly RouteLiteralPageSourceStrategy _routeLiterals = new();
     private static readonly string[] RouteExtensions = [".ts", ".tsx", ".js", ".jsx", ".vue"];
     private static readonly string[] SkippedDirectories = ["node_modules", "dist", "build", ".next", "coverage"];
     private static readonly string[] NextSpecialPages = ["_app", "_document", "_error", "404", "500", "_middleware"];
@@ -46,39 +56,23 @@ internal static class WebPageSourceScanner
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     /// <summary>
-    /// Discovers normalized route patterns from <paramref name="sourceFolder"/>, absolute or relative to
-    /// <see cref="AppContext.BaseDirectory"/>. <paramref name="framework"/> is <c>auto</c> (default) or one
-    /// of <c>next</c>, <c>nuxt</c>, <c>remix</c>, <c>vue</c>, <c>react</c>; an unknown value falls back to
-    /// <c>auto</c>.
+    /// Discovers normalized route patterns from the options' source folder, absolute or relative to
+    /// <see cref="AppContext.BaseDirectory"/>, scanned as the options' framework (auto-detected when it
+    /// is <see cref="WebPageFramework.Auto"/>).
     /// </summary>
-    public static IReadOnlyList<string> Discover(string? sourceFolder, string? framework)
+    public IReadOnlyList<string> Discover(WebPageSourceOptions options)
     {
-        var folder = ResolveFolder(sourceFolder);
+        ArgumentNullException.ThrowIfNull(options);
+        var folder = ResolveFolder(options.SourceFolder);
         if (folder is null) return [];
 
         try
         {
             if (!Directory.Exists(folder)) return [];
-            var kind = ParseFramework(framework);
-            if (kind == Framework.Auto) kind = Detect(folder);
+            var framework = options.Framework == WebPageFramework.Auto ? Detect(folder) : options.Framework;
+            var strategy = _strategies.TryGetValue(framework, out var found) ? found : _routeLiterals;
             var routes = new SortedSet<string>(StringComparer.Ordinal);
-            switch (kind)
-            {
-                case Framework.Next:
-                    ScanPagesDirectory(folder, routes, skipApiSegment: true);
-                    ScanAppRouter(folder, routes);
-                    break;
-                case Framework.Nuxt:
-                    ScanPagesDirectory(folder, routes, skipApiSegment: false);
-                    break;
-                case Framework.Remix:
-                    ScanRemixRoutes(folder, routes);
-                    break;
-                default:
-                    ScanRouteLiterals(folder, routes);
-                    break;
-            }
-
+            strategy.Collect(folder, routes);
             return [.. routes];
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -117,33 +111,11 @@ internal static class WebPageSourceScanner
         => path.Equals(baseDirectory, StringComparison.OrdinalIgnoreCase)
            || path.StartsWith(baseDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
            || path.StartsWith(baseDirectory + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
-
-    internal enum Framework
-    {
-        Auto,
-        Next,
-        Nuxt,
-        Remix,
-        Vue,
-        React
-    }
-
-    private static Framework ParseFramework(string? value)
-        => value?.Trim().ToLowerInvariant() switch
-        {
-            "next" => Framework.Next,
-            "nuxt" => Framework.Nuxt,
-            "remix" => Framework.Remix,
-            "vue" => Framework.Vue,
-            "react" => Framework.React,
-            _ => Framework.Auto
-        };
-
     /// <summary>Detects the framework from the nearest <c>package.json</c>, then from the folder layout.</summary>
-    private static Framework Detect(string folder)
+    private static WebPageFramework Detect(string folder)
     {
         var fromPackage = DetectFromPackageJson(folder);
-        return fromPackage != Framework.Auto ? fromPackage : DetectFromLayout(folder);
+        return fromPackage != WebPageFramework.Auto ? fromPackage : DetectFromLayout(folder);
     }
 
     /// <summary>
@@ -151,7 +123,7 @@ internal static class WebPageSourceScanner
     /// up from the resolved folder. The first package file found is the project boundary: the walk stops
     /// there, so a parent repository's dependencies never decide how this folder is scanned.
     /// </summary>
-    private static Framework DetectFromPackageJson(string folder)
+    private static WebPageFramework DetectFromPackageJson(string folder)
     {
         var current = new DirectoryInfo(folder);
         for (var level = 0; current is not null && level <= MaxPackageJsonLevels; level++, current = current.Parent)
@@ -160,66 +132,66 @@ internal static class WebPageSourceScanner
             if (File.Exists(package)) return ReadPackageFramework(package);
         }
 
-        return Framework.Auto;
+        return WebPageFramework.Auto;
     }
 
-    private static Framework ReadPackageFramework(string package)
+    private static WebPageFramework ReadPackageFramework(string package)
     {
         try
         {
             using var document = JsonDocument.Parse(File.ReadAllText(package));
             var root = document.RootElement;
-            if (HasDependency(root, "next")) return Framework.Next;
-            if (HasDependency(root, "nuxt")) return Framework.Nuxt;
+            if (HasDependency(root, "next")) return WebPageFramework.Next;
+            if (HasDependency(root, "nuxt")) return WebPageFramework.Nuxt;
             if (HasDependency(root, "@remix-run/react")
                 || HasDependency(root, "@remix-run/node")
                 || HasDependency(root, "@remix-run/dev"))
             {
-                return Framework.Remix;
+                return WebPageFramework.Remix;
             }
 
-            if (HasDependency(root, "vue")) return Framework.Vue;
-            if (HasDependency(root, "react")) return Framework.React;
+            if (HasDependency(root, "vue")) return WebPageFramework.Vue;
+            if (HasDependency(root, "react")) return WebPageFramework.React;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
         {
         }
 
-        return Framework.Auto;
+        return WebPageFramework.Auto;
     }
 
     private static bool HasDependency(JsonElement root, string name)
         => (root.TryGetProperty("dependencies", out var dependencies) && dependencies.TryGetProperty(name, out _))
            || (root.TryGetProperty("devDependencies", out var devDependencies) && devDependencies.TryGetProperty(name, out _));
 
-    internal static Framework DetectFromLayout(string folder)
+    internal static WebPageFramework DetectFromLayout(string folder)
     {
-        if (HasFile(folder, "next.config.*")) return Framework.Next;
-        if (HasFile(folder, "nuxt.config.*")) return Framework.Nuxt;
+        if (HasFile(folder, "next.config.*")) return WebPageFramework.Next;
+        if (HasFile(folder, "nuxt.config.*")) return WebPageFramework.Nuxt;
         if (Directory.Exists(Path.Combine(folder, "app", "routes")))
         {
             // A Next.js app-router project can own an app/routes folder; page.* files anywhere under
             // app/ mean Next, not Remix.
             return HasFile(Path.Combine(folder, "app"), "page.*", SearchOption.AllDirectories)
                    || HasFile(Path.Combine(folder, "src", "app"), "page.*", SearchOption.AllDirectories)
-                ? Framework.Next
-                : Framework.Remix;
+                ? WebPageFramework.Next
+                : WebPageFramework.Remix;
         }
 
         if (HasFile(Path.Combine(folder, "app"), "page.*")
             || HasFile(Path.Combine(folder, "src", "app"), "page.*"))
         {
-            return Framework.Next;
+            return WebPageFramework.Next;
         }
 
         foreach (var pages in new[] { Path.Combine(folder, "pages"), Path.Combine(folder, "src", "pages") })
         {
             if (Directory.Exists(pages)) return HasExtension(pages, ".vue", SearchOption.AllDirectories)
-                ? Framework.Nuxt
-                : Framework.Next;
+                ? WebPageFramework.Nuxt
+                : WebPageFramework.Next;
         }
 
-        return Framework.Auto;
+        return WebPageFramework.Auto;
     }
 
     /// <summary>
@@ -458,5 +430,40 @@ internal static class WebPageSourceScanner
         {
             return false;
         }
+    }
+
+    /// <summary>One framework's route discovery over a source folder.</summary>
+    private interface IPageSourceStrategy
+    {
+        void Collect(string folder, SortedSet<string> routes);
+    }
+
+    /// <summary>Next.js: <c>pages/</c> without its api handlers, plus the <c>app/</c> router.</summary>
+    private sealed class NextPageSourceStrategy : IPageSourceStrategy
+    {
+        public void Collect(string folder, SortedSet<string> routes)
+        {
+            ScanPagesDirectory(folder, routes, skipApiSegment: true);
+            ScanAppRouter(folder, routes);
+        }
+    }
+
+    /// <summary>Nuxt: <c>pages/</c>, including the folders its api convention uses.</summary>
+    private sealed class NuxtPageSourceStrategy : IPageSourceStrategy
+    {
+        public void Collect(string folder, SortedSet<string> routes)
+            => ScanPagesDirectory(folder, routes, skipApiSegment: false);
+    }
+
+    /// <summary>Remix: flat <c>app/routes/</c> file names.</summary>
+    private sealed class RemixPageSourceStrategy : IPageSourceStrategy
+    {
+        public void Collect(string folder, SortedSet<string> routes) => ScanRemixRoutes(folder, routes);
+    }
+
+    /// <summary>Vue Router and React Router path literals; also the auto-detect fallback.</summary>
+    private sealed class RouteLiteralPageSourceStrategy : IPageSourceStrategy
+    {
+        public void Collect(string folder, SortedSet<string> routes) => ScanRouteLiterals(folder, routes);
     }
 }

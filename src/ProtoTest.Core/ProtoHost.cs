@@ -60,6 +60,16 @@ public sealed class ProtoHost : IAsyncDisposable
         => ProtoHostRegistry.FindTraceWriter(traceId);
 
     /// <summary>
+    /// Finds the trace writer for a span: the supplied activity, or <see cref="Activity.Current"/> when
+    /// none is given. The one-line form for a telemetry callback that has an activity in hand.
+    /// </summary>
+    public static IProtoTraceWriter? FindTraceWriter(Activity? activity = null)
+    {
+        var span = activity ?? Activity.Current;
+        return span is null ? null : FindTraceWriter(span.TraceId);
+    }
+
+    /// <summary>
     /// Returns whether the host is composed with a capability of the given kind (optionally a specific
     /// name). Integrations declare capabilities when they are configured, so this answers what the host
     /// can actually do rather than what it was asked to do.

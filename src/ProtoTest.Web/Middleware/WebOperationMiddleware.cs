@@ -67,7 +67,6 @@ public sealed class WebOperationContext
     public string SessionName { get; }
     public string CorrelationId { get; }
     public WebElementReference? Element { get; }
-    public object? Result { get; internal set; }
     internal IWebBackend Backend { get; }
 }
 

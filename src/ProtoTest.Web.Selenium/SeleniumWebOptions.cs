@@ -1,6 +1,7 @@
 namespace ProtoTest.Web.Selenium;
 
 using ProtoTest.Core;
+using ProtoTest.Web.Internal;
 
 public enum SeleniumDiagnosticTraceRetention
 {
@@ -20,8 +21,8 @@ public sealed class SeleniumWebOptions : IProtoConfigurableOptions
 
     string IProtoConfigurableOptions.ConfigurationSectionName => ConfigurationSectionName;
 
-    public TimeSpan ActionTimeout { get; set; } = TimeSpan.FromSeconds(5);
-    public TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(50);
+    public TimeSpan ActionTimeout { get; set; } = WebTiming.DefaultTimeout;
+    public TimeSpan PollInterval { get; set; } = WebTiming.DefaultPollInterval;
     public bool WaitForStableBounds { get; set; } = true;
     public bool CheckClickObstruction { get; set; } = true;
     public SeleniumDiagnosticTraceRetention DiagnosticTraceRetention { get; set; } = SeleniumDiagnosticTraceRetention.OnWebFailure;

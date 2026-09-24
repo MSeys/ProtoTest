@@ -62,6 +62,26 @@ internal static class WebFailureArtifacts
         return attachments;
     }
 
+    /// <summary>
+    /// Records a diagnostics capture that could not be attached, so one failed artifact never fails the
+    /// test and every backend reports the failure the same way.
+    /// </summary>
+    public static void TraceArtifactFailure(
+        ProtoExecutionContext context,
+        string traceSource,
+        string label,
+        string artifact,
+        Exception exception,
+        string? parentId = null)
+        => context.Trace.WriteEvent(
+            "web.diagnostics.artifact_failed",
+            $"{label} diagnostic failed · {artifact}",
+            traceSource,
+            outcome: ProtoTraceOutcome.Failed,
+            attributes: new Dictionary<string, string?> { ["web.artifact"] = artifact },
+            exception: exception,
+            parentId: parentId);
+
     private static async ValueTask CaptureAsync(
         ProtoExecutionContext context,
         string traceSource,
@@ -79,13 +99,7 @@ internal static class WebFailureArtifacts
         }
         catch (Exception exception)
         {
-            context.Trace.WriteEvent(
-                "web.diagnostics.artifact_failed",
-                $"{backendName} diagnostic failed · {artifact}",
-                traceSource,
-                outcome: ProtoTraceOutcome.Failed,
-                attributes: new Dictionary<string, string?> { ["web.artifact"] = artifact },
-                exception: exception);
+            TraceArtifactFailure(context, traceSource, backendName, artifact, exception);
         }
     }
 }

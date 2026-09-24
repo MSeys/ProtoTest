@@ -27,7 +27,8 @@ public sealed class WebFlow<TComponent> where TComponent : WebComponent
 {
     WebFlow<TComponent> Fill(Func<TComponent, WebElement> element, string value);
     WebFlow<TComponent> Click(Func<TComponent, WebElement> element);
-    WebFlow<TComponent> Check(Func<TComponent, WebElement> element, bool isChecked = true);
+    WebFlow<TComponent> Check(Func<TComponent, WebElement> element);
+    WebFlow<TComponent> Uncheck(Func<TComponent, WebElement> element);
     WebFlow<TComponent> Select(Func<TComponent, WebElement> element, string value);
     WebFlow<TComponent> Press(Func<TComponent, WebElement> element, WebKey key);
     WebFlow<TComponent> Do(Func<TComponent, CancellationToken, ValueTask> interaction);
@@ -35,7 +36,7 @@ public sealed class WebFlow<TComponent> where TComponent : WebComponent
 }
 ```
 
-`Check(..., isChecked: false)` unchecks. `Do` runs anything else — including assertions — as a step:
+`Check` checks and `Uncheck` unchecks. `Do` runs anything else — including assertions — as a step:
 
 ```csharp
 await dialog.Flow("Confirm deletion")

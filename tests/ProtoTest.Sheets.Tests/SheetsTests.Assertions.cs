@@ -111,7 +111,7 @@ public sealed partial class SheetsTests
 
         model.Column(row => row.Amount).ShouldNot.Be([100m, 200m]);
         var sort = Assert.Throws<SpreadsheetAssertionException>(
-            () => model.Column(row => row.Amount).ShouldNot.BeSortedBy(ascending: false));
+            () => model.Column(row => row.Amount).ShouldNot.BeSortedBy(ProtoSortDirection.Descending));
         var exception = Assert.Throws<SpreadsheetAssertionException>(
             () => model.Column(row => row.Amount).ShouldNot.Be([1200m, 900m]));
 

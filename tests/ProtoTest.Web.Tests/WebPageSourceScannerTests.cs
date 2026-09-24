@@ -1,10 +1,13 @@
 namespace ProtoTest.Web.Tests;
 
+using Microsoft.Extensions.Configuration;
+using ProtoTest.Web;
 using ProtoTest.Web.Internal;
 
 [TestFixture]
 public sealed class WebPageSourceScannerTests
 {
+    private readonly WebPageSourceScanner _scanner = new();
     private string _folder = null!;
 
     [SetUp]
@@ -41,7 +44,7 @@ public sealed class WebPageSourceScannerTests
         Write("pages/404.tsx");
         Write("pages/notes.md");
 
-        var routes = WebPageSourceScanner.Discover(_folder, "next");
+        var routes = Discover(_folder, WebPageFramework.Next);
 
         Assert.That(routes, Is.EqualTo(new[]
         {
@@ -62,7 +65,7 @@ public sealed class WebPageSourceScannerTests
         Write("pages/_middleware.ts");
         Write("src/pages/api/health.ts");
 
-        var routes = WebPageSourceScanner.Discover(_folder, "next");
+        var routes = Discover(_folder, WebPageFramework.Next);
 
         Assert.That(routes, Is.EqualTo(new[] { "/" }),
             "API handlers, test/spec files, declarations and framework specials are not pages");
@@ -81,7 +84,7 @@ public sealed class WebPageSourceScannerTests
         Write("app/template.tsx");
         Write("src/app/reports/page.tsx");
 
-        var routes = WebPageSourceScanner.Discover(_folder, "next");
+        var routes = Discover(_folder, WebPageFramework.Next);
 
         Assert.That(routes, Is.EqualTo(new[] { "/", "/about", "/reports", "/users/{id}" }));
     }
@@ -96,7 +99,7 @@ public sealed class WebPageSourceScannerTests
         Write("app/routes/users.$id.edit.tsx");
         Write("app/routes/files.$.tsx");
 
-        var routes = WebPageSourceScanner.Discover(_folder, "remix");
+        var routes = Discover(_folder, WebPageFramework.Remix);
 
         Assert.That(routes, Is.EqualTo(new[]
         {
@@ -104,10 +107,10 @@ public sealed class WebPageSourceScannerTests
         }), "a bare $ is a splat and maps to the rest pattern");
     }
 
-    [TestCase("vue")]
-    [TestCase("react")]
-    [TestCase("auto")]
-    public void RouteLiterals_ShouldCollectAbsoluteVueAndReactPatterns(string framework)
+    [TestCase(WebPageFramework.Vue)]
+    [TestCase(WebPageFramework.React)]
+    [TestCase(WebPageFramework.Auto)]
+    public void RouteLiterals_ShouldCollectAbsoluteVueAndReactPatterns(WebPageFramework framework)
     {
         Write("src/router/index.ts", """
             const routes = [
@@ -131,7 +134,7 @@ public sealed class WebPageSourceScannerTests
         Write("node_modules/pkg/routes.ts", "const routes = [{ path: '/ignored-package' }];");
         Write("dist/routes.js", "const routes = [{ path: '/ignored-build' }];");
 
-        var routes = WebPageSourceScanner.Discover(_folder, framework);
+        var routes = Discover(_folder, framework);
 
         Assert.That(routes, Is.EqualTo(new[]
         {
@@ -147,7 +150,7 @@ public sealed class WebPageSourceScannerTests
         Write("pages/orders.tsx");
         Write("src/ignored.ts", "const routes = [{ path: '/literal-only' }];");
 
-        var routes = WebPageSourceScanner.Discover(_folder, "auto");
+        var routes = Discover(_folder, WebPageFramework.Auto);
 
         Assert.That(routes, Is.EqualTo(new[] { "/", "/orders" }));
     }
@@ -159,7 +162,7 @@ public sealed class WebPageSourceScannerTests
         Write("pages/index.tsx");
         Write("src/router.ts", "export const routes = [{ path: '/login' }];");
 
-        var routes = WebPageSourceScanner.Discover(_folder, "auto");
+        var routes = Discover(_folder, WebPageFramework.Auto);
 
         Assert.That(routes, Is.EqualTo(new[] { "/login" }), "package.json wins over the pages layout");
     }
@@ -170,7 +173,7 @@ public sealed class WebPageSourceScannerTests
         Write("package.json", """{ "devDependencies": { "react": "^18.0.0" } }""");
         Write("src/App.tsx", """<Route path="/dashboard" />""");
 
-        var routes = WebPageSourceScanner.Discover(_folder, "auto");
+        var routes = Discover(_folder, WebPageFramework.Auto);
 
         Assert.That(routes, Is.EqualTo(new[] { "/dashboard" }));
     }
@@ -180,7 +183,7 @@ public sealed class WebPageSourceScannerTests
     {
         Write("app/routes/users.$id.tsx");
 
-        var routes = WebPageSourceScanner.Discover(_folder, "auto");
+        var routes = Discover(_folder, WebPageFramework.Auto);
 
         Assert.That(routes, Is.EqualTo(new[] { "/users/{id}" }));
     }
@@ -195,8 +198,8 @@ public sealed class WebPageSourceScannerTests
         Assert.Multiple(() =>
         {
             Assert.That(WebPageSourceScanner.DetectFromLayout(_folder),
-                Is.EqualTo(WebPageSourceScanner.Framework.Next));
-            Assert.That(WebPageSourceScanner.Discover(_folder, "auto"),
+                Is.EqualTo(WebPageFramework.Next));
+            Assert.That(Discover(_folder, WebPageFramework.Auto),
                 Is.EqualTo(new[] { "/routes/dashboard" }));
         });
     }
@@ -206,9 +209,9 @@ public sealed class WebPageSourceScannerTests
     {
         Assert.Multiple(() =>
         {
-            Assert.That(WebPageSourceScanner.Discover(null, "next"), Is.Empty);
-            Assert.That(WebPageSourceScanner.Discover("  ", "next"), Is.Empty);
-            Assert.That(WebPageSourceScanner.Discover(Path.Combine(_folder, "missing"), "next"), Is.Empty);
+            Assert.That(Discover(null, WebPageFramework.Next), Is.Empty);
+            Assert.That(Discover("  ", WebPageFramework.Next), Is.Empty);
+            Assert.That(Discover(Path.Combine(_folder, "missing"), WebPageFramework.Next), Is.Empty);
         });
     }
 
@@ -221,7 +224,7 @@ public sealed class WebPageSourceScannerTests
         try
         {
             var relative = Path.GetRelativePath(AppContext.BaseDirectory, folder);
-            var routes = WebPageSourceScanner.Discover(relative, "next");
+            var routes = Discover(relative, WebPageFramework.Next);
 
             Assert.Multiple(() =>
             {
@@ -247,7 +250,7 @@ public sealed class WebPageSourceScannerTests
         {
             Assert.That(WebPageSourceScanner.ResolveFolder(escaping), Is.Null,
                 "a relative folder may not escape the test assembly's base directory");
-            Assert.That(WebPageSourceScanner.Discover(escaping, "next"), Is.Empty);
+            Assert.That(Discover(escaping, WebPageFramework.Next), Is.Empty);
         });
     }
 
@@ -259,7 +262,7 @@ public sealed class WebPageSourceScannerTests
         Write("package.json", """{ "dependencies": { "vue": "^3.4.0" } }""");
         Write("a/b/c/d/pages/about.tsx");
 
-        var routes = WebPageSourceScanner.Discover(Path.Combine(_folder, "a", "b", "c", "d"), "auto");
+        var routes = Discover(Path.Combine(_folder, "a", "b", "c", "d"), WebPageFramework.Auto);
 
         Assert.That(routes, Is.EqualTo(new[] { "/about" }),
             "a package.json above the bounded walk does not decide the framework");
@@ -274,20 +277,30 @@ public sealed class WebPageSourceScannerTests
         Write("app/package.json", """{ "name": "inner" }""");
         Write("app/pages/index.tsx");
 
-        var routes = WebPageSourceScanner.Discover(Path.Combine(_folder, "app"), "auto");
+        var routes = Discover(Path.Combine(_folder, "app"), WebPageFramework.Auto);
 
         Assert.That(routes, Is.EqualTo(new[] { "/" }),
             "the inner package.json is the project boundary, so the pages layout decides");
     }
 
     [Test]
-    public void Discover_ShouldTreatUnknownFrameworkAsAuto()
+    public void SourceOptions_ShouldTreatUnknownFrameworkAsAuto()
     {
         Write("pages/about.tsx");
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [$"{WebPageSourceOptions.ConfigurationSectionName}:Source"] = _folder,
+            [$"{WebPageSourceOptions.ConfigurationSectionName}:Framework"] = "svelte"
+        }).Build();
 
-        var routes = WebPageSourceScanner.Discover(_folder, "svelte");
+        var options = WebPageSourceOptions.FromConfiguration(configuration);
 
-        Assert.That(routes, Is.EqualTo(new[] { "/about" }), "the pages layout is detected from the folder shape");
+        Assert.Multiple(() =>
+        {
+            Assert.That(options.Framework, Is.EqualTo(WebPageFramework.Auto));
+            Assert.That(_scanner.Discover(options), Is.EqualTo(new[] { "/about" }),
+                "the pages layout is detected from the folder shape");
+        });
     }
 
     [Test]
@@ -299,10 +312,10 @@ public sealed class WebPageSourceScannerTests
         Assert.Multiple(() =>
         {
             Assert.That(WebPageSourceScanner.DetectFromLayout(Path.Combine(_folder, "vuex-project")),
-                Is.EqualTo(WebPageSourceScanner.Framework.Next),
+                Is.EqualTo(WebPageFramework.Next),
                 "a Windows wildcard search for *.vue must not match .vuex");
             Assert.That(WebPageSourceScanner.DetectFromLayout(Path.Combine(_folder, "vue-project")),
-                Is.EqualTo(WebPageSourceScanner.Framework.Nuxt));
+                Is.EqualTo(WebPageFramework.Nuxt));
         });
     }
 
@@ -324,7 +337,7 @@ public sealed class WebPageSourceScannerTests
                     "cannot be exercised here.");
             }
 
-            var routes = WebPageSourceScanner.Discover(_folder, "next");
+            var routes = Discover(_folder, WebPageFramework.Next);
 
             Assert.That(routes, Is.EqualTo(new[] { "/", "/about" }),
                 "a self-referencing link cannot loop and an external link is not followed");
@@ -342,6 +355,9 @@ public sealed class WebPageSourceScannerTests
             }
         }
     }
+
+    private IReadOnlyList<string> Discover(string? folder, WebPageFramework framework)
+        => _scanner.Discover(new WebPageSourceOptions(folder, framework));
 
     private static void TryDeleteDirectoryLink(string path)
     {

@@ -6,16 +6,17 @@ using Microsoft.Playwright;
 using ProtoTest.Core;
 using ProtoTest.Web.Internal;
 
-public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics, IWebBackendDownloads
+public sealed partial class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics, IWebBackendDownloads
 {
+    /// <summary>The trace source every Playwright backend event declares.</summary>
+    internal const string TraceSource = "ProtoTest.Web.Playwright";
+
     private readonly ProtoExecutionContext _context;
     private readonly IBrowserContext _browserContext;
     private readonly PlaywrightWebOptions _options;
     private readonly string _sessionName;
-    private readonly SemaphoreSlim _traceGroupGate = new(1, 1);
-    private readonly ConcurrentDictionary<string, byte> _openTraceGroups = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, byte> _openOperations = new(StringComparer.Ordinal);
-    private string? _activeCorrelation;
+    private readonly PlaywrightCorrelationState _correlation = new();
+    private readonly PlaywrightLocatorTranslator _locators;
     private int _failureSequence;
     private bool _webFailure;
     private int _completeStarted;
@@ -33,6 +34,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         Page = page;
         _options = options;
         _sessionName = sessionName;
+        _locators = new PlaywrightLocatorTranslator(page);
         // Playwright's default is 30 seconds; the assertion polling contract needs one read or action to
         // give up inside its own budget, and Selenium already fails after ActionTimeout.
         Page.SetDefaultTimeout((float)_options.ActionTimeout.TotalMilliseconds);
@@ -43,7 +45,8 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     public IPage Page { get; }
     public IBrowserContext BrowserContext => _browserContext;
 
-    public string? CurrentAddress => Page.Url;
+    public ValueTask<string?> GetCurrentAddressAsync(CancellationToken cancellationToken = default)
+        => ValueTask.FromResult<string?>(Page.Url);
 
     /// <summary>
     /// Starts native trace correlation for a semantic operation. Grouping follows operation lineage: an
@@ -56,18 +59,17 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         WebBackendOperationContext operation,
         CancellationToken cancellationToken = default)
     {
-        if (operation.ParentCorrelationId is { } parent && _openOperations.ContainsKey(parent))
+        if (operation.ParentCorrelationId is { } parent && _correlation.IsOpen(parent))
         {
             // A nested operation never owns a trace group - its group-owning ancestor holds the gate -
             // but it is tracked while it runs so its own descendants keep resolving the lineage at any
             // depth. Without the registration a read inside a nested WaitUntil would look top-level and
             // start a group while the outer wait still holds the gate, deadlocking against itself.
-            _openOperations[operation.CorrelationId] = 0;
+            _correlation.Open(operation.CorrelationId);
             return ValueTask.CompletedTask;
         }
 
-        _openOperations[operation.CorrelationId] = 0;
-        Volatile.Write(ref _activeCorrelation, operation.CorrelationId);
+        _correlation.Open(operation.CorrelationId);
         if (_options.TraceRetention == PlaywrightTraceRetention.Off || !_options.CorrelateTraceGroups)
         {
             return ValueTask.CompletedTask;
@@ -80,16 +82,16 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         WebBackendOperationContext operation,
         CancellationToken cancellationToken)
     {
-        await _traceGroupGate.WaitAsync(cancellationToken);
+        await _correlation.TraceGroupGate.WaitAsync(cancellationToken);
         try
         {
             await _browserContext.Tracing.GroupAsync(
                 $"[{operation.CorrelationId}] [{operation.SessionName}] {operation.Name}");
-            _openTraceGroups[operation.CorrelationId] = 0;
+            _correlation.OpenTraceGroup(operation.CorrelationId);
         }
         catch (Exception exception)
         {
-            _traceGroupGate.Release();
+            _correlation.TraceGroupGate.Release();
             TraceDiagnosticFailure("group_start", exception, operation.CorrelationId);
         }
     }
@@ -100,14 +102,10 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         Exception? exception = null,
         CancellationToken cancellationToken = default)
     {
-        _openOperations.TryRemove(operation.CorrelationId, out _);
-        if (string.Equals(Volatile.Read(ref _activeCorrelation), operation.CorrelationId, StringComparison.Ordinal))
-        {
-            Volatile.Write(ref _activeCorrelation, null);
-        }
+        _correlation.Close(operation.CorrelationId);
 
         // Only the operation that opened the group ends it.
-        if (!_openTraceGroups.TryRemove(operation.CorrelationId, out _)) return ValueTask.CompletedTask;
+        if (!_correlation.CloseTraceGroup(operation.CorrelationId)) return ValueTask.CompletedTask;
         return EndTraceGroupAsync(operation);
     }
 
@@ -123,12 +121,9 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         }
         finally
         {
-            _traceGroupGate.Release();
+            _correlation.TraceGroupGate.Release();
         }
     }
-
-    /// <summary>The most recently opened operation on this session, used to parent native diagnostics.</summary>
-    private string? ActiveCorrelation => Volatile.Read(ref _activeCorrelation);
 
     internal static async ValueTask<PlaywrightWebBackend> CreateAsync(
         ProtoExecutionContext context,
@@ -142,7 +137,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         try
         {
             var browser = await pool.GetBrowserAsync(options, cancellationToken);
-            browserContext = await browser.NewContextAsync(options.Context);
+            browserContext = await browser.NewContextAsync(options.BuildContextOptions());
             if (options.TraceRetention != PlaywrightTraceRetention.Off)
             {
                 await browserContext.Tracing.StartAsync(new TracingStartOptions
@@ -198,13 +193,13 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     public async ValueTask PressAsync(WebElementReference element, WebKey key, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await ExecuteResolvedAsync(element, locator => locator.PressAsync(MapKey(key)));
+        await ExecuteResolvedAsync(element, locator => locator.PressAsync(PlaywrightLocatorTranslator.MapKey(key)));
     }
 
     public async ValueTask<int> CountAsync(WebElementReference elements, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return await Resolve(elements).CountAsync();
+        return await _locators.Resolve(elements).CountAsync();
     }
 
     public async ValueTask<string> ReadTextAsync(WebElementReference element, CancellationToken cancellationToken = default)
@@ -219,31 +214,34 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         return await ReadResolvedAsync(element, locator => locator.InputValueAsync());
     }
 
-    public async ValueTask<bool> IsVisibleAsync(WebElementReference element, CancellationToken cancellationToken = default)
+    public ValueTask<bool> IsVisibleAsync(WebElementReference element, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var locator = Resolve(element);
-        var count = await locator.CountAsync();
-        if (count > 1) throw WebBackendErrors.MultipleMatch(element.Locator, element.ComponentPath, count);
-        return count == 1 && await locator.IsVisibleAsync();
+        return ReadFlagAsync(element, locator => locator.IsVisibleAsync());
     }
 
-    public async ValueTask<bool> IsEnabledAsync(WebElementReference element, CancellationToken cancellationToken = default)
+    public ValueTask<bool> IsEnabledAsync(WebElementReference element, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var locator = Resolve(element);
-        var count = await locator.CountAsync();
-        if (count > 1) throw WebBackendErrors.MultipleMatch(element.Locator, element.ComponentPath, count);
-        return count == 1 && await locator.IsEnabledAsync();
+        return ReadFlagAsync(element, locator => locator.IsEnabledAsync());
     }
 
-    public async ValueTask<bool> IsCheckedAsync(WebElementReference element, CancellationToken cancellationToken = default)
+    public ValueTask<bool> IsCheckedAsync(WebElementReference element, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var locator = Resolve(element);
+        return ReadFlagAsync(element, locator => locator.IsCheckedAsync());
+    }
+
+    /// <summary>
+    /// Reads one boolean element state, rejecting a locator that matches more than one element the same
+    /// way the other operations do, and treating "no element" as false rather than an error.
+    /// </summary>
+    private async ValueTask<bool> ReadFlagAsync(WebElementReference element, Func<ILocator, Task<bool>> read)
+    {
+        var locator = _locators.Resolve(element);
         var count = await locator.CountAsync();
         if (count > 1) throw WebBackendErrors.MultipleMatch(element.Locator, element.ComponentPath, count);
-        return count == 1 && await locator.IsCheckedAsync();
+        return count == 1 && await read(locator);
     }
 
     public async ValueTask<bool> EvaluateBooleanAsync(string script, CancellationToken cancellationToken = default)
@@ -290,7 +288,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
         cancellationToken.ThrowIfCancellationRequested();
         return await WebFailureArtifacts.CaptureAsync(
             _context,
-            "ProtoTest.Web.Playwright",
+            TraceSource,
             "Playwright",
             _sessionName,
             failure,
@@ -301,15 +299,10 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     }
 
     /// <summary>
-    /// The sanitized current address, falling back to the raw address when sanitizing produces nothing
-    /// (for example <c>about:blank</c>), so the location artifact is never dropped.
+    /// The sanitized current address; a value that is not an absolute address (for example
+    /// <c>about:blank</c>) passes through, so the location artifact is never dropped.
     /// </summary>
-    private string CurrentLocation()
-    {
-        var address = Page.Url;
-        if (!Uri.TryCreate(address, UriKind.Absolute, out var uri)) return address;
-        return ProtoUriSanitizer.Sanitize(uri, null) ?? address;
-    }
+    private string? CurrentLocation() => ProtoUriSanitizer.ForDisplay(Page.Url);
 
     /// <summary>
     /// Runs one action against the resolved locator, translating Playwright's strict-mode violation into
@@ -318,33 +311,37 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     /// <see cref="PlaywrightWebOptions.ActionTimeout"/>. Without the translation, polling assertions and
     /// wait conditions would see a raw <c>PlaywrightException</c> instead of the documented failures.
     /// </summary>
-    private async ValueTask ExecuteResolvedAsync(WebElementReference element, Func<ILocator, Task> action)
-    {
-        var locator = Resolve(element);
-        try
-        {
-            await action(locator);
-        }
-        catch (TimeoutException)
-        {
-            throw WebBackendErrors.NotActionable(element, _options.ActionTimeout);
-        }
-        catch (PlaywrightException exception) when (IsStrictViolation(exception))
-        {
-            throw WebBackendErrors.MultipleMatch(element.Locator, element.ComponentPath, null);
-        }
-    }
+    private ValueTask<bool> ExecuteResolvedAsync(WebElementReference element, Func<ILocator, Task> action)
+        => RunResolvedAsync(
+            element,
+            async locator =>
+            {
+                await action(locator);
+                return true;
+            },
+            element => WebBackendErrors.NotActionable(element, _options.ActionTimeout));
 
-    private async ValueTask<T> ReadResolvedAsync<T>(WebElementReference element, Func<ILocator, Task<T>> read)
+    private ValueTask<T> ReadResolvedAsync<T>(WebElementReference element, Func<ILocator, Task<T>> read)
+        => RunResolvedAsync(element, read, element => WebBackendErrors.NotPresent(element, _options.ActionTimeout));
+
+    /// <summary>
+    /// Runs one operation against the resolved locator, translating Playwright's strict-mode violation
+    /// into the same <see cref="WebElementResolutionException"/> Selenium raises for multiple matches and
+    /// its auto-wait timeout into the failure the caller names.
+    /// </summary>
+    private async ValueTask<T> RunResolvedAsync<T>(
+        WebElementReference element,
+        Func<ILocator, Task<T>> action,
+        Func<WebElementReference, Exception> onTimeout)
     {
-        var locator = Resolve(element);
+        var locator = _locators.Resolve(element);
         try
         {
-            return await read(locator);
+            return await action(locator);
         }
         catch (TimeoutException)
         {
-            throw WebBackendErrors.NotPresent(element, _options.ActionTimeout);
+            throw onTimeout(element);
         }
         catch (PlaywrightException exception) when (IsStrictViolation(exception))
         {
@@ -354,239 +351,6 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
 
     private static bool IsStrictViolation(PlaywrightException exception)
         => exception.Message.Contains("strict mode violation", StringComparison.OrdinalIgnoreCase);
-
-    private ILocator Resolve(WebElementReference element)
-    {
-        ILocator? current = null;
-        foreach (var root in element.ComponentRoots)
-            current = Apply(current, root);
-        return Apply(current, element.Locator);
-    }
-
-    private ILocator Apply(ILocator? scope, WebLocator locator)
-        => locator switch
-        {
-            TestIdWebLocator value => scope is null ? Page.GetByTestId(value.Value) : scope.GetByTestId(value.Value),
-            RoleWebLocator value => Role(scope, value),
-            TextWebLocator value => Text(scope, value),
-            LabelWebLocator value => scope is null
-                ? Page.GetByLabel(value.Value, new PageGetByLabelOptions { Exact = value.Exact })
-                : scope.GetByLabel(value.Value, new LocatorGetByLabelOptions { Exact = value.Exact }),
-            PlaceholderWebLocator value => scope is null
-                ? Page.GetByPlaceholder(value.Value, new PageGetByPlaceholderOptions { Exact = value.Exact })
-                : scope.GetByPlaceholder(value.Value, new LocatorGetByPlaceholderOptions { Exact = value.Exact }),
-            CssWebLocator value => scope is null ? Page.Locator(value.Selector) : scope.Locator(value.Selector),
-            AttributeWebLocator value => scope is null
-                ? Page.Locator($"[{CssIdentifier(value.Name)}={CssString(value.Value)}]")
-                : scope.Locator($"[{CssIdentifier(value.Name)}={CssString(value.Value)}]"),
-            NthWebLocator value => Apply(scope, value.Source).Nth(value.Index),
-            TableCellWebLocator value => (scope is null
-                ? Page.Locator("th, td")
-                : scope.Locator(":scope > th, :scope > td")).Nth(value.Index),
-            TableCellByHeaderWebLocator value => scope is null
-                ? Page.Locator($"xpath={WebXPath.TableCellByHeader(value, documentScoped: true)}")
-                : scope.Locator($"xpath={WebXPath.TableCellByHeader(value)}"),
-            AndWebLocator value => And(scope, value),
-            HasTextWebLocator => throw new WebBackendCapabilityException("HasText is a filter and must be composed with another locator using And()."),
-            _ => throw new WebBackendCapabilityException($"Playwright does not support locator type '{locator.GetType().Name}'.")
-        };
-
-    private ILocator Role(ILocator? scope, RoleWebLocator locator)
-    {
-        var role = MapRole(locator.Role);
-        if (scope is null)
-        {
-            var options = new PageGetByRoleOptions { Exact = locator.Exact };
-            if (locator.Name is not null) options.Name = locator.Name;
-            return Page.GetByRole(role, options);
-        }
-        else
-        {
-            var options = new LocatorGetByRoleOptions { Exact = locator.Exact };
-            if (locator.Name is not null) options.Name = locator.Name;
-            return scope.GetByRole(role, options);
-        }
-    }
-
-    private ILocator Text(ILocator? scope, TextWebLocator locator)
-    {
-        // A Playwright string is case-insensitive unless Exact; only the exact case-sensitive case can
-        // use a plain string, the rest need a regex with matching flags.
-        if (!locator.IgnoreCase && locator.Exact)
-        {
-            return scope is null
-                ? Page.GetByText(locator.Value, new PageGetByTextOptions { Exact = true })
-                : scope.GetByText(locator.Value, new LocatorGetByTextOptions { Exact = true });
-        }
-
-        var pattern = locator.Exact ? $"^{Regex.Escape(locator.Value)}$" : Regex.Escape(locator.Value);
-        var regex = new Regex(pattern, locator.IgnoreCase ? RegexOptions.IgnoreCase : RegexOptions.None);
-        return scope is null ? Page.GetByText(regex) : scope.GetByText(regex);
-    }
-
-    private ILocator And(ILocator? scope, AndWebLocator locator)
-    {
-        var left = Apply(scope, locator.Left);
-        if (locator.Right is HasTextWebLocator text)
-        {
-            if (text.IgnoreCase && !text.Exact)
-                return left.Filter(new LocatorFilterOptions { HasText = text.Value });
-            var pattern = text.Exact ? $"^{Regex.Escape(text.Value)}$" : Regex.Escape(text.Value);
-            return left.Filter(new LocatorFilterOptions
-            {
-                HasTextRegex = new Regex(pattern, text.IgnoreCase ? RegexOptions.IgnoreCase : RegexOptions.None)
-            });
-        }
-
-        return left.And(Apply(scope, locator.Right));
-    }
-
-    internal static AriaRole MapRole(WebRole role) => role switch
-    {
-        WebRole.Alert => AriaRole.Alert,
-        WebRole.Button => AriaRole.Button,
-        WebRole.Checkbox => AriaRole.Checkbox,
-        WebRole.Combobox => AriaRole.Combobox,
-        WebRole.Dialog => AriaRole.Dialog,
-        WebRole.Grid => AriaRole.Grid,
-        WebRole.Heading => AriaRole.Heading,
-        WebRole.Image => AriaRole.Img,
-        WebRole.Link => AriaRole.Link,
-        WebRole.List => AriaRole.List,
-        WebRole.ListItem => AriaRole.Listitem,
-        WebRole.Menu => AriaRole.Menu,
-        WebRole.MenuItem => AriaRole.Menuitem,
-        WebRole.Navigation => AriaRole.Navigation,
-        WebRole.Option => AriaRole.Option,
-        WebRole.ProgressBar => AriaRole.Progressbar,
-        WebRole.Radio => AriaRole.Radio,
-        WebRole.Region => AriaRole.Region,
-        WebRole.Row => AriaRole.Row,
-        WebRole.RowGroup => AriaRole.Rowgroup,
-        WebRole.Searchbox => AriaRole.Searchbox,
-        WebRole.Slider => AriaRole.Slider,
-        WebRole.SpinButton => AriaRole.Spinbutton,
-        WebRole.Status => AriaRole.Status,
-        WebRole.Switch => AriaRole.Switch,
-        WebRole.Tab => AriaRole.Tab,
-        WebRole.Table => AriaRole.Table,
-        WebRole.TabList => AriaRole.Tablist,
-        WebRole.TabPanel => AriaRole.Tabpanel,
-        WebRole.Textbox => AriaRole.Textbox,
-        WebRole.Toolbar => AriaRole.Toolbar,
-        WebRole.Tooltip => AriaRole.Tooltip,
-        WebRole.Tree => AriaRole.Tree,
-        WebRole.TreeItem => AriaRole.Treeitem,
-        _ => throw new WebBackendCapabilityException($"Playwright role mapping is not available for '{role}'.")
-    };
-
-    private static string MapKey(WebKey key) => WebKeyMap.Get(key).Playwright;
-
-    private static string CssIdentifier(string value)
-    {
-        if (value.All(character => char.IsLetterOrDigit(character) || character is '-' or '_' or ':'))
-            return value.Replace(":", "\\:");
-        throw new WebBackendCapabilityException($"Attribute name '{value}' cannot be represented safely as a CSS identifier.");
-    }
-
-    private static string CssString(string value) => $"\"{value.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
-
-    private void WireDiagnostics()
-    {
-        if (_options.ConsoleCapture != PlaywrightConsoleCapture.Off)
-        {
-            Page.Console += (_, message) =>
-            {
-                if (!ShouldCaptureConsole(message.Type)) return;
-                _context.Trace.WriteEvent(
-                    "web.browser.console",
-                    $"Browser console · {message.Type}",
-                    "ProtoTest.Web.Playwright",
-                    outcome: ProtoTraceOutcome.Unknown,
-                    attributes: new Dictionary<string, string?>
-                    {
-                        ["web.session"] = _sessionName,
-                        ["web.correlation_id"] = ActiveCorrelation,
-                        ["browser.console.type"] = message.Type,
-                        ["browser.console.text"] = Truncate(message.Text)
-                    },
-                    parentId: ActiveCorrelation);
-            };
-        }
-
-        if (_options.CapturePageErrors)
-        {
-            Page.PageError += (_, message) => _context.Trace.WriteEvent(
-                "web.browser.page_error",
-                "Browser page error",
-                "ProtoTest.Web.Playwright",
-                outcome: ProtoTraceOutcome.Unknown,
-                attributes: new Dictionary<string, string?>
-                {
-                    ["web.session"] = _sessionName,
-                    ["web.correlation_id"] = ActiveCorrelation,
-                    ["browser.error.message"] = Truncate(message)
-                },
-                parentId: ActiveCorrelation);
-        }
-
-        if (_options.CaptureRequestFailures)
-        {
-            Page.RequestFailed += (_, request) => _context.Trace.WriteEvent(
-                "web.browser.request_failed",
-                $"Request failed · {request.Method}",
-                "ProtoTest.Web.Playwright",
-                outcome: ProtoTraceOutcome.Unknown,
-                attributes: new Dictionary<string, string?>
-                {
-                    ["web.session"] = _sessionName,
-                    ["web.correlation_id"] = ActiveCorrelation,
-                    ["http.method"] = request.Method,
-                    ["http.url"] = SafeUrl(request.Url),
-                    ["browser.request.failure"] = Truncate(request.Failure)
-                },
-                parentId: ActiveCorrelation);
-        }
-    }
-
-    private bool ShouldCaptureConsole(string type)
-        => _options.ConsoleCapture switch
-        {
-            PlaywrightConsoleCapture.All => true,
-            PlaywrightConsoleCapture.Errors => string.Equals(type, "error", StringComparison.OrdinalIgnoreCase),
-            PlaywrightConsoleCapture.WarningsAndErrors =>
-                string.Equals(type, "error", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(type, "warning", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(type, "warn", StringComparison.OrdinalIgnoreCase),
-            _ => false
-        };
-
-    private void TraceDiagnosticFailure(string stage, Exception exception, string correlationId)
-        => _context.Trace.WriteEvent(
-            "web.playwright.correlation_failed",
-            $"Playwright trace correlation failed · {stage}",
-            "ProtoTest.Web.Playwright",
-            outcome: ProtoTraceOutcome.Unknown,
-            attributes: new Dictionary<string, string?>
-            {
-                ["web.session"] = _sessionName,
-                ["web.correlation_id"] = correlationId,
-                ["web.diagnostics.stage"] = stage,
-                ["web.diagnostics.error"] = exception.Message
-            },
-            parentId: correlationId);
-
-    internal static string? SafeUrl(string? value)
-    {
-        if (value is null) return null;
-        var withoutUserInfo = ProtoUriSanitizer.WithoutUserInfo(value);
-        return Uri.TryCreate(withoutUserInfo, UriKind.Absolute, out var uri)
-            ? new UriBuilder(uri) { Query = string.Empty, Fragment = string.Empty }.Uri.ToString()
-            : withoutUserInfo;
-    }
-
-    private static string? Truncate(string? value)
-        => value is null || value.Length <= 4096 ? value : value[..4096] + "…";
 
     public async ValueTask CompleteAsync(CancellationToken cancellationToken = default)
     {
@@ -628,7 +392,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
             _context.Trace.WriteEvent(
                 "web.playwright.trace_failed",
                 "Playwright native trace capture failed",
-                "ProtoTest.Web.Playwright",
+                TraceSource,
                 ProtoTracePhase.Teardown,
                 ProtoTraceOutcome.Failed,
                 exception: exception);
@@ -639,7 +403,7 @@ public sealed class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, I
     {
         if (Interlocked.Exchange(ref _disposeStarted, 1) != 0) return;
         await CompleteAsync();
-        _traceGroupGate.Dispose();
+        _correlation.TraceGroupGate.Dispose();
         await _browserContext.DisposeAsync();
     }
 }

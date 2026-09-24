@@ -29,7 +29,7 @@ public static class SeleniumWebHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(createDriver);
         return builder
             .AddCapability(new ProtoCapabilityDescriptor(
-                "Selenium", ProtoCapabilityKinds.Browser, "ProtoTest.Web.Selenium"))
+                "Selenium", ProtoCapabilityKinds.Browser, SeleniumWebBackend.TraceSource))
             .AddWebBackend(new SeleniumWebBackendFactory(createDriver, configure));
     }
 
@@ -49,6 +49,6 @@ public static class SeleniumWebHostBuilderExtensions
         application.Services.AddWebBackend(new SeleniumWebBackendFactory(createDriver, configure));
         application.RegisterClient("Web", "Default");
         return application.AddCapability(new ProtoCapabilityDescriptor(
-            "Selenium", ProtoCapabilityKinds.Browser, "ProtoTest.Web.Selenium"));
+            "Selenium", ProtoCapabilityKinds.Browser, SeleniumWebBackend.TraceSource));
     }
 }

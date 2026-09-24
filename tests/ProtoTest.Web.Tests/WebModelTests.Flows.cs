@@ -27,7 +27,7 @@ public sealed partial class WebModelTests
         await form.Flow("Sign in")
             .Fill(f => f.Password, "super-secret")
             .Check(f => f.RememberMe)
-            .Check(f => f.RememberMe, isChecked: false)
+            .Uncheck(f => f.RememberMe)
             .Select(f => f.Language, "nl")
             .Press(f => f.Password, WebKey.Enter)
             .Do((f, _) =>

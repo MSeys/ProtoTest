@@ -197,23 +197,52 @@ Expected: net-negative.
 
 ## Stage 6 — Data and diagnostics
 
-- `ProtoDataObjectBuilder` split into planner and resolver (`INT-F22`); redaction policy extracted
-  from `ProtoDataRegistry` (`INT-F24`); `JsonDiagnosticSanitizer` redactor strategies (`INT-F23`);
-  remove `Proto.Context` from builders and Sheets assertions (`INT-F39`, `SHT-SH9`).
+Complete. Done: `ProtoDataRedactionPolicy` owns the redaction sets, the member/type matching and the
+graph walker, and `ProtoDataRegistry` delegates (`INT-F24`); `FormContentRedactor`,
+`MultipartContentRedactor` and `XmlContentRedactor` are their own types and `JsonDiagnosticSanitizer`
+keeps the JSON redactor and the sniffing facade (`INT-F23`); `ProtoDataObjectBuilder` is partial
+classes by concern — planning, construction, tracing (`INT-F22`); the scoped data service's `For<T>()` entry reads `Proto.Context` once and passes the execution context
+into the builder, so the builder no longer reads the ambient static (`INT-F39`).
+
+Closed as no-change: `SHT-SH9` (`SheetModelAssertions`), because the assertion is an extension on the
+user's row record, which carries no context; every alternative either breaks the test-author API or
+threads the context through model rows.
 
 Expected: net-negative.
 
 ## Stage 7 — Web
 
-- **7a behavior:** shared actionability/poll engine, Selenium adopts it (`WEB-S2`, `WEB-B2`);
-  honest Selenium driver executor (`WEB-S4`, `WEB-X6`); per-operation correlation state
-  (`WEB-P4`, `WEB-P6`); one URL sanitizer (`WEB-S8`); route-discovery race (`WEB-W9`).
-- **7b dispatch/translation:** operation descriptor table (`WEB-W1`, `WEB-W2`, `WEB-W4`, `WEB-B1`);
-  translator contract plus `PlaywrightLocatorTranslator` (`WEB-B3`, `WEB-W11`, `WEB-W12`).
-- **7c structure/options:** Playwright and Selenium class splits (`WEB-P1..P3`, `WEB-P7`,
-  `WEB-S1`, `WEB-S3`, `WEB-S5..S7`); scanner strategy + DI + framework enum (`WEB-W7`, `WEB-W8`,
-  `WEB-W10`); options without leaked Playwright types (`WEB-W15`, `WEB-P9`); enums for behavior
-  flags (`WEB-X5`); trace constants and one artifact-failure event (`WEB-X7`, `WEB-X8`).
+Complete. Done from 7a/7b/7c and the bug list: one URL policy (`ProtoUriSanitizer.ForDisplay` and
+`ForDiagnostics` replace the three hand-rolled sanitizers); one trace-source constant per backend;
+`WebRouteDiscovery` memoizes one discovery task so concurrent navigations cannot double-record, with
+retry after failure; one boolean-state helper per backend; Playwright's resolved action and read share
+one runner; `WebTiming` owns the 5s/50ms defaults the poller, waits and both backends repeated; one
+`TraceArtifactFailure` helper for all three artifact-failure writers; both backends are partial classes
+by concern; `PlaywrightCorrelationState` owns the open operations, trace groups, gate and latest
+operation (`WEB-P6`), with the page-diagnostic attribution rule documented (`WEB-P4`);
+`PlaywrightLocatorTranslator` owns the semantic-to-Playwright translation, mirroring Selenium
+(`WEB-B3`, `WEB-W12`); each backend owns its semantic key table, so the shared `WebKeyMap` no longer
+names Playwright and Selenium, with the conformance test still proving both cover every key
+(`WEB-W11`); `WebCoverageCollector` scans the page source on first use instead of in its constructor
+and tracks inventory membership in a set while keeping the ordered list the pattern matching needs
+(`WEB-W10`); `PlaywrightWebOptions` exposes bindable context settings plus a `ConfigureContext`
+escape hatch instead of leaking `BrowserNewContextOptions` (`WEB-W15`, `WEB-P9`); the operation runner
+threads its result through a typed local, so the public context carries no untyped slot (`WEB-W4`,
+`WEB-B1`); the Vue discovery script is an embedded JavaScript resource and `VueRouteParser` owns the
+parsing (`WEB-W8`); `WebProbeLoop` is the one retry loop behind element assertions and Selenium's
+actionability, so both poll through `ProtoPolling` at the web interval and Selenium no longer
+hand-rolls a `Stopwatch` loop (`WEB-B2`, `WEB-S2`); `SeleniumDriverExecutor` runs every WebDriver call
+on one dedicated pump thread — driver access is serialized, `Task.Run` and the `Background` helper are
+gone, and `IWebBackend.CurrentAddress` became `GetCurrentAddressAsync` so the address read hops onto
+the pump too (`WEB-S4`, `WEB-X6`); `WebTextMatch`, `WebFlow.Check`/`Uncheck` and
+`BeSortedBy(ProtoSortDirection)` replace the boolean behaviour flags (`WEB-X5`).
+
+Closed as no-change: `WEB-W7` (strategy service in place, real filesystem kept: the tests drive the
+strategies through temp folders, and a file-system interface would add surface with no failing case to
+justify it); the polarity enum (`WEB-X5` remainder: `negated` is the polarity of an assertion object,
+already encapsulated by the `Should`/`ShouldNot` facades, and its only remaining form is the documented
+bool parameter of `ProtoAssertion`'s pure primitives — an enum would either churn five integrations for
+naming taste or add a mapping layer that reads worse than the bool).
 
 Expected: net-negative.
 
@@ -272,6 +301,32 @@ forward into an earlier stage when that stage touches the same files.
 
 Expected: net-negative.
 
+## Stage 12 — Follow-ups from the refactors
+
+- `CTX-1` (done): the context rule is documented and implemented. `Proto.Context` is the lookup for
+  everything that runs inside a test on the test's flow — test bodies and test-author entries
+  (`context.Data().For<T>()`, `row.ShouldMatchShape(...)`, `exception.ShouldHaveStatus(...)`) and the
+  plumbing they call, with explicit passing preferred only where it keeps the callee constructible in
+  a test. Run scope uses the host (`ProtoHost.CurrentHost`, the reference a hook receives); off-flow
+  telemetry uses `ProtoHost.FindTraceWriter(Activity?)` and correlates by trace id; objects whose
+  lifetime spans tests resolve per call and never hold a context. The rule lives in the `Proto.Context`
+  XML remarks and in `CONTRIBUTING.md` ("Context lookups"). The assertion facades are compliant as
+  written; wrappers are not needed. `IProtoContextAccessor` stayed removed, and the data service keeps
+  its single entry read.
+- `TST-13`: move the remaining duplicated test doubles into `tests/ProtoTest.TestSupport`
+  (`StubHandler`/`StubHttpHandler`, `StaticConfigurationSource`, `StubTransportInitializer`).
+- `INT-51`: design-check and, if it holds, extract one scalar write/compare rule shared by
+  `JsonShapeMatcher`, `GraphQLLiteral`, `JsonDiagnosticSanitizer.Serialize` and
+  `ProtoTraceValueFormatter` (the classification half is `JsonScalarTypes`; this is the output half).
+- `INT-52`: finish descriptor adoption for the integrations that still register capabilities with
+  literal names and sources (Sql, Sheets, Testcontainers, OpenTelemetry), and let their capture
+  options share `ProtoDiagnosticCaptureOptions` where they capture at all.
+- `REF-1`: decide per partial-class split which parts earn a real collaborator (candidates: GraphQL
+  subscriptions, data planning) versus staying files; a collaborator only where there is a seam a test
+  can hold, since indirection without one costs more than the file split.
+
+Expected: assessed per item; the test doubles and descriptor adoption are net-negative candidates.
+
 ## Progress
 
 Record `git diff --shortstat` for the stage's commits after the suite is green.
@@ -284,13 +339,14 @@ Record `git diff --shortstat` for the stage's commits after the suite is green.
 | 3 — Integration contract | Complete | +509 / −389 (net +120) | Net-positive: the descriptors, keyed state, shared facade/context records and client-trace helper are new shared code. Every trace-source literal, observation kind, coverage category and capability now reads from `ProtoProtocol`; one auth hook and one context state serve REST, GraphQL and gRPC; gRPC's status assertion and auth applier delegate to the shared ones; REST and GraphQL share the assertion facade; `ProtoHttpResponseContext` replaced the positional parameter lists. Six findings closed as no-change with reasons in the stage notes. |
 | 4 — HTTP execution | Complete | +1266 / −1012 (net +254) | Done: shared request-builder seam and observation rule (`INT-F1`), readable REST phases (`INT-F21`), `ShapePlan` record (`INT-F26`), observation factory (`INT-F15`), `AssertMissing` (`INT-F16`), partial-class split (`INT-F19`), operation enum (`INT-F30`), dead AST removed (`INT-F44`), nested-filter helper (`INT-F47`). The full send template was designed and rejected as line-neutral with twenty behavioural traps. `INT-F43`/`INT-F45` closed as no-change. |
 | 5 — gRPC and Messaging | Complete | +509 / −420 (net +89) | Done: `BeginCallTrace`/`CompleteCall` (`INT-F14`), formatting partial split (`INT-F20`), `Blocking` adapter (`INT-F35`), neutral capture options (`INT-F46`), messaging registration object (`INT-F27`), single-signal in-memory broker (`INT-F37`), RabbitMQ async consumer (`INT-F38`, CI-verified), messaging descriptor (`INT-F50`). |
-| 6 — Data and diagnostics | Not started | | |
-| 7 — Web | Not started | | |
+| 6 — Data and diagnostics | Complete | +1050 / −925 (net +125) | Done: `ProtoDataRedactionPolicy` extracted from `ProtoDataRegistry` (`INT-F24`); `JsonDiagnosticSanitizer` down to 142 lines with `FormContentRedactor`, `MultipartContentRedactor` and `XmlContentRedactor` as their own types (`INT-F23`); the data builder split into planning/construction/tracing parts (`INT-F22`); the ambient read moved to the data service's `For<T>()` entry, which passes the context into the builder (`INT-F39`, refined by `CTX-1`). `SHT-SH9` closed as no-change: the row assertion is an extension on the user's record, which carries no context. |
+| 7 — Web | Complete | +1808 / −1225 (net +583) | Done: one URL policy and trace constants (`WEB-S8`, `WEB-X8`), memoized route discovery (`WEB-W9`), boolean-state helper (`WEB-P2`, `WEB-S3`), one resolved runner (`WEB-P3`), `WebTiming` defaults (`WEB-X4`), one artifact-failure helper (`WEB-X7`), backend partial splits (`WEB-P1`, `WEB-S1` partial), correlation state (`WEB-P4`, `WEB-P6`), Playwright translator (`WEB-B3`, `WEB-W12`), backend key tables (`WEB-W11`), lazy coverage inventory (`WEB-W10`), bindable Playwright options (`WEB-W15`, `WEB-P9`), scanner strategies and framework options (`WEB-W7`), operation descriptors for the session wrappers (`WEB-W1`, `WEB-W2`), typed runner result (`WEB-W4`), embedded Vue script with its own parser (`WEB-W8`), `WebTextMatch` flag (`WEB-X5` partial); the probe loop shared by assertions and Selenium (`WEB-B2`, `WEB-S2`); the single-thread Selenium driver executor, with `IWebBackend.GetCurrentAddressAsync` replacing the sync address property (`WEB-S4`, `WEB-X6`); `WebFlow.Check`/`Uncheck` and `BeSortedBy(ProtoSortDirection)` (`WEB-X5` complete; the polarity enum closed as no-change with its reason in the stage notes). Net-positive: `WebProbeLoop` and `SeleniumDriverExecutor` are new shared primitives and the partial splits add headers, so the duplication they remove is smaller than the audit estimated. |
 | 8 — Sheets, Sql, Testcontainers | Not started | | |
 | 9 — Reporting, OpenApi, AspNetCore | Not started | | |
 | 10 — Samples, templates, docs | Not started | | |
 | 11 — Deferred test hygiene | Not started | | |
-| **Cumulative** | | **+1616** | Target: clearly negative by Stage 6; see the note under the table |
+| 12 — Follow-ups from the refactors | In progress | −10 (CTX-1) | `CTX-1` done: one ambient entry plus parameters below, `IProtoContextAccessor` removed, `FindTraceWriter(Activity?)` added. Remaining: `TST-13` shared doubles, `INT-51` scalar format, `INT-52` descriptor adoption, `REF-1` partial-split review. |
+| **Cumulative** | | **+2314** | Target: clearly negative by Stage 6; see the note under the table |
 
 ### Measured line outcome (after Stage 5)
 

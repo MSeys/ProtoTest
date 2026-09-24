@@ -1,5 +1,7 @@
 namespace ProtoTest.Web;
 
+using ProtoTest.Web.Internal;
+
 /// <summary>
 /// The assertions for one element, in their positive (<see cref="WebElement.Should"/>) or negated
 /// (<see cref="WebElement.ShouldNot"/>) form. Each assertion polls until it passes or its timeout
@@ -30,11 +32,11 @@ public sealed class WebAssertions
 
     /// <summary>Asserts that the element's text becomes exactly <paramref name="expected"/>.</summary>
     public ValueTask HaveTextAsync(string expected, TimeSpan? timeout = null, CancellationToken cancellationToken = default)
-        => _element.Session.Assertions.ShouldHaveTextAsync(_element.Reference, expected, contains: false, _negated, timeout, cancellationToken);
+        => _element.Session.Assertions.ShouldHaveTextAsync(_element.Reference, expected, WebTextMatch.Exact, _negated, timeout, cancellationToken);
 
     /// <summary>Asserts that the element's text becomes a superstring of <paramref name="expected"/>.</summary>
     public ValueTask ContainTextAsync(string expected, TimeSpan? timeout = null, CancellationToken cancellationToken = default)
-        => _element.Session.Assertions.ShouldHaveTextAsync(_element.Reference, expected, contains: true, _negated, timeout, cancellationToken);
+        => _element.Session.Assertions.ShouldHaveTextAsync(_element.Reference, expected, WebTextMatch.Contains, _negated, timeout, cancellationToken);
 
     /// <summary>Asserts that the element's value becomes exactly <paramref name="expected"/>.</summary>
     public ValueTask HaveValueAsync(string expected, TimeSpan? timeout = null, CancellationToken cancellationToken = default)

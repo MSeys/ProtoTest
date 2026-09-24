@@ -12,4 +12,9 @@
     <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
   </ItemGroup>
 
+  <!-- The Vue discovery script ships as JavaScript, not as a C# raw string. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Internal\vue-route-discovery.js" LogicalName="ProtoTest.Web.Internal.vue-route-discovery.js" />
+  </ItemGroup>
+
 </Project>

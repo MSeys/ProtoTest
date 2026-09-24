@@ -10,6 +10,10 @@ Web/Sheets/Sql/Data/Messaging/Testcontainers; verification against NUnit (`Simpl
 and MSTest (`TestMethodRunner.Execution.cs`, `TestMethodRunner.DataRow.cs`) framework sources; and
 extraction of a fresh real `.prototrace` produced 2026-09-24 15:53 to confirm the client-entity split.
 
+**Status: closed 2026-09-24.** Stages 0–8 complete; the two consciously postponed register items
+(8.14 template runner variants, 8.15 static trace index) are carried into `eng/plan-4.md`. Findings are
+resolved, decided or deliberately left; do not reopen this plan for new work — add it to `eng/plan-4.md`.
+
 **Goal:** finish the contracts the first two audits left at the boundaries — one evidence policy, one
 client identity, one outcome vocabulary, one owner per derived fact, and runner lifecycle boundaries that
 are documented and pinned — before adding the new capabilities in `eng/feature-plan.md`.
@@ -385,8 +389,8 @@ items not chosen for this pass are decisions below.
   redacted), the `EmbedArtifacts = false` mode and the `MaxArtifactBytes` cap.
 - [x] 8.16 AI-assistance note (2.16): a section in `CONTRIBUTING.md` (disclosure, walkthrough,
   accountability).
-- [ ] 8.14 Template runner variants and 8.15 static trace index: not chosen for this pass — recorded as
-  decisions below rather than silently dropped.
+- [x] 8.14 Template runner variants and 8.15 static trace index: not chosen for this pass; carried into
+  `eng/plan-4.md` (X1, X2) instead of being silently dropped.
 
 ## Progress
 
@@ -402,7 +406,7 @@ Record `git diff --shortstat` per stage split by `src`, `tests` and `docs`, with
 | 5 — Cross-cutting consistency | Complete | src +197 / −27 · tests +230 / −1 · docs +1 / −1 | D5 validation at resolve plus collector construction at Build; D6 diagnostic failures traced; D7 AddSheets composes (AddWeb decision); D12 collector isolation; C1/C3/C4 and C2 fixed. Binder relocation, AddWeb composition, ownership flags and raw-auth caching recorded as decisions. Full suite and format gate green. |
 | 6 — Scale and measurement | Complete | src +21 / −0 · tests +133 / −0 · docs +28 / −0 | Harness measures 100/1,000 tests and asserts the per-test trace bound; numbers and levers published on the benchmarks page; `EmbedArtifacts` added; temp attachment copies documented. Full suite, format gate and docs check green. |
 | 7 — Decisions and closure | Complete | src +16 / −15 · tests +11 / −0 · docs 0 | Remaining decisions recorded; the registration and report-markup tests labelled `Characterization`; the stale hook/infrastructure/resource/bridge comments corrected; the unreachable `SetCount` branch removed. Full suite and format gate green. |
-| 8 — Open-question register | Complete (8.14/8.15 deferred) | src +1591 / −6 · tests +204 / −0 · docs +95 / −2 · other +28 / −4 | Contracts published (format policy, order bands, community versioning, no-telemetry, concurrency + measured ceiling, crash resilience, attachment policy, AI note); package validation against the 1.0.1 baseline with recorded suppressions; report accessibility and NuGet link fixed; `ProtoTest.Traces` reader and the `prototest` CLI shipped and dogfooded. Template runner variants and the static trace index deferred by decision. Full suite, format gate, docs check and pack all green. |
+| 8 — Open-question register | Complete (8.14/8.15 into plan-4) | src +1591 / −6 · tests +204 / −0 · docs +95 / −2 · other +28 / −4 | Contracts published (format policy, order bands, community versioning, no-telemetry, concurrency + measured ceiling, crash resilience, attachment policy, AI note); package validation against the 1.0.1 baseline with recorded suppressions; report accessibility and NuGet link fixed; `ProtoTest.Traces` reader and the `prototest` CLI shipped and dogfooded. Template runner variants and the static trace index deferred by decision. Full suite, format gate, docs check and pack all green. |
 
 ## Decisions taken
 
@@ -433,7 +437,8 @@ Carried from the prior plans and binding here:
   labelled `Characterization` rather than rewritten.
 - Stage 8: `PublicApiAnalyzers` is not taken — package validation against the 1.0.1 baseline with
   recorded suppressions is the commitment; template `--runner` variants (2.10) and the static trace
-  index (2.14) are deferred; the crash-resilience answer is documentation, not an incremental flush.
+  index (2.14) are carried into `eng/plan-4.md`; the crash-resilience answer is documentation, not an
+  incremental flush.
 
 ## Stop criteria
 

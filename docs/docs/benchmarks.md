@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 title: Benchmarks
 description: "Measured trace size, run time, export time and memory growth for synthetic suites, and the levers that change them."
 ---

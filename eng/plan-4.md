@@ -55,12 +55,18 @@ Order is the recommendations' own priority (§2). W1–W5 are independent and sm
 - [ ] **W4 Roadmap page** `/docs/roadmap` (rec 2.5): **Next** (committed, rough timing), **Exploring**
   (Aspire, MCP, WireMock, MassTransit, substitution), **Not planned** (with reasons). Synced with
   `eng/feature-plan.md`, which keeps being the internal source of truth.
-- [ ] **W5 The viewer as the primary CTA** (rec 2.3): a "See what a failed integration test actually did"
-  action beside the hero CTAs pointing at the demo trace, plus a ~60-second screencast committed to the
-  docs assets and reusable for launch.
-- [ ] **W6 Overhead benchmark vs raw `WebApplicationFactory`** (rec 2.6, completes feature-plan A7):
-  per-test overhead (lifecycle + context + trace), suite startup with tracing on/off, trace write cost and
-  size at 100/1,000 tests, methodology and hardware, including where ProtoTest is slower.
+- [x] **W5 The viewer as the primary CTA** (rec 2.3): "See a failing test's trace" is the hero's primary
+  CTA (with Get started secondary), and the old TraceView illustration became a faithful three-view panel -
+  Run, Story and Check, drawn from the bundled demo trace with the real viewer's grammar and real values,
+  switchable with the keyboard, theme-aware and asset-free. **Decision:** the 60-second screencast was
+  dropped, and real screenshots were tried and dropped too - the replica keeps the viewer's text at full
+  size, follows the light/dark theme, ships no raster assets and cannot drift into stale images.
+- [x] **W6 Overhead benchmark vs raw `WebApplicationFactory`** (rec 2.6, executes feature-plan A7):
+  `tests/ProtoTest.AspNetCore.Tests/OverheadBenchmarkTests.cs` measures the same in-process request through
+  a full ProtoTest test cycle (start, REST call, complete) with tracing on and off against the raw
+  `WebApplicationFactory` equivalent, with per-phase splits, allocations and suite startup through the
+  first completed request; the numbers are published with methodology and the slower-where-it-is-slower
+  reading on the [benchmarks page](../docs/docs/benchmarks.md).
 - [ ] **W7 Versioned docs at 1.1** (rec 2.5): cut the 1.0 snapshot at the 1.1 release, point the release
   banner at the matching version, verify old links resolve. Executes last on this track.
 - [ ] **W8 Small wins** (rec 2.7): homepage release feed (blog-as-release-notes), GitHub Discussions
@@ -136,6 +142,9 @@ Record `git diff --shortstat` per stage split by `src`, `tests`, `docs`, with th
 | W2 — Objections FAQ | Complete | docs +67 / −1 · src 0 · tests 0 | `/docs/faq` published: the nine recommended objections plus licensing, telemetry, target runtimes and where-to-start, each answer linking its proof (coverage, runners, clients, AI usage, nothing-phones-home). Benchmarks moved to `sidebar_position: 4` so FAQ sits beside the comparison page. Verified in the built site: `check-docs` (99 files) and `npm run build` green, anchors checked against the built HTML. |
 | W3 — Sustainability page | Complete | docs +50 / −0 · src 0 · tests 0 | `/docs/project/sustainability` published with the user's answers: no funding and personal time; semver with the accidental-public exception list, `Obsolete` at least one minor before removal where feasible, patch releases never break, the pack-time package-validation gate named as enforcement; fixes on the newest line only; help via docs, issues and SECURITY.md; the survives-its-author argument; and the solo-project caveats. This also executes feature-plan A6 (compatibility and deprecation policy). Verified in the built site: `check-docs` (100 files) and `npm run build` green. |
 | W4 — Roadmap page | Complete | docs +64 / −0 · src 0 · tests 0 | `/docs/roadmap` published with three sections: Next (1.1 polish and trust, 1.2 hosting and the reference demo, 1.x platform line), Exploring (MCP, MassTransit, Wolverine, analyzers, traffic coverage, exhaustive mode, Allure/ReportPortal, static trace index, MQTT) and Not planned (hosted service, commercial CSMS, pre-.NET 8, reimplementing the libraries, coverage conflation, renaming, further device transports) - each with its reason. Effort-ordered, explicitly not date-ordered; unshipped items phrased as plans. Verified in the built site: `check-docs` (101 files) and `npm run build` green, page rendered and read. |
+| W5 — Viewer CTA and demo panel | Complete | docs +690 / −242 · src 0 · tests 0 | The hero's primary CTA is now "See a failing test's trace" (opens trace.prototest.dev/?demo=1), Get started is secondary, and the stale TraceView card is replaced by `ViewerWalkthrough`: Run (outcome line, phase bar, "what this run could see", needs-attention list), Story (failure card and lifecycle) and Check (exception, recorded location, source), switchable by click and arrow keys, with every value copied from the bundled demo trace. Verified in the built site at desktop/mobile in both themes: `check-docs` (104 files), `npm run typecheck`, stylelint and the Docusaurus build green. Screenshots and the screencast were dropped (recorded in Decisions). |
+| W6 — Overhead benchmark | Complete | docs +62 / −1 · tests +545 / −0 · src 0 | `OverheadBenchmarkTests` (Category `Benchmark`) leads with a real short test - POST an order, read it back, assert both bodies - written once with ProtoTest (tracing on/off) and once with the raw stack, and keeps the micro comparison that explains it: single request, lifecycle-only mode, suite startup through the first completed request. `TestApi` gained a `/benchmark/orders` create/read pair so both versions send identical requests. Published on the benchmarks page: the same short test is ~3x the raw stack without tracing and ~8x with it; the bare lifecycle is 0.06 ms, the REST client adds ~0.15 ms over a raw request and tracing adds ~1.6 ms and ~1 MB per test. Closes feature-plan A7. Full suite, format gate and docs check green. |
+| W8 — Small wins | Complete (Discussions pending maintainer) | docs +102 / −0 · eng +61 / −0 · src 0 · tests 0 | The homepage gains a release feed (`releases.ts` + `ReleaseFeed`) showing the latest version, date and summary plus the release before it; `eng/check-docs.ps1` cross-checks versions and dates against `CHANGELOG.md` and the drift was verified to fail the gate. The AI-usage page is surfaced from Why ProtoTest; the docs search was checked for "integration testing .NET" (64 hits, intro and integrations first), "trace" (100) and "coverage" (98) and lands on the right pages. The screencast was dropped in W5; GitHub Discussions needs a repository setting (see Decisions) and is linked nowhere until it exists. |
 
 ## Decisions taken
 
@@ -146,6 +155,14 @@ Record `git diff --shortstat` per stage split by `src`, `tests`, `docs`, with th
   readiness, TimeProvider, Devices.WebSocket, WireMock, substitution, Aspire, demo benchmark.
 - Docs versioning happens at 1.1; 1.0 is frozen then and patches update the current set.
 - Track D2 MCP stays feature-plan work; its docs page and any hero line wait for D2–D4.
+- W5: the screencast is dropped (a video ages and cannot be interacted with), and real screenshots were
+  tried and dropped after reading them: at panel size the viewer's text shrank, the theme was fixed, and
+  they added ~560 KB of drift-prone raster assets. The faithful `ViewerWalkthrough` replica carries the
+  same three views with full-size text, theme awareness and zero assets.
+- W8: GitHub Discussions must be enabled in the repository settings before any page links it (the
+  never-advertise rule); the maintainer action is recorded here and the links land in the sustainability
+  page, the FAQ and the footer once it exists. The release feed is checked, not hand-trusted: a release
+  that skips `docs/src/data/releases.ts` fails `eng/check-docs.ps1`.
 
 ## Stop criteria
 

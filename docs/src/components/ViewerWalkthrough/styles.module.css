@@ -1,0 +1,326 @@
+.headTitle {
+  color: var(--text);
+  font: var(--weight-semibold) var(--text-body) var(--font-ui);
+}
+
+.headTitle small { margin-left: var(--space-2); color: var(--dim); font: var(--text-micro) var(--font-mono); }
+
+.archive { color: var(--blueprint); font-family: var(--font-mono); }
+
+/* The tabs follow the viewer's own nav: underline, no pills. */
+.tabs {
+  display: flex;
+  gap: var(--space-5);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  padding: var(--space-2) 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font: var(--weight-semibold) var(--text-meta) var(--font-ui);
+  cursor: pointer;
+}
+
+.tab:hover { color: var(--text); }
+
+.tab:focus-visible { outline: 2px solid var(--blueprint); outline-offset: 2px; }
+
+.tabActive { color: var(--text); border-bottom-color: var(--blueprint); }
+
+.view { padding: var(--space-3) 0 0; }
+
+/* Run view ------------------------------------------------------------------ */
+
+.run { padding: 0 var(--space-4) var(--space-1); }
+
+.outcomeLine { margin: 0; font: var(--weight-bold) var(--text-strong) var(--font-ui); }
+
+.failedText { color: var(--danger); }
+.partialText { color: var(--warning); }
+.passedText { color: var(--success); }
+
+.meta { margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--text-meta); }
+
+/* The phase bar: one tick per test, passed kept quiet, the four that need attention in full colour. */
+.bar { display: flex; gap: 2px; margin: var(--space-3) 0; }
+
+.tick { flex: 1 1 0; height: 5px; border-radius: var(--radius-hairline); }
+.tickPassed { background: var(--success-line); }
+.tickFailed { background: var(--danger); }
+.tickPartial { background: var(--warning); }
+
+.panel { margin-top: var(--space-3); overflow: clip; border: 1px solid var(--border); border-radius: var(--radius-control); }
+.panelHead { padding: var(--space-2) var(--space-3); font-weight: var(--weight-bold); }
+
+.panelLead { margin: 0 var(--space-3) var(--space-2); color: var(--muted); font-size: var(--text-meta); }
+
+.kv {
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+}
+
+.kvLabel { color: var(--muted); font-size: var(--text-meta); }
+.kv b { font-size: var(--text-meta); }
+
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+
+.chip {
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--text-micro);
+  font-style: normal;
+  line-height: 1.9;
+}
+
+.chipOn { border-color: var(--blueprint); background: color-mix(in srgb, var(--blueprint) 10%, transparent); color: var(--text); }
+.chipOff { border-style: dashed; color: var(--dim); }
+
+.attention { border-top: 1px solid var(--border); }
+
+.attRow {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid transparent;
+}
+
+.attRow + .attRow { border-top: 1px solid var(--border); }
+
+.attFailed { border-left-color: var(--danger); background: var(--danger-soft); }
+.attPartial { border-left-color: var(--warning); background: var(--warning-soft); }
+.attFinding { border-left-color: var(--warning); }
+.attPassed { border-left-color: var(--success); }
+
+.attNumber { color: var(--muted); font: var(--text-micro) var(--font-mono); }
+
+.attBody { display: grid; gap: 2px; min-width: 0; }
+.attTitle { font-size: var(--text-meta); font-weight: var(--weight-semibold); }
+.attKicker { color: var(--muted); font-size: var(--text-micro); }
+.attDetail { color: var(--muted); font-size: var(--text-micro); overflow-wrap: anywhere; }
+
+.attLabel { align-self: start; font-size: var(--text-micro); font-weight: var(--weight-semibold); white-space: nowrap; }
+.attLabelFailed { color: var(--danger); }
+.attLabelPartial { color: var(--warning); }
+.attLabelFinding { color: var(--warning); }
+.attLabelPassed { color: var(--success); }
+
+/* Story view ---------------------------------------------------------------- */
+
+.story { padding: 0 var(--space-4) var(--space-1); }
+
+.testHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-3); }
+
+.testNumber { color: var(--muted); font: var(--text-meta) var(--font-mono); }
+
+.testName {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text);
+  font: var(--weight-semibold) var(--text-body) var(--font-ui);
+}
+
+/* The sentence a reader sees, with the code name it came from, as in the viewer header. */
+.testName small { display: block; color: var(--dim); font: var(--text-micro) var(--font-mono); }
+
+.outcome {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--danger);
+  font-size: var(--text-meta);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.outcomeDot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.outcome em { color: var(--muted); font-size: var(--text-micro); font-style: normal; font-weight: var(--weight-regular); }
+
+/* The failure card: the check that failed and the document it validated, before anything else. */
+.card {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius-control);
+  background: var(--danger-soft);
+}
+
+.cardHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
+.cardHead strong { font-size: var(--text-strong); }
+.verdict { color: var(--danger); font-size: var(--text-meta); font-weight: var(--weight-semibold); }
+.on { color: var(--muted); font-size: var(--text-meta); }
+
+.shape { overflow: clip; border: 1px solid var(--border); border-radius: var(--radius-chip); background: var(--surface); }
+
+.shapeHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: var(--text-meta);
+  font-weight: var(--weight-semibold);
+}
+
+.shapeHead small { margin-left: auto; font-size: var(--text-micro); font-weight: var(--weight-regular); }
+.matched { color: var(--success); }
+.differs { color: var(--danger); }
+
+.mismatch {
+  padding: var(--space-1) var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1);
+  font: var(--text-micro) var(--font-mono);
+}
+
+.mismatch b { color: var(--danger); }
+.property { color: var(--blueprint); font-weight: var(--weight-semibold); }
+.colon { color: var(--muted); }
+.mismatch s { color: var(--muted); text-decoration-color: var(--danger); }
+.mismatch i { color: var(--danger); font-style: normal; }
+.mismatch strong { color: var(--danger); }
+
+.rows { padding: var(--space-3) 0 0; }
+
+.phase + .phase { margin-top: var(--space-2); }
+
+.phaseHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-1);
+  border-bottom: 1px solid var(--border);
+}
+
+.marker { width: 8px; height: 8px; border-radius: var(--radius-hairline); background: var(--marker); }
+.phaseHead span { flex: 1 1 auto; font-size: var(--text-meta); font-weight: var(--weight-bold); }
+.phaseHead small { color: var(--muted); font-size: var(--text-micro); }
+.phaseFailed { color: var(--danger); font-size: var(--text-micro); font-weight: var(--weight-semibold); }
+
+/* The viewer's story row: node, kind chip, title, facts, duration - and the checks on their call. */
+.row {
+  margin-left: calc(var(--depth) * var(--space-5));
+  padding: var(--space-1) var(--space-1) var(--space-1) 0;
+  display: grid;
+  grid-template-columns: 10px auto minmax(0, 1.6fr) minmax(0, 1fr) 52px;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+
+.failed { background: var(--danger-soft); box-shadow: inset 2px 0 0 var(--danger); }
+
+.fold {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-hairline);
+  background:
+    linear-gradient(var(--muted), var(--muted)) center / 6px 1px no-repeat,
+    linear-gradient(var(--muted), var(--muted)) center / 1px 6px no-repeat;
+}
+
+.node { justify-self: center; width: 7px; height: 7px; transform: rotate(45deg); background: var(--node); }
+
+.kind {
+  justify-self: start;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-chip);
+  background: color-mix(in srgb, var(--node) 14%, transparent);
+  color: color-mix(in srgb, var(--node) 78%, var(--text));
+  font-size: var(--text-micro);
+  font-weight: var(--weight-semibold);
+  line-height: 1.8;
+  white-space: nowrap;
+}
+
+.label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-body); }
+.quiet { color: var(--muted); }
+/* Without facts, the title takes their column too. */
+.wide { grid-column: span 2; }
+.facts { min-width: 0; overflow: hidden; color: var(--muted); font-size: var(--text-micro); text-overflow: ellipsis; white-space: nowrap; }
+.duration { color: var(--muted); font-size: var(--text-micro); text-align: right; white-space: nowrap; }
+
+.checks { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: var(--space-1); }
+
+.check {
+  padding: 0 var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--text-micro);
+  line-height: 1.8;
+}
+
+.check b { color: var(--success); }
+.checkFailed { border-color: var(--danger); color: var(--danger); font-weight: var(--weight-semibold); }
+.checkFailed b { color: var(--danger); }
+
+/* Check view ---------------------------------------------------------------- */
+
+.checkView { padding: 0 var(--space-4) var(--space-1); display: grid; gap: var(--space-2); }
+
+.crumb { margin: 0; color: var(--muted); font-size: var(--text-meta); }
+.crumbOp { color: var(--blueprint); font: var(--text-micro) var(--font-mono); }
+
+.checkHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.checkHead strong { font-size: var(--text-strong); }
+
+.checkStatus { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--text-meta); }
+.checkStatus .meta { margin: 0; }
+
+.checkStatusOutcome { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold); }
+
+.checkOp { margin: 0; color: var(--muted); font: var(--text-micro) var(--font-mono); }
+
+.exception {
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-1);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius-control);
+  background: var(--danger-soft);
+}
+
+.exception b { color: var(--danger); font: var(--weight-semibold) var(--text-meta) var(--font-mono); }
+.exceptionNote { color: var(--muted); font-size: var(--text-meta); }
+
+/* The recorded line, as the viewer's inspector shows it. */
+.source { min-width: 0; display: grid; gap: var(--space-1); }
+.sourceHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); }
+.sourceHead b { font: var(--weight-semibold) var(--text-meta) var(--font-mono); }
+.sourceHead small { min-width: 0; color: var(--muted); font-size: var(--text-micro); overflow-wrap: anywhere; }
+.source pre {
+  margin: 0;
+  padding: var(--space-2) 0;
+  overflow-x: auto;
+  border-radius: var(--radius-chip);
+  background: var(--surface-sunken);
+  color: var(--code-text);
+  font: var(--text-micro)/1.6 var(--font-mono);
+}
+.source pre span { display: block; padding-right: var(--space-3); white-space: pre; }
+.source pre span b { display: inline-block; width: 4ch; margin-right: var(--space-3); color: var(--code-comment); font-weight: var(--weight-regular); text-align: right; }
+.source pre .current { background: var(--code-highlight); box-shadow: inset 2px 0 0 var(--blueprint); }
+.source pre .current b { color: var(--code-text); }

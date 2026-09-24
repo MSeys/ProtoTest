@@ -64,9 +64,9 @@ checkboxes below stay the source of truth for scope, and `eng/plan-4.md` is the 
 - [x] **A6 Compatibility and deprecation policy** (brief item 22): done in `eng/plan-4.md` W3 - the
   stated 1.x policy (semver, the accidental-public exception list, `Obsolete` at least one minor before
   removal where feasible, fixes on the newest line) lives on the support and sustainability page.
-- [ ] **A7 Benchmark page** (brief item 17 / open question 2): per-test overhead vs raw
-  `WebApplicationFactory`; suite startup with tracing on/off; trace size at 100/1,000 tests. Publishes
-  the audit's Stage 6 numbers. Executed by `eng/plan-4.md` W6; re-run on the reference demo by P8.
+- [x] **A7 Benchmark page** (brief item 17 / open question 2): done in `eng/plan-4.md` W6 - the
+  benchmarks page carries the trace-size table and the `WebApplicationFactory` overhead comparison
+  (per-test lifecycle with tracing on/off, startup, allocations). Re-run on the reference demo by P8.
 - [ ] **A8 Test clock** (plan-4 P3): `TimeProvider` integration — `Proto.Context.Clock()` backed by the
   host's `TimeProvider`, `FakeTimeProvider` in tests — for tariff, expiry and idle-fee behavior.
   Acceptance: a test advances time without sleeping and the advancement is visible in the trace.

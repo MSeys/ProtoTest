@@ -84,6 +84,13 @@ export default async function createConfig(): Promise<Config> {
           editUrl: 'https://github.com/MSeys/ProtoTest/tree/main/docs/',
           // Read from git: a page says when it last changed, which matters while the docs move with the code.
           showLastUpdateTime: true,
+          // The released documentation is frozen per version; docs/ follows the next one under /docs/next,
+          // so merging 1.1 work never moves a 1.0 page. At a release, cut the released version with
+          // `npm run docusaurus docs:version <version>` and move `lastVersion` forward.
+          lastVersion: '1.0',
+          versions: {
+            current: {label: '1.1 (in progress)', path: 'next'},
+          },
         },
         blog: false,
         sitemap: {
@@ -110,7 +117,7 @@ export default async function createConfig(): Promise<Config> {
     announcementBar: {
       id: 'release-1.0',
       content:
-        '<span class="announcement-preview">1.0</span> ProtoTest 1.0 is released: packages are stable on NuGet and this documentation matches the release. &nbsp; <a target="_blank" rel="noopener noreferrer" href="https://www.nuget.org/packages?q=ProtoTest">Install from NuGet</a>',
+        '<span class="announcement-preview">1.0</span> ProtoTest 1.0 is released - these pages are the 1.0 documentation. <a href="/docs/next/roadmap">What 1.1 will add</a> &nbsp; <a target="_blank" rel="noopener noreferrer" href="https://www.nuget.org/packages?q=ProtoTest">Install from NuGet</a>',
       isCloseable: true,
     },
     navbar: {
@@ -128,6 +135,7 @@ export default async function createConfig(): Promise<Config> {
           position: 'left',
           label: 'Docs',
         },
+        {type: 'docsVersionDropdown', position: 'left'},
         {to: '/docs/recipes/overview', label: 'Recipes', position: 'left'},
         {href: 'https://prototest.dev/api/', label: 'API reference', position: 'left'},
         {href: 'https://trace.prototest.dev', label: 'Trace viewer', position: 'left'},
@@ -185,6 +193,7 @@ export default async function createConfig(): Promise<Config> {
             {label: 'GitHub', href: 'https://github.com/MSeys/ProtoTest'},
             {label: 'Contributing', href: 'https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md'},
             {label: 'Support', href: 'https://github.com/MSeys/ProtoTest/blob/main/SUPPORT.md'},
+            {label: 'Discussions', href: 'https://github.com/MSeys/ProtoTest/discussions'},
             {label: 'NuGet', href: 'https://www.nuget.org/packages?q=ProtoTest'},
             {label: 'Issues', href: 'https://github.com/MSeys/ProtoTest/issues'},
           ],

@@ -30,6 +30,7 @@ if (Test-Path -LiteralPath $factsRoot) {
 $forbiddenFailures = New-Object System.Collections.Generic.List[string]
 $keyFailures = New-Object System.Collections.Generic.List[string]
 $linkFailures = New-Object System.Collections.Generic.List[string]
+$releaseFailures = New-Object System.Collections.Generic.List[string]
 
 function Get-RelativePath {
     param([string]$FullPath)
@@ -181,10 +182,28 @@ foreach ($file in $docsContentFiles) {
     }
 }
 
+# 4. Generated changelog --------------------------------------------------------
+
+# One source: the repository CHANGELOG.md. docs/scripts/generate-changelog.mjs writes the documentation
+# page and the homepage release feed from it; check mode fails when either output is stale, so a release
+# that edits the changelog without regenerating fails here.
+
+$changelogGenerator = Join-Path $docsRoot "scripts\generate-changelog.mjs"
+if (Test-Path -LiteralPath $changelogGenerator) {
+    $generatorOutput = & node $changelogGenerator --check 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $releaseFailures.Add("the generated changelog is stale; run node docs/scripts/generate-changelog.mjs")
+        foreach ($line in $generatorOutput) { $releaseFailures.Add("  $line") }
+    }
+}
+else {
+    $releaseFailures.Add("docs/scripts/generate-changelog.mjs is missing")
+}
+
 # Summary -----------------------------------------------------------------------
 
 $checkedFiles = $docsContentFiles.Count + $docsSourceFiles.Count + $factFiles.Count
-$totalFailures = $forbiddenFailures.Count + $keyFailures.Count + $linkFailures.Count
+$totalFailures = $forbiddenFailures.Count + $keyFailures.Count + $linkFailures.Count + $releaseFailures.Count
 
 if ($totalFailures -gt 0) {
     Write-Host "Documentation checks failed:"
@@ -199,6 +218,10 @@ if ($totalFailures -gt 0) {
     if ($linkFailures.Count -gt 0) {
         Write-Host ("  Sample links ({0}):" -f $linkFailures.Count)
         foreach ($failure in $linkFailures) { Write-Host "    $failure" }
+    }
+    if ($releaseFailures.Count -gt 0) {
+        Write-Host ("  Generated changelog ({0}):" -f $releaseFailures.Count)
+        foreach ($failure in $releaseFailures) { Write-Host "    $failure" }
     }
 }
 

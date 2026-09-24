@@ -61,4 +61,6 @@ I wanted tests to focus on the scenario again. I wanted integrations to work tog
 
 ProtoTest is my attempt to solve those problems.
 
+Writing it meant writing a lot of code and documentation, and I used AI heavily to do it - how, why and with what reservations is on the [AI usage page](./ai-usage.md).
+
 It is a new project and real use will show where I got things wrong. That is part of building it too.

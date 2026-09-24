@@ -1,0 +1,212 @@
+# ProtoTest Plan 4 — the evaluator site and the reference demo
+
+Sources: `assets/internal/prototest-website-recommendations.md` and
+`assets/internal/prototest-reference-demo-spec.md` (2026-09-24 companions to the brief). Carries the two
+items `eng/audit-plan-3.md` Stage 8 postponed (8.14 template runner variants, 8.15 static trace index).
+Audit 3 is closed; this plan executes the companions in the order they rank themselves, and reorders
+`eng/feature-plan.md` where the reference demo changes what is demanded.
+
+**Goal:** first make the site answer evaluators — comparison, objections, support, roadmap — with content
+that matches shipped reality; then prove ProtoTest on a product nobody wrote for the framework: one
+satellite repository, three run modes, a real regression in the trace, and the framework gaps it exposes
+closed in demand order.
+
+## Locked decisions
+
+- The website recommendations' rule 0 is binding: **never advertise what does not exist**. Compare, FAQ
+  and roadmap describe shipped behavior only; Aspire, MCP, WireMock, MassTransit and per-test substitution
+  stay "exploring" until their packages exist.
+- **Website content ships before the demo.** The demo is announced only once the site already tells the
+  truth about what it proves.
+- The reference demo lives in **its own repository** (`opencsms`, MIT), created when R1 begins — never
+  inside this repo, or it will be read as another demo.
+- The demo's framework gaps move ahead of the feature plan in **demand-pulled order**: background-worker
+  hosting and readiness first (R1 needs them), then TimeProvider and `ProtoTest.Devices.WebSocket` (R2),
+  then WireMock, per-test substitution and the Aspire adapter (R4), then the demo-app benchmark (R5).
+- **Docs versioning:** freeze a `1.0` snapshot at the 1.1 release (Docusaurus `docs:version`), keep 1.0
+  reachable, and let patches update the current set in place. Do not cut versions before 1.1; a single
+  current set is acceptable until then because there is no breakage history to consult.
+- The demo keeps its warts (spec §2.2): a documented coverage gap, real error paths, retry/dead-letter
+  semantics, a clock dependency, seeded volume and a multi-tenancy negative test. No curated "showcase"
+  failures.
+
+## Rules
+
+1. Never advertise what does not exist; every Limits section is mandatory and honest, including numbers
+   that are worse than the alternative.
+2. Every behavior change lands with a test; docs-only work must pass `eng/check-docs.ps1`, code must pass
+   `eng/test.ps1` and `eng/lint.ps1`.
+3. A stage is the unit of commit and the unit of green; the Progress table records each stage's diff.
+4. Decisions are recorded here, not in prose elsewhere; postponed work gets an entry or a decision.
+5. The demo repository obeys the same evidence bar: its CI is its reason to exist, and its traces are real.
+
+## Track W — evaluator content (in-repo docs, ships first)
+
+Order is the recommendations' own priority (§2). W1–W5 are independent and small.
+
+- [ ] **W1 Comparison page** `/docs/compare` (rec 2.1): one section per alternative — WAF+Testcontainers+
+  Verify, Alba, Aspire, Playwright alone, building in-house — each with "where they win" and "where
+  ProtoTest wins", closing with "when ProtoTest is not the right choice". Claims must cite shipped
+  packages only; Aspire appears as complementary once P7 exists, "exploring" before.
+- [ ] **W2 FAQ** `/docs/faq` (rec 2.2): the nine objections, each answered in a short paragraph with a
+  link to the proof (coverage docs, runner matrix, AI-usage page, licensing).
+- [ ] **W3 Sustainability page** `/docs/project/sustainability` (rec 2.4): maintainer model, funding
+  reality, semver/deprecation/support policy, how to get help, and the "survives its author" argument.
+- [ ] **W4 Roadmap page** `/docs/roadmap` (rec 2.5): **Next** (committed, rough timing), **Exploring**
+  (Aspire, MCP, WireMock, MassTransit, substitution), **Not planned** (with reasons). Synced with
+  `eng/feature-plan.md`, which keeps being the internal source of truth.
+- [x] **W5 The viewer as the primary CTA** (rec 2.3): "See a failing test's trace" is the hero's primary
+  CTA (with Get started secondary), and the old TraceView illustration became a faithful three-view panel -
+  Run, Story and Check, drawn from the bundled demo trace with the real viewer's grammar and real values,
+  switchable with the keyboard, theme-aware and asset-free. **Decision:** the 60-second screencast was
+  dropped, and real screenshots were tried and dropped too - the replica keeps the viewer's text at full
+  size, follows the light/dark theme, ships no raster assets and cannot drift into stale images.
+- [x] **W6 Overhead benchmark vs raw `WebApplicationFactory`** (rec 2.6, executes feature-plan A7):
+  `tests/ProtoTest.AspNetCore.Tests/OverheadBenchmarkTests.cs` measures the same in-process request through
+  a full ProtoTest test cycle (start, REST call, complete) with tracing on and off against the raw
+  `WebApplicationFactory` equivalent, with per-phase splits, allocations and suite startup through the
+  first completed request; the numbers are published with methodology and the slower-where-it-is-slower
+  reading on the [benchmarks page](../docs/docs/benchmarks.md).
+- [x] **W7 Versioned docs at 1.1** (rec 2.5): the released 1.0 docs were cut from `main` into
+  `versioned_docs/version-1.0` (78 pages, with `versions.json`), `/docs/` now serves 1.0 through
+  `lastVersion` while `docs/` carries the 1.1 work under `/docs/next/`, the navbar gained the version
+  dropdown and the announcement bar states the split instead of claiming the release matches. One
+  mechanical fix: the 1.0 snapshot's repo file links gained one `../` because a versioned page sits one
+  directory deeper. Verified: the build is green (broken file links throw), `/docs/`, `/docs/next/`,
+  `/docs/next/roadmap` and old paths all serve, and the 1.0 hooks page lacks the 1.1 section while the
+  next page has it. At the 1.1 release: `npm run docusaurus docs:version 1.1`, move `lastVersion` and
+  refresh the bar.
+- [x] **W8 Small wins** (rec 2.7): homepage release feed (`docs/src/data/releases.ts` + `ReleaseFeed`,
+  cross-checked against `CHANGELOG.md` by the docs gate), GitHub Discussions enabled and linked from the
+  sustainability page, the FAQ, the footer and `SUPPORT.md`, the AI-usage page surfaced from Why
+  ProtoTest, and a docs-search check that "integration testing .NET", "trace" and "coverage" land on the
+  right pages. The screencast was dropped in W5 (recorded in Decisions).
+- [x] **W9 One changelog source** (follow-up): the repository `CHANGELOG.md` is now the only file a
+  release edits. `docs/scripts/generate-changelog.mjs` generates the docs changelog page and the homepage
+  feed (`docs/src/data/changelog.generated.ts`; `releases.ts` is gone), the docs build runs it, and
+  `eng/check-docs.ps1` runs its `--check` mode so a stale generated file fails the docs gate (verified by
+  deliberate drift). GitHub Release notes already derive from the same file; the announcement bar stays a
+  release-checklist item because it names the docs-version split, not a release.
+
+## Track R — the reference demo (OpenCSMS, separate repository)
+
+Milestones are the spec's (§8); each is stage-sized and leaves the demo runnable.
+
+- [ ] **R0 Repository discipline** — created at `opencsms` on its own git history when R1 starts; README
+  states what it is, the three run modes and an honest "what this proves"; MIT; linked from the docs as
+  *the reference suite* (never as a sample). One command: `docker compose up` or `dotnet test`.
+- [ ] **R1 CSMS API + Postgres + billing worker + REST suite + one journey** (M1, 2–3 weeks; needs P1, P2):
+  REST/OpenAPI surface, tariff rules, `AddWorker<Program>`-hosted billing worker consuming RabbitMQ events
+  with retry and dead-letter, Testcontainers Postgres/RabbitMQ, first end-to-end journey, and the
+  documented coverage gap.
+- [ ] **R2 OCPP gateway + charge-point simulator + device journey** (M2, 2 weeks; needs P3, P4): OCPP 1.6J
+  core subset (BootNotification, Heartbeat, StatusNotification, Start/StopTransaction, MeterValues,
+  RemoteStart/Stop), the simulator built on `ProtoTest.Devices.WebSocket`, the idle-fee journey with
+  `Proto.Context.Clock()`, and the duplicate-StopTransaction and malformed-MeterValues error paths.
+- [ ] **R3 Dashboard + public page + Playwright journeys + monthly export** (M3, 2 weeks): operator and
+  viewer roles, session timeline, invoice view, the .xlsx export through Sheets, and the multi-tenancy
+  negative test.
+- [ ] **R4 Container topology + deployed mode + mocks + fault injection + nightly CI** (M4, 1–2 weeks;
+  needs P5, P6, P7): the same suite against containers (Aspire AppHost) and a staging `BaseUrl` with
+  skip conditions, PSP/email/webhook fakes via WireMock, PSP-down fault injection, three CI jobs
+  (PR fast, nightly topology, optional staging smoke).
+- [ ] **R5 Benchmarks + docs page + trace showpiece + launch post** (M5, 1 week; needs P8): the seeded
+  1,000-journey run on this app produces the published overhead numbers; a real regression (idle fee not
+  applied after a tariff change) yields the linked failing `.prototrace`; the docs page and the launch
+  post only after W1/W4/W5 and P8 exist.
+
+## Track P — framework prerequisites the demo pulls
+
+IDs below are `eng/feature-plan.md` items; the demo is their demand proof, the feature plan is their
+scope. Plan-4 fixes their order; done means the feature-plan acceptance criteria.
+
+- [ ] **P1 Background-worker hosting** (spec item 1) → feature-plan **C5**: `AddWorker<Program>` or
+  generic-host support so the billing worker is hostable the way the API is, with lifecycle, readiness
+  and trace.
+- [ ] **P2 Readiness waiting** (spec item 2) → feature-plan **C6**: `AwaitReady`/health probes on
+  resources and applications instead of sleeps.
+- [ ] **P3 Clock control** (spec item 5) → feature-plan **A8**: `TimeProvider` integration
+  (`Proto.Context.Clock()`, `FakeTimeProvider` in tests) for tariff and expiry behavior.
+- [ ] **P4 `ProtoTest.Devices.WebSocket`** (spec item 4) → feature-plan **F2** reordered: WebSocket is the
+  first device backend, earned by OCPP; MQTT follows a real MQTT user.
+- [ ] **P5 WireMock integration** (spec item 6 prerequisite) → feature-plan **C1**.
+- [ ] **P6 Per-test substitution and fault injection** (spec item 6) → feature-plan **B1**.
+- [ ] **P7 Aspire adapter** (spec item 3) → feature-plan **C3**.
+- [ ] **P8 Demo-app benchmark** (spec item 7) → feature-plan **A7** (W6 publishes the first half from the
+  harness; P8 re-runs it on OpenCSMS).
+
+## Track X — carried from audit 3
+
+- [ ] **X1 Template `--runner` variants** (audit-3 8.14): `dotnet new prototest --runner xunit|tunit|mstest`;
+  depends on feature-plan B4/B5 for what the generated suite should look like, so it lands with or after
+  them.
+- [ ] **X2 Static trace index for sharing** (audit-3 8.15): a folder of traces plus a generated static
+  index page, no server; feeds W5's showpiece and R5.
+
+Feature-plan **D2 (MCP)** and its dependent docs page stay in the feature plan; the agents page is
+published only when D2–D4 exist (never-advertise rule). The recommendations' §3 wording is the gate.
+
+## Progress
+
+Record `git diff --shortstat` per stage split by `src`, `tests`, `docs`, with this file excluded.
+
+| Stage | Status | Net lines | Notes |
+| --- | --- | --- | --- |
+| — (planning) | Complete | docs +0 | Audit 3 closed; companions stored under `assets/internal/`; plan 4 written; feature plan reordered demand-pulled. |
+| W1 — Comparison page | Complete | docs +114 / −0 · src 0 · tests 0 | `/docs/compare` published: five alternatives (WAF+Testcontainers+Verify+Shouldly, Alba, Aspire, Playwright alone, in-house), each with where they win and where ProtoTest wins, closing with when ProtoTest is not the right choice. Claims limited to shipped packages; the service-substitution gap and the unshipped Aspire adapter are stated. Verified in the built site: `check-docs`, `npm run typecheck` and `npm run build` green. |
+| W2 — Objections FAQ | Complete | docs +67 / −1 · src 0 · tests 0 | `/docs/faq` published: the nine recommended objections plus licensing, telemetry, target runtimes and where-to-start, each answer linking its proof (coverage, runners, clients, AI usage, nothing-phones-home). Benchmarks moved to `sidebar_position: 4` so FAQ sits beside the comparison page. Verified in the built site: `check-docs` (99 files) and `npm run build` green, anchors checked against the built HTML. |
+| W3 — Sustainability page | Complete | docs +50 / −0 · src 0 · tests 0 | `/docs/project/sustainability` published with the user's answers: no funding and personal time; semver with the accidental-public exception list, `Obsolete` at least one minor before removal where feasible, patch releases never break, the pack-time package-validation gate named as enforcement; fixes on the newest line only; help via docs, issues and SECURITY.md; the survives-its-author argument; and the solo-project caveats. This also executes feature-plan A6 (compatibility and deprecation policy). Verified in the built site: `check-docs` (100 files) and `npm run build` green. |
+| W4 — Roadmap page | Complete | docs +64 / −0 · src 0 · tests 0 | `/docs/roadmap` published with three sections: Next (1.1 polish and trust, 1.2 hosting and the reference demo, 1.x platform line), Exploring (MCP, MassTransit, Wolverine, analyzers, traffic coverage, exhaustive mode, Allure/ReportPortal, static trace index, MQTT) and Not planned (hosted service, commercial CSMS, pre-.NET 8, reimplementing the libraries, coverage conflation, renaming, further device transports) - each with its reason. Effort-ordered, explicitly not date-ordered; unshipped items phrased as plans. Verified in the built site: `check-docs` (101 files) and `npm run build` green, page rendered and read. |
+| W5 — Viewer CTA and demo panel | Complete | docs +690 / −242 · src 0 · tests 0 | The hero's primary CTA is now "See a failing test's trace" (opens trace.prototest.dev/?demo=1), Get started is secondary, and the stale TraceView card is replaced by `ViewerWalkthrough`: Run (outcome line, phase bar, "what this run could see", needs-attention list), Story (failure card and lifecycle) and Check (exception, recorded location, source), switchable by click and arrow keys, with every value copied from the bundled demo trace. Verified in the built site at desktop/mobile in both themes: `check-docs` (104 files), `npm run typecheck`, stylelint and the Docusaurus build green. Screenshots and the screencast were dropped (recorded in Decisions). |
+| W6 — Overhead benchmark | Complete | docs +62 / −1 · tests +545 / −0 · src 0 | `OverheadBenchmarkTests` (Category `Benchmark`) leads with a real short test - POST an order, read it back, assert both bodies - written once with ProtoTest (tracing on/off) and once with the raw stack, and keeps the micro comparison that explains it: single request, lifecycle-only mode, suite startup through the first completed request. `TestApi` gained a `/benchmark/orders` create/read pair so both versions send identical requests. Published on the benchmarks page: the same short test is ~3x the raw stack without tracing and ~8x with it; the bare lifecycle is 0.06 ms, the REST client adds ~0.15 ms over a raw request and tracing adds ~1.6 ms and ~1 MB per test. Closes feature-plan A7. Full suite, format gate and docs check green. |
+| W8 — Small wins | Complete | docs +105 / −2 · eng +61 / −0 · src 0 · tests 0 | The homepage gains a release feed (`releases.ts` + `ReleaseFeed`) showing the latest version, date and summary plus the release before it; `eng/check-docs.ps1` cross-checks versions and dates against `CHANGELOG.md` and the drift was verified to fail the gate. The AI-usage page is surfaced from Why ProtoTest; the docs search was checked for "integration testing .NET" (64 hits, intro and integrations first), "trace" (100) and "coverage" (98) and lands on the right pages. GitHub Discussions is enabled and linked from the sustainability page, the FAQ, the footer and `SUPPORT.md`; the screencast was dropped in W5. |
+| W7 — Versioned docs | Complete | docs +9,106 / −1 · src 0 · tests 0 | The released 1.0 documentation is frozen as `versioned_docs/version-1.0` (78 pages cut from `main`) with `versions.json`; `lastVersion: '1.0'` serves it at `/docs/`, `docs/` moves to `/docs/next/` as "1.1 (in progress)", the navbar shows the version dropdown and the announcement bar points at 1.0 and the 1.1 roadmap. The 1.0 snapshot's repo file links gained one `../` (a versioned page is one directory deeper); everything else is untouched. Verified by the throwing build and by serving `/docs/`, `/docs/next/`, `/docs/next/roadmap` and old paths, and by content checks that split the versions. |
+| W9 — One changelog source | Complete | docs +281 / −44 · eng +23 / −36 · src 0 · tests 0 | `docs/scripts/generate-changelog.mjs` parses the repository `CHANGELOG.md` into the changelog page and `changelog.generated.ts` (summary = the release's opening paragraph, or its first sentence as a bullet; `Unreleased` and the link-reference tail stay in the repository file). `Releases.ts` is deleted, `ReleaseFeed` imports the generated data, the docs build and start run the generator, and `check-docs` runs `--check` with deliberate drift verified to fail the gate. The page now carries the repository wording and gains `Fixed`/`Added`/`Changed` navigation; `RELEASING.md` says one edit per release. |
+
+## Decisions taken
+
+- Website content first (user decision 2026-09-24): the site must be honest and evaluator-complete before
+  the demo is announced.
+- The demo lives in its own repository, created when R1 begins; nothing is created until then.
+- The demo's framework demands reorder the feature plan rather than waiting for it: worker hosting,
+  readiness, TimeProvider, Devices.WebSocket, WireMock, substitution, Aspire, demo benchmark.
+- Docs versioning happens at 1.1; 1.0 is frozen then and patches update the current set.
+- Track D2 MCP stays feature-plan work; its docs page and any hero line wait for D2–D4.
+- W5: the screencast is dropped (a video ages and cannot be interacted with), and real screenshots were
+  tried and dropped after reading them: at panel size the viewer's text shrank, the theme was fixed, and
+  they added ~560 KB of drift-prone raster assets. The faithful `ViewerWalkthrough` replica carries the
+  same three views with full-size text, theme awareness and zero assets.
+- W8: GitHub Discussions is enabled and linked from the sustainability page, the FAQ, the footer and
+  `SUPPORT.md`; the release feed is checked, not hand-trusted, because a release that skips
+  `docs/src/data/releases.ts` fails `eng/check-docs.ps1`.
+- W9: the changelog page is generated rather than curated, so it carries the repository `CHANGELOG.md`
+  wording (the hand-written copy is gone); the homepage feed's summary is the release's opening
+  paragraph, falling back to its first bullet. One edit per release; the announcement bar stays manual
+  because it names the docs-version split.
+
+## Stop criteria
+
+- `/docs/compare`, `/docs/faq`, `/docs/project/sustainability` and `/docs/roadmap` exist, match shipped
+  behavior and pass the docs check; no "coming soon" integration tile anywhere on the site.
+- The overhead numbers vs raw `WebApplicationFactory` are published with methodology and an honest
+  slower-or-equal case.
+- Docs are versioned at the 1.1 release and the release banner points at the matching version.
+- OpenCSMS runs from `dotnet test` and `docker compose up` in its own repo, in three modes, with the
+  documented coverage gap and the real regression trace linked from its README.
+- The framework gaps the demo pulled are shipped with tests, docs and changelog entries, or recorded as
+  decisions here.
+
+## Non-goals
+
+- Not a commercial CSMS; no hardware certification, real PSP onboarding or production operations.
+- No marketing that outruns the gap list (§7 of the recommendations): no testimonials, no coming-soon
+  tiles, no landing-page redesign.
+- No second demo inside this repository, and no Northstar rewrite — it stays the first-run sandbox.
+- No MCP/agents content before the MCP server exists.
+
+## Metrics to watch (rec §6)
+
+- Demo trace opens; later, MCP endpoint hits.
+- NuGet installs beyond the author's own CI (Core package trend).
+- Issues filed by strangers and time-to-first-response.
+- Docs search terms that find nothing.

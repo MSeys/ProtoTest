@@ -2,9 +2,10 @@
 
 Source: `prototest-complete-brief.md` (2026-09-24, independent review + ecosystem + strategy).
 Baseline: `09d2590` (same as `eng/audit-plan-3.md`).
-Relationship: this plan covers **new capabilities**. `eng/audit-plan-3.md` covers internal correctness
-and must land first where it is a dependency. Feature IDs here (`A1`, `B2`, …) are feature IDs, distinct
-from the finding IDs in the audit plan.
+Relationship: this plan covers **new capabilities**. `eng/audit-plan-3.md` is closed (2026-09-24) and
+must land first where it is a dependency; `eng/plan-4.md` executes the brief's companion recommendations
+(the evaluator site, then the OpenCSMS reference demo) and reorders the items below demand-pulled.
+Feature IDs here (`A1`, `B2`, …) are feature IDs, distinct from the finding IDs in the audit plan.
 
 **Goal:** ship the brief's missing capabilities on the model that exists — extension points first, one new
 Core seam only (per-test substitution), and nothing advertised before it is real.
@@ -32,6 +33,15 @@ Core seam only (per-test substitution), and nothing advertised before it is real
 | Benchmarks and any scale claims | Stage 6 (1–2k measurement) |
 | Track B low-ceremony mode | Stage 4 (runner boundaries) complete |
 
+## Execution order (set by `eng/plan-4.md`)
+
+`eng/plan-4.md` executes the website recommendations first, then the reference demo (OpenCSMS), and the
+demo pulls these items ahead of the rest in this order: background-worker hosting (**C5**) and readiness
+waiting (**C6**), then the test clock (**A8**) and `ProtoTest.Devices.WebSocket` (**F2**, reordered),
+then WireMock (**C1**), per-test substitution (**B1**) and the Aspire adapter (**C3**), then the demo-app
+benchmark (**A7**, re-run by plan-4 P8). Everything else keeps its track and waits for demand; the
+checkboxes below stay the source of truth for scope, and `eng/plan-4.md` is the source of truth for order.
+
 ## Track A — 1.1 polish and trust (small, user-visible)
 
 - [ ] **A1 Path-based single-value read** — `ReadAsJson<int>("$.id")` on responses, so one value does not
@@ -51,11 +61,15 @@ Core seam only (per-test substitution), and nothing advertised before it is real
   used in a test with no application/client registered, a `[RequiresCapability]` kind that no registration
   contributes). Scope conservatively; a noisy analyzer is worse than none. Effort: 1–2 weeks after a
   one-page design.
-- [ ] **A6 Compatibility and deprecation policy** (brief item 22): the changelog promise becomes a stated
-  1.x policy — semver, deprecation window, accidental-public list. Documentation only.
-- [ ] **A7 Benchmark page** (brief item 17 / open question 2): per-test overhead vs raw
-  `WebApplicationFactory`; suite startup with tracing on/off; trace size at 100/1,000 tests. Publishes
-  the audit's Stage 6 numbers.
+- [x] **A6 Compatibility and deprecation policy** (brief item 22): done in `eng/plan-4.md` W3 - the
+  stated 1.x policy (semver, the accidental-public exception list, `Obsolete` at least one minor before
+  removal where feasible, fixes on the newest line) lives on the support and sustainability page.
+- [x] **A7 Benchmark page** (brief item 17 / open question 2): done in `eng/plan-4.md` W6 - the
+  benchmarks page carries the trace-size table and the `WebApplicationFactory` overhead comparison
+  (per-test lifecycle with tracing on/off, startup, allocations). Re-run on the reference demo by P8.
+- [ ] **A8 Test clock** (plan-4 P3): `TimeProvider` integration — `Proto.Context.Clock()` backed by the
+  host's `TimeProvider`, `FakeTimeProvider` in tests — for tariff, expiry and idle-fee behavior.
+  Acceptance: a test advances time without sleeping and the advancement is visible in the trace.
 
 ## Track B — Alba-parity release (1.2)
 
@@ -97,6 +111,13 @@ Core seam only (per-test substitution), and nothing advertised before it is real
   in-process assertions).
 - [ ] **C4 Wolverine.Tracking bridge** (optional, ecosystem adjacency to Alba): same shape as C2; only if
   a user asks.
+- [ ] **C5 Background-worker hosting** (plan-4 P1): host a worker (generic host / `IHostedService`
+  application) the way the API is hosted — `AddWorker<Program>` or generic-host support — with lifecycle,
+  readiness and trace. Acceptance: the reference demo's billing worker runs in-process under the suite
+  and its consumption is traced.
+- [ ] **C6 Readiness waiting** (plan-4 P2): `AwaitReady`/health probes for resources and applications so
+  suites wait for readiness instead of sleeping. Acceptance: Testcontainers and hosted applications
+  expose readiness; the demo uses it with no `Task.Delay` in setup.
 
 ## Track D — Agentic evidence layer (highest strategic leverage; parallel after Stage 3)
 
@@ -135,10 +156,11 @@ Gates: D1/D2 dogfooded on the demo suite; record the session; external launch po
 - [ ] **F1 Design spike for `ProtoTest.Devices`**: device model, virtual device, replay, assertion-level
   device coverage, trace kinds (`device.connect/send/command/replay`, category `Device`). One-page design
   with a working vertical slice, mirroring `ProtoTest.Web` + backends.
-- [ ] **F2 MQTT backend first** (brief's recommendation), against a Mosquitto container; capabilities
+- [ ] **F2 WebSocket backend first** (reordered by plan-4 P4; the reference demo's OCPP gateway earns it),
+  then MQTT against a Mosquitto container when a real MQTT user exists; capabilities
   (`[RequiresDevice<T>]`) so the same suite runs against hardware in a lab.
 - [ ] **F3 Whole-journey scenario** as the acceptance demo: device frame → platform processing → command
-  back → report, one `.prototrace`.
+  back → report, one `.prototrace` (the reference demo's R2 is this scenario).
 - [ ] **F4 TCP/Serial/Sigfox** only after a real transport user exists.
 - [ ] **F5 Commercial angle** (telematics/regulatory reporting): decide separately from the OSS plan;
   do not gate the package on it.
@@ -155,10 +177,10 @@ Gates: D1/D2 dogfooded on the demo suite; record the session; external launch po
 
 | Version | Theme | Contains | Gate |
 | --- | --- | --- | --- |
-| 1.1 | Polish and trust | audit-plan-3 Stages 0–2 + Track A; nothing user-facing breaks | real-run adapter and redaction tests green |
-| 1.2 | Alba parity | audit-plan-3 Stages 3–4 + Track B | demo suite dogfooded with substitution and exact mode |
-| 1.x | Platform | audit-plan-3 Stages 5–6 + Track C + Track D | one external suite; CI evidence in use |
-| Later | Bets | Track E, Track F, Track G as demand/decision allows | explicit demand for each |
+| 1.1 | Polish and trust | audit-plan-3 (complete) + Track A incl. A8 + `eng/plan-4.md` Track W | demo suite green; overhead numbers published; docs versioned |
+| 1.2 | Alba parity and hosting | Track B (B1 first) + C5/C6 worker hosting and readiness + plan-4 R1 | the reference demo runs its billing worker in-process under the suite |
+| 1.x | Platform | Track C (C1–C3, C6), Track D, Track F (WebSocket first), plan-4 R2–R5 | one external suite; CI evidence in use |
+| Later | Bets | Track E, Track G, plan-4 X1/X2 as demand allows | explicit demand for each |
 
 ## Open questions from the brief, mapped
 

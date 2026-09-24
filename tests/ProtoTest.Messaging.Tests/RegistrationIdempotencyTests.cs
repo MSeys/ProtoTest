@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 
 [TestFixture]
+[Category("Characterization")]
 public sealed class RegistrationIdempotencyTests
 {
     [Test]
@@ -29,7 +30,7 @@ public sealed class RegistrationIdempotencyTests
 
         public Type ClientType => typeof(object);
 
-        public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
+        public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
         {
             context.RegisterClient(new object(), Name);
             return Task.FromResult(true);

@@ -2,7 +2,7 @@ namespace ProtoTest.OpenApi.Tests;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.OpenApi.Readers;
+using Microsoft.OpenApi;
 using ProtoTest.Core;
 using ProtoTest.OpenApi;
 using ProtoTest.Rest;
@@ -15,7 +15,7 @@ public class OpenApiCoverageCollectorTests
     [Test]
     public void Constructor_ShouldAcceptAPrebuiltOpenApiDocument()
     {
-        var document = new OpenApiStringReader().Read(OpenApiTestHelper.SampleJsonSpec, out _);
+        var document = OpenApiDocument.Parse(OpenApiTestHelper.SampleJsonSpec).Document!;
 
         var collector = new OpenApiCoverageCollector("TestApi", document);
 
@@ -26,6 +26,19 @@ public class OpenApiCoverageCollectorTests
             Assert.That(root.Children!.Single(child => child.Identifier == "200")
                 .Children!.Any(child => child.Identifier == "$.id"), Is.True);
         }
+    }
+
+    [Test]
+    public void MissingSpecification_ShouldFailWhenTheHostIsBuilt()
+    {
+        // Stage 5 (Audit 3, finding D5): collectors are constructed at Build, so a missing specification
+        // fails configuration instead of the first test that happens to record an observation.
+        var builder = new ProtoHostBuilder();
+        builder.AddRest(rest => rest
+            .AddClient("Orders", "https://orders.test")
+            .AddCollector<OpenApiCoverageCollector>());
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
     }
 
     [Test]

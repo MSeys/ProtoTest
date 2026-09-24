@@ -2,6 +2,7 @@ namespace ProtoTest.Messaging.RabbitMq;
 
 using System.Text;
 using global::RabbitMQ.Client;
+using global::RabbitMQ.Client.Exceptions;
 using ProtoTest.Core;
 using ProtoTest.Messaging;
 
@@ -10,14 +11,14 @@ using ProtoTest.Messaging;
 /// topology decides routing. Each test owns a consumer with its own channel and per-test tap queues,
 /// deleted when the test ends, so parallel tests may share a destination without stealing each other's
 /// messages. The connection is shared by the run and is thread-safe; channels are not, so each side
-/// serializes its own.
+/// serializes its own. Every broker call is asynchronous: the client's 7.x API has no synchronous one.
 /// </summary>
-internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IDisposable
+internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IAsyncDisposable
 {
     private readonly RabbitMqOptions _options;
-    private readonly ProtoLock _gate = new();
+    private readonly SemaphoreSlim _gate = new(1, 1);
     private IConnection? _connection;
-    private IModel? _publishChannel;
+    private IChannel? _publishChannel;
 
     public RabbitMqMessageBroker(RabbitMqOptions options)
     {
@@ -27,71 +28,109 @@ internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IDisposable
 
     public string Name => "RabbitMQ";
 
-
     /// <summary>Creates a consumer that owns its own channel on the shared connection.</summary>
     public ValueTask<IProtoMessageConsumer> CreateConsumerAsync(CancellationToken cancellationToken = default)
         => new(new RabbitMqProtoMessageConsumer(this));
 
-    public ValueTask PublishAsync(ProtoMessage message, CancellationToken cancellationToken = default)
+    public async ValueTask PublishAsync(ProtoMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
         var body = Encoding.UTF8.GetBytes(message.Payload ?? string.Empty);
-        lock (_gate)
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            var channel = PublishChannel();
-            var properties = channel.CreateBasicProperties();
-            properties.ContentType = message.ContentType ?? "application/json";
-            properties.Persistent = false;
+            var channel = await PublishChannelAsync(cancellationToken).ConfigureAwait(false);
+            var properties = new BasicProperties
+            {
+                ContentType = message.ContentType ?? "application/json",
+                Persistent = false
+            };
             if (message.Headers is not null)
             {
-                properties.Headers = message.Headers
-                    .Where(pair => pair.Value is not null)
-                    .ToDictionary(pair => pair.Key, pair => (object)pair.Value!);
+                var headers = new Dictionary<string, object?>();
+                foreach (var (key, value) in message.Headers)
+                {
+                    if (value is not null)
+                    {
+                        headers[key] = value;
+                    }
+                }
+
+                properties.Headers = headers;
             }
 
-            channel.BasicPublish(
+            await channel.BasicPublishAsync(
                 exchange: message.Destination,
                 routingKey: message.Destination,
+                mandatory: false,
                 basicProperties: properties,
-                body: body);
+                body: body,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
         }
-
-        return ValueTask.CompletedTask;
+        finally
+        {
+            _gate.Release();
+        }
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
-        lock (_gate)
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            _publishChannel?.Dispose();
-            _publishChannel = null;
-            _connection?.Dispose();
-            _connection = null;
+            if (_publishChannel is not null)
+            {
+                await _publishChannel.DisposeAsync().ConfigureAwait(false);
+                _publishChannel = null;
+            }
+
+            if (_connection is not null)
+            {
+                await _connection.DisposeAsync().ConfigureAwait(false);
+                _connection = null;
+            }
+        }
+        finally
+        {
+            _gate.Release();
         }
     }
 
     /// <summary>Creates a channel on the shared connection; the caller owns and serializes it.</summary>
-    internal IModel CreateChannel()
+    internal async Task<IChannel> CreateChannelAsync(CancellationToken cancellationToken = default)
     {
-        lock (_gate)
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            return Connection().CreateModel();
+            var connection = await ConnectionAsync(cancellationToken).ConfigureAwait(false);
+            return await connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
         }
     }
 
-    private IModel PublishChannel()
+    private async Task<IChannel> PublishChannelAsync(CancellationToken cancellationToken)
     {
         if (_publishChannel is { IsOpen: true })
         {
             return _publishChannel;
         }
 
-        _publishChannel?.Dispose();
-        _publishChannel = Connection().CreateModel();
+        if (_publishChannel is not null)
+        {
+            await _publishChannel.DisposeAsync().ConfigureAwait(false);
+            _publishChannel = null;
+        }
+
+        var connection = await ConnectionAsync(cancellationToken).ConfigureAwait(false);
+        _publishChannel = await connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         return _publishChannel;
     }
 
-    private IConnection Connection()
+    /// <summary>Returns the open shared connection, opening one when the broker dropped it.</summary>
+    private async Task<IConnection> ConnectionAsync(CancellationToken cancellationToken)
     {
         if (_connection is { IsOpen: true })
         {
@@ -102,15 +141,18 @@ internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IDisposable
         {
             var factory = new ConnectionFactory
             {
-                Uri = new Uri(_options.ConnectionString),
-                DispatchConsumersAsync = false
+                Uri = new Uri(_options.ConnectionString)
             };
-            _connection?.Dispose();
-            _connection = factory.CreateConnection("ProtoTest.Messaging");
+            if (_connection is not null)
+            {
+                await _connection.DisposeAsync().ConfigureAwait(false);
+                _connection = null;
+            }
+
+            _connection = await factory.CreateConnectionAsync("ProtoTest.Messaging", cancellationToken).ConfigureAwait(false);
             return _connection;
         }
-        catch (Exception exception) when (exception is UriFormatException
-            or global::RabbitMQ.Client.Exceptions.BrokerUnreachableException)
+        catch (Exception exception) when (exception is UriFormatException or BrokerUnreachableException)
         {
             throw new InvalidOperationException(
                 $"The RabbitMQ broker at '{ProtoUriSanitizer.WithoutUserInfo(_options.ConnectionString)}' is unreachable. Configure " +
@@ -119,4 +161,3 @@ internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IDisposable
         }
     }
 }
-

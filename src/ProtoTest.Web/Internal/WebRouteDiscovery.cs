@@ -1,7 +1,7 @@
 namespace ProtoTest.Web.Internal;
 
 using ProtoTest.Core;
-using ProtoTest.Core.Internal;
+using ProtoTest.Web.Pages;
 
 /// <summary>
 /// Opt-in Vue Router discovery (<c>DiscoverRoutes</c> on <c>[WebSession]</c> or

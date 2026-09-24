@@ -103,7 +103,7 @@ ProtoTest attachment 'rest-01-response': /path/to/TestResults/.../rest-01-respon
 - No native attachments — artifacts land next to the trace, not in xUnit's output.
 - No dynamic skip: the reason is decided before the test method is invoked, so a condition cannot depend on the body.
 - Every test class must join the collection; the host is never initialized otherwise.
-- Theory rows are recorded under xUnit's display name, unlike the fully qualified names the other adapters use.
+- Theory rows are recorded under xUnit's display name; NUnit and MSTest also append the row's arguments, while a plain method keeps the fully qualified name.
 
 ## Next
 

@@ -1,5 +1,6 @@
 namespace ProtoTest.AdapterContract;
 
+using System.Reflection;
 using ProtoTest.Core;
 
 /// <summary>
@@ -31,7 +32,55 @@ public static class AdapterLifecycle
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.AddTestHook<TrackingHook>();
+        builder.AddTestHook<FailureProbeHook>();
+        builder.AddRunHook<RunContractVerificationHook>();
     }
+
+    /// <summary>Returns the last recorded trace for a method, so a driver can assert what the adapter recorded.</summary>
+    public static ProtoTestTrace FindTrace(ProtoHost host, MethodInfo method)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        ArgumentNullException.ThrowIfNull(method);
+        var name = ProtoTestName.FromMethod(method);
+        return host.Trace.Snapshot().Tests.Last(test => test.Name == name);
+    }
+
+    /// <summary>
+    /// Verifies the completed run once, before the host stops: every test the adapter wrapped recorded an
+    /// outcome, the shared compliance test succeeded, and its body attachment is in the trace. This is the
+    /// real-run half of the adapter contract — an adapter that fails to map a result or complete a scope
+    /// fails the run itself instead of silently recording <c>Unknown</c>. A run that never started (zero
+    /// recorded tests) is skipped so a host start failure is not masked by this check.
+    /// </summary>
+    public static void VerifyCompletedRun(ProtoHost host)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        var tests = host.Trace.Snapshot().Tests;
+        if (tests.Count == 0)
+        {
+            return;
+        }
+
+        var unknown = tests
+            .Where(test => test.Outcome == ProtoTraceOutcome.Unknown)
+            .Select(test => test.Name)
+            .ToArray();
+        Ensure(
+            unknown.Length == 0,
+            $"Every wrapped test must record an outcome; unknown: {string.Join(", ", unknown)}.");
+
+        var compliance = tests.SingleOrDefault(test => test.MethodName == ComplianceTestName);
+        Ensure(compliance is not null, "The shared compliance test did not run in this assembly.");
+        Ensure(
+            compliance!.Outcome == ProtoTraceOutcome.Succeeded,
+            $"The shared compliance test recorded '{compliance.Outcome}' instead of Succeeded.");
+        Ensure(
+            compliance.Record?.Attachments?.Any(attachment =>
+                attachment.Name.EndsWith("-adapter-contract", StringComparison.Ordinal)) == true,
+            "The shared compliance test's body attachment is missing from the trace record.");
+    }
+
+    private const string ComplianceTestName = "Adapter_ShouldSatisfySharedLifecycleContract";
 
     /// <summary>
     /// Verifies the before lifecycle, the test's identity and the attachment surface, then marks the

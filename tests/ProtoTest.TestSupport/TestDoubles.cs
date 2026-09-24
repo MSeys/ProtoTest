@@ -16,7 +16,7 @@ public sealed class StubTransportInitializer(string name, string baseAddress, Ht
 {
     public string Name { get; } = name;
 
-    public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
+    public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
     {
         context.RegisterClient(new HttpClient(handler) { BaseAddress = new Uri(baseAddress) }, Name);
         return Task.FromResult(true);

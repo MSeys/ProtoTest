@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Mvc.Testing.Handlers;
 using ProtoTest.Core;
-using ProtoTest.Core.Internal;
+using ProtoTest.Web.Pages;
 
 /// <summary>
 /// Initializes an in-process ASP.NET Core test server and a per-test client for it.
@@ -38,8 +38,15 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
     public string Name { get; }
 
     /// <inheritdoc />
-    public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
+    public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
     {
+        // The transport can serve several protocol chains that share its name; the initializer hook
+        // invokes it once, and this guard keeps a direct second call from registering a second client.
+        if (context.TryClient<HttpClient>(Name) is not null)
+        {
+            return Task.FromResult(true);
+        }
+
         var lease = _serverLifetime.Acquire(context, Name, CombinedConfigure);
         var server = lease.Server;
         var clientOptions = new WebApplicationFactoryClientOptions();
@@ -50,6 +57,7 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
         var client = server.Factory.CreateDefaultClient(clientOptions.BaseAddress, handlers);
         context.RegisterClient(client, Name);
         var serverState = new AspNetCoreServerState(
+            Name,
             typeof(TProgram).FullName!,
             typeof(TProgram).Name,
             _serverLifetime.Kind,

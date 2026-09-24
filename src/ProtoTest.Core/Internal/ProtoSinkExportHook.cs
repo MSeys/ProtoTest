@@ -20,7 +20,9 @@ internal sealed class ProtoSinkExportHook(
             try
             {
                 await sink.ExportAsync(items, cancellationToken);
-                if (sink is IProtoSinkArtifactSource artifactSource)
+                // Artifacts are only captured when they will be archived; with tracing off the bytes
+                // would be read and retained for a run that writes nothing.
+                if (traceSession.Enabled && sink is IProtoSinkArtifactSource artifactSource)
                 {
                     await traceSession.CaptureRunArtifactsAsync(
                         artifactSource.GetArtifacts(),

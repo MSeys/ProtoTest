@@ -188,7 +188,7 @@ With capture enabled, each traced call attaches its request and response message
 
 ### Coverage
 
-The async call helpers record a `grpc.response` observation per call. Register the collector on the target returned by `AddClient` to aggregate service/method coverage:
+The async call helpers record a `grpc.response` observation per successful call. Register the collector on the target returned by `AddClient` to aggregate service/method coverage:
 
 ```csharp
 .AddGrpc(grpc => grpc.AddClient("Api")
@@ -209,7 +209,7 @@ The resolver overloads register the client with a deferred address, so initializ
 
 ## Tracing and coverage
 
-The async helpers record a `grpc.call` operation named `gRPC · {method.FullName}` with the client entity `client:ProtoTest.Grpc.ProtoGrpcClient:{name}` and attributes `rpc.system`, `rpc.service`, `rpc.method`, `client.name`, `rpc.deadline`, `rpc.metadata.{key}` (sensitive values `(redacted)`), `auth.outcome`/`auth.type`, `grpc.request.count` for client streaming and `grpc.response.count`. Request and response sections are protobuf code; a failure adds `rpc.grpc.status_code`/`rpc.grpc.status` and a `Status` Fields section with `code` and `detail`. Each call records a `grpc.response` observation with `rpc.system`, `rpc.service`, `rpc.method` and `rpc.grpc.status`.
+The async helpers record a `grpc.call` operation named `gRPC · {method.FullName}` with the client entity `client:ProtoTest.Grpc.ProtoGrpcClient:{name}` and attributes `rpc.system`, `rpc.service`, `rpc.method`, `client.name`, `rpc.deadline`, `rpc.metadata.{key}` (sensitive values `(redacted)`), `auth.outcome`/`auth.type`, `grpc.request.count` for client streaming and `grpc.response.count`. Request and response sections are protobuf code; a failure adds `rpc.grpc.status_code`/`rpc.grpc.status` and a `Status` Fields section with `code` and `detail`. Each call records a `grpc.response` observation with `rpc.system`, `rpc.service`, `rpc.method` and `rpc.grpc.status`; a failed call records `grpc.failure` instead, so a call that never succeeded does not count as covered.
 
 The client is state, not history: it appears once with `client.name`, `client.protocol`, `client.type`, `client.endpoint_source` and the sanitized `client.address`; Core adds the `client.initialize` operation and the `client.initializer` field. The `grpc.client.resolve` event records a fallback resolution, and `grpc.attachment.failed` records a capture failure with `attachment.name`.
 
@@ -226,7 +226,7 @@ The client is state, not history: it appears once with `client.name`, `client.pr
 ## Limits
 
 - **Streaming capture is capped.** Only the first 10 messages of a client- or server-streaming call are attached; the cap is a private constant and not configurable.
-- **Raw helpers are untraced and uncaptured.** `ServerStreaming`, `DuplexStreaming`, `OpenServerStreamingAsync` and `OpenDuplexStreamingAsync` return the call for you to drive; only `[Auth]` metadata is applied.
+- **Raw helpers are untraced and uncaptured.** `ServerStreaming`, `DuplexStreaming`, `OpenServerStreamingAsync` and `OpenDuplexStreamingAsync` return the call for you to drive; only `[Auth]` metadata is applied. Because a raw call has no traced operation to cache an authenticator on, each raw call resolves a fresh one - keep raw calls to cases the traced helpers cannot express.
 - **Two serializations.** Trace request/response sections use protobuf text format, while attachments and shape matching use JSON.
 - **One attachments section.** `GrpcAttachmentOptions` binds one global section per registration; there is no per-client section.
 - **No retries.** There is no exponential backoff and no client interceptor beyond metadata.

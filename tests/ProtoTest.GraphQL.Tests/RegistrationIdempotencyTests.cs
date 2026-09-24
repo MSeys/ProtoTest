@@ -7,6 +7,7 @@ using ProtoTest.Core;
 using ProtoTest.Http;
 
 [TestFixture]
+[Category("Characterization")]
 public sealed class RegistrationIdempotencyTests
 {
     [Test]

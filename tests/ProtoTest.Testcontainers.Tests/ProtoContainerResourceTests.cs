@@ -202,15 +202,36 @@ public sealed class ProtoContainerResourceTests
     }
 
     [Test]
-    public async Task StartAsync_ShouldThrowObjectDisposedExceptionAfterRelease()
+    public async Task StartAsync_AfterRelease_ShouldStartAFreshContainer()
     {
-        var container = new FakeContainer();
-        var resource = new FakeResource(() => container);
+        var first = new FakeContainer { ConnectionString = "fake://first" };
+        var second = new FakeContainer { ConnectionString = "fake://second" };
+        var built = new Queue<FakeContainer>([first, second]);
+        var resource = new FakeResource(() => built.Dequeue());
 
+        await resource.StartAsync();
         await resource.DisposeAsync();
 
-        Assert.ThrowsAsync<ObjectDisposedException>(async () => await resource.StartAsync());
-        Assert.That(container.StartCount, Is.Zero, "A released resource must not start.");
+        Assert.Multiple(() =>
+        {
+            Assert.That(resource.ConnectionString, Is.Empty, "a released container's endpoint must not stay readable");
+            Assert.That(resource.IsStarted, Is.False);
+            Assert.That(first.DisposeCount, Is.EqualTo(1));
+        });
+
+        // A retry after a failed run start re-owns the infrastructure it starts again, so the new
+        // ownership period must be startable and releasable like the first.
+        await resource.StartAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(second.StartCount, Is.EqualTo(1));
+            Assert.That(resource.IsStarted, Is.True);
+            Assert.That(resource.ConnectionString, Is.EqualTo("fake://second"));
+        });
+
+        await resource.DisposeAsync();
+        Assert.That(second.DisposeCount, Is.EqualTo(1));
     }
 
     [Test]

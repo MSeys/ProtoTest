@@ -1,24 +1,26 @@
 namespace ProtoTest.OpenApi.Internal;
 
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
 internal static class OpenApiSchemaExtractor
 {
-    public static HashSet<string> ExtractResponseProperties(
-        OpenApiDocument document,
-        OpenApiResponse response)
+    public static HashSet<string> ExtractResponseProperties(IOpenApiResponse response)
     {
         var properties = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var visited = new HashSet<(OpenApiSchema Schema, string Path)>();
+        var visited = new HashSet<(IOpenApiSchema Schema, string Path)>();
+        if (response.Content is not { } content)
+        {
+            return properties;
+        }
 
-        foreach (var mediaType in response.Content.Values)
+        foreach (var mediaType in content.Values)
         {
             if (mediaType.Schema is not null)
             {
                 // The whole response body is a coverage unit: a successful shape match reports "$"
                 // itself, so without a baseline row that match could never land.
                 properties.Add("$");
-                TraverseSchema("$", mediaType.Schema, document, properties, [], visited);
+                TraverseSchema("$", mediaType.Schema, properties, [], visited);
             }
         }
 
@@ -27,13 +29,12 @@ internal static class OpenApiSchemaExtractor
 
     private static void TraverseSchema(
         string currentPath,
-        OpenApiSchema schema,
-        OpenApiDocument document,
+        IOpenApiSchema schema,
         HashSet<string> result,
-        HashSet<OpenApiSchema> recursionStack,
-        HashSet<(OpenApiSchema Schema, string Path)> visited)
+        HashSet<IOpenApiSchema> recursionStack,
+        HashSet<(IOpenApiSchema Schema, string Path)> visited)
     {
-        schema = ResolveReference(schema, document);
+        schema = ResolveReference(schema);
         if (!recursionStack.Add(schema))
         {
             return;
@@ -49,9 +50,9 @@ internal static class OpenApiSchemaExtractor
                 return;
             }
 
-            foreach (var composedSchema in schema.AllOf.Concat(schema.OneOf).Concat(schema.AnyOf))
+            foreach (var composedSchema in (schema.AllOf ?? []).Concat(schema.OneOf ?? []).Concat(schema.AnyOf ?? []))
             {
-                TraverseSchema(currentPath, composedSchema, document, result, recursionStack, visited);
+                TraverseSchema(currentPath, composedSchema, result, recursionStack, visited);
             }
 
             if (schema.Properties is { Count: > 0 })
@@ -60,7 +61,7 @@ internal static class OpenApiSchemaExtractor
                 {
                     var childPath = $"{currentPath}.{propertyName}";
                     result.Add(childPath);
-                    TraverseSchema(childPath, propertySchema, document, result, recursionStack, visited);
+                    TraverseSchema(childPath, propertySchema, result, recursionStack, visited);
                 }
             }
 
@@ -70,7 +71,7 @@ internal static class OpenApiSchemaExtractor
                 // (normalized to $.lines[]) has a baseline row to land on.
                 var itemPath = $"{currentPath}[]";
                 result.Add(itemPath);
-                TraverseSchema(itemPath, schema.Items, document, result, recursionStack, visited);
+                TraverseSchema(itemPath, schema.Items, result, recursionStack, visited);
             }
         }
         finally
@@ -79,15 +80,10 @@ internal static class OpenApiSchemaExtractor
         }
     }
 
-    private static OpenApiSchema ResolveReference(OpenApiSchema schema, OpenApiDocument document)
-    {
-        var referenceId = schema.Reference?.Id;
-        if (!string.IsNullOrWhiteSpace(referenceId)
-            && document.Components?.Schemas.TryGetValue(referenceId, out var referencedSchema) == true)
-        {
-            return referencedSchema;
-        }
-
-        return schema;
-    }
+    /// <summary>
+    /// A schema reached through <c>$ref</c> is an <see cref="OpenApiSchemaReference"/> carrying the
+    /// resolved target; traversal follows the target so a shared component is walked once.
+    /// </summary>
+    private static IOpenApiSchema ResolveReference(IOpenApiSchema schema)
+        => schema is OpenApiSchemaReference { Target: { } target } ? target : schema;
 }

@@ -20,6 +20,38 @@ using ProtoTest.Http.Authenticators;
 public sealed class GrpcIntegrationTests
 {
     [Test]
+    public async Task CancelledCall_ShouldRecordACancelledOperation()
+    {
+        // Stage 3 (Audit 3, finding D3): one cancellation rule; gRPC reports both an OCE and a status
+        // code for a cancelled call, and both are recorded as cancelled.
+        var builder = new ProtoHostBuilder();
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("grpc cancel", TestMethods.Placeholder);
+        var client = context.Grpc("Echo");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var exception = Assert.CatchAsync(async () =>
+            await client.UnaryAsync(
+                EchoMethods.Say,
+                new EchoRequest { Message = "hello" },
+                cancellationToken: cancellation.Token));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        var call = host.Trace.Snapshot().Tests.Single().Entries.Single(entry => entry.Kind == "grpc.call");
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception, Is.Not.Null);
+            Assert.That(
+                call.Outcome,
+                Is.EqualTo(ProtoTraceOutcome.Cancelled),
+                "a cancelled call is recorded as cancelled");
+        });
+    }
+
+    [Test]
     public async Task UnaryCall_ShouldTraceReportAndCarryMetadata()
     {
         var builder = new ProtoHostBuilder();
@@ -533,11 +565,47 @@ public sealed class GrpcIntegrationTests
         });
     }
 
+    [Test]
+    public async Task ApplicationTransportFallback_ShouldApplyConfiguredOptions()
+    {
+        // Stage 3 (Audit 3, finding D2): a client resolved through the application transport keeps the
+        // options configured for the protocol instead of starting from defaults. The call names an
+        // unregistered client, which is the path that falls back to the transport.
+        var builder = new ProtoHostBuilder();
+        builder.AddGrpc(grpc => grpc.AddClient(
+            "Configured",
+            GrpcTestServer.Address,
+            configure: options => options.Metadata.Add("x-fallback", "configured")));
+        builder.ConfigureServices(services =>
+        {
+            services.AddSingleton(new ProtoApplicationTransport("Echo", "Echo"));
+            services.AddSingleton<IProtoClientInitializer>(new TransportClientInitializer("Echo", GrpcTestServer.Address));
+        });
+        builder.AddApplication("Echo", _ => { });
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("grpc fallback options", ApplicationTransportTestMethod());
+        var client = context.Grpc("Unregistered");
+
+        var reply = await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "options" });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        var call = host.Trace.Snapshot().Tests.Single().Entries.Single(entry => entry.Kind == "grpc.call");
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply.Message, Is.EqualTo("options"));
+            Assert.That(
+                call.Attributes["rpc.metadata.x-fallback"],
+                Is.EqualTo("configured"),
+                "the fallback client carries the configured metadata");
+        });
+    }
+
     private sealed class TransportClientInitializer(string name, string address) : IProtoClientInitializer<HttpClient>
     {
         public string Name { get; } = name;
 
-        public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
+        public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
         {
             var client = new HttpClient { BaseAddress = new Uri(address) };
             context.RegisterClient(client, Name);

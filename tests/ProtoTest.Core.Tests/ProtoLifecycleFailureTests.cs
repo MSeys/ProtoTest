@@ -85,8 +85,39 @@ public sealed class ProtoLifecycleFailureTests
             Assert.That(exception, Is.Not.Null);
             Assert.That(
                 host.Trace.Snapshot().Tests.Single().Outcome,
-                Is.EqualTo(ProtoTraceOutcome.Failed));
+                Is.EqualTo(ProtoTraceOutcome.Succeeded),
+                "a capture failure is teardown evidence, not the test's result");
             Assert.Throws<InvalidOperationException>(() => _ = ProtoHost.CurrentContext);
+        });
+        await host.StopAsync();
+    }
+
+    [Test]
+    public async Task ArtifactCaptureFailure_ShouldRecordPartialWithoutReplacingTheResult()
+    {
+        var builder = new ProtoHostBuilder();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("Failure", "00001", TestMethods.Placeholder);
+        context.AddAttachment(CreateUnreadableAttachment());
+
+        var exception = Assert.ThrowsAsync<ArgumentNullException>(
+            async () => await host.CompleteTestAsync(ProtoTestResult.Passed));
+
+        var test = host.Trace.Snapshot().Tests.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception, Is.Not.Null);
+            Assert.That(test.Outcome, Is.EqualTo(ProtoTraceOutcome.Partial),
+                "the test passed but its teardown failed");
+            Assert.That(test.Error, Is.Null, "the capture failure is not the test's own error");
+            Assert.That(
+                test.Entries.Single(entry => entry.Kind == "test.teardown").Outcome,
+                Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(
+                test.Record!.Findings,
+                Has.Some.Matches<ProtoTraceFindingRecord>(finding =>
+                    finding.Category == "Teardown" && finding.Message.Contains("Teardown failed")));
         });
         await host.StopAsync();
     }

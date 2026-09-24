@@ -23,7 +23,7 @@ public sealed partial class GraphQLRequestBuilder
         var identifier = $"{operation.Kind.WireName()} {operation.Name ?? "<anonymous>"}";
         var operationScope = Context.Trace
             .Operation("graphql.operation", $"GraphQL · {identifier}", ProtoGraphQLBuilder.Protocol.TraceSource)
-            .ForClient(typeof(HttpClient), TargetName)
+            .ForClient(typeof(HttpClient), TargetName, ClientEntityName)
             .With("graphql.operation.type", operation.Kind.WireName())
             .With("graphql.operation.name", operation.Name);
         if (Headers.Count > 0)

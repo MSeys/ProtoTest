@@ -2,8 +2,8 @@ namespace ProtoTest.Web;
 
 using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
-using ProtoTest.Core.Internal;
 using ProtoTest.Web.Internal;
+using ProtoTest.Web.Pages;
 
 /// <summary>
 /// Aggregates page coverage: every page path the suite visited, verified or discovered, plus the
@@ -82,7 +82,7 @@ public sealed class WebCoverageCollector : ProtoCoverageCollector
     {
         EnsureInventory();
         return base.CanCollect(observation)
-               && observation.Kind is "web.page.visited" or "web.page.verified" or "web.page.available";
+               && observation.Kind is "web.page.visited" or "web.page.verified" or WebPageInventory.AvailableObservationKind;
     }
 
     public override void Collect(ProtoObservation observation)

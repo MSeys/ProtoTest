@@ -5,6 +5,7 @@ namespace ProtoTest.AspNetCore.Internal;
 /// event both carry exactly these fields, so they can never disagree about what was started.
 /// </summary>
 internal sealed record AspNetCoreServerState(
+    string ServerName,
     string ProgramType,
     string ProgramName,
     AspNetCoreServerLifetime Lifetime,
@@ -12,7 +13,7 @@ internal sealed record AspNetCoreServerState(
     bool WebHostCustomized,
     bool ClientCustomized)
 {
-    public string EntityId => $"server:{ProgramType}";
+    public string EntityId => $"server:{ProgramType}:{ServerName}";
 
     public string DisplayName => $"Server · {ProgramName}";
 

@@ -1,4 +1,4 @@
-namespace ProtoTest.Core.Internal;
+namespace ProtoTest.Web.Pages;
 
 using ProtoTest.Core;
 
@@ -7,8 +7,14 @@ using ProtoTest.Core;
 /// pattern and emitted as a <c>web.page.available</c> observation, so explicit configuration, the source
 /// scanner, Vue runtime discovery and the ASP.NET Core endpoint inventory land on the same identities.
 /// </summary>
-internal static class WebPageInventory
+public static class WebPageInventory
 {
+    /// <summary>The observation kind an available page is recorded under; every producer uses it.</summary>
+    public const string AvailableObservationKind = "web.page.available";
+
+    /// <summary>The metadata key naming the producer that recorded an inventory entry.</summary>
+    public const string SourceMetadataKey = "web.page.source";
+
     /// <summary>
     /// Normalizes and records the routes, skipping duplicates and blank entries; returns how many were
     /// recorded. <paramref name="metadata"/> carries producer-specific facts (session, application) and
@@ -39,10 +45,10 @@ internal static class WebPageInventory
             var observationMetadata = metadata is null
                 ? new Dictionary<string, object>()
                 : new Dictionary<string, object>(metadata);
-            observationMetadata["web.page.source"] = source;
+            observationMetadata[SourceMetadataKey] = source;
             context.RecordObservation(new ProtoObservation(
                 targetName,
-                "web.page.available",
+                AvailableObservationKind,
                 path,
                 Metadata: observationMetadata));
             recorded++;

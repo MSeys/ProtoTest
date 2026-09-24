@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>true</IsPackable>
+    <!-- New in 1.1: no baseline package exists yet; enable once 1.1 ships. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>prototest</ToolCommandName>
+    <PackageId>ProtoTest.Cli</PackageId>
+    <Description>Command-line access to ProtoTest traces: the failure digest without a browser.</Description>
+    <PackageTags>testing;trace;cli;tool;dotnet</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Traces\ProtoTest.Traces.csproj" />
+  </ItemGroup>
+</Project>

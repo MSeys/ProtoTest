@@ -15,6 +15,9 @@ public sealed class ProtoRestBuilder : ProtoHttpProtocolBuilder<ProtoRestBuilder
     /// <summary>Configuration section backing <see cref="ProtoHttpProtocolBuilder{TBuilder}.CaptureAttachments"/>.</summary>
     public const string AttachmentsConfigurationSectionName = "ProtoTest:Rest:Attachments";
 
+    /// <summary>The observation kind a failed request records; the coverage collector ignores it.</summary>
+    internal const string FailureObservationKind = "http.failure";
+
     /// <summary>The protocol's identity: names, trace source, observation kind and coverage category.</summary>
     internal static readonly ProtoProtocol Protocol = new(
         ProtocolName, "REST", "ProtoTest.Rest", "http.response", "REST");

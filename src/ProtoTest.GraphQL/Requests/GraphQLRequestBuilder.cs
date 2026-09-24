@@ -23,8 +23,8 @@ public sealed partial class GraphQLRequestBuilder
     private GraphQLSubscriptionTransport _subscriptionTransport = GraphQLSubscriptionTransport.WebSocket;
     private object? _connectionPayload;
 
-    internal GraphQLRequestBuilder(HttpClient client, ProtoExecutionContext context, string targetName)
-        : base(client, context, targetName, ProtoGraphQLBuilder.Protocol)
+    internal GraphQLRequestBuilder(HttpClient client, ProtoExecutionContext context, string targetName, string? clientEntityName = null)
+        : base(client, context, targetName, ProtoGraphQLBuilder.Protocol, clientEntityName)
     {
     }
 

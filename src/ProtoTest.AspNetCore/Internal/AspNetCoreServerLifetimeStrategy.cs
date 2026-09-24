@@ -2,7 +2,6 @@ namespace ProtoTest.AspNetCore.Internal;
 
 using Microsoft.AspNetCore.Hosting;
 using ProtoTest.Core;
-using ProtoTest.Core.Internal;
 
 /// <summary>
 /// How one lifetime acquires the application's server. The strategy owns the acquisition and the

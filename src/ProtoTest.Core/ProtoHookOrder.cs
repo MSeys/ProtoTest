@@ -19,10 +19,10 @@ public static class ProtoHookOrder
     /// </summary>
     public const int ClientCompletion = First + 1;
 
-    /// <summary>The run hook that releases run-scoped resources, before reports export and the trace archives.</summary>
+    /// <summary>The run hook that releases run-scoped resources, after reports export and before the trace archives.</summary>
     public const int RunResources = First + 1;
 
-    /// <summary>The run hook that exports reports, before resources are released.</summary>
+    /// <summary>The run hook that exports reports, before resources are released and the trace archives.</summary>
     public const int ReportSinks = First + 2;
 
     /// <summary>The run hook that evaluates run gates, before reports export.</summary>

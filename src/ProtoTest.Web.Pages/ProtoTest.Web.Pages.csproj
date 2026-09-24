@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    
+    <!-- No 1.0.1 baseline exists for this package (or its Web.Pages dependency); validate once 1.1 ships. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <PackageId>ProtoTest.Web.Pages</PackageId>
+    <Description>Shared page identity and inventory for ProtoTest web integrations.</Description>
+    <PackageTags>testing;integration-testing;web;coverage;dotnet</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+  </ItemGroup>
+
+</Project>

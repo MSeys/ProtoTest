@@ -2,7 +2,8 @@ namespace ProtoTest.Core;
 
 /// <summary>
 /// Something the current test owns. Resources are released in reverse registration order during
-/// teardown, after test hooks and attributes have run but before the test's clients are disposed.
+/// teardown, after test hooks and attributes have run; the test's clients are part of the same ordered
+/// release, so a resource registered after a client releases before it.
 /// </summary>
 public interface IProtoResource
 {

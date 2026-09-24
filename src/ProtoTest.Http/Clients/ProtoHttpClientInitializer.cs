@@ -25,7 +25,7 @@ public sealed class ProtoHttpClientInitializer(
     public static string GetFactoryName(string protocolName, string clientName)
         => $"ProtoTest.{protocolName}:{clientName}";
 
-    public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
+    public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
     {
         var baseUrl = ResolveBaseUrl(context.Configuration);
         if (string.IsNullOrWhiteSpace(baseUrl))
@@ -108,7 +108,5 @@ public sealed class ProtoHttpClientInitializer(
     }
 
     private static string SafeAddress(Uri address)
-        => string.IsNullOrEmpty(address.UserInfo)
-            ? address.ToString()
-            : ProtoUriSanitizer.WithoutUserInfo(address.OriginalString);
+        => ProtoUriSanitizer.ForDiagnostics(address.OriginalString) ?? address.OriginalString;
 }

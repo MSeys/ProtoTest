@@ -41,9 +41,7 @@ public sealed class ScenarioProbeInitializer : IProtoClientInitializer<ScenarioP
 {
     public string Name => "ScenarioProbe";
 
-    public Task<bool> TryInitializeAsync(
-        ProtoExecutionContext context,
-        CancellationToken cancellationToken = default)
+    public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
     {
         context.RegisterClient(new ScenarioProbe(), Name);
         return Task.FromResult(true);

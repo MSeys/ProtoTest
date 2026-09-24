@@ -1,4 +1,4 @@
-namespace ProtoTest.Core.Internal;
+namespace ProtoTest.Web.Pages;
 
 using Microsoft.Extensions.Configuration;
 
@@ -6,7 +6,7 @@ using Microsoft.Extensions.Configuration;
 /// Reads a page-list section the one way every inventory producer reads it: values from scalar, array
 /// or object children, with configuration keys the section reserves for itself skipped.
 /// </summary>
-internal static class WebPageConfig
+public static class WebPageConfig
 {
     public static IReadOnlyList<string> Read(
         IConfiguration configuration,

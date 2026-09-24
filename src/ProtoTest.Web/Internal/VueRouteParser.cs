@@ -1,7 +1,7 @@
 namespace ProtoTest.Web.Internal;
 
 using System.Text.Json;
-using ProtoTest.Core.Internal;
+using ProtoTest.Web.Pages;
 
 /// <summary>
 /// Turns the Vue Router discovery script's answer into normalized page routes. A malformed or empty

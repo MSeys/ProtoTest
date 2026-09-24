@@ -1,5 +1,6 @@
 namespace ProtoTest.AdapterContract;
 
+using System.Collections.Concurrent;
 using ProtoTest.Core;
 
 /// <summary>Test support every adapter test project shares: the tracking hook and attribute, the
@@ -26,6 +27,80 @@ public sealed class ExecutionLogState : IProtoContext
 
     /// <summary>Whether a compliance test body ran <see cref="AdapterLifecycle.VerifyTestBody{T}"/>.</summary>
     internal bool ContractVerified { get; set; }
+}
+
+/// <summary>
+/// Switchboard for the shared failure probes. A driver registers the lifecycle method's name before
+/// invoking the adapter's real entry point, and <see cref="FailureProbeHook"/> fails the matching
+/// lifecycle phase so the adapter's setup/teardown failure handling can be characterized without a red
+/// suite. The registration is process-local and removed when the driver finishes.
+/// </summary>
+public static class AdapterFailureProbe
+{
+    public const string SetupMessage = "The setup probe failed.";
+    public const string TeardownMessage = "The teardown probe failed.";
+
+    private static readonly ConcurrentDictionary<string, ProbePhase> Phases = new(StringComparer.Ordinal);
+
+    /// <summary>Fails setup for the next lifecycle whose method has this name.</summary>
+    public static IDisposable BeginSetupFailure(string testMethodName)
+    {
+        Phases[testMethodName] = ProbePhase.Setup;
+        return new ProbeScope(testMethodName);
+    }
+
+    /// <summary>Fails teardown for the next lifecycle whose method has this name.</summary>
+    public static IDisposable BeginTeardownFailure(string testMethodName)
+    {
+        Phases[testMethodName] = ProbePhase.Teardown;
+        return new ProbeScope(testMethodName);
+    }
+
+    internal static bool ShouldFail(string testMethodName, ProbePhase phase)
+        => Phases.TryGetValue(testMethodName, out var registered) && registered == phase;
+
+    internal enum ProbePhase
+    {
+        Setup,
+        Teardown
+    }
+
+    private sealed class ProbeScope(string testMethodName) : IDisposable
+    {
+        public void Dispose() => Phases.TryRemove(testMethodName, out _);
+    }
+}
+
+/// <summary>Fails setup or teardown for the method names registered through <see cref="AdapterFailureProbe"/>.</summary>
+internal sealed class FailureProbeHook : IProtoTestHook
+{
+    public int Order => 1;
+
+    public Task BeforeTestAsync(ProtoExecutionContext context)
+        => AdapterFailureProbe.ShouldFail(context.TestMethod.Name, AdapterFailureProbe.ProbePhase.Setup)
+            ? Task.FromException(new InvalidOperationException(AdapterFailureProbe.SetupMessage))
+            : Task.CompletedTask;
+
+    public Task AfterTestAsync(ProtoExecutionContext context)
+        => AdapterFailureProbe.ShouldFail(context.TestMethod.Name, AdapterFailureProbe.ProbePhase.Teardown)
+            ? Task.FromException(new InvalidOperationException(AdapterFailureProbe.TeardownMessage))
+            : Task.CompletedTask;
+}
+
+/// <summary>
+/// Verifies the completed run once every test finished, while the host is still active. Registered by
+/// <see cref="AdapterLifecycle.ConfigureHost"/>, so every adapter test project fails loudly when an
+/// adapter records no outcome or does not complete the shared compliance test.
+/// </summary>
+internal sealed class RunContractVerificationHook : IProtoRunHook
+{
+    public Task BeforeRunAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Task AfterRunAsync(CancellationToken cancellationToken = default)
+    {
+        AdapterLifecycle.VerifyCompletedRun(ProtoHost.CurrentHost);
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>

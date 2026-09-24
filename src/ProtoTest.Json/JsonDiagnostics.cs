@@ -1,5 +1,6 @@
 namespace ProtoTest.Json;
 
+using System.Collections;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -23,22 +24,67 @@ public static class JsonDiagnosticSanitizer
 {
     public static string Serialize(object? value, JsonDiagnosticOptions? configured = null)
     {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
         try
         {
-            return Sanitize(JsonSerializer.Serialize(value, new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            }), configured);
+            return Sanitize(JsonSerializer.Serialize(value, options), configured);
         }
         catch (Exception exception)
         {
-            return JsonSerializer.Serialize(new
-            {
-                unavailable = true,
-                type = value?.GetType().FullName,
-                reason = exception.GetType().Name
-            });
+            return SerializeDegraded(value, exception, options);
         }
+    }
+
+    /// <summary>
+    /// A value that cannot be serialized as a whole is degraded element by element, so one
+    /// unserializable item does not cost the rest; a single value reports what it was instead.
+    /// </summary>
+    private static string SerializeDegraded(object? value, Exception exception, JsonSerializerOptions options)
+    {
+        if (value is IEnumerable sequence and not string)
+        {
+            var items = new List<string>();
+            foreach (var item in sequence)
+            {
+                try
+                {
+                    items.Add(JsonSerializer.Serialize(item, options));
+                }
+                catch (Exception itemException)
+                {
+                    items.Add(Unavailable(item, itemException));
+                }
+            }
+
+            return $"[{string.Join(",", items)}]";
+        }
+
+        return Unavailable(value, exception);
+    }
+
+    private static string Unavailable(object? value, Exception exception)
+        => JsonSerializer.Serialize(new
+        {
+            unavailable = true,
+            type = DisplayType(value?.GetType()),
+            reason = exception.GetType().Name
+        });
+
+    /// <summary>
+    /// The name a reader should see for a value that could not be serialized. Compiler-generated
+    /// names (<c>&lt;&gt;z__ReadOnlyArray</c>, anonymous types) carry no meaning, so the shape they
+    /// describe is reported instead.
+    /// </summary>
+    private static string? DisplayType(Type? type)
+    {
+        if (type is null) return null;
+        if (type.IsArray) return $"{DisplayType(type.GetElementType())}[]";
+        return type.Name.StartsWith('<')
+            ? typeof(IEnumerable).IsAssignableFrom(type) ? "collection" : "anonymous type"
+            : type.Name;
     }
 
     public static string Sanitize(string content, JsonDiagnosticOptions? configured = null, bool truncate = true)
@@ -59,7 +105,12 @@ public static class JsonDiagnosticSanitizer
                     if (ContainsSensitive(document.RootElement, sensitive))
                         result = WriteRedacted(document.RootElement, sensitive);
                 }
-                catch (JsonException) { }
+                catch (JsonException)
+                {
+                    // A truncated or otherwise malformed body is exactly where a secret survives: it
+                    // still starts like JSON, so the text-level form redactor would not look at it.
+                    result = RedactMalformedJson(result, sensitive);
+                }
             }
             else
             {
@@ -82,6 +133,22 @@ public static class JsonDiagnosticSanitizer
         if (string.IsNullOrWhiteSpace(content)) return false;
         var trimmed = content.AsSpan().TrimStart();
         return !trimmed.IsEmpty && trimmed[0] is '{' or '[';
+    }
+
+    /// <summary>
+    /// Redacts the string values of sensitive keys in text that starts like JSON but does not parse.
+    /// The value pattern accepts an unterminated string, so a body cut off mid-value is still covered.
+    /// </summary>
+    private static string RedactMalformedJson(string content, HashSet<string> sensitive)
+    {
+        if (sensitive.Count == 0) return content;
+        var names = string.Join("|", sensitive.Select(Regex.Escape));
+        var pattern = $"\"(?<key>{names})\"\\s*:\\s*\"[^\"]*\"?";
+        return Regex.Replace(
+            content,
+            pattern,
+            match => $"\"{match.Groups["key"].Value}\":\"{ProtoUriSanitizer.RedactedValue}\"",
+            RegexOptions.IgnoreCase);
     }
 
     private static bool ContainsSensitive(JsonElement element, HashSet<string> sensitive)

@@ -1,8 +1,13 @@
 <Project>
-  <!-- Ship IntelliSense documentation with every public package. This is also the source DocFX uses. -->
+  <!--
+    Compatibility guard for the published packages: validate every packable project against the last
+    released baseline (1.0.1) and fail the pack when a public API changes without a recorded
+    suppression. Directory.Build.props runs before a project sets IsPackable, so the condition lives
+    here, in the targets pass. A project may opt out by setting EnablePackageValidation itself: the
+    Web.Pages family has no 1.0.1 release yet, so it cannot restore a baseline.
+  -->
   <PropertyGroup Condition="'$(IsPackable)' == 'true'">
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <EnablePackageValidation Condition="'$(EnablePackageValidation)' == ''">true</EnablePackageValidation>
+    <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == ''">1.0.1</PackageValidationBaselineVersion>
   </PropertyGroup>
 </Project>

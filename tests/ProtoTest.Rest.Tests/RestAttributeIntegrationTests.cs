@@ -238,9 +238,7 @@ public sealed class RestAttributeIntegrationTests
     {
         public string Name { get; } = name;
 
-        public Task<bool> TryInitializeAsync(
-            ProtoExecutionContext context,
-            CancellationToken cancellationToken = default)
+        public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
         {
             var client = new HttpClient(new CapturingHandler(Name, requests))
             {

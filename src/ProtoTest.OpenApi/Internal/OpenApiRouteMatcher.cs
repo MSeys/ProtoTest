@@ -1,6 +1,6 @@
 namespace ProtoTest.OpenApi.Internal;
 
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using ProtoTest.Http;
 
 /// <summary>
@@ -29,15 +29,17 @@ internal sealed class OpenApiRouteMatcher(OpenApiDocument document)
     public static string? FindResponseKey(OpenApiOperation operation, int statusCode)
     {
         ArgumentNullException.ThrowIfNull(operation);
+        if (operation.Responses is not { } responses) return null;
+
         var exact = statusCode.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        if (operation.Responses.ContainsKey(exact)) return exact;
+        if (responses.ContainsKey(exact)) return exact;
 
         var wildcard = $"{statusCode / 100}XX";
-        var wildcardKey = operation.Responses.Keys.FirstOrDefault(
+        var wildcardKey = responses.Keys.FirstOrDefault(
             key => string.Equals(key, wildcard, StringComparison.OrdinalIgnoreCase));
         if (wildcardKey is not null) return wildcardKey;
 
-        return operation.Responses.Keys.FirstOrDefault(
+        return responses.Keys.FirstOrDefault(
             key => string.Equals(key, "default", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -74,13 +76,8 @@ internal sealed class OpenApiRouteMatcher(OpenApiDocument document)
                 continue;
             }
 
-            if (IsRouteParameter(requestSegments[index]) || !string.Equals(
-                    requestSegments[index],
-                    contractSegments[index],
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return -1;
-            }
+            // The segments differ and the contract segment is not a parameter: no match.
+            return -1;
         }
 
         return literalMatches;

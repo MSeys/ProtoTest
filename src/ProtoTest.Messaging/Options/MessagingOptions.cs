@@ -17,4 +17,16 @@ public sealed class MessagingOptions : IProtoConfigurableOptions
     /// taps from it before the system under test publishes. Optional for brokers that keep history.
     /// </summary>
     public IList<string> Destinations { get; set; } = new List<string>();
+
+    /// <inheritdoc />
+    public void Validate()
+    {
+        if (DefaultTimeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(DefaultTimeout),
+                DefaultTimeout,
+                "MessagingOptions.DefaultTimeout must be greater than zero.");
+        }
+    }
 }

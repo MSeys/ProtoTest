@@ -64,10 +64,17 @@ public sealed class ProtoTraceOperation : IDisposable
 
     public void Succeed() => Complete(ProtoTraceOutcome.Succeeded);
 
+    /// <summary>
+    /// Fails the operation. An <see cref="OperationCanceledException"/> is part of the shared failure
+    /// vocabulary, not a product failure: it completes the operation as
+    /// <see cref="ProtoTraceOutcome.Cancelled"/> wherever the cancellation surfaces.
+    /// </summary>
     public void Fail(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        Complete(ProtoTraceOutcome.Failed, exception);
+        Complete(
+            exception is OperationCanceledException ? ProtoTraceOutcome.Cancelled : ProtoTraceOutcome.Failed,
+            exception);
     }
 
     public void Cancel(Exception? exception = null)

@@ -48,6 +48,13 @@ ProtoTrace exists to show the lifecycle around that failure. It records setup, o
 
 Playwright tracing was a large inspiration, but I wanted the trace to cover more than browser actions.
 
+## Nothing phones home
+
+ProtoTest runs entirely in your process. Nothing is sent anywhere: there is no telemetry, no account and no
+service. The trace viewer is a static page that reads the file in your browser, and a `.prototrace` stays on
+your machine unless you move it. Attachments are redacted and sanitized before they are written, and the
+benchmarks page documents the size levers if a trace is too large to share.
+
 ## What I wanted to build
 
 I wanted tests to focus on the scenario again. I wanted integrations to work together instead of every one of them solving lifecycle and diagnostics again. I wanted failures to leave enough information behind to investigate them afterwards.

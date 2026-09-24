@@ -25,6 +25,7 @@ public sealed partial class ProtoGrpcClient : IDisposable
 
     private readonly ProtoExecutionContext _context;
     private readonly string _targetName;
+    private readonly string _entityName;
     private readonly GrpcClientOptions _options;
     private readonly Func<ProtoExecutionContext, CancellationToken, ValueTask<GrpcChannel>> _channelFactory;
     private readonly ProtoLock _gate = new();
@@ -37,24 +38,32 @@ public sealed partial class ProtoGrpcClient : IDisposable
         ProtoExecutionContext context,
         string targetName,
         GrpcClientOptions options,
-        Func<ProtoExecutionContext, CancellationToken, ValueTask<GrpcChannel>> channelFactory)
+        Func<ProtoExecutionContext, CancellationToken, ValueTask<GrpcChannel>> channelFactory,
+        string? entityName = null)
     {
         _context = context;
         _targetName = targetName;
+        _entityName = entityName ?? targetName;
         _options = options;
         _channelFactory = channelFactory;
         Blocking = new ProtoGrpcBlockingClient(this);
     }
 
     /// <summary>Creates a client over a known transport, for resolutions outside the initializer.</summary>
-    internal static ProtoGrpcClient ForTransport(ProtoExecutionContext context, string name, HttpClient transport)
+    internal static ProtoGrpcClient ForTransport(
+        ProtoExecutionContext context,
+        string name,
+        HttpClient transport,
+        GrpcClientOptions options,
+        string entityName)
         => new(
             context,
             name,
-            new GrpcClientOptions(),
+            options,
             (_, _) => ValueTask.FromResult(GrpcChannel.ForAddress(
                 transport.BaseAddress ?? new Uri("http://localhost"),
-                new GrpcChannelOptions { HttpHandler = new Internal.GrpcChannelForwardingHandler(transport) })));
+                new GrpcChannelOptions { HttpHandler = new Internal.GrpcChannelForwardingHandler(transport) })),
+            entityName);
 
     /// <summary>Calls a unary method and waits for its response.</summary>
     public async Task<TResponse> UnaryAsync<TRequest, TResponse>(
@@ -389,14 +398,28 @@ public sealed partial class ProtoGrpcClient : IDisposable
                 new ProtoTraceSectionItem("code", exception.StatusCode.ToString()),
                 new ProtoTraceSectionItem("detail", exception.Status.Detail)
             ]));
-        operation.Fail(exception);
-        _context.RecordObservation(Observation(service, name, exception.StatusCode.ToString()));
+        // A call the caller cancelled is not a product failure, even when gRPC reports it as a status
+        // code rather than an OperationCanceledException.
+        if (exception.StatusCode == StatusCode.Cancelled)
+        {
+            operation.Cancel(exception);
+        }
+        else
+        {
+            operation.Fail(exception);
+        }
+
+        _context.RecordObservation(Observation(
+            service,
+            name,
+            exception.StatusCode.ToString(),
+            ProtoGrpcBuilder.FailureObservationKind));
     }
 
-    private ProtoObservation Observation(string service, string name, string status)
+    private ProtoObservation Observation(string service, string name, string status, string kind)
         => new(
             _targetName,
-            ProtoGrpcBuilder.Protocol.ResponseObservationKind,
+            kind,
             $"{service}/{name}",
             Data: null,
             Metadata: new Dictionary<string, object>
@@ -426,7 +449,7 @@ public sealed partial class ProtoGrpcClient : IDisposable
     private ProtoTraceOperation BeginCallTrace(IMethod method, DateTime? deadline)
         => _context.Trace
             .Operation("grpc.call", $"gRPC · {method.FullName}", ProtoGrpcBuilder.Protocol.TraceSource)
-            .For(ProtoTraceEntityKinds.Client, ProtoClientTrace.Id(typeof(ProtoGrpcClient), _targetName))
+            .ForClient(typeof(ProtoGrpcClient), _targetName, _entityName)
             .With("rpc.system", "grpc")
             .With("rpc.service", method.ServiceName)
             .With("rpc.method", method.Name)
@@ -470,7 +493,7 @@ public sealed partial class ProtoGrpcClient : IDisposable
 
         addResponseSection(operation);
         operation.Succeed();
-        _context.RecordObservation(Observation(method.ServiceName, method.Name, "ok"));
+        _context.RecordObservation(Observation(method.ServiceName, method.Name, "ok", ProtoGrpcBuilder.Protocol.ResponseObservationKind));
     }
 
 }

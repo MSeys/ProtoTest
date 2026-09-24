@@ -39,6 +39,7 @@ public static class ProtoOptionsRegistration
             }
 
             options.BindFromConfiguration(serviceProvider.GetRequiredService<IConfiguration>());
+            options.Validate();
             return options;
         });
     }
@@ -60,6 +61,7 @@ public static class ProtoOptionsRegistration
         var options = factory();
         configure?.Invoke(options);
         options.BindFromConfiguration(services.GetRequiredService<IConfiguration>());
+        options.Validate();
         return options;
     }
 

@@ -47,12 +47,14 @@ xUnit v2, MSTest and TUnit run this lifecycle asynchronously. NUnit and xUnit v3
 | Runner | Outcomes ProtoTest records | Why |
 | --- | --- | --- |
 | xUnit v2 | Passed, Failed, Cancelled | xUnit's aggregator decides pass/fail; cancellation is read from the runner's `CancellationTokenSource`; a failure keeps the exception. |
-| xUnit v3 | Passed, Failed, Skipped, Unknown | Skipped covers xUnit's `Skipped` and `NotRun`; Unknown is the fallback for an unmapped state. |
-| NUnit | Passed, Failed, Skipped, Partial, Unknown | Inconclusive maps to Skipped; Warning maps to Partial because the test passed with warnings attached. |
-| MSTest | Passed, Failed, Skipped, Partial, Unknown | Ignored and Inconclusive map to Skipped; a mix of passed and ignored data rows maps to Partial; Unknown when the result is empty or unmapped. |
+| xUnit v3 | Passed, Failed, Skipped, Cancelled, Unknown | Skipped covers xUnit's `Skipped` and `NotRun`; a cancelled exception type maps to Cancelled; Unknown is the fallback for an unmapped state. |
+| NUnit | Passed, Failed, Skipped, Partial, Unknown | Inconclusive maps to Skipped; Warning maps to Partial because the test passed with warnings attached. NUnit exposes no exception type, so a cancelled test reads as Failed. |
+| MSTest | Passed, Failed, Skipped, Cancelled, Unknown | Ignored, Inconclusive and NotRunnable map to Skipped; a cancelled exception, timeout or abort maps to Cancelled. |
 | TUnit | Passed, Failed, Skipped, Cancelled | `SkipTestException` maps to Skipped, `OperationCanceledException` to Cancelled; anything else fails. |
 
-Failure detail: xUnit v2 carries the exception into the trace; xUnit v3 records the state's exception type, message and stack; NUnit reports the type as `NUnit.{Label}` (`NUnit.Failed` when the label is empty); MSTest uses `MSTest.{Outcome}` when the result has no failure exception; TUnit records the thrown exception.
+Failure detail: xUnit v2 carries the exception into the trace; xUnit v3 records the state's exception type, message and stack; NUnit reports the type as `NUnit.{Label}` (`NUnit.Failed` when the label is empty) and its message and stack; MSTest uses `MSTest.{Outcome}` when the result has no failure exception; TUnit records the thrown exception.
+
+Lifecycle boundary: the context wraps the test method. NUnit, xUnit v2, MSTest and TUnit span setup and teardown because their wrappers sit outside them. xUnit v3 starts in the before-attribute, so class construction, `IAsyncLifetime.InitializeAsync` and class disposal stay outside the context.
 
 A skipped test appears only in the runner's own results. Nothing is written to ProtoTest's trace or reports for it — no record, no teardown.
 

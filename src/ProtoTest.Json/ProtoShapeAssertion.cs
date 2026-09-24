@@ -100,7 +100,7 @@ public static class ProtoShapeAssertion
         {
             operation?.SetAttribute("shape.result", "mismatched");
             operation?.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(exception.MatchedProperties, diagnosticOptions));
-            operation?.SetAttribute("shape.mismatches", JsonDiagnosticSanitizer.Serialize(exception.Mismatches, diagnosticOptions));
+            operation?.SetAttribute("shape.mismatches", SerializeMismatches(exception.Mismatches, options, diagnosticOptions));
             operation?.SetAttribute("shape.mismatch_count", exception.Mismatches.Count.ToString());
             operation?.AddSection(new ProtoTraceSection(
                 "Result",
@@ -159,6 +159,26 @@ public static class ProtoShapeAssertion
         operation?.Fail(exception);
         throw exception;
     }
+
+    /// <summary>
+    /// Projects the mismatches for the trace. The expected side of a mismatch can hold a value
+    /// constraint or any other object System.Text.Json cannot serialize, so each expected value is
+    /// described through the same expansion the recorded shape uses; the actual side is already a
+    /// JSON-safe scalar or raw text.
+    /// </summary>
+    private static string SerializeMismatches(
+        IReadOnlyList<JsonShapeMismatch> mismatches,
+        JsonSerializerOptions? options,
+        JsonDiagnosticOptions? diagnosticOptions)
+        => JsonDiagnosticSanitizer.Serialize(
+            mismatches.Select(mismatch => new
+            {
+                mismatch.PropertyPath,
+                mismatch.Reason,
+                Expected = DescribeExpectedValue(mismatch.Expected, options),
+                mismatch.Actual
+            }).ToArray(),
+            diagnosticOptions);
 
     /// <summary>The maximum nesting depth described before a placeholder is recorded.</summary>
     private const int MaxDescriptionDepth = 16;

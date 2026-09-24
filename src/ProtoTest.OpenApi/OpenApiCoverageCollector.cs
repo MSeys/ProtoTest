@@ -1,7 +1,7 @@
 namespace ProtoTest.OpenApi;
 
 using Microsoft.Extensions.Configuration;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using ProtoTest.Core;
 using ProtoTest.Http;
 using ProtoTest.OpenApi.Internal;
@@ -145,8 +145,7 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
         }
 
         route = matchedRoute;
-        return Enum.TryParse<OperationType>(method, ignoreCase: true, out var operationType)
-            && _document.Paths.TryGetValue(route, out var pathItem)
-            && pathItem.Operations.TryGetValue(operationType, out operation!);
+        return _document.Paths.TryGetValue(route, out var pathItem)
+            && pathItem.Operations?.TryGetValue(new HttpMethod(method), out operation!) == true;
     }
 }

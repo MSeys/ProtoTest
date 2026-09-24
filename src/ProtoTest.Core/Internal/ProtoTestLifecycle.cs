@@ -201,12 +201,10 @@ internal sealed class ProtoTestLifecycle
     {
         var context = state.Context!;
         var phase = isRollback ? ProtoTracePhase.Rollback : ProtoTracePhase.Teardown;
+        var recorder = context.Trace as ProtoTestTraceRecorder;
         state.ExecutionOperation?.Complete(result);
         state.ExecutionOperation?.Dispose();
-        if (context.Trace is ProtoTestTraceRecorder testTrace)
-        {
-            testTrace.SetDefaultParent(null);
-        }
+        recorder?.SetDefaultParent(null);
 
         using var lifecycleOperation = context.Trace
             .Operation(
@@ -221,71 +219,106 @@ internal sealed class ProtoTestLifecycle
             .Begin();
         var exceptionCountBeforeTeardown = exceptions.Count;
 
+        // The teardown chain is a collect-mode flow: every step runs, each keeps its own trace
+        // operation, and the failures come back as a list instead of being threaded through the loops.
+        var flow = new ProtoFlow(
+            isRollback ? "test.rollback" : "test.teardown",
+            "ProtoTest.Core",
+            ProtoFlowFailureMode.Collect);
+
         foreach (var attribute in state.CompletedAttributes.AsEnumerable().Reverse())
         {
-            await TraceCleanupAsync(
-                context,
-                "attribute.after",
-                $"After · {attribute.GetType().Name}",
-                phase,
-                () => attribute.AfterTestAsync(context),
-                exceptions,
-                new Dictionary<string, string?>
-                {
-                    ["attribute.type"] = attribute.GetType().FullName,
-                    ["attribute.order"] = attribute.Order.ToString()
-                });
+            var current = attribute;
+            flow.Step(
+                new ProtoStepDescriptor(
+                    "attribute.after",
+                    $"After · {current.GetType().Name}",
+                    "ProtoTest.Core",
+                    phase,
+                    new Dictionary<string, string?>
+                    {
+                        ["attribute.type"] = current.GetType().FullName,
+                        ["attribute.order"] = current.Order.ToString()
+                    }),
+                _ => new ValueTask(current.AfterTestAsync(context)));
         }
 
         foreach (var hook in state.CompletedHooks.AsEnumerable().Reverse())
         {
-            await TraceCleanupAsync(
-                context,
-                "hook.after",
-                $"After · {hook.GetType().Name}",
-                phase,
-                () => hook.AfterTestAsync(context),
-                exceptions,
-                new Dictionary<string, string?>
-                {
-                    ["hook.type"] = hook.GetType().FullName,
-                    ["hook.order"] = hook.Order.ToString()
-                });
+            var current = hook;
+            flow.Step(
+                new ProtoStepDescriptor(
+                    "hook.after",
+                    $"After · {current.GetType().Name}",
+                    "ProtoTest.Core",
+                    phase,
+                    new Dictionary<string, string?>
+                    {
+                        ["hook.type"] = current.GetType().FullName,
+                        ["hook.order"] = current.Order.ToString()
+                    }),
+                _ => new ValueTask(current.AfterTestAsync(context)));
         }
 
-        if (state.AttachmentPublisher is not null)
+        exceptions.AddRange((await flow.RunAsync(context.Trace)).Failures);
+
+        // Publishing and disposal run in a second flow: a teardown hook may add an attachment, and
+        // the attachment list must be snapshotted after those hooks, not when the first flow was built.
+        var releaseFlow = new ProtoFlow(
+            isRollback ? "test.rollback" : "test.teardown",
+            "ProtoTest.Core",
+            ProtoFlowFailureMode.Collect);
+        if (state.AttachmentPublisher is { } publisher)
         {
             foreach (var attachment in context.Attachments)
             {
-                await TraceCleanupAsync(
-                    context,
-                    "attachment.publish",
-                    $"Publish · {attachment.Name}",
-                    phase,
-                    async () => await state.AttachmentPublisher.PublishAsync(attachment),
-                    exceptions,
-                    new Dictionary<string, string?>
-                    {
-                        ["attachment.name"] = attachment.Name,
-                        ["attachment.media_type"] = attachment.MediaType,
-                        ["attachment.description"] = attachment.Description,
-                        ["attachment.source"] = attachment.IsFile ? "file" : "memory"
-                    });
+                var current = attachment;
+                releaseFlow.Step(
+                    new ProtoStepDescriptor(
+                        "attachment.publish",
+                        $"Publish · {current.Name}",
+                        "ProtoTest.Core",
+                        phase,
+                        new Dictionary<string, string?>
+                        {
+                            ["attachment.name"] = current.Name,
+                            ["attachment.media_type"] = current.MediaType,
+                            ["attachment.description"] = current.Description,
+                            ["attachment.source"] = current.IsFile ? "file" : "memory"
+                        }),
+                    _ => publisher.PublishAsync(current));
             }
         }
 
-        await TraceCleanupAsync(
-            context,
-            "context.dispose",
-            "Dispose execution context",
-            phase,
-            () => context.DisposeAsync(phase).AsTask(),
-            exceptions,
-            new Dictionary<string, string?>
+        releaseFlow.Step(
+            new ProtoStepDescriptor(
+                "context.dispose",
+                "Dispose execution context",
+                "ProtoTest.Core",
+                phase,
+                new Dictionary<string, string?>
+                {
+                    ["context.type"] = context.GetType().FullName,
+                    ["attachment.count"] = context.Attachments.Count.ToString()
+                }),
+            _ => context.DisposeAsync(phase));
+
+        exceptions.AddRange((await releaseFlow.RunAsync(context.Trace)).Failures);
+
+        // Capturing artifacts is one teardown step among several: its failure is recorded like any
+        // other, but it never replaces the result the test reported. Completing the test still runs
+        // after it, so the ambient context is always cleared.
+        if (recorder is not null)
+        {
+            try
             {
-                ["context.type"] = context.GetType().FullName,
-                ["attachment.count"] = context.Attachments.Count.ToString()
-            });
+                await recorder.CaptureArtifactsAsync(context.Attachments);
+            }
+            catch (Exception exception)
+            {
+                exceptions.Add(exception);
+            }
+        }
 
         if (exceptions.Count > exceptionCountBeforeTeardown)
         {
@@ -295,10 +328,12 @@ internal sealed class ProtoTestLifecycle
             lifecycleOperation.Fail(exceptions[^1]);
             foreach (var failure in exceptions.Skip(exceptionCountBeforeTeardown))
             {
-                context.Trace.Finding(
+                // The same path as any other finding, so a teardown failure reaches the sinks and run
+                // gates instead of living only in the trace.
+                context.AddFinding(
                     $"Teardown failed: {failure.Message}",
-                    ProtoReportStatus.Error.ToString(),
-                    "Teardown",
+                    ProtoReportStatus.Error,
+                    category: "Teardown",
                     targetName: context.TestName,
                     tags: [failure.GetType().Name]);
             }
@@ -309,50 +344,12 @@ internal sealed class ProtoTestLifecycle
         }
         lifecycleOperation.Dispose();
 
-        if (context.Trace is ProtoTestTraceRecorder recorder)
-        {
-            try
-            {
-                await recorder.CaptureArtifactsAsync(context.Attachments);
-            }
-            catch (Exception exception)
-            {
-                // Capturing artifacts is one teardown step among several: its failure is reported like
-                // any other, but it must not skip completing the test and clearing the ambient context.
-                exceptions.Add(exception);
-                result = ProtoTestResult.Failed(exception);
-            }
-
-            recorder.CompleteTest(result);
-        }
+        recorder?.CompleteTest(result);
 
         if (ReferenceEquals(Current.Value, state))
         {
             state.Context = null;
             Current.Value = null;
-        }
-    }
-
-    private static async Task TraceCleanupAsync(
-        ProtoExecutionContext context,
-        string kind,
-        string name,
-        ProtoTracePhase phase,
-        Func<Task> action,
-        List<Exception> exceptions,
-        IReadOnlyDictionary<string, string?>? attributes = null)
-    {
-        try
-        {
-            await context.Trace
-                .Operation(kind, name, "ProtoTest.Core")
-                .During(phase)
-                .With(attributes)
-                .RunAsync(() => new ValueTask(action()));
-        }
-        catch (Exception exception)
-        {
-            exceptions.Add(exception);
         }
     }
 

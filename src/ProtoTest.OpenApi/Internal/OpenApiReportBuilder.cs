@@ -1,6 +1,6 @@
 namespace ProtoTest.OpenApi.Internal;
 
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using ProtoTest.Core;
 
 /// <summary>
@@ -21,17 +21,17 @@ internal static class OpenApiReportBuilder
         var reportItems = new List<ProtoReportItem>();
         foreach (var (pathKey, pathItem) in document.Paths)
         {
-            foreach (var (operationType, operation) in pathItem.Operations)
+            foreach (var (httpMethod, operation) in pathItem.Operations ?? [])
             {
-                var method = operationType.ToString().ToUpperInvariant();
+                var method = httpMethod.Method.ToUpperInvariant();
                 var totalEndpointHits = ledger.EndpointHits(method, pathKey);
                 var childItems = new List<ProtoReportItem>();
 
-                foreach (var (responseKey, response) in operation.Responses)
+                foreach (var (responseKey, response) in operation.Responses ?? [])
                 {
                     var responseHits = ledger.ResponseHits(method, pathKey, responseKey);
                     var propertyItems = OpenApiSchemaExtractor
-                        .ExtractResponseProperties(document, response)
+                        .ExtractResponseProperties(response)
                         .Select(propertyPath =>
                         {
                             var propertyHits = ledger.PropertyHits(method, pathKey, responseKey, propertyPath);

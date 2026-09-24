@@ -18,8 +18,9 @@ public static class ProtoHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(builder);
         builder.ConfigureServices(services =>
         {
-            services.TryAddSingleton(serviceProvider =>
-                ProtoOptionsRegistration.Resolve<SheetsOptions>(serviceProvider, configure));
+            // Configure composes: a repeated AddSheets runs every callback in registration order instead
+            // of dropping the later ones.
+            ProtoOptionsRegistration.Configure(services, () => new SheetsOptions(), configure);
             services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoCollector>(new SheetsCoverageCollector("Sheets")));
         });
         return builder.AddCapability(new ProtoCapabilityDescriptor(

@@ -2,53 +2,74 @@ namespace ProtoTest.NUnit;
 
 using global::NUnit.Framework;
 using global::NUnit.Framework.Interfaces;
+using global::NUnit.Framework.Internal;
+using global::NUnit.Framework.Internal.Commands;
 using ProtoTest.Core;
 
 /// <summary>
-/// NUnit test attribute that manages the <see cref="ProtoExecutionContext"/> lifecycle for each test method.
+/// NUnit test attribute that manages the <see cref="ProtoExecutionContext"/> lifecycle for each test.
+/// The lifecycle is a command wrapper applied outside NUnit's setup and teardown, so it spans
+/// <c>[SetUp]</c> and <c>[TearDown]</c>, and a skip condition is decided before <c>[SetUp]</c> runs.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
-public class ProtoTestAttribute : TestAttribute, ITestAction
+public class ProtoTestAttribute : TestAttribute, IWrapSetUpTearDown
 {
-    private const string FrameworkName = "NUnit";
-
-    private ProtoTestScope? _scope;
-
-    public ActionTargets Targets => ActionTargets.Test;
-
-    public void BeforeTest(ITest test)
+    /// <summary>Wraps the test so the lifecycle encloses setup, the body and teardown.</summary>
+    public TestCommand Wrap(TestCommand command)
     {
-        var preparation = ProtoTestAdapter.Prepare(test.Method!.MethodInfo, ProtoTestAssembly.Host);
-        if (!preparation.CanRun)
-        {
-            Assert.Ignore(preparation.SkipReason!);
-        }
-
-        _scope = ProtoTestAsync.RunSync(() => new ValueTask<ProtoTestScope>(ProtoTestScope.StartAsync(
-            preparation, ProtoTestAssembly.Host, NUnitAttachmentPublisher.Instance)));
+        ArgumentNullException.ThrowIfNull(command);
+        return new ProtoTestCommand(command);
     }
 
-    public void AfterTest(ITest test)
+    /// <summary>
+    /// Runs one test's lifecycle: skip before anything runs, otherwise start the scope, run NUnit's
+    /// command pipeline, and complete the scope with the result NUnit recorded.
+    /// </summary>
+    private sealed class ProtoTestCommand(TestCommand innerCommand) : DelegatingTestCommand(innerCommand)
     {
-        if (_scope is null)
+        public override TestResult Execute(TestExecutionContext context)
         {
-            return;
-        }
+            var test = Test;
 
-        _scope.Result = MapResult();
-        ProtoTestAsync.RunSync(() => _scope.DisposeAsync());
-        _scope = null;
+            // The case's full name distinguishes parameterized rows while staying the stable fully
+            // qualified name for a plain method.
+            var preparation = ProtoTestAdapter.Prepare(
+                test.Method!.MethodInfo,
+                ProtoTestAssembly.Host,
+                test.FullName);
+
+            if (!preparation.CanRun)
+            {
+                // Nothing has run yet, not even [SetUp]; reporting the skip here keeps the lifecycle
+                // and the trace honest.
+                context.CurrentResult.SetResult(ResultState.Ignored, preparation.SkipReason!);
+                return context.CurrentResult;
+            }
+
+            var scope = ProtoTestAsync.RunSync(() => new ValueTask<ProtoTestScope>(
+                ProtoTestScope.StartAsync(preparation, ProtoTestAssembly.Host, NUnitAttachmentPublisher.Instance)));
+            try
+            {
+                return innerCommand.Execute(context);
+            }
+            finally
+            {
+                scope.Result = MapResult(context);
+                ProtoTestAsync.RunSync(() => scope.DisposeAsync());
+            }
+        }
     }
 
-    private static ProtoTestResult MapResult()
+    private static ProtoTestResult MapResult(TestExecutionContext context)
     {
-        var nunitResult = TestContext.CurrentContext.Result;
-        return nunitResult.Outcome.Status switch
+        var nunitResult = context.CurrentResult;
+        var state = nunitResult.ResultState;
+        return state.Status switch
         {
             TestStatus.Passed => ProtoTestResult.Passed,
             TestStatus.Failed => ProtoTestResult.Failed(
-                FrameworkName,
-                nunitResult.Outcome.Label ?? TestStatus.Failed.ToString(),
+                "NUnit",
+                state.Label ?? TestStatus.Failed.ToString(),
                 string.IsNullOrWhiteSpace(nunitResult.Message)
                     ? "NUnit reported a failed test without a failure message."
                     : nunitResult.Message,

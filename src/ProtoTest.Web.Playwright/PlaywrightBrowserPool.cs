@@ -80,11 +80,9 @@ internal sealed class PlaywrightBrowserPool : IAsyncDisposable
             PlaywrightBrowser.Webkit => "webkit",
             _ => "chromium"
         };
-        if (InstalledBrowsers.Contains(browser))
-        {
-            return;
-        }
 
+        // Every read of the installed set happens under the gate: it is a plain HashSet written by
+        // another test's install.
         await InstallGate.WaitAsync();
         try
         {

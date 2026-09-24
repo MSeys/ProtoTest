@@ -19,11 +19,13 @@ public abstract class ProtoHttpRequestBuilder<TResponse, TBuilder>
         HttpClient client,
         ProtoExecutionContext context,
         string targetName,
-        ProtoProtocol protocol)
+        ProtoProtocol protocol,
+        string? clientEntityName = null)
     {
         Client = client ?? throw new ArgumentNullException(nameof(client));
         Context = context ?? throw new ArgumentNullException(nameof(context));
         TargetName = targetName ?? throw new ArgumentNullException(nameof(targetName));
+        ClientEntityName = string.IsNullOrWhiteSpace(clientEntityName) ? TargetName : clientEntityName;
         _protocol = protocol ?? throw new ArgumentNullException(nameof(protocol));
     }
 
@@ -35,6 +37,9 @@ public abstract class ProtoHttpRequestBuilder<TResponse, TBuilder>
 
     /// <summary>The registered target name requests, observations and collectors agree on.</summary>
     protected string TargetName { get; }
+
+    /// <summary>The registry key of the client the request actually uses; the client entity's id.</summary>
+    protected string ClientEntityName { get; }
 
     /// <summary>The protocol identity: names, trace source, observation kinds and coverage category.</summary>
     protected ProtoProtocol Protocol => _protocol;

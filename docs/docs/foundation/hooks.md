@@ -110,6 +110,18 @@ The built-in orders are named in `ProtoHookOrder`, so a hook can sit relative to
 
 The hook that creates clients runs **first** on the way in, so your hooks can use them. The run hooks that export reports, release resources and write the trace archive run **last** on the way out, in the reverse order above.
 
+### Reserved `Order` bands
+
+First-party attributes and integrations use the ranges below, so a third-party capability can pick the band it
+belongs to instead of guessing a number. Ties inside a band keep registration order.
+
+| Band | `Order` | For |
+| --- | --- | --- |
+| Infrastructure | `-300` … `-201` | pieces that must exist before environment selection (containers, servers) |
+| Environment | `-200` … `-101` | tenant, database, broker and endpoint selection |
+| Identity | `-100` … `-1` | users, authentication and roles |
+| Scenario | `0` and above | the test's own attributes and hooks (`ProtoHookOrder.Default`) |
+
 Integrations add their own test hooks too — the HTTP integrations apply `[Auth<T>]` from a hook at `ProtoHookOrder.Authentication`.
 
 Remember that **all test hooks run before any [attribute](./attributes.md)**. See [Host and lifecycle](./lifecycle.md) for the full sequence and failure rules.

@@ -1,4 +1,4 @@
-namespace ProtoTest.Core.Internal;
+namespace ProtoTest.Web.Pages;
 
 /// <summary>
 /// Page identity for web coverage: the absolute path of an HTTP(S) address, without query or fragment,
@@ -9,7 +9,7 @@ namespace ProtoTest.Core.Internal;
 /// <c>/a%20b</c> and <c>/a b</c> are one identity; a segment that decodes to a slash keeps it encoded
 /// (<c>%2F</c>) so one segment never becomes two.
 /// </summary>
-internal static class WebPagePath
+public static class WebPagePath
 {
     /// <summary>The coverage path of a full address, or <see langword="null"/> when it is not a page.</summary>
     public static string? FromAddress(string? address)
@@ -83,7 +83,7 @@ internal static class WebPagePath
     /// parameter (<c>:id(\d+)</c>) drops the constraint and becomes <c>{id}</c>; anything else is a
     /// literal.
     /// </summary>
-    internal static string MapDynamicSegment(string segment)
+    public static string MapDynamicSegment(string segment)
     {
         if (segment.StartsWith('{') && segment.EndsWith('}') && segment.Length > 2)
         {

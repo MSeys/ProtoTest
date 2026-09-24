@@ -6,6 +6,7 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Http;
+using ProtoTest.Json;
 using ProtoTest.Rest.Internal;
 
 public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, RestRequestBuilder>
@@ -17,8 +18,9 @@ public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, R
     internal RestRequestBuilder(
         HttpClient httpClient,
         ProtoExecutionContext context,
-        string targetName)
-        : base(httpClient, context, targetName, ProtoRestBuilder.Protocol)
+        string targetName,
+        string? clientEntityName = null)
+        : base(httpClient, context, targetName, ProtoRestBuilder.Protocol, clientEntityName)
     {
     }
 
@@ -37,7 +39,9 @@ public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, R
     public RestRequestBuilder Body(object payload, JsonSerializerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(payload);
-        var json = JsonSerializer.Serialize(payload, options);
+        // Request payloads follow the shared web defaults (camelCase names), the same options
+        // GraphQL variables use, so one DTO serializes the same through every protocol.
+        var json = JsonSerializer.Serialize(payload, options ?? ProtoJsonDefaults.Web);
         return Body(json, "application/json");
     }
 
@@ -107,7 +111,7 @@ public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, R
         var attachmentOptions = Context.ResolveAttachmentOptions(ProtoRestBuilder.ProtocolName);
         using var traceOperation = Context.Trace
             .Operation("http.request", $"REST · {method.Method.ToUpperInvariant()} {routeTemplate}", ProtoRestBuilder.Protocol.TraceSource)
-            .ForClient(typeof(HttpClient), TargetName)
+            .ForClient(typeof(HttpClient), TargetName, ClientEntityName)
             .With("http.request.method", method.Method.ToUpperInvariant())
             .With("http.route", routeTemplate)
             .With(_requestAttributes)
@@ -426,7 +430,7 @@ public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, R
             var diagnostics = ProtoHttpFailureDiagnostics.From(requestUri, exception, cancellationToken, attachmentOptions);
             return new ProtoObservation(
                 TargetName: TargetName,
-                Kind: "http.failure",
+                Kind: ProtoRestBuilder.FailureObservationKind,
                 Identifier: $"{method.Method.ToUpperInvariant()} {routeTemplate}",
                 Data: new RestFailureData(
                     method.Method,

@@ -80,3 +80,5 @@ public interface IProtoTestAttachmentPublisher
 - Attachment names are unique per test after prefixing; there is no overwrite.
 - Attachments are in-memory or file-backed references until publishing; the archive copy is made after the test.
 - Publishing is best-effort per attachment: one failure is reported, the rest still publish.
+- A file-backed runner (NUnit, TUnit) makes an in-memory attachment durable by writing a copy under `%TEMP%/ProtoTest/attachments`; ProtoTest does not delete those copies, so they accumulate until the OS temp cleaner runs. They are safe to delete between runs.
+- The archive embeds attachment bytes by default; `trace.EmbedArtifacts = false` declares them (name, media type, size) without reading or writing the content, and `MaxArtifactBytes` caps any single artifact.

@@ -308,6 +308,37 @@ public sealed class ProtoShapeAssertionTests
         await host.StopAsync();
     }
 
+    [Test]
+    public async Task Assert_ShouldRenderMismatchesThatCarryAConstraintWithoutCompilerTypeNames()
+    {
+        var builder = new ProtoHostBuilder();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("constrained mismatch", TestMethods.Placeholder);
+
+        // The actual is an array, so the whole expected object - including its constraint - becomes
+        // the mismatch's Expected value, which System.Text.Json cannot serialize as it stands.
+        var exception = Assert.Throws<JsonShapeMismatchException>(() => ProtoShapeAssertion.Assert(
+            new ProtoShapeAssertionContext(context, "ProtoTest.Tests", "Assert shape"),
+            "[1,2,3]",
+            new { id = JsonValue.GreaterThan(0) }));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        var operation = host.Trace.Snapshot().Tests.Single().Entries
+            .Single(entry => entry.Kind == "assert.json.shape");
+        var mismatches = operation.Attributes["shape.mismatches"];
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Mismatches.Single().Reason, Is.EqualTo("Expected an object."));
+            Assert.That(mismatches, Does.Contain("Expected an object."), "the mismatch detail survives the trace");
+            Assert.That(mismatches, Does.Contain("constraint: greater than 0"), "a constraint renders as its description");
+            Assert.That(mismatches, Does.Not.Contain("<>"), "no compiler-generated type names in the trace");
+            Assert.That(mismatches, Does.Not.Contain("z__"));
+            Assert.That(mismatches, Does.Not.Contain("unavailable"));
+        });
+        await host.StopAsync();
+    }
+
     private sealed class ScalarShape
     {
         public DateOnly Day { get; init; } = new(2026, 9, 23);

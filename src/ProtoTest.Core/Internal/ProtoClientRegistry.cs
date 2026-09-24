@@ -49,10 +49,33 @@ internal sealed class ProtoClientRegistry
         var key = BuildKey(clientType, name);
         lock (_gate)
         {
+            ObjectDisposedException.ThrowIf(_sealed != 0, this);
             if (_clients.TryAdd(key, client))
             {
                 _registrationOrder.Add(key);
             }
+        }
+    }
+
+    /// <summary>
+    /// Finds the registration name a client instance is registered under. The registry keys clients by
+    /// their scoped name while operations trace entities, so the request path resolves the exact key
+    /// here once instead of deriving it again.
+    /// </summary>
+    public string? FindName(object client)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        lock (_gate)
+        {
+            foreach (var (key, value) in _clients)
+            {
+                if (ReferenceEquals(value, client))
+                {
+                    return key.Name;
+                }
+            }
+
+            return null;
         }
     }
 

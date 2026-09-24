@@ -7,12 +7,27 @@ public static class ProtoDocumentSource
     // runs that load several documents, and a caller can still pass its own.
     private static readonly HttpClient SharedClient = new();
 
-    public static string LoadText(string source, string? baseUrl = null, HttpClient? httpClient = null)
+    /// <summary>
+    /// Loads a text document from inline content, a local file, or an HTTP(S) URL.
+    /// </summary>
+    /// <param name="source">An inline document, a local file path, or an absolute or relative URL.</param>
+    /// <param name="baseUrl">The origin a relative URL resolves against, when one is configured.</param>
+    /// <param name="httpClient">The client to retrieve a URL with; the shared one is used when omitted.</param>
+    /// <param name="inlinePrefixes">
+    /// The document-format prefixes the calling integration recognizes - an SDL document starts with
+    /// <c>type </c>, an OpenAPI document with <c>openapi:</c>. Core knows only that a multi-line body
+    /// or a JSON object/array is inline, so each format's vocabulary stays with that format.
+    /// </param>
+    public static string LoadText(
+        string source,
+        string? baseUrl = null,
+        HttpClient? httpClient = null,
+        params string[] inlinePrefixes)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
 
         if (File.Exists(source)) return File.ReadAllText(source);
-        if (LooksLikeInlineDocument(source)) return source;
+        if (LooksLikeInlineDocument(source, inlinePrefixes ?? [])) return source;
         if (!TryResolveHttpUri(source, baseUrl, out var uri)) return source;
 
         try
@@ -39,11 +54,10 @@ public static class ProtoDocumentSource
     private static bool IsHttpUri(Uri uri)
         => uri.Scheme is "http" or "https";
 
-    private static bool LooksLikeInlineDocument(string source)
+    private static bool LooksLikeInlineDocument(string source, string[] inlinePrefixes)
     {
         var trimmed = source.TrimStart();
         if (trimmed.Contains('\n') || trimmed.StartsWith('{') || trimmed.StartsWith('[')) return true;
-        return new[] { "openapi:", "swagger:", "type ", "schema ", "extend ", "directive ", "scalar ", "enum ", "interface ", "union ", "input ", "#" }
-            .Any(prefix => trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+        return inlinePrefixes.Any(prefix => trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
     }
 }

@@ -90,57 +90,36 @@ public sealed class ProtoFlowTests
     }
 
     [Test]
-    public async Task RunAsync_ShouldRetryAFailedStepUntilItSucceeds()
+    public async Task RunAsync_WithADescriptor_ShouldRecordTheDeclaredOperationAndEntity()
     {
         await using var host = new ProtoHostBuilder().Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("flow retry", TestMethods.Placeholder);
+        var context = await host.StartTestAsync("flow descriptor", TestMethods.Placeholder);
 
-        var attempts = 0;
-        var result = await new ProtoFlow("retrying", Source)
+        var result = await new ProtoFlow("resource.release", Source, ProtoFlowFailureMode.Collect)
             .Step(
-                "flaky",
-                _ =>
-                {
-                    attempts++;
-                    return attempts < 3
-                        ? throw new InvalidOperationException("transient")
-                        : ValueTask.CompletedTask;
-                },
-                new ProtoStepOptions { RetryCount = 3, RetryDelay = TimeSpan.Zero })
+                new ProtoStepDescriptor(
+                    "resource.release",
+                    "Release · database:connection",
+                    Source,
+                    Attributes: new Dictionary<string, string?> { ["resource.kind"] = "database" },
+                    EntityKind: "database",
+                    EntityId: "database:connection"),
+                _ => ValueTask.CompletedTask)
             .RunAsync(context.Trace);
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         var step = host.Trace.Snapshot().Tests.Single().Entries
-            .Single(entry => entry.Kind == "flow.step");
+            .Single(entry => entry.Kind == "resource.release");
 
         Assert.Multiple(() =>
         {
             Assert.That(result.Succeeded, Is.True);
-            Assert.That(attempts, Is.EqualTo(3));
-            Assert.That(step.Attributes["step.attempts"], Is.EqualTo("3"));
-        });
-    }
-
-    [Test]
-    public async Task RunAsync_ShouldTimeOutAStep()
-    {
-        await using var host = new ProtoHostBuilder().Build();
-        await host.StartAsync();
-        var context = await host.StartTestAsync("flow timeout", TestMethods.Placeholder);
-
-        var result = await new ProtoFlow("timing out", Source)
-            .Step(
-                "slow",
-                async token => await Task.Delay(TimeSpan.FromSeconds(5), token),
-                new ProtoStepOptions { Timeout = TimeSpan.FromMilliseconds(50) })
-            .RunAsync(context.Trace);
-
-        await host.CompleteTestAsync(ProtoTestResult.Failed(result.Failures[0]));
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.Failures, Has.Count.EqualTo(1));
-            Assert.That(result.Failures[0], Is.InstanceOf<TimeoutException>());
+            Assert.That(step.Name, Is.EqualTo("Release · database:connection"));
+            Assert.That(step.EntityKind, Is.EqualTo("database"));
+            Assert.That(step.EntityId, Is.EqualTo("database:connection"));
+            Assert.That(step.Attributes["resource.kind"], Is.EqualTo("database"));
+            Assert.That(step.Attributes["flow.name"], Is.EqualTo("resource.release"));
         });
     }
 

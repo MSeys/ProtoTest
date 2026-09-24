@@ -14,7 +14,10 @@ public sealed class ProtoMessagingBuilder
 
     internal Func<IServiceProvider, IProtoMessageBroker>? AdapterFactory { get; private set; }
 
-    /// <summary>Replaces the default in-memory broker with an adapter, for example RabbitMQ.</summary>
+    /// <summary>
+    /// Replaces the default in-memory broker with an adapter, for example RabbitMQ. The broker the
+    /// factory returns is owned by ProtoTest: it is released with the run.
+    /// </summary>
     public ProtoMessagingBuilder UseBroker(Func<IServiceProvider, IProtoMessageBroker> factory)
     {
         ArgumentNullException.ThrowIfNull(factory);

@@ -3,6 +3,7 @@ namespace ProtoTest.Core.Tests;
 using Microsoft.Extensions.DependencyInjection;
 
 [TestFixture]
+[Category("Characterization")]
 public sealed class RegistrationIdempotencyTests
 {
     [Test]

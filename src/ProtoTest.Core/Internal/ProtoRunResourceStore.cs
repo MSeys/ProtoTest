@@ -40,6 +40,16 @@ internal sealed class ProtoRunResourceStore : IProtoReportSource
     /// </summary>
     public void ResetForRestart() => _resources.ResetForRestart();
 
+    /// <summary>
+    /// Re-arms a resource the retry is about to start again, so its next ownership period is released
+    /// too. The host calls this for each piece of infrastructure it starts, immediately before starting it.
+    /// </summary>
+    public void Rearm(IProtoResource resource)
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        _resources.Rearm(resource.Id);
+    }
+
     public IReadOnlyList<ProtoResourceSnapshot> Snapshot() => _resources.Snapshot();
 
     public IReadOnlyList<IProtoResource> Resources => _resources.Resources;

@@ -26,7 +26,7 @@ public sealed class ProtoGrpcClientInitializer(
 
     private string ScopedName => ProtoClientResolution.ScopedName(Protocol, Name);
 
-    public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
+    public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
     {
         var configured = ResolveConfiguredAddress(context.Configuration);
         if (configured is null && !allowMissingAddress)
@@ -42,7 +42,7 @@ public sealed class ProtoGrpcClientInitializer(
             configured,
             addressResolver,
             application,
-            ct));
+            ct), ScopedName);
         context.RegisterClient(client, ScopedName);
         TraceConfiguration(context, configured, source);
         return Task.FromResult(true);
@@ -106,7 +106,7 @@ public sealed class ProtoGrpcClientInitializer(
         var details = new Dictionary<string, string?>();
         if (address is not null)
         {
-            details["client.address"] = ProtoUriSanitizer.WithoutUserInfo(address.ToString());
+            details["client.address"] = ProtoUriSanitizer.ForDiagnostics(address.ToString());
         }
 
         ProtoClientTraceState.SetConfiguration(

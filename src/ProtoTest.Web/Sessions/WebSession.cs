@@ -2,8 +2,8 @@ namespace ProtoTest.Web;
 
 using System.Runtime.CompilerServices;
 using ProtoTest.Core;
-using ProtoTest.Core.Internal;
 using ProtoTest.Web.Internal;
+using ProtoTest.Web.Pages;
 
 /// <summary>Test-scoped entry point for pages, operations, and explicit native backend access.</summary>
 public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
@@ -344,7 +344,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
             Metadata: new Dictionary<string, object>
             {
                 ["web.session"] = Name,
-                ["web.page.source"] = source
+                [WebPageInventory.SourceMetadataKey] = source
             }));
     }
 
@@ -388,7 +388,32 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         cancellationToken.ThrowIfCancellationRequested();
         lock (_backendGate)
         {
-            return _backendTask ??= CreateBackendAsync(cancellationToken);
+            if (_backendTask is not null)
+            {
+                return _backendTask;
+            }
+
+            var task = CreateBackendAsync(cancellationToken);
+            _backendTask = task;
+
+            // A failed creation must not be cached: the next call starts from a clean slate. The
+            // continuation runs synchronously for a failure that happened before the first await, and
+            // the task is already published by then, so the clear always wins.
+            _ = task.ContinueWith(
+                _ =>
+                {
+                    lock (_backendGate)
+                    {
+                        if (ReferenceEquals(_backendTask, task))
+                        {
+                            _backendTask = null;
+                        }
+                    }
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
+                TaskScheduler.Default);
+            return task;
         }
     }
 
@@ -409,7 +434,6 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         catch (Exception exception)
         {
             operation.Fail(exception);
-            lock (_backendGate) _backendTask = null;
             throw;
         }
     }

@@ -111,8 +111,6 @@ public sealed class SqlIsolationTests
         var open = entries.Single(entry => entry.Kind == "sql.connection.open");
         var begin = entries.Single(entry => entry.Kind == "sql.transaction.begin");
         var rollback = entries.Single(entry => entry.Kind == "sql.transaction.rollback");
-        var rollbackStep = entries.Single(entry =>
-            entry.Kind == "flow.step" && entry.Name.EndsWith("rollback", StringComparison.Ordinal));
         var release = entries.Single(entry => entry.Kind == "resource.release");
         Assert.Multiple(() =>
         {
@@ -127,9 +125,10 @@ public sealed class SqlIsolationTests
             Assert.That(begin.Attributes["sql.isolation"], Is.EqualTo(nameof(SqlIsolation.Transaction)));
 
             Assert.That(rollback.Phase, Is.EqualTo(ProtoTracePhase.Teardown));
-            Assert.That(rollbackStep.ParentId, Is.EqualTo(release.Id));
-            Assert.That(rollback.ParentId, Is.EqualTo(rollbackStep.Id));
+            // The rollback step is the release's own step, not a generic flow.step under it.
+            Assert.That(rollback.ParentId, Is.EqualTo(release.Id));
             Assert.That(rollback.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
+            Assert.That(rollback.Attributes["sql.isolation"], Is.EqualTo(nameof(SqlIsolation.Transaction)));
         });
 
         await host.StopAsync();

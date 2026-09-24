@@ -17,8 +17,15 @@ public class ProtoTestExecutor : ITestExecutor
     /// <returns>A <see cref="ValueTask"/> representing the execution flow.</returns>
     public async ValueTask ExecuteTest(TestContext context, Func<ValueTask> action)
     {
-        var methodInfo = context.Metadata.TestDetails.MethodMetadata.GetReflectionInfo()
-            ?? throw new InvalidOperationException("TUnit did not expose a reflection MethodInfo for the test method.");
+        var methodInfo = context.Metadata.TestDetails.MethodMetadata.GetReflectionInfo();
+        if (methodInfo is null)
+        {
+            // A source-generated test exposes no reflection method to prepare from; running the body
+            // unwrapped keeps it executing instead of failing on the executor's own assumption.
+            await action();
+            return;
+        }
+
         var preparation = ProtoTestAdapter.Prepare(methodInfo, ProtoTestAssembly.Host);
         if (!preparation.CanRun)
         {

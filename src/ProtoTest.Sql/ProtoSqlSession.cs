@@ -72,11 +72,14 @@ public sealed class ProtoSqlSession
         var flow = new ProtoFlow("sql.release", TraceSource, ProtoFlowFailureMode.Collect);
         if (transaction is not null)
         {
-            flow.Step("rollback", async ct => await release.Trace
-                .Operation("sql.transaction.rollback", "SQL · rollback transaction", TraceSource)
-                .During(release.Phase)
-                .With("sql.isolation", _options.Isolation.ToString())
-                .RunAsync(async () => await transaction.RollbackAsync(ct)));
+            flow.Step(
+                new ProtoStepDescriptor(
+                    "sql.transaction.rollback",
+                    "SQL · rollback transaction",
+                    TraceSource,
+                    Phase: release.Phase,
+                    Attributes: new Dictionary<string, string?> { ["sql.isolation"] = _options.Isolation.ToString() }),
+                ct => new ValueTask(transaction.RollbackAsync(ct)));
             flow.Step("dispose transaction", _ => transaction.DisposeAsync());
         }
 

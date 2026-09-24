@@ -33,14 +33,23 @@ public sealed class OutcomeTests
         Assert.Equal(ProtoTraceOutcome.Skipped, trace.Outcome);
     }
 
+    [Fact]
+    public void CancelledSubject_ShouldRecordCancelledOutcome()
+    {
+        var trace = RunSubject(
+            nameof(Subjects.Cancelled),
+            TestResultState.FromException(0m, new OperationCanceledException("deliberate cancellation")));
+
+        Assert.Equal(ProtoTraceOutcome.Cancelled, trace.Outcome);
+    }
+
     // Drives the real attribute and the outcome mapping out of band, so a failing subject cannot fail the suite.
     private static ProtoTestTrace RunSubject(string subjectName, TestResultState state)
     {
         var method = typeof(Subjects).GetMethod(subjectName)!;
 
-        var attribute = new ProtoTestFactAttribute();
-        ((IBeforeAfterTestAttribute)attribute).Before(method, null!);
-        ProtoTestLifecycleHandler.Complete(((IProtoTestXunit3Attribute)attribute).Scope, state);
+        var scope = ProtoTestLifecycleHandler.Before(method, test: null);
+        ProtoTestLifecycleHandler.Complete(scope, state);
 
         var name = ProtoTestName.FromMethod(method);
         return ProtoTestAssembly.Host.Trace.Snapshot().Tests.Last(test => test.Name == name);
@@ -60,6 +69,9 @@ public sealed class OutcomeTests
 
         [ProtoTestFact]
         public void Skipped() => Assert.Skip("deliberate skip");
+
+        [ProtoTestFact]
+        public void Cancelled() => throw new OperationCanceledException("deliberate cancellation");
     }
 #pragma warning restore xUnit1000
 }

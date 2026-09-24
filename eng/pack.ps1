@@ -54,6 +54,7 @@ $packages = @(
     "src/ProtoTest.OpenApi/ProtoTest.OpenApi.csproj",
     "src/ProtoTest.OpenTelemetry/ProtoTest.OpenTelemetry.csproj",
     "src/ProtoTest.Reporting/ProtoTest.Reporting.csproj",
+    "src/ProtoTest.Web.Pages/ProtoTest.Web.Pages.csproj",
     "src/ProtoTest.Web/ProtoTest.Web.csproj",
     "src/ProtoTest.Web.Playwright/ProtoTest.Web.Playwright.csproj",
     "src/ProtoTest.Web.Selenium/ProtoTest.Web.Selenium.csproj",

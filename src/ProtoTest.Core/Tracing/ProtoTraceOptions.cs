@@ -27,4 +27,18 @@ public sealed class ProtoTraceOptions
     /// each operation. Turn it off when a trace leaves the people who may read the suite's code. On by default.
     /// </summary>
     public bool EmbedSources { get; set; } = true;
+
+    /// <summary>
+    /// The largest attachment the archive embeds, in bytes. An attachment over the limit is recorded as
+    /// an error artifact (its name and size stay visible, its content is left out) instead of being held
+    /// in memory or written. Defaults to 64 MB.
+    /// </summary>
+    public long MaxArtifactBytes { get; set; } = 64L * 1024 * 1024;
+
+    /// <summary>
+    /// Embeds attachment content in the archive. Turn it off for a size- or privacy-conscious run: the
+    /// attachment is still declared (name, media type, size) but its content is neither read nor written,
+    /// and the artifact carries an error saying embedding is disabled. On by default.
+    /// </summary>
+    public bool EmbedArtifacts { get; set; } = true;
 }

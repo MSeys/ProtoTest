@@ -77,6 +77,20 @@ npm run build
 
 By contributing, you agree that your contribution is licensed under the repository's [MIT License](LICENSE).
 
+## Community packages
+
+First-party ProtoTest packages share one version and are released together. A package published outside this
+repository versions independently and declares the ProtoTest it needs: depend on the lowest compatible
+`ProtoTest.Core` (or integration) version and state it in the README. Do not take a dependency on an internal
+API marked `internal`; if an extension point is missing, open an issue so it can be added deliberately.
+
+## AI-assisted contributions
+
+AI-assisted work is welcome and reviewed like any other contribution. Disclose it in the pull request
+(which parts, with which tool), be ready to explain the design and verify the behavior yourself, and keep the
+same evidence bar: tests for behavior changes, docs for public behavior, and no generated build output or
+credentials. A reviewer may ask for a walkthrough of any part; the contributor stays accountable for it.
+
 ## Conduct
 
 Be precise, patient and constructive. See the [Code of Conduct](CODE_OF_CONDUCT.md) for the community standard and reporting route.

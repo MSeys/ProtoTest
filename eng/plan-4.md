@@ -67,11 +67,26 @@ Order is the recommendations' own priority (§2). W1–W5 are independent and sm
   `WebApplicationFactory` equivalent, with per-phase splits, allocations and suite startup through the
   first completed request; the numbers are published with methodology and the slower-where-it-is-slower
   reading on the [benchmarks page](../docs/docs/benchmarks.md).
-- [ ] **W7 Versioned docs at 1.1** (rec 2.5): cut the 1.0 snapshot at the 1.1 release, point the release
-  banner at the matching version, verify old links resolve. Executes last on this track.
-- [ ] **W8 Small wins** (rec 2.7): homepage release feed (blog-as-release-notes), GitHub Discussions
-  enabled and linked, the AI-usage page surfaced from Why ProtoTest, and a docs-search check that
-  "integration testing .NET", "trace" and "coverage" land on the right pages.
+- [x] **W7 Versioned docs at 1.1** (rec 2.5): the released 1.0 docs were cut from `main` into
+  `versioned_docs/version-1.0` (78 pages, with `versions.json`), `/docs/` now serves 1.0 through
+  `lastVersion` while `docs/` carries the 1.1 work under `/docs/next/`, the navbar gained the version
+  dropdown and the announcement bar states the split instead of claiming the release matches. One
+  mechanical fix: the 1.0 snapshot's repo file links gained one `../` because a versioned page sits one
+  directory deeper. Verified: the build is green (broken file links throw), `/docs/`, `/docs/next/`,
+  `/docs/next/roadmap` and old paths all serve, and the 1.0 hooks page lacks the 1.1 section while the
+  next page has it. At the 1.1 release: `npm run docusaurus docs:version 1.1`, move `lastVersion` and
+  refresh the bar.
+- [x] **W8 Small wins** (rec 2.7): homepage release feed (`docs/src/data/releases.ts` + `ReleaseFeed`,
+  cross-checked against `CHANGELOG.md` by the docs gate), GitHub Discussions enabled and linked from the
+  sustainability page, the FAQ, the footer and `SUPPORT.md`, the AI-usage page surfaced from Why
+  ProtoTest, and a docs-search check that "integration testing .NET", "trace" and "coverage" land on the
+  right pages. The screencast was dropped in W5 (recorded in Decisions).
+- [x] **W9 One changelog source** (follow-up): the repository `CHANGELOG.md` is now the only file a
+  release edits. `docs/scripts/generate-changelog.mjs` generates the docs changelog page and the homepage
+  feed (`docs/src/data/changelog.generated.ts`; `releases.ts` is gone), the docs build runs it, and
+  `eng/check-docs.ps1` runs its `--check` mode so a stale generated file fails the docs gate (verified by
+  deliberate drift). GitHub Release notes already derive from the same file; the announcement bar stays a
+  release-checklist item because it names the docs-version split, not a release.
 
 ## Track R — the reference demo (OpenCSMS, separate repository)
 
@@ -144,7 +159,9 @@ Record `git diff --shortstat` per stage split by `src`, `tests`, `docs`, with th
 | W4 — Roadmap page | Complete | docs +64 / −0 · src 0 · tests 0 | `/docs/roadmap` published with three sections: Next (1.1 polish and trust, 1.2 hosting and the reference demo, 1.x platform line), Exploring (MCP, MassTransit, Wolverine, analyzers, traffic coverage, exhaustive mode, Allure/ReportPortal, static trace index, MQTT) and Not planned (hosted service, commercial CSMS, pre-.NET 8, reimplementing the libraries, coverage conflation, renaming, further device transports) - each with its reason. Effort-ordered, explicitly not date-ordered; unshipped items phrased as plans. Verified in the built site: `check-docs` (101 files) and `npm run build` green, page rendered and read. |
 | W5 — Viewer CTA and demo panel | Complete | docs +690 / −242 · src 0 · tests 0 | The hero's primary CTA is now "See a failing test's trace" (opens trace.prototest.dev/?demo=1), Get started is secondary, and the stale TraceView card is replaced by `ViewerWalkthrough`: Run (outcome line, phase bar, "what this run could see", needs-attention list), Story (failure card and lifecycle) and Check (exception, recorded location, source), switchable by click and arrow keys, with every value copied from the bundled demo trace. Verified in the built site at desktop/mobile in both themes: `check-docs` (104 files), `npm run typecheck`, stylelint and the Docusaurus build green. Screenshots and the screencast were dropped (recorded in Decisions). |
 | W6 — Overhead benchmark | Complete | docs +62 / −1 · tests +545 / −0 · src 0 | `OverheadBenchmarkTests` (Category `Benchmark`) leads with a real short test - POST an order, read it back, assert both bodies - written once with ProtoTest (tracing on/off) and once with the raw stack, and keeps the micro comparison that explains it: single request, lifecycle-only mode, suite startup through the first completed request. `TestApi` gained a `/benchmark/orders` create/read pair so both versions send identical requests. Published on the benchmarks page: the same short test is ~3x the raw stack without tracing and ~8x with it; the bare lifecycle is 0.06 ms, the REST client adds ~0.15 ms over a raw request and tracing adds ~1.6 ms and ~1 MB per test. Closes feature-plan A7. Full suite, format gate and docs check green. |
-| W8 — Small wins | Complete (Discussions pending maintainer) | docs +102 / −0 · eng +61 / −0 · src 0 · tests 0 | The homepage gains a release feed (`releases.ts` + `ReleaseFeed`) showing the latest version, date and summary plus the release before it; `eng/check-docs.ps1` cross-checks versions and dates against `CHANGELOG.md` and the drift was verified to fail the gate. The AI-usage page is surfaced from Why ProtoTest; the docs search was checked for "integration testing .NET" (64 hits, intro and integrations first), "trace" (100) and "coverage" (98) and lands on the right pages. The screencast was dropped in W5; GitHub Discussions needs a repository setting (see Decisions) and is linked nowhere until it exists. |
+| W8 — Small wins | Complete | docs +105 / −2 · eng +61 / −0 · src 0 · tests 0 | The homepage gains a release feed (`releases.ts` + `ReleaseFeed`) showing the latest version, date and summary plus the release before it; `eng/check-docs.ps1` cross-checks versions and dates against `CHANGELOG.md` and the drift was verified to fail the gate. The AI-usage page is surfaced from Why ProtoTest; the docs search was checked for "integration testing .NET" (64 hits, intro and integrations first), "trace" (100) and "coverage" (98) and lands on the right pages. GitHub Discussions is enabled and linked from the sustainability page, the FAQ, the footer and `SUPPORT.md`; the screencast was dropped in W5. |
+| W7 — Versioned docs | Complete | docs +9,106 / −1 · src 0 · tests 0 | The released 1.0 documentation is frozen as `versioned_docs/version-1.0` (78 pages cut from `main`) with `versions.json`; `lastVersion: '1.0'` serves it at `/docs/`, `docs/` moves to `/docs/next/` as "1.1 (in progress)", the navbar shows the version dropdown and the announcement bar points at 1.0 and the 1.1 roadmap. The 1.0 snapshot's repo file links gained one `../` (a versioned page is one directory deeper); everything else is untouched. Verified by the throwing build and by serving `/docs/`, `/docs/next/`, `/docs/next/roadmap` and old paths, and by content checks that split the versions. |
+| W9 — One changelog source | Complete | docs +281 / −44 · eng +23 / −36 · src 0 · tests 0 | `docs/scripts/generate-changelog.mjs` parses the repository `CHANGELOG.md` into the changelog page and `changelog.generated.ts` (summary = the release's opening paragraph, or its first sentence as a bullet; `Unreleased` and the link-reference tail stay in the repository file). `Releases.ts` is deleted, `ReleaseFeed` imports the generated data, the docs build and start run the generator, and `check-docs` runs `--check` with deliberate drift verified to fail the gate. The page now carries the repository wording and gains `Fixed`/`Added`/`Changed` navigation; `RELEASING.md` says one edit per release. |
 
 ## Decisions taken
 
@@ -159,10 +176,13 @@ Record `git diff --shortstat` per stage split by `src`, `tests`, `docs`, with th
   tried and dropped after reading them: at panel size the viewer's text shrank, the theme was fixed, and
   they added ~560 KB of drift-prone raster assets. The faithful `ViewerWalkthrough` replica carries the
   same three views with full-size text, theme awareness and zero assets.
-- W8: GitHub Discussions must be enabled in the repository settings before any page links it (the
-  never-advertise rule); the maintainer action is recorded here and the links land in the sustainability
-  page, the FAQ and the footer once it exists. The release feed is checked, not hand-trusted: a release
-  that skips `docs/src/data/releases.ts` fails `eng/check-docs.ps1`.
+- W8: GitHub Discussions is enabled and linked from the sustainability page, the FAQ, the footer and
+  `SUPPORT.md`; the release feed is checked, not hand-trusted, because a release that skips
+  `docs/src/data/releases.ts` fails `eng/check-docs.ps1`.
+- W9: the changelog page is generated rather than curated, so it carries the repository `CHANGELOG.md`
+  wording (the hand-written copy is gone); the homepage feed's summary is the release's opening
+  paragraph, falling back to its first bullet. One edit per release; the announcement bar stays manual
+  because it names the docs-version split.
 
 ## Stop criteria
 

@@ -63,4 +63,4 @@ Openly and heavily, for code and documentation, with the maintainer directing th
 
 ## Something is broken. Where do I start?
 
-The [troubleshooting page](./getting-started/troubleshooting.md) lists the common failures with their exact error strings. For anything else, [open an issue](https://github.com/MSeys/ProtoTest/issues); the project is new and reports from real use are how it improves.
+The [troubleshooting page](./getting-started/troubleshooting.md) lists the common failures with their exact error strings. For anything else, ask in [Discussions](https://github.com/MSeys/ProtoTest/discussions) or [open an issue](https://github.com/MSeys/ProtoTest/issues) - the project is new and reports from real use are how it improves.

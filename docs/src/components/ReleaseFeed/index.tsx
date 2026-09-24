@@ -1,13 +1,14 @@
 import type {ReactNode} from 'react';
 import Link from '@docusaurus/Link';
 
-import {releases} from '@site/src/data/releases';
+import {releases} from '@site/src/data/changelog.generated';
 import styles from './styles.module.css';
 
 /*
  * The homepage release feed: the latest release with its date and a one-line summary, and the release
- * before it, so a visitor can see the project is moving. The data lives in src/data/releases.ts and is
- * checked against CHANGELOG.md by eng/check-docs.ps1.
+ * before it, so a visitor can see the project is moving. Both this component's data and the changelog
+ * page are generated from the repository's CHANGELOG.md by docs/scripts/generate-changelog.mjs, which
+ * eng/check-docs.ps1 runs in check mode.
  */
 
 const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];

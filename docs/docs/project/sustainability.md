@@ -31,7 +31,7 @@ All ProtoTest packages share one version and are released together, so "ProtoTes
 ## How to get help
 
 - Start with the [documentation](https://prototest.dev/docs/) and the [troubleshooting guide](../getting-started/troubleshooting.md); the error strings there are exact and searchable.
-- Questions, bugs, and feature ideas go to [GitHub Issues](https://github.com/MSeys/ProtoTest/issues). The [support page](https://github.com/MSeys/ProtoTest/blob/main/SUPPORT.md) says what to include - versions, runner, a minimal reproduction, and the smallest useful excerpt from the trace.
+- Questions and open-ended discussion belong in [GitHub Discussions](https://github.com/MSeys/ProtoTest/discussions). Bugs and feature requests go to [GitHub Issues](https://github.com/MSeys/ProtoTest/issues) so they can be tracked to a fix; the [support page](https://github.com/MSeys/ProtoTest/blob/main/SUPPORT.md) says what to include - versions, runner, a minimal reproduction, and the smallest useful excerpt from the trace.
 - Suspected vulnerabilities do **not** go in a public issue; follow [SECURITY.md](https://github.com/MSeys/ProtoTest/blob/main/SECURITY.md) instead.
 
 ## If the maintainer stops

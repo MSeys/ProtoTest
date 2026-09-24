@@ -182,59 +182,22 @@ foreach ($file in $docsContentFiles) {
     }
 }
 
-# 4. Releases ------------------------------------------------------------------
+# 4. Generated changelog --------------------------------------------------------
 
-# The homepage release feed must not fall behind the repository changelog: every released `## [x.y.z] -
-# date` header in CHANGELOG.md has to appear (same version and date) in docs/src/data/releases.ts, and
-# the feed may not list a version the changelog does not have. A release that skips the feed fails here.
+# One source: the repository CHANGELOG.md. docs/scripts/generate-changelog.mjs writes the documentation
+# page and the homepage release feed from it; check mode fails when either output is stale, so a release
+# that edits the changelog without regenerating fails here.
 
-$changelogPath = Join-Path $repository "CHANGELOG.md"
-$releaseDataPath = Join-Path $docsSourceRoot "data\releases.ts"
-
-$changelogReleases = @{}
-if (Test-Path -LiteralPath $changelogPath) {
-    foreach ($line in Get-Content -LiteralPath $changelogPath) {
-        $match = [regex]::Match($line, '^## \[(\d+\.\d+\.\d+)\] - (\d{4}-\d{2}-\d{2})\s*$')
-        if ($match.Success) {
-            $changelogReleases[$match.Groups[1].Value] = $match.Groups[2].Value
-        }
+$changelogGenerator = Join-Path $docsRoot "scripts\generate-changelog.mjs"
+if (Test-Path -LiteralPath $changelogGenerator) {
+    $generatorOutput = & node $changelogGenerator --check 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $releaseFailures.Add("the generated changelog is stale; run node docs/scripts/generate-changelog.mjs")
+        foreach ($line in $generatorOutput) { $releaseFailures.Add("  $line") }
     }
 }
 else {
-    $releaseFailures.Add("CHANGELOG.md is missing")
-}
-
-if (Test-Path -LiteralPath $releaseDataPath) {
-    $releaseText = Get-Content -Raw -LiteralPath $releaseDataPath
-    $versions = @([regex]::Matches($releaseText, "version: '([^']+)'") | ForEach-Object { $_.Groups[1].Value })
-    $dates = @([regex]::Matches($releaseText, "date: '([^']+)'") | ForEach-Object { $_.Groups[1].Value })
-    if ($versions.Count -ne $dates.Count) {
-        $releaseFailures.Add("docs/src/data/releases.ts has $($versions.Count) version(s) but $($dates.Count) date(s)")
-    }
-
-    $feedReleases = @{}
-    for ($index = 0; $index -lt $versions.Count -and $index -lt $dates.Count; $index++) {
-        $feedReleases[$versions[$index]] = $dates[$index]
-    }
-
-    foreach ($version in $changelogReleases.Keys) {
-        if (-not $feedReleases.ContainsKey($version)) {
-            $releaseFailures.Add("CHANGELOG.md release $version is missing from docs/src/data/releases.ts")
-        }
-        elseif ($feedReleases[$version] -ne $changelogReleases[$version]) {
-            $releaseFailures.Add(
-                "docs/src/data/releases.ts lists $version on $($feedReleases[$version]); CHANGELOG.md says $($changelogReleases[$version])")
-        }
-    }
-
-    foreach ($version in $feedReleases.Keys) {
-        if (-not $changelogReleases.ContainsKey($version)) {
-            $releaseFailures.Add("docs/src/data/releases.ts lists $version, which CHANGELOG.md does not")
-        }
-    }
-}
-else {
-    $releaseFailures.Add("docs/src/data/releases.ts is missing")
+    $releaseFailures.Add("docs/scripts/generate-changelog.mjs is missing")
 }
 
 # Summary -----------------------------------------------------------------------
@@ -257,7 +220,7 @@ if ($totalFailures -gt 0) {
         foreach ($failure in $linkFailures) { Write-Host "    $failure" }
     }
     if ($releaseFailures.Count -gt 0) {
-        Write-Host ("  Releases ({0}):" -f $releaseFailures.Count)
+        Write-Host ("  Generated changelog ({0}):" -f $releaseFailures.Count)
         foreach ($failure in $releaseFailures) { Write-Host "    $failure" }
     }
 }

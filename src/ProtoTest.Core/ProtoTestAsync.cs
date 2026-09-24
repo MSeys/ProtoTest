@@ -1,9 +1,9 @@
 namespace ProtoTest.Core;
 
 /// <summary>
-/// The one bridge for frameworks whose lifecycle hooks are synchronous. The frameworks call these
-/// hooks on a thread without a synchronization context and Core's awaits use ConfigureAwait(false),
-/// so blocking here cannot deadlock the way a UI-thread wait could.
+/// The one bridge for frameworks whose lifecycle hooks are synchronous. It blocks the calling thread
+/// until the async lifecycle completes; the adapters only use it on runner hooks that do not install a
+/// single-threaded synchronization context, where a blocking wait cannot deadlock.
 /// </summary>
 public static class ProtoTestAsync
 {

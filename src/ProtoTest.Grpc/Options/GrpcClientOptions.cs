@@ -30,4 +30,16 @@ public sealed class GrpcClientOptions : IProtoConfigurableOptions
     /// </summary>
     public List<string> SensitiveMetadataKeys { get; set; } =
         ["authorization", "cookie", "set-cookie", "x-api-key", "api-key", "token", "x-auth-token"];
+
+    /// <inheritdoc />
+    public void Validate()
+    {
+        if (DefaultDeadline is { } deadline && deadline <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(DefaultDeadline),
+                deadline,
+                "GrpcClientOptions.DefaultDeadline must be greater than zero when set.");
+        }
+    }
 }

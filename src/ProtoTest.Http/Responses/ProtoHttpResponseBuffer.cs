@@ -10,7 +10,7 @@ public static class ProtoHttpResponseBuffer
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(response);
-        if (maximumBytes < 0) throw new InvalidOperationException("MaxResponseBodyBytes cannot be negative.");
+        ArgumentOutOfRangeException.ThrowIfNegative(maximumBytes, "MaxResponseBodyBytes");
 
         var original = response.Content;
         // HEAD, 204, 304 and 1xx responses never carry a body, so a large Content-Length describes

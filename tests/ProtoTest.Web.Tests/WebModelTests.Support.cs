@@ -112,6 +112,9 @@ public sealed partial class WebModelTests
         public string? NavigateAddressOverride { get; set; }
         public string? CurrentAddress { get; set; }
 
+        public ValueTask<string?> GetCurrentAddressAsync(CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(CurrentAddress);
+
         public ValueTask NavigateAsync(Uri address, CancellationToken cancellationToken = default)
         {
             Operations.Add(("navigate", null, address.ToString()));
@@ -330,6 +333,9 @@ public sealed partial class WebModelTests
         public bool ThrowOnUrl { get; set; }
         public List<OpenQA.Selenium.By> FindAllQueries { get; } = [];
 
+        /// <summary>The threads that ran a driver call, so a test can prove they all share the pump.</summary>
+        public HashSet<int> CallerThreads { get; } = [];
+
         /// <summary>Supplies the elements a lookup returns; empty when unset.</summary>
         public Func<OpenQA.Selenium.By, IReadOnlyList<OpenQA.Selenium.IWebElement>>? Elements { get; set; }
         public string Url
@@ -348,6 +354,7 @@ public sealed partial class WebModelTests
         public OpenQA.Selenium.IWebElement FindElement(OpenQA.Selenium.By by) => throw new OpenQA.Selenium.NoSuchElementException();
         public System.Collections.ObjectModel.ReadOnlyCollection<OpenQA.Selenium.IWebElement> FindElements(OpenQA.Selenium.By by)
         {
+            CallerThreads.Add(Environment.CurrentManagedThreadId);
             FindAllQueries.Add(by);
             return new((Elements?.Invoke(by) ?? []).ToList());
         }

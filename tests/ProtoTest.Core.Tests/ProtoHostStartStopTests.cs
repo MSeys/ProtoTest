@@ -2,7 +2,6 @@ namespace ProtoTest.Core.Tests;
 
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 
 [TestFixture]
 public sealed class ProtoHostStartStopTests
@@ -93,7 +92,7 @@ public sealed class ProtoHostStartStopTests
     }
 
     [Test]
-    public async Task StartAsync_WhenInfrastructureFails_ShouldReleaseWhatStartedAndAllowRetry()
+    public async Task StartAsync_WhenInfrastructureFails_ShouldReleaseEachOwnershipAndAllowRetry()
     {
         var first = new TrackingInfrastructure("first");
         var second = new TrackingInfrastructure("second", failuresBeforeStart: 1);
@@ -120,9 +119,75 @@ public sealed class ProtoHostStartStopTests
         {
             Assert.That(first.StartCount, Is.EqualTo(2), "a retry starts the released infrastructure again");
             Assert.That(second.StartCount, Is.EqualTo(2));
-            Assert.That(first.ReleaseCount, Is.EqualTo(1), "a resource is released at most once, even across a retry");
-            Assert.That(second.ReleaseCount, Is.EqualTo(1));
+            Assert.That(first.ReleaseCount, Is.EqualTo(2), "a restarted resource is released with its new ownership period");
+            Assert.That(second.ReleaseCount, Is.EqualTo(2));
         });
+    }
+
+    [Test]
+    public async Task StartAsync_WhenRollbackReleaseFails_ShouldReleaseTheRetriedOwnershipPeriod()
+    {
+        // Stage 2 (Audit 3, finding B1): a failed release is re-armed when the host starts the resource
+        // again, so the retried ownership period is released too.
+        var failing = new TrackingInfrastructure("failing", failuresBeforeStart: 1, failuresBeforeRelease: 1);
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddInfrastructure(failing);
+        await using var host = builder.Build();
+
+        Assert.CatchAsync(async () => await host.StartAsync());
+        Assert.That(failing.ReleaseCount, Is.EqualTo(1), "the first ownership period's release failed");
+
+        await host.StartAsync();
+        await host.StopAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(failing.StartCount, Is.EqualTo(2), "the retry started the resource again");
+            Assert.That(
+                failing.ReleaseCount,
+                Is.EqualTo(2),
+                "the retried ownership period is released as well");
+        });
+    }
+
+    [Test]
+    public async Task StartAsync_WhenInfrastructureFails_ShouldNotExportReportsOrTrace()
+    {
+        // Stage 2 (Audit 3, finding B4): a run that never finished starting exports nothing. Only the
+        // run-resource rollback runs, so no sink is asked to export and no archive is written.
+        var output = Path.Combine(Path.GetTempPath(), $"prototest-start-failure-{Guid.NewGuid():N}.prototrace");
+        try
+        {
+            var sink = new CapturingSink();
+            var builder = new ProtoHostBuilder();
+            builder.AddSink(sink);
+            builder.ConfigureTracing(options => options.OutputPath = output);
+            builder.AddInfrastructure(new TrackingInfrastructure("failing", failuresBeforeStart: 1));
+            await using var host = builder.Build();
+
+            // Act
+            Assert.CatchAsync(async () => await host.StartAsync());
+
+            // Assert
+            Assert.Multiple(() =>
+            {
+                Assert.That(sink.Items, Is.Empty, "no report is exported for a run that never started");
+                Assert.That(File.Exists(output), Is.False, "no archive is written for a run that never started");
+            });
+
+            // A retry runs and stops normally, so the next run does export.
+            await host.StartAsync();
+            await host.StopAsync();
+            Assert.That(File.Exists(output), Is.True);
+        }
+        finally
+        {
+            if (File.Exists(output))
+            {
+                File.Delete(output);
+            }
+        }
     }
 
     [Test]
@@ -247,7 +312,10 @@ public sealed class ProtoHostStartStopTests
         });
     }
 
-    private sealed class TrackingInfrastructure(string id, int failuresBeforeStart = 0) : IProtoInfrastructure
+    private sealed class TrackingInfrastructure(
+        string id,
+        int failuresBeforeStart = 0,
+        int failuresBeforeRelease = 0) : IProtoInfrastructure
     {
         public string Id { get; } = id;
         public string Kind => "tracked";
@@ -267,7 +335,9 @@ public sealed class ProtoHostStartStopTests
         public ValueTask ReleaseAsync(ProtoResourceReleaseContext context)
         {
             ReleaseCount++;
-            return ValueTask.CompletedTask;
+            return ReleaseCount <= failuresBeforeRelease
+                ? ValueTask.FromException(new InvalidOperationException($"Release of {Id} failed."))
+                : ValueTask.CompletedTask;
         }
     }
 

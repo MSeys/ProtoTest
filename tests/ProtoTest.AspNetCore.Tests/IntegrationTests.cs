@@ -49,10 +49,12 @@ public class IntegrationTests
     [Test]
     public async Task InProcessInventory_ShouldRecordPageLikeEndpointsAndExcludeApiRoutes()
     {
+        // Arrange
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>("InventoryApi")
             .Build();
         await using var ownedHost = host;
+        // Act
         await host.StartTestAsync("PageInventory_Test", "00011", TestMethods.Placeholder);
 
         var pages = Proto.Context.RecordedObservations
@@ -61,6 +63,7 @@ public class IntegrationTests
             .ToArray();
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
+        // Assert
         Assert.Multiple(() =>
         {
             Assert.That(pages, Does.Contain("/welcome"), "an endpoint producing text/html is page-like");
@@ -75,6 +78,7 @@ public class IntegrationTests
     [Test]
     public async Task InProcessInventory_ShouldHonorApplicationPageFiltersAndRecordOncePerRun()
     {
+        // Arrange
         var host = new ProtoHostBuilder()
             .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
@@ -87,6 +91,7 @@ public class IntegrationTests
         await using var ownedHost = host;
         var method = TestMethods.Placeholder;
 
+        // Act
         await host.StartTestAsync("PageInventoryFilter_Test", "00012", method);
         var first = Proto.Context.RecordedObservations
             .Where(observation => observation.Kind == "web.page.available")
@@ -101,6 +106,7 @@ public class IntegrationTests
             .ToArray();
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
+        // Assert
         Assert.Multiple(() =>
         {
             Assert.That(first, Does.Contain("/portal/home"), "the include glob keeps the portal page");
@@ -113,10 +119,12 @@ public class IntegrationTests
     [Test]
     public async Task InProcessInventory_ShouldRequireHtmlEvidenceForControllerActions()
     {
+        // Arrange
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>("ControllerInventory")
             .Build();
         await using var ownedHost = host;
+        // Act
         await host.StartTestAsync("ControllerInventory_Test", "00014", TestMethods.Placeholder);
 
         var pages = Proto.Context.RecordedObservations
@@ -125,6 +133,7 @@ public class IntegrationTests
             .ToArray();
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
+        // Assert
         Assert.Multiple(() =>
         {
             Assert.That(pages, Does.Not.Contain("/mvc/json"), "a JSON MVC action is not a page");
@@ -141,6 +150,7 @@ public class IntegrationTests
     [Test]
     public async Task InProcessInventory_ShouldReadScalarIncludeAndExcludeValues()
     {
+        // Arrange
         var host = new ProtoHostBuilder()
             .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
@@ -151,6 +161,7 @@ public class IntegrationTests
             .AddAspNetCoreServer<SampleApi.Program>("ScalarApi")
             .Build();
         await using var ownedHost = host;
+        // Act
         await host.StartTestAsync("ScalarFilter_Test", "00015", TestMethods.Placeholder);
 
         var pages = Proto.Context.RecordedObservations
@@ -159,6 +170,7 @@ public class IntegrationTests
             .ToArray();
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
+        // Assert
         Assert.Multiple(() =>
         {
             Assert.That(pages, Does.Contain("/portal/home"), "a scalar Include keeps the matching page");
@@ -170,7 +182,9 @@ public class IntegrationTests
     [Test]
     public async Task InProcessInventory_ShouldRetryAfterAFailedDiscovery()
     {
+        // Arrange
         var flaky = new FlakyEndpointDataSource();
+        // Arrange
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>(
                 "RetryApi",
@@ -179,6 +193,7 @@ public class IntegrationTests
         await using var ownedHost = host;
         var method = TestMethods.Placeholder;
 
+        // Act
         await host.StartTestAsync("PageInventoryRetry_First", "00016", method);
         var first = Proto.Context.RecordedObservations
             .Where(observation => observation.Kind == "web.page.available")
@@ -193,6 +208,7 @@ public class IntegrationTests
             .ToArray();
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
+        // Assert
         Assert.Multiple(() =>
         {
             Assert.That(first, Is.Empty, "the failed discovery recorded nothing");
@@ -207,6 +223,7 @@ public class IntegrationTests
     [Test]
     public async Task InProcessInventory_ShouldRetryAfterAnEmptyDiscovery()
     {
+        // Arrange
         SampleApi.LatePageState.Enabled = false;
         var host = new ProtoHostBuilder()
             .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
@@ -223,6 +240,7 @@ public class IntegrationTests
         await using var ownedHost = host;
         var method = TestMethods.Placeholder;
 
+        // Act
         await host.StartTestAsync("EmptyInventory_First", "00018", method);
         var first = Proto.Context.RecordedObservations
             .Where(observation => observation.Kind == "web.page.available")
@@ -240,6 +258,7 @@ public class IntegrationTests
                 .ToArray();
             await host.CompleteTestAsync(ProtoTestResult.Passed);
 
+            // Assert
             Assert.Multiple(() =>
             {
                 Assert.That(first, Is.Empty, "an empty discovery records nothing");
@@ -249,6 +268,7 @@ public class IntegrationTests
         }
         finally
         {
+            // Arrange
             SampleApi.LatePageState.Enabled = false;
         }
     }
@@ -257,6 +277,7 @@ public class IntegrationTests
     public async Task Rest_First_Should_Use_External_Client_When_BaseUrl_Is_Configured()
     {
         // 1. Arrange: Provide Configuration override for the client BaseUrl
+        // Arrange
         var inMemoryConfig = new Dictionary<string, string?>
         {
             { "ProtoTest:Applications:ExternalApi:BaseUrl", "https://api.example.com" }
@@ -291,17 +312,21 @@ public class IntegrationTests
     [Test]
     public async Task Rest_First_Should_Fall_Through_To_AspNetCore_When_BaseUrl_Is_Missing()
     {
+        // Arrange
         var host = new ProtoHostBuilder()
             .AddRest(rest => rest.AddClient("OrderApi"))
             .AddAspNetCoreServer<SampleApi.Program>("OrderApi")
             .Build();
 
+        // Act
         await host.StartTestAsync("LocalFallback_Test", "00004", TestMethods.Placeholder);
 
         try
         {
+            // Act
             var response = await Proto.Context.Rest("OrderApi").GetAsync("/ping");
 
+            // Assert
             response.Should.HaveHttpStatus(HttpStatusCode.OK);
             Assert.That(Proto.Context.ServerFactory<SampleApi.Program>("OrderApi"), Is.Not.Null);
         }
@@ -315,6 +340,7 @@ public class IntegrationTests
     [Test]
     public async Task Configured_Url_Should_Win_Regardless_Of_Server_Registration_Order()
     {
+        // Arrange
         var inMemoryConfig = new Dictionary<string, string?>
         {
             ["ProtoTest:Applications:OrderApi:BaseUrl"] = "https://api.example.com"
@@ -326,12 +352,14 @@ public class IntegrationTests
             .AddRest(rest => rest.AddClient("OrderApi"))
             .Build();
 
+        // Act
         await host.StartTestAsync("RegistrationOrder_Test", "00005", TestMethods.Placeholder);
 
         try
         {
             var client = Proto.Context.Client<HttpClient>("OrderApi");
 
+            // Assert
             Assert.Multiple(() =>
             {
                 Assert.That(client.BaseAddress, Is.EqualTo(new Uri("https://api.example.com/")),
@@ -364,6 +392,7 @@ public class IntegrationTests
                 })
             .Build();
 
+        // Act
         await host.StartTestAsync("FactoryConfiguration", "00003", TestMethods.Placeholder);
 
         try
@@ -383,6 +412,7 @@ public class IntegrationTests
     [Test]
     public async Task AddAspNetCoreServer_ShouldApplyWebHostServiceOverridesAndClientOptions()
     {
+        // Arrange
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>(
                 "ConfiguredApi",
@@ -401,10 +431,12 @@ public class IntegrationTests
 
         try
         {
+            // Act
             var client = Proto.Context.Client<HttpClient>("ConfiguredApi");
             using var response = await client.GetAsync("/message");
             var body = await response.Content.ReadAsStringAsync();
 
+            // Assert
             Assert.That(client.BaseAddress, Is.EqualTo(new Uri("https://configured.example.test")));
             Assert.That(body, Does.Contain("replacement"));
         }
@@ -418,6 +450,7 @@ public class IntegrationTests
     [Test]
     public async Task PerRunLifetime_ShouldShareOneApplicationAcrossTests_AndDisposeItWithTheHost()
     {
+        // Arrange
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>(
                 "SharedApi",
@@ -425,6 +458,7 @@ public class IntegrationTests
             .Build();
         var method = TestMethods.Placeholder;
 
+        // Act
         await host.StartTestAsync("First", "00007", method);
         var first = Proto.Context.ServerFactory<SampleApi.Program>("SharedApi");
         using (var response = await Proto.Context.Client<HttpClient>("SharedApi").GetAsync("/ping"))
@@ -446,6 +480,7 @@ public class IntegrationTests
             .ToArray();
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
+        // Assert
         Assert.Multiple(() =>
         {
             Assert.That(second, Is.SameAs(first));
@@ -460,6 +495,7 @@ public class IntegrationTests
     [Test]
     public async Task PerTestLifetime_ShouldStartAndDisposeAnApplicationForEachTest()
     {
+        // Arrange
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>(
                 "IsolatedApi",
@@ -478,6 +514,7 @@ public class IntegrationTests
 
         await host.StartTestAsync("Second", "00010", method);
         var second = Proto.Context.ServerFactory<SampleApi.Program>("IsolatedApi");
+        // Assert
         Assert.Multiple(() =>
         {
             Assert.That(second, Is.Not.SameAs(first));

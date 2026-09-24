@@ -30,16 +30,14 @@ internal static class ProtoGrpcClientRegistration
         }
 
         services.AddSingleton<IProtoClientInitializer>(serviceProvider =>
-        {
-            var options = ProtoOptionsRegistration.Resolve<GrpcClientOptions>(serviceProvider, configure);
-            return new ProtoGrpcClientInitializer(
+            new ProtoGrpcClientInitializer(
                 protocolName,
                 name,
-                options,
+                serviceProvider.GetRequiredService<GrpcClientOptions>(),
                 address,
                 allowMissingAddress: allowMissingAddress,
-                application: application);
-        });
+                application: application));
+        ProtoOptionsRegistration.Configure(services, () => new GrpcClientOptions(), configure);
         services.AddSingleton(new ProtoApplicationTarget(name, application ?? name));
         return new ProtoTargetBuilder(name, services);
     }
@@ -58,16 +56,14 @@ internal static class ProtoGrpcClientRegistration
         ArgumentNullException.ThrowIfNull(addressResolver);
 
         services.AddSingleton<IProtoClientInitializer>(serviceProvider =>
-        {
-            var options = ProtoOptionsRegistration.Resolve<GrpcClientOptions>(serviceProvider, configure);
-            return new ProtoGrpcClientInitializer(
+            new ProtoGrpcClientInitializer(
                 protocolName,
                 name,
-                options,
+                serviceProvider.GetRequiredService<GrpcClientOptions>(),
                 allowMissingAddress: true,
                 application: application,
-                addressResolver: addressResolver);
-        });
+                addressResolver: addressResolver));
+        ProtoOptionsRegistration.Configure(services, () => new GrpcClientOptions(), configure);
         services.AddSingleton(new ProtoApplicationTarget(name, application ?? name));
         return new ProtoTargetBuilder(name, services);
     }

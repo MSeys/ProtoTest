@@ -1,7 +1,6 @@
 namespace ProtoTest.Core.Tests;
 
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 
 [TestFixture]
 public sealed class ProtoInfrastructureTests

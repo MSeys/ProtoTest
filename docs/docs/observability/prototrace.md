@@ -17,10 +17,13 @@ builder.ConfigureTracing(trace =>
 {
     trace.Enabled = true;                                       // default
     trace.OutputPath = "TestResults/billing.prototrace";        // default: TestResults/prototest-{runId}.prototrace
+    trace.EmbedArtifacts = true;                                // false declares attachments without their bytes
 });
 ```
 
-With `Enabled = false`, nothing is recorded and no file is written. Observations and reports keep working.
+With `Enabled = false`, no trace file is written and application spans from the configured sources are not
+captured. ProtoTest still records tests and run state in memory (run gates and `Trace.Snapshot()` can use
+it), and observations and reports keep working.
 
 ## What a trace contains
 
@@ -136,9 +139,27 @@ run.prototrace
 - **`sources`** in the manifest maps each recorded `code.file.path` to its embedded copy.
 - Each artifact is declared once, with its media type, size and path in the archive; an attachment event refers to it by id.
 
-Entries are stored **uncompressed**, so a browser can read the archive without a decompression library. Property names are camelCase. The archive manifest is format **2.0**, its spans document is 2.0, and its state document is **1.1** — tracked values are generic `value` items with the domain type in the id. The live snapshot exposed to code (`host.Trace.Snapshot()`) reports format **1.9**.
+Entries are stored **uncompressed**, so a browser can read the archive without a decompression library. Property names are camelCase. The archive manifest is format **2.0**, its spans document is 2.0, and its state document is **1.1** — tracked values are generic `value` items with the domain type in the id. The live snapshot exposed to code (`host.Trace.Snapshot()`) reports the same span format version.
 
 Test artifacts — every [attachment](../foundation/attachments.md) — live under the test's id. Run-level artifacts, such as the reports written by [sinks](./reporting.md), live under `resources/run/`.
+
+### Format compatibility
+
+The format is versioned and tested against `design/prototrace-wire.contract.json`. The reader that ships with
+the tooling supports the current major and the one before it, and the viewer keeps opening archives it has always
+opened. A breaking format change bumps the major and arrives with a migration note in the changelog; a reader
+that meets a format it does not support fails with a message naming the version rather than guessing.
+`ProtoTest.Traces` follows the same rule: it reads 2.x and rejects anything else explicitly.
+
+### If the process dies
+
+The archive is written once, at the end of the run, after the gates and the reports — so a process killed
+mid-run writes no `.prototrace`. What survives instead is the runner's own output and anything the run already
+released. An incremental flush (spans per completed test) is not implemented; if you need evidence from a
+process that dies, keep the runner's console output and any artifacts the run had already published.
+
+The [benchmarks page](../benchmarks.md) records what a trace costs at 100 and 1,000 tests, and the levers that
+change it (`EmbedSources`, `EmbedArtifacts`, `MaxArtifactBytes`, capture options).
 
 ## Reading a trace in code
 
@@ -151,3 +172,8 @@ Assert.That(click.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
 ```
 
 To add your own entries, see [Extending ProtoTest](../advanced/extending.md#adding-to-the-trace). To forward operations to an observability backend, see [OpenTelemetry](./opentelemetry.md).
+
+Without a browser, `ProtoTest.Traces` reads the archive and the `prototest` CLI prints the failure digest:
+`prototest trace summary TestResults/Shop.prototrace` lists the run, the outcome counts, and every test that did
+not fully succeed with its error, source location and failing operation. It is the same compact story a CI log
+or an agent can use.

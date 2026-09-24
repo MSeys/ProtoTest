@@ -144,6 +144,53 @@ public sealed partial class WebModelTests
         public ValueTask ReleaseAsync(ProtoResourceReleaseContext context) => ValueTask.CompletedTask;
     }
 
+    [Test]
+    public async Task WebSession_ShouldRetryBackendCreationAfterASynchronousFailure()
+    {
+        var attempts = 0;
+        var factory = new FlakyBackendFactory((context, _) =>
+        {
+            attempts++;
+            if (attempts == 1)
+            {
+                throw new InvalidOperationException("the browser is not installed");
+            }
+
+            return new FakeBackend { Context = context };
+        });
+        var builder = new ProtoHostBuilder();
+        builder.AddWebBackend(factory);
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web retry", TestMethods.Placeholder);
+        var session = context.Web();
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await session.GetBackendAsync<IWebBackend>());
+        Assert.That(exception!.Message, Is.EqualTo("the browser is not installed"));
+
+        // A failed creation must not be cached: the next call starts from a clean slate.
+        var backend = await session.GetBackendAsync<IWebBackend>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(attempts, Is.EqualTo(2));
+            Assert.That(backend.Name, Is.EqualTo("Fake"));
+        });
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    private sealed class FlakyBackendFactory(
+        Func<ProtoExecutionContext, string, IWebBackend> create) : IWebBackendFactory
+    {
+        public string Name => "Flaky";
+
+        public ValueTask<IWebBackend> CreateAsync(
+            ProtoExecutionContext context,
+            string sessionName,
+            CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(create(context, sessionName));
+    }
+
     // Compile-time guard: [WebSession] must resolve to WebSessionAttribute even though WebSession is a type.
     [WebSession("Admin", Open = "/dashboard")]
     private sealed class WebSessionAttributeSyntax;

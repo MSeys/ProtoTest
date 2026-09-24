@@ -47,8 +47,8 @@ public sealed class ProtoModelColumnAssertions<TValue>
             () => new SheetAssertionFailure(DescribeFailure(expected, mismatch)));
     }
 
-    /// <summary>Checks the values are ordered.</summary>
-    public void BeSortedBy(bool ascending = true)
+    /// <summary>Checks the values are ordered in the requested direction.</summary>
+    public void BeSortedBy(ProtoSortDirection direction = ProtoSortDirection.Ascending)
     {
         string? actual = null;
         SheetAssertion.Run(
@@ -62,7 +62,7 @@ public sealed class ProtoModelColumnAssertions<TValue>
                 {
                     var comparison = Comparer<TValue?>.Default.Compare(
                         _column.Values[index - 1], _column.Values[index]);
-                    if (ascending ? comparison > 0 : comparison < 0)
+                    if (direction == ProtoSortDirection.Ascending ? comparison > 0 : comparison < 0)
                     {
                         actual = $"row {_dataStartRow + index} was {ProtoModelColumn<TValue>.Display(_column.Values[index])}";
                         return false;
@@ -73,8 +73,8 @@ public sealed class ProtoModelColumnAssertions<TValue>
             },
             () =>
             {
-                var expectation = $"be sorted {(ascending ? "ascending" : "descending")}";
-                var detail = actual ?? $"it was sorted {(ascending ? "ascending" : "descending")}";
+                var expectation = $"be sorted {Describe(direction)}";
+                var detail = actual ?? $"it was sorted {Describe(direction)}";
                 return new SheetAssertionFailure(
                     $"{SheetAssertion.Describe(Subject, expectation, _negated)} but {detail}.",
                     new Dictionary<string, string?>
@@ -84,6 +84,9 @@ public sealed class ProtoModelColumnAssertions<TValue>
                     });
             });
     }
+
+    private static string Describe(ProtoSortDirection direction)
+        => direction == ProtoSortDirection.Ascending ? "ascending" : "descending";
 
     private string Subject => $"column '{_sheetName}.{_column.Header}'";
 

@@ -8,6 +8,36 @@ Thanks for helping make integration tests easier to build and explain. Bug repor
 - For a substantial API, package or architecture change, open an issue first. A short design conversation can prevent a large patch from heading in the wrong direction.
 - Keep a contribution focused. Unrelated cleanup is easier to review separately.
 
+## Context lookups
+
+ProtoTest has three scopes, and each has exactly one way to reach it:
+
+- **Inside a test, on the test's flow** — use `Proto.Context`. This covers test bodies,
+  test-author entries (`context.Data().For<T>()`, `row.ShouldMatchShape(...)`,
+  `exception.ShouldHaveStatus(...)`) and the plumbing they call. Prefer passing the context down
+  from an entry when the callee is easy to construct directly in a test; do not thread it through
+  purely for style.
+- **Run scope** — use the host: the reference a hook receives at registration, or
+  `ProtoHost.CurrentHost`. There is no ambient run context: run hooks and report building run
+  outside any test.
+- **Off the test's flow** — telemetry callbacks and library threads (a message consumer's delivery
+  callbacks, a span processor's worker) use `ProtoHost.FindTraceWriter(activity)` and correlate by
+  W3C trace id. `Proto.Context` cannot answer there, because there is no flow-local test.
+
+An object whose lifetime spans tests (a broker, a browser pool, a run-scoped resource) must not hold
+a test context; it resolves per call, and only when it acts on the test's flow. Release callbacks get
+their trace writer from `ProtoResourceReleaseContext`.
+
+## Test conventions
+
+A test's name states the behavior it pins: `Subject_ShouldOutcome`, with `_WhenCondition` when the
+condition is the point (for example `RollbackFailure_ShouldStillDisposeTheTransactionAndConnection`).
+Use the plain present tense and name the subject as the reader knows it, not the type under test.
+
+Keep the phases visible with `// Arrange`, `// Act` and `// Assert` comments whenever the test is long
+enough that the phases are not obvious from the code; a short test needs none. One behavior per test,
+one act per test. Fixture data names its intent (`OverdueInvoice`, not `Invoice1`), and a helper used
+by more than one suite lives in `ProtoTest.TestSupport`.
 ## Build and test
 
 ProtoTest requires the .NET 8, 9 and 10 SDKs. Node.js 20 or newer is needed for the documentation and trace viewer.
@@ -46,6 +76,20 @@ npm run build
 - Do not commit generated build output, local traces or credentials.
 
 By contributing, you agree that your contribution is licensed under the repository's [MIT License](LICENSE).
+
+## Community packages
+
+First-party ProtoTest packages share one version and are released together. A package published outside this
+repository versions independently and declares the ProtoTest it needs: depend on the lowest compatible
+`ProtoTest.Core` (or integration) version and state it in the README. Do not take a dependency on an internal
+API marked `internal`; if an extension point is missing, open an issue so it can be added deliberately.
+
+## AI-assisted contributions
+
+AI-assisted work is welcome and reviewed like any other contribution. Disclose it in the pull request
+(which parts, with which tool), be ready to explain the design and verify the behavior yourself, and keep the
+same evidence bar: tests for behavior changes, docs for public behavior, and no generated build output or
+credentials. A reviewer may ask for a walkthrough of any part; the contributor stays accountable for it.
 
 ## Conduct
 

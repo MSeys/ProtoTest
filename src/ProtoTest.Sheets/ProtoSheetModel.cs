@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
 using ProtoTest.Core;
+using ProtoTest.Sheets.Internal;
 
 /// <summary>
 /// A sheet modelled as a record: <c>[Sheet]</c> and <c>[Column]</c> declare the layout once, the model
@@ -14,12 +15,12 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
 {
     private readonly ProtoTable _table;
     private readonly ProtoExecutionContext? _context;
-    private readonly IReadOnlyDictionary<PropertyInfo, int> _columns;
+    private readonly IReadOnlyList<SheetColumnBinding> _columns;
 
     private ProtoSheetModel(
         ProtoSheet sheet,
         ProtoTable table,
-        IReadOnlyDictionary<PropertyInfo, int> columns,
+        IReadOnlyList<SheetColumnBinding> columns,
         ProtoExecutionContext? context)
     {
         Sheet = sheet;
@@ -59,24 +60,17 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
     /// <summary>Reads a whole column as typed values with property-style assertions.</summary>
     public ProtoModelColumn<TValue> Column<TValue>(Expression<Func<TRow, TValue>> property)
     {
-        var info = PropertyOf(property);
-        if (!_columns.TryGetValue(info, out var number))
-        {
-            throw new SpreadsheetAssertionException(
-                $"'{typeof(TRow).Name}.{info.Name}' is not mapped to a column; mark it with a [Column(\"...\")] attribute.");
-        }
-
-        var optional = info.GetCustomAttribute<ColumnAttribute>()?.Optional == true;
-        _table.RecordRead(_table.ColumnRange(number));
+        var binding = BindingOf(PropertyOf(property));
+        _table.RecordRead(_table.ColumnRange(binding.Number));
         var values = new TValue?[_table.RowCount];
         for (var index = 0; index < values.Length; index++)
         {
-            var cell = _table.Cell(_table.DataStartRow + index, number);
-            GuardEmpty(info, cell, optional);
-            values[index] = (TValue?)ConvertValue(typeof(TValue), cell);
+            var cell = _table.Cell(_table.DataStartRow + index, binding.Number);
+            GuardEmpty(binding, cell);
+            values[index] = (TValue?)SheetCellValue.Convert(typeof(TValue), cell);
         }
 
-        return new ProtoModelColumn<TValue>(Sheet.Name, info.Name, values, _table.DataStartRow, _context);
+        return new ProtoModelColumn<TValue>(Sheet.Name, binding.Name, values, _table.DataStartRow, _context);
     }
 
     /// <summary>Checks every declared column against the record's shape; all violations are reported.</summary>
@@ -84,27 +78,26 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
     {
         _table.RecordRead(_table.DataRange);
         var failures = new List<string>();
-        foreach (var (property, number) in _columns)
+        foreach (var binding in _columns)
         {
-            var column = property.GetCustomAttribute<ColumnAttribute>()!;
-            var optional = column.Optional;
+            var column = binding.Attribute;
             var seen = column.Unique ? new Dictionary<string, string>(StringComparer.Ordinal) : null;
             for (var row = _table.DataStartRow; row < _table.DataStartRow + Math.Max(0, _table.RowCount); row++)
             {
-                var cell = _table.Cell(row, number);
+                var cell = _table.Cell(row, binding.Number);
                 if (cell.IsEmpty)
                 {
-                    if (!optional && !IsNullable(property.PropertyType))
+                    if (!binding.Optional && !binding.IsNullable)
                     {
-                        failures.Add($"'{property.Name}' is empty at {cell.Reference}");
+                        failures.Add($"'{binding.Name}' is empty at {cell.Reference}");
                     }
 
                     continue;
                 }
 
-                if (!TryConvert(property.PropertyType, cell))
+                if (!SheetCellValue.TryConvert(binding.Property.PropertyType, cell, out _))
                 {
-                    failures.Add($"'{property.Name}' is not a {property.PropertyType.Name} at {cell.Reference} (was {cell.Display()})");
+                    failures.Add($"'{binding.Name}' is not a {binding.Property.PropertyType.Name} at {cell.Reference} (was {cell.Display()})");
                     continue;
                 }
 
@@ -112,26 +105,26 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
                 // has no Text, so validating only those would silently skip the constraint.
                 if (!double.IsNaN(column.Min) && TypedNumber(cell) is { } below && below < column.Min)
                 {
-                    failures.Add($"'{property.Name}' is {cell.Display()} at {cell.Reference}, below the minimum {column.Min}");
+                    failures.Add($"'{binding.Name}' is {cell.Display()} at {cell.Reference}, below the minimum {column.Min}");
                 }
 
                 if (!double.IsNaN(column.Max) && TypedNumber(cell) is { } above && above > column.Max)
                 {
-                    failures.Add($"'{property.Name}' is {cell.Display()} at {cell.Reference}, above the maximum {column.Max}");
+                    failures.Add($"'{binding.Name}' is {cell.Display()} at {cell.Reference}, above the maximum {column.Max}");
                 }
 
                 if (column.Pattern is { } pattern
                     && cell.RenderedValue is { } rendered
                     && !System.Text.RegularExpressions.Regex.IsMatch(rendered, pattern))
                 {
-                    failures.Add($"'{property.Name}' is '{rendered}' at {cell.Reference}, which does not match '{pattern}'");
+                    failures.Add($"'{binding.Name}' is '{rendered}' at {cell.Reference}, which does not match '{pattern}'");
                 }
 
                 if (column.OneOf is { Length: > 0 } allowed
                     && cell.RenderedValue is { } candidate
                     && !allowed.Contains(candidate, StringComparer.Ordinal))
                 {
-                    failures.Add($"'{property.Name}' is '{candidate}' at {cell.Reference}, not one of {string.Join(", ", allowed)}");
+                    failures.Add($"'{binding.Name}' is '{candidate}' at {cell.Reference}, not one of {string.Join(", ", allowed)}");
                 }
 
                 if (seen is not null)
@@ -141,7 +134,7 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
                     var uniqueKey = UniqueKey(cell);
                     if (seen.TryGetValue(uniqueKey, out var firstReference))
                     {
-                        failures.Add($"'{property.Name}' repeats '{cell.Display()}' at {cell.Reference} (first at {firstReference})");
+                        failures.Add($"'{binding.Name}' repeats '{cell.Display()}' at {cell.Reference} (first at {firstReference})");
                     }
                     else
                     {
@@ -152,7 +145,7 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
         }
 
         using var operation = _context?.Trace
-            .Operation("sheets.model", $"Sheets · model {typeof(TRow).Name}", "ProtoTest.Sheets")
+            .Operation("sheets.model", $"Sheets · model {typeof(TRow).Name}", ProtoSheets.TraceSource)
             .With("sheets.sheet", Sheet.Name)
             .With("sheets.columns", _columns.Count.ToString(CultureInfo.InvariantCulture))
             .Begin();
@@ -177,21 +170,24 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
                 $"{typeof(TRow).Name} needs a [Sheet(\"...\")] attribute to model a sheet.");
         var sheet = workbook.Sheet(attribute.Name);
         var table = sheet.Table(attribute.HeaderRows);
-        var columns = new Dictionary<PropertyInfo, int>();
+        var columns = new List<SheetColumnBinding>();
         foreach (var property in typeof(TRow).GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
-            if (property.GetCustomAttribute<ColumnAttribute>() is { } column)
+            if (property.GetCustomAttribute<ColumnAttribute>() is not { } column)
             {
-                if (column.Optional && !IsNullable(property.PropertyType))
-                {
-                    throw new SpreadsheetAssertionException(
-                        $"'{property.Name}' on {typeof(TRow).Name} is marked Optional, but " +
-                        $"{property.PropertyType.Name} cannot hold an empty cell. Use a nullable type " +
-                        $"such as {property.PropertyType.Name}?.");
-                }
-
-                columns[property] = table.ColumnNumber(column.Path);
+                continue;
             }
+
+            var binding = new SheetColumnBinding(property, table.ColumnNumber(column.Path), column);
+            if (binding.Optional && !binding.IsNullable)
+            {
+                throw new SpreadsheetAssertionException(
+                    $"'{binding.Name}' on {typeof(TRow).Name} is marked Optional, but " +
+                    $"{property.PropertyType.Name} cannot hold an empty cell. Use a nullable type " +
+                    $"such as {property.PropertyType.Name}?.");
+            }
+
+            columns.Add(binding);
         }
 
         if (columns.Count == 0)
@@ -208,28 +204,32 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
         // Records only expose their primary constructor, so the instance is created uninitialized and
         // every declared property is set from its column.
         var instance = (TRow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(TRow));
-        foreach (var (property, number) in _columns)
+        foreach (var binding in _columns)
         {
-            var cell = _table.Cell(row, number);
-            var optional = property.GetCustomAttribute<ColumnAttribute>()?.Optional == true;
-            // The projection must fail the same way Column does; ConvertValue returns null for an
+            var cell = _table.Cell(row, binding.Number);
+            // The projection must fail the same way Column does; the converter returns null for an
             // empty cell, and assigning null to a non-nullable value type throws a raw reflection error.
-            GuardEmpty(property, cell, optional);
-            property.SetValue(instance, ConvertValue(property.PropertyType, cell));
+            GuardEmpty(binding, cell);
+            binding.Property.SetValue(instance, SheetCellValue.Convert(binding.Property.PropertyType, cell));
         }
 
         return instance;
     }
 
-    private void GuardEmpty(PropertyInfo property, ProtoCell cell, bool optional)
+    private void GuardEmpty(SheetColumnBinding binding, ProtoCell cell)
     {
-        if (cell.IsEmpty && !IsNullable(property.PropertyType) && !optional)
+        if (cell.IsEmpty && !binding.IsNullable && !binding.Optional)
         {
             throw new SpreadsheetAssertionException(
-                $"'{property.Name}' is empty at {cell.Reference}, so '{Sheet.Name}' has no " +
-                $"{property.PropertyType.Name} value for it. Mark the column Optional to allow empty cells.");
+                $"'{binding.Name}' is empty at {cell.Reference}, so '{Sheet.Name}' has no " +
+                $"{binding.Property.PropertyType.Name} value for it. Mark the column Optional to allow empty cells.");
         }
     }
+
+    private SheetColumnBinding BindingOf(PropertyInfo property)
+        => _columns.FirstOrDefault(binding => binding.Property == property)
+            ?? throw new SpreadsheetAssertionException(
+                $"'{typeof(TRow).Name}.{property.Name}' is not mapped to a column; mark it with a [Column(\"...\")] attribute.");
 
     /// <summary>The numeric value a constraint compares: a number, or a date as its serial value.</summary>
     private static double? TypedNumber(ProtoCell cell)
@@ -256,66 +256,4 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
             ? info
             : throw new ArgumentException("Use a property access like row => row.Amount.", nameof(property));
     }
-
-    private static bool TryConvert(Type type, ProtoCell cell)
-    {
-        try
-        {
-            return ConvertValue(type, cell) is not null;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-    }
-
-    private static object? ConvertValue(Type type, ProtoCell cell)
-    {
-        if (cell.IsEmpty)
-        {
-            return null;
-        }
-
-        var target = Nullable.GetUnderlyingType(type) ?? type;
-        if (target == typeof(string))
-        {
-            return cell.Text ?? cell.Display();
-        }
-
-        if (target == typeof(decimal))
-        {
-            return cell.Number is { } number ? (decimal)number : throw new FormatException(cell.Display());
-        }
-
-        if (target == typeof(double))
-        {
-            return cell.Number ?? throw new FormatException(cell.Display());
-        }
-
-        if (target == typeof(int))
-        {
-            return cell.Number is { } value ? (int)Math.Round(value) : throw new FormatException(cell.Display());
-        }
-
-        if (target == typeof(long))
-        {
-            return cell.Number is { } value ? (long)Math.Round(value) : throw new FormatException(cell.Display());
-        }
-
-        if (target == typeof(bool))
-        {
-            return cell.Boolean ?? throw new FormatException(cell.Display());
-        }
-
-        if (target == typeof(DateTime))
-        {
-            return cell.Date ?? throw new FormatException(cell.Display());
-        }
-
-        throw new FormatException(
-            $"'{cell.Display()}' at {cell.Reference} cannot be converted to {target.Name}.");
-    }
-
-    private static bool IsNullable(Type type)
-        => !type.IsValueType || Nullable.GetUnderlyingType(type) is not null;
 }

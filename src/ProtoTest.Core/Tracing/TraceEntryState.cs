@@ -17,6 +17,7 @@ internal sealed class TraceEntryState
     private readonly List<ProtoTraceAttachmentRecord> _recordAttachments = [];
     private readonly List<ProtoTraceFindingRecord> _recordFindings = [];
     private readonly Activity? _activity;
+    private bool _hasFailedDescendant;
 
     public TraceEntryState(
         string id,
@@ -66,6 +67,17 @@ internal sealed class TraceEntryState
     public Activity? Activity => _activity;
     public ProtoTraceOutcome Outcome { get { lock (_gate) return _outcome; } }
     public int Count { get { lock (_gate) return _count; } }
+
+    /// <summary>
+    /// Whether any descendant completed failed or partial, recorded as it happens so an operation's
+    /// outcome does not need a scan of every entry when it completes.
+    /// </summary>
+    public bool HasFailedDescendant { get { lock (_gate) return _hasFailedDescendant; } }
+
+    public void MarkFailedDescendant()
+    {
+        lock (_gate) _hasFailedDescendant = true;
+    }
     public IReadOnlyDictionary<string, string?> Attributes { get { lock (_gate) return new Dictionary<string, string?>(_attributes); } }
 
     public void SetAttribute(string name, string? value)
@@ -75,14 +87,7 @@ internal sealed class TraceEntryState
 
     public void SetCount(int count)
     {
-        lock (_gate)
-        {
-            _count = count;
-            if (_activity is { IsStopped: false })
-            {
-                _activity.SetTag("prototest.entry.count", count);
-            }
-        }
+        lock (_gate) _count = count;
     }
 
     public void AddSection(ProtoTraceSection section)

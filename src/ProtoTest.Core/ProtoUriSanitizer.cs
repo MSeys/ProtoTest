@@ -75,6 +75,31 @@ public static class ProtoUriSanitizer
             ? null
             : Sanitize(address.OriginalString, sensitiveQueryParameters ?? DefaultSensitiveQueryParameters);
 
+    /// <summary>
+    /// The display form of an address for a trace field or an artifact: user info removed, everything
+    /// else - including the query and fragment - kept. A value that is not an absolute address is
+    /// returned as it is, so a location is never dropped.
+    /// </summary>
+    public static string? ForDisplay(string? address)
+        => address is null ? null : Sanitize(address, sensitiveQueryParameters: null);
+
+    /// <summary>
+    /// The diagnostic form of a request address: user info removed and the query and fragment dropped,
+    /// so a logged request URL cannot leak a token through a query parameter the policy does not know.
+    /// </summary>
+    public static string? ForDiagnostics(string? address)
+    {
+        if (address is null)
+        {
+            return null;
+        }
+
+        var withoutUserInfo = WithoutUserInfo(address);
+        return Uri.TryCreate(withoutUserInfo, UriKind.Absolute, out var uri)
+            ? new UriBuilder(uri) { Query = string.Empty, Fragment = string.Empty }.Uri.ToString()
+            : withoutUserInfo;
+    }
+
     private static string RedactQueryParameter(string parameter, HashSet<string> sensitive)
     {
         var separatorIndex = parameter.IndexOf('=');

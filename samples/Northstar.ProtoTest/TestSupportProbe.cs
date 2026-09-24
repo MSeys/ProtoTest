@@ -1,27 +1,23 @@
 namespace Northstar.ProtoTest;
 
 using System.Net;
-using System.Runtime.CompilerServices;
 using global::ProtoTest.Core;
 using global::ProtoTest.Rest;
-using Microsoft.Extensions.Configuration;
 
 /// <summary>
-/// Verifies once per run that the application exposes <c>/test-support</c>, so a deployment that
-/// does not enable the development affordance fails with a clear message instead of a 404 during
-/// scenario provisioning.
+/// Verifies once per run that the application exposes <c>/test-support</c>, so a deployment that does
+/// not enable the development affordance fails with a clear message instead of a 404 during scenario
+/// provisioning. Registered as a run-scoped singleton: the probe result lives exactly as long as the
+/// host that produced it, so a second run in the same process probes again.
 /// </summary>
-internal static class TestSupportProbe
+internal sealed class TestSupportProbe
 {
-    // The run's own configuration is the identity of the run: a new host builds a new configuration,
-    // so a second run in the same process probes again instead of trusting the first run's target.
-    private static readonly ConditionalWeakTable<IConfiguration, StrongBox<bool>> Verified = new();
+    private bool _verified;
 
-    public static async Task EnsureAvailableAsync(ProtoExecutionContext context)
+    public async Task EnsureAvailableAsync(ProtoExecutionContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var verified = Verified.GetValue(context.Configuration, _ => new StrongBox<bool>());
-        if (verified.Value)
+        if (_verified)
         {
             return;
         }
@@ -36,6 +32,6 @@ internal static class TestSupportProbe
         }
 
         response.Should.HaveHttpStatus(HttpStatusCode.OK);
-        verified.Value = true;
+        _verified = true;
     }
 }

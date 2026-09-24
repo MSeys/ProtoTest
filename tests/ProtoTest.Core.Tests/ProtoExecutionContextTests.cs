@@ -92,6 +92,39 @@ public class ProtoExecutionContextTests
         Assert.That(first.Observations.Single().Data, Is.EqualTo(200));
     }
 
+    [Test]
+    public void RecordObservation_ShouldRedactSensitiveMetadataBeforeTheReport()
+    {
+        var collector = new CoverageCollector("Orders");
+        using var provider = new ServiceCollection()
+            .AddSingleton<IProtoCollector>(collector)
+            .BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var context = new ProtoExecutionContext("TestMethod", scope, "00001", TestMethods.Placeholder);
+
+        context.RecordObservation(
+            "Orders",
+            "http.response",
+            "GET /orders",
+            metadata: new Dictionary<string, object>
+            {
+                ["token"] = "hunter2",
+                ["status"] = 200
+            });
+
+        var item = collector.GetReportItems().Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(item.Metadata!["token"], Is.EqualTo("[REDACTED]"));
+            Assert.That(item.Metadata!["status"], Is.EqualTo(200));
+        });
+    }
+
+    private sealed class CoverageCollector(string targetName) : ProtoCoverageCollector(targetName)
+    {
+        public override string Category => "Coverage";
+    }
+
     private sealed record SampleContext(string Value) : IProtoContext;
 
     private sealed class RecordingCollector(string targetName) : IProtoCollector

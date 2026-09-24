@@ -7,7 +7,4 @@ using Xunit;
 /// Marks a method as a ProtoTest Theory in xUnit v3 and manages its context lifecycle.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
-public class ProtoTestTheoryAttribute : TheoryAttribute, IProtoTestXunit3Attribute
-{
-    ProtoTestScope? IProtoTestXunit3Attribute.Scope { get; set; }
-}
+public class ProtoTestTheoryAttribute : TheoryAttribute, IProtoTestXunit3Attribute;

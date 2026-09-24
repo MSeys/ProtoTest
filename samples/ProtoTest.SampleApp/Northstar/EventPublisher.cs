@@ -25,61 +25,101 @@ internal sealed class RabbitMqEventPublisher(string connectionString) : IEventPu
     /// <summary>The exchanges this application owns; topology is declared at startup like a migration.</summary>
     private static readonly string[] Exchanges = ["invoice.paid"];
 
-    private readonly object _gate = new();
+    private readonly SemaphoreSlim _gate = new(1, 1);
     private IConnection? _connection;
-    private IModel? _channel;
+    private IChannel? _channel;
 
     /// <summary>Declares the application's event topology so operators and consumers find it ready.</summary>
-    public void EnsureTopology()
+    public async Task EnsureTopologyAsync(CancellationToken cancellationToken = default)
     {
-        foreach (var exchange in Exchanges)
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            _ = Channel(exchange);
+            foreach (var exchange in Exchanges)
+            {
+                _ = await ChannelLockedAsync(exchange, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _gate.Release();
         }
     }
 
-    public ValueTask PublishAsync(string destination, string payload, CancellationToken cancellationToken = default)
+    public async ValueTask PublishAsync(string destination, string payload, CancellationToken cancellationToken = default)
     {
-        var channel = Channel(destination);
-        var properties = channel.CreateBasicProperties();
-        properties.ContentType = "application/json";
-        properties.Persistent = false;
-        channel.BasicPublish(
-            exchange: destination,
-            routingKey: destination,
-            basicProperties: properties,
-            body: Encoding.UTF8.GetBytes(payload));
-        return ValueTask.CompletedTask;
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var channel = await ChannelLockedAsync(destination, cancellationToken).ConfigureAwait(false);
+            var properties = new BasicProperties
+            {
+                ContentType = "application/json",
+                Persistent = false
+            };
+            await channel.BasicPublishAsync(
+                exchange: destination,
+                routingKey: destination,
+                mandatory: false,
+                basicProperties: properties,
+                body: Encoding.UTF8.GetBytes(payload),
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
-        lock (_gate)
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            _channel?.Dispose();
+            if (_channel is not null)
+            {
+                await _channel.DisposeAsync().ConfigureAwait(false);
+                _channel = null;
+            }
+
+            if (_connection is not null)
+            {
+                await _connection.DisposeAsync().ConfigureAwait(false);
+                _connection = null;
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Returns the open channel; the caller holds the gate across its use of the channel.</summary>
+    private async Task<IChannel> ChannelLockedAsync(string exchange, CancellationToken cancellationToken)
+    {
+        if (_channel is { IsOpen: true })
+        {
+            return _channel;
+        }
+
+        if (_channel is not null)
+        {
+            await _channel.DisposeAsync().ConfigureAwait(false);
             _channel = null;
-            _connection?.Dispose();
+        }
+
+        if (_connection is not null)
+        {
+            await _connection.DisposeAsync().ConfigureAwait(false);
             _connection = null;
         }
 
-        return ValueTask.CompletedTask;
-    }
-
-    private IModel Channel(string exchange)
-    {
-        lock (_gate)
-        {
-            if (_channel is { IsOpen: true })
-            {
-                return _channel;
-            }
-
-            var factory = new ConnectionFactory { Uri = new Uri(connectionString) };
-            _connection = factory.CreateConnection("Northstar");
-            _channel = _connection.CreateModel();
-            // The event exchange is part of the application's contract; a deployment may pre-declare it.
-            _channel.ExchangeDeclare(exchange, ExchangeType.Fanout, durable: true, autoDelete: false);
-            return _channel;
-        }
+        var factory = new ConnectionFactory { Uri = new Uri(connectionString) };
+        _connection = await factory.CreateConnectionAsync("Northstar", cancellationToken).ConfigureAwait(false);
+        _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        // The event exchange is part of the application's contract; a deployment may pre-declare it.
+        await _channel.ExchangeDeclareAsync(
+            exchange, ExchangeType.Fanout, durable: true, autoDelete: false, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return _channel;
     }
 }

@@ -163,7 +163,7 @@ builder.AddInfrastructure(
 builder.AddMessaging(messaging => messaging.UseRabbitMq());
 ```
 
-`AddInfrastructure` starts the container with the host and fills every key with the started connection string, so the adapter and the application under test reach the same broker. It starts before any test-level skip condition is evaluated, so a machine without a container runtime fails the run at start. `RabbitMqBroker.Container()` creates the resource without starting it; `Start()` starts now or throws with the reason; `TryStart(configure, out broker, out error)` reports the reason instead, for a fixture that decides before registering infrastructure. The default image is `rabbitmq:3`, configurable through the builder passed to `Container`. Registering with `AddResource` only owns the release — it neither starts the container nor fills settings.
+`AddInfrastructure` starts the container with the host and fills every key with the started connection string, so the adapter and the application under test reach the same broker. It starts before any test-level skip condition is evaluated, so a machine without a container runtime fails the run at start. `RabbitMqBroker.Container()` creates the resource without starting it; `Start()` starts now or throws with the reason; `TryStart(configure)` reports the reason in its result instead, for a fixture that decides before registering infrastructure. The default image is `rabbitmq:3`, configurable through the builder passed to `Container`. Registering with `AddResource` only owns the release — it neither starts the container nor fills settings.
 
 ### Attachments
 

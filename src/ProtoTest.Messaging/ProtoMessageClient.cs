@@ -12,7 +12,7 @@ using ProtoTest.Json;
 public sealed class ProtoMessageClient
 {
     private static readonly ProtoAttachmentFailure AttachmentFailure =
-        new("messaging.attachment.failed", "ProtoTest.Messaging", "Messaging attachment");
+        new("messaging.attachment.failed", ProtoMessagingProtocol.Protocol.TraceSource, "Messaging attachment");
 
     private readonly ProtoExecutionContext _context;
     private readonly IProtoMessageBroker _broker;
@@ -42,7 +42,7 @@ public sealed class ProtoMessageClient
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(destination);
         using var operation = _context.Trace
-            .Operation("messaging.publish", $"Messaging · publish {destination}", "ProtoTest.Messaging")
+            .Operation(ProtoMessagingProtocol.Publish, $"Messaging · publish {destination}", ProtoMessagingProtocol.Protocol.TraceSource)
             .With("messaging.system", _broker.Name)
             .With("messaging.destination", destination)
             .Begin();
@@ -73,7 +73,7 @@ public sealed class ProtoMessageClient
             operation.Succeed();
             _context.RecordObservation(new ProtoObservation(
                 _broker.Name,
-                "messaging.publish",
+                ProtoMessagingProtocol.Publish,
                 destination,
                 Metadata: new Dictionary<string, object> { ["messaging.system"] = _broker.Name }));
         }
@@ -99,7 +99,7 @@ public sealed class ProtoMessageClient
         ArgumentNullException.ThrowIfNull(predicate);
         var effective = timeout ?? _options.DefaultTimeout;
         using var operation = _context.Trace
-            .Operation("messaging.await", $"Messaging · await {destination}", "ProtoTest.Messaging")
+            .Operation(ProtoMessagingProtocol.Await, $"Messaging · await {destination}", ProtoMessagingProtocol.Protocol.TraceSource)
             .With("messaging.system", _broker.Name)
             .With("messaging.destination", destination)
             .With("messaging.timeout_ms", effective.TotalMilliseconds.ToString("0", CultureInfo.InvariantCulture))
@@ -131,7 +131,7 @@ public sealed class ProtoMessageClient
             operation.Succeed();
             _context.RecordObservation(new ProtoObservation(
                 _broker.Name,
-                "messaging.receive",
+                ProtoMessagingProtocol.Protocol.ResponseObservationKind,
                 message.Destination,
                 Metadata: new Dictionary<string, object> { ["messaging.system"] = _broker.Name }));
             return message;

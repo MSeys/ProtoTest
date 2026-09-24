@@ -81,7 +81,7 @@ public sealed class BillingJourney
     public async Task PayingAnInvoiceEmitsASignedInvoicePaidWebhook()
     {
         // Arrange
-        var sink = await DemoSupport.CreateSinkAsync(0);
+        var sink = await Proto.Context.Demo().CreateSinkAsync(0);
         using var webhook = await Proto.Context.Rest()
             .Body(new CreateWebhookRequest(sink.Url.ToString(), [WebhookEventTypes.InvoicePaid]))
             .PostAsync("/api/v1/webhooks");
@@ -101,12 +101,12 @@ public sealed class BillingJourney
             paidAtUtc = JsonValue.NotNull(),
             payments = new[] { new { status = PaymentStatuses.Succeeded, method = PaymentMethods.Visa } }
         });
-        var delivery = await DemoSupport.WaitForDeliveredAsync(WebhookEventTypes.InvoicePaid);
-        var receipt = (await DemoSupport.ReceiptsAsync(sink.Id)).Single();
+        var delivery = await Proto.Context.Demo().WaitForDeliveredAsync(WebhookEventTypes.InvoicePaid);
+        var receipt = (await Proto.Context.Demo().ReceiptsAsync(sink.Id)).Single();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(delivery.Attempts, Is.EqualTo(1));
-            Assert.That(receipt.Signature, Is.EqualTo(DemoSupport.Sign(endpoint.Secret, receipt.Body)));
+            Assert.That(receipt.Signature, Is.EqualTo(Proto.Context.Demo().Sign(endpoint.Secret, receipt.Body)));
         }
     }
 

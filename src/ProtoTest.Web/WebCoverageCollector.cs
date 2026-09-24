@@ -2,8 +2,8 @@ namespace ProtoTest.Web;
 
 using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
-using ProtoTest.Core.Internal;
 using ProtoTest.Web.Internal;
+using ProtoTest.Web.Pages;
 
 /// <summary>
 /// Aggregates page coverage: every page path the suite visited, verified or discovered, plus the
@@ -17,6 +17,10 @@ using ProtoTest.Web.Internal;
 public sealed class WebCoverageCollector : ProtoCoverageCollector
 {
     private readonly List<string> _inventory = [];
+    private readonly HashSet<string> _inventorySet = new(StringComparer.OrdinalIgnoreCase);
+    private readonly IConfiguration? _configuration;
+    private readonly IWebPageSourceScanner _scanner;
+    private bool _inventoryLoaded;
 
     /// <summary>
     /// Creates the built-in collector under the <c>Web</c> target, reading <c>ProtoTest:Web:Pages</c>,
@@ -31,32 +35,59 @@ public sealed class WebCoverageCollector : ProtoCoverageCollector
     /// Supplies the explicit <c>ProtoTest:Web:Pages</c> inventory and the optional frontend folder under
     /// <c>ProtoTest:Web:Pages:Source</c>, when present. A missing folder contributes nothing.
     /// </param>
-    public WebCoverageCollector(string targetName, IConfiguration? configuration = null) : base(targetName)
+    public WebCoverageCollector(string targetName, IConfiguration? configuration = null)
+        : this(targetName, configuration, new WebPageSourceScanner())
     {
-        if (configuration is null) return;
-        // Configured entries accept the same route syntax as discovered routes, so "/users/:id" is the
-        // same pattern as a Vue route definition and matches a visit to "/users/42".
-        foreach (var value in WebPageConfig.Read(configuration, "ProtoTest:Web:Pages", "Source", "Framework"))
-        {
-            AddInventory(WebPagePath.NormalizeRoute(value));
-        }
+    }
 
-        foreach (var value in WebPageSourceScanner.Discover(
-                     configuration["ProtoTest:Web:Pages:Source"],
-                     configuration["ProtoTest:Web:Pages:Framework"]))
-        {
-            AddInventory(value);
-        }
+    internal WebCoverageCollector(
+        string targetName,
+        IConfiguration? configuration,
+        IWebPageSourceScanner scanner)
+        : base(targetName)
+    {
+        _configuration = configuration;
+        _scanner = scanner;
     }
 
     public override string Category => "Web";
 
+    /// <summary>
+    /// Reads the configured inventory and scans the frontend source folder once, on first use, so
+    /// constructing the collector never touches the filesystem.
+    /// </summary>
+    private void EnsureInventory()
+    {
+        if (_inventoryLoaded) return;
+        lock (_lock)
+        {
+            if (_inventoryLoaded) return;
+            _inventoryLoaded = true;
+            if (_configuration is null) return;
+            // Configured entries accept the same route syntax as discovered routes, so "/users/:id" is
+            // the same pattern as a Vue route definition and matches a visit to "/users/42".
+            foreach (var value in WebPageConfig.Read(_configuration, "ProtoTest:Web:Pages", "Source", "Framework"))
+            {
+                AddInventory(WebPagePath.NormalizeRoute(value));
+            }
+
+            foreach (var value in _scanner.Discover(WebPageSourceOptions.FromConfiguration(_configuration)))
+            {
+                AddInventory(value);
+            }
+        }
+    }
+
     public override bool CanCollect(ProtoObservation observation)
-        => base.CanCollect(observation)
-           && observation.Kind is "web.page.visited" or "web.page.verified" or "web.page.available";
+    {
+        EnsureInventory();
+        return base.CanCollect(observation)
+               && observation.Kind is "web.page.visited" or "web.page.verified" or WebPageInventory.AvailableObservationKind;
+    }
 
     public override void Collect(ProtoObservation observation)
     {
+        EnsureInventory();
         ArgumentNullException.ThrowIfNull(observation);
         var path = WebPagePath.Normalize(observation.Identifier);
         if (path is null) return;
@@ -78,6 +109,7 @@ public sealed class WebCoverageCollector : ProtoCoverageCollector
 
     public override IEnumerable<ProtoReportItem> GetReportItems()
     {
+        EnsureInventory();
         lock (_lock)
         {
             var items = new Dictionary<string, ProtoReportItem>(_items, StringComparer.OrdinalIgnoreCase);
@@ -108,7 +140,7 @@ public sealed class WebCoverageCollector : ProtoCoverageCollector
     /// </summary>
     private string ResolveKey(string path)
     {
-        if (_items.ContainsKey(path) || _inventory.Contains(path, StringComparer.OrdinalIgnoreCase)) return path;
+        if (_items.ContainsKey(path) || _inventorySet.Contains(path)) return path;
         string? catchAll = null;
         foreach (var pattern in _inventory)
         {
@@ -122,7 +154,7 @@ public sealed class WebCoverageCollector : ProtoCoverageCollector
 
     private void AddInventory(string? path)
     {
-        if (path is not null && !_inventory.Contains(path, StringComparer.OrdinalIgnoreCase))
+        if (path is not null && _inventorySet.Add(path))
         {
             _inventory.Add(path);
         }

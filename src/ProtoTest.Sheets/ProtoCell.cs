@@ -65,11 +65,5 @@ public sealed class ProtoCell
             ?? Date?.ToString("O", CultureInfo.InvariantCulture);
 
     internal string Display()
-        => IsEmpty
-            ? "<empty>"
-            : Text
-              ?? Number?.ToString(CultureInfo.InvariantCulture)
-              ?? Boolean?.ToString()
-              ?? Date?.ToString("O", CultureInfo.InvariantCulture)
-              ?? "<empty>";
+        => RenderedValue ?? "<empty>";
 }

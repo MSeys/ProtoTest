@@ -27,13 +27,12 @@ public sealed class SqlOptions : IProtoConfigurableOptions
         set
         {
             _sharedWith.Clear();
-            foreach (var applicationName in value ?? [])
+            if (value is null)
             {
-                if (!string.IsNullOrWhiteSpace(applicationName))
-                {
-                    _sharedWith.Add(applicationName);
-                }
+                return;
             }
+
+            ShareConnectionWith([.. value.Where(name => !string.IsNullOrWhiteSpace(name))]);
         }
     }
 

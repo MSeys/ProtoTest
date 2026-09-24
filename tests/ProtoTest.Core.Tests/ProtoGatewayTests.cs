@@ -2,7 +2,6 @@ namespace ProtoTest.Core.Tests;
 
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 
 [TestFixture]
 public class ProtoGatewayTests

@@ -7,11 +7,11 @@ public sealed class GraphQLOperationBuilder
 {
     private readonly List<GraphQLFieldBuilder> _fields = [];
     private readonly List<(string Name, string Type)> _variables = [];
-    private readonly string _operationType;
+    private readonly GraphQLOperationKind _kind;
 
-    internal GraphQLOperationBuilder(string operationType, string? name)
+    internal GraphQLOperationBuilder(GraphQLOperationKind kind, string? name)
     {
-        _operationType = operationType;
+        _kind = kind;
         Name = name;
     }
 
@@ -52,7 +52,7 @@ public sealed class GraphQLOperationBuilder
             throw new InvalidOperationException("A GraphQL operation must select at least one field.");
         }
 
-        var text = new StringBuilder(_operationType);
+        var text = new StringBuilder(_kind.WireName());
         if (!string.IsNullOrWhiteSpace(Name)) text.Append(' ').Append(Name);
         if (_variables.Count > 0)
         {
@@ -67,7 +67,6 @@ public sealed class GraphQLOperationBuilder
         text.Append(" {");
         foreach (var field in _fields) field.Render(text, 1);
         text.AppendLine().Append('}');
-        var document = Utf8GraphQLParser.Parse(text.ToString());
-        return new GraphQLBuiltOperation(text.ToString(), document, _operationType, Name);
+        return new GraphQLBuiltOperation(text.ToString(), _kind, Name);
     }
 }

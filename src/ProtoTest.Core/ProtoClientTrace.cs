@@ -17,10 +17,16 @@ public static class ProtoClientTrace
 
     /// <summary>
     /// Ties the operation to the client entity and records the client's name on it. Chain after
-    /// <c>Operation(...)</c> in place of a bare <c>For(...)</c>.
+    /// <c>Operation(...)</c> in place of a bare <c>For(...)</c>. <paramref name="entityName"/> is the
+    /// registration key when the logical name differs from it, so the operation links to the entity the
+    /// client's configuration was recorded on.
     /// </summary>
-    public static ProtoTraceScope ForClient(this ProtoTraceScope scope, Type clientType, string name)
+    public static ProtoTraceScope ForClient(
+        this ProtoTraceScope scope,
+        Type clientType,
+        string name,
+        string? entityName = null)
         => scope
-            .For(ProtoTraceEntityKinds.Client, Id(clientType, name))
+            .For(ProtoTraceEntityKinds.Client, Id(clientType, entityName ?? name))
             .With("client.name", name);
 }

@@ -4,11 +4,11 @@ using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 
 [TestFixture]
-[Tracking("ClassLevel", Order = 1)]
+[Tracking("Class", Order = 10)]
 public class ProtoAttributeLifecycleTests
 {
     [ProtoTest]
-    [Tracking("MethodLevel", Order = 2)]
+    [Tracking("Method", Order = 20)]
     public void ProtoTest_ShouldExecuteClassAndMethodAttributesInOrder()
     {
         // Act
@@ -17,7 +17,7 @@ public class ProtoAttributeLifecycleTests
         // Assert
         // Note: The AfterTest hooks execute after this test body completes,
         // so we check the Before execution log here within the test body.
-        string[] expectedBeforeSequence = [.. AdapterTestSupport.ExpectedBeforeSequence, "TestExecution"];
+        string[] expectedBeforeSequence = [.. AdapterLifecycle.ExpectedBeforeSequence, "TestExecution"];
         Assert.That(Proto.Context.Resolve<ExecutionLogState>().Log, Is.EqualTo(expectedBeforeSequence));
     }
 }

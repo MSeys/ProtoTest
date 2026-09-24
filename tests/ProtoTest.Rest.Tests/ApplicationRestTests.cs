@@ -4,7 +4,6 @@ using System.Net.Http;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Http;
 
@@ -299,16 +298,4 @@ public sealed class ApplicationRestTests
     }
 
 
-
-    private sealed class StubTransportInitializer(string name, string baseAddress, HttpMessageHandler handler)
-        : IProtoClientInitializer<HttpClient>
-    {
-        public string Name { get; } = name;
-
-        public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
-        {
-            context.RegisterClient(new HttpClient(handler) { BaseAddress = new Uri(baseAddress) }, Name);
-            return Task.FromResult(true);
-        }
-    }
 }

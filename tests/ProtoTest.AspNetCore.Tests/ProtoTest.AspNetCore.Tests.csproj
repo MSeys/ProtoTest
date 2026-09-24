@@ -33,4 +33,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.TestSupport\ProtoTest.TestSupport.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\NUnitParallelization.cs" Link="NUnitParallelization.cs" />
+  </ItemGroup>
 </Project>

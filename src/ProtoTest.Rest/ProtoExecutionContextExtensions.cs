@@ -20,7 +20,11 @@ public static class ProtoExecutionContextExtensions
 
         // The builder works with the registered target name: it is the identity clients, observations,
         // and collectors agree on. The requested name is only how the caller addressed the client.
-        return new RestRequestBuilder(resolution.Client, context, resolution.ResolvedName)
+        return new RestRequestBuilder(
+            resolution.Client,
+            context,
+            resolution.ResolvedName,
+            resolution.ClientEntityName)
             .UseAuthenticatorFactory(authenticatorFactory)
             .UseBaseAddressResolver(resolution.BaseAddressResolver);
     }

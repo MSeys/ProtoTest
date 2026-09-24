@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.IO.Compression;
 using System.Reflection;
 using System.Text.Json;
-using NUnit.Framework;
 
 [TestFixture]
 public sealed class ProtoTracingTests

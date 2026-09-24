@@ -4,7 +4,6 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.GraphQL;
 using ProtoTest.Http;
@@ -365,20 +364,5 @@ public class RestConfigurationAndAuthenticationTests
             TestMethods.Placeholder);
         await authenticator.AuthenticateAsync(
             new ProtoHttpAuthenticationContext(request, context, "Default"));
-    }
-
-    private sealed class StaticConfigurationSource(IReadOnlyDictionary<string, string?> values) : IConfigurationSource
-    {
-        public IConfigurationProvider Build(IConfigurationBuilder builder)
-            => new StaticConfigurationProvider(values);
-    }
-
-    private sealed class StaticConfigurationProvider(IReadOnlyDictionary<string, string?> values)
-        : ConfigurationProvider
-    {
-        public override void Load()
-        {
-            Data = new Dictionary<string, string?>(values, StringComparer.OrdinalIgnoreCase);
-        }
     }
 }

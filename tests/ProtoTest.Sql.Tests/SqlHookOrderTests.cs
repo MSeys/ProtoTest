@@ -1,6 +1,5 @@
 namespace ProtoTest.Sql.Tests;
 
-using NUnit.Framework;
 using ProtoTest.Sql;
 
 [TestFixture]

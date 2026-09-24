@@ -17,7 +17,7 @@ public sealed class NorthstarClockProvisioner : IProtoDataProvisioner<AdvanceClo
         ProtoDataProvisioningContext context,
         CancellationToken cancellationToken)
     {
-        await TestSupportProbe.EnsureAvailableAsync(context.Execution);
+        await context.Execution.Service<TestSupportProbe>().EnsureAvailableAsync(context.Execution);
         var organization = context.Execution.Resolve<NorthstarOrganizationContext>();
         using var response = await context.Execution.Rest()
             .WithoutAuth()
@@ -45,7 +45,7 @@ public sealed class NorthstarWebhookSinkProvisioner
         ProtoDataProvisioningContext context,
         CancellationToken cancellationToken)
     {
-        await TestSupportProbe.EnsureAvailableAsync(context.Execution);
+        await context.Execution.Service<TestSupportProbe>().EnsureAvailableAsync(context.Execution);
         using var response = await context.Execution.Rest()
             .WithoutAuth()
             .Body(value)
@@ -69,7 +69,7 @@ public sealed class NorthstarTestSupportTenantProvisioner
         ProtoDataProvisioningContext context,
         CancellationToken cancellationToken)
     {
-        await TestSupportProbe.EnsureAvailableAsync(context.Execution);
+        await context.Execution.Service<TestSupportProbe>().EnsureAvailableAsync(context.Execution);
         using var response = await context.Execution.Rest()
             .WithoutAuth()
             .Body(value)
@@ -109,7 +109,7 @@ public sealed class NorthstarTestSupportMemberProvisioner
         ProtoDataProvisioningContext context,
         CancellationToken cancellationToken)
     {
-        await TestSupportProbe.EnsureAvailableAsync(context.Execution);
+        await context.Execution.Service<TestSupportProbe>().EnsureAvailableAsync(context.Execution);
         var organization = context.Execution.Resolve<NorthstarOrganizationContext>();
         using var response = await context.Execution.Rest()
             .WithoutAuth()

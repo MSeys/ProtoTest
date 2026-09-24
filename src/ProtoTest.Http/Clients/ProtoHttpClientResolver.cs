@@ -13,7 +13,8 @@ public sealed record ProtoHttpClientResolution(
     string ResolvedName,
     string? ApplicationName,
     string EndpointResolver,
-    Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>>? BaseAddressResolver);
+    Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>>? BaseAddressResolver,
+    string? ClientEntityName = null);
 
 /// <summary>
 /// Resolves the HTTP client a protocol accessor uses for the current test: the protocol's scoped client
@@ -40,9 +41,10 @@ public static class ProtoHttpClientResolver
         var application = ProtoApplicationResolution.ResolveApplicationName(context);
         var (requested, resolvedName) = ProtoClientResolution.ResolveNames(context, protocolName, clientName);
 
-        // First registration wins, matching the client initializer and endpoint selection.
-        var registration = context.Services
-            .GetServices<ProtoHttpBaseAddressRegistration>()
+        // First registration wins, matching the client initializer. One entry holds the endpoint and
+        // the per-test resolver, so both lookups read the same record.
+        var entry = context.Services
+            .GetServices<ProtoHttpClientEntry>()
             .FirstOrDefault(item => Matches(item.ProtocolName, item.ClientName, protocolName, resolvedName, requested));
 
         // The application's own transport registers under a context client name; it is not a host
@@ -54,19 +56,22 @@ public static class ProtoHttpClientResolver
         var lookup = ProtoClientResolution.Find<HttpClient>(context, protocolName, requested, resolvedName, transport);
         var client = lookup.Client;
         resolvedName = lookup.ResolvedName;
+        // The entity the operation links to is the client that actually serves the request: the registry
+        // key that was hit, or the transport's key when the application transport serves it.
+        var clientEntityName = lookup.RegisteredName;
 
         Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>>? transportResolver = null;
-        if ((client is null || client.BaseAddress is null) && registration is null)
+        if ((client is null || client.BaseAddress is null) && entry?.BaseAddressResolver is null)
         {
             // No URL configured and no per-test resolver owns the address: fall back to the
             // application's in-process transport, rooted at the endpoint the client was registered with.
             if (transport is not null)
             {
                 client = transport;
-                var endpointName = RegisteredEndpoint(context, resolvedName);
-                var endpointPath = endpointName is null || application is null
+                clientEntityName = context.TryClientName(transport) ?? clientEntityName;
+                var endpointPath = entry?.Endpoint is null || application is null
                     ? null
-                    : ProtoApplication.Endpoint(context.Configuration, application, endpointName);
+                    : ProtoApplication.Endpoint(context.Configuration, application, entry.Endpoint);
                 if (!string.IsNullOrWhiteSpace(endpointPath))
                 {
                     transportResolver = (_, _) => ValueTask.FromResult(new Uri(transport.BaseAddress!, endpointPath));
@@ -85,7 +90,7 @@ public static class ProtoHttpClientResolver
         // base-address registration) beats the registered client's own base address.
         var endpointResolver = transportResolver is not null
             ? "transport"
-            : registration?.ResolveAsync is not null
+            : entry?.BaseAddressResolver is not null
                 ? "per-test"
                 : "client";
 
@@ -95,7 +100,8 @@ public static class ProtoHttpClientResolver
             resolvedName,
             application,
             endpointResolver,
-            transportResolver ?? registration?.ResolveAsync);
+            transportResolver ?? entry?.BaseAddressResolver,
+            clientEntityName ?? resolvedName);
     }
 
     private static bool Matches(
@@ -108,10 +114,4 @@ public static class ProtoHttpClientResolver
             && (string.Equals(itemClient, resolvedName, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(itemClient, requested, StringComparison.OrdinalIgnoreCase));
 
-    private static string? RegisteredEndpoint(ProtoExecutionContext context, string resolvedName)
-        => context.Services.GetServices<ProtoHttpClientEndpointRegistration>()
-            // First registration wins, matching the client initializer selection.
-            .FirstOrDefault(registration =>
-                string.Equals(registration.ClientName, resolvedName, StringComparison.OrdinalIgnoreCase))
-            ?.Endpoint;
 }

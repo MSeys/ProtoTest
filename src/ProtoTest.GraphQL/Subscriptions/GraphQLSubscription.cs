@@ -241,19 +241,15 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
                     _attachmentOptions),
                 "application/json",
                 _identifier);
-        _context.RecordObservation(new ProtoObservation(
+        _context.RecordObservation(GraphQLObservations.Response(
             _targetName,
-            ProtoGraphQLBuilder.Protocol.ResponseObservationKind,
             _identifier,
-            new GraphQLResponseData(
-                _operation.Type,
-                _operation.Name,
-                GraphQLDocumentRedactor.Redact(_operation.DocumentText, _attachmentOptions),
-                (int)statusCode,
-                result.Errors.Count,
-                result.Errors.Select(error => error.Code).Where(code => code is not null).Cast<string>().ToArray(),
-                _stopwatch.Elapsed,
-                _variablesJson)));
+            _operation,
+            _attachmentOptions,
+            (int)statusCode,
+            result,
+            _stopwatch.Elapsed,
+            _variablesJson));
         _context.Trace.WriteEvent(
             "graphql.subscription.next",
             $"Subscription event · {eventNumber}",

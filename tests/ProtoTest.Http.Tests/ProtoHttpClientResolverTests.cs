@@ -102,8 +102,12 @@ public sealed class ProtoHttpClientResolverTests
         builder.AddApplication(applicationName, app =>
         {
             app.RegisterClient(protocolName, clientName);
-            app.Services.AddSingleton(new ProtoHttpClientEndpointRegistration(
-                ProtoHttpClientRegistration.Qualify(clientName, applicationName), endpointName));
+            app.Services.AddSingleton(new ProtoHttpClientEntry(
+                protocolName,
+                ProtoHttpClientRegistration.Qualify(clientName, applicationName),
+                applicationName,
+                endpointName,
+                BaseAddressResolver: null));
             // Stands in for AddAspNetCoreServer: the transport the accessor falls back to without a base URL.
             app.Services.AddSingleton(new ProtoApplicationTransport(applicationName, applicationName));
             app.Services.AddSingleton<IProtoClientInitializer>(
@@ -120,7 +124,7 @@ public sealed class ProtoHttpClientResolverTests
 
         public string? Protocol { get; } = protocol;
 
-        public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
+        public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
         {
             context.RegisterClient(
                 new HttpClient { BaseAddress = new Uri(baseAddress) },

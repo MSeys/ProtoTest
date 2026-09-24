@@ -3,7 +3,6 @@ namespace ProtoTest.Rest.Tests;
 using System.Net;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Http;
 using ProtoTest.Json;
@@ -175,6 +174,35 @@ public class RestRequestBuilderTests
         Assert.That(
             System.Text.Encoding.UTF8.GetString(await _context.Attachments[2].ReadAllBytesAsync()),
             Does.Contain("constraint: greater than 0"));
+    }
+
+    [Test]
+    public async Task Body_Object_ShouldSerializeWithTheSharedWebDefaults()
+    {
+        // Arrange
+        _handler.ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{}")
+        };
+
+        var builder = new RestRequestBuilder(_httpClient, _context, "TestTarget")
+            .Body(new PascalCaseBody { DisplayName = "Ada", Role = "Admin" });
+
+        // Act
+        await builder.PostAsync("/users");
+
+        // Assert
+        Assert.Multiple(() =>
+        {
+            Assert.That(_handler.LastRequestBody, Does.Contain("\"displayName\":\"Ada\""));
+            Assert.That(_handler.LastRequestBody, Does.Not.Contain("\"DisplayName\""));
+        });
+    }
+
+    private sealed class PascalCaseBody
+    {
+        public string DisplayName { get; init; } = string.Empty;
+        public string Role { get; init; } = string.Empty;
     }
 
     [Test]

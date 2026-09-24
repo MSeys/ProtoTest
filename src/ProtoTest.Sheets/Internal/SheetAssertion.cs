@@ -32,7 +32,7 @@ internal static class SheetAssertion
         Func<SheetAssertionFailure> describeFailure)
     {
         using var operation = context?.Trace
-            .Operation("assert.sheets", title, "ProtoTest.Sheets")
+            .Operation("assert.sheets", title, ProtoSheets.TraceSource)
             .With(attributes)
             .Begin();
         bool satisfied;

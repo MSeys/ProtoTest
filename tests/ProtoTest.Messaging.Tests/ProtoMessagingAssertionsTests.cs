@@ -1,7 +1,6 @@
 namespace ProtoTest.Messaging.Tests;
 
 using System.Reflection;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Json;
 

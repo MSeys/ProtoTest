@@ -14,7 +14,10 @@ public sealed class ProtoMessagingBuilder
 
     internal Func<IServiceProvider, IProtoMessageBroker>? AdapterFactory { get; private set; }
 
-    /// <summary>Replaces the default in-memory broker with an adapter, for example RabbitMQ.</summary>
+    /// <summary>
+    /// Replaces the default in-memory broker with an adapter, for example RabbitMQ. The broker the
+    /// factory returns is owned by ProtoTest: it is released with the run.
+    /// </summary>
     public ProtoMessagingBuilder UseBroker(Func<IServiceProvider, IProtoMessageBroker> factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
@@ -51,79 +54,94 @@ public static class ProtoHostBuilderExtensions
         Action<ProtoMessagingBuilder>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        BrokerHolder? newHolder = null;
         builder.ConfigureServices(services =>
         {
-            var registration = services.FirstOrDefault(
-                descriptor => descriptor.ServiceType == typeof(MessagingRegistration))?
-                .ImplementationInstance as MessagingRegistration;
-
+            // The configure callback runs first: a call whose configure throws must leave no
+            // registration behind, so a later successful call still composes.
             var messaging = new ProtoMessagingBuilder(services);
             configure?.Invoke(messaging);
 
-            if (registration is null)
+            var registration = MessagingRegistration.Add(services, out var created);
+            if (created)
             {
-                registration = new MessagingRegistration();
-                services.AddSingleton(registration);
-                services.AddSingleton<IProtoClientInitializer>(
-                    _ => new ProtoMessageClientInitializer("Default"));
-                newHolder = registration.Holder;
+                builder.AddResource(new ProtoResource(
+                    "messaging:broker",
+                    "broker",
+                    "Messaging broker",
+                    _ => registration.Holder.ReleaseAsync(),
+                    ProtoResourceScope.Run));
             }
 
-            services.TryAddSingleton(serviceProvider =>
-                ProtoOptionsRegistration.Resolve<MessagingOptions>(serviceProvider));
-
-            services.TryAddSingleton(registration.Holder);
-
-            if (messaging.AdapterFactory is { } adapterFactory)
-            {
-                // An adapter always replaces the in-memory default, so a later call can supply one; the
-                // first adapter configured wins, mirroring the same-name rule the protocols use.
-                if (!registration.AdapterConfigured)
-                {
-                    registration.AdapterConfigured = true;
-                    services.RemoveAll<IProtoMessageBroker>();
-                    services.AddSingleton<IProtoMessageBroker>(serviceProvider =>
-                    {
-                        var broker = adapterFactory(serviceProvider);
-                        registration.Holder.Attach(broker);
-                        return broker;
-                    });
-                    services.AddSingleton(new ProtoCapabilityDescriptor(
-                        "Messaging", ProtoCapabilityKinds.Broker, "ProtoTest.Messaging"));
-                }
-            }
-            else if (!registration.AdapterConfigured)
-            {
-                // A real adapter is what makes the Broker capability true: the in-memory default is a test
-                // double, so [RequiresCapability(ProtoCapabilityKinds.Broker)] skips where no broker is
-                // reachable and runs where one is, instead of always passing against the double.
-                services.TryAddSingleton<IProtoMessageBroker>(_ =>
-                {
-                    var broker = new InMemoryProtoMessageBroker();
-                    registration.Holder.Attach(broker);
-                    return broker;
-                });
-            }
-
+            registration.Configure(services, messaging.AdapterFactory);
         });
-
-        if (newHolder is not null)
-        {
-            builder.AddResource(new ProtoResource(
-                "messaging:broker",
-                "broker",
-                "Messaging broker",
-                _ => newHolder.ReleaseAsync(),
-                ProtoResourceScope.Run));
-        }
-
         return builder;
     }
 
     private sealed class MessagingRegistration
     {
         public BrokerHolder Holder { get; } = new();
-        public bool AdapterConfigured { get; set; }
+
+        private bool _adapterConfigured;
+
+        /// <summary>Adds the registration once and reports whether this call created it.</summary>
+        public static MessagingRegistration Add(IServiceCollection services, out bool created)
+        {
+            var existing = services
+                .LastOrDefault(descriptor => descriptor.ServiceType == typeof(MessagingRegistration))?
+                .ImplementationInstance as MessagingRegistration;
+            created = existing is null;
+            var registration = existing ?? new MessagingRegistration();
+            if (!created)
+            {
+                return registration;
+            }
+
+            services.AddSingleton(registration);
+            services.AddSingleton<IProtoClientInitializer>(_ => new ProtoMessageClientInitializer("Default"));
+            services.TryAddSingleton(registration.Holder);
+            services.TryAddSingleton(serviceProvider =>
+                ProtoOptionsRegistration.Resolve<MessagingOptions>(serviceProvider));
+            return registration;
+        }
+
+        /// <summary>
+        /// Applies this call's adapter, if any. An adapter always replaces the in-memory default, so a
+        /// later call can supply one; the first adapter configured wins.
+        /// </summary>
+        public void Configure(IServiceCollection services, Func<IServiceProvider, IProtoMessageBroker>? adapterFactory)
+        {
+            if (adapterFactory is not null)
+            {
+                if (_adapterConfigured)
+                {
+                    return;
+                }
+
+                _adapterConfigured = true;
+                services.RemoveAll<IProtoMessageBroker>();
+                services.AddSingleton<IProtoMessageBroker>(serviceProvider =>
+                {
+                    var broker = adapterFactory(serviceProvider);
+                    Holder.Attach(broker);
+                    return broker;
+                });
+                services.AddSingleton(new ProtoCapabilityDescriptor(
+                    ProtoMessagingProtocol.Protocol.Name, ProtoCapabilityKinds.Broker, ProtoMessagingProtocol.Protocol.TraceSource));
+                return;
+            }
+
+            // A real adapter is what makes the Broker capability true: the in-memory default is a test
+            // double, so [RequiresCapability(ProtoCapabilityKinds.Broker)] skips where no broker is
+            // reachable and runs where one is, instead of always passing against the double.
+            if (!_adapterConfigured)
+            {
+                services.TryAddSingleton<IProtoMessageBroker>(_ =>
+                {
+                    var broker = new InMemoryProtoMessageBroker();
+                    Holder.Attach(broker);
+                    return broker;
+                });
+            }
+        }
     }
 }

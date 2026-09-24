@@ -2,7 +2,9 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
-    <IsPackable>true</IsPackable>
+    
+    <!-- No 1.0.1 baseline exists for this package (or its Web.Pages dependency); validate once 1.1 ships. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
     <PackageId>ProtoTest.Web</PackageId>
     <Description>Backend-neutral, component-based web testing for ProtoTest.</Description>
     <PackageTags>testing;integration-testing;web;browser;dotnet</PackageTags>
@@ -10,6 +12,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <ProjectReference Include="..\ProtoTest.Web.Pages\ProtoTest.Web.Pages.csproj" />
+  </ItemGroup>
+
+  <!-- The Vue discovery script ships as JavaScript, not as a C# raw string. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Internal\vue-route-discovery.js" LogicalName="ProtoTest.Web.Internal.vue-route-discovery.js" />
   </ItemGroup>
 
 </Project>

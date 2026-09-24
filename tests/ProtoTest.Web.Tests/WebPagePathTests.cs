@@ -1,8 +1,7 @@
 namespace ProtoTest.Web.Tests;
 
-using ProtoTest.Core.Internal;
 
-using ProtoTest.Web.Internal;
+using ProtoTest.Web.Pages;
 
 [TestFixture]
 public sealed class WebPagePathTests

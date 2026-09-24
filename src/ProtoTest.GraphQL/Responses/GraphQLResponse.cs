@@ -152,30 +152,19 @@ public sealed class GraphQLResponse : ProtoHttpResponse
         ArgumentNullException.ThrowIfNull(expectedShape);
         if (SelectedData is not { } selected || selected.ValueKind == JsonValueKind.Null)
         {
-            // A data-less response (errors-only, or "data": null) has nothing to match against; record
-            // the failed assertion the same way a mismatch is recorded, then keep the GraphQL-specific
-            // failure the docs promise.
-            using var operation = Context!.Trace
-                .Operation("assert.json.shape", "Assert GraphQL data shape", ProtoGraphQLBuilder.Protocol.TraceSource)
-                .With("expected.type", expectedShape.GetType().FullName)
-                .With("graphql.operation", Identifier!)
-                .With("shape.result", "mismatched")
-                .Parent(RequestTraceId)
-                .Begin();
-            var exception = new GraphQLAssertionException(
-                "Expected GraphQL data, but the response did not contain data.");
-            operation.AddSection(new ProtoTraceSection(
-                "Result",
-                ProtoTraceSectionKind.Checks,
-                [
-                    new(
-                        "shape",
-                        "no data",
-                        exception.Message,
-                        ProtoTraceSectionTone.Error)
-                ]));
-            operation.Fail(exception);
-            throw exception;
+            // A data-less response (errors-only, or "data": null) has nothing to match against; the
+            // shared assertion records the failure the same way a mismatch is recorded, with the
+            // GraphQL-specific failure the docs promise.
+            ProtoShapeAssertion.AssertMissing(
+                new ProtoShapeAssertionContext(
+                    Context!,
+                    ProtoGraphQLBuilder.Protocol.TraceSource,
+                    "Assert GraphQL data shape",
+                    ParentOperationId: RequestTraceId,
+                    ExtraAttributes: new Dictionary<string, string?> { ["graphql.operation"] = Identifier! }),
+                expectedShape,
+                () => new GraphQLAssertionException(
+                    "Expected GraphQL data, but the response did not contain data."));
         }
 
         AssertShape(

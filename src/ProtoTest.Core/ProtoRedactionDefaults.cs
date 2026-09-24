@@ -20,6 +20,8 @@ public static class ProtoRedactionDefaults
         "authorization",
         "cookie",
         "connectionString",
-        "clientSecret"
+        "clientSecret",
+        "client_secret",
+        "id_token"
     ];
 }

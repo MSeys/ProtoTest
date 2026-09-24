@@ -33,7 +33,8 @@ public interface IWebBackend : IAsyncDisposable
     /// Page coverage reads it after a navigation (so a redirect is attributed to its final page) and
     /// after a passing assertion.
     /// </summary>
-    string? CurrentAddress => null;
+    ValueTask<string?> GetCurrentAddressAsync(CancellationToken cancellationToken = default)
+        => ValueTask.FromResult<string?>(null);
 
     ValueTask NavigateAsync(Uri address, CancellationToken cancellationToken = default);
     ValueTask ClickAsync(WebElementReference element, CancellationToken cancellationToken = default);

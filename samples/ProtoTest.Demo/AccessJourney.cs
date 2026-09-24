@@ -24,10 +24,10 @@ public sealed class AccessJourney
         var billing = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Billing);
 
         // Act
-        using var developerAttempt = await DemoSupport.As(developer)
+        using var developerAttempt = await Proto.Context.Demo().As(developer)
             .Body(new CreateProjectRequest("dev-project"))
             .PostAsync("/api/v1/projects");
-        using var billingAttempt = await DemoSupport.As(billing)
+        using var billingAttempt = await Proto.Context.Demo().As(billing)
             .Body(new CreateProjectRequest("billing-project"))
             .PostAsync("/api/v1/projects");
 
@@ -45,7 +45,7 @@ public sealed class AccessJourney
         var owner = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Owner);
 
         // Act
-        using var project = await DemoSupport.As(owner)
+        using var project = await Proto.Context.Demo().As(owner)
             .Body(new CreateProjectRequest("owner-project"))
             .PostAsync("/api/v1/projects");
 
@@ -65,13 +65,13 @@ public sealed class AccessJourney
         var production = await Proto.Context.Data().CreateEnvironmentAsync(project.Id, "production", EnvironmentKinds.Production);
 
         // Act
-        using var previewDeploy = await DemoSupport.As(developer)
+        using var previewDeploy = await Proto.Context.Demo().As(developer)
             .Body(new CreateDeploymentRequest("1.0.0", "abc1234"))
             .PostAsync("/api/v1/environments/{environmentId}/deployments", new { environmentId = preview.Id });
-        using var productionAttempt = await DemoSupport.As(developer)
+        using var productionAttempt = await Proto.Context.Demo().As(developer)
             .Body(new CreateDeploymentRequest("1.0.0", "abc1234"))
             .PostAsync("/api/v1/environments/{environmentId}/deployments", new { environmentId = production.Id });
-        using var productionDeploy = await DemoSupport.As(owner)
+        using var productionDeploy = await Proto.Context.Demo().As(owner)
             .Body(new CreateDeploymentRequest("1.0.0", "abc1234"))
             .PostAsync("/api/v1/environments/{environmentId}/deployments", new { environmentId = production.Id });
 
@@ -90,7 +90,7 @@ public sealed class AccessJourney
         var viewer = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Viewer);
 
         // Act
-        using var audit = await DemoSupport.As(viewer).GetAsync("/api/v1/audit");
+        using var audit = await Proto.Context.Demo().As(viewer).GetAsync("/api/v1/audit");
 
         // Assert
         audit.Should.HaveHttpStatus(HttpStatusCode.Forbidden)
@@ -104,7 +104,7 @@ public sealed class AccessJourney
         var billing = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Billing);
 
         // Act
-        using var audit = await DemoSupport.As(billing).GetAsync("/api/v1/audit");
+        using var audit = await Proto.Context.Demo().As(billing).GetAsync("/api/v1/audit");
 
         // Assert
         audit.Should.HaveHttpStatus(HttpStatusCode.OK);
@@ -115,7 +115,7 @@ public sealed class AccessJourney
     {
         // Arrange
         var owner = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Owner);
-        using var createdToken = await DemoSupport.As(owner)
+        using var createdToken = await Proto.Context.Demo().As(owner)
             .Body(new CreateApiTokenRequest("ci-readonly", [TokenScopes.Read]))
             .PostAsync("/api/v1/tokens");
         createdToken.Should.HaveHttpStatus(HttpStatusCode.Created);
@@ -124,7 +124,7 @@ public sealed class AccessJourney
         var preview = await Proto.Context.Data().CreateEnvironmentAsync(project.Id, "preview", EnvironmentKinds.Preview);
 
         // Act
-        using var deployment = await DemoSupport.As(readOnly)
+        using var deployment = await Proto.Context.Demo().As(readOnly)
             .Body(new CreateDeploymentRequest("1.0.0", "abc1234"))
             .PostAsync("/api/v1/environments/{environmentId}/deployments", new { environmentId = preview.Id });
 
@@ -143,14 +143,14 @@ public sealed class AccessJourney
             .With(request => request.Name, $"northstar-intruder-{Proto.Context.TestId}")
             .With(request => request.PlanId, PlanIds.Free)
             .CreateAsync<TenantResponse>();
-        using var secret = await DemoSupport.As(intruder.OwnerToken)
+        using var secret = await Proto.Context.Demo().As(intruder.OwnerToken)
             .Body(new CreateProjectRequest("secret"))
             .PostAsync("/api/v1/projects");
         secret.Should.HaveHttpStatus(HttpStatusCode.Created);
         var secretProject = secret.ReadAsJson<ProjectResponse>()!;
 
         // Act
-        using var attempt = await DemoSupport.As(owner)
+        using var attempt = await Proto.Context.Demo().As(owner)
             .GetAsync("/api/v1/projects/{projectId}", new { projectId = secretProject.Id });
 
         // Assert
@@ -167,10 +167,10 @@ public sealed class AccessJourney
         // Act
         for (var request = 0; request < 60; request++)
         {
-            using var allowed = await DemoSupport.As(owner).GetAsync("/api/v1/organization");
+            using var allowed = await Proto.Context.Demo().As(owner).GetAsync("/api/v1/organization");
         }
 
-        using var limited = await DemoSupport.As(owner).GetAsync("/api/v1/organization");
+        using var limited = await Proto.Context.Demo().As(owner).GetAsync("/api/v1/organization");
 
         // Assert
         limited.Should.HaveHttpStatus(HttpStatusCode.TooManyRequests)

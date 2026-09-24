@@ -2,10 +2,10 @@ namespace ProtoTest.Sheets.Tests;
 
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 using ProtoTest.Core;
 
 [TestFixture]
+[Category("Characterization")]
 public sealed class RegistrationIdempotencyTests
 {
     [Test]
@@ -35,5 +35,20 @@ public sealed class RegistrationIdempotencyTests
         await host.StopAsync();
     }
 
+    [Test]
+    public async Task AddSheets_CalledTwice_ShouldApplyEveryConfigureCallback()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddSheets(options => options.IncludeHiddenSheets = false);
+        builder.AddSheets(options => options.IncludeHiddenSheets = true);
 
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("sheets compose", TestMethods.Placeholder);
+
+        // Both callbacks run in registration order; the old first-wins behavior would leave this false.
+        Assert.That(context.Service<SheetsOptions>().IncludeHiddenSheets, Is.True);
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
 }

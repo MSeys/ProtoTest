@@ -3,6 +3,7 @@ namespace ProtoTest.Core;
 using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ProtoTest.Core.Internal;
 
 internal static class ProtoTraceArchiveWriter
 {
@@ -26,26 +27,55 @@ internal static class ProtoTraceArchiveWriter
         run = run.CompletedAtUtc is null ? run with { CompletedAtUtc = DateTimeOffset.UtcNow } : run;
         var fullPath = Path.GetFullPath(path);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-        await using var destination = File.Create(fullPath);
-        using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: true);
 
-        foreach (var source in artifacts ?? [])
+        // Write beside the destination and move it into place: a failure mid-write must not leave a
+        // truncated archive where readers expect a complete one.
+        var temporaryPath = $"{fullPath}.{Guid.NewGuid():N}.tmp";
+        try
         {
-            if (source.Artifact.Error is not null) continue;
-            var entry = archive.CreateEntry(source.Artifact.ArchivePath, CompressionLevel.NoCompression);
-            await using var stream = entry.Open();
-            await stream.WriteAsync(source.Content, cancellationToken);
+            await using (var destination = File.Create(temporaryPath))
+            using (var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: true))
+            {
+                foreach (var source in artifacts ?? [])
+                {
+                    if (source.Artifact.Error is not null) continue;
+                    var entry = archive.CreateEntry(source.Artifact.ArchivePath, CompressionLevel.NoCompression);
+                    await using var stream = entry.Open();
+                    await stream.WriteAsync(source.Content, cancellationToken);
+                }
+
+                var sources = embedSources ? await WriteSourcesAsync(archive, run, cancellationToken) : null;
+
+                await WriteJsonAsync(
+                    archive,
+                    "manifest.json",
+                    new ProtoTraceManifest(ArchiveFormatVersion, "spans.json", "state.json", sources),
+                    cancellationToken);
+                await WriteJsonAsync(archive, "spans.json", ProtoTraceWire.Spans(run), cancellationToken);
+                await WriteJsonAsync(archive, "state.json", ProtoTraceWire.State(run), cancellationToken);
+            }
+
+            File.Move(temporaryPath, fullPath, overwrite: true);
         }
+        catch
+        {
+            TryDelete(temporaryPath);
+            throw;
+        }
+    }
 
-        var sources = embedSources ? await WriteSourcesAsync(archive, run, cancellationToken) : null;
-
-        await WriteJsonAsync(
-            archive,
-            "manifest.json",
-            new ProtoTraceManifest(ArchiveFormatVersion, "spans.json", "state.json", sources),
-            cancellationToken);
-        await WriteJsonAsync(archive, "spans.json", ProtoTraceWire.Spans(run), cancellationToken);
-        await WriteJsonAsync(archive, "state.json", ProtoTraceWire.State(run), cancellationToken);
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     /// <summary>
@@ -71,7 +101,7 @@ internal static class ProtoTraceArchiveWriter
             {
                 var file = new FileInfo(ProtoSourceLocator.Resolve(path));
                 if (!file.Exists || file.Length > MaxSourceBytes) continue;
-                var archivePath = $"sources/{sources.Count + 1}/{file.Name}";
+                var archivePath = $"sources/{sources.Count + 1}/{ProtoPathSanitizer.FileName(file.Name, "source")}";
                 var entry = archive.CreateEntry(archivePath, CompressionLevel.NoCompression);
                 await using var stream = entry.Open();
                 await using var content = file.OpenRead();

@@ -20,8 +20,11 @@ public sealed class WebFlow<TComponent> where TComponent : WebComponent
     public WebFlow<TComponent> Click(Func<TComponent, WebElement> element)
         => Add(element, target => target.ClickAsync());
 
-    public WebFlow<TComponent> Check(Func<TComponent, WebElement> element, bool isChecked = true)
-        => Add(element, target => isChecked ? target.CheckAsync() : target.UncheckAsync());
+    public WebFlow<TComponent> Check(Func<TComponent, WebElement> element)
+        => Add(element, target => target.CheckAsync());
+
+    public WebFlow<TComponent> Uncheck(Func<TComponent, WebElement> element)
+        => Add(element, target => target.UncheckAsync());
 
     public WebFlow<TComponent> Select(Func<TComponent, WebElement> element, string value)
         => Add(element, target => target.SelectOptionAsync(value));

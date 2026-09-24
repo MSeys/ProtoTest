@@ -19,6 +19,10 @@ public sealed class GraphQLCoverageCollector(string targetName)
 
 public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector
 {
+    // SDL documents start like one of these; the vocabulary belongs to the format, not to Core.
+    private static readonly string[] InlineSchemaPrefixes =
+        ["type ", "schema ", "extend ", "directive ", "scalar ", "enum ", "interface ", "union ", "input ", "#"];
+
     private readonly GraphQLSchemaIndex _schema;
     private readonly Dictionary<string, int> _fieldHits = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _argumentHits = new(StringComparer.Ordinal);
@@ -35,16 +39,20 @@ public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector
         var source = application["GraphQL:Schema"];
         if (string.IsNullOrWhiteSpace(source))
             throw new InvalidOperationException(ProtoApplication.MissingSettingMessage(applicationName, "GraphQL:Schema"));
-        _schema = GraphQLSchemaIndex.Parse(ProtoDocumentSource.LoadText(source, application["BaseUrl"]));
+        _schema = GraphQLSchemaIndex.Parse(
+            ProtoDocumentSource.LoadText(source, application["BaseUrl"], inlinePrefixes: InlineSchemaPrefixes));
     }
 
     public GraphQLSchemaCoverageCollector(string targetName, string schemaSource) : base(targetName)
-        => _schema = GraphQLSchemaIndex.Parse(ProtoDocumentSource.LoadText(schemaSource));
+        => _schema = GraphQLSchemaIndex.Parse(
+            ProtoDocumentSource.LoadText(schemaSource, inlinePrefixes: InlineSchemaPrefixes));
 
     public override string Category => "GraphQL schema";
 
     public override bool CanCollect(ProtoObservation observation)
-        => base.CanCollect(observation) && observation.Kind == "graphql.response" && observation.Data is GraphQLResponseData;
+        => base.CanCollect(observation)
+            && observation.Kind == ProtoGraphQLBuilder.Protocol.ResponseObservationKind
+            && observation.Data is GraphQLResponseData;
 
     public override void Collect(ProtoObservation observation)
     {

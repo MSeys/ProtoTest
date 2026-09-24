@@ -8,7 +8,9 @@ using ProtoTest.Web.Selenium;
 /// <summary>
 /// Selenium registration for <see cref="IProtoHostBuilder"/>. Reference the ProtoTest.Web.Selenium
 /// package and call <c>AddWeb(...)</c>; the backend is implied by the referenced package. Sessions are
-/// created per test via <c>Proto.Context.Web(name)</c>.
+/// created per test via <c>Proto.Context.Web(name)</c>. The driver a session creates is owned by
+/// ProtoTest: it is quit and disposed when the session completes, so the factory must return a fresh
+/// driver rather than a shared one.
 /// </summary>
 public static class SeleniumWebHostBuilderExtensions
 {
@@ -18,7 +20,10 @@ public static class SeleniumWebHostBuilderExtensions
 
     /// <summary>Adds a Selenium-backed web host.</summary>
     /// <param name="builder">The host builder.</param>
-    /// <param name="createDriver">Creates the WebDriver for each session.</param>
+    /// <param name="createDriver">
+    /// Creates a fresh WebDriver for each session. ProtoTest owns it: the session quits and disposes it,
+    /// so returning a shared driver would tear it down under later tests.
+    /// </param>
     /// <param name="configure">Optional callback to configure Selenium options for every session.</param>
     public static IProtoHostBuilder AddWeb(
         this IProtoHostBuilder builder,
@@ -29,7 +34,7 @@ public static class SeleniumWebHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(createDriver);
         return builder
             .AddCapability(new ProtoCapabilityDescriptor(
-                "Selenium", ProtoCapabilityKinds.Browser, "ProtoTest.Web.Selenium"))
+                "Selenium", ProtoCapabilityKinds.Browser, SeleniumWebBackend.TraceSource))
             .AddWebBackend(new SeleniumWebBackendFactory(createDriver, configure));
     }
 
@@ -49,6 +54,6 @@ public static class SeleniumWebHostBuilderExtensions
         application.Services.AddWebBackend(new SeleniumWebBackendFactory(createDriver, configure));
         application.RegisterClient("Web", "Default");
         return application.AddCapability(new ProtoCapabilityDescriptor(
-            "Selenium", ProtoCapabilityKinds.Browser, "ProtoTest.Web.Selenium"));
+            "Selenium", ProtoCapabilityKinds.Browser, SeleniumWebBackend.TraceSource));
     }
 }

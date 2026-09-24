@@ -39,6 +39,13 @@ internal sealed class ProtoSpanConverter
 
     public void Observe(IProtoTraceWriter writer, Activity activity, string? operationId)
     {
+        // A recorder that completed cannot record another span, so late telemetry must not resurrect its
+        // per-writer state after CompleteTest released it.
+        if (writer is ProtoTestTraceRecorder recorder && recorder.IsCompleted)
+        {
+            return;
+        }
+
         foreach (var identity in Identities(activity))
         {
             var state = ReadState(activity, identity.Prefix, identity.Key);

@@ -125,8 +125,10 @@ public sealed class SqlIsolationTests
             Assert.That(begin.Attributes["sql.isolation"], Is.EqualTo(nameof(SqlIsolation.Transaction)));
 
             Assert.That(rollback.Phase, Is.EqualTo(ProtoTracePhase.Teardown));
+            // The rollback step is the release's own step, not a generic flow.step under it.
             Assert.That(rollback.ParentId, Is.EqualTo(release.Id));
             Assert.That(rollback.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
+            Assert.That(rollback.Attributes["sql.isolation"], Is.EqualTo(nameof(SqlIsolation.Transaction)));
         });
 
         await host.StopAsync();

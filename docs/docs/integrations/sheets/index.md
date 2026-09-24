@@ -135,7 +135,7 @@ var sales = Proto.Context.Sheets().Open(response).Model<SalesRow>();
 
 sales.Verify();                                                    // every rule, every row
 sales.Column(row => row.Amount).Should.Be([1200m, 900m]);
-sales.Column(row => row.Amount).Should.BeSortedBy(ascending: false);
+sales.Column(row => row.Amount).Should.BeSortedBy(ProtoSortDirection.Descending);
 sales.Column(row => row.Amount).ShouldAll(amount => amount > 0);
 sales.Row(row => row.Region == "EMEA")
     .ShouldMatchShape(new { Amount = 1200m, Count = 12 });

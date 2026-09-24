@@ -48,5 +48,10 @@ public sealed class ProtoTestIdOptions
 
 public interface IProtoTestIdGenerator
 {
+    /// <summary>
+    /// Generates the next test ID. <paramref name="testMethod"/> is the test the ID is for: a generator
+    /// may use it, for example to derive an ID from the method, or ignore it like the default numeric
+    /// sequence-based generator does.
+    /// </summary>
     ProtoTestId Next(MethodInfo testMethod);
 }

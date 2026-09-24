@@ -26,7 +26,7 @@ public static class SheetModelAssertions
             ProtoShapeAssertion.Assert(
                 new ProtoShapeAssertionContext(
                     context,
-                    "ProtoTest.Sheets",
+                    ProtoSheets.TraceSource,
                     "Assert row shape",
                     ExtraAttributes: new Dictionary<string, string?>
                     {

@@ -1,7 +1,6 @@
 namespace ProtoTest.OpenApi.Tests;
 
 using System.Net;
-using NUnit.Framework;
 using ProtoTest.OpenApi.Internal;
 
 [TestFixture]
@@ -16,6 +15,29 @@ public class OpenApiSpecLoaderTests
         // Assert
         Assert.That(doc, Is.Not.Null);
         Assert.That(doc.Paths.ContainsKey("/users/{id}"), Is.True);
+    }
+
+    [Test]
+    public void Load_ShouldParseYamlContent()
+    {
+        // YAML is the other format OpenAPI documents are written in; the reader package must be
+        // registered for it, or a suite with a YAML spec fails where the 1.x reader succeeded.
+        const string yaml = """
+        openapi: 3.0.1
+        info:
+          title: YAML API
+          version: 1.0.0
+        paths:
+          /orders/{id}:
+            get:
+              responses:
+                "200":
+                  description: ok
+        """;
+
+        var document = OpenApiSpecLoader.Load(yaml);
+
+        Assert.That(document.Paths.ContainsKey("/orders/{id}"), Is.True);
     }
 
     [Test]

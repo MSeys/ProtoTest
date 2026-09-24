@@ -1,92 +1,55 @@
 namespace Northstar.ProtoTest;
 
 using System.Net;
+using global::ProtoTest.Core;
 using global::ProtoTest.Data;
 using global::ProtoTest.Rest;
 using global::ProtoTest.SampleApp.Contracts;
 
-/// <summary>
-/// Provisions members through the real <c>POST /api/v1/members</c> endpoint. This is the portable
-/// example: it needs nothing but the public API, so it runs in every environment.
-/// </summary>
-public sealed class NorthstarMemberProvisioner : IProtoDataProvisioner<InviteMemberRequest, MembershipResponse>
+/// <summary>Provisions members through the real <c>POST /api/v1/members</c> endpoint.</summary>
+public sealed class NorthstarMemberProvisioner : NorthstarApiProvisioner<InviteMemberRequest, MembershipResponse>
 {
-    public async ValueTask<ProtoDataProvisioningResult<MembershipResponse>> CreateAsync(
-        InviteMemberRequest value,
-        ProtoDataProvisioningContext context,
-        CancellationToken cancellationToken)
-    {
-        using var response = await context.Execution.Rest()
-            .Body(value)
-            .PostAsync("/api/v1/members", ct: cancellationToken);
-        response.Should.HaveHttpStatus(HttpStatusCode.Created);
-        var member = response.ReadAsJson<MembershipResponse>()
-            ?? throw new InvalidOperationException("The sample app returned no provisioned member.");
-        return new ProtoDataProvisioningResult<MembershipResponse>(member, member.Id);
-    }
+    protected override string Url => "/api/v1/members";
+
+    protected override object Body(InviteMemberRequest value) => value;
+
+    protected override string IdOf(MembershipResponse response) => response.Id;
 }
 
 /// <summary>Creates a project through the public API when no domain store is reachable.</summary>
-public sealed class NorthstarApiProjectProvisioner
-    : IProtoDataProvisioner<CreateProjectRequest, ProjectResponse>
+public sealed class NorthstarApiProjectProvisioner : NorthstarApiProvisioner<CreateProjectRequest, ProjectResponse>
 {
-    public async ValueTask<ProtoDataProvisioningResult<ProjectResponse>> CreateAsync(
-        CreateProjectRequest value,
-        ProtoDataProvisioningContext context,
-        CancellationToken cancellationToken)
-    {
-        using var response = await context.Execution.Rest()
-            .Body(value)
-            .PostAsync("/api/v1/projects", ct: cancellationToken);
-        response.Should.HaveHttpStatus(HttpStatusCode.Created);
-        var project = response.ReadAsJson<ProjectResponse>()
-            ?? throw new InvalidOperationException("The sample app returned no provisioned project.");
-        return new ProtoDataProvisioningResult<ProjectResponse>(project, project.Id);
-    }
+    protected override string Url => "/api/v1/projects";
+
+    protected override object Body(CreateProjectRequest value) => value;
+
+    protected override string IdOf(ProjectResponse response) => response.Id;
 }
 
 /// <summary>Creates an environment through the public API when no domain store is reachable.</summary>
 public sealed class NorthstarApiEnvironmentProvisioner
-    : IProtoDataProvisioner<ProvisionEnvironmentRequest, EnvironmentResponse>
+    : NorthstarApiProvisioner<ProvisionEnvironmentRequest, EnvironmentResponse>
 {
-    public async ValueTask<ProtoDataProvisioningResult<EnvironmentResponse>> CreateAsync(
-        ProvisionEnvironmentRequest value,
-        ProtoDataProvisioningContext context,
-        CancellationToken cancellationToken)
-    {
-        using var response = await context.Execution.Rest()
-            .Body(new CreateEnvironmentRequest(value.Name, value.Kind))
-            .PostAsync(
-                "/api/v1/projects/{projectId}/environments",
-                new { projectId = value.ProjectId },
-                ct: cancellationToken);
-        response.Should.HaveHttpStatus(HttpStatusCode.Created);
-        var environment = response.ReadAsJson<EnvironmentResponse>()
-            ?? throw new InvalidOperationException("The sample app returned no provisioned environment.");
-        return new ProtoDataProvisioningResult<EnvironmentResponse>(environment, environment.Id);
-    }
+    protected override string Url => "/api/v1/projects/{projectId}/environments";
+
+    protected override object Body(ProvisionEnvironmentRequest value) => new CreateEnvironmentRequest(value.Name, value.Kind);
+
+    protected override object? RouteValues(ProvisionEnvironmentRequest value) => new { projectId = value.ProjectId };
+
+    protected override string IdOf(EnvironmentResponse response) => response.Id;
 }
 
 /// <summary>Deploys through the public API when no domain store is reachable.</summary>
 public sealed class NorthstarApiDeploymentProvisioner
-    : IProtoDataProvisioner<ProvisionDeploymentRequest, DeploymentResponse>
+    : NorthstarApiProvisioner<ProvisionDeploymentRequest, DeploymentResponse>
 {
-    public async ValueTask<ProtoDataProvisioningResult<DeploymentResponse>> CreateAsync(
-        ProvisionDeploymentRequest value,
-        ProtoDataProvisioningContext context,
-        CancellationToken cancellationToken)
-    {
-        using var response = await context.Execution.Rest()
-            .Body(new CreateDeploymentRequest(value.Version, value.CommitSha))
-            .PostAsync(
-                "/api/v1/environments/{environmentId}/deployments",
-                new { environmentId = value.EnvironmentId },
-                ct: cancellationToken);
-        response.Should.HaveHttpStatus(HttpStatusCode.Created);
-        var deployment = response.ReadAsJson<DeploymentResponse>()
-            ?? throw new InvalidOperationException("The sample app returned no provisioned deployment.");
-        return new ProtoDataProvisioningResult<DeploymentResponse>(deployment, deployment.Id);
-    }
+    protected override string Url => "/api/v1/environments/{environmentId}/deployments";
+
+    protected override object Body(ProvisionDeploymentRequest value) => new CreateDeploymentRequest(value.Version, value.CommitSha);
+
+    protected override object? RouteValues(ProvisionDeploymentRequest value) => new { environmentId = value.EnvironmentId };
+
+    protected override string IdOf(DeploymentResponse response) => response.Id;
 }
 
 /// <summary>
@@ -102,7 +65,7 @@ public sealed class NorthstarApiInvoiceProvisioner
         CancellationToken cancellationToken)
     {
         var execution = context.Execution;
-        await TestSupportProbe.EnsureAvailableAsync(execution);
+        await execution.Service<TestSupportProbe>().EnsureAvailableAsync(execution);
         var organization = execution.Resolve<NorthstarOrganizationContext>();
 
         using var usage = await execution.Rest()

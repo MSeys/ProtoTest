@@ -46,26 +46,25 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
     public async ValueTask StartAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (Volatile.Read(ref _released) != 0)
-        {
-            throw new ObjectDisposedException(GetType().FullName);
-        }
-
         await GetOrStartTask(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Returns the one start task every caller awaits. Concurrent callers share the first task, so a
     /// second caller cannot return before the container is up and its connection string is set. A
-    /// failed task is cleared so the resource can be retried.
+    /// failed task is cleared so the resource can be retried, and a released resource starts a fresh
+    /// container: the retry after a failed run start re-owns the infrastructure it starts again, so
+    /// the new ownership period must be releasable too.
     /// </summary>
     private Task GetOrStartTask(CancellationToken cancellationToken)
     {
         lock (_containerGate)
         {
-            if (Volatile.Read(ref _released) != 0)
+            // Only a settled release re-arms the resource; a release racing an in-flight start lets
+            // that start observe the release and fault instead of adopting a container nothing owns.
+            if (_startTask is null && _released != 0)
             {
-                return Task.FromException(new ObjectDisposedException(GetType().FullName));
+                _released = 0;
             }
 
             if (_startTask is null)
@@ -100,7 +99,7 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
 
             lock (_containerGate)
             {
-                if (Volatile.Read(ref _released) == 0)
+                if (_released == 0)
                 {
                     ConnectionString = connectionString;
                     _container = container;
@@ -153,18 +152,18 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
     /// already releases the built container when starting fails, so the candidate stays retryable; the
     /// caller can adopt it, retry, or simply let it go.
     /// </summary>
-    protected static bool TryStartContainer(ProtoContainerResource<TContainer> candidate, out string? error)
+    protected static ContainerStartResult<TResource> TryStartContainer<TResource>(TResource resource)
+        where TResource : ProtoContainerResource<TContainer>
     {
+        ArgumentNullException.ThrowIfNull(resource);
         try
         {
-            Task.Run(() => candidate.StartAsync().AsTask()).GetAwaiter().GetResult();
-            error = null;
-            return true;
+            Task.Run(() => resource.StartAsync().AsTask()).GetAwaiter().GetResult();
+            return new(resource, null);
         }
         catch (Exception exception)
         {
-            error = $"{exception.GetType().Name}: {exception.Message}";
-            return false;
+            return new(null, $"{exception.GetType().Name}: {exception.Message}");
         }
     }
 
@@ -172,17 +171,27 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
 
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _released, 1) != 0)
-        {
-            return;
-        }
-
         TContainer? container;
         lock (_containerGate)
         {
+            if (_released != 0)
+            {
+                return;
+            }
+
+            _released = 1;
             container = _container;
             _container = default;
+            // The released container's endpoint is dead; nothing may keep reading it.
+            ConnectionString = string.Empty;
             Volatile.Write(ref _started, 0);
+
+            // A settled start is replaced by the next ownership period's start; an in-flight start
+            // is left to observe the release and fault itself.
+            if (_startTask is { IsCompletedSuccessfully: true })
+            {
+                _startTask = null;
+            }
         }
 
         if (container is not null)

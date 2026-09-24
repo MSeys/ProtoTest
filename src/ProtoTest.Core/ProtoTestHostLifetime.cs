@@ -10,6 +10,7 @@ public sealed class ProtoTestHostLifetime
     private readonly object _gate = new();
     private readonly string _initializationHint;
     private ProtoHost? _host;
+    private Task<ProtoHost>? _starting;
 
     /// <param name="initializationHint">
     /// Adapter-specific guidance appended to the "not initialized" error message.
@@ -24,18 +25,43 @@ public sealed class ProtoTestHostLifetime
     public ProtoHost Host => Volatile.Read(ref _host)
         ?? throw new InvalidOperationException($"ProtoHost is not initialized. {_initializationHint}");
 
-    /// <summary>Builds and starts the host. Throws if it has already been initialized.</summary>
+    /// <summary>
+    /// Builds and starts the host once. Throws if it has already been initialized or a start is in
+    /// flight; a failed start leaves the lifetime retryable.
+    /// </summary>
     public async Task StartAsync(Action<IProtoHostBuilder> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
+        Task<ProtoHost> attempt;
         lock (_gate)
         {
-            if (_host is not null)
+            if (_host is not null || _starting is not null)
             {
                 throw new InvalidOperationException("ProtoHost has already been initialized for this assembly.");
             }
+
+            attempt = StartCoreAsync(configure);
+            _starting = attempt;
         }
 
+        try
+        {
+            await attempt.ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                if (ReferenceEquals(_starting, attempt))
+                {
+                    _starting = null;
+                }
+            }
+        }
+    }
+
+    private async Task<ProtoHost> StartCoreAsync(Action<IProtoHostBuilder> configure)
+    {
         var builder = new ProtoHostBuilder();
         configure(builder);
         var host = builder.Build();
@@ -45,7 +71,15 @@ public sealed class ProtoTestHostLifetime
         }
         catch
         {
-            await host.DisposeAsync().ConfigureAwait(false);
+            try
+            {
+                await host.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // The start failure is what the caller needs to see; a disposal failure must not hide it.
+            }
+
             throw;
         }
 
@@ -53,6 +87,8 @@ public sealed class ProtoTestHostLifetime
         {
             _host = host;
         }
+
+        return host;
     }
 
     /// <summary>Stops and disposes the host, clearing it so later access reports "not initialized".</summary>

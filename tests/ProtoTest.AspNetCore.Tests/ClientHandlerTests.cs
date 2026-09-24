@@ -11,6 +11,7 @@ public sealed class ClientHandlerTests
     [Test]
     public async Task DefaultClient_ShouldFollowRedirectsThroughTheMirroredHandlers()
     {
+        // Arrange
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>("Default")
             .Build();
@@ -18,12 +19,14 @@ public sealed class ClientHandlerTests
 
         try
         {
+            // Act
             var client = Proto.Context.Client<HttpClient>("Default");
 
             using var response = await client.GetAsync("/redirect");
 
             Assert.Multiple(() =>
             {
+                // Assert
                 Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
                 Assert.That(response.RequestMessage!.RequestUri!.AbsolutePath, Is.EqualTo("/ping"),
                     "the client followed the redirect before returning the final response");
@@ -39,6 +42,7 @@ public sealed class ClientHandlerTests
     [Test]
     public async Task DefaultClient_ShouldCarryCookiesThroughTheMirroredHandlers()
     {
+        // Arrange
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>("Default")
             .Build();
@@ -46,6 +50,7 @@ public sealed class ClientHandlerTests
 
         try
         {
+            // Act
             var client = Proto.Context.Client<HttpClient>("Default");
             using (var set = await client.GetAsync("/cookies/set"))
             {
@@ -54,6 +59,7 @@ public sealed class ClientHandlerTests
 
             var cookie = await client.GetStringAsync("/cookies/read");
 
+            // Assert
             Assert.That(cookie, Is.EqualTo("chocolate"),
                 "the cookie handler stored the Set-Cookie value and replayed it on the next request");
         }
@@ -67,6 +73,7 @@ public sealed class ClientHandlerTests
     [Test]
     public async Task ProtoTraceContextHandler_ShouldInjectTheCurrentTestTraceContext()
     {
+        // Arrange
         var host = new ProtoHostBuilder()
             .ConfigureTracing(options => options.ActivitySources.Add("ProtoTest.AspNetCore.Tests"))
             .AddAspNetCoreServer<SampleApi.Program>("Default")
@@ -77,10 +84,12 @@ public sealed class ClientHandlerTests
 
         try
         {
+            // Act
             using var operation = context.Trace
                 .Operation("test.probe", "Trace context probe", "ProtoTest.AspNetCore.Tests")
                 .Begin();
             var activity = Activity.Current;
+            // Assert
             Assert.That(activity, Is.Not.Null, "the probe operation opens the test's W3C trace context");
 
             var traceparent = await Proto.Context.Client<HttpClient>("Default").GetStringAsync("/traceparent");
@@ -104,6 +113,7 @@ public sealed class ClientHandlerTests
     [Test]
     public async Task ProtoTraceContextHandler_ShouldNotOverwriteAnExistingTraceparent()
     {
+        // Arrange
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>("Default")
             .Build();
@@ -111,6 +121,7 @@ public sealed class ClientHandlerTests
 
         try
         {
+            // Act
             const string existing = "00-11111111111111111111111111111111-2222222222222222-01";
             using var request = new HttpRequestMessage(HttpMethod.Get, "/traceparent");
             request.Headers.TryAddWithoutValidation("traceparent", existing);
@@ -118,6 +129,7 @@ public sealed class ClientHandlerTests
             using var response = await Proto.Context.Client<HttpClient>("Default").SendAsync(request);
             var traceparent = await response.Content.ReadAsStringAsync();
 
+            // Assert
             Assert.That(traceparent, Is.EqualTo(existing),
                 "an explicitly set traceparent must survive the ProtoTest handler");
         }

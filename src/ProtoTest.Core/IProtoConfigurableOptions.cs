@@ -10,6 +10,15 @@ public interface IProtoConfigurableOptions
 {
     /// <summary>The configuration section this type binds from, e.g. "ProtoTest:Rest:Responses".</summary>
     string ConfigurationSectionName { get; }
+
+    /// <summary>
+    /// Validates the resolved options once, after code callbacks and configuration have been applied.
+    /// A bad value is a configuration error and must throw here rather than fail the first test that
+    /// happens to use it. The default does nothing.
+    /// </summary>
+    void Validate()
+    {
+    }
 }
 
 public static class ProtoConfigurableOptionsExtensions

@@ -41,7 +41,7 @@ public static class PlaywrightWebHostBuilderExtensions
 
         return builder
             .AddCapability(new ProtoCapabilityDescriptor(
-                "Playwright", ProtoCapabilityKinds.Browser, "ProtoTest.Web.Playwright"))
+                "Playwright", ProtoCapabilityKinds.Browser, PlaywrightWebBackend.TraceSource))
             .AddWebBackend(new PlaywrightWebBackendFactory(configure));
     }
 
@@ -66,6 +66,6 @@ public static class PlaywrightWebHostBuilderExtensions
         }
 
         return application.AddCapability(new ProtoCapabilityDescriptor(
-            "Playwright", ProtoCapabilityKinds.Browser, "ProtoTest.Web.Playwright"));
+            "Playwright", ProtoCapabilityKinds.Browser, PlaywrightWebBackend.TraceSource));
     }
 }

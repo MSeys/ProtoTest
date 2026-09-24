@@ -47,10 +47,11 @@ public static class ProtoClientResolution
     /// Finds the client for <paramref name="protocol"/> under the scoped qualified name, then the scoped
     /// requested name, then under the bare names: a host- or user-registered client stays reachable by
     /// its own name. <paramref name="exclude"/> keeps the application's transport from satisfying a name
-    /// lookup. The returned name is the logical (application-qualified, unscoped) name that matched, so
-    /// endpoint and registration lookups stay on the user's naming.
+    /// lookup. The returned <c>ResolvedName</c> is the logical (application-qualified, unscoped) name that
+    /// matched, so endpoint and registration lookups stay on the user's naming; <c>RegisteredName</c> is
+    /// the exact registry key that was hit, which is the identity the client's trace entity uses.
     /// </summary>
-    public static (TClient? Client, string ResolvedName) Find<TClient>(
+    public static (TClient? Client, string ResolvedName, string? RegisteredName) Find<TClient>(
         ProtoExecutionContext context,
         string protocol,
         string requested,
@@ -63,25 +64,27 @@ public static class ProtoClientResolution
 
         var requestedDiffers = !string.Equals(resolvedName, requested, StringComparison.Ordinal);
 
-        var client = context.TryClient<TClient>(ScopedName(protocol, resolvedName));
+        var scopedResolved = ScopedName(protocol, resolvedName);
+        var client = context.TryClient<TClient>(scopedResolved);
         if (client is not null && !ReferenceEquals(client, exclude))
         {
-            return (client, resolvedName);
+            return (client, resolvedName, scopedResolved);
         }
 
         if (requestedDiffers)
         {
-            client = context.TryClient<TClient>(ScopedName(protocol, requested));
+            var scopedRequested = ScopedName(protocol, requested);
+            client = context.TryClient<TClient>(scopedRequested);
             if (client is not null && !ReferenceEquals(client, exclude))
             {
-                return (client, requested);
+                return (client, requested, scopedRequested);
             }
         }
 
         client = context.TryClient<TClient>(resolvedName);
         if (client is not null && !ReferenceEquals(client, exclude))
         {
-            return (client, resolvedName);
+            return (client, resolvedName, resolvedName);
         }
 
         if (requestedDiffers)
@@ -89,10 +92,10 @@ public static class ProtoClientResolution
             client = context.TryClient<TClient>(requested);
             if (client is not null && !ReferenceEquals(client, exclude))
             {
-                return (client, requested);
+                return (client, requested, requested);
             }
         }
 
-        return (null, resolvedName);
+        return (null, resolvedName, null);
     }
 }

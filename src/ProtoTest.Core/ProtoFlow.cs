@@ -1,5 +1,7 @@
 namespace ProtoTest.Core;
 
+using System.Globalization;
+
 /// <summary>How a flow treats a failing step.</summary>
 public enum ProtoFlowFailureMode
 {
@@ -10,27 +12,6 @@ public enum ProtoFlowFailureMode
     Collect
 }
 
-/// <summary>Per-step policy: a timeout, a retry budget and which failures are worth retrying.</summary>
-public sealed record ProtoStepOptions
-{
-    /// <summary>No timeout, no retry.</summary>
-    public static readonly ProtoStepOptions Default = new();
-
-    /// <summary>Bounds one attempt; a timeout surfaces as a <see cref="TimeoutException"/>.</summary>
-    public TimeSpan? Timeout { get; init; }
-
-    /// <summary>How often a failed attempt is retried after the first.</summary>
-    public int RetryCount { get; init; }
-
-    /// <summary>Pause between attempts. Zero retries immediately.</summary>
-    public TimeSpan RetryDelay { get; init; }
-
-    /// <summary>
-    /// Decides whether a failed attempt may be retried. Defaults to every failure except cancellation.
-    /// </summary>
-    public Func<Exception, bool>? ShouldRetry { get; init; }
-}
-
 /// <summary>The failures a flow collected, in step order.</summary>
 public sealed record ProtoFlowResult(IReadOnlyList<Exception> Failures)
 {
@@ -39,10 +20,25 @@ public sealed record ProtoFlowResult(IReadOnlyList<Exception> Failures)
 }
 
 /// <summary>
-/// A named, traced sequence of steps: each step is one <c>flow.step</c> operation whose outcome is
-/// derived, the flow either stops at the first failure or collects every failure, and a step can
-/// carry a timeout and a retry policy. This is the shared sequence primitive for lifecycle phases,
-/// teardown chains and journeys.
+/// One step of a flow: the operation the step records and the entity that operation belongs to.
+/// Declaring the operation is what lets a teardown chain keep its semantic entry - a resource release
+/// stays <c>resource.release</c>, an attribute teardown stays <c>attribute.after</c> - instead of
+/// collapsing into a generic step. A step declared by name alone records as <c>flow.step</c>.
+/// </summary>
+public sealed record ProtoStepDescriptor(
+    string Kind,
+    string Name,
+    string Source,
+    ProtoTracePhase Phase = ProtoTracePhase.Execution,
+    IReadOnlyDictionary<string, string?>? Attributes = null,
+    string? EntityKind = null,
+    string? EntityId = null);
+
+/// <summary>
+/// A named, traced sequence of steps: each step is one operation whose outcome is derived, and the
+/// flow either stops at the first failure or collects every failure. This is the shared sequence
+/// primitive for lifecycle phases and teardown chains, so a release chain reads as a list of steps
+/// instead of a loop, an exception list and a tracing helper.
 /// </summary>
 public sealed class ProtoFlow
 {
@@ -63,12 +59,25 @@ public sealed class ProtoFlow
         _failureMode = failureMode;
     }
 
-    /// <summary>Appends a named step.</summary>
-    public ProtoFlow Step(string name, Func<CancellationToken, ValueTask> action, ProtoStepOptions? options = null)
+    /// <summary>Appends a step traced as the generic <c>flow.step</c> operation.</summary>
+    public ProtoFlow Step(string name, Func<CancellationToken, ValueTask> action)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return Step(
+            new ProtoStepDescriptor(
+                "flow.step",
+                $"{_name} · {name}",
+                _source,
+                Attributes: new Dictionary<string, string?> { ["step.name"] = name }),
+            action);
+    }
+
+    /// <summary>Appends a step traced as the operation the descriptor declares.</summary>
+    public ProtoFlow Step(ProtoStepDescriptor step, Func<CancellationToken, ValueTask> action)
+    {
+        ArgumentNullException.ThrowIfNull(step);
         ArgumentNullException.ThrowIfNull(action);
-        _steps.Add(new FlowStep(name, action, options ?? ProtoStepOptions.Default));
+        _steps.Add(new FlowStep(step, action));
         return this;
     }
 
@@ -112,65 +121,30 @@ public sealed class ProtoFlow
         int index,
         CancellationToken cancellationToken)
     {
-        await trace
-            .Operation("flow.step", $"{_name} · {step.Name}", _source)
-            .With("flow.name", _name)
-            .With("step.name", step.Name)
-            .With("step.index", index.ToString(System.Globalization.CultureInfo.InvariantCulture))
-            .RunAsync(async operation =>
+        var attributes = new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["flow.name"] = _name,
+            ["step.index"] = index.ToString(CultureInfo.InvariantCulture)
+        };
+        if (step.Descriptor.Attributes is not null)
+        {
+            foreach (var (key, value) in step.Descriptor.Attributes)
             {
-                var attempt = 0;
-                while (true)
-                {
-                    attempt++;
-                    try
-                    {
-                        await ExecuteAttemptAsync(step, cancellationToken);
-                        if (attempt > 1)
-                        {
-                            operation.SetAttribute(
-                                "step.attempts",
-                                attempt.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                        }
+                attributes[key] = value;
+            }
+        }
 
-                        return;
-                    }
-                    catch (Exception exception) when (
-                        attempt <= step.Options.RetryCount
-                        && !cancellationToken.IsCancellationRequested
-                        && (step.Options.ShouldRetry?.Invoke(exception) ?? true))
-                    {
-                        operation.SetAttribute(
-                            "step.retry",
-                            $"{attempt}/{step.Options.RetryCount}");
-                        if (step.Options.RetryDelay > TimeSpan.Zero)
-                        {
-                            await Task.Delay(step.Options.RetryDelay, cancellationToken);
-                        }
-                    }
-                }
-            });
+        var scope = trace
+            .Operation(step.Descriptor.Kind, step.Descriptor.Name, step.Descriptor.Source)
+            .During(step.Descriptor.Phase)
+            .With(attributes);
+        if (step.Descriptor.EntityKind is not null && step.Descriptor.EntityId is not null)
+        {
+            scope = scope.For(step.Descriptor.EntityKind, step.Descriptor.EntityId);
+        }
+
+        await scope.RunAsync(_ => step.Action(cancellationToken));
     }
 
-    private static async ValueTask ExecuteAttemptAsync(FlowStep step, CancellationToken cancellationToken)
-    {
-        if (step.Options.Timeout is not { } timeout)
-        {
-            await step.Action(cancellationToken);
-            return;
-        }
-
-        using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        attempt.CancelAfter(timeout);
-        try
-        {
-            await step.Action(attempt.Token);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new TimeoutException($"Step '{step.Name}' did not finish within {timeout}.");
-        }
-    }
-
-    private sealed record FlowStep(string Name, Func<CancellationToken, ValueTask> Action, ProtoStepOptions Options);
+    private sealed record FlowStep(ProtoStepDescriptor Descriptor, Func<CancellationToken, ValueTask> Action);
 }

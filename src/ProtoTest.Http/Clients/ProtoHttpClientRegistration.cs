@@ -63,7 +63,8 @@ public static class ProtoHttpClientRegistration
                 allowMissingBaseUrl: allowMissingBaseUrl,
                 application: application,
                 endpoint: endpoint));
-        services.AddSingleton(new ProtoHttpClientEndpointRegistration(name, endpoint));
+        services.AddSingleton(new ProtoHttpClientEntry(
+            protocolName, name, application, endpoint, BaseAddressResolver: null));
         services.AddSingleton(new ProtoApplicationTarget(name, application ?? name));
 
         return new ProtoTargetBuilder(name, services);
@@ -86,7 +87,8 @@ public static class ProtoHttpClientRegistration
         configure?.Invoke(httpClientBuilder);
         services.AddSingleton<IProtoClientInitializer>(
             _ => new ProtoHttpClientInitializer(protocolName, name, allowMissingBaseUrl: true));
-        services.AddSingleton(new ProtoHttpBaseAddressRegistration(protocolName, name, baseAddressResolver));
+        services.AddSingleton(new ProtoHttpClientEntry(
+            protocolName, name, application, Endpoint: null, baseAddressResolver));
         services.AddSingleton(new ProtoApplicationTarget(name, application ?? name));
 
         return new ProtoTargetBuilder(name, services);

@@ -175,7 +175,7 @@ public sealed partial class WebModelTests
     }
 
     [Test]
-    public void WebKeyMap_ShouldMapEveryKeyForBothBackends()
+    public void KeyMaps_ShouldCoverEveryKeyForBothBackends()
     {
         var seleniumKeys = new Dictionary<WebKey, string>
         {
@@ -198,15 +198,22 @@ public sealed partial class WebModelTests
         Assert.Multiple(() =>
         {
             Assert.That(seleniumKeys.Keys, Is.EquivalentTo(Enum.GetValues<WebKey>()), "every semantic key is covered");
+            Assert.That(
+                PlaywrightLocatorTranslator.KeyMap.Keys,
+                Is.EquivalentTo(Enum.GetValues<WebKey>()),
+                "Playwright covers every key");
+            Assert.That(
+                SeleniumWebBackend.KeyMap.Keys,
+                Is.EquivalentTo(Enum.GetValues<WebKey>()),
+                "Selenium covers every key");
             foreach (var (key, selenium) in seleniumKeys)
             {
-                var value = WebKeyMap.Get(key);
-                Assert.That(value.Playwright, Is.Not.Empty, $"{key} has a Playwright value");
-                Assert.That(value.Selenium, Is.EqualTo(selenium), $"{key} keeps its Selenium value");
+                Assert.That(PlaywrightLocatorTranslator.KeyMap[key], Is.Not.Empty, $"{key} has a Playwright value");
+                Assert.That(SeleniumWebBackend.KeyMap[key], Is.EqualTo(selenium), $"{key} keeps its Selenium value");
             }
 
-            Assert.That(WebKeyMap.Get(WebKey.Enter).Playwright, Is.EqualTo("Enter"));
-            Assert.That(WebKeyMap.Get(WebKey.Space).Playwright, Is.EqualTo(" "));
+            Assert.That(PlaywrightLocatorTranslator.KeyMap[WebKey.Enter], Is.EqualTo("Enter"));
+            Assert.That(PlaywrightLocatorTranslator.KeyMap[WebKey.Space], Is.EqualTo(" "));
         });
     }
 

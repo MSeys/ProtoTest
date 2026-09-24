@@ -6,7 +6,7 @@ description: "Set up ProtoTest with MSTest: the assembly initialize and cleanup 
 
 # MSTest
 
-`ProtoTest.MSTest` gives you two static helpers to call from MSTest's assembly hooks, plus a `[ProtoTest]` attribute that wraps each test and all of its data rows in one ProtoTest context.
+`ProtoTest.MSTest` gives you two static helpers to call from MSTest's assembly hooks, plus a `[ProtoTest]` attribute that wraps each invocation in one ProtoTest context - MSTest invokes the attribute once per data row, so each row is its own context and its own trace.
 
 ## Install
 
@@ -67,17 +67,18 @@ public class OrderTests
 
 ## Per-test lifecycle
 
-`ExecuteAsync` is awaited properly — no sync-over-async. It starts the context once, runs `base.ExecuteAsync` (every data row), then completes the context in a `finally`, so the trace shows one test whose body ran all rows.
+`ExecuteAsync` is awaited properly — no sync-over-async. MSTest calls it once per data row, so each call starts a context, runs the body, and completes the context in a `finally`: one row, one trace. The row's arguments are appended to the trace name (`..TestMethod[2, 4]`), so the rows stay apart.
 
 ## Outcomes
 
-| MSTest result | ProtoTest records | Why |
+| MSTest result (one row) | ProtoTest records | Why |
 | --- | --- | --- |
-| all rows `Passed` | `Passed` | |
-| all rows `Ignored` or `Inconclusive` | `Skipped` | nothing ran |
-| passed rows mixed with ignored/inconclusive rows | `Partial` | Passed would hide the skip; Skipped would hide the rows that ran |
-| first row `Failed`, `Error`, `Timeout` or `Aborted` | `Failed` | with `TestFailureException` when there is one, else error type `MSTest.{Outcome}` |
-| no results, or an unmapped outcome | `Unknown` | |
+| `Passed` | `Passed` | |
+| `Ignored`, `Inconclusive` or `NotRunnable` | `Skipped` | nothing ran |
+| `Failed`, `Error` | `Failed` | with `TestFailureException` when there is one, else error type `MSTest.{Outcome}` |
+| `Failed`/`Error` with an `OperationCanceledException` | `Cancelled` | the test was interrupted, not broken |
+| `Timeout` or `Aborted` | `Cancelled` | the test never finished |
+| an unmapped outcome | `Unknown` | |
 
 ## Skipping
 

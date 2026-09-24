@@ -1,7 +1,6 @@
 namespace ProtoTest.OpenApi.Tests;
 
-using Microsoft.OpenApi.Models;
-using NUnit.Framework;
+using Microsoft.OpenApi;
 using ProtoTest.OpenApi.Internal;
 
 [TestFixture]
@@ -12,11 +11,11 @@ public class OpenApiSchemaExtractorTests
     {
         // Arrange
         var doc = OpenApiSpecLoader.Load(OpenApiTestHelper.SampleJsonSpec);
-        var operation = doc.Paths["/users/{id}"].Operations[OperationType.Get];
-        var response = operation.Responses["200"];
+        var operation = doc.Paths["/users/{id}"].Operations![HttpMethod.Get];
+        var response = operation.Responses!["200"];
 
         // Act
-        var properties = OpenApiSchemaExtractor.ExtractResponseProperties(doc, response);
+        var properties = OpenApiSchemaExtractor.ExtractResponseProperties(response);
 
         // Assert
         Assert.That(properties, Is.EquivalentTo(
@@ -65,9 +64,9 @@ public class OpenApiSchemaExtractorTests
         }
         """;
         var document = OpenApiSpecLoader.Load(specification);
-        var response = document.Paths["/users"].Operations[OperationType.Get].Responses["200"];
+        var response = document.Paths["/users"].Operations![HttpMethod.Get].Responses!["200"];
 
-        var properties = OpenApiSchemaExtractor.ExtractResponseProperties(document, response);
+        var properties = OpenApiSchemaExtractor.ExtractResponseProperties(response);
 
         Assert.That(properties, Is.EquivalentTo(["$", "$.id", "$.roles", "$.roles[]", "$.roles[].name"]));
     }
@@ -116,9 +115,9 @@ public class OpenApiSchemaExtractorTests
         }
         """;
         var document = OpenApiSpecLoader.Load(specification);
-        var response = document.Paths["/diamond"].Operations[OperationType.Get].Responses["200"];
+        var response = document.Paths["/diamond"].Operations![HttpMethod.Get].Responses!["200"];
 
-        var properties = OpenApiSchemaExtractor.ExtractResponseProperties(document, response);
+        var properties = OpenApiSchemaExtractor.ExtractResponseProperties(response);
 
         Assert.That(properties, Is.EquivalentTo(["$", "$.leaf"]));
     }

@@ -3,7 +3,6 @@ namespace ProtoTest.Messaging.Tests;
 using System.Reflection;
 using System.Text;
 using Microsoft.Extensions.Configuration;
-using NUnit.Framework;
 using ProtoTest.Core;
 
 [TestFixture]

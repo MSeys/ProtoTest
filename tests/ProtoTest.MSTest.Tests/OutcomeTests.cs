@@ -50,33 +50,21 @@ public sealed class OutcomeTests
     }
 
     [TestMethod]
-    public void MixedPassedAndIgnoredRows_ShouldRecordPartialOutcome()
+    public void CancelledRow_ShouldRecordCancelledOutcome()
     {
-        var result = ProtoTestAttribute.ToProtoTestResult(
-        [
-            new TestResult { Outcome = UnitTestOutcome.Passed },
-            new TestResult { Outcome = UnitTestOutcome.Ignored }
-        ]);
+        var result = ProtoTestAttribute.ToProtoTestResult(new TestResult
+        {
+            Outcome = UnitTestOutcome.Failed,
+            TestFailureException = new OperationCanceledException("deliberate cancellation")
+        });
 
-        Assert.AreEqual(ProtoTraceOutcome.Partial, result.Outcome);
-    }
-
-    [TestMethod]
-    public void MixedPassedAndInconclusiveRows_ShouldRecordPartialOutcome()
-    {
-        var result = ProtoTestAttribute.ToProtoTestResult(
-        [
-            new TestResult { Outcome = UnitTestOutcome.Passed },
-            new TestResult { Outcome = UnitTestOutcome.Inconclusive }
-        ]);
-
-        Assert.AreEqual(ProtoTraceOutcome.Partial, result.Outcome);
+        Assert.AreEqual(ProtoTraceOutcome.Cancelled, result.Outcome);
     }
 
     [TestMethod]
     public void TimedOutRow_ShouldRecordCancelledOutcomeWithQualifiedErrorType()
     {
-        var result = ProtoTestAttribute.ToProtoTestResult([new TestResult { Outcome = UnitTestOutcome.Timeout }]);
+        var result = ProtoTestAttribute.ToProtoTestResult(new TestResult { Outcome = UnitTestOutcome.Timeout });
 
         Assert.AreEqual(ProtoTraceOutcome.Cancelled, result.Outcome);
         Assert.AreEqual("MSTest.Timeout", result.Error?.Type);
@@ -85,30 +73,26 @@ public sealed class OutcomeTests
     [TestMethod]
     public void AbortedRow_ShouldRecordCancelledOutcome()
     {
-        var result = ProtoTestAttribute.ToProtoTestResult([new TestResult { Outcome = UnitTestOutcome.Aborted }]);
+        var result = ProtoTestAttribute.ToProtoTestResult(new TestResult { Outcome = UnitTestOutcome.Aborted });
 
         Assert.AreEqual(ProtoTraceOutcome.Cancelled, result.Outcome);
     }
 
     [TestMethod]
-    public void FailedRowWithoutException_ShouldRecordQualifiedErrorType()
+    public void NotRunnableRow_ShouldRecordSkippedOutcome()
     {
-        var result = ProtoTestAttribute.ToProtoTestResult([new TestResult { Outcome = UnitTestOutcome.Error }]);
+        var result = ProtoTestAttribute.ToProtoTestResult(new TestResult { Outcome = UnitTestOutcome.NotRunnable });
 
-        Assert.AreEqual(ProtoTraceOutcome.Failed, result.Outcome);
-        Assert.AreEqual("MSTest.Error", result.Error?.Type);
+        Assert.AreEqual(ProtoTraceOutcome.Skipped, result.Outcome);
     }
 
     [TestMethod]
-    public void FailedRow_ShouldOutweighATimedOutRow()
+    public void FailedRowWithoutException_ShouldRecordQualifiedErrorType()
     {
-        var result = ProtoTestAttribute.ToProtoTestResult(
-        [
-            new TestResult { Outcome = UnitTestOutcome.Timeout },
-            new TestResult { Outcome = UnitTestOutcome.Failed, TestFailureException = new InvalidOperationException("row") }
-        ]);
+        var result = ProtoTestAttribute.ToProtoTestResult(new TestResult { Outcome = UnitTestOutcome.Error });
 
         Assert.AreEqual(ProtoTraceOutcome.Failed, result.Outcome);
+        Assert.AreEqual("MSTest.Error", result.Error?.Type);
     }
 
     private static async Task<ProtoTestTrace> RunSubjectAsync(string subjectName)

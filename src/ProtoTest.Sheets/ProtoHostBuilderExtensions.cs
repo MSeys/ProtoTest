@@ -23,6 +23,6 @@ public static class ProtoHostBuilderExtensions
             services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoCollector>(new SheetsCoverageCollector("Sheets")));
         });
         return builder.AddCapability(new ProtoCapabilityDescriptor(
-            "Sheets", ProtoCapabilityKinds.Document, "ProtoTest.Sheets"));
+            "Sheets", ProtoCapabilityKinds.Document, ProtoSheets.TraceSource));
     }
 }

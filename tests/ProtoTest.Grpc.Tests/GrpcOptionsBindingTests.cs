@@ -1,7 +1,6 @@
 namespace ProtoTest.Grpc.Tests;
 
 using Microsoft.Extensions.Configuration;
-using NUnit.Framework;
 using ProtoTest.Core;
 
 [TestFixture]

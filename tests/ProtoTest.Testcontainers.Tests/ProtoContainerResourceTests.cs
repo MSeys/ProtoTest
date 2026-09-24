@@ -245,8 +245,12 @@ public sealed class ProtoContainerResourceTests
         var built = new Queue<FakeContainer>([failed, fresh]);
         var resource = new FakeResource(() => built.Dequeue());
 
-        Assert.That(resource.TryStart(out var error), Is.False);
-        Assert.That(error, Is.EqualTo("InvalidOperationException: no container runtime"));
+        var result = resource.TryStart();
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Started, Is.False);
+            Assert.That(result.Error, Is.EqualTo("InvalidOperationException: no container runtime"));
+        });
 
         await resource.StartAsync();
 
@@ -279,7 +283,7 @@ public sealed class ProtoContainerResourceTests
 
         public override string Description => "Fake container";
 
-        public bool TryStart(out string? error) => TryStartContainer(this, out error);
+        public ContainerStartResult<FakeResource> TryStart() => TryStartContainer(this);
     }
 
     private sealed class FakeContainer : IAsyncDisposable

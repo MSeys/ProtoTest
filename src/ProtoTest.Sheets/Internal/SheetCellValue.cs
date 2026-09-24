@@ -1,0 +1,80 @@
+namespace ProtoTest.Sheets.Internal;
+
+/// <summary>
+/// The one place a cell's typed value becomes a .NET value. A value that does not fit the target type
+/// is a value problem rather than an exception to swallow: <see cref="TryConvert"/> answers false and
+/// <see cref="Convert"/> names the cell, its value and the target type.
+/// </summary>
+internal static class SheetCellValue
+{
+    /// <summary>Converts a cell to <paramref name="type"/>; a value that cannot convert fails the read.</summary>
+    public static object? Convert(Type type, ProtoCell cell)
+    {
+        if (TryConvert(type, cell, out var value))
+        {
+            return value;
+        }
+
+        throw new FormatException(
+            $"'{cell.Display()}' at {cell.Reference} cannot be converted to " +
+            $"{(Nullable.GetUnderlyingType(type) ?? type).Name}.");
+    }
+
+    /// <summary>
+    /// Converts a cell to <paramref name="type"/>. An empty cell converts to <see langword="null"/>; a
+    /// non-empty cell whose typed value does not fit answers false.
+    /// </summary>
+    public static bool TryConvert(Type type, ProtoCell cell, out object? value)
+    {
+        value = null;
+        if (cell.IsEmpty)
+        {
+            return true;
+        }
+
+        var target = Nullable.GetUnderlyingType(type) ?? type;
+        if (target == typeof(string))
+        {
+            value = cell.Text ?? cell.Display();
+            return true;
+        }
+
+        if (target == typeof(decimal) && cell.Number is { } decimalNumber)
+        {
+            value = (decimal)decimalNumber;
+            return true;
+        }
+
+        if (target == typeof(double) && cell.Number is { } doubleNumber)
+        {
+            value = doubleNumber;
+            return true;
+        }
+
+        if (target == typeof(int) && cell.Number is { } intNumber)
+        {
+            value = (int)Math.Round(intNumber);
+            return true;
+        }
+
+        if (target == typeof(long) && cell.Number is { } longNumber)
+        {
+            value = (long)Math.Round(longNumber);
+            return true;
+        }
+
+        if (target == typeof(bool) && cell.Boolean is { } boolean)
+        {
+            value = boolean;
+            return true;
+        }
+
+        if (target == typeof(DateTime) && cell.Date is { } date)
+        {
+            value = date;
+            return true;
+        }
+
+        return false;
+    }
+}

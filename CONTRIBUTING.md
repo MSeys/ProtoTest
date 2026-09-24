@@ -28,6 +28,16 @@ An object whose lifetime spans tests (a broker, a browser pool, a run-scoped res
 a test context; it resolves per call, and only when it acts on the test's flow. Release callbacks get
 their trace writer from `ProtoResourceReleaseContext`.
 
+## Test conventions
+
+A test's name states the behavior it pins: `Subject_ShouldOutcome`, with `_WhenCondition` when the
+condition is the point (for example `RollbackFailure_ShouldStillDisposeTheTransactionAndConnection`).
+Use the plain present tense and name the subject as the reader knows it, not the type under test.
+
+Keep the phases visible with `// Arrange`, `// Act` and `// Assert` comments whenever the test is long
+enough that the phases are not obvious from the code; a short test needs none. One behavior per test,
+one act per test. Fixture data names its intent (`OverdueInvoice`, not `Invoice1`), and a helper used
+by more than one suite lives in `ProtoTest.TestSupport`.
 ## Build and test
 
 ProtoTest requires the .NET 8, 9 and 10 SDKs. Node.js 20 or newer is needed for the documentation and trace viewer.

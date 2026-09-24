@@ -1,7 +1,6 @@
 namespace ProtoTest.Core.Tests;
 
 using System.Net;
-using NUnit.Framework;
 
 [TestFixture]
 public sealed class ProtoDocumentSourceTests
@@ -15,7 +14,7 @@ public sealed class ProtoDocumentSourceTests
     public void LoadText_ShouldResolveRelativeHttpSourceAgainstBaseUrl()
     {
         Uri? requestedUri = null;
-        using var client = new HttpClient(new StubHandler(request =>
+        using var client = new HttpClient(new StubHttpHandler(request =>
         {
             requestedUri = request.RequestUri;
             return new HttpResponseMessage(HttpStatusCode.OK)
@@ -31,11 +30,5 @@ public sealed class ProtoDocumentSourceTests
             Assert.That(result, Is.EqualTo("schema"));
             Assert.That(requestedUri, Is.EqualTo(new Uri("https://example.test/schema.graphql")));
         });
-    }
-
-    private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(response(request));
     }
 }

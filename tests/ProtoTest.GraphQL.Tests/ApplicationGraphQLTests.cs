@@ -5,7 +5,6 @@ using System.Net.Http;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Http;
 
@@ -46,7 +45,7 @@ public sealed class ApplicationGraphQLTests
     public async Task Application_ShouldFallBackToTheTransportRootedAtTheGraphQlEndpoint()
     {
         Uri? requestedUri = null;
-        var handler = new StubHandler(request =>
+        var handler = new StubHttpHandler(request =>
         {
             requestedUri = request.RequestUri;
             return new HttpResponseMessage(HttpStatusCode.OK)
@@ -84,22 +83,4 @@ public sealed class ApplicationGraphQLTests
     }
 
 
-
-    private sealed class StubTransportInitializer(string name, string baseAddress, HttpMessageHandler handler)
-        : IProtoClientInitializer<HttpClient>
-    {
-        public string Name { get; } = name;
-
-        public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
-        {
-            context.RegisterClient(new HttpClient(handler) { BaseAddress = new Uri(baseAddress) }, Name);
-            return Task.FromResult(true);
-        }
-    }
-
-    private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(response(request));
-    }
 }

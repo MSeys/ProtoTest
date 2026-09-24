@@ -131,7 +131,7 @@ public sealed class PlatformJourney
     public async Task WebhookDeliveriesAreSignedAndRetriedUntilTheySucceed()
     {
         // Arrange
-        var sink = await DemoSupport.CreateSinkAsync(2);
+        var sink = await Proto.Context.Demo().CreateSinkAsync(2);
         using var webhook = await Proto.Context.Rest()
             .Body(new CreateWebhookRequest(sink.Url.ToString(), [WebhookEventTypes.ProjectCreated]))
             .PostAsync("/api/v1/webhooks");
@@ -145,13 +145,13 @@ public sealed class PlatformJourney
 
         // Assert
         project.Should.HaveHttpStatus(HttpStatusCode.Created);
-        var delivery = await DemoSupport.WaitForDeliveredAsync(WebhookEventTypes.ProjectCreated);
-        var receipt = (await DemoSupport.ReceiptsAsync(sink.Id)).Single();
+        var delivery = await Proto.Context.Demo().WaitForDeliveredAsync(WebhookEventTypes.ProjectCreated);
+        var receipt = (await Proto.Context.Demo().ReceiptsAsync(sink.Id)).Single();
         using (Assert.EnterMultipleScope())
         {
             Assert.That(delivery.Attempts, Is.GreaterThanOrEqualTo(3));
             Assert.That(receipt.EventType, Is.EqualTo(WebhookEventTypes.ProjectCreated));
-            Assert.That(receipt.Signature, Is.EqualTo(DemoSupport.Sign(endpoint.Secret, receipt.Body)));
+            Assert.That(receipt.Signature, Is.EqualTo(Proto.Context.Demo().Sign(endpoint.Secret, receipt.Body)));
         }
     }
 }

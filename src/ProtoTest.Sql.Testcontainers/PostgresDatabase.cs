@@ -37,27 +37,16 @@ public sealed class PostgresDatabase : ProtoContainerResource<PostgreSqlContaine
 
     /// <summary>Starts a container now, or throws with the reason it could not start.</summary>
     public static PostgresDatabase Start(Action<PostgreSqlBuilder>? configure = null)
-        => TryStart(configure, out var database, out var error)
-            ? database!
-            : throw new InvalidOperationException($"The PostgreSQL container did not start: {error}");
+    {
+        var result = TryStart(configure);
+        return result.Resource
+            ?? throw new InvalidOperationException($"The PostgreSQL container did not start: {result.Error}");
+    }
 
     /// <summary>
     /// Starts a container, reporting why it could not start instead of throwing - a machine without a
     /// container runtime should be able to fall back or skip rather than fail the run.
     /// </summary>
-    public static bool TryStart(
-        Action<PostgreSqlBuilder>? configure,
-        out PostgresDatabase? database,
-        out string? error)
-    {
-        var candidate = Container(configure);
-        if (TryStartContainer(candidate, out error))
-        {
-            database = candidate;
-            return true;
-        }
-
-        database = null;
-        return false;
-    }
+    public static ContainerStartResult<PostgresDatabase> TryStart(Action<PostgreSqlBuilder>? configure = null)
+        => TryStartContainer(Container(configure));
 }

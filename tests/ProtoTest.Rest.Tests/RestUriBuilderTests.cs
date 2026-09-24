@@ -1,6 +1,5 @@
 namespace ProtoTest.Rest.Tests;
 
-using NUnit.Framework;
 using ProtoTest.Http;
 using ProtoTest.Rest.Internal;
 

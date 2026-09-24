@@ -378,7 +378,7 @@ public sealed class GraphQLShapeDrivenApiTests
     {
         var builder = new ProtoHostBuilder();
         builder.AddGraphQL(graphQL => graphQL.AddClient("Default", "https://example.test/graphql", http =>
-            http.ConfigurePrimaryHttpMessageHandler(() => new StubHandler(response))));
+            http.ConfigurePrimaryHttpMessageHandler(() => new StubHttpHandler(response))));
         return builder.Build();
     }
 
@@ -399,9 +399,4 @@ public sealed class GraphQLShapeDrivenApiTests
     private sealed record RenamedInput(
         [property: JsonPropertyName("product")] string Name,
         int Quantity);
-    private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(response(request));
-    }
 }

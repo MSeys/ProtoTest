@@ -13,7 +13,7 @@ public class Setup : ProtoTestAssembly
     {
         await InitializeAsync(builder =>
         {
-            AdapterTestSupport.ConfigureHost(builder);
+            AdapterLifecycle.ConfigureHost(builder);
             builder.ConfigureServices(services =>
             {
                 services.AddScoped<ITestService>(_ => new ProbeTestService("MSTest_Integration_Success"));

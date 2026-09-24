@@ -6,6 +6,9 @@ using ProtoTest.Core;
 /// <summary>Entry point for opening generated workbooks.</summary>
 public sealed class ProtoSheets
 {
+    /// <summary>The trace source every Sheets event declares.</summary>
+    internal const string TraceSource = "ProtoTest.Sheets";
+
     private readonly ProtoExecutionContext _context;
     private readonly SheetsOptions _options;
 

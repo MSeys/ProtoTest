@@ -6,14 +6,13 @@ using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Json;
 
 public sealed partial class SheetsTests
 {
 
-    [OneTimeSetUp]
+    [SetUp]
     public void CreateWorkbook()
     {
         _path = Path.Combine(Path.GetTempPath(), $"prototest-sheets-{Guid.NewGuid():N}.xlsx");

@@ -175,5 +175,5 @@ public sealed class ProtoTable
 
     /// <summary>Records that the test read <paramref name="reference"/>; only actual reads reach here.</summary>
     internal void RecordRead(string reference)
-        => _context?.RecordObservation(new ProtoObservation("Sheets", "sheets.range", reference));
+        => _sheet.RecordRead(reference);
 }

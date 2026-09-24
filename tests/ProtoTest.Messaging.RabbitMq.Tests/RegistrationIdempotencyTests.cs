@@ -2,7 +2,6 @@ namespace ProtoTest.Messaging.RabbitMq.Tests;
 
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Messaging;
 

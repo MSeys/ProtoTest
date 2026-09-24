@@ -1,7 +1,6 @@
 namespace ProtoTest.OpenApi.Tests;
 
 using Microsoft.OpenApi.Models;
-using NUnit.Framework;
 using ProtoTest.OpenApi.Internal;
 
 [TestFixture]

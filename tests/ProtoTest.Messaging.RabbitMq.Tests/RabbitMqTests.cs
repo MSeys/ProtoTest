@@ -3,7 +3,6 @@ namespace ProtoTest.Messaging.RabbitMq.Tests;
 using System.Reflection;
 using global::RabbitMQ.Client;
 using Microsoft.Extensions.Configuration;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Messaging;
 using ProtoTest.Messaging.RabbitMq;
@@ -15,7 +14,7 @@ public sealed class RabbitMqTests
     private static RabbitMqBroker? _container;
 
     [OneTimeTearDown]
-    public async Task StopContainer()
+    public static async Task StopContainer()
     {
         if (_container is not null)
         {
@@ -328,6 +327,8 @@ public sealed class RabbitMqTests
                     exchange,
                     message =>
                     {
+                        // A deliberate timing probe: the predicate must outlast the poll
+                        // interval so the wait is still pending when its timeout elapses.
                         Thread.Sleep(20);
                         return message.Payload == "never";
                     },
@@ -394,9 +395,9 @@ public sealed class RabbitMqTests
             return configured;
         }
 
-        if (_container is null && RabbitMqBroker.TryStart(configure: null, out var broker, out _))
+        if (_container is null && RabbitMqBroker.TryStart() is { Started: true } result)
         {
-            _container = broker;
+            _container = result.Resource;
         }
 
         return _container?.ConnectionString;

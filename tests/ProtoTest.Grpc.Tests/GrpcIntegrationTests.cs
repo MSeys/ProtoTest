@@ -11,7 +11,6 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Grpc.Tests.Echo;
 using ProtoTest.Http;
@@ -20,33 +19,11 @@ using ProtoTest.Http.Authenticators;
 [TestFixture]
 public sealed class GrpcIntegrationTests
 {
-    private static WebApplication _server = null!;
-    private static string _address = null!;
-
-    [OneTimeSetUp]
-    public async Task StartServer()
-    {
-        var port = FreePort();
-        var builder = WebApplication.CreateBuilder();
-        builder.WebHost.ConfigureKestrel(kestrel => kestrel.Listen(
-            IPAddress.Loopback,
-            port,
-            endpoint => endpoint.Protocols = HttpProtocols.Http2));
-        builder.Services.AddGrpc();
-        _server = builder.Build();
-        _server.MapGrpcService<EchoService>();
-        await _server.StartAsync();
-        _address = $"http://127.0.0.1:{port}";
-    }
-
-    [OneTimeTearDown]
-    public async Task StopServer() => await _server.DisposeAsync();
-
     [Test]
     public async Task UnaryCall_ShouldTraceReportAndCarryMetadata()
     {
         var builder = new ProtoHostBuilder();
-        builder.AddGrpc(grpc => grpc.AddClient("Echo", _address).AddCollector<GrpcCoverageCollector>());
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address).AddCollector<GrpcCoverageCollector>());
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("grpc unary", TestMethods.Placeholder);
@@ -96,7 +73,7 @@ public sealed class GrpcIntegrationTests
                 Is.True);
             var entity = test.Entities!.Single(candidate =>
                 candidate.Kind == ProtoTraceEntityKinds.Client && candidate.Id.Contains("ProtoGrpcClient"));
-            Assert.That(entity.State["client.address"], Does.StartWith(_address));
+            Assert.That(entity.State["client.address"], Does.StartWith(GrpcTestServer.Address));
             Assert.That(entity.State["client.protocol"], Is.EqualTo("Grpc"));
             Assert.That(entity.State["client.initializer"], Is.EqualTo("ProtoGrpcClientInitializer"));
         });
@@ -106,7 +83,7 @@ public sealed class GrpcIntegrationTests
     public async Task ClientName_ShouldFindAHostRegisteredClientInsideAnApplication()
     {
         var builder = new ProtoHostBuilder();
-        builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("grpc host client", TestMethods.Placeholder);
@@ -123,10 +100,11 @@ public sealed class GrpcIntegrationTests
     }
 
     [Test]
+    [NonParallelizable]
     public async Task AuthAttribute_ShouldApplyMetadataThroughTheSharedPipeline()
     {
         var builder = new ProtoHostBuilder();
-        builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("grpc auth", AuthenticatedTestMethod());
@@ -146,10 +124,11 @@ public sealed class GrpcIntegrationTests
     }
 
     [Test]
+    [NonParallelizable]
     public async Task RawServerStreaming_ShouldApplyAuthMetadataWithoutTracing()
     {
         var builder = new ProtoHostBuilder();
-        builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("grpc raw stream auth", AuthenticatedTestMethod());
@@ -178,7 +157,7 @@ public sealed class GrpcIntegrationTests
     public async Task ServerStreaming_ShouldReturnEveryMessage()
     {
         var builder = new ProtoHostBuilder();
-        builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("grpc stream", TestMethods.Placeholder);
@@ -194,7 +173,7 @@ public sealed class GrpcIntegrationTests
     public async Task ClientStreaming_ShouldCollectEveryMessage()
     {
         var builder = new ProtoHostBuilder();
-        builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("grpc client stream", TestMethods.Placeholder);
@@ -212,7 +191,7 @@ public sealed class GrpcIntegrationTests
     public async Task DuplexStreaming_ShouldExchangeInBothDirections()
     {
         var builder = new ProtoHostBuilder();
-        builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("grpc duplex", TestMethods.Placeholder);
@@ -236,7 +215,7 @@ public sealed class GrpcIntegrationTests
     public async Task OpenDuplexStreamingAsync_ShouldExchangeInBothDirections()
     {
         var builder = new ProtoHostBuilder();
-        builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("grpc async duplex", TestMethods.Placeholder);
@@ -263,7 +242,7 @@ public sealed class GrpcIntegrationTests
         builder.AddGrpc(grpc =>
         {
             grpc.CaptureAttachments();
-            grpc.AddClient("Echo", _address);
+            grpc.AddClient("Echo", GrpcTestServer.Address);
         });
         await using var host = builder.Build();
         await host.StartAsync();
@@ -301,7 +280,7 @@ public sealed class GrpcIntegrationTests
         builder.AddGrpc(grpc =>
         {
             grpc.CaptureAttachments(options => options.MaxDiagnosticBodyLength = 64);
-            grpc.AddClient("Echo", _address);
+            grpc.AddClient("Echo", GrpcTestServer.Address);
         });
         await using var host = builder.Build();
         await host.StartAsync();
@@ -330,7 +309,7 @@ public sealed class GrpcIntegrationTests
     public async Task CaptureAttachments_WhenNotEnabled_ShouldNotAttach()
     {
         var builder = new ProtoHostBuilder();
-        builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("grpc no attachments", TestMethods.Placeholder);
@@ -349,7 +328,7 @@ public sealed class GrpcIntegrationTests
         builder.AddGrpc(grpc =>
         {
             grpc.CaptureAttachments();
-            grpc.AddClient("Echo", _address);
+            grpc.AddClient("Echo", GrpcTestServer.Address);
         });
         await using var host = builder.Build();
         await host.StartAsync();
@@ -381,8 +360,8 @@ public sealed class GrpcIntegrationTests
         builder.AddGrpc(grpc =>
         {
             grpc.CaptureAttachments();
-            grpc.AddClient("Echo", _address);
-            grpc.AddClient("Mirror", _address);
+            grpc.AddClient("Echo", GrpcTestServer.Address);
+            grpc.AddClient("Mirror", GrpcTestServer.Address);
         });
         await using var host = builder.Build();
         await host.StartAsync();
@@ -413,7 +392,7 @@ public sealed class GrpcIntegrationTests
         builder.AddGrpc(grpc =>
         {
             grpc.CaptureAttachments();
-            grpc.AddClient("Echo", _address);
+            grpc.AddClient("Echo", GrpcTestServer.Address);
         });
         await using var host = builder.Build();
         await host.StartAsync();
@@ -450,7 +429,7 @@ public sealed class GrpcIntegrationTests
         builder.AddGrpc(grpc =>
         {
             grpc.CaptureAttachments();
-            grpc.AddClient("Echo", _address);
+            grpc.AddClient("Echo", GrpcTestServer.Address);
         });
         await using var host = builder.Build();
         await host.StartAsync();
@@ -500,7 +479,7 @@ public sealed class GrpcIntegrationTests
         var builder = new ProtoHostBuilder();
         builder.AddGrpc(grpc => grpc.AddClient(
             "Echo",
-            _address,
+            GrpcTestServer.Address,
             options => options.SensitiveMetadataKeys.Add("x-custom-secret")));
         await using var host = builder.Build();
         await host.StartAsync();
@@ -534,7 +513,7 @@ public sealed class GrpcIntegrationTests
             // The application's transport: a client under the application's name, exactly what
             // AddAspNetCoreServer registers, so the deferred channel resolves it at first call.
             services.AddSingleton(new ProtoApplicationTransport("Echo", "Echo"));
-            services.AddSingleton<IProtoClientInitializer>(new TransportClientInitializer("Echo", _address));
+            services.AddSingleton<IProtoClientInitializer>(new TransportClientInitializer("Echo", GrpcTestServer.Address));
         });
         builder.AddApplication("Echo", app => app.AddGrpc(grpc => grpc.AddClient("Default")));
         await using var host = builder.Build();
@@ -571,7 +550,7 @@ public sealed class GrpcIntegrationTests
     public async Task RawServerStreaming_WithAnAsynchronousAuthenticator_ShouldNotDeadlock()
     {
         var builder = new ProtoHostBuilder();
-        builder.AddGrpc(grpc => grpc.AddClient("Echo", _address));
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("grpc async auth raw stream", AsyncAuthenticatedTestMethod());
@@ -659,16 +638,6 @@ public sealed class GrpcIntegrationTests
             context.Request.Headers.TryAddWithoutValidation("authorization", "Bearer async-token");
         }
     }
-
-    private static int FreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
-    }
-
 
     [Auth<BearerTokenAuthenticator>("shared-token")]
     private static void AuthenticatedPlaceholder()

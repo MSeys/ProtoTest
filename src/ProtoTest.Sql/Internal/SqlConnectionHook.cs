@@ -1,11 +1,10 @@
 namespace ProtoTest.Sql.Internal;
 
-using System.Data.Common;
 using ProtoTest.Core;
 
 /// <summary>
-/// Opens the test's connection, starts its transaction when the isolation strategy needs one, and owns
-/// both as a resource released before the test's clients are disposed.
+/// Owns the test's database connection as a resource and asks the session to open it. The resource is
+/// registered before the connection is opened, so an open or begin failure still owns what it created.
 /// </summary>
 internal sealed class SqlConnectionHook(SqlOptions options) : IProtoTestHook
 {
@@ -25,66 +24,10 @@ internal sealed class SqlConnectionHook(SqlOptions options) : IProtoTestHook
             "database:connection",
             "database",
             $"{session.Connection.GetType().Name} · {options.Isolation}{sharing}",
-            release => ReleaseAsync(session, release)));
+            session.ReleaseAsync));
 
-        using var open = context.Trace
-            .Operation("sql.connection.open", $"SQL · open {session.Connection.GetType().Name}", "ProtoTest.Sql")
-            .During(ProtoTracePhase.Setup)
-            .With("sql.connection.type", session.Connection.GetType().FullName)
-            .Begin();
-        try
-        {
-            await session.Connection.OpenAsync();
-            if (options.Isolation == SqlIsolation.Transaction)
-            {
-                await context.Trace
-                    .Operation("sql.transaction.begin", "SQL · begin transaction", "ProtoTest.Sql")
-                    .During(ProtoTracePhase.Setup)
-                    .With("sql.isolation", options.Isolation.ToString())
-                    .RunAsync(async () => session.Transaction = await session.Connection.BeginTransactionAsync());
-            }
-
-            open.Succeed();
-        }
-        catch (Exception exception)
-        {
-            open.Fail(exception);
-            throw;
-        }
+        await session.StartAsync(context);
     }
 
     public Task AfterTestAsync(ProtoExecutionContext context) => Task.CompletedTask;
-
-    private async ValueTask ReleaseAsync(ProtoSqlSession session, ProtoResourceReleaseContext release)
-    {
-        var transaction = session.Transaction;
-        try
-        {
-            if (transaction is not null)
-            {
-                await release.Trace
-                    .Operation("sql.transaction.rollback", "SQL · rollback transaction", "ProtoTest.Sql")
-                    .During(release.Phase)
-                    .With("sql.isolation", options.Isolation.ToString())
-                    .RunAsync(async () => await transaction.RollbackAsync(release.CancellationToken));
-            }
-        }
-        finally
-        {
-            // Teardown must release both even when rollback fails: the transaction first, then the
-            // connection, each in its own finally.
-            session.Transaction = null;
-            try
-            {
-                if (transaction is not null)
-                {
-                    await transaction.DisposeAsync();
-                }
-            }
-            finally
-            {
-                await session.Connection.DisposeAsync();
-            }
-        }
-    }
 }

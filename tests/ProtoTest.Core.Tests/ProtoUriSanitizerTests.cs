@@ -1,6 +1,5 @@
 namespace ProtoTest.Core.Tests;
 
-using NUnit.Framework;
 
 [TestFixture]
 public sealed class ProtoUriSanitizerTests

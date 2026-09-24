@@ -63,7 +63,7 @@ public sealed class ProtoSheet
         var normalized = reference.ToUpperInvariant();
         var (column, row) = SheetReferences.Parse(normalized);
         // Coverage is recorded only for a reference that parsed: an invalid read never happened.
-        Record(normalized);
+        RecordRead($"{Name}!{normalized}");
         return CellByNumber(row, column);
     }
 
@@ -73,7 +73,7 @@ public sealed class ProtoSheet
         ArgumentOutOfRangeException.ThrowIfLessThan(row, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(column, 1);
         var reference = SheetReferences.Format(column, row);
-        Record(reference);
+        RecordRead($"{Name}!{reference}");
         return CellByNumber(row, column);
     }
 
@@ -139,19 +139,17 @@ public sealed class ProtoSheet
             var cells = new List<ProtoCell>();
             for (var column = startColumn; column <= endColumn; column++)
             {
-                var cellReference = SheetReferences.Format(column, row);
-                cells.Add(_cells.TryGetValue(cellReference, out var cell)
-                    ? cell
-                    : ProtoCell.Empty(cellReference, Name, _context));
+                cells.Add(CellByNumber(row, column));
             }
 
             rows.Add(cells);
         }
 
-        Record(normalized);
+        RecordRead($"{Name}!{normalized}");
         return new ProtoRange(normalized, rows, Name, _context);
     }
 
-    private void Record(string reference)
-        => _context?.RecordObservation(new ProtoObservation("Sheets", "sheets.range", $"{Name}!{reference}"));
+    /// <summary>Records that the test read a sheet-qualified reference; only actual reads reach here.</summary>
+    internal void RecordRead(string reference)
+        => _context?.RecordObservation(new ProtoObservation("Sheets", "sheets.range", reference));
 }

@@ -15,9 +15,7 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
 {
     private readonly Action<IWebHostBuilder>? _configureWebHost;
     private readonly Action<WebApplicationFactoryClientOptions>? _configureClientOptions;
-    private readonly AspNetCoreServerLifetime _lifetime;
-    private readonly ProtoLock _gate = new();
-    private AspNetCoreServer<TProgram>? _sharedServer;
+    private readonly IAspNetCoreServerLifetime<TProgram> _serverLifetime;
     private int _pageInventoryRecorded;
 
     public AspNetCoreClientInitializer(
@@ -29,7 +27,11 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
         Name = name;
         _configureWebHost = configureWebHost;
         _configureClientOptions = configureClientOptions;
-        _lifetime = lifetime;
+        _serverLifetime = lifetime switch
+        {
+            AspNetCoreServerLifetime.PerRun => new PerRunServerLifetime<TProgram>(),
+            _ => new PerTestServerLifetime<TProgram>()
+        };
     }
 
     /// <inheritdoc />
@@ -38,25 +40,8 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
     /// <inheritdoc />
     public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
     {
-        var reused = false;
-        AspNetCoreServer<TProgram> server;
-        if (_lifetime == AspNetCoreServerLifetime.PerRun)
-        {
-            lock (_gate)
-            {
-                reused = _sharedServer is not null;
-                server = _sharedServer ??= AspNetCoreServer<TProgram>.Start(CombinedConfigure(context));
-            }
-
-            context.RegisterClient(server.Factory, FactoryName(Name), ProtoClientOwnership.Caller);
-        }
-        else
-        {
-            server = AspNetCoreServer<TProgram>.Start(CombinedConfigure(context));
-            context.RegisterClient(server, FactoryName(Name));
-            context.RegisterClient(server.Factory, FactoryName(Name), ProtoClientOwnership.Caller);
-        }
-
+        var lease = _serverLifetime.Acquire(context, Name, CombinedConfigure);
+        var server = lease.Server;
         var clientOptions = new WebApplicationFactoryClientOptions();
         _configureClientOptions?.Invoke(clientOptions);
         var handlers = CreateClientHandlers(clientOptions)
@@ -64,20 +49,18 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
             .ToArray();
         var client = server.Factory.CreateDefaultClient(clientOptions.BaseAddress, handlers);
         context.RegisterClient(client, Name);
-        var entityId = $"server:{typeof(TProgram).FullName}";
-        var serverState = new Dictionary<string, string?>
-        {
-            ["aspnetcore.application.type"] = typeof(TProgram).FullName,
-            ["aspnetcore.server.lifetime"] = _lifetime.ToString(),
-            ["aspnetcore.server.reused"] = reused ? "true" : "false",
-            ["aspnetcore.web_host.customized"] = (_configureWebHost is not null).ToString().ToLowerInvariant(),
-            ["aspnetcore.client.customized"] = (_configureClientOptions is not null).ToString().ToLowerInvariant()
-        };
+        var serverState = new AspNetCoreServerState(
+            typeof(TProgram).FullName!,
+            typeof(TProgram).Name,
+            _serverLifetime.Kind,
+            lease.Reused,
+            _configureWebHost is not null,
+            _configureClientOptions is not null);
         context.Trace.SetEntityState(
             ProtoTraceEntityKinds.Server,
-            entityId,
-            $"Server · {typeof(TProgram).Name}",
-            serverState,
+            serverState.EntityId,
+            serverState.DisplayName,
+            serverState.ToAttributes(),
             scope: context.TestName,
             change: "initialized");
         context.Trace.WriteEvent(
@@ -86,9 +69,9 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
             "ProtoTest.AspNetCore",
             ProtoTracePhase.Setup,
             ProtoTraceOutcome.Succeeded,
-            serverState,
+            serverState.ToAttributes(),
             entityKind: ProtoTraceEntityKinds.Server,
-            entityId: entityId);
+            entityId: serverState.EntityId);
         RecordPageInventory(context, server);
         return Task.FromResult(true);
     }
@@ -129,8 +112,7 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
         }
     }
 
-    public ValueTask DisposeAsync()
-        => _sharedServer is not null ? _sharedServer.DisposeAsync() : ValueTask.CompletedTask;
+    public ValueTask DisposeAsync() => _serverLifetime.DisposeAsync();
 
     /// <summary>
     /// Started infrastructure provides its connection strings as host settings, so an in-process

@@ -5,7 +5,6 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Http;
 using ProtoTest.Http.Authenticators;

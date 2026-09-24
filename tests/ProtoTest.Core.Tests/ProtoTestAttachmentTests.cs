@@ -3,7 +3,6 @@ namespace ProtoTest.Core.Tests;
 using System.Reflection;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 
 [TestFixture]
 public sealed class ProtoTestAttachmentTests

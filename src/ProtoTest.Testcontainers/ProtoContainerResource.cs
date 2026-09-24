@@ -153,18 +153,18 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
     /// already releases the built container when starting fails, so the candidate stays retryable; the
     /// caller can adopt it, retry, or simply let it go.
     /// </summary>
-    protected static bool TryStartContainer(ProtoContainerResource<TContainer> candidate, out string? error)
+    protected static ContainerStartResult<TResource> TryStartContainer<TResource>(TResource resource)
+        where TResource : ProtoContainerResource<TContainer>
     {
+        ArgumentNullException.ThrowIfNull(resource);
         try
         {
-            Task.Run(() => candidate.StartAsync().AsTask()).GetAwaiter().GetResult();
-            error = null;
-            return true;
+            Task.Run(() => resource.StartAsync().AsTask()).GetAwaiter().GetResult();
+            return new(resource, null);
         }
         catch (Exception exception)
         {
-            error = $"{exception.GetType().Name}: {exception.Message}";
-            return false;
+            return new(null, $"{exception.GetType().Name}: {exception.Message}");
         }
     }
 

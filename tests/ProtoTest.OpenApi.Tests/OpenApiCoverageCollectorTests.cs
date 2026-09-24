@@ -3,7 +3,6 @@ namespace ProtoTest.OpenApi.Tests;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi.Readers;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.OpenApi;
 using ProtoTest.Rest;
@@ -454,32 +453,10 @@ public class OpenApiCoverageCollectorTests
         var endpoint = collector.GetReportItems().Single();
         Assert.That(endpoint.Count, Is.EqualTo(1));
     }
-
-    private sealed class StubHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(respond(request));
-    }
-
-    private sealed class StaticConfigurationSource(IReadOnlyDictionary<string, string?> values) : IConfigurationSource
-    {
-        public IConfigurationProvider Build(IConfigurationBuilder builder)
-            => new StaticConfigurationProvider(values);
-    }
-
     private sealed class TestTargetBuilder(string targetName, IServiceCollection services)
         : IProtoTargetBuilder
     {
         public string TargetName { get; } = targetName;
         public IServiceCollection Services { get; } = services;
-    }
-
-    private sealed class StaticConfigurationProvider(IReadOnlyDictionary<string, string?> values)
-        : ConfigurationProvider
-    {
-        public override void Load()
-        {
-            Data = new Dictionary<string, string?>(values, StringComparer.OrdinalIgnoreCase);
-        }
     }
 }

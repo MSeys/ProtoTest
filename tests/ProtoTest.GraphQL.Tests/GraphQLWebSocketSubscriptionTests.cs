@@ -249,10 +249,4 @@ public sealed class GraphQLWebSocketSubscriptionTests
             return Task.CompletedTask;
         }
     }
-
-    private sealed class StubHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(response(request));
-    }
 }

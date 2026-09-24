@@ -6,7 +6,6 @@ using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Json;
 
@@ -22,7 +21,7 @@ public sealed partial class SheetsTests
         var emea = model.Row(row => row.Region == "EMEA");
         model.Column(row => row.Amount).Should.Be([1200m, 900m]);
         model.Column(row => row.Amount).ShouldAll(value => value > 0);
-        model.Column(row => row.Amount).Should.BeSortedBy(ascending: false);
+        model.Column(row => row.Amount).Should.BeSortedBy(ProtoSortDirection.Descending);
         Assert.Multiple(() =>
         {
             Assert.That(emea.Amount, Is.EqualTo(1200m));

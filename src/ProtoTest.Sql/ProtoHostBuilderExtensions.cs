@@ -27,7 +27,7 @@ public static class ProtoHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(connectionFactory);
 
         return builder
-            .AddCapability(new ProtoCapabilityDescriptor("SQL", ProtoCapabilityKinds.Store, "ProtoTest.Sql"))
+            .AddCapability(new ProtoCapabilityDescriptor("SQL", ProtoCapabilityKinds.Store, ProtoSqlSession.TraceSource))
             .ConfigureServices(services =>
             {
                 // The marker, not the presence of SqlOptions, decides whether SQL already registered: a
@@ -40,7 +40,9 @@ public static class ProtoHostBuilderExtensions
 
                 services.AddScoped(connectionFactory);
                 services.AddScoped(services =>
-                    new ProtoSqlSession(services.GetRequiredService<DbConnection>()));
+                    new ProtoSqlSession(
+                        services.GetRequiredService<DbConnection>(),
+                        services.GetRequiredService<SqlOptions>()));
                 services.TryAddSingleton(provider =>
                     ProtoOptionsRegistration.Resolve<SqlOptions>(provider, configure));
                 services.AddSingleton<IProtoTestHook>(provider =>

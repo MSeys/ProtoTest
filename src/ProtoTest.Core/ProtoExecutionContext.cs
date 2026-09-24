@@ -17,6 +17,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     private readonly ProtoResourceRegistry _resources = new();
     private readonly HashSet<string> _reportedResources = new(StringComparer.Ordinal);
     private readonly ProtoObservationDispatcher _observations;
+    private readonly ProtoFindingStore? _findings;
     private int _disposeStarted;
     private int _findingSequence;
 
@@ -43,6 +44,9 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         TestMethod = testMethod ?? throw new ArgumentNullException(nameof(testMethod));
         _attachments = new ProtoAttachmentCollection(TestId);
         _observations = new ProtoObservationDispatcher(_scope.ServiceProvider);
+        // Resolved once: a teardown finding is recorded after the scope is disposed, so it cannot look
+        // the store up lazily any more. The store itself is a root singleton and stays valid.
+        _findings = _scope.ServiceProvider.GetService<ProtoFindingStore>();
         Trace = trace;
     }
 
@@ -255,6 +259,12 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     internal object? TryClient(Type clientType, string name)
         => _clients.TryGet(clientType, name);
 
+    /// <summary>
+    /// Finds the registration name a client was registered under, so traced operations can link to the
+    /// client entity the configuration was recorded on.
+    /// </summary>
+    internal string? TryClientName(object client) => _clients.FindName(client);
+
     /// <summary>The registered clients in registration order; used by the completion phase.</summary>
     internal IReadOnlyList<object> RegisteredClients => _clients.Snapshot();
 
@@ -331,6 +341,9 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
         var sequence = Interlocked.Increment(ref _findingSequence);
+        // One redacted copy serves the report item and the trace record: the evidence boundary applies
+        // the policy once, so no axis can carry a name the other hides.
+        var redactedMetadata = WithTestIdentity(ProtoMetadataRedaction.Redact(metadata));
         var item = new ProtoReportItem(
             TargetName: targetName ?? "Test findings",
             Category: category ?? "Finding",
@@ -339,10 +352,10 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
             Status: status,
             Message: message,
             Tags: tags,
-            Metadata: WithTestIdentity(metadata),
+            Metadata: redactedMetadata,
             DisplayGroup: TestName);
-        TryService<ProtoFindingStore>()?.Add(item);
-        Trace.Finding(message, status.ToString(), item.Category, item.TargetName, tags, metadata);
+        _findings?.Add(item);
+        Trace.Finding(message, status.ToString(), item.Category, item.TargetName, tags, redactedMetadata);
         return item;
     }
 
@@ -362,7 +375,23 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     /// <summary>Stores and dispatches an observation to every collector that accepts it.</summary>
     public void RecordObservation(ProtoObservation observation)
     {
-        _observations.Record(observation);
+        foreach (var failure in _observations.Record(observation))
+        {
+            // A collector bug is evidence, not a test failure: record it and let the collectors behind
+            // it and the observation itself continue.
+            Trace.WriteEvent(
+                "collector.failed",
+                $"Collector failed · {observation.Kind}",
+                "ProtoTest.Core",
+                outcome: ProtoTraceOutcome.Failed,
+                attributes: new Dictionary<string, string?>
+                {
+                    ["observation.kind"] = observation.Kind,
+                    ["observation.target"] = observation.TargetName
+                },
+                exception: failure);
+        }
+
         Trace.Observation(
             observation.TargetName,
             observation.Kind,

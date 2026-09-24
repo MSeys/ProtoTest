@@ -13,7 +13,7 @@ interface NuGetLinkProps {
 export default function NuGetLink({mobile, onClick}: NuGetLinkProps): ReactNode {
   return (
     <NavbarMarkLink
-      href="https://www.nuget.org/packages?q=ProtoTest"
+      href="https://www.nuget.org/packages/ProtoTest.Core"
       name="NuGet"
       title="ProtoTest on NuGet"
       mobile={mobile}

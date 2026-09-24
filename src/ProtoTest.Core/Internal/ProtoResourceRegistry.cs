@@ -110,14 +110,32 @@ internal sealed class ProtoResourceRegistry
 
     /// <summary>
     /// Reopens the one-shot release gate after a failed run start released what had started, so a retry
-    /// can attempt the release that belongs to the run's real end. Entries that were already released or
-    /// failed keep their state: a resource is released at most once, and a retry must not release it again.
+    /// can attempt the release that belongs to the run's real end. Entries keep their state until the
+    /// retry actually starts them again (see <see cref="Rearm"/>), so a resource the retry never
+    /// restarts is not released a second time.
     /// </summary>
     public void ResetForRestart()
     {
         lock (_gate)
         {
             _releaseStarted = 0;
+        }
+    }
+
+    /// <summary>
+    /// Re-arms a resource the failed start released, so the retry that starts it again releases it
+    /// again at the run's real end. A resource that stays released is not re-released, which is what a
+    /// retry that never restarts it needs.
+    /// </summary>
+    public void Rearm(string id)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        lock (_gate)
+        {
+            if (_byId.TryGetValue(id, out var entry))
+            {
+                entry.Rearm();
+            }
         }
     }
 
@@ -243,6 +261,27 @@ internal sealed class ProtoResourceRegistry
             {
                 _state = ProtoResourceState.Released;
                 _releaseDuration = duration;
+            }
+        }
+
+        /// <summary>
+        /// Returns an entry to its registered state for its next release. A failed release is re-armed
+        /// too: the host may start the resource again, and that new ownership period must be released
+        /// even though the previous one could not be.
+        /// </summary>
+        public void Rearm()
+        {
+            lock (_releaseGate)
+            {
+                if (_state is not (ProtoResourceState.Released or ProtoResourceState.ReleaseFailed))
+                {
+                    return;
+                }
+
+                _state = ProtoResourceState.Registered;
+                _releaseDuration = null;
+                _error = null;
+                _releasing = false;
             }
         }
 

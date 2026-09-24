@@ -11,7 +11,7 @@ public class Setup : ProtoTestAssembly
 {
     protected override void Configure(IProtoHostBuilder builder)
     {
-        AdapterTestSupport.ConfigureHost(builder);
+        AdapterLifecycle.ConfigureHost(builder);
         builder.ConfigureServices(services =>
         {
             services.AddScoped<ITestService>(_ => new ProbeTestService("Xunit3_Integration_Success"));

@@ -82,7 +82,7 @@ internal static class ProtoTraceWire
         ProtoTraceRecord? record,
         IReadOnlyList<ProtoTraceArtifact>? artifacts)
     {
-        var events = new Dictionary<string, List<object>>(StringComparer.Ordinal);
+        var recordEvents = new Dictionary<string, List<object>>(StringComparer.Ordinal);
         var orphans = new List<object>();
         // A timeline event with no operation above it - a run's gate verdicts - belongs to the scope, the
         // same place record items without an operation go; nothing on the timeline may drop off the wire.
@@ -90,11 +90,19 @@ internal static class ProtoTraceWire
             .Where(entry => entry.EntryKind == ProtoTraceEntryKind.Operation)
             .Select(entry => entry.Id)
             .ToHashSet(StringComparer.Ordinal);
-        orphans.AddRange(entries
-            .Where(entry => entry.EntryKind == ProtoTraceEntryKind.Event
-                && (entry.ParentId is null || !operations.Contains(entry.ParentId)))
+        // Grouped once instead of scanning every entry for every operation: the number of operations
+        // and the number of events both grow with the test, so the per-operation scan is quadratic.
+        var timelineEvents = entries
+            .Where(entry => entry.EntryKind == ProtoTraceEntryKind.Event)
+            .ToArray();
+        var eventsByParent = timelineEvents
+            .Where(entry => entry.ParentId is not null && operations.Contains(entry.ParentId))
+            .GroupBy(entry => entry.ParentId!, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Select(TimelineEvent).ToList(), StringComparer.Ordinal);
+        orphans.AddRange(timelineEvents
+            .Where(entry => entry.ParentId is null || !operations.Contains(entry.ParentId))
             .Select(TimelineEvent));
-        AddRecordEvents(events, orphans, record);
+        AddRecordEvents(recordEvents, orphans, record);
         var spans = entries
             .Where(entry => entry.EntryKind == ProtoTraceEntryKind.Operation)
             .Select(entry => new
@@ -114,7 +122,7 @@ internal static class ProtoTraceWire
                 entityId = entry.EntityId,
                 attributes = entry.Attributes,
                 sections = entry.Sections,
-                events = ChildEvents(entry.Id, entries, events)
+                events = ChildEvents(entry.Id, eventsByParent, recordEvents)
             })
             .ToArray();
 
@@ -146,19 +154,13 @@ internal static class ProtoTraceWire
 
     private static object[] ChildEvents(
         string spanId,
-        IReadOnlyList<ProtoTraceEntry> entries,
+        IReadOnlyDictionary<string, List<object>> timelineEvents,
         IReadOnlyDictionary<string, List<object>> recordEvents)
     {
         var events = new List<object>();
-        foreach (var entry in entries)
+        if (timelineEvents.TryGetValue(spanId, out var timeline))
         {
-            if (entry.EntryKind != ProtoTraceEntryKind.Event
-                || !string.Equals(entry.ParentId, spanId, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            events.Add(TimelineEvent(entry));
+            events.AddRange(timeline);
         }
 
         if (recordEvents.TryGetValue(spanId, out var recorded))

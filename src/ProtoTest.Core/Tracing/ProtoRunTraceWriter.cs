@@ -79,7 +79,14 @@ internal sealed class ProtoRunTraceWriter : IProtoTraceWriter
         lock (_recordGate)
         {
             _findings.Add(ProtoTraceRecords.Finding(
-                $"finding-{_findings.Count + 1}", null, message, status, category, targetName, tags, metadata));
+                $"finding-{_findings.Count + 1}",
+                null,
+                message,
+                status,
+                category,
+                targetName,
+                tags,
+                ProtoMetadataRedaction.Redact(metadata)));
         }
     }
 

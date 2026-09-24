@@ -2,8 +2,7 @@ namespace ProtoTest.OpenApi.Tests;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.OpenApi.Readers;
-using NUnit.Framework;
+using Microsoft.OpenApi;
 using ProtoTest.Core;
 using ProtoTest.OpenApi;
 using ProtoTest.Rest;
@@ -16,7 +15,7 @@ public class OpenApiCoverageCollectorTests
     [Test]
     public void Constructor_ShouldAcceptAPrebuiltOpenApiDocument()
     {
-        var document = new OpenApiStringReader().Read(OpenApiTestHelper.SampleJsonSpec, out _);
+        var document = OpenApiDocument.Parse(OpenApiTestHelper.SampleJsonSpec).Document!;
 
         var collector = new OpenApiCoverageCollector("TestApi", document);
 
@@ -27,6 +26,19 @@ public class OpenApiCoverageCollectorTests
             Assert.That(root.Children!.Single(child => child.Identifier == "200")
                 .Children!.Any(child => child.Identifier == "$.id"), Is.True);
         }
+    }
+
+    [Test]
+    public void MissingSpecification_ShouldFailWhenTheHostIsBuilt()
+    {
+        // Stage 5 (Audit 3, finding D5): collectors are constructed at Build, so a missing specification
+        // fails configuration instead of the first test that happens to record an observation.
+        var builder = new ProtoHostBuilder();
+        builder.AddRest(rest => rest
+            .AddClient("Orders", "https://orders.test")
+            .AddCollector<OpenApiCoverageCollector>());
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
     }
 
     [Test]
@@ -454,32 +466,10 @@ public class OpenApiCoverageCollectorTests
         var endpoint = collector.GetReportItems().Single();
         Assert.That(endpoint.Count, Is.EqualTo(1));
     }
-
-    private sealed class StubHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(respond(request));
-    }
-
-    private sealed class StaticConfigurationSource(IReadOnlyDictionary<string, string?> values) : IConfigurationSource
-    {
-        public IConfigurationProvider Build(IConfigurationBuilder builder)
-            => new StaticConfigurationProvider(values);
-    }
-
     private sealed class TestTargetBuilder(string targetName, IServiceCollection services)
         : IProtoTargetBuilder
     {
         public string TargetName { get; } = targetName;
         public IServiceCollection Services { get; } = services;
-    }
-
-    private sealed class StaticConfigurationProvider(IReadOnlyDictionary<string, string?> values)
-        : ConfigurationProvider
-    {
-        public override void Load()
-        {
-            Data = new Dictionary<string, string?>(values, StringComparer.OrdinalIgnoreCase);
-        }
     }
 }

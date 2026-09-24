@@ -16,8 +16,18 @@ public static class ProtoHostBuilderExtensions
         Action<ProtoDataConfiguration>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        var registry = Registries.GetValue(builder, static _ => new ProtoDataRegistry());
-        configure?.Invoke(new ProtoDataConfiguration(registry));
+        if (Registries.TryGetValue(builder, out var registry))
+        {
+            configure?.Invoke(new ProtoDataConfiguration(registry));
+        }
+        else
+        {
+            // The first call composes on a fresh registry and adopts it only once configure returns:
+            // a throwing callback leaves the builder with nothing to inherit.
+            registry = new ProtoDataRegistry();
+            configure?.Invoke(new ProtoDataConfiguration(registry));
+            Registries.Add(builder, registry);
+        }
 
         return builder
             .AddCapability(new ProtoCapabilityDescriptor("Data", ProtoCapabilityKinds.Data, "ProtoTest.Data"))

@@ -2,8 +2,8 @@ namespace ProtoTest.Web;
 
 using System.Runtime.CompilerServices;
 using ProtoTest.Core;
-using ProtoTest.Core.Internal;
 using ProtoTest.Web.Internal;
+using ProtoTest.Web.Pages;
 
 /// <summary>Test-scoped entry point for pages, operations, and explicit native backend access.</summary>
 public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
@@ -43,7 +43,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
             Name,
             TraceSource,
             cancellationToken => new ValueTask<IWebBackend>(GetOrCreateBackendAsync(cancellationToken)));
-        _assertions = new WebAssertionPoller(this, _operations);
+        _assertions = new WebAssertionPoller(this, _operations, new WebProbeLoop(WebTiming.DefaultPollInterval));
         _downloads = new WebDownloadCapture(context, Name, TraceSource, _operations);
         _routeDiscovery = new WebRouteDiscovery(context, Name, TraceSource, discoverRoutes);
     }
@@ -125,7 +125,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         // A redirect lands on a different page, so the backend's final address wins over the target. The
         // target is only the fallback when the backend cannot report an address at all; a reported
         // external origin is deliberately not replaced by the target.
-        var currentAddress = TryCurrentAddress(backend);
+        var currentAddress = await TryCurrentAddressAsync(backend, cancellationToken);
         RecordPageObservation(
             "web.page.visited",
             currentAddress is null ? PagePathFrom(target.ToString()) : PagePathFrom(currentAddress),
@@ -165,9 +165,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
 
     internal ValueTask ClickAsync(WebElementReference element, CancellationToken cancellationToken)
         => _operations.ExecuteVoidAsync(
-            "web.click",
-            $"WEB · Click · {element.Name}",
-            WebOperationKind.Click,
+            WebOperations.Click,
             element,
             ElementAttributes(element),
             (backend, ct) => backend.ClickAsync(element, ct),
@@ -179,9 +177,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         attributes["web.value"] = "[REDACTED]";
         attributes["web.value.length"] = value.Length.ToString();
         return _operations.ExecuteVoidAsync(
-            "web.fill",
-            $"WEB · Fill · {element.Name}",
-            WebOperationKind.Fill,
+            WebOperations.Fill,
             element,
             attributes,
             (backend, ct) => backend.FillAsync(element, value, ct),
@@ -190,9 +186,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
 
     internal ValueTask CheckAsync(WebElementReference element, bool isChecked, CancellationToken cancellationToken)
         => _operations.ExecuteVoidAsync(
-            "web.check",
-            $"WEB · {(isChecked ? "Check" : "Uncheck")} · {element.Name}",
-            WebOperationKind.Check,
+            isChecked ? WebOperations.Check : WebOperations.Uncheck,
             element,
             ElementAttributes(element),
             (backend, ct) => backend.CheckAsync(element, isChecked, ct),
@@ -203,9 +197,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         var attributes = ElementAttributes(element);
         attributes["web.option"] = value;
         return _operations.ExecuteVoidAsync(
-            "web.select_option",
-            $"WEB · Select option · {element.Name}",
-            WebOperationKind.SelectOption,
+            WebOperations.SelectOption,
             element,
             attributes,
             (backend, ct) => backend.SelectOptionAsync(element, value, ct),
@@ -217,20 +209,17 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         var attributes = ElementAttributes(element);
         attributes["web.key"] = key.ToString();
         return _operations.ExecuteVoidAsync(
-            "web.press",
-            $"WEB · Press {key} · {element.Name}",
-            WebOperationKind.Press,
+            WebOperations.Press,
             element,
             attributes,
             (backend, ct) => backend.PressAsync(element, key, ct),
-            cancellationToken);
+            cancellationToken,
+            detail: key.ToString());
     }
 
     internal ValueTask<int> CountAsync(WebElementReference elements, CancellationToken cancellationToken)
         => _operations.ExecuteAsync(
-            "web.count",
-            $"WEB · Count · {elements.Name}",
-            WebOperationKind.Count,
+            WebOperations.Count,
             elements,
             ElementAttributes(elements),
             (backend, ct) => backend.CountAsync(elements, ct),
@@ -238,9 +227,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
 
     internal ValueTask<string> ReadTextAsync(WebElementReference element, CancellationToken cancellationToken)
         => _operations.ExecuteAsync(
-            "web.read_text",
-            $"WEB · Read text · {element.Name}",
-            WebOperationKind.ReadText,
+            WebOperations.ReadText,
             element,
             ElementAttributes(element),
             (backend, ct) => backend.ReadTextAsync(element, ct),
@@ -248,9 +235,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
 
     internal ValueTask<string?> ReadValueAsync(WebElementReference element, CancellationToken cancellationToken)
         => _operations.ExecuteAsync(
-            "web.read_value",
-            $"WEB · Read value · {element.Name}",
-            WebOperationKind.ReadValue,
+            WebOperations.ReadValue,
             element,
             ElementAttributes(element),
             (backend, ct) => backend.ReadValueAsync(element, ct),
@@ -258,9 +243,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
 
     internal ValueTask<bool> IsVisibleAsync(WebElementReference element, CancellationToken cancellationToken)
         => _operations.ExecuteAsync(
-            "web.is_visible",
-            $"WEB · Is visible · {element.Name}",
-            WebOperationKind.IsVisible,
+            WebOperations.IsVisible,
             element,
             ElementAttributes(element),
             (backend, ct) => backend.IsVisibleAsync(element, ct),
@@ -268,9 +251,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
 
     internal ValueTask<bool> IsEnabledAsync(WebElementReference element, CancellationToken cancellationToken)
         => _operations.ExecuteAsync(
-            "web.is_enabled",
-            $"WEB · Is enabled · {element.Name}",
-            WebOperationKind.IsEnabled,
+            WebOperations.IsEnabled,
             element,
             ElementAttributes(element),
             (backend, ct) => backend.IsEnabledAsync(element, ct),
@@ -278,9 +259,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
 
     internal ValueTask<bool> IsCheckedAsync(WebElementReference element, CancellationToken cancellationToken)
         => _operations.ExecuteAsync(
-            "web.is_checked",
-            $"WEB · Is checked · {element.Name}",
-            WebOperationKind.IsChecked,
+            WebOperations.IsChecked,
             element,
             ElementAttributes(element),
             (backend, ct) => backend.IsCheckedAsync(element, ct),
@@ -365,15 +344,17 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
             Metadata: new Dictionary<string, object>
             {
                 ["web.session"] = Name,
-                ["web.page.source"] = source
+                [WebPageInventory.SourceMetadataKey] = source
             }));
     }
 
-    internal static string? TryCurrentAddress(IWebBackend backend)
+    internal static async ValueTask<string?> TryCurrentAddressAsync(
+        IWebBackend backend,
+        CancellationToken cancellationToken)
     {
         try
         {
-            return backend.CurrentAddress;
+            return await backend.GetCurrentAddressAsync(cancellationToken);
         }
         catch (Exception)
         {
@@ -407,7 +388,32 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         cancellationToken.ThrowIfCancellationRequested();
         lock (_backendGate)
         {
-            return _backendTask ??= CreateBackendAsync(cancellationToken);
+            if (_backendTask is not null)
+            {
+                return _backendTask;
+            }
+
+            var task = CreateBackendAsync(cancellationToken);
+            _backendTask = task;
+
+            // A failed creation must not be cached: the next call starts from a clean slate. The
+            // continuation runs synchronously for a failure that happened before the first await, and
+            // the task is already published by then, so the clear always wins.
+            _ = task.ContinueWith(
+                _ =>
+                {
+                    lock (_backendGate)
+                    {
+                        if (ReferenceEquals(_backendTask, task))
+                        {
+                            _backendTask = null;
+                        }
+                    }
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
+                TaskScheduler.Default);
+            return task;
         }
     }
 
@@ -428,7 +434,6 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         catch (Exception exception)
         {
             operation.Fail(exception);
-            lock (_backendGate) _backendTask = null;
             throw;
         }
     }

@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 
 [TestFixture]
+[Category("Characterization")]
 public sealed class ReportSinkTests
 {
     [Test]
@@ -181,6 +182,10 @@ public sealed class ReportSinkTests
             Assert.That(html, Does.Contain("uncovered"));
             Assert.That(html, Does.Contain("Needs &lt;attention&gt;"));
             Assert.That(html, Does.Contain("id=\"reportSearch\""));
+            Assert.That(
+                html,
+                Does.Contain("aria-label=\"Search report\""),
+                "the search input has an accessible name");
             Assert.That(html, Does.Contain("data-filter=\"uncovered\""));
             Assert.That(html, Does.Contain("data-filter=\"partial\""));
             Assert.That(html, Does.Contain("id=\"themeToggle\""));

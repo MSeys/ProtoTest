@@ -44,9 +44,9 @@ public sealed partial class WebModelTests
             {
                 ["ProtoTest:Web:Playwright:Browser"] = "Firefox",
                 ["ProtoTest:Web:Playwright:Channel"] = "msedge",
-                ["ProtoTest:Web:Playwright:Context:Locale"] = "nl-BE",
-                ["ProtoTest:Web:Playwright:Context:ViewportSize:Width"] = "1280",
-                ["ProtoTest:Web:Playwright:Context:ViewportSize:Height"] = "720"
+                ["ProtoTest:Web:Playwright:Locale"] = "nl-BE",
+                ["ProtoTest:Web:Playwright:ViewportWidth"] = "1280",
+                ["ProtoTest:Web:Playwright:ViewportHeight"] = "720"
             }))
             .Build();
         await using var ownedHost = host;
@@ -68,9 +68,13 @@ public sealed partial class WebModelTests
             Assert.That(resolved.SlowMo, Is.EqualTo(10));
             Assert.That(resolved.Browser, Is.EqualTo(ProtoTest.Web.Playwright.PlaywrightBrowser.Firefox));
             Assert.That(resolved.Channel, Is.EqualTo("msedge"), "the backend section wins over code");
-            Assert.That(resolved.Context.Locale, Is.EqualTo("nl-BE"));
-            Assert.That(resolved.Context.ViewportSize?.Width, Is.EqualTo(1280));
-            Assert.That(resolved.Context.ViewportSize?.Height, Is.EqualTo(720));
+            Assert.That(resolved.Locale, Is.EqualTo("nl-BE"));
+            Assert.That(resolved.ViewportWidth, Is.EqualTo(1280));
+            Assert.That(resolved.ViewportHeight, Is.EqualTo(720));
+            var contextOptions = resolved.BuildContextOptions();
+            Assert.That(contextOptions.Locale, Is.EqualTo("nl-BE"));
+            Assert.That(contextOptions.ViewportSize?.Width, Is.EqualTo(1280));
+            Assert.That(contextOptions.ViewportSize?.Height, Is.EqualTo(720));
         });
         await host.CompleteTestAsync(ProtoTestResult.Passed);
     }

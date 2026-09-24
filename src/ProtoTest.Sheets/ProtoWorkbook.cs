@@ -61,7 +61,7 @@ public sealed class ProtoWorkbook
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(options);
         using var operation = context?.Trace
-            .Operation("sheets.open", $"Sheets · open {name}", "ProtoTest.Sheets")
+            .Operation("sheets.open", $"Sheets · open {name}", ProtoSheets.TraceSource)
             .With("sheets.name", name)
             .Begin();
         try
@@ -72,7 +72,7 @@ public sealed class ProtoWorkbook
                 .Elements<SharedStringItem>()
                 .Select(item => item.InnerText)
                 .ToArray() ?? [];
-            var isDateStyle = DateStyles(workbookPart.WorkbookStylesPart?.Stylesheet);
+            var dateFormats = SheetDateFormat.FromStylesheet(workbookPart.WorkbookStylesPart?.Stylesheet);
             var date1904 = workbookPart.Workbook.WorkbookProperties?.Date1904?.Value ?? false;
 
             var sheets = new List<ProtoSheet>();
@@ -84,7 +84,7 @@ public sealed class ProtoWorkbook
                 if (!hidden || options.IncludeHiddenSheets)
                 {
                     var part = (DocumentFormat.OpenXml.Packaging.WorksheetPart)workbookPart.GetPartById(sheet.Id!.Value!);
-                    var cells = ReadCells(part, sharedStrings, isDateStyle, date1904);
+                    var cells = ReadCells(part, sharedStrings, dateFormats, date1904);
                     sheets.Add(new ProtoSheet(
                         sheetName,
                         index,
@@ -123,7 +123,7 @@ public sealed class ProtoWorkbook
     private static List<CellData> ReadCells(
         DocumentFormat.OpenXml.Packaging.WorksheetPart part,
         IReadOnlyList<string> sharedStrings,
-        Func<uint?, bool> isDateStyle,
+        SheetDateFormat dateFormats,
         bool date1904)
     {
         var cells = new List<CellData>();
@@ -165,7 +165,7 @@ public sealed class ProtoWorkbook
             else if (raw is not null
                 && double.TryParse(raw, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var value))
             {
-                if (isDateStyle(cell.StyleIndex?.Value))
+                if (dateFormats.IsDateStyle(cell.StyleIndex?.Value))
                 {
                     // The 1904 date system counts from 1904-01-01, 1462 days after the 1900 epoch.
                     date = DateTime.FromOADate(date1904 ? value + Date1904Offset : value);
@@ -240,114 +240,5 @@ public sealed class ProtoWorkbook
         }
 
         return [.. byReference.Values];
-    }
-
-    /// <summary>Dates are numeric cells with a date number format; built-in ids plus a format-code check.</summary>
-    private static Func<uint?, bool> DateStyles(Stylesheet? stylesheet)
-    {
-        if (stylesheet?.CellFormats is null)
-        {
-            return _ => false;
-        }
-
-        var formats = stylesheet.CellFormats.Elements<CellFormat>().ToArray();
-        var customFormats = stylesheet.NumberingFormats?.Elements<NumberingFormat>()
-            .Where(format => format.NumberFormatId is not null && format.FormatCode is not null)
-            .ToDictionary(format => format.NumberFormatId!.Value, format => format.FormatCode!.Value)
-            ?? [];
-        return styleIndex =>
-        {
-            if (styleIndex is null || styleIndex.Value >= formats.Length)
-            {
-                return false;
-            }
-
-            var formatId = formats[(int)styleIndex.Value].NumberFormatId?.Value ?? 0;
-            // Built-in date and time ids: 14-22 (dates/times), 27-36 (East Asian dates),
-            // 45-47 (times) and 50-58 (East Asian dates/times).
-            if (formatId is >= 14 and <= 22 or >= 27 and <= 36 or >= 45 and <= 47 or >= 50 and <= 58)
-            {
-                return true;
-            }
-
-            if (!customFormats.TryGetValue(formatId, out var code) || string.IsNullOrEmpty(code))
-            {
-                return false;
-            }
-
-            return HasDateToken(code);
-        };
-    }
-
-    /// <summary>
-    /// A format code is a date format when it carries a y, d or h token after literals are removed.
-    /// Quoted text, bracketed sections (colors, conditions, locale ids) and escaped characters are
-    /// literals, so a currency suffix like <c>#,##0.00 "USD"</c> must not read as a date. A bracketed
-    /// elapsed-hours token like <c>[h]</c> is a time value, not a literal.
-    /// </summary>
-    private static bool HasDateToken(string code)
-    {
-        var remaining = StripLiterals(code);
-        return remaining.Contains('y', StringComparison.OrdinalIgnoreCase)
-            || remaining.Contains('d', StringComparison.OrdinalIgnoreCase)
-            || remaining.Contains('h', StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string StripLiterals(string code)
-    {
-        var tokens = new System.Text.StringBuilder(code.Length);
-        for (var index = 0; index < code.Length; index++)
-        {
-            var current = code[index];
-            if (current == '"')
-            {
-                // Quoted literals end at the next quote; "" inside one displays a single quote.
-                for (index++; index < code.Length; index++)
-                {
-                    if (code[index] != '"')
-                    {
-                        continue;
-                    }
-
-                    if (index + 1 < code.Length && code[index + 1] == '"')
-                    {
-                        index++;
-                        continue;
-                    }
-
-                    break;
-                }
-
-                continue;
-            }
-
-            if (current == '[')
-            {
-                var start = index + 1;
-                while (index < code.Length && code[index] != ']')
-                {
-                    index++;
-                }
-
-                var content = code[start..Math.Min(index, code.Length)];
-                if (content.Length is > 0 and <= 2 && content.All(token => token is 'h' or 'H'))
-                {
-                    // An elapsed-hours token ([h] or [hh]) is a time value, not a bracketed literal.
-                    tokens.Append('h');
-                }
-
-                continue;
-            }
-
-            if (current is '\\' or '_' or '*')
-            {
-                index++;
-                continue;
-            }
-
-            tokens.Append(current);
-        }
-
-        return tokens.ToString();
     }
 }

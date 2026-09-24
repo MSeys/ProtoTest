@@ -53,9 +53,14 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
         }
 
         var resolved = new List<InitializedClient>();
+
+        // An unscoped provider serves every chain that names it, so it runs once per test and the
+        // chains after the first reuse the client it registered. Without the memo, two protocols
+        // sharing a client name would each invoke it and the second registration would conflict.
+        var fallbacks = new Dictionary<IProtoClientInitializer, InitializedClient?>(ReferenceEqualityComparer.Instance);
         foreach (var chain in chains)
         {
-            await InitializeChainAsync(context, chain, resolved);
+            await InitializeChainAsync(context, chain, resolved, fallbacks);
         }
 
         // A client owned by exactly one provider group is also reachable by its bare name, so
@@ -78,7 +83,8 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
     private static async Task InitializeChainAsync(
         ProtoExecutionContext context,
         ClientChain chain,
-        List<InitializedClient> resolved)
+        List<InitializedClient> resolved,
+        Dictionary<IProtoClientInitializer, InitializedClient?> fallbacks)
     {
         var clientId = $"client:{chain.ClientType.FullName}:{chain.ScopedName}";
         var clientName = $"Client {chain.ClientType.Name} '{chain.ScopedName}'";
@@ -98,6 +104,20 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
         {
             try
             {
+                // An unscoped provider has already served its one invocation for this test when a
+                // previous chain reached it: reuse what it registered, or its decline, as it stands.
+                if (initializer.Protocol is null && fallbacks.TryGetValue(initializer, out var cached))
+                {
+                    if (cached.HasValue)
+                    {
+                        resolved.Add(cached.Value);
+                        initialized = true;
+                        break;
+                    }
+
+                    continue;
+                }
+
                 if (await initializer.TryInitializeAsync(context))
                 {
                     context.Trace.SetEntityState(
@@ -108,12 +128,23 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
                         {
                             ["client.initializer"] = initializer.GetType().Name
                         });
-                    resolved.Add(new InitializedClient(
+                    var entry = new InitializedClient(
                         initializer.Name,
                         initializer.ClientType,
-                        ProtoClientResolution.ScopedName(initializer.Protocol, initializer.Name)));
+                        ProtoClientResolution.ScopedName(initializer.Protocol, initializer.Name));
+                    if (initializer.Protocol is null)
+                    {
+                        fallbacks[initializer] = entry;
+                    }
+
+                    resolved.Add(entry);
                     initialized = true;
                     break;
+                }
+
+                if (initializer.Protocol is null)
+                {
+                    fallbacks[initializer] = null;
                 }
             }
             catch (Exception exception)

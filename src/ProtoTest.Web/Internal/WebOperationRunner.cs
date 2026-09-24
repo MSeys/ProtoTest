@@ -40,6 +40,40 @@ internal sealed class WebOperationRunner(
             cancellationToken,
             opensNestingScope);
 
+    /// <summary>Runs one semantic operation with the trace vocabulary its descriptor owns.</summary>
+    public ValueTask ExecuteVoidAsync(
+        WebOperation operation,
+        WebElementReference element,
+        Dictionary<string, string?> attributes,
+        Func<IWebBackend, CancellationToken, ValueTask> execute,
+        CancellationToken cancellationToken,
+        string? detail = null)
+        => ExecuteVoidAsync(
+            operation.TraceKind,
+            operation.TraceName(element, detail),
+            operation.Kind,
+            element,
+            attributes,
+            execute,
+            cancellationToken);
+
+    /// <summary>Reads one semantic operation's result with the trace vocabulary its descriptor owns.</summary>
+    public ValueTask<TResult> ExecuteAsync<TResult>(
+        WebOperation operation,
+        WebElementReference element,
+        Dictionary<string, string?> attributes,
+        Func<IWebBackend, CancellationToken, ValueTask<TResult>> execute,
+        CancellationToken cancellationToken,
+        string? detail = null)
+        => ExecuteAsync(
+            operation.TraceKind,
+            operation.TraceName(element, detail),
+            operation.Kind,
+            element,
+            attributes,
+            execute,
+            cancellationToken);
+
     public async ValueTask<TResult> ExecuteAsync<TResult>(
         string kind,
         string name,
@@ -71,6 +105,9 @@ internal sealed class WebOperationRunner(
             context, operationKind, OperationName(name), backend.Name, sessionName, operation.Id, element, backend);
         try
         {
+            // The tail writes the result into this typed local; middlewares wrap the pipeline but never
+            // carry the value, so the runner never casts an object back to the caller's type.
+            TResult result = default!;
             WebOperationDelegate pipeline = async (operationContext, ct) =>
             {
                 using var backendOperation = context.Trace
@@ -85,7 +122,7 @@ internal sealed class WebOperationRunner(
                 try
                 {
                     await backend.BeginOperationAsync(backendContext, ct);
-                    operationContext.Result = await execute(backend, ct);
+                    result = await execute(backend, ct);
                     outcome = ProtoTraceOutcome.Succeeded;
                     backendOperation.Succeed();
                 }
@@ -117,7 +154,6 @@ internal sealed class WebOperationRunner(
 
             await pipeline(webOperation, cancellationToken);
 
-            var result = (TResult)webOperation.Result!;
             afterCapture?.Invoke(result, operation);
             operation.Succeed();
             return result;

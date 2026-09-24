@@ -26,6 +26,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
     private readonly Action<ProtoTestTraceRecorder>? _onCompleted;
     private readonly ProtoItemStore _items = new();
     private readonly ProtoLock _orphanGate = new();
+    private readonly ProtoLock _completionGate = new();
     private readonly List<ProtoTraceObservationRecord> _orphanObservations = [];
     private readonly List<ProtoTraceAttachmentRecord> _orphanAttachments = [];
     private readonly List<ProtoTraceFindingRecord> _orphanFindings = [];
@@ -52,6 +53,9 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
 
     public string TestId { get; }
     public string Name { get; }
+
+    /// <summary>Whether this test completed; a completed recorder must not observe new spans.</summary>
+    internal bool IsCompleted => Volatile.Read(ref _completed) != 0;
 
     public ProtoTraceOperation StartOperation(
         string kind,
@@ -173,6 +177,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
             entityKind,
             entityId);
         entry.Complete(outcome, exception);
+        MarkFailedAncestors(entry, outcome);
         _entries.Enqueue(entry);
         _entriesById.TryAdd(entry.Id, entry);
         WriteActivityEvent(entry);
@@ -290,6 +295,9 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
     {
         ProtoTraceRecords.ValidateFinding(message, status, category);
         if (!_options.Enabled) return;
+        // The recording boundary applies the evidence policy too, so a direct Trace.Finding caller
+        // cannot put raw or cyclic metadata into the archive.
+        metadata = ProtoMetadataRedaction.Redact(metadata);
         var entry = _current.Value;
         if (entry is not null)
         {
@@ -330,6 +338,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
             exception: null,
             error: ProtoTraceActivity.Error(activity),
             duration: activity.Duration);
+        MarkFailedAncestors(entry, failed ? ProtoTraceOutcome.Failed : ProtoTraceOutcome.Succeeded);
         _entries.Enqueue(entry);
         _entriesById.TryAdd(entry.Id, entry);
         return entry.Id;
@@ -347,13 +356,19 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
 
     public void CompleteTest(ProtoTestResult result)
     {
-        if (Interlocked.Exchange(ref _completed, 1) != 0) return;
-        _duration = Stopwatch.GetElapsedTime(_startedTimestamp);
-        _outcome = result.Outcome == ProtoTraceOutcome.Succeeded && _entries.Any(entry =>
-                entry.Outcome is ProtoTraceOutcome.Failed or ProtoTraceOutcome.Partial)
-            ? ProtoTraceOutcome.Partial
-            : result.Outcome;
-        _error = result.Error ?? (result.Exception is null ? null : ProtoTraceError.FromException(result.Exception));
+        // The duration, outcome and error are published before the completed flag: a snapshot that sees
+        // the flag set must see the final fields, not a zero duration and an unknown outcome.
+        lock (_completionGate)
+        {
+            if (_completed != 0) return;
+            _duration = Stopwatch.GetElapsedTime(_startedTimestamp);
+            _outcome = result.Outcome == ProtoTraceOutcome.Succeeded && _entries.Any(entry =>
+                    entry.Outcome is ProtoTraceOutcome.Failed or ProtoTraceOutcome.Partial)
+                ? ProtoTraceOutcome.Partial
+                : result.Outcome;
+            _error = result.Error ?? (result.Exception is null ? null : ProtoTraceError.FromException(result.Exception));
+            Volatile.Write(ref _completed, 1);
+        }
 
         foreach (var entry in _entries)
         {
@@ -385,7 +400,12 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
                 attachment.MediaType,
                 attachment.Description,
                 archivePath);
-            var source = await ProtoArtifactCapture.CaptureAsync(artifact, attachment, cancellationToken);
+            var source = await ProtoArtifactCapture.CaptureAsync(
+                artifact,
+                attachment,
+                _options.MaxArtifactBytes,
+                _options.EmbedArtifacts,
+                cancellationToken);
             artifacts.Add(source);
             PatchAttachment(attachment.Name, id, archivePath, source.Content.Length, source.Artifact.Error);
         }
@@ -476,7 +496,9 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
 
     internal void Complete(TraceEntryState entry, ProtoTraceOutcome outcome, Exception? exception)
     {
-        entry.Complete(ResolveOutcome(entry, outcome), exception);
+        var resolved = ResolveOutcome(entry, outcome);
+        entry.Complete(resolved, exception);
+        MarkFailedAncestors(entry, resolved);
         if (ReferenceEquals(_current.Value, entry))
         {
             _current.Value = entry.Parent;
@@ -485,18 +507,40 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
 
     internal void Complete(TraceEntryState entry, ProtoTestResult result)
     {
-        entry.Complete(ResolveOutcome(entry, result.Outcome), result.Exception, result.Error);
+        var resolved = ResolveOutcome(entry, result.Outcome);
+        entry.Complete(resolved, result.Exception, result.Error);
+        MarkFailedAncestors(entry, resolved);
         if (ReferenceEquals(_current.Value, entry))
         {
             _current.Value = entry.Parent;
         }
     }
 
-    private ProtoTraceOutcome ResolveOutcome(TraceEntryState entry, ProtoTraceOutcome outcome)
-        => outcome == ProtoTraceOutcome.Succeeded && _entries.Any(candidate =>
-            candidate.ParentId == entry.Id && candidate.Outcome is ProtoTraceOutcome.Failed or ProtoTraceOutcome.Partial)
+    private static ProtoTraceOutcome ResolveOutcome(TraceEntryState entry, ProtoTraceOutcome outcome)
+        => outcome == ProtoTraceOutcome.Succeeded && entry.HasFailedDescendant
             ? ProtoTraceOutcome.Partial
             : outcome;
+
+    /// <summary>
+    /// Marks every ancestor of a failed entry, so an operation that succeeds while a child failed
+    /// resolves to partial without scanning the entries recorded after it.
+    /// </summary>
+    private void MarkFailedAncestors(TraceEntryState entry, ProtoTraceOutcome outcome)
+    {
+        if (outcome is not (ProtoTraceOutcome.Failed or ProtoTraceOutcome.Partial))
+        {
+            return;
+        }
+
+        for (var parent = ParentOf(entry); parent is not null; parent = ParentOf(parent))
+        {
+            parent.MarkFailedDescendant();
+        }
+    }
+
+    private TraceEntryState? ParentOf(TraceEntryState entry)
+        => entry.Parent
+           ?? (entry.ParentId is not null && _entriesById.TryGetValue(entry.ParentId, out var parent) ? parent : null);
 
     public ProtoTestTrace Snapshot()
     {

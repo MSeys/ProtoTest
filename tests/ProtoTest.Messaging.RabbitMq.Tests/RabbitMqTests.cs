@@ -3,7 +3,6 @@ namespace ProtoTest.Messaging.RabbitMq.Tests;
 using System.Reflection;
 using global::RabbitMQ.Client;
 using Microsoft.Extensions.Configuration;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Messaging;
 using ProtoTest.Messaging.RabbitMq;
@@ -12,14 +11,22 @@ using ProtoTest.Messaging.RabbitMq.Testcontainers;
 [TestFixture]
 public sealed class RabbitMqTests
 {
-    private static RabbitMqBroker? _container;
+    // One lazy start shared by every parallel test: a check-then-act here would start a container
+    // per racing caller and leak all but the last.
+    private static readonly Lazy<(RabbitMqBroker? Broker, string? Error)> Container = new(
+        static () =>
+        {
+            var result = RabbitMqBroker.TryStart();
+            return (result.Resource, result.Error);
+        },
+        LazyThreadSafetyMode.ExecutionAndPublication);
 
     [OneTimeTearDown]
-    public async Task StopContainer()
+    public static async Task StopContainer()
     {
-        if (_container is not null)
+        if (Container.IsValueCreated && Container.Value.Broker is { } container)
         {
-            await _container.DisposeAsync();
+            await container.DisposeAsync();
         }
     }
 
@@ -58,11 +65,7 @@ public sealed class RabbitMqTests
         var connectionString = RequireBroker();
 
         var exchange = $"prototest.tests.{Guid.NewGuid():N}";
-        using (var bootstrap = Connect(connectionString))
-        using (var channel = bootstrap.CreateModel())
-        {
-            channel.ExchangeDeclare(exchange, ExchangeType.Fanout, durable: false, autoDelete: true);
-        }
+        await DeclareExchangeAsync(connectionString, exchange, ExchangeType.Fanout);
 
         try
         {
@@ -91,9 +94,7 @@ public sealed class RabbitMqTests
         }
         finally
         {
-            using var cleanup = Connect(connectionString);
-            using var channel = cleanup.CreateModel();
-            channel.ExchangeDelete(exchange);
+            await DeleteExchangeAsync(connectionString, exchange);
         }
     }
 
@@ -103,11 +104,7 @@ public sealed class RabbitMqTests
         var connectionString = RequireBroker();
 
         var exchange = $"prototest.tests.{Guid.NewGuid():N}";
-        using (var bootstrap = Connect(connectionString))
-        using (var channel = bootstrap.CreateModel())
-        {
-            channel.ExchangeDeclare(exchange, ExchangeType.Direct, durable: false, autoDelete: true);
-        }
+        await DeclareExchangeAsync(connectionString, exchange, ExchangeType.Direct);
 
         try
         {
@@ -137,9 +134,7 @@ public sealed class RabbitMqTests
         }
         finally
         {
-            using var cleanup = Connect(connectionString);
-            using var channel = cleanup.CreateModel();
-            channel.ExchangeDelete(exchange);
+            await DeleteExchangeAsync(connectionString, exchange);
         }
     }
 
@@ -149,11 +144,7 @@ public sealed class RabbitMqTests
         var connectionString = RequireBroker();
 
         var exchange = $"prototest.tests.{Guid.NewGuid():N}";
-        using (var bootstrap = Connect(connectionString))
-        using (var channel = bootstrap.CreateModel())
-        {
-            channel.ExchangeDeclare(exchange, ExchangeType.Headers, durable: false, autoDelete: true);
-        }
+        await DeclareExchangeAsync(connectionString, exchange, ExchangeType.Headers);
 
         try
         {
@@ -187,9 +178,7 @@ public sealed class RabbitMqTests
         }
         finally
         {
-            using var cleanup = Connect(connectionString);
-            using var channel = cleanup.CreateModel();
-            channel.ExchangeDelete(exchange);
+            await DeleteExchangeAsync(connectionString, exchange);
         }
     }
 
@@ -199,11 +188,7 @@ public sealed class RabbitMqTests
         var connectionString = RequireBroker();
 
         var exchange = $"prototest.tests.{Guid.NewGuid():N}";
-        using (var bootstrap = Connect(connectionString))
-        using (var channel = bootstrap.CreateModel())
-        {
-            channel.ExchangeDeclare(exchange, ExchangeType.Fanout, durable: false, autoDelete: true);
-        }
+        await DeclareExchangeAsync(connectionString, exchange, ExchangeType.Fanout);
 
         try
         {
@@ -252,9 +237,7 @@ public sealed class RabbitMqTests
         }
         finally
         {
-            using var cleanup = Connect(connectionString);
-            using var channel = cleanup.CreateModel();
-            channel.ExchangeDelete(exchange);
+            await DeleteExchangeAsync(connectionString, exchange);
         }
     }
 
@@ -291,11 +274,7 @@ public sealed class RabbitMqTests
         var connectionString = RequireBroker();
 
         var exchange = $"prototest.tests.{Guid.NewGuid():N}";
-        using (var bootstrap = Connect(connectionString))
-        using (var channel = bootstrap.CreateModel())
-        {
-            channel.ExchangeDeclare(exchange, ExchangeType.Fanout, durable: false, autoDelete: true);
-        }
+        await DeclareExchangeAsync(connectionString, exchange, ExchangeType.Fanout);
 
         try
         {
@@ -308,7 +287,7 @@ public sealed class RabbitMqTests
             builder.AddMessaging(messaging => messaging.UseRabbitMq(options =>
             {
                 options.ConnectionString = connectionString;
-                options.PollInterval = TimeSpan.FromMilliseconds(10);
+
             }));
             await using var host = builder.Build();
             await host.StartAsync();
@@ -328,6 +307,8 @@ public sealed class RabbitMqTests
                     exchange,
                     message =>
                     {
+                        // A deliberate timing probe: the predicate must outlast the poll
+                        // interval so the wait is still pending when its timeout elapses.
                         Thread.Sleep(20);
                         return message.Payload == "never";
                     },
@@ -344,9 +325,7 @@ public sealed class RabbitMqTests
         }
         finally
         {
-            using var cleanup = Connect(connectionString);
-            using var channel = cleanup.CreateModel();
-            channel.ExchangeDelete(exchange);
+            await DeleteExchangeAsync(connectionString, exchange);
         }
     }
 
@@ -380,7 +359,7 @@ public sealed class RabbitMqTests
         {
             Assert.Ignore(
                 "No RabbitMQ broker is available: set ProtoTest__Messaging__RabbitMq__ConnectionString " +
-                "or start a container runtime.");
+                "or start a container runtime. " + Container.Value.Error);
         }
 
         return connectionString;
@@ -394,17 +373,26 @@ public sealed class RabbitMqTests
             return configured;
         }
 
-        if (_container is null && RabbitMqBroker.TryStart(configure: null, out var broker, out _))
-        {
-            _container = broker;
-        }
-
-        return _container?.ConnectionString;
+        return Container.Value.Broker?.ConnectionString;
     }
 
-    private static IConnection Connect(string connectionString)
-        => new ConnectionFactory { Uri = new Uri(connectionString) }
-            .CreateConnection("ProtoTest.Messaging.RabbitMq.Tests");
+    /// <summary>Declares a throwaway exchange for one test, on a connection of its own.</summary>
+    private static async Task DeclareExchangeAsync(string connectionString, string exchange, string type)
+    {
+        await using var connection = await ConnectAsync(connectionString);
+        await using var channel = await connection.CreateChannelAsync();
+        await channel.ExchangeDeclareAsync(exchange, type, durable: false, autoDelete: true);
+    }
 
+    /// <summary>Deletes the throwaway exchange, so a rerun starts from the same broker state.</summary>
+    private static async Task DeleteExchangeAsync(string connectionString, string exchange)
+    {
+        await using var connection = await ConnectAsync(connectionString);
+        await using var channel = await connection.CreateChannelAsync();
+        await channel.ExchangeDeleteAsync(exchange);
+    }
 
+    private static async Task<IConnection> ConnectAsync(string connectionString)
+        => await new ConnectionFactory { Uri = new Uri(connectionString) }
+            .CreateConnectionAsync("ProtoTest.Messaging.RabbitMq.Tests");
 }

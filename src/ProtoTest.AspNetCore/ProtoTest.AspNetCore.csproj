@@ -5,13 +5,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
-    <IsPackable>true</IsPackable>
+    
+    <!-- No 1.0.1 baseline exists for this package (or its Web.Pages dependency); validate once 1.1 ships. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
     <Description>In-process ASP.NET Core application testing for ProtoTest.</Description>
     <PackageTags>testing;integration-testing;aspnetcore;webapplicationfactory;dotnet</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <!-- The in-process server contributes the same page inventory the browser sessions consume. -->
+    <ProjectReference Include="..\ProtoTest.Web.Pages\ProtoTest.Web.Pages.csproj" />
   </ItemGroup>
     
   <!-- Conditional Version Mapping -->

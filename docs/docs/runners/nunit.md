@@ -6,7 +6,7 @@ description: "Set up ProtoTest with NUnit: the SetUpFixture, [ProtoTest] tests, 
 
 # NUnit
 
-`ProtoTest.NUnit` starts the host from a `[SetUpFixture]` and wraps each `[ProtoTest]` method in a ProtoTest context. It is the runner the repository's own sample suite uses.
+`ProtoTest.NUnit` starts the host from a `[SetUpFixture]` and wraps each `[ProtoTest]` method in a ProtoTest context. The wrapper is applied outside NUnit's setup and teardown, so the lifecycle spans `[SetUp]`, the body and `[TearDown]`. It is the runner the repository's own sample suite uses.
 
 ## Install
 
@@ -80,7 +80,7 @@ public class OrderTests
 
 ## Skipping
 
-`BeforeTest` evaluates the test's conditions before `StartTestAsync`; a skip calls `Assert.Ignore(reason)` and nothing is started, so no trace entry is written. `[RequiresCapability]`, `[RequiresInProcess]` and `[RequiresPlaywrightBrowser]` all work this way. See [Skip conditions](../foundation/skip-conditions.md).
+The wrapper evaluates the test's conditions before anything runs - not even `[SetUp]` - by reporting an ignored result, so no trace entry is written for a skipped test. `[RequiresCapability]`, `[RequiresInProcess]` and `[RequiresPlaywrightBrowser]` all work this way. See [Skip conditions](../foundation/skip-conditions.md).
 
 ## Attachments
 

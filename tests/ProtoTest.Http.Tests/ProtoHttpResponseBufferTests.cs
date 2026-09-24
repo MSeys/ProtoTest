@@ -25,7 +25,7 @@ public sealed class ProtoHttpResponseBufferTests
     public void BufferAsync_ShouldRejectNegativeLimit()
     {
         using var response = Response(new StringContent("hello"));
-        Assert.ThrowsAsync<InvalidOperationException>(() => ProtoHttpResponseBuffer.BufferAsync(response, -1));
+        Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => ProtoHttpResponseBuffer.BufferAsync(response, -1));
     }
 
     [Test]

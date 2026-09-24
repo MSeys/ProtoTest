@@ -8,7 +8,6 @@ using ProtoTest.Core.Internal;
 
 internal sealed class ProtoTraceSession : IProtoTraceSource
 {
-    internal const string CurrentFormatVersion = "1.9";
     private readonly ConcurrentDictionary<string, ProtoTestTraceRecorder> _tests = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ProtoTestTraceRecorder> _testsByTraceId = new(StringComparer.Ordinal);
     private readonly ConcurrentQueue<ProtoTraceArtifactSource> _runArtifacts = new();
@@ -33,7 +32,7 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
     /// </summary>
     public void StartListening()
     {
-        if (_options.ActivitySources.Count == 0 || Interlocked.Exchange(ref _listening, 1) != 0)
+        if (!_options.Enabled || _options.ActivitySources.Count == 0 || Interlocked.Exchange(ref _listening, 1) != 0)
         {
             return;
         }
@@ -61,7 +60,7 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
 
     private void OnActivityStopped(Activity activity)
     {
-        if (activity.Source.Name == ProtoTestDiagnostics.ActivitySourceName)
+        if (!_options.Enabled || activity.Source.Name == ProtoTestDiagnostics.ActivitySourceName)
         {
             return;
         }
@@ -70,9 +69,32 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
         {
             // A span that carries a test's trace id belongs to that test even though the callback runs
             // outside its flow - the whole point of propagating context across the app boundary.
-            var writer = FindWriter(activity.TraceId)
-                ?? (IProtoTraceWriter?)ProtoHost.CurrentContextOrNull?.Trace
-                ?? _runWriter;
+            var writer = FindWriter(activity.TraceId);
+            if (writer is null)
+            {
+                var ambient = ProtoHost.CurrentContextOrNull;
+                if (ambient is not null)
+                {
+                    // The ambient context is process-wide: only the session that recorded the test may
+                    // capture its spans, or two hosts would both record the same span.
+                    if (!Owns(ambient.Trace))
+                    {
+                        return;
+                    }
+
+                    writer = ambient.Trace;
+                }
+                else if (ProtoHostRegistry.FindTraceSession(activity.TraceId) is not null)
+                {
+                    // Another host's test owns the span; that host's listener captures it.
+                    return;
+                }
+                else
+                {
+                    writer = _runWriter;
+                }
+            }
+
             var operationId = writer.CaptureActivity(activity);
             _converter.Observe(writer, activity, operationId);
         }
@@ -81,6 +103,10 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
             // Capturing telemetry must never break the application.
         }
     }
+
+    /// <summary>Whether a writer is one of this session's test recorders.</summary>
+    private bool Owns(IProtoTraceWriter writer)
+        => _tests.Values.Any(recorder => ReferenceEquals(recorder, writer));
 
     /// <inheritdoc />
     public IProtoTraceWriter? FindWriter(ActivityTraceId traceId)
@@ -103,6 +129,9 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
     /// <summary>Gets the writer for operations that belong to the run rather than to one test.</summary>
     public IProtoTraceWriter RunWriter => _runWriter;
 
+    /// <summary>Whether automatic trace collection and export are on.</summary>
+    internal bool Enabled => _options.Enabled;
+
     /// <summary>Gets how many completed or active tests still hold observed converter state; used by tests.</summary>
     internal int TrackedWriterCount => _converter.TrackedWriterCount;
 
@@ -119,7 +148,9 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
         var values = _runWriter.SnapshotValues();
 
         return new ProtoTraceRun(
-            CurrentFormatVersion,
+            // The run snapshot has no separate version of its own: it is serialized as the span
+            // document, so its version is the span format's.
+            ProtoTraceWire.SpanFormatVersion,
             _runId,
             _startedAtUtc,
             _completedAtUtc,
@@ -200,7 +231,12 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
             var id = $"run-artifact-{sequence}";
             var archivePath = $"resources/run/{ProtoPathSanitizer.FileName(sourceName, "artifact")}/{id}/{ProtoPathSanitizer.FileName(attachment.Name, "artifact")}";
             var artifact = new ProtoTraceArtifact(id, attachment.Name, attachment.MediaType, attachment.Description, archivePath);
-            _runArtifacts.Enqueue(await ProtoArtifactCapture.CaptureAsync(artifact, attachment, cancellationToken));
+            _runArtifacts.Enqueue(await ProtoArtifactCapture.CaptureAsync(
+                artifact,
+                attachment,
+                _options.MaxArtifactBytes,
+                _options.EmbedArtifacts,
+                cancellationToken));
         }
     }
 

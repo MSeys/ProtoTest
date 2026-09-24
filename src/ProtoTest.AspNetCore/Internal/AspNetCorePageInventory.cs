@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using ProtoTest.Core.Internal;
+using ProtoTest.Web.Pages;
 
 /// <summary>
 /// Best-effort inventory of an in-process application's page-like GET routes. Each route becomes a

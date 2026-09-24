@@ -20,7 +20,10 @@ public sealed class ProtoHost : IAsyncDisposable
     private readonly ProtoRunStateMachine _runState = new();
     private readonly List<IProtoRunHook> _startedHooks = [];
 
-    public ProtoHost(IServiceProvider rootServiceProvider)
+    // The builder is the only composition path: it registers the stores, gates and hooks the host's
+    // reporting depends on, so a provider assembled by hand cannot produce a host that silently
+    // loses findings and resource reports.
+    internal ProtoHost(IServiceProvider rootServiceProvider)
     {
         _rootServiceProvider = rootServiceProvider ?? throw new ArgumentNullException(nameof(rootServiceProvider));
 
@@ -58,6 +61,16 @@ public sealed class ProtoHost : IAsyncDisposable
     /// </summary>
     public static IProtoTraceWriter? FindTraceWriter(ActivityTraceId traceId)
         => ProtoHostRegistry.FindTraceWriter(traceId);
+
+    /// <summary>
+    /// Finds the trace writer for a span: the supplied activity, or <see cref="Activity.Current"/> when
+    /// none is given. The one-line form for a telemetry callback that has an activity in hand.
+    /// </summary>
+    public static IProtoTraceWriter? FindTraceWriter(Activity? activity = null)
+    {
+        var span = activity ?? Activity.Current;
+        return span is null ? null : FindTraceWriter(span.TraceId);
+    }
 
     /// <summary>
     /// Returns whether the host is composed with a capability of the given kind (optionally a specific
@@ -112,10 +125,8 @@ public sealed class ProtoHost : IAsyncDisposable
             await _runHooks.RunBeforeAsync(_startedHooks, cancellationToken);
 
             // A retry after a failed start re-owns the run-scoped resources the rollback released.
-            if (_rootServiceProvider.GetService<ProtoRunResourceStore>() is { } runResources)
-            {
-                runResources.ResetForRestart();
-            }
+            var runResources = _rootServiceProvider.GetService<ProtoRunResourceStore>();
+            runResources?.ResetForRestart();
 
             foreach (var capability in _rootServiceProvider.GetServices<ProtoCapabilityDescriptor>())
             {
@@ -140,6 +151,9 @@ public sealed class ProtoHost : IAsyncDisposable
             foreach (var registration in _rootServiceProvider.GetServices<ProtoInfrastructureRegistration>())
             {
                 var infrastructure = registration.Infrastructure;
+
+                // Starting it again makes this a new ownership period: its release must run again.
+                runResources?.Rearm(infrastructure);
                 await infrastructure.StartAsync(cancellationToken);
                 var state = new Dictionary<string, string?>
                 {
@@ -176,11 +190,13 @@ public sealed class ProtoHost : IAsyncDisposable
         }
         catch (Exception exception)
         {
-            // Nothing that did start may leak: the completed run hooks run in reverse, which releases
-            // the run's resources (the infrastructure started so far) in reverse registration order,
-            // and the state returns to Created so a retry is possible.
+            // Nothing that did start may leak: the run-resource hook releases the infrastructure started
+            // so far, in reverse registration order. Gates, reports and the archive do not run for a run
+            // that never finished starting, and the state returns to Created so a retry is possible.
             var failures = new List<Exception> { exception };
-            await _runHooks.RunAfterAsync(_startedHooks, failures, cancellationToken);
+            IReadOnlyList<IProtoRunHook> rollbackHooks =
+                [.. _startedHooks.OfType<ProtoRunResourceHook>().Cast<IProtoRunHook>()];
+            await _runHooks.RunAfterAsync(rollbackHooks, failures, cancellationToken);
             _startedHooks.Clear();
             _runState.RollbackStart();
 

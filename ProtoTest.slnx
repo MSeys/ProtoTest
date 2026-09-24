@@ -21,6 +21,7 @@
     <Project Path="src/ProtoTest.Sql.EntityFrameworkCore/ProtoTest.Sql.EntityFrameworkCore.csproj" />
     <Project Path="src/ProtoTest.Sql.Testcontainers/ProtoTest.Sql.Testcontainers.csproj" />
     <Project Path="src/ProtoTest.Testcontainers/ProtoTest.Testcontainers.csproj" />
+    <Project Path="src/ProtoTest.Web.Pages/ProtoTest.Web.Pages.csproj" />
     <Project Path="src/ProtoTest.Web/ProtoTest.Web.csproj" />
     <Project Path="src/ProtoTest.Web.Playwright/ProtoTest.Web.Playwright.csproj" />
     <Project Path="src/ProtoTest.Web.Selenium/ProtoTest.Web.Selenium.csproj" />
@@ -41,6 +42,7 @@
     <Project Path="tests/ProtoTest.Messaging.Tests/ProtoTest.Messaging.Tests.csproj" />
     <Project Path="tests/ProtoTest.Messaging.RabbitMq.Tests/ProtoTest.Messaging.RabbitMq.Tests.csproj" />
     <Project Path="tests/ProtoTest.Sheets.Tests/ProtoTest.Sheets.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Traces.Tests/ProtoTest.Traces.Tests.csproj" />
   </Folder>
   <Folder Name="/4. Tests/Adapters/">
     <Project Path="tests/ProtoTest.MSTest.Tests/ProtoTest.MSTest.Tests.csproj" Id="46d67240-27b6-4460-a3d1-558336e41c9f" />
@@ -75,5 +77,9 @@
   </Folder>
   <Folder Name="/6. Templates/">
     <Project Path="src/ProtoTest.Templates/ProtoTest.Templates.csproj" />
+  </Folder>
+  <Folder Name="/7. Tools/">
+    <Project Path="src/ProtoTest.Cli/ProtoTest.Cli.csproj" />
+    <Project Path="src/ProtoTest.Traces/ProtoTest.Traces.csproj" />
   </Folder>
 </Solution>

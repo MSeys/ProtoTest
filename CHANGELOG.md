@@ -7,6 +7,31 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ## [Unreleased]
 
+### Fixed
+
+- Shape mismatches whose expected shape carries a value constraint now record every mismatch in the
+  trace instead of an internal compiler-generated type name (or an opaque constraint object on
+  .NET 8).
+- Malformed JSON response bodies are redacted with the shared sensitive-name policy instead of
+  passing through unredacted.
+- Report metadata (findings and observations) is redacted with the same policy the trace uses.
+- A released container resource can be started again and its connection string is cleared on
+  release, so a retry after a failed run start works and no released endpoint stays readable.
+- Run resources restarted by a retry are released with their new ownership period instead of being
+  skipped as already released.
+- A failed web backend creation is no longer cached, so a session retries from a clean slate.
+- RabbitMQ uses `RabbitMQ.Client` 7.x end to end (async connection, channel, publish and consume), and
+  a delivery is converted to the broker-neutral message inside the consumer handler, where its body
+  buffer is still valid.
+
+### Changed
+
+- REST object request bodies serialize with the shared web defaults (camelCase names), matching
+  GraphQL variables. Pass explicit `JsonSerializerOptions` to keep another naming policy.
+- OpenAPI coverage reads specifications with `Microsoft.OpenApi` 3.x (JSON and YAML, including 3.1
+  documents). `ProtoTest.OpenApi` references `ProtoTest.Core` directly instead of relying on a
+  transitive reference.
+
 ### Breaking
 
 - `AddClientFrom` was removed from the REST and GraphQL builders. Register clients under an
@@ -14,6 +39,15 @@ All ProtoTest packages share one version; breaking API changes are called out be
   address depends on test context.
 - Several registration, observation and runner implementation types are now internal. Use the
   public builder, response and runner APIs instead of constructing those implementation types.
+- `ProtoHost` can no longer be constructed from a service provider directly; use `ProtoHostBuilder`,
+  which registers the stores, gates and hooks the host's reporting depends on.
+- `ProtoFlow` steps now declare the trace operation they record (`ProtoStepDescriptor`); the unused
+  `ProtoStepOptions` retry and timeout surface was removed.
+- `IProtoClientInitializer.TryInitializeAsync` no longer takes a cancellation token. Test setup is
+  not cancellable by any runner adapter; a run-scoped hook is the cancellable extension point.
+- `ProtoTest.AspNetCore` now depends on the new `ProtoTest.Web.Pages` package (page identity and
+  inventory) instead of the full `ProtoTest.Web`, for the one concept the in-process server and the
+  browser sessions share. `ProtoTest.Web` depends on it too.
 - `ProtoTest:Web:Sessions:{name}` settings no longer configure sessions. Put addresses under
   `ProtoTest:Applications:{application}` and select the session with `[WebSession]` or `Web()`;
   backend options remain under `ProtoTest:Web:Playwright` or `ProtoTest:Web:Selenium`.

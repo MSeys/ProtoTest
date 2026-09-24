@@ -2,7 +2,6 @@ namespace ProtoTest.Grpc.Tests;
 
 using System.Reflection;
 using global::Grpc.Core;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Grpc.Tests.Echo;
 using ProtoTest.Json;

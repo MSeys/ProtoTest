@@ -223,6 +223,25 @@ public sealed class JsonShapeMatcherTests
     }
 
     [Test]
+    public void DiagnosticSanitizer_ShouldRedactSensitiveKeysInMalformedJson()
+    {
+        // A truncated body is exactly where a secret survives: it starts like JSON, so the
+        // text-level form redactor would not look at it.
+        var truncated = JsonDiagnosticSanitizer.Sanitize("""{"user":"ada","token":"secret""");
+        var midObject = JsonDiagnosticSanitizer.Sanitize("""{"data":{"access_token":"abc""");
+        var completeButInvalid = JsonDiagnosticSanitizer.Sanitize("""{"token":"secret",}""");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(truncated, Does.Not.Contain("secret"));
+            Assert.That(truncated, Does.Contain("\"token\":\"[REDACTED]\""));
+            Assert.That(truncated, Does.Contain("\"user\":\"ada\""));
+            Assert.That(midObject, Does.Not.Contain("abc"));
+            Assert.That(completeButInvalid, Does.Not.Contain("secret"));
+        }
+    }
+
+    [Test]
     public void DiagnosticSanitizer_ShouldRedactSensitiveKeysInNonJsonBodies()
     {
         var form = JsonDiagnosticSanitizer.Sanitize("username=ada&password=hunter2");

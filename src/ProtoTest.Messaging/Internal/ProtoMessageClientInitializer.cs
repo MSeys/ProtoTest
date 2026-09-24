@@ -12,13 +12,12 @@ internal sealed class ProtoMessageClientInitializer(string name) : IProtoClientI
 {
     public string Name { get; } = name;
 
-    public async Task<bool> TryInitializeAsync(
-        ProtoExecutionContext context,
-        CancellationToken cancellationToken = default)
+    public async Task<bool> TryInitializeAsync(ProtoExecutionContext context)
     {
         var broker = context.Service<IProtoMessageBroker>();
         var options = context.Service<MessagingOptions>();
-        var consumer = await broker.CreateConsumerAsync(cancellationToken);
+        // Test setup is not cancellable: no adapter supplies a token for it.
+        var consumer = await broker.CreateConsumerAsync(CancellationToken.None);
 
         // Register before preparing: a failed PrepareAsync must not leak the consumer's channel or queues.
         context.RegisterResource(
@@ -29,7 +28,7 @@ internal sealed class ProtoMessageClientInitializer(string name) : IProtoClientI
         if (options.Destinations.Count > 0)
         {
             // Bind the test's taps before it acts: a message published after this point is never missed.
-            await consumer.PrepareAsync([.. options.Destinations], cancellationToken);
+            await consumer.PrepareAsync([.. options.Destinations], CancellationToken.None);
         }
 
         context.RegisterClient(new ProtoMessageClient(context, broker, consumer, options), Name);

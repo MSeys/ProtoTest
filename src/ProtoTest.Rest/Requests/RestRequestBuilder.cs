@@ -6,82 +6,42 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Http;
+using ProtoTest.Json;
 using ProtoTest.Rest.Internal;
 
-public sealed class RestRequestBuilder
+public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, RestRequestBuilder>
 {
-    private readonly HttpClient _httpClient;
-    private readonly ProtoExecutionContext _context;
-    private readonly string _targetName;
-    private readonly Dictionary<string, string> _headers = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _tracedHeaders = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string?> _requestAttributes = new(StringComparer.Ordinal);
     private Func<HttpContent>? _contentFactory;
-    private Func<ProtoExecutionContext, IProtoHttpAuthenticator>? _authenticatorFactory;
-    private IProtoHttpAuthenticator? _resolvedAuthenticator;
-    private Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>>? _baseAddressResolver;
 
     internal RestRequestBuilder(
         HttpClient httpClient,
         ProtoExecutionContext context,
-        string targetName)
+        string targetName,
+        string? clientEntityName = null)
+        : base(httpClient, context, targetName, ProtoRestBuilder.Protocol, clientEntityName)
     {
-        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _context = context ?? throw new ArgumentNullException(nameof(context));
-        _targetName = targetName ?? throw new ArgumentNullException(nameof(targetName));
     }
 
-    public RestRequestBuilder Auth(IProtoHttpAuthenticator authenticator)
+    protected override void OnAuthenticationConfigured(string source, Type? authenticatorType)
     {
-        _resolvedAuthenticator = authenticator ?? throw new ArgumentNullException(nameof(authenticator));
-        _authenticatorFactory = _ => authenticator;
-        Configure(("auth.source", "request"), ("auth.type", authenticator.GetType().FullName));
-        return this;
+        Configure(("auth.source", source));
+        if (authenticatorType is not null)
+        {
+            Configure(("auth.type", authenticatorType.FullName));
+        }
     }
 
-    public RestRequestBuilder Auth<TAuth>(params object[] constructorArgs) where TAuth : class, IProtoHttpAuthenticator
-    {
-        _resolvedAuthenticator = null;
-        _authenticatorFactory = context => ProtoAuthenticatorFactory.Create<TAuth>(context, constructorArgs);
-        Configure(("auth.source", "request"), ("auth.type", typeof(TAuth).FullName));
-        return this;
-    }
-
-    /// <summary>Disables inherited or class-level authentication for this request builder.</summary>
-    public RestRequestBuilder WithoutAuth()
-    {
-        _resolvedAuthenticator = null;
-        _authenticatorFactory = null;
-        Configure(("auth.source", "request"));
-        return this;
-    }
-
-    internal RestRequestBuilder UseAuthenticatorFactory(
-        Func<ProtoExecutionContext, IProtoHttpAuthenticator>? authenticatorFactory)
-    {
-        _resolvedAuthenticator = null;
-        _authenticatorFactory = authenticatorFactory;
-        return this;
-    }
-
-    internal RestRequestBuilder UseBaseAddressResolver(
-        Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>>? baseAddressResolver)
-    {
-        _baseAddressResolver = baseAddressResolver;
-        return this;
-    }
-
-    public RestRequestBuilder Header(string name, string value)
-    {
-        _headers[name] = value;
-        Configure(("http.request.header_count", _headers.Count.ToString()));
-        return this;
-    }
+    protected override void OnHeaderConfigured(string name, bool isNewHeader)
+        => Configure(("http.request.header_count", Headers.Count.ToString()));
 
     public RestRequestBuilder Body(object payload, JsonSerializerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(payload);
-        var json = JsonSerializer.Serialize(payload, options);
+        // Request payloads follow the shared web defaults (camelCase names), the same options
+        // GraphQL variables use, so one DTO serializes the same through every protocol.
+        var json = JsonSerializer.Serialize(payload, options ?? ProtoJsonDefaults.Web);
         return Body(json, "application/json");
     }
 
@@ -148,122 +108,152 @@ public sealed class RestRequestBuilder
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(method);
-        var attachmentOptions = _context.ResolveAttachmentOptions(ProtoRestBuilder.ProtocolName);
-        using var traceOperation = _context.Trace
+        var attachmentOptions = Context.ResolveAttachmentOptions(ProtoRestBuilder.ProtocolName);
+        using var traceOperation = Context.Trace
             .Operation("http.request", $"REST · {method.Method.ToUpperInvariant()} {routeTemplate}", ProtoRestBuilder.Protocol.TraceSource)
-            .ForClient(typeof(HttpClient), _targetName)
+            .ForClient(typeof(HttpClient), TargetName, ClientEntityName)
             .With("http.request.method", method.Method.ToUpperInvariant())
             .With("http.route", routeTemplate)
             .With(_requestAttributes)
             .Begin();
         TraceConfiguredHeaders(traceOperation);
         var stopwatch = Stopwatch.StartNew();
-        Uri requestUri;
-        try
+
+        // One failure arm for every phase: stop the clock, fail the operation, record the failure
+        // observation, and rethrow so the caller sees the original exception.
+        async Task<TResult> RunAsync<TResult>(Func<Task<TResult>> phase, Uri? uri)
         {
-            requestUri = await RestUriBuilder.BuildRequestUriAsync(
-                routeTemplate,
-                routeAndQueryParams,
-                _httpClient.BaseAddress,
-                _baseAddressResolver,
-                _context,
-                ct);
-            traceOperation.SetAttribute(
-                "http.request.url",
-                ProtoHttpDiagnosticSanitizer.SanitizeUri(requestUri, attachmentOptions));
+            try
+            {
+                return await phase();
+            }
+            catch (Exception exception)
+            {
+                stopwatch.Stop();
+                traceOperation.Fail(exception);
+                TryRecordFailure(method, routeTemplate, uri, stopwatch.Elapsed, exception, ct, attachmentOptions);
+                throw;
+            }
         }
-        catch (Exception exception)
-        {
-            stopwatch.Stop();
-            traceOperation.Fail(exception);
-            TryRecordFailure(method, routeTemplate, null, stopwatch.Elapsed, exception, ct, attachmentOptions);
-            throw;
-        }
+
+        var requestUri = await RunAsync(
+            () => ResolveRequestUriAsync(routeTemplate, routeAndQueryParams, traceOperation, attachmentOptions, ct),
+            uri: null);
 
         using var request = new HttpRequestMessage(method, requestUri);
-        var restState = _context.TryResolve<ProtoHttpContextState>(ProtoRestBuilder.Protocol.Key);
-        if (restState is null)
-        {
-            restState = new ProtoHttpContextState();
-            _context.SetContext(ProtoRestBuilder.Protocol.Key, restState);
-        }
-        var attachmentNumber = attachmentOptions is null
-            ? (int?)null
-            : restState.NextRequestNumber();
-        var attachmentPrefix = attachmentNumber is null ? null : $"rest-{attachmentNumber:00}";
+        var attachmentPrefix = NextAttachmentPrefix(attachmentOptions);
         var attachmentDescription = $"{method.Method.ToUpperInvariant()} {routeTemplate}";
-
-        try
-        {
-            if (_contentFactory is not null)
+        await RunAsync(
+            async () =>
             {
-                request.Content = _contentFactory()
-                    ?? throw new InvalidOperationException("The REST request content factory returned null.");
+                await PrepareRequestAsync(request, traceOperation, attachmentOptions, attachmentPrefix, attachmentDescription, ct);
+                return true;
+            },
+            request.RequestUri);
 
-                if (attachmentOptions?.CaptureRequestBodies == true)
-                {
-                    var requestBody = await request.Content.ReadAsStringAsync(ct);
-                    var mediaType = request.Content.Headers.ContentType?.MediaType;
-                    _context.AddAttachment(
-                        $"{attachmentPrefix}-request",
-                        ProtoHttpDiagnosticSanitizer.SanitizeBody(requestBody, attachmentOptions),
-                        mediaType ?? "text/plain",
-                        attachmentDescription);
-                }
-            }
-
-            ProtoHttpHeaders.Apply(request, _headers);
-
-            _resolvedAuthenticator = await ProtoHttpAuthenticationApplier.ApplyAsync(
-                _authenticatorFactory,
-                _resolvedAuthenticator,
-                request,
-                _context,
-                _targetName,
-                traceOperation,
-                ct);
-
-            var requestFacts = new List<ProtoTraceSectionItem>
-            {
-                new("url", ProtoHttpDiagnosticSanitizer.SanitizeUri(request.RequestUri, attachmentOptions)),
-                new("auth", _authenticatorFactory is null ? "none" : _resolvedAuthenticator?.GetType().Name ?? "applied")
-            };
-            if (_requestAttributes.TryGetValue("http.request.body.media_type", out var bodyMediaType) && bodyMediaType is not null)
-            {
-                requestFacts.Add(new(
-                    "body",
-                    bodyMediaType,
-                    _requestAttributes.GetValueOrDefault("http.request.body.length") is { } bodyLength ? $"{bodyLength} B" : null));
-            }
-            if (_headers.Count > 0)
-            {
-                requestFacts.Add(new("headers", _headers.Count.ToString()));
-            }
-            traceOperation.AddSection(new ProtoTraceSection("Request", ProtoTraceSectionKind.Fields, requestFacts));
-        }
-        catch (Exception exception)
-        {
-            stopwatch.Stop();
-            traceOperation.Fail(exception);
-            TryRecordFailure(
+        return await RunAsync(
+            () => SendAndObserveAsync(
                 method,
                 routeTemplate,
-                request.RequestUri,
-                stopwatch.Elapsed,
-                exception,
-                ct,
-                attachmentOptions);
-            throw;
+                request,
+                traceOperation,
+                stopwatch,
+                attachmentOptions,
+                attachmentPrefix,
+                attachmentDescription,
+                ct),
+            request.RequestUri);
+    }
+
+    /// <summary>Builds the request URI and records it on the operation, sanitized.</summary>
+    private async Task<Uri> ResolveRequestUriAsync(
+        string routeTemplate,
+        object? routeAndQueryParams,
+        ProtoTraceOperation traceOperation,
+        ProtoHttpAttachmentOptions? attachmentOptions,
+        CancellationToken ct)
+    {
+        var requestUri = await RestUriBuilder.BuildRequestUriAsync(
+            routeTemplate,
+            routeAndQueryParams,
+            Client.BaseAddress,
+            BaseAddressResolver,
+            Context,
+            ct);
+        traceOperation.SetAttribute(
+            "http.request.url",
+            ProtoHttpDiagnosticSanitizer.SanitizeUri(requestUri, attachmentOptions));
+        return requestUri;
+    }
+
+    /// <summary>Attaches the body, applies the headers and authentication, and records the request facts.</summary>
+    private async Task PrepareRequestAsync(
+        HttpRequestMessage request,
+        ProtoTraceOperation traceOperation,
+        ProtoHttpAttachmentOptions? attachmentOptions,
+        string? attachmentPrefix,
+        string attachmentDescription,
+        CancellationToken ct)
+    {
+        if (_contentFactory is not null)
+        {
+            request.Content = _contentFactory()
+                ?? throw new InvalidOperationException("The REST request content factory returned null.");
+
+            if (attachmentOptions?.CaptureRequestBodies == true)
+            {
+                var requestBody = await request.Content.ReadAsStringAsync(ct);
+                var mediaType = request.Content.Headers.ContentType?.MediaType;
+                Context.AddAttachment(
+                    $"{attachmentPrefix}-request",
+                    ProtoHttpDiagnosticSanitizer.SanitizeBody(requestBody, attachmentOptions),
+                    mediaType ?? "text/plain",
+                    attachmentDescription);
+            }
         }
 
+        ProtoHttpHeaders.Apply(request, Headers);
+
+        await ApplyAuthenticationAsync(request, traceOperation, ct);
+
+        var requestFacts = new List<ProtoTraceSectionItem>
+        {
+            new("url", ProtoHttpDiagnosticSanitizer.SanitizeUri(request.RequestUri, attachmentOptions)),
+            new("auth", AuthenticatorFactory is null ? "none" : ResolvedAuthenticator?.GetType().Name ?? "applied")
+        };
+        if (_requestAttributes.TryGetValue("http.request.body.media_type", out var bodyMediaType) && bodyMediaType is not null)
+        {
+            requestFacts.Add(new(
+                "body",
+                bodyMediaType,
+                _requestAttributes.GetValueOrDefault("http.request.body.length") is { } bodyLength ? $"{bodyLength} B" : null));
+        }
+        if (Headers.Count > 0)
+        {
+            requestFacts.Add(new("headers", Headers.Count.ToString()));
+        }
+        traceOperation.AddSection(new ProtoTraceSection("Request", ProtoTraceSectionKind.Fields, requestFacts));
+    }
+
+    /// <summary>Sends the request, records the response facts and attachments, and wraps the response.</summary>
+    private async Task<RestResponse> SendAndObserveAsync(
+        HttpMethod method,
+        string routeTemplate,
+        HttpRequestMessage request,
+        ProtoTraceOperation traceOperation,
+        Stopwatch stopwatch,
+        ProtoHttpAttachmentOptions? attachmentOptions,
+        string? attachmentPrefix,
+        string attachmentDescription,
+        CancellationToken ct)
+    {
         HttpResponseMessage? responseMessage = null;
         try
         {
-            var responseOptions = _context.ResolveResponseOptions(ProtoRestBuilder.ProtocolName);
             var exchange = await ProtoHttpExchange.SendAsync(
-                _httpClient,
+                Client,
                 request,
-                responseOptions.MaxResponseBodyBytes,
+                ResolveResponseOptions().MaxResponseBodyBytes,
                 ct);
             responseMessage = exchange.Response;
             var bodyBytes = exchange.BodyBytes;
@@ -304,7 +294,7 @@ public sealed class RestRequestBuilder
                     $"{attachmentDescription} returned {(int)responseMessage.StatusCode} ({responseMessage.StatusCode})";
                 if (IsTextMediaType(responseMediaType))
                 {
-                    _context.AddAttachment(
+                    Context.AddAttachment(
                         attachmentName,
                         diagnosticBody,
                         attachmentMediaType,
@@ -312,7 +302,7 @@ public sealed class RestRequestBuilder
                 }
                 else
                 {
-                    _context.AddAttachment(
+                    Context.AddAttachment(
                         attachmentName,
                         bodyBytes,
                         attachmentMediaType,
@@ -326,8 +316,8 @@ public sealed class RestRequestBuilder
 
             var routeIdentifier = $"{method.Method.ToUpperInvariant()} {routeTemplate}";
 
-            _context.RecordObservation(new ProtoObservation(
-                TargetName: _targetName,
+            Context.RecordObservation(new ProtoObservation(
+                TargetName: TargetName,
                 Kind: ProtoRestBuilder.Protocol.ResponseObservationKind,
                 Identifier: routeIdentifier,
                 Data: new RestResponseData(
@@ -345,34 +335,44 @@ public sealed class RestRequestBuilder
                 .SetAttribute("http.response.status_code", ((int)responseMessage.StatusCode).ToString());
             traceOperation.Succeed();
 
-            return new RestResponse(
+            var response = new RestResponse(
                 responseMessage,
                 bodyString,
                 stopwatch.Elapsed,
                 new ProtoHttpResponseContext(
-                    Execution: _context,
-                    TargetName: _targetName,
+                    Execution: Context,
+                    TargetName: TargetName,
                     Identifier: routeIdentifier,
                     AttachmentOptions: attachmentOptions,
                     AttachmentPrefix: attachmentPrefix,
                     RequestTraceId: traceOperation.Id),
                 bodyBytes);
+            responseMessage = null; // The response owns the message from here on.
+            return response;
         }
-        catch (Exception exception)
+        catch
         {
-            stopwatch.Stop();
-            traceOperation.Fail(exception);
             responseMessage?.Dispose();
-            TryRecordFailure(
-                method,
-                routeTemplate,
-                request.RequestUri,
-                stopwatch.Elapsed,
-                exception,
-                ct,
-                attachmentOptions);
             throw;
         }
+    }
+
+    /// <summary>The per-call attachment prefix, allocating the next request number when capture is on.</summary>
+    private string? NextAttachmentPrefix(ProtoHttpAttachmentOptions? attachmentOptions)
+    {
+        if (attachmentOptions is null)
+        {
+            return null;
+        }
+
+        var state = Context.TryResolve<ProtoHttpContextState>(ProtoRestBuilder.Protocol.Key);
+        if (state is null)
+        {
+            state = new ProtoHttpContextState();
+            Context.SetContext(ProtoRestBuilder.Protocol.Key, state);
+        }
+
+        return $"rest-{state.NextRequestNumber():00}";
     }
 
     private static bool IsTextMediaType(string? mediaType)
@@ -392,10 +392,10 @@ public sealed class RestRequestBuilder
     {
         // One event per distinct header per builder, matching GraphQL: a reused builder must not
         // duplicate the configure events on every send.
-        foreach (var name in _headers.Keys)
+        foreach (var name in Headers.Keys)
         {
             if (!_tracedHeaders.Add(name)) continue;
-            _context.Trace.WriteEvent(
+            Context.Trace.WriteEvent(
                 "http.header.configure",
                 $"Header · {name}",
                 ProtoRestBuilder.Protocol.TraceSource,
@@ -425,13 +425,12 @@ public sealed class RestRequestBuilder
         Exception exception,
         CancellationToken cancellationToken,
         ProtoHttpAttachmentOptions? attachmentOptions)
-    {
-        try
+        => ProtoObservationCapture.TryRecord(Context, () =>
         {
             var diagnostics = ProtoHttpFailureDiagnostics.From(requestUri, exception, cancellationToken, attachmentOptions);
-            _context.RecordObservation(new ProtoObservation(
-                TargetName: _targetName,
-                Kind: "http.failure",
+            return new ProtoObservation(
+                TargetName: TargetName,
+                Kind: ProtoRestBuilder.FailureObservationKind,
                 Identifier: $"{method.Method.ToUpperInvariant()} {routeTemplate}",
                 Data: new RestFailureData(
                     method.Method,
@@ -440,11 +439,6 @@ public sealed class RestRequestBuilder
                     duration,
                     diagnostics.ExceptionType,
                     diagnostics.Message,
-                    diagnostics.IsCanceled)));
-        }
-        catch
-        {
-            // A diagnostic failure must never hide the original request failure.
-        }
-    }
+                    diagnostics.IsCanceled));
+        });
 }

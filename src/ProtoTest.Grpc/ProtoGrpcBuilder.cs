@@ -10,6 +10,12 @@ public sealed class ProtoGrpcBuilder
     internal static readonly ProtoProtocol Protocol = new(
         "Grpc", "gRPC", "ProtoTest.Grpc", "grpc.response", "gRPC");
 
+    /// <summary>
+    /// The observation kind a failed call records. It is deliberately not the response kind: a call that
+    /// failed was attempted, not covered, so the coverage collector ignores it.
+    /// </summary>
+    internal const string FailureObservationKind = "grpc.failure";
+
     private readonly IProtoApplicationBuilder? _application;
 
     internal ProtoGrpcBuilder(IServiceCollection services, IProtoApplicationBuilder? application = null)

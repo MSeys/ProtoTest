@@ -1,5 +1,7 @@
 namespace ProtoTest.Core;
 
+using ProtoTest.Core.Internal;
+
 /// <summary>
 /// Thread-safe base for collectors that aggregate observations as coverage items.
 /// </summary>
@@ -58,7 +60,7 @@ public abstract class ProtoCoverageCollector : IProtoCollector, IProtoReportSour
                 Status = ProtoReportStatus.Success,
                 Count = item.Count + 1,
                 IsCovered = true,
-                Metadata = MergeMetadata(item.Metadata, observation.Metadata)
+                Metadata = MergeMetadata(item.Metadata, ProtoMetadataRedaction.Redact(observation.Metadata))
             };
         }
     }

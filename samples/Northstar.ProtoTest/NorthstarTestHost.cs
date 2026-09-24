@@ -69,6 +69,7 @@ public static class NorthstarTestHost
         var options = new NorthstarDataOptions();
         configure?.Invoke(options);
 
+        builder.ConfigureServices(services => services.AddSingleton<TestSupportProbe>());
         builder.AddData(data => data.AddDefaults<NorthstarDataDefaults>());
 
         // Portable API provisioning: members go through POST /api/v1/members in every environment.

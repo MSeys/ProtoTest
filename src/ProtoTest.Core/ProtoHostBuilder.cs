@@ -44,6 +44,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     public IProtoHostBuilder ConfigureTracing(Action<ProtoTraceOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
+        ThrowIfBuilt();
         configure(_traceOptions);
         return this;
     }
@@ -79,8 +80,23 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     /// <inheritdoc />
     public IProtoHostBuilder AddResource(IProtoResource resource)
     {
+        ArgumentNullException.ThrowIfNull(resource);
+        ThrowIfBuilt();
         _runResources.Add(resource);
         return this;
+    }
+
+    /// <summary>
+    /// Registering after the host was built would mutate live host state (a running run's resources or
+    /// options) instead of composing the host, so it is rejected like a second build.
+    /// </summary>
+    private void ThrowIfBuilt()
+    {
+        if (_built)
+        {
+            throw new InvalidOperationException(
+                "The ProtoHostBuilder has already built a ProtoHost; configure a new builder instead.");
+        }
     }
 
     /// <inheritdoc />
@@ -122,6 +138,10 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
         var rootProvider = _services.BuildServiceProvider();
         try
         {
+            // Collectors are singletons: constructing them here turns a bad specification or schema -
+            // an OpenAPI document or GraphQL SDL that cannot be read - into a build failure instead of
+            // one that surfaces on the first test that records an observation.
+            _ = rootProvider.GetServices<IProtoCollector>().ToArray();
             return new ProtoHost(rootProvider);
         }
         catch

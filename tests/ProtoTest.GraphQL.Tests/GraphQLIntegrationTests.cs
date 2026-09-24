@@ -18,7 +18,7 @@ public sealed class GraphQLIntegrationTests
     public async Task FluentQuery_ShouldRenderExecuteAssertAndObserve()
     {
         string? requestBody = null;
-        var handler = new StubHandler(request =>
+        var handler = new StubHttpHandler(request =>
         {
             requestBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
             return new HttpResponseMessage(HttpStatusCode.OK)
@@ -147,7 +147,7 @@ public sealed class GraphQLIntegrationTests
             type Query { product: Product }
             type Product { id: ID! name: String! }
             """;
-        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        var handler = new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent("""{"data":{"product":{"id":"42","name":"Notebook"}}}""")
         });
@@ -191,7 +191,7 @@ public sealed class GraphQLIntegrationTests
     [Test]
     public async Task GraphQLErrors_ShouldRemainInspectable()
     {
-        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        var handler = new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent("""{"data":{"product":null},"errors":[{"message":"Missing","path":["product"],"extensions":{"code":"NOT_FOUND"}}]}""")
         });
@@ -235,7 +235,7 @@ public sealed class GraphQLIntegrationTests
     public async Task AddClient_ShouldResolvePerTestBaseAddress()
     {
         Uri? requestedUri = null;
-        var handler = new StubHandler(request =>
+        var handler = new StubHttpHandler(request =>
         {
             requestedUri = request.RequestUri;
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"data":{"ping":"pong"}}""") };
@@ -260,7 +260,7 @@ public sealed class GraphQLIntegrationTests
     [Test]
     public async Task ResponseLimit_ShouldRejectOversizedPayloadAndRecordFailure()
     {
-        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        var handler = new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent("""{"data":{"value":"too large"}}""")
         });
@@ -286,7 +286,7 @@ public sealed class GraphQLIntegrationTests
     [Test]
     public async Task SendFailure_ShouldRecordSanitizedFailureData()
     {
-        var handler = new StubHandler(_ => throw new HttpRequestException("connection refused"));
+        var handler = new StubHttpHandler(_ => throw new HttpRequestException("connection refused"));
         var builder = new ProtoHostBuilder();
         builder.AddGraphQL(graphQL => graphQL.AddClient(
             "Default",
@@ -344,7 +344,7 @@ public sealed class GraphQLIntegrationTests
     [Test]
     public async Task Attachments_ShouldRedactSensitiveRequestAndExpectedShapeValues()
     {
-        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        var handler = new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent("""{"data":{"login":{"token":"server-secret"}}}""")
         });
@@ -472,7 +472,7 @@ public sealed class GraphQLIntegrationTests
     public async Task HeaderTrace_ShouldRecordCountAndNamesWithoutValues()
     {
         const string secret = "super-secret-token";
-        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        var handler = new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent("""{"data":{"ping":"pong"}}""")
         });
@@ -511,7 +511,7 @@ public sealed class GraphQLIntegrationTests
     [Test]
     public async Task Variables_ShouldBeTruncatedToTheConfiguredDiagnosticLength()
     {
-        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        var handler = new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent("""{"data":{"search":[]}}""")
         });
@@ -546,7 +546,7 @@ public sealed class GraphQLIntegrationTests
     public async Task NamedClients_ShouldRouteEachNameToItsOwnBaseAddress()
     {
         Uri? requestedUri = null;
-        var handler = new StubHandler(request =>
+        var handler = new StubHttpHandler(request =>
         {
             requestedUri = request.RequestUri;
             return new HttpResponseMessage(HttpStatusCode.OK)
@@ -582,7 +582,7 @@ public sealed class GraphQLIntegrationTests
     [Test]
     public async Task Errors_ShouldTolerateMalformedMessagesAndPaths()
     {
-        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        var handler = new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent(
                 """{"errors":[{"message":42,"path":["a",{"bad":true},null,1.5,2]},{"path":"not-an-array"},7]}""")
@@ -630,11 +630,5 @@ public sealed class GraphQLIntegrationTests
             if (item.Children is not null)
                 foreach (var child in Flatten(item.Children)) yield return child;
         }
-    }
-
-    private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(response(request));
     }
 }

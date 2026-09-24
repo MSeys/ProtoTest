@@ -33,4 +33,24 @@ public class ProtoHttpResponseOptions : IProtoConfigurableOptions
 
     /// <summary>The configuration section this instance binds from, e.g. "ProtoTest:Rest:Responses".</summary>
     public string ConfigurationSectionName { get; }
+
+    /// <inheritdoc />
+    public void Validate()
+    {
+        if (MaxResponseBodyBytes <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(MaxResponseBodyBytes),
+                MaxResponseBodyBytes,
+                "MaxResponseBodyBytes must be greater than zero.");
+        }
+
+        if (MaxDiagnosticBodyLength < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(MaxDiagnosticBodyLength),
+                MaxDiagnosticBodyLength,
+                "MaxDiagnosticBodyLength cannot be negative.");
+        }
+    }
 }

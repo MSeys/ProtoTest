@@ -32,7 +32,12 @@ public static class ProtoExecutionContextExtensions
                     $"'ProtoTest:Applications:{application}:Grpc:Address'.");
             }
 
-            client = ProtoGrpcClient.ForTransport(context, resolvedName, transport);
+            client = ProtoGrpcClient.ForTransport(
+                context,
+                resolvedName,
+                transport,
+                context.TryService<GrpcClientOptions>() ?? new GrpcClientOptions(),
+                ProtoClientResolution.ScopedName("Grpc", resolvedName));
             context.RegisterClient(client, ProtoClientResolution.ScopedName("Grpc", resolvedName));
 
             context.Trace.WriteEvent(

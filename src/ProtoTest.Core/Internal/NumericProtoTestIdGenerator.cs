@@ -29,6 +29,8 @@ internal sealed class NumericProtoTestIdGenerator : IProtoTestIdGenerator
 
     public ProtoTestId Next(System.Reflection.MethodInfo testMethod)
     {
+        // The numeric scheme is a run-wide sequence, so the method is intentionally not part of the ID;
+        // the parameter exists for generators that derive IDs from the test.
         ArgumentNullException.ThrowIfNull(testMethod);
         var sequence = Interlocked.Increment(ref _sequence);
         if (sequence > _maximumSequence)

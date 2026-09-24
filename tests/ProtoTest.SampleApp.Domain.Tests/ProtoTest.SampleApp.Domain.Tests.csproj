@@ -27,4 +27,6 @@
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.TestSupport\ProtoTest.TestSupport.csproj" />
   </ItemGroup>
+  <ItemGroup>
+  </ItemGroup>
 </Project>

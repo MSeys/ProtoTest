@@ -43,6 +43,29 @@ internal static class ProtoHostRegistry
     }
 
     /// <summary>
+    /// Finds the host that owns an application span's test trace, searching every active host. The
+    /// session's listener uses this to leave a span to its owner instead of capturing it twice.
+    /// </summary>
+    public static ProtoTraceSession? FindTraceSession(ActivityTraceId traceId)
+    {
+        ProtoHost[] hosts;
+        lock (Gate)
+        {
+            hosts = ActiveHosts.ToArray();
+        }
+
+        foreach (var host in hosts)
+        {
+            if (host.Trace is ProtoTraceSession session && session.FindWriter(traceId) is not null)
+            {
+                return session;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Finds the test trace that an application span belongs to, searching every active host. Telemetry
     /// callbacks run outside the test's flow and may see multiple hosts, but a W3C trace id is unique,
     /// so the search is unambiguous.

@@ -7,6 +7,7 @@ internal sealed class ProtoDataService : IProtoData
 {
     private readonly ProtoDataRegistry _registry;
     private readonly IServiceProvider _services;
+
     private readonly object _gate = new();
     private readonly List<ProvisionedObject> _provisioned = [];
     private long _objectSequence;
@@ -20,7 +21,12 @@ internal sealed class ProtoDataService : IProtoData
     }
 
     public ProtoDataObjectBuilder<T> For<T>()
-        => new(_registry, this, Interlocked.Increment(ref _objectSequence));
+    {
+        // The test-author entry point: this scoped service is only reachable from a running test, so
+        // the context is read once here and passed into the builder, which never reads it ambiently.
+        var execution = Proto.Context;
+        return new(_registry, this, execution, Interlocked.Increment(ref _objectSequence));
+    }
 
     public T Ref<T>(string? identity = null)
     {

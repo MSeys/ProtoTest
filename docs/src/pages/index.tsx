@@ -267,7 +267,7 @@ public async Task The_sales_report_ranks_regions_by_amount()
     var sales = Proto.Context.Sheets().Open(response).Model<SalesRow>();
     sales.Verify();
 
-    sales.Column(row => row.Amount).ShouldBeSortedBy(ascending: false);
+    sales.Column(row => row.Amount).Should.BeSortedBy(ProtoSortDirection.Descending);
     sales.Row(row => row.Region == "EMEA")
         .ShouldMatchShape(new { Amount = 1200m, Count = 12 });
 }`,

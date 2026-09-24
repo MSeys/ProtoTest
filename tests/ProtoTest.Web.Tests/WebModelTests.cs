@@ -128,7 +128,7 @@ public sealed partial class WebModelTests
                     Does.Contain($"@role='{WebRoleMap.AriaName(role)}'"),
                     $"Selenium must always accept the explicit ARIA name for {role}");
                 Assert.That(
-                    PlaywrightWebBackend.MapRole(role).ToString().ToLowerInvariant(),
+                    PlaywrightLocatorTranslator.MapRole(role).ToString().ToLowerInvariant(),
                     Is.EqualTo(WebRoleMap.AriaName(role)),
                     $"Playwright's native mapping for {role} must be the shared ARIA name");
             }

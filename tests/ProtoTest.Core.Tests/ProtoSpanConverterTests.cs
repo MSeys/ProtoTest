@@ -2,7 +2,6 @@ namespace ProtoTest.Core.Tests;
 
 using System.Diagnostics;
 using System.Reflection;
-using NUnit.Framework;
 
 [TestFixture]
 public sealed class ProtoSpanConverterTests

@@ -9,7 +9,7 @@ using ProtoTest.SampleApp.Northstar;
 
 public class Program
 {
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
@@ -58,7 +58,7 @@ public class Program
         else
         {
             var eventPublisher = new RabbitMqEventPublisher(messagingConnection);
-            eventPublisher.EnsureTopology();
+            await eventPublisher.EnsureTopologyAsync();
             builder.Services.AddSingleton<IEventPublisher>(eventPublisher);
         }
         // A second instance serving only the UI must not dispatch webhooks the suite's instance also sends.
@@ -117,7 +117,7 @@ public class Program
         app.MapGraphQL("/graphql");
         app.UseNorthstarConsole();
 
-        app.Run();
+        await app.RunAsync();
     }
 
     private static bool IsTestSupportEnabled(IConfiguration configuration)

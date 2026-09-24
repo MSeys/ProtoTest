@@ -90,7 +90,7 @@ public sealed class PlaywrightConformanceTests
             .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
-                    ["ProtoTest:Web:Playwright:Context:Locale"] = "nl-BE"
+                    ["ProtoTest:Web:Playwright:Locale"] = "nl-BE"
                 }))
             .AddWeb(options =>
             {

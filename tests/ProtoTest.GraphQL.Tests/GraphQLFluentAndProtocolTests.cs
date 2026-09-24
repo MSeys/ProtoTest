@@ -378,7 +378,7 @@ public sealed class GraphQLFluentAndProtocolTests
     {
         var builder = new ProtoHostBuilder();
         builder.AddGraphQL(graphQL => graphQL.AddClient("Default", "https://example.test/graphql", http =>
-            http.ConfigurePrimaryHttpMessageHandler(() => new StubHandler(response)))
+            http.ConfigurePrimaryHttpMessageHandler(() => new StubHttpHandler(response)))
             .WithSubscriptionTransport(GraphQLSubscriptionTransport.Sse));
         return builder.Build();
     }
@@ -391,10 +391,4 @@ public sealed class GraphQLFluentAndProtocolTests
     }
 
     private sealed record ValueData(int Value);
-    private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(response(request));
-    }
-
 }

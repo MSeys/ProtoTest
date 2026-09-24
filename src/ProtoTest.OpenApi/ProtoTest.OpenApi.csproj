@@ -11,12 +11,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
     <ProjectReference Include="..\ProtoTest.Http\ProtoTest.Http.csproj" />
-    <PackageReference Include="Microsoft.OpenApi.Readers" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\ProtoTest.Rest\ProtoTest.Rest.csproj" />
+    <PackageReference Include="Microsoft.OpenApi" />
+    <!-- YAML documents are a separate reader in 2.x; 1.x read them out of the box. -->
+    <PackageReference Include="Microsoft.OpenApi.YamlReader" />
   </ItemGroup>
 
 </Project>

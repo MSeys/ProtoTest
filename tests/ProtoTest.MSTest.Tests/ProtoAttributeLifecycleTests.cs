@@ -5,11 +5,11 @@ using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 
 [TestClass]
-[Tracking("ClassLevel", Order = 2)]
+[Tracking("Class", Order = 2)]
 public class ProtoAttributeLifecycleTests
 {
     [ProtoTest]
-    [Tracking("MethodLevel", Order = 3)]
+    [Tracking("Method", Order = 3)]
     public void ProtoTestMethod_ShouldExecuteHooksAndAttributesInOrder()
     {
         // Fetch test-scoped log state
@@ -19,7 +19,7 @@ public class ProtoAttributeLifecycleTests
         logState.Log.Add("TestExecution");
 
         // Assert
-        string[] expectedBeforeSequence = [.. AdapterTestSupport.ExpectedBeforeSequence, "TestExecution"];
+        string[] expectedBeforeSequence = [.. AdapterLifecycle.ExpectedBeforeSequence, "TestExecution"];
         CollectionAssert.AreEqual(expectedBeforeSequence, logState.Log);
     }
 }

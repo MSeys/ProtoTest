@@ -157,7 +157,7 @@ public sealed class GraphQLRedactionTests
         {
             graphQL.CaptureAttachments();
             graphQL.AddClient("Default", "https://example.test/graphql", http =>
-                http.ConfigurePrimaryHttpMessageHandler(() => new StubHandler(response)));
+                http.ConfigurePrimaryHttpMessageHandler(() => new StubHttpHandler(response)));
         });
         return builder.Build();
     }
@@ -178,10 +178,4 @@ public sealed class GraphQLRedactionTests
     private static HttpResponseMessage Json(string content)
         => new(HttpStatusCode.OK) { Content = new StringContent(content) };
 
-
-    private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(response(request));
-    }
 }

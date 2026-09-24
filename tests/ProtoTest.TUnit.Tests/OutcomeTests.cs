@@ -40,6 +40,15 @@ public sealed class OutcomeTests
         await Assert.That(trace.Outcome).IsEqualTo(ProtoTraceOutcome.Skipped);
     }
 
+    [Test]
+    [TestExecutor<PassthroughTestExecutor>]
+    public async Task Executor_ShouldRecordCancelledForACancelledBody()
+    {
+        var trace = await RecordAsync(() => throw new OperationCanceledException("deliberate cancellation"));
+
+        await Assert.That(trace.Outcome).IsEqualTo(ProtoTraceOutcome.Cancelled);
+    }
+
     /// <summary>
     /// Runs the real <see cref="ProtoTestExecutor"/> around the given body while the passthrough executor
     /// keeps this driver itself outside a ProtoTest lifecycle, then returns the trace it recorded. The

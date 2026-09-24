@@ -11,6 +11,7 @@ using ProtoTest.Sql.EntityFrameworkCore;
 
 [TestFixture]
 [NonParallelizable]
+[Category("Characterization")]
 public sealed class RegistrationIdempotencyTests
 {
     private SqliteKeeper _database = null!;

@@ -7,7 +7,7 @@ using ProtoTest.Core;
 /// holds or the timeout passes, treats "not found yet" and "not actionable yet" as "not yet", and
 /// records a passing element assertion as page coverage.
 /// </summary>
-internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner operations)
+internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner operations, WebProbeLoop probes)
 {
     public ValueTask ShouldBeVisibleAsync(
         WebElementReference element,
@@ -19,9 +19,7 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
             negated,
             "be visible",
             timeout,
-            async (backend, ct) => await backend.IsVisibleAsync(element, ct)
-                ? (true, "visible")
-                : (false, "not visible"),
+            async (backend, ct) => new WebProbe(await backend.IsVisibleAsync(element, ct), "visible", "not visible"),
             cancellationToken);
 
     public ValueTask ShouldBeEnabledAsync(
@@ -34,9 +32,7 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
             negated,
             "be enabled",
             timeout,
-            async (backend, ct) => await backend.IsEnabledAsync(element, ct)
-                ? (true, "enabled")
-                : (false, "disabled or absent"),
+            async (backend, ct) => new WebProbe(await backend.IsEnabledAsync(element, ct), "enabled", "disabled or absent"),
             cancellationToken);
 
     public ValueTask ShouldBeCheckedAsync(
@@ -49,15 +45,13 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
             negated,
             "be checked",
             timeout,
-            async (backend, ct) => await backend.IsCheckedAsync(element, ct)
-                ? (true, "checked")
-                : (false, "unchecked or absent"),
+            async (backend, ct) => new WebProbe(await backend.IsCheckedAsync(element, ct), "checked", "unchecked or absent"),
             cancellationToken);
 
     public ValueTask ShouldHaveTextAsync(
         WebElementReference element,
         string expected,
-        bool contains,
+        WebTextMatch match,
         bool negated,
         TimeSpan? timeout,
         CancellationToken cancellationToken)
@@ -66,15 +60,15 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
         return AssertUntilAsync(
             element,
             negated,
-            contains ? $"contain text \"{expected}\"" : $"have text \"{expected}\"",
+            match == WebTextMatch.Contains ? $"contain text \"{expected}\"" : $"have text \"{expected}\"",
             timeout,
             async (backend, ct) =>
             {
                 var actual = await backend.ReadTextAsync(element, ct);
-                var holds = contains
+                var holds = match == WebTextMatch.Contains
                     ? actual.Contains(expected, StringComparison.Ordinal)
                     : string.Equals(actual, expected, StringComparison.Ordinal);
-                return (holds, $"text was \"{actual}\"");
+                return new WebProbe(holds, $"text was \"{actual}\"");
             },
             cancellationToken);
     }
@@ -95,7 +89,8 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
             async (backend, ct) =>
             {
                 var actual = await backend.ReadValueAsync(element, ct);
-                return (string.Equals(actual, expected, StringComparison.Ordinal),
+                return new WebProbe(
+                    string.Equals(actual, expected, StringComparison.Ordinal),
                     $"value length was {actual?.Length ?? 0} (value redacted)");
             },
             cancellationToken);
@@ -113,8 +108,7 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(condition);
-        var waitTimeout = timeout ?? TimeSpan.FromSeconds(5);
-        if (waitTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout));
+        var waitTimeout = timeout ?? WebTiming.DefaultTimeout;
         var expectation = string.IsNullOrWhiteSpace(description) ? "the condition to hold" : description;
 
         return operations.ExecuteVoidAsync(
@@ -130,22 +124,10 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
             },
             async (_, ct) =>
             {
-                var result = await ProtoPolling.PollAsync(
-                    async token =>
-                    {
-                        try
-                        {
-                            return await condition(token);
-                        }
-                        catch (Exception exception) when (
-                            exception is WebElementResolutionException or WebActionabilityException)
-                        {
-                            return false;
-                        }
-                    },
-                    satisfied => satisfied,
+                var result = await probes.PollObservationAsync(
+                    async token => new WebProbe(await condition(token), expectation),
+                    observation => observation.Holds,
                     waitTimeout,
-                    ProtoPolling.DefaultInterval,
                     ct);
 
                 if (!result.Satisfied)
@@ -163,11 +145,10 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
         bool negated,
         string expectation,
         TimeSpan? timeout,
-        Func<IWebBackend, CancellationToken, ValueTask<(bool Holds, string Observation)>> inspect,
+        Func<IWebBackend, CancellationToken, ValueTask<WebProbe>> inspect,
         CancellationToken cancellationToken)
     {
-        var assertionTimeout = timeout ?? TimeSpan.FromSeconds(5);
-        if (assertionTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout));
+        var assertionTimeout = timeout ?? WebTiming.DefaultTimeout;
         var describedExpectation = ProtoAssertion.Describe(expectation, negated);
         var attributes = WebSession.ElementAttributes(element);
         attributes["web.expectation"] = describedExpectation;
@@ -181,29 +162,17 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
             attributes,
             async (backend, ct) =>
             {
-                var result = await ProtoPolling.PollAsync(
-                    async token =>
-                    {
-                        try
-                        {
-                            return await inspect(backend, token);
-                        }
-                        catch (Exception exception) when (
-                            exception is WebElementResolutionException or WebActionabilityException)
-                        {
-                            return (Holds: false, Observation: exception.Message);
-                        }
-                    },
+                var result = await probes.PollObservationAsync(
+                    token => inspect(backend, token),
                     observation => ProtoAssertion.IsSatisfied(observation.Holds, negated),
                     assertionTimeout,
-                    ProtoPolling.DefaultInterval,
                     ct);
 
                 if (!result.Satisfied)
                 {
                     throw new WebAssertionException(
                         $"Element '{element.ComponentPath}.{element.Name}' should {describedExpectation} within {assertionTimeout}. " +
-                        $"Last observed: {result.Value.Observation ?? "no observation"}.");
+                        $"Last observed: {result.Value.Observation}.");
                 }
             },
             cancellationToken);
@@ -212,7 +181,7 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
         var backend = await session.GetOrCreateBackendAsync(cancellationToken);
         session.RecordPageObservation(
             "web.page.verified",
-            session.PagePathFrom(WebSession.TryCurrentAddress(backend)),
+            session.PagePathFrom(await WebSession.TryCurrentAddressAsync(backend, cancellationToken)),
             "assert");
     }
 

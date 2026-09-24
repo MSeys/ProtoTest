@@ -33,7 +33,7 @@ builder
 | `RestCoverageCollector` | every REST endpoint your suite called, with hit counts |
 | [`OpenApiCoverageCollector`](../integrations/openapi.md) | the **whole** OpenAPI document: endpoints → responses → response properties, covered or not |
 | [GraphQL schema coverage](../integrations/graphql/coverage.md) | the whole schema: types → fields → arguments, and input types → input fields |
-| `GrpcCoverageCollector` | every gRPC service/method your suite called, from the client's `grpc.response` observations |
+| `GrpcCoverageCollector` | every gRPC service/method your suite called, from the client's `grpc.response` observations (a failed call records `grpc.failure` and does not count as covered) |
 
 Collectors gather; [sinks](./reporting.md) write the results. Without a sink you won't see anything.
 

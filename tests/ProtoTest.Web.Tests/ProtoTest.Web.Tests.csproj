@@ -21,11 +21,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\NUnitParallelization.cs" Link="NUnitParallelization.cs" />
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 
 
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.TestSupport\ProtoTest.TestSupport.csproj" />
+  </ItemGroup>
+  <ItemGroup>
   </ItemGroup>
 </Project>

@@ -9,7 +9,7 @@ public class ProtoTestFixture : ProtoTestAssembly
 {
     protected override void Configure(IProtoHostBuilder builder)
     {
-        AdapterTestSupport.ConfigureHost(builder);
+        AdapterLifecycle.ConfigureHost(builder);
         builder.ConfigureServices(services =>
         {
             services.AddScoped<ITestService>(_ => new ProbeTestService("ProtoTest_Xunit_Success"));

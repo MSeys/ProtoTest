@@ -15,6 +15,4 @@ public sealed class RabbitMqOptions : IProtoConfigurableOptions
     /// <summary>AMQP connection string of the broker, for example the deployed environment's.</summary>
     public string ConnectionString { get; set; } = "amqp://guest:guest@localhost:5672/";
 
-    /// <summary>How often an await checks for a new message.</summary>
-    public TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(25);
 }

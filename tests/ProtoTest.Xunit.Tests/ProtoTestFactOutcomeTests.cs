@@ -77,6 +77,69 @@ public sealed class ProtoTestFactOutcomeTests
     }
 
     [Fact]
+    public async Task SetupFailure_ShouldReportFailedToTheRunnerAndRecordOneFailedTrace()
+    {
+        var testCase = new ProtoXunitTestCase(
+            new NullMessageSink(),
+            TestMethodDisplay.ClassAndMethod,
+            TestMethodDisplayOptions.None,
+            TestMethod(nameof(Subjects.SetupProbe)));
+        var bus = new RecordingMessageBus();
+
+        using (AdapterFailureProbe.BeginSetupFailure(nameof(Subjects.SetupProbe)))
+        {
+            await testCase.RunAsync(new NullMessageSink(), bus, [], new ExceptionAggregator(), new CancellationTokenSource());
+        }
+
+        var trace = TraceFor(testCase.DisplayName);
+        Assert.Equal(ProtoTraceOutcome.Failed, trace.Outcome);
+        Assert.Contains(AdapterFailureProbe.SetupMessage, trace.Error?.Message);
+        Assert.Contains(bus.Messages, message => message is ITestFailed);
+    }
+
+    [Fact]
+    public async Task TeardownFailure_ShouldReportPassedToTheRunnerAndRecordPartial()
+    {
+        var testCase = new ProtoXunitTestCase(
+            new NullMessageSink(),
+            TestMethodDisplay.ClassAndMethod,
+            TestMethodDisplayOptions.None,
+            TestMethod(nameof(Subjects.TeardownProbe)));
+        var bus = new RecordingMessageBus();
+
+        using (AdapterFailureProbe.BeginTeardownFailure(nameof(Subjects.TeardownProbe)))
+        {
+            await testCase.RunAsync(new NullMessageSink(), bus, [], new ExceptionAggregator(), new CancellationTokenSource());
+        }
+
+        var trace = TraceFor(testCase.DisplayName);
+        Assert.Equal(ProtoTraceOutcome.Partial, trace.Outcome);
+        Assert.Null(trace.Error);
+        Assert.Contains(
+            trace.Record!.Findings!,
+            finding => finding.Message.Contains(AdapterFailureProbe.TeardownMessage));
+        Assert.Contains(bus.Messages, message => message is ITestPassed);
+    }
+
+    [Fact]
+    public async Task CancelledFact_ShouldRecordCancelledOutcome()
+    {
+        var testCase = new ProtoXunitTestCase(
+            new NullMessageSink(),
+            TestMethodDisplay.ClassAndMethod,
+            TestMethodDisplayOptions.None,
+            TestMethod(nameof(Subjects.Cancelled)));
+        var bus = new RecordingMessageBus();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await testCase.RunAsync(new NullMessageSink(), bus, [], new ExceptionAggregator(), cancellation);
+
+        var trace = TraceFor(testCase.DisplayName);
+        Assert.Equal(ProtoTraceOutcome.Cancelled, trace.Outcome);
+    }
+
+    [Fact]
     public async Task TheoryRows_ShouldEachRecordTheirOwnOutcome()
     {
         var method = TestMethod(nameof(Subjects.EvenOnly));
@@ -147,10 +210,24 @@ public sealed class ProtoTestFactOutcomeTests
         [InlineData(3)]
         public void EvenOnly(int value) => Assert.Equal(0, value % 2);
 
+        // Only the probe drivers above run these; the failure hook must not fire on them.
+        [ProtoTestFact]
+        public void SetupProbe()
+        {
+        }
+
+        [ProtoTestFact]
+        public void TeardownProbe()
+        {
+        }
+
         [ProtoTestFact]
         [RequiresCapability("not-composed", Reason = "the adapter proves the skip path")]
         public void RequiresCapability()
             => throw new InvalidOperationException("A skipped test must not run its body.");
+
+        [ProtoTestFact]
+        public void Cancelled() => throw new OperationCanceledException("deliberate cancellation");
     }
 
 #pragma warning restore xUnit1000

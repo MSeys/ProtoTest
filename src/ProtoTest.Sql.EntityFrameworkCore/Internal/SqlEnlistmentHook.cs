@@ -12,6 +12,8 @@ using ProtoTest.Sql;
 internal sealed class SqlEnlistmentHook<TContext> : IProtoTestHook
     where TContext : DbContext
 {
+    private const string TraceSource = "ProtoTest.Sql.EntityFrameworkCore";
+
     // Runs after the connection hook, which opens the connection and starts the transaction.
     public int Order => SqlHookOrders.Enlistment;
 
@@ -38,7 +40,7 @@ internal sealed class SqlEnlistmentHook<TContext> : IProtoTestHook
         if (session.Transaction is { } transaction)
         {
             await context.Trace
-                .Operation("sql.enlist", $"SQL · enlist {typeof(TContext).Name}", "ProtoTest.Sql.EntityFrameworkCore")
+                .Operation("sql.enlist", $"SQL · enlist {typeof(TContext).Name}", TraceSource)
                 .During(ProtoTracePhase.Setup)
                 .With("db.context", typeof(TContext).FullName)
                 .RunAsync(() =>

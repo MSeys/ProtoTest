@@ -90,6 +90,7 @@ The publisher is constructed with the live `TestContext` and calls `context.Outp
 
 - No ProtoTest attribute: test discovery and the `[Test]` attribute are entirely TUnit's.
 - Narrower executor scoping (`[TestExecutor<T>]` on a class or method) is not exercised by this repository's tests.
+- A source-generated test that exposes no reflection `MethodInfo` runs unwrapped; the executor cannot prepare a context for it.
 - A teardown failure is recorded but can never change the body's outcome.
 
 ## Next

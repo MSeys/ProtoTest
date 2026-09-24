@@ -6,7 +6,6 @@ using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Json;
 
@@ -14,18 +13,18 @@ using ProtoTest.Json;
 public sealed partial class SheetsTests
 {
     private static readonly DateTime ReportDate = new(2026, 9, 18);
-    private static readonly List<ProtoHost> Hosts = [];
-    private static string _path = null!;
+    private readonly List<ProtoHost> _hosts = [];
+    private string _path = null!;
 
-    [OneTimeTearDown]
+    [TearDown]
     public async Task DisposeHostsAndDeleteWorkbook()
     {
-        foreach (var host in Hosts)
+        foreach (var host in _hosts)
         {
             await host.DisposeAsync();
         }
 
-        Hosts.Clear();
+        _hosts.Clear();
         File.Delete(_path);
     }
 
@@ -41,7 +40,7 @@ public sealed partial class SheetsTests
             .GetReportItems()
             .ToArray();
 
-    private static (ProtoHost Host, ProtoExecutionContext Context) Start(
+    private (ProtoHost Host, ProtoExecutionContext Context) Start(
         string name,
         Action<SheetsOptions>? configure = null)
     {
@@ -53,7 +52,7 @@ public sealed partial class SheetsTests
         // inside an async helper would scope it to the helper and hide it from the test method.
         host.StartAsync().GetAwaiter().GetResult();
         var context = host.StartTestAsync(name, TestMethods.Placeholder).GetAwaiter().GetResult();
-        Hosts.Add(host);
+        _hosts.Add(host);
         return (host, context);
     }
 

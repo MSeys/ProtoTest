@@ -2,6 +2,7 @@ namespace ProtoTest.NUnit.Tests;
 
 using global::NUnit.Framework.Interfaces;
 using global::NUnit.Framework.Internal;
+using global::NUnit.Framework.Internal.Commands;
 using ProtoTest.Core;
 
 [TestFixture]
@@ -22,6 +23,10 @@ public sealed class OutcomeTests
 
         Assert.That(trace.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
         Assert.That(trace.Error?.Message, Does.Contain("deliberate failure"));
+        Assert.That(
+            trace.Error?.StackTrace,
+            Does.Contain("deliberate stack trace"),
+            "the runner's stack trace survives into the trace");
     }
 
     [Test]
@@ -48,38 +53,53 @@ public sealed class OutcomeTests
         Assert.That(trace.Outcome, Is.EqualTo(ProtoTraceOutcome.Partial));
     }
 
+    [Test]
+    public void CancelledSubject_ShouldRecordFailedOutcomeBecauseNUnitExposesNoExceptionType()
+    {
+        // NUnit's result carries no exception object, only a message and stack trace, so the shared
+        // cancellation rule cannot be applied by the adapter; a cancelled test records Failed.
+        var trace = RunSubject(nameof(Subjects.Cancelled), ResultState.Failure, "deliberate cancellation");
+
+        Assert.That(trace.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+    }
+
     private static ProtoTestTrace RunSubject(string subjectName, ResultState state, string? message = null)
     {
-        var method = new TestMethod(new MethodWrapper(typeof(Subjects), subjectName));
-        var attribute = new ProtoTestAttribute();
+        var subject = new TestMethod(new MethodWrapper(typeof(Subjects), subjectName));
+        var command = new ProtoTestAttribute().Wrap(new ResultCommand(subject, state, message));
 
-        attribute.BeforeTest(method);
-
-        var result = method.MakeTestResult();
-        if (message is null)
-        {
-            result.SetResult(state);
-        }
-        else
-        {
-            result.SetResult(state, message, "deliberate stack trace");
-        }
-
-        // Stand in for the NUnit runner: AfterTest reads the outcome from the ambient execution context.
+        // Stand in for the NUnit runner: the wrapper reads the result from the ambient execution context.
         var context = TestExecutionContext.CurrentContext;
         var previousResult = context.CurrentResult;
-        context.CurrentResult = result;
+        context.CurrentResult = subject.MakeTestResult();
         try
         {
-            attribute.AfterTest(method);
+            command.Execute(context);
         }
         finally
         {
             context.CurrentResult = previousResult;
         }
 
-        var name = ProtoTestName.FromMethod(typeof(Subjects).GetMethod(subjectName)!);
-        return ProtoTestAssembly.Host.Trace.Snapshot().Tests.Last(test => test.Name == name);
+        return ProtoTestAssembly.Host.Trace.Snapshot().Tests.Last(test => test.Name == subject.FullName);
+    }
+
+    /// <summary>Stands in for the test body: records the state the subject would have produced.</summary>
+    private sealed class ResultCommand(Test subject, ResultState state, string? message) : TestCommand(subject)
+    {
+        public override TestResult Execute(TestExecutionContext context)
+        {
+            if (message is null)
+            {
+                context.CurrentResult.SetResult(state);
+            }
+            else
+            {
+                context.CurrentResult.SetResult(state, message, "deliberate stack trace");
+            }
+
+            return context.CurrentResult;
+        }
     }
 
     // Private, so NUnit's own discovery ignores these; their outcomes are recorded through the attribute above.
@@ -96,5 +116,7 @@ public sealed class OutcomeTests
         public void Inconclusive() => Assert.Inconclusive("deliberate inconclusive");
 
         public void Warning() => Assert.Warn("deliberate warning");
+
+        public void Cancelled() => throw new OperationCanceledException("deliberate cancellation");
     }
 }

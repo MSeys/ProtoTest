@@ -4,7 +4,6 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using global::Grpc.Core;
 using global::Grpc.Net.Client;
-using NUnit.Framework;
 using ProtoTest.Core;
 using ProtoTest.Grpc.Tests.Echo;
 

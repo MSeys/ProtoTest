@@ -31,7 +31,7 @@ public static class ProtoMessagingAssertions
             ProtoShapeAssertion.Assert(
                 new ProtoShapeAssertionContext(
                     context,
-                    "ProtoTest.Messaging",
+                    ProtoMessagingProtocol.Protocol.TraceSource,
                     "Assert message shape",
                     ExtraAttributes: new Dictionary<string, string?> { ["messaging.destination"] = message.Destination }),
                 message.Payload,

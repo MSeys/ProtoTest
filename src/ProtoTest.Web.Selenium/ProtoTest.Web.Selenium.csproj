@@ -2,7 +2,9 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
-    <IsPackable>true</IsPackable>
+    
+    <!-- No 1.0.1 baseline exists for this package (or its Web.Pages dependency); validate once 1.1 ships. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
     <PackageId>ProtoTest.Web.Selenium</PackageId>
     <Description>Selenium execution backend for ProtoTest.Web.</Description>
     <PackageTags>testing;integration-testing;web;selenium;browser;dotnet</PackageTags>

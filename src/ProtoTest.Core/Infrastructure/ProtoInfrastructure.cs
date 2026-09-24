@@ -2,7 +2,7 @@ namespace ProtoTest.Core;
 
 /// <summary>
 /// Something the run provides for itself - a database, a broker, a storage emulator. The host starts
-/// every registered piece before the run hooks, records it as a run entity, and releases it with the
+/// every registered piece after the run hooks, records it as a run entity, and releases it with the
 /// run, so a test suite declares what it needs instead of starting things by hand.
 /// </summary>
 public interface IProtoInfrastructure : IProtoResource

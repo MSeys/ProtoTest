@@ -1,18 +1,22 @@
 namespace ProtoTest.OpenApi;
 
 using Microsoft.Extensions.Configuration;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using ProtoTest.Core;
 using ProtoTest.Http;
 using ProtoTest.OpenApi.Internal;
 using ProtoTest.Rest;
 
+/// <summary>
+/// Collects OpenAPI coverage from REST responses and shape matches: the route matcher resolves each hit
+/// to a contract path, the typed ledger counts it, and the report builder renders the contract's
+/// endpoints, responses and properties whether or not they were hit.
+/// </summary>
 public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
 {
     private readonly OpenApiDocument _document;
-    private readonly Dictionary<(string Method, string Route), int> _endpointHits = new();
-    private readonly Dictionary<(string Method, string Route, string Response), int> _responseHits = new();
-    private readonly Dictionary<(string Method, string Route, string Response, string PropertyPath), int> _propertyHits = new();
+    private readonly OpenApiRouteMatcher _routes;
+    private readonly OpenApiCoverageLedger _ledger = new();
 
     public override string Category => "OpenAPI";
 
@@ -35,18 +39,21 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
         }
 
         _document = OpenApiSpecLoader.Load(source, application["BaseUrl"]);
+        _routes = new OpenApiRouteMatcher(_document);
     }
 
     public OpenApiCoverageCollector(string targetName, string openApiSpecSource)
         : base(targetName)
     {
         _document = OpenApiSpecLoader.Load(openApiSpecSource);
+        _routes = new OpenApiRouteMatcher(_document);
     }
 
     public OpenApiCoverageCollector(string targetName, OpenApiDocument document)
         : base(targetName)
     {
         _document = document ?? throw new ArgumentNullException(nameof(document));
+        _routes = new OpenApiRouteMatcher(_document);
     }
 
     public override bool CanCollect(ProtoObservation observation)
@@ -70,277 +77,75 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
         }
     }
 
-    private void RecordRestHit(RestResponseData hit)
-    {
-        var matchedRoute = FindMatchingOpenApiRoute(hit.RouteTemplate);
-        if (matchedRoute == null) return;
-
-        var method = hit.Method.ToUpperInvariant();
-        // Only a method the spec describes becomes an endpoint hit; the report enumerates spec
-        // operations, so counting an unmatched method here would record a hit nobody can see.
-        if (!TryGetOperation(method, matchedRoute, out var operation))
-        {
-            return;
-        }
-
-        var epKey = (method, matchedRoute);
-        _endpointHits[epKey] = _endpointHits.GetValueOrDefault(epKey, 0) + 1;
-
-        if (FindResponseKey(operation, hit.StatusCode) is { } responseKey)
-        {
-            var statusKey = (method, matchedRoute, responseKey);
-            _responseHits[statusKey] = _responseHits.GetValueOrDefault(statusKey, 0) + 1;
-        }
-    }
-
     /// <summary>The endpoint hits recorded so far, keyed by method and matched route. A snapshot: mutating
     /// the returned dictionary must not change what the collector reports.</summary>
     internal IReadOnlyDictionary<(string Method, string Route), int> EndpointHits
-        => new Dictionary<(string Method, string Route), int>(_endpointHits);
+        => _ledger.EndpointSnapshot();
 
-    private void RecordShapeMatchHit(RestShapeMatchData hit)
-    {
-        var parts = hit.RequestIdentifier.Split(' ', 2);
-        if (parts.Length < 2) return;
-
-        var method = parts[0].ToUpperInvariant();
-        var matchedRoute = FindMatchingOpenApiRoute(parts[1]);
-        if (matchedRoute == null
-            || hit.StatusCode is null
-            || !TryGetOperation(method, matchedRoute, out var operation)
-            || FindResponseKey(operation, hit.StatusCode.Value) is not { } responseKey)
-        {
-            return;
-        }
-
-        foreach (var prop in hit.MatchedProperties)
-        {
-            // The path is stored case-insensitively: schema extraction is ignore-case, so a match
-            // reported as "$.Id" must land on the "$.id" baseline row.
-            var propKey = (method, matchedRoute, responseKey, PropertyKey(prop));
-            _propertyHits[propKey] = _propertyHits.GetValueOrDefault(propKey, 0) + 1;
-        }
-    }
-
-    /// <summary>
-    /// Generates hierarchical coverage items based on the loaded OpenAPI spec contract.
-    /// Maps endpoints, response status codes, and schema properties to coverage nodes.
-    /// </summary>
     public override IEnumerable<ProtoReportItem> GetReportItems()
     {
         lock (_lock)
         {
-            var reportItems = new List<ProtoReportItem>();
-
-            foreach (var (pathKey, pathItem) in _document.Paths)
-            {
-                foreach (var (operationType, operation) in pathItem.Operations)
-                {
-                    var method = operationType.ToString().ToUpperInvariant();
-                    var endpointIdentifier = $"{method} {pathKey}";
-                    var totalEndpointHits = _endpointHits.GetValueOrDefault((method, pathKey), 0);
-
-                    var childItems = new List<ProtoReportItem>();
-
-                    foreach (var (responseKey, response) in operation.Responses)
-                    {
-                        var responseHits = _responseHits.GetValueOrDefault((method, pathKey, responseKey), 0);
-                        var propertyItems = OpenApiSchemaExtractor
-                            .ExtractResponseProperties(_document, response)
-                            .Select(propertyPath =>
-                            {
-                                var propertyHits = _propertyHits.GetValueOrDefault(
-                                    (method, pathKey, responseKey, PropertyKey(propertyPath)), 0);
-                                return new ProtoReportItem(
-                                    TargetName: TargetName,
-                                    Category: "OpenAPI Property",
-                                    Identifier: propertyPath,
-                                    Kind: ProtoReportItemKinds.Coverage,
-                                    Status: propertyHits > 0 ? ProtoReportStatus.Success : ProtoReportStatus.Neutral,
-                                    Count: propertyHits,
-                                    IsCovered: propertyHits > 0,
-                                    DisplayName: FormatPropertyPath(propertyPath),
-                                    DisplayGroup: "Property");
-                            })
-                            .ToArray();
-
-                        childItems.Add(new ProtoReportItem(
-                            TargetName: TargetName,
-                            Category: "OpenAPI Response",
-                            Identifier: responseKey,
-                            Kind: ProtoReportItemKinds.Coverage,
-                            Status: responseHits > 0 ? ProtoReportStatus.Success : ProtoReportStatus.Neutral,
-                            Count: responseHits,
-                            IsCovered: responseHits > 0,
-                            Children: propertyItems,
-                            DisplayName: string.Equals(responseKey, "default", StringComparison.OrdinalIgnoreCase)
-                                ? "Default response"
-                                : $"{responseKey} response",
-                            DisplayGroup: "Response"));
-                    }
-                    reportItems.Add(new ProtoReportItem(
-                        TargetName: TargetName,
-                        Category: Category,
-                        Identifier: endpointIdentifier,
-                        Kind: ProtoReportItemKinds.Coverage,
-                        Status: totalEndpointHits > 0 ? ProtoReportStatus.Success : ProtoReportStatus.Neutral,
-                        Count: totalEndpointHits,
-                        IsCovered: totalEndpointHits > 0,
-                        Children: childItems
-                    ));
-                }
-            }
-
-            return reportItems;
+            return OpenApiReportBuilder.Build(_document, _ledger, TargetName, Category);
         }
     }
 
-    private string? FindMatchingOpenApiRoute(string template)
+    private void RecordRestHit(RestResponseData hit)
     {
-        var normalizedTemplate = NormalizeRoute(template);
-        return _document.Paths.Keys
-            .Select(path => new { Path = path, Score = MatchRoute(normalizedTemplate, NormalizeRoute(path)) })
-            .Where(candidate => candidate.Score >= 0)
-            .OrderByDescending(candidate => candidate.Score)
-            .ThenBy(candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
-            .Select(candidate => candidate.Path)
-            .FirstOrDefault();
+        if (!TryResolve(hit.Method, hit.RouteTemplate, out var method, out var route, out var operation))
+        {
+            return;
+        }
+
+        _ledger.RecordEndpoint(method, route);
+        if (OpenApiRouteMatcher.FindResponseKey(operation, hit.StatusCode) is { } responseKey)
+        {
+            _ledger.RecordResponse(method, route, responseKey);
+        }
     }
 
-    private bool TryGetOperation(string method, string route, out OpenApiOperation operation)
+    private void RecordShapeMatchHit(RestShapeMatchData hit)
     {
+        var parts = hit.RequestIdentifier.Split(' ', 2);
+        if (parts.Length < 2 || hit.StatusCode is null)
+        {
+            return;
+        }
+
+        if (!TryResolve(parts[0], parts[1], out var method, out var route, out var operation)
+            || OpenApiRouteMatcher.FindResponseKey(operation, hit.StatusCode.Value) is not { } responseKey)
+        {
+            return;
+        }
+
+        foreach (var property in hit.MatchedProperties)
+        {
+            _ledger.RecordProperty(method, route, responseKey, property);
+        }
+    }
+
+    /// <summary>
+    /// Resolves a request method and route to a spec operation. Only a method the spec describes
+    /// resolves: the report enumerates spec operations, so counting an unmatched method would record a
+    /// hit nobody can see.
+    /// </summary>
+    private bool TryResolve(
+        string requestMethod,
+        string requestRoute,
+        out string method,
+        out string route,
+        out OpenApiOperation operation)
+    {
+        method = requestMethod.ToUpperInvariant();
+        route = string.Empty;
         operation = null!;
-        return Enum.TryParse<OperationType>(method, ignoreCase: true, out var operationType)
-            && _document.Paths.TryGetValue(route, out var pathItem)
-            && pathItem.Operations.TryGetValue(operationType, out operation!);
-    }
-
-    private static string? FindResponseKey(OpenApiOperation operation, int statusCode)
-    {
-        var exact = statusCode.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        if (operation.Responses.ContainsKey(exact)) return exact;
-
-        var wildcard = $"{statusCode / 100}XX";
-        var wildcardKey = operation.Responses.Keys.FirstOrDefault(
-            key => string.Equals(key, wildcard, StringComparison.OrdinalIgnoreCase));
-        if (wildcardKey is not null) return wildcardKey;
-
-        return operation.Responses.Keys.FirstOrDefault(
-            key => string.Equals(key, "default", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static int MatchRoute(string requestRoute, string contractRoute)
-    {
-        if (string.Equals(requestRoute, contractRoute, StringComparison.OrdinalIgnoreCase))
+        if (_routes.Find(requestRoute) is not { } matchedRoute)
         {
-            return int.MaxValue;
+            return false;
         }
 
-        var requestSegments = requestRoute.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        var contractSegments = contractRoute.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (requestSegments.Length != contractSegments.Length) return -1;
-
-        var literalMatches = 0;
-        for (var index = 0; index < requestSegments.Length; index++)
-        {
-            if (string.Equals(requestSegments[index], contractSegments[index], StringComparison.OrdinalIgnoreCase))
-            {
-                literalMatches++;
-                continue;
-            }
-
-            if (IsRouteParameter(contractSegments[index]))
-            {
-                // A constrained parameter such as {id:int} only matches a value the constraint
-                // accepts, so /users/abc must not cover /users/{id:int}.
-                if (!IsRouteParameter(requestSegments[index])
-                    && !MatchesConstraints(requestSegments[index], contractSegments[index]))
-                {
-                    return -1;
-                }
-
-                continue;
-            }
-
-            if (IsRouteParameter(requestSegments[index]) || !string.Equals(
-                    requestSegments[index],
-                    contractSegments[index],
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return -1;
-            }
-        }
-
-        return literalMatches;
+        route = matchedRoute;
+        return _document.Paths.TryGetValue(route, out var pathItem)
+            && pathItem.Operations?.TryGetValue(new HttpMethod(method), out operation!) == true;
     }
-
-    private static bool IsRouteParameter(string segment)
-        => segment.Length > 2 && segment[0] == '{' && segment[^1] == '}';
-
-    /// <summary>Checks a request segment against the constraints of a contract segment like <c>{id:int}</c>.</summary>
-    private static bool MatchesConstraints(string value, string contractSegment)
-    {
-        var inner = contractSegment[1..^1];
-        var parts = inner.Split(':', StringSplitOptions.RemoveEmptyEntries);
-        for (var index = 1; index < parts.Length; index++)
-        {
-            var constraint = parts[index];
-            var argument = string.Empty;
-            var open = constraint.IndexOf('(');
-            if (open >= 0 && constraint.EndsWith(')'))
-            {
-                argument = constraint[(open + 1)..^1];
-                constraint = constraint[..open];
-            }
-
-            var matches = constraint.ToLowerInvariant() switch
-            {
-                "int" => int.TryParse(value, System.Globalization.NumberStyles.Integer,
-                    System.Globalization.CultureInfo.InvariantCulture, out _),
-                "long" => long.TryParse(value, System.Globalization.NumberStyles.Integer,
-                    System.Globalization.CultureInfo.InvariantCulture, out _),
-                "decimal" or "double" or "float" => decimal.TryParse(value,
-                    System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out _),
-                "guid" => Guid.TryParse(value, out _),
-                "bool" => bool.TryParse(value, out _),
-                "minlength" => int.TryParse(argument, out var minimum) && value.Length >= minimum,
-                "maxlength" => int.TryParse(argument, out var maximum) && value.Length <= maximum,
-                // An unknown constraint is not evidence the route does not match.
-                _ => true
-            };
-            if (!matches)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static string NormalizeRoute(string route)
-    {
-        var path = ProtoHttpUri.TryCreateAbsoluteHttpUri(route, out var absoluteUri)
-            ? absoluteUri!.AbsolutePath
-            : route.Split('#', 2)[0].Split('?', 2)[0];
-        path = path.Trim();
-        if (!path.StartsWith('/')) path = $"/{path}";
-        return path.Length > 1 ? path.TrimEnd('/') : path;
-    }
-
-    private static string FormatPropertyPath(string path)
-    {
-        var trimmed = path.Trim();
-        if (trimmed == "$") return "Response body";
-        if (trimmed.StartsWith("$.", StringComparison.Ordinal)) trimmed = trimmed[2..];
-        trimmed = trimmed.Replace("[]", ".item", StringComparison.Ordinal);
-        return string.Join(" › ", trimmed.Split('.', StringSplitOptions.RemoveEmptyEntries));
-    }
-
-    private static string NormalizePropertyPath(string path)
-        => System.Text.RegularExpressions.Regex.Replace(path, @"\[\d+\]", "[]");
-
-    /// <summary>The case-insensitive dictionary key for a matched property path.</summary>
-    private static string PropertyKey(string path)
-        => NormalizePropertyPath(path).ToLowerInvariant();
 }

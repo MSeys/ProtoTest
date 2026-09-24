@@ -155,7 +155,7 @@ public sealed class GrpcIntegrationTests
         var context = await host.StartTestAsync("grpc raw stream auth", AuthenticatedTestMethod());
         var client = context.Grpc("Echo");
 
-        using var call = client.ServerStreaming(EchoMethods.Stream, new EchoRequest { Message = "a, b" });
+        using var call = client.Blocking.ServerStreaming(EchoMethods.Stream, new EchoRequest { Message = "a, b" });
         var replies = new List<string>();
         await foreach (var reply in call.ResponseStream.ReadAllAsync())
         {
@@ -218,7 +218,7 @@ public sealed class GrpcIntegrationTests
         var context = await host.StartTestAsync("grpc duplex", TestMethods.Placeholder);
         var client = context.Grpc("Echo");
 
-        using var call = client.DuplexStreaming(EchoMethods.Chat);
+        using var call = client.Blocking.DuplexStreaming(EchoMethods.Chat);
         await call.RequestStream.WriteAsync(new EchoRequest { Message = "one" });
         await call.RequestStream.WriteAsync(new EchoRequest { Message = "two" });
         await call.RequestStream.CompleteAsync();
@@ -581,7 +581,7 @@ public sealed class GrpcIntegrationTests
         // pumps: if the blocking part ran there, the async authenticator's continuation would be posted
         // back to the blocked thread and the call would deadlock.
         var call = RunWithNonPumpingContext(
-            () => client.ServerStreaming(EchoMethods.Stream, new EchoRequest { Message = "a, b" }),
+            () => client.Blocking.ServerStreaming(EchoMethods.Stream, new EchoRequest { Message = "a, b" }),
             TimeSpan.FromSeconds(20));
         var replies = new List<string>();
         using (call)

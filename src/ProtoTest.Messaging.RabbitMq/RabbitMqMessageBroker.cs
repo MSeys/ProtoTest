@@ -27,8 +27,6 @@ internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IDisposable
 
     public string Name => "RabbitMQ";
 
-    /// <summary>How often an await polls its tap queue.</summary>
-    internal TimeSpan PollInterval => _options.PollInterval;
 
     /// <summary>Creates a consumer that owns its own channel on the shared connection.</summary>
     public ValueTask<IProtoMessageConsumer> CreateConsumerAsync(CancellationToken cancellationToken = default)

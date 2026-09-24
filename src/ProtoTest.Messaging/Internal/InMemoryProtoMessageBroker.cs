@@ -4,14 +4,16 @@ namespace ProtoTest.Messaging.Internal;
 /// The default broker: messages live for the run, ordered by a publish position, and every consumer
 /// snapshots the current position at creation, so it only ever matches messages published after its own
 /// test started. A match advances that consumer's position, so repeated awaits consume the stream like
-/// RabbitMQ does instead of re-delivering the first match. It makes the API and the demo independent of
-/// infrastructure; a real adapter replaces it with the broker the system under test actually uses.
+/// RabbitMQ does instead of re-delivering the first match. One lock guards the history and the signal;
+/// predicates always run in the awaiting flow, so a slow or throwing predicate cannot stall publishers.
+/// It makes the API and the demo independent of infrastructure; a real adapter replaces it with the
+/// broker the system under test actually uses.
 /// </summary>
 internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
 {
     private readonly ProtoLock _gate = new();
     private readonly List<Entry> _messages = [];
-    private readonly List<Waiter> _waiters = [];
+    private TaskCompletionSource _published = NewSignal();
     private long _position;
 
     public string Name => "InMemory";
@@ -30,108 +32,50 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
     public ValueTask PublishAsync(ProtoMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
-        long position;
-        Waiter[] waiters;
+        TaskCompletionSource signal;
         lock (_gate)
         {
-            position = ++_position;
-            _messages.Add(new Entry(position, message));
-            waiters = [.. _waiters];
+            _position++;
+            _messages.Add(new Entry(_position, message));
+            signal = _published;
+            _published = NewSignal();
         }
 
-        // User predicates run outside the broker lock: a slow or throwing predicate must not stall other
-        // publishes, and its failure only fails the await that owns the predicate.
-        foreach (var waiter in waiters)
+        // Completed outside the lock: a waiter woken by this signal scans the history the lock protects.
+        signal.TrySetResult();
+        return ValueTask.CompletedTask;
+    }
+
+    /// <summary>Returns the first message after <paramref name="position"/> that matches, or null.</summary>
+    private MatchedMessage? Find(
+        string destination,
+        Func<ProtoMessage, bool> predicate,
+        long position)
+    {
+        Entry[] candidates;
+        lock (_gate)
         {
-            if (position <= waiter.AfterPosition
-                || !string.Equals(message.Destination, waiter.Destination, StringComparison.Ordinal))
+            candidates = [.. _messages.Where(entry => entry.Position > position)];
+        }
+
+        foreach (var entry in candidates)
+        {
+            if (!string.Equals(entry.Message.Destination, destination, StringComparison.Ordinal))
             {
                 continue;
             }
 
-            lock (waiter)
+            if (predicate(entry.Message))
             {
-                bool matched;
-                try
-                {
-                    matched = waiter.Predicate(message);
-                }
-                catch (Exception exception)
-                {
-                    lock (_gate)
-                    {
-                        _waiters.Remove(waiter);
-                    }
-
-                    waiter.Completion.TrySetException(exception);
-                    continue;
-                }
-
-                if (!matched) continue;
-                lock (_gate)
-                {
-                    _waiters.Remove(waiter);
-                    // Completed under the lock: an await whose timeout fires at the same instant either
-                    // sees the completed match or the waiter is already gone and the timeout wins; it can
-                    // never time out after a match was assigned.
-                    waiter.Completion.TrySetResult(new MatchedMessage(message, position));
-                }
+                return new MatchedMessage(entry.Message, entry.Position);
             }
         }
 
-        return ValueTask.CompletedTask;
+        return null;
     }
 
-    private async ValueTask<MatchedMessage> AwaitAsync(
-        string destination,
-        Func<ProtoMessage, bool> predicate,
-        TimeSpan timeout,
-        long afterPosition,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(destination);
-        ArgumentNullException.ThrowIfNull(predicate);
-        Task<MatchedMessage> completion;
-        Waiter waiter;
-        lock (_gate)
-        {
-            var existing = _messages
-                .Where(entry => entry.Position > afterPosition
-                    && string.Equals(entry.Message.Destination, destination, StringComparison.Ordinal)
-                    && predicate(entry.Message))
-                .Cast<Entry?>()
-                .FirstOrDefault();
-            if (existing is { } found)
-            {
-                return new MatchedMessage(found.Message, found.Position);
-            }
-
-            waiter = new Waiter(destination, predicate, afterPosition);
-            _waiters.Add(waiter);
-            completion = waiter.Completion.Task;
-        }
-
-        var timeoutTask = Task.Delay(timeout, CancellationToken.None);
-        var cancellation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var registration = cancellationToken.Register(() => cancellation.TrySetResult());
-        await Task.WhenAny(completion, timeoutTask, cancellation.Task);
-
-        bool assigned;
-        lock (_gate)
-        {
-            _waiters.Remove(waiter);
-            assigned = completion.IsCompleted;
-        }
-
-        if (assigned)
-        {
-            return await completion;
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        throw new TimeoutException(
-            $"No message matching the predicate arrived on '{destination}' within {timeout.TotalSeconds:0.###}s.");
-    }
+    private static TaskCompletionSource NewSignal()
+        => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private readonly record struct Entry(long Position, ProtoMessage Message);
 
@@ -163,7 +107,7 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
             await _awaitGate.WaitAsync(cancellationToken);
             try
             {
-                var matched = await broker.AwaitAsync(
+                var matched = await AwaitMatchAsync(
                     destination,
                     predicate,
                     timeout,
@@ -180,18 +124,51 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
             }
         }
 
+        private async ValueTask<MatchedMessage> AwaitMatchAsync(
+            string destination,
+            Func<ProtoMessage, bool> predicate,
+            TimeSpan timeout,
+            long position,
+            CancellationToken cancellationToken)
+        {
+            var deadline = DateTime.UtcNow + timeout;
+            while (true)
+            {
+                Task signal;
+                lock (broker._gate)
+                {
+                    // The signal is captured before the scan: a publish that lands in between completes
+                    // this signal, so the wait cannot miss it, and one that landed before it is already
+                    // in the history the scan reads.
+                    signal = broker._published.Task;
+                }
+
+                if (broker.Find(destination, predicate, position) is { } matched)
+                {
+                    return matched;
+                }
+
+                var remaining = deadline - DateTime.UtcNow;
+                if (remaining <= TimeSpan.Zero)
+                {
+                    // A match assigned at the same instant the deadline passes must win, never time out.
+                    if (broker.Find(destination, predicate, position) is { } lateMatch)
+                    {
+                        return lateMatch;
+                    }
+
+                    throw new TimeoutException(
+                        $"No message matching the predicate arrived on '{destination}' within {timeout.TotalSeconds:0.###}s.");
+                }
+
+                var timeoutTask = Task.Delay(remaining, CancellationToken.None);
+                var cancellation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                using var registration = cancellationToken.Register(() => cancellation.TrySetResult());
+                await Task.WhenAny(signal, timeoutTask, cancellation.Task);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+        }
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-    }
-
-    private sealed class Waiter(string destination, Func<ProtoMessage, bool> predicate, long afterPosition)
-    {
-        public string Destination { get; } = destination;
-
-        public Func<ProtoMessage, bool> Predicate { get; } = predicate;
-
-        public long AfterPosition { get; } = afterPosition;
-
-        public TaskCompletionSource<MatchedMessage> Completion { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 }

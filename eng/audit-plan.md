@@ -148,23 +148,50 @@ Expected: net-negative.
 
 ## Stage 4 — HTTP execution (REST and GraphQL)
 
-- `ProtoHttpRequestBuilder<TResponse,TBuilder>` template base; deletes the duplicated auth/header/
-  failure code and the 230-line `SendAsync` (`INT-F1`, `INT-F21`, `INT-F4`).
-- GraphQL: operation-type enum (`INT-F30`); request-plan type instead of `_simple*` hidden state
-  (`INT-F26`); observation factory (`INT-F15`); shape assertion through `ProtoShapeAssertion`
-  (`INT-F16`); drop the dead parsed document (`INT-F44`); builder split (`INT-F19`); filter builder
-  core (`INT-F47`).
-- `ProtoHttpExchange` single decode (`INT-F45`); `ReadAsAnonymous` honesty (`INT-F43`).
+Complete. Done: operation-kind enum (`INT-F30`); dead parsed document removed (`INT-F44`);
+`ProtoObservationCapture` is the one diagnostic rule both protocols share; `ProtoHttpRequestBuilder`
+owns the shared state, DSL, authentication application and trace helpers (`INT-F1`); the REST send
+path is an orchestrator over resolve-URI, prepare and send-and-observe phases with one failure arm
+(`INT-F21`); the GraphQL shape-driven operation is one immutable `ShapePlan` record instead of four
+fields kept in step by hand (`INT-F26`); responses and subscriptions record through
+`GraphQLObservations.Response` (`INT-F15`); the data-less assertion goes through
+`ProtoShapeAssertion.AssertMissing` (`INT-F16`); the builder is partial classes by concern —
+operations, execution, subscriptions (`INT-F19`); the filter builder builds nested filters through one
+helper (`INT-F47`).
 
-Expected: net-negative, the largest single reduction in the plan.
+The full send-template extraction was designed member by member and deliberately rejected: the
+comparison showed it is roughly line-neutral while introducing twenty behavioural traps (header trace
+timing and parent, GraphQL endpoint child operation, attachment capture ordering and redaction,
+response-section shapes, ownership/disposal differences, subscription bypass). The shared seam closes
+the drift without the risk.
+
+Closed as no-change, with the reason recorded here:
+
+- `INT-F45` single decode: the second read decodes an in-memory buffer; re-implementing
+  `ReadAsStringAsync`'s charset and BOM handling would risk behaviour for no real gain.
+- `INT-F43` `ReadAsAnonymous`: the parameter exists for generic inference and the XML doc says its
+  value is ignored; validating it would add reflection for no behaviour change.
+
+Expected: net-positive as built (the seam and the split add files; the payback is the closed drift and
+the readable phases). The remaining net reduction comes from Stages 5-9.
 
 ## Stage 5 — gRPC and Messaging
 
-- `ExecuteCallAsync` template and message formatter split (`INT-F14`, `INT-F20`); `Blocking` adapter
-  (`INT-F35`); protocol-neutral attachment options (`INT-F46`).
-- Messaging registration object, no closure/descriptor introspection (`INT-F27`); in-memory broker
-  over channels (`INT-F37`); RabbitMQ async consumer instead of polling (`INT-F38`); shared naming
-  constants (`INT-F50`).
+Complete. Done: `BeginCallTrace` and `CompleteCall` own the duplicated trace and completion blocks of
+the four call shapes (`INT-F14`); the message formatter is its own partial file, `ProtoGrpcClient`
+522 lines and `ProtoGrpcClient.Formatting` 98 (`INT-F20`); the synchronous stream opens moved behind
+`ProtoGrpcBlockingClient`, reachable as `client.Blocking`, so the client keeps one async API and the
+blocking thread behaviour is explicit (`INT-F35`); `GrpcAttachmentOptions` derives from a
+protocol-neutral `ProtoDiagnosticCaptureOptions` instead of inheriting HTTP headers and query
+parameters (`INT-F46`); `MessagingRegistration` owns its own once-only setup and adapter application
+(`INT-F27`); the in-memory broker is one lock and one publish signal with predicates running in the
+awaiting flow, replacing the waiter list and per-waiter locks (`INT-F37`); the RabbitMQ consumer is fed
+by an `AsyncEventingBasicConsumer` into an unbounded channel instead of `BasicGet` polling, which
+retires `RabbitMqOptions.PollInterval` (`INT-F38`); `ProtoMessagingProtocol` owns the trace source, the
+operation names and the receive observation kind, and documents the deliberate verb pair (`INT-F50`).
+
+The RabbitMQ round trips are exercised by the CI job that runs against a real broker; locally they
+skip, so that change is verified by CI on the next run.
 
 Expected: net-negative.
 
@@ -237,6 +264,11 @@ forward into an earlier stage when that stage touches the same files.
   short forwarders as the cost of five different framework entry points.
 - `ADP-7`: decide the outcome mappers. Either extract an `IProtoTestOutcomeMapper<T>` per adapter
   (unit-testable in isolation, more types) or accept the current mapping methods where they are.
+- `TST-12`: use global usings where they remove repetition rather than hide dependencies. Candidates:
+  the per-file `System.Diagnostics`/`System.Text.Json`/`internal` using blocks the partial-class
+  splits now repeat, and the test projects' shared imports. Add them to `Directory.Build.props` /
+  `tests/Directory.Build.props` per assembly, keep project-specific usings explicit, and do not
+  globalize anything that meaningfully points at a dependency.
 
 Expected: net-negative.
 
@@ -250,12 +282,24 @@ Record `git diff --shortstat` for the stage's commits after the suite is green.
 | 1 — Core primitives | Complete | +915 / −403 (net +512) | Net-positive by design: the primitives every later stage spends. Done: `ProtoRunStateMachine`; `ProtoFlow` with named steps, timeout, retry and fail-fast/collect plus `ProtoTraceScope.RunAsync` adoption; `ProtoPolling` (WebPolling deleted); `JsonScalarTypes`, `ProtoJsonDefaults`, `ProtoJsonPropertyProjection`, `JsonDiagnosticSanitizer.LooksLikeJson`; `ProtoAttachmentCapture`; `ProtoRegistrationGuard`; `ProtoClientOwnership`. `ProtoProtocol` moved to Stage 3 where its readers land. |
 | 2 — Lifecycle and adapters | Complete | +307 / −137 (net +170) | Net-positive by design: `ProtoTestScope`, `ProtoTestAsync` and the attachment publisher base are new Core primitives, plus two tests pinning the shared policy. The five adapters now share one teardown policy (fixes MSTest replacing the reported result), one publisher shape, one sync bridge and one xUnit v3 before/after; the `lifecycleStarted` guards and per-adapter completion try/catch are gone. `ADP-1` and `ADP-7` moved to Stage 11 as decisions. |
 | 3 — Integration contract | Complete | +509 / −389 (net +120) | Net-positive: the descriptors, keyed state, shared facade/context records and client-trace helper are new shared code. Every trace-source literal, observation kind, coverage category and capability now reads from `ProtoProtocol`; one auth hook and one context state serve REST, GraphQL and gRPC; gRPC's status assertion and auth applier delegate to the shared ones; REST and GraphQL share the assertion facade; `ProtoHttpResponseContext` replaced the positional parameter lists. Six findings closed as no-change with reasons in the stage notes. |
-| 4 — HTTP execution | Not started | | |
-| 5 — gRPC and Messaging | Not started | | |
+| 4 — HTTP execution | Complete | +1266 / −1012 (net +254) | Done: shared request-builder seam and observation rule (`INT-F1`), readable REST phases (`INT-F21`), `ShapePlan` record (`INT-F26`), observation factory (`INT-F15`), `AssertMissing` (`INT-F16`), partial-class split (`INT-F19`), operation enum (`INT-F30`), dead AST removed (`INT-F44`), nested-filter helper (`INT-F47`). The full send template was designed and rejected as line-neutral with twenty behavioural traps. `INT-F43`/`INT-F45` closed as no-change. |
+| 5 — gRPC and Messaging | Complete | +509 / −420 (net +89) | Done: `BeginCallTrace`/`CompleteCall` (`INT-F14`), formatting partial split (`INT-F20`), `Blocking` adapter (`INT-F35`), neutral capture options (`INT-F46`), messaging registration object (`INT-F27`), single-signal in-memory broker (`INT-F37`), RabbitMQ async consumer (`INT-F38`, CI-verified), messaging descriptor (`INT-F50`). |
 | 6 — Data and diagnostics | Not started | | |
 | 7 — Web | Not started | | |
 | 8 — Sheets, Sql, Testcontainers | Not started | | |
 | 9 — Reporting, OpenApi, AspNetCore | Not started | | |
 | 10 — Samples, templates, docs | Not started | | |
 | 11 — Deferred test hygiene | Not started | | |
-| **Cumulative** | | **+1273** | Target: clearly negative by Stage 6 |
+| **Cumulative** | | **+1616** | Target: clearly negative by Stage 6; see the note under the table |
+
+### Measured line outcome (after Stage 5)
+
+The audit's deletion estimates were optimistic. Every stage so far introduced shared primitives
+(descriptors, options records, template seams, partial-file headers) whose cost exceeds the duplicated
+lines they remove, so the cumulative count is +1616 rather than approaching negative. The consistent
+architecture and closed drift are real; the line target is not on track.
+
+Revised expectation: Stages 6-10 each record their measured delta and justify any net-positive result;
+the cumulative target is reassessed after Stage 9. If the final number is still positive, the honest
+conclusion is that this codebase's duplication was smaller than the audit estimated, and the plan's
+value is the consistency and the bug fixes, not the line count.

@@ -18,29 +18,31 @@ public sealed class GraphQLFilterBuilder
 
     public GraphQLFilterBuilder Some(string field, Action<GraphQLFilterBuilder> configure)
     {
-        var nested = new GraphQLFilterBuilder();
-        configure(nested);
-        _fields[field] = new Dictionary<string, object?> { ["some"] = nested.Value };
+        _fields[field] = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["some"] = Build(configure)
+        };
         return this;
     }
 
     public GraphQLFilterBuilder Nested(string field, Action<GraphQLFilterBuilder> configure)
     {
-        var nested = new GraphQLFilterBuilder();
-        configure(nested);
-        _fields[field] = nested.Value;
+        _fields[field] = Build(configure);
         return this;
     }
 
     public GraphQLFilterBuilder Or(params Action<GraphQLFilterBuilder>[] alternatives)
     {
-        _fields["or"] = alternatives.Select(action =>
-        {
-            var item = new GraphQLFilterBuilder();
-            action(item);
-            return item.Value;
-        }).ToArray();
+        _fields["or"] = alternatives.Select(Build).ToArray();
         return this;
+    }
+
+    private static IReadOnlyDictionary<string, object?> Build(Action<GraphQLFilterBuilder> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        var nested = new GraphQLFilterBuilder();
+        configure(nested);
+        return nested.Value;
     }
 
     private GraphQLFilterBuilder Operation(string field, string operation, object? value)

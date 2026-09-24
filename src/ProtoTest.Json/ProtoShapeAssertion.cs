@@ -122,6 +122,44 @@ public static class ProtoShapeAssertion
         }
     }
 
+    /// <summary>
+    /// Records the assertion that data was present at all, for a protocol whose response can legitimately
+    /// carry none. The operation, attributes and Checks section mirror a mismatch, and the protocol
+    /// supplies the failure its own exception type and message.
+    /// </summary>
+    public static void AssertMissing(
+        ProtoShapeAssertionContext context,
+        object? expectedShape,
+        Func<Exception> failureFactory)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(failureFactory);
+
+        using var operation = context.Execution is null
+            ? null
+            : context.Execution.Trace
+                .Operation("assert.json.shape", context.Title, context.Source)
+                .With("expected.type", expectedShape?.GetType().FullName)
+                .With(context.ExtraAttributes)
+                .Parent(context.ParentOperationId)
+                .Begin();
+        var exception = failureFactory();
+        operation?.SetAttribute("shape.result", "mismatched");
+        operation?.SetAttribute("shape.mismatch_count", "1");
+        operation?.AddSection(new ProtoTraceSection(
+            "Result",
+            ProtoTraceSectionKind.Checks,
+            [
+                new(
+                    "shape",
+                    "no data",
+                    exception.Message,
+                    ProtoTraceSectionTone.Error)
+            ]));
+        operation?.Fail(exception);
+        throw exception;
+    }
+
     /// <summary>The maximum nesting depth described before a placeholder is recorded.</summary>
     private const int MaxDescriptionDepth = 16;
 

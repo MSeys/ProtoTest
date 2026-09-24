@@ -308,7 +308,7 @@ public sealed class RabbitMqTests
             builder.AddMessaging(messaging => messaging.UseRabbitMq(options =>
             {
                 options.ConnectionString = connectionString;
-                options.PollInterval = TimeSpan.FromMilliseconds(10);
+
             }));
             await using var host = builder.Build();
             await host.StartAsync();

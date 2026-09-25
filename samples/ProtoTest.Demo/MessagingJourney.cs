@@ -56,15 +56,29 @@ public sealed class MessagingJourney
             Assert.That(message.Payload, Does.Contain($"\"status\":\"{InvoiceStatuses.Paid}\""));
         });
     }
+}
 
+/// <summary>
+/// The console half of the messaging journey: paying on the standalone console's billing screen
+/// publishes the event, because the browser session follows that application's published address.
+/// </summary>
+[Application(NorthstarTargets.Console)]
+[NorthstarTenant(PlanIds.Growth)]
+[Auth<NorthstarAuthenticator>]
+[WebSession("Default", DiscoverRoutes = true)]
+[RequiresCapability(
+    ProtoCapabilityKinds.Broker,
+    Reason = "No broker is configured; set ProtoTest:Messaging:RabbitMq:ConnectionString.")]
+[RequiresCapability(
+    ProtoCapabilityKinds.Server,
+    CapabilityName = "Northstar standalone",
+    Reason = "Paying through the console needs the standalone application.")]
+[RequiresConsoleBuild]
+public sealed class ConsoleMessagingJourney
+{
     [ProtoTest]
     [SignedInAs]
     [LoginAs<NorthstarConsoleLogin>("owner")]
-    [RequiresCapability(
-        ProtoCapabilityKinds.Server,
-        CapabilityName = "Northstar standalone",
-        Reason = "Paying through the console needs the standalone application.")]
-    [RequiresConsoleBuild]
     public async Task PayingInTheConsolePublishesAnInvoicePaidEvent()
     {
         // Arrange: an open invoice the console can pay.

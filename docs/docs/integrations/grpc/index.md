@@ -39,7 +39,7 @@ IProtoTargetBuilder AddClient(string name,
 ProtoGrpcBuilder CaptureAttachments(Action<GrpcAttachmentOptions>? configure = null);
 ```
 
-The channel address comes from, in order: the explicit argument to `AddClient`, `ProtoTest:Applications:{app}:Grpc:Address`, the application's `BaseUrl`, or the application's in-process transport when the application is hosted with `AddAspNetCoreServer`. An application-scoped client with no address defers resolution to its first call. A resolver overload resolves the address per test:
+The channel address comes from, in order: the explicit argument to `AddClient`, `ProtoTest:Applications:{app}:Grpc:Address`, the application's `BaseUrl`, or the application's in-process transport when the application is hosted with `AddAspNetCoreServer`. Both application keys resolve with the shared precedence - an address a started piece published wins over configuration - so the client follows the process the run started. An application-scoped client with no address defers resolution to its first call. A resolver overload resolves the address per test:
 
 ```csharp
 .AddGrpc(grpc => grpc.AddClient("Api", context => context.Configuration.GetValue<Uri>("Api:Grpc")))

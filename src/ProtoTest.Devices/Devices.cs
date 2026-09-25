@@ -47,8 +47,14 @@ public interface IProtoDeviceConnection : IAsyncDisposable
 /// </summary>
 public interface IProtoInProcessDeviceTransport : IProtoDeviceTransport
 {
-    /// <summary>Whether this transport can reach <paramref name="endpoint"/> right now.</summary>
-    bool CanConnect(ProtoExecutionContext context, DeviceEndpoint endpoint);
+    /// <summary>
+    /// Whether this transport serves <paramref name="applicationName"/> right now: the requested
+    /// application must be the one this transport belongs to, and that application must be hosted
+    /// in-process. The endpoint path is deliberately not consulted - whether the application is hosted
+    /// decides reachability, and a wrong application must never fall back to another application's
+    /// server at the same path.
+    /// </summary>
+    bool CanConnect(ProtoExecutionContext context, string? applicationName);
 }
 
 /// <summary>

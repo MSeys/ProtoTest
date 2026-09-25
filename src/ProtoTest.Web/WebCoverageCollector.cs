@@ -8,7 +8,7 @@ using ProtoTest.Web.Pages;
 /// <summary>
 /// Aggregates page coverage: every page path the suite visited, verified or discovered, plus the
 /// inventory in <c>ProtoTest:Web:Pages</c> and the frontend routes discovered from
-/// <c>ProtoTest:Web:Pages:Source</c>. A page is covered only when a <c>web.page.verified</c> observation
+/// <c>ProtoTest:Web:Pages:Source</c>. A page is covered only when a <see cref="WebPageInventory.VerifiedObservationKind"/> observation
 /// was recorded for it; a page that was merely visited, or that only exists in the inventory, is
 /// reported uncovered. A concrete path that matches an inventory pattern lands on the pattern: verifying
 /// <c>/users/42</c> covers <c>/users/{id}</c>, and configured entries accept the same route syntax as
@@ -82,7 +82,7 @@ public sealed class WebCoverageCollector : ProtoCoverageCollector
     {
         EnsureInventory();
         return base.CanCollect(observation)
-               && observation.Kind is "web.page.visited" or "web.page.verified" or WebPageInventory.AvailableObservationKind;
+               && observation.Kind is WebPageInventory.VisitedObservationKind or WebPageInventory.VerifiedObservationKind or WebPageInventory.AvailableObservationKind;
     }
 
     public override void Collect(ProtoObservation observation)
@@ -96,7 +96,7 @@ public sealed class WebCoverageCollector : ProtoCoverageCollector
         {
             var key = ResolveKey(path);
             var item = _items.TryGetValue(key, out var existing) ? existing : CreateItem(key);
-            _items[key] = observation.Kind == "web.page.verified"
+            _items[key] = observation.Kind == WebPageInventory.VerifiedObservationKind
                 ? item with
                 {
                     Status = ProtoReportStatus.Success,

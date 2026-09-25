@@ -8,7 +8,7 @@ using ProtoTest.Core;
 /// run releases it after the reports are written. Technology packages supply the builder and the
 /// connection accessor; the base depends on no container library.
 /// </summary>
-public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfrastructure, IProtoStartupEvidence, IAsyncDisposable
+public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfrastructure, IProtoConfiguredInfrastructure, IProtoStartupEvidence, IAsyncDisposable
     where TContainer : IAsyncDisposable
 {
     private readonly Func<TContainer> _build;
@@ -21,6 +21,7 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
     private int _started;
     private int _released;
     private int? _readinessPort;
+    private ProtoReadinessOptions? _readinessOptions;
     private Dictionary<string, string?> _startupEvidence = new(StringComparer.Ordinal);
 
     protected ProtoContainerResource(
@@ -48,8 +49,9 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
     public IReadOnlyDictionary<string, string?> StartupEvidence => _startupEvidence;
 
     /// <summary>
-    /// Gets or sets how long the readiness checks may take after the container starts. Defaults to 30
-    /// seconds; a technology package may tighten it.
+    /// Gets or sets how long the readiness checks may take after the container starts when the
+    /// container is started directly. Defaults to 30 seconds; a technology package may tighten it.
+    /// When the host starts the container, the run's <see cref="ProtoReadinessOptions"/> wins.
     /// </summary>
     protected TimeSpan ReadinessTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
@@ -118,6 +120,20 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
     {
         cancellationToken.ThrowIfCancellationRequested();
         await GetOrStartTask(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Starts the piece with the run's collected state, so the run's readiness policy
+    /// (<see cref="ProtoInfrastructureContext.Readiness"/>, set by <c>ConfigureReadiness</c> or
+    /// <c>ProtoTest:Readiness</c>) governs this container's waits like every host probe. The host
+    /// prefers this overload; a direct <see cref="StartAsync(CancellationToken)"/> uses the
+    /// container's own <see cref="ReadinessTimeout"/>/<see cref="ReadinessInterval"/>.
+    /// </summary>
+    public ValueTask StartAsync(ProtoInfrastructureContext context, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        _readinessOptions = context.Readiness;
+        return StartAsync(cancellationToken);
     }
 
     /// <summary>
@@ -227,11 +243,15 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
             return;
         }
 
+        // One timeout owner: the run's policy when the piece started through a host, the container's
+        // own values when it was started directly.
+        var timeout = _readinessOptions?.Timeout ?? ReadinessTimeout;
+        var interval = _readinessOptions?.Interval ?? ReadinessInterval;
         var evidence = new Dictionary<string, string?>(StringComparer.Ordinal);
         foreach (var (name, check) in _readiness)
         {
             var result = await ProtoReadiness
-                .WaitAsync(name, token => check(container, token), ReadinessTimeout, ReadinessInterval, cancellationToken)
+                .WaitAsync(name, token => check(container, token), timeout, interval, cancellationToken)
                 .ConfigureAwait(false);
             evidence[$"readiness.{name}.attempts"] = result.Attempts.ToString(System.Globalization.CultureInfo.InvariantCulture);
             evidence[$"readiness.{name}.waitedMs"] = ((long)result.Waited.TotalMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture);

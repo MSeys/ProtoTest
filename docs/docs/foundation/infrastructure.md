@@ -136,6 +136,7 @@ builder
 - A probe is infrastructure: the host awaits it at its registration position, and it is recorded as a `readiness` run entity carrying the attempts and the wait it spent.
 - `ProtoReadiness.Tcp(host, port)` is ready when a connection succeeds. `ProtoReadiness.Http(url)` is ready when the address answers at all - pass an acceptance check to demand a status or a health payload. Any delegate returning `ValueTask<bool>` works too.
 - An exception is "not ready yet": a connection refusal while a container boots is normal, and the last error appears in the timeout failure. The default timeout is 30 seconds.
+- One policy governs every wait: `ConfigureReadiness` sets the timeout and interval for host probes **and** for the containers the run starts, and the section `ProtoTest:Readiness` binds over the code values when the host is built. A slow image is tuned in one place.
 - A probe that never becomes ready fails the run before the first test, naming the probe, its attempts and the last error.
 
 The shipped containers declare their own checks: a [PostgreSQL container](../integrations/sql/index.md) waits for its standard port to accept connections, [RabbitMQ](../integrations/messaging/index.md) for the AMQP port. When a custom image listens elsewhere, override the port:
@@ -150,7 +151,7 @@ A published application is waited for where its address is declared - `ProtoTest
 builder.AddHttpReadiness("Northstar API");
 ```
 
-An in-process application has no address to wait for, so the probe is skipped and records why.
+Register the probe **after** the piece that publishes the address: probes are awaited at their registration position, so a probe registered first resolves nothing and records `readiness.skipped` naming its position and the later publisher instead of waiting - it never claims the application runs in-process. An in-process application has no address to wait for, so the probe is skipped and records why.
 
 ## How settings reach tests
 
@@ -173,15 +174,15 @@ app.AddAspNetCoreServer<Program>(configureWebHost: webHost =>
 });
 ```
 
-Precedence is decided by each reader. The in-process web host and the RabbitMQ adapter both apply explicit configuration last, so it wins; the web session is the deliberate exception:
+One application-setting precedence is shared by every address reader: an address a started piece published through `ProtoInfrastructureSettings` wins over static configuration. The in-process web host and the RabbitMQ adapter decide their own settings differently, and `AddAspNetCoreServer`'s step-aside deliberately reads static configuration only:
 
 | Reader | Order | Winner |
 | --- | --- | --- |
-| In-process application (`AddAspNetCoreServer`) | infrastructure settings first, then `configureWebHost` | explicit `configureWebHost` |
+| Application address (REST, GraphQL, gRPC, readiness, web sessions, device clients) | published infrastructure settings first, then configuration | the started instance's address |
+| In-process application (`AddAspNetCoreServer`, its own settings) | infrastructure settings first, then `configureWebHost` | explicit `configureWebHost` |
 | RabbitMQ adapter (`UseRabbitMq`) | `ProtoTest:Messaging:RabbitMq:ConnectionString` first, then infrastructure settings | explicit configuration |
-| Web session application address | infrastructure-provided `ProtoTest:Applications:{application}:BaseUrl` first, then configuration | the started instance's address |
 
-The web session is the deliberate exception: the address of the process the run started wins over a configured one, so a standalone instance is always the one the browser drives.
+`AddAspNetCoreServer`'s **step-aside** is the one deliberate asymmetry: it reads static configuration, so an application whose address only a started piece published keeps its in-process server (for `ServerFactory`-style access) while the address readers above talk to the published process. Give the published process its own application name when both must coexist; the demo registers its standalone console as its own application for exactly that reason.
 
 ## When it is released
 
@@ -212,6 +213,6 @@ Use `AddInfrastructure` when the piece must start with the run or publish values
 - **A configured environment wins.** Declare the keys a piece fills; when all of them are configured the host skips the piece instead of shadowing the environment. `AddInfrastructureAlways` forces a start (see [above](#when-the-environment-already-provides-the-addresses)).
 - **Failures are run failures.** There is no automatic skip for infrastructure that cannot start; use `TryStart` and decide before registering.
 - **Readiness fails, it does not skip.** A probe that times out fails the run before the first test. It also runs once, at run start - waiting inside a test is a hook's job, not a probe's.
-- **Settings don't change `IConfiguration`.** They live in `ProtoInfrastructureSettings`; a reader that only looks at `IConfiguration` won't see them. The built-in readers — the in-process web host, the RabbitMQ adapter and web sessions — do.
+- **Settings don't change `IConfiguration`.** They live in `ProtoInfrastructureSettings`; a reader that only looks at `IConfiguration` won't see them. The built-in readers — the address readers (REST/GraphQL/gRPC clients, readiness, web sessions, device clients), the in-process web host and the RabbitMQ adapter — do.
 - **No ordering control.** Registrations start in the order they were added, and there is no dependency graph between pieces.
 - **`ProtoInfrastructureSettings.Set` is internal.** Only the host fills it; tests read `Values`.

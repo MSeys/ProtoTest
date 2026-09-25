@@ -44,7 +44,7 @@ app.AddAspNetCoreServer<Program>(configureWebHost: webHost =>
 });
 ```
 
-The demo owns a **file** SQLite database per run (`TestResults/ProtoTest.Demo/northstar-demo.db`, deleted before the run starts). The sample application itself would fall back to a named in-memory SQLite database if it were launched without a connection string, but the demo always hands it one. When the suite doesn't own a PostgreSQL container, it also starts a standalone copy of the application for the browser journeys and fills the default [web session](../integrations/web/index.md)'s base URL from it.
+The demo owns a **file** SQLite database per run (`TestResults/ProtoTest.Demo/northstar-demo.db`, deleted before the run starts). The sample application itself would fall back to a named in-memory SQLite database if it were launched without a connection string, but the demo always hands it one. When the suite doesn't own a PostgreSQL container, it also starts a standalone copy of the application for the browser journeys, registered as its **own application** (`Northstar console`) whose published base URL the [web sessions](../integrations/web/index.md) and console-targeting REST/GraphQL clients follow - one address authority per application.
 
 Because the test-side domain is composed over the same store, `DomainAccessJourney` runs; because no RabbitMQ adapter is configured, `MessagingJourney` skips.
 
@@ -86,7 +86,7 @@ Because the application is not started by the run, nothing guarantees it is up w
 builder.AddHttpReadiness(NorthstarTargets.Api);   // waits for ProtoTest:Applications:{app}:BaseUrl
 ```
 
-An in-process application has no address to wait for, so the probe is skipped there and says why.
+Register the probe **after** the infrastructure that publishes the address; a probe registered first sees no address and records a `readiness.skipped` reason naming the ordering requirement instead of waiting. An in-process application has no address to wait for, so the probe is skipped there and says why.
 
 ## What doesn't change
 

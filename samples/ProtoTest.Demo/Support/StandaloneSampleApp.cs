@@ -9,9 +9,9 @@ using ProtoTest.Core;
 
 /// <summary>
 /// Starts the sample application as a standalone process over the suite's store, so browser tests have a
-/// real address. It is run-scoped infrastructure: the host starts it, exposes its address as the
-/// application's base URL so every client and session follows it, and releases it with the run - the
-/// journey file only contains the journey.
+/// real address. It is run-scoped infrastructure: the host starts it, publishes its address as the
+/// console application's base URL so the sessions and clients that target that application follow it,
+/// and releases it with the run - the journey file only contains the journey.
 /// </summary>
 internal sealed class StandaloneSampleApp(
     string connectionString,
@@ -35,7 +35,7 @@ internal sealed class StandaloneSampleApp(
 
     public IReadOnlyDictionary<string, string> Settings => new Dictionary<string, string>
     {
-        [$"ProtoTest:Applications:{NorthstarTargets.Api}:BaseUrl"] = _baseUrl
+        [$"ProtoTest:Applications:{NorthstarTargets.Console}:BaseUrl"] = _baseUrl
     };
 
     public async ValueTask StartAsync(CancellationToken cancellationToken = default)

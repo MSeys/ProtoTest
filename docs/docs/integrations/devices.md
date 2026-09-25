@@ -56,7 +56,7 @@ builder.AddApplication("Api", app => app
             .AddDevice<AcCharger>()));
 ```
 
-An application hosted **in-process** has no listening socket. Register the in-process transport once and keep the same client registration: it uses the application's `TestServer` when the application is hosted in-process, and the configured address (socket) when it is published - so switching modes never touches the client:
+An application hosted **in-process** has no listening socket. Register the in-process transport once per application and keep the same client registration: it uses the application's `TestServer` when the application is hosted in-process, and the configured address (socket) when it is published - so switching modes never touches the client:
 
 ```csharp
 builder
@@ -67,6 +67,8 @@ builder
             .AddWebSocketClient("Chargers", path: "/ocpp/{deviceId}")
                 .AddDevice<AcCharger>()));
 ```
+
+The registration is keyed by `(TProgram, application)`: a second application, or a second program, gets its own transport, and a client is only routed through the transport of the application it was registered under - two applications exposing the same path each serve their own clients. A client that has only a path (no address resolver) and no matching in-process transport fails naming the application instead of falling back to another transport.
 
 ## Using it
 
@@ -97,7 +99,9 @@ builder.ConfigureServices(services => services.AddSingleton<IProtoCollector>(
 
 ## Transport options
 
-The WebSocket backend takes code defaults in `AddWebSocketDevices(configure)` and lets configuration override them:
+The WebSocket backend takes code defaults in `AddWebSocketClient(..., configure)` (or the same callback on `AddInProcessWebSocketDevices<TProgram>(application, configure)`) and lets configuration override them; the in-process
+transport resolves and validates the same registered options, so a bad value fails when the device is
+created and `ConnectTimeout` bounds the in-process connect too:
 
 | Key | Meaning | Default |
 | --- | --- | --- |
@@ -107,13 +111,19 @@ The WebSocket backend takes code defaults in `AddWebSocketDevices(configure)` an
 
 ## What the trace shows
 
-A `device` entity per device (transport, address, connection state) and `device.connect`, `device.send`, `device.receive` and `device.command` operations; a failed expectation is a failed `device.command` carrying the awaited description and the frame log.
+A `device` entity per device (client, type, transport, address, connection state) and `device.connect`,
+`device.send`, `device.receive` and `device.command` operations; a failed expectation is a failed
+`device.command` carrying the awaited description and the frame log. The entity id is
+`device:{client}:{deviceType}:{id}`, so two device types can share an id, and the test's end disconnects
+the device: the final state is `device.connected = false` with a `device.disconnect` event, even when
+the test never called `DisconnectAsync`.
 
 ## Limits
 
 - **One instance per (client, type, id) per test.** Devices are not shared across tests; state that must persist belongs to the product.
+- **One conversation per device instance.** Connection creation is single-flight and sends are serialized; one receive may be in flight at a time - a second concurrent receive fails fast naming the device instead of stealing frames. A send that races a disconnect fails with a device error naming the device. Send and receive may run concurrently.
 - **No per-device configuration.** The client's address template or resolver plus the device id is the whole story; a client is where environment differences live.
-- **In-process endpoints are preferred automatically.** When `AddInProcessWebSocketDevices<TProgram>` is registered and the application is hosted in-process (`AddAspNetCoreServer`), the client uses its `TestServer`; otherwise the address resolver runs. The two transports are packages and registrations, not client API variants.
+- **In-process endpoints are preferred automatically.** When `AddInProcessWebSocketDevices<TProgram>(application)` is registered and that application is hosted in-process (`AddAspNetCoreServer`), the client uses its `TestServer`; otherwise the address resolver runs. The transport belongs to one `(TProgram, application)` pair, so multi-application suites route each client to its own application.
 - **`ExpectAsync` consumes frames.** The bounded exchange log is for failure messages, not for matching a frame twice.
 - **Replay is not shipped.** The `device.replay` operation is designed; recording and replaying a frame script against another transport is future work.
 - **Transports ship one at a time.** WebSocket today; MQTT when a user needs it, TCP/serial after that.

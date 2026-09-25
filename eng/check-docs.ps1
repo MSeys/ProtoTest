@@ -2,8 +2,8 @@
 param()
 
 # Documentation enforcement for docs/docs and docs/src. It runs before the Docusaurus build so that
-# removed symbols, configuration keys and sample links cannot drift back in. This mirrors the
-# enforcement list in assets/internal/docs-rework-plan.md.
+# removed symbols, dead API names, configuration keys and sample links cannot drift back in. This
+# mirrors the enforcement list in assets/internal/docs-rework-plan.md.
 
 $ErrorActionPreference = "Stop"
 
@@ -28,6 +28,7 @@ if (Test-Path -LiteralPath $factsRoot) {
 }
 
 $forbiddenFailures = New-Object System.Collections.Generic.List[string]
+$apiFailures = New-Object System.Collections.Generic.List[string]
 $keyFailures = New-Object System.Collections.Generic.List[string]
 $linkFailures = New-Object System.Collections.Generic.List[string]
 $releaseFailures = New-Object System.Collections.Generic.List[string]
@@ -39,20 +40,9 @@ function Get-RelativePath {
 
 # 1. Forbidden symbols ---------------------------------------------------------
 
-$forbiddenSymbols = @(
-    'ShouldHaveHttpStatus',
-    'ShouldMatchData',
-    'Messages()',
-    'RestResponseOptions',
-    'GraphQLResponseOptions',
-    'RestAttachmentOptions',
-    'GraphQLAttachmentOptions',
-    'ProtoGrpcClientOptions',
-    'ProtoMessagingOptions',
-    'ProtoRabbitMqOptions',
-    'ProtoSqlOptions',
-    'ProtoSheetsOptions',
-    'IProtoMessageBrokerSetup',
+# The non-API half of the deny list: artifact file names and old vocabulary strings that no API
+# list can name.
+$forbiddenVocabulary = @(
     'run.json',
     'sheets.assert',
     'auth.apply',
@@ -62,6 +52,49 @@ $forbiddenSymbols = @(
     '--prerelease',
     '0.1.0-alpha'
 )
+
+# The removed-API half is the package-validation evidence itself. Every
+# src/**/CompatibilitySuppressions.xml entry records a public symbol the published baseline had and
+# this branch deliberately removed, so the gate reads those files instead of a hand list.
+# CP0001 suppresses a removed public type: its short name is the deny entry. CP0002 suppresses a
+# removed member: the entry is `DeclaringType.Member`, and only while no member of that name is
+# left on the declaring type in source - CP0002 also records changed overloads, whose name is still
+# live and whose page must stay correct. CP0006 is deliberately not read: it means "a member was
+# added to an interface", so the member exists and denying it would fail a page that teaches the
+# current interface. Only the Target name is read; the lib/... Left/Right paths name the same
+# symbol per target framework and add nothing.
+$sourceFiles = @(Get-ChildItem -Path (Join-Path $repository "src") -Recurse -File -Filter *.cs |
+    Where-Object { $_.FullName -notmatch $generatedFolders } |
+    ForEach-Object { [pscustomobject]@{ Text = Get-Content -Raw -LiteralPath $_.FullName } })
+
+$removedApiSymbols = New-Object System.Collections.Generic.HashSet[string]
+foreach ($suppressionFile in Get-ChildItem -Path (Join-Path $repository "src") -Recurse -Filter CompatibilitySuppressions.xml) {
+    [xml]$suppressions = Get-Content -Raw -LiteralPath $suppressionFile.FullName
+    foreach ($suppression in $suppressions.Suppressions.Suppression) {
+        if ($suppression.DiagnosticId -notin @('CP0001', 'CP0002')) { continue }
+
+        $signature = ((($suppression.Target -replace '^[A-Z]:', '') -split '\(')[0]) -replace '`', ''
+        $segments = $signature -split '\.'
+        $member = $segments[-1]
+        if ($member -match '^(get|set)_(.+)$') { $member = $Matches[2] }
+        if ($member -in @('#ctor', '#cctor')) { continue }
+
+        if ($suppression.DiagnosticId -eq 'CP0001') {
+            [void]$removedApiSymbols.Add($member)
+            continue
+        }
+
+        $declaring = if ($segments.Count -ge 2) { $segments[-2] } else { '' }
+        $typeFiles = @($sourceFiles | Where-Object { $_.Text -match "\b(class|struct|interface|enum|record)\s+$([regex]::Escape($declaring))\b" })
+        $stillDeclared = $false
+        foreach ($typeFile in $typeFiles) {
+            if ($typeFile.Text -match "\b$([regex]::Escape($member))\b") { $stillDeclared = $true; break }
+        }
+        if (-not $stillDeclared) { [void]$removedApiSymbols.Add("$declaring.$member") }
+    }
+}
+
+$forbiddenSymbols = @($forbiddenVocabulary) + @($removedApiSymbols | Sort-Object)
 
 foreach ($file in @($docsContentFiles + $docsSourceFiles)) {
     $relative = Get-RelativePath $file.FullName
@@ -75,7 +108,55 @@ foreach ($file in @($docsContentFiles + $docsSourceFiles)) {
     }
 }
 
-# 2. Configuration keys --------------------------------------------------------
+# 2. Documented API names ------------------------------------------------------
+# A documented Add* symbol must exist as a method in src/** or samples/** (the sample helpers are part
+# of what the docs teach). The check catches the class the audit found: docs taught AddWebSocketDevices
+# after the builder had been renamed. Only camelCase API names match (Add followed by an uppercase
+# letter), so prose like "Adding", "Address" or "Added" is not a candidate. Comments and string
+# literals are stripped first: a name that only appears in prose, an example string or a usage message
+# is not an API (A5R-03). The allowlist covers the framework helpers the docs reference, which are not
+# this repository's API; add a name here with its owner when a page legitimately teaches it.
+
+$apiAllowlist = @(
+    'AddBus',                  # a reader-written extension example (advanced/extending.md)
+    'AddEnvironmentVariables', # Microsoft.Extensions.Configuration
+    'AddJsonFile',             # Microsoft.Extensions.Configuration
+    'AddMinutes',              # System.DateTimeOffset
+    'AddOtlpExporter'          # OpenTelemetry exporter builder
+)
+
+$apiNamePattern = [regex]'\b(Add[A-Z][A-Za-z0-9_]*)\b'
+$sourceApiNames = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
+$sourceRoots = @((Join-Path $repository "src"), (Join-Path $repository "samples"))
+foreach ($sourceRoot in $sourceRoots) {
+    if (-not (Test-Path -LiteralPath $sourceRoot)) { continue }
+    foreach ($file in Get-ChildItem -LiteralPath $sourceRoot -Recurse -File -Filter *.cs |
+        Where-Object { $_.FullName -notmatch $generatedFolders }) {
+        $text = Get-Content -Raw -LiteralPath $file.FullName
+        $codeText = ($text -split "`r?`n" | ForEach-Object {
+                ($_ -replace '"[^"]*"', '') -replace '/\*.*?\*/', '' -replace '//.*$', ''
+            }) -join "`n"
+        foreach ($match in [regex]::Matches($codeText, '\b(Add[A-Z][A-Za-z0-9_]*)\s*[<(]')) {
+            [void]$sourceApiNames.Add($match.Groups[1].Value)
+        }
+    }
+}
+
+foreach ($file in @($docsContentFiles + $docsSourceFiles)) {
+    $relative = Get-RelativePath $file.FullName
+    $lines = @(Get-Content -LiteralPath $file.FullName)
+    for ($lineNumber = 0; $lineNumber -lt $lines.Count; $lineNumber++) {
+        foreach ($match in $apiNamePattern.Matches($lines[$lineNumber])) {
+            $symbol = $match.Groups[1].Value
+            if ($apiAllowlist -contains $symbol) { continue }
+            if (-not $sourceApiNames.Contains($symbol)) {
+                $apiFailures.Add(("{0}:{1}: '{2}' is documented but no Add* method with that name exists in src/ or samples/" -f $relative, ($lineNumber + 1), $symbol))
+            }
+        }
+    }
+}
+
+# 3. Configuration keys --------------------------------------------------------
 
 $keyPattern = [regex]'ProtoTest:[A-Za-z:]+[A-Za-z]'
 
@@ -146,7 +227,7 @@ if (-not $keyCrossCheckSkipped) {
     }
 }
 
-# 3. Sample links ---------------------------------------------------------------
+# 4. Sample links ---------------------------------------------------------------
 
 $linkPattern = [regex]'\]\(([^()\s]+)\)'
 foreach ($file in $docsContentFiles) {
@@ -182,7 +263,7 @@ foreach ($file in $docsContentFiles) {
     }
 }
 
-# 4. Generated changelog --------------------------------------------------------
+# 5. Generated changelog --------------------------------------------------------
 
 # One source: the repository CHANGELOG.md. docs/scripts/generate-changelog.mjs writes the documentation
 # page and the homepage release feed from it; check mode fails when either output is stale, so a release
@@ -203,13 +284,17 @@ else {
 # Summary -----------------------------------------------------------------------
 
 $checkedFiles = $docsContentFiles.Count + $docsSourceFiles.Count + $factFiles.Count
-$totalFailures = $forbiddenFailures.Count + $keyFailures.Count + $linkFailures.Count + $releaseFailures.Count
+$totalFailures = $forbiddenFailures.Count + $apiFailures.Count + $keyFailures.Count + $linkFailures.Count + $releaseFailures.Count
 
 if ($totalFailures -gt 0) {
     Write-Host "Documentation checks failed:"
     if ($forbiddenFailures.Count -gt 0) {
         Write-Host ("  Forbidden symbols ({0}):" -f $forbiddenFailures.Count)
         foreach ($failure in $forbiddenFailures) { Write-Host "    $failure" }
+    }
+    if ($apiFailures.Count -gt 0) {
+        Write-Host ("  Documented API names ({0}):" -f $apiFailures.Count)
+        foreach ($failure in $apiFailures) { Write-Host "    $failure" }
     }
     if ($keyFailures.Count -gt 0) {
         Write-Host ("  Configuration keys ({0}):" -f $keyFailures.Count)

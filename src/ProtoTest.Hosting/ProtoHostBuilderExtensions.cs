@@ -32,9 +32,17 @@ public static class ProtoHostBuilderExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         var registrations = RegisteredWorkers.GetValue(builder, static _ => new Registrations());
-        if (registrations.Names.Contains(name))
+        if (registrations.Programs.TryGetValue(name, out var registeredProgram))
         {
-            return builder;
+            if (registeredProgram == typeof(TProgram))
+            {
+                return builder;
+            }
+
+            // A dropped duplicate that is a different program is a silent wrong state, not a no-op.
+            throw new InvalidOperationException(
+                $"A worker named '{name}' is already registered for {registeredProgram.FullName}; " +
+                $"register {typeof(TProgram).FullName} under a different name instead.");
         }
 
         var options = new ProtoWorkerOptions();
@@ -56,7 +64,7 @@ public static class ProtoHostBuilderExtensions
             registrations.RegistryRegistered = true;
         }
 
-        registrations.Names.Add(name);
+        registrations.Programs.Add(name, typeof(TProgram));
         return builder.AddCapability(new ProtoCapabilityDescriptor(
             typeof(TProgram).Assembly.GetName().Name ?? typeof(TProgram).FullName!,
             ProtoCapabilityKinds.Worker,
@@ -65,7 +73,7 @@ public static class ProtoHostBuilderExtensions
 
     private sealed class Registrations
     {
-        public HashSet<string> Names { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, Type> Programs { get; } = new(StringComparer.Ordinal);
 
         public ProtoWorkerRegistry Registry { get; } = new();
 

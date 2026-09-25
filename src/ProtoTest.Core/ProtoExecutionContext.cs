@@ -18,6 +18,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     private readonly HashSet<string> _reportedResources = new(StringComparer.Ordinal);
     private readonly ProtoObservationDispatcher _observations;
     private readonly ProtoFindingStore? _findings;
+    private readonly ProtoClockRegistry? _clockRegistry;
     private int _disposeStarted;
     private int _findingSequence;
 
@@ -37,7 +38,8 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         ProtoTestId id,
         MethodInfo testMethod,
         ProtoTestTraceRecorder trace,
-        ProtoClock? clock = null)
+        ProtoClock? clock = null,
+        ProtoClockRegistry? clockRegistry = null)
     {
         TestName = testName ?? throw new ArgumentNullException(nameof(testName));
         _scope = scope ?? throw new ArgumentNullException(nameof(scope));
@@ -48,6 +50,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         // Resolved once: a teardown finding is recorded after the scope is disposed, so it cannot look
         // the store up lazily any more. The store itself is a root singleton and stays valid.
         _findings = _scope.ServiceProvider.GetService<ProtoFindingStore>();
+        _clockRegistry = clockRegistry;
         Trace = trace;
         Clock = clock ?? new ProtoClock();
         Clock.Advanced += OnClockAdvanced;
@@ -464,8 +467,9 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
             return;
         }
 
-        // The test is over: a request that still carries its id finds the run clock from here on.
-        ProtoClockLocator.Remove(Id.Value);
+        // The test is over: a request that still carries its id finds the run clock from here on. The
+        // registry is host-scoped, so this only removes this host's entry.
+        _clockRegistry?.Remove(Id.Value);
         _clients.Seal();
         using var releaseOperation = Trace
             .Operation("resources.release", "Release owned resources", "ProtoTest.Core")

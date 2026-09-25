@@ -41,6 +41,16 @@ The factory runs inside the test's scope, so it can resolve services — the dem
 provider => CreateDatabaseConnection(ResolveDatabase(provider, fallbackDatabase), usePostgres)
 ```
 
+When the address is environment-dependent, declare the keys that can provide the connection:
+
+```csharp
+builder.AddSql(
+    provider => new NpgsqlConnection(...),
+    sql => sql.AddressKeys.Add("ConnectionStrings:Orders"));
+```
+
+With at least one key declared, `AddSql` declares the `SQL` store capability only while one of them can provide a connection — a configured value, or a key a registered container declares and fills. When none can, the integration is inert: the connection is not opened during setup, and `Proto.Context.SqlSession()`, `SqlConnection()` and `SqlTransaction()` throw naming the missing keys and the `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate. `AddressKeys` is a code API — a `SqlAddressKeys` set that only `Add` (or a `SqlOptions` instance registered before `AddSql`) fills. No configuration section binds it, because the capability decision is made when the host is built and a key that only configuration knows could not have promised the connection the decision was made against. It is empty by default, which keeps the capability unconditional and the factory owning the address.
+
 ## Isolation
 
 `SqlIsolation` has two modes:
@@ -105,6 +115,8 @@ public static IProtoHostBuilder AddEntityFrameworkCore<TContext>(
 
 After the connection hook has opened the connection and begun the transaction, the enlistment hook checks that `dbContext.Database.GetDbConnection()` **is** the connection ProtoTest owns — a context over its own connection throws with an explanation instead of silently escaping the transaction — and then records `sql.enlist` and calls `UseTransaction` with the test's transaction. That is why the provider must be configured with `services.GetRequiredService<DbConnection>()`; with `Isolation = None` there is no transaction and no enlistment.
 
+`AddEntityFrameworkCore` shares the SQL address rule: when `AddSql` declared `AddressKeys` and none is provided, the `Entity Framework Core` store capability is absent too, gated tests skip, the enlistment hook leaves the session and the context alone, and `Proto.Context.Sql<TContext>()` throws the same missing-keys message. The keys are read when `AddEntityFrameworkCore` runs, so call it after `AddSql`; without declared keys the capability stays unconditional.
+
 **Call order matters.** Entity Framework Core keeps the first `DbContextOptions<TContext>` registration and drops later options delegates. `AddEntityFrameworkCore` therefore registers the context only when no `DbContextOptions<TContext>` exists yet: a host `AddDbContext` called **before** it keeps its own configuration and is still enlisted, while one called **after** has its options dropped. Register the host's context first when it needs both its options and the test transaction. A repeated `AddEntityFrameworkCore<TContext>` is a no-op (a ProtoTest-owned marker gates it); two different contexts are different registrations and both apply.
 
 ## PostgreSQL container
@@ -128,7 +140,7 @@ An application hosted in process receives the same keys as host settings automat
 
 - Operations follow the connection's lifecycle, all with source `ProtoTest.Sql`: `sql.connection.open` (Setup, with `sql.connection.type`), `sql.transaction.begin` (Setup, child of the open, with `sql.isolation`), `sql.transaction.rollback` (release phase, inside the connection resource's release), and `sql.enlist` (Setup, when a `DbContext` joins the transaction, with `db.context`, source `ProtoTest.Sql.EntityFrameworkCore`).
 - The connection is a **test-scoped resource**: entity kind `database`, id `database:connection`, described as the connection type and isolation, plus the names it is shared with when there are any. Its release runs in teardown before the test's clients are disposed, and is recorded as a `resource.release` entry with `resource.kind = database`.
-- The run registers `SQL` and `Entity Framework Core` as `store` capabilities.
+- The run registers `SQL` and `Entity Framework Core` as `store` capabilities. Both are declared only while the SQL address keys can provide a connection; with declared-but-unprovided keys the trace records both as `capability.skipped` and no connection is opened.
 - Individual commands are not traced, and neither package emits observations or report items — ProtoTest records the connection's lifecycle, not the SQL your test sends.
 
 ## The demo's wiring
@@ -166,7 +178,7 @@ The capabilities are name `"SQL"` kind `store` and name `"Entity Framework Core"
 [RequiresCapability("store", CapabilityName = "SQL")]
 ```
 
-There are no package-specific attributes. See [Skip conditions](../../foundation/skip-conditions.md).
+With `AddressKeys` declared and none of them provided, the `SQL` capability is absent, so the first gate skips instead of failing setup. The `Entity Framework Core` capability follows the same keys, so it drops with `SQL`. There are no package-specific attributes. See [Skip conditions](../../foundation/skip-conditions.md).
 
 ## Limits
 

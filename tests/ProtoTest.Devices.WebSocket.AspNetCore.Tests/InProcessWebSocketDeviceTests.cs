@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -47,7 +48,10 @@ public sealed class InProcessWebSocketDeviceTests
                 entity.State["device.transport"],
                 Is.EqualTo(InProcessWebSocketDeviceTransport<SampleApi.Program>.TransportName));
             Assert.That(entity.State["device.address"], Is.EqualTo("/ws/CP-001"));
-            Assert.That(entity.State["device.connected"], Is.EqualTo("true"));
+            Assert.That(
+                entity.State["device.connected"],
+                Is.EqualTo("false"),
+                "the release path disconnects the device and finalises its state");
         });
     }
 
@@ -115,6 +119,116 @@ public sealed class InProcessWebSocketDeviceTests
         await host.StopAsync();
 
         Assert.That(echoed, Is.EqualTo(payload));
+    }
+
+    [Test]
+    public async Task InProcessTransportCapability_WhenTheApplicationIsHosted_ShouldBeDeclared()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder
+            .AddInProcessWebSocketDevices<SampleApi.Program>("Api")
+            .AddApplication("Api", app => app.AddAspNetCoreServer<SampleApi.Program>());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StopAsync();
+
+        Assert.That(
+            host.HasCapability(
+                ProtoCapabilityKinds.Device,
+                InProcessWebSocketDeviceTransport<SampleApi.Program>.TransportName),
+            Is.True,
+            "the in-process transport serves the hosted application");
+    }
+
+    [Test]
+    public async Task InProcessTransportCapability_WhenTheApplicationIsPublished_ShouldBeDropped()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Applications:Api:BaseUrl"] = "https://published.example.test"
+            }));
+        builder
+            .AddInProcessWebSocketDevices<SampleApi.Program>("Api")
+            .AddApplication("Api", app => app.AddAspNetCoreServer<SampleApi.Program>());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var skipped = host.Trace.Snapshot().Entries!
+            .Single(entry => entry.Kind == "capability.skipped"
+                && entry.Attributes["capability.name"] == InProcessWebSocketDeviceTransport<SampleApi.Program>.TransportName);
+        await host.StopAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                host.HasCapability(
+                    ProtoCapabilityKinds.Device,
+                    InProcessWebSocketDeviceTransport<SampleApi.Program>.TransportName),
+                Is.False,
+                "a published application is served over the socket, so the in-process capability is absent");
+            Assert.That(skipped.Attributes["capability.keys"], Does.Contain("ProtoTest:Applications:Api:BaseUrl"));
+        });
+    }
+
+    [Test]
+    public async Task InProcessConnect_WhenTheRegisteredConnectTimeoutElapses_ShouldTimeOut()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder
+            .AddInProcessWebSocketDevices<SampleApi.Program>(
+                "Api",
+                options =>
+                {
+                    options.ConnectTimeout = TimeSpan.FromMilliseconds(100);
+                    options.ReceiveBufferBytes = 1024;
+                })
+            .AddApplication("Api", app => app
+                .AddAspNetCoreServer<SampleApi.Program>(configureWebHost: webHost =>
+                    webHost.ConfigureTestServices(services =>
+                        services.AddSingleton<IStartupFilter>(
+                            new SlowWebSocketStartupFilter(TimeSpan.FromSeconds(2)))))
+                .AddDevices(devices => devices
+                    .AddWebSocketClient("Chargers", path: "/ws/{deviceId}")
+                        .AddDevice<EchoDevice>()));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("in-process connect timeout", "00001", TestMethods.Placeholder);
+
+        var device = Proto.Context.Devices("Chargers").For<EchoDevice>("CP-001");
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () => await device.BootAsync());
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        await host.StopAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                exception!.Message,
+                Does.Contain("timed out after 0.1s"),
+                "the registered ConnectTimeout governs the in-process connect, like the socket path");
+            Assert.That(exception.Message, Does.Contain("could not connect"));
+        });
+    }
+
+    private sealed class SlowWebSocketStartupFilter(TimeSpan delay) : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use(async (context, nextMiddleware) =>
+            {
+                if (context.Request.Path.StartsWithSegments("/ws"))
+                {
+                    await Task.Delay(delay);
+                }
+
+                await nextMiddleware(context);
+            });
+            next(app);
+        };
     }
 
     private sealed class EchoDevice : ProtoDevice

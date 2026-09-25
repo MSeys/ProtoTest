@@ -3,11 +3,14 @@ namespace ProtoTest.Sql.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore;
 using ProtoTest.Core;
 using ProtoTest.Sql;
+using ProtoTest.Sql.Internal;
 
 /// <summary>
 /// Enlists the test's <see cref="DbContext"/> in the transaction ProtoTest.Sql opened. Without this the
 /// provider refuses to execute, because ADO.NET requires a command to carry the transaction of a
-/// connection that has a pending local transaction.
+/// connection that has a pending local transaction. When the SQL address keys are declared and none is
+/// provided, the integration is inert: the hook leaves the session and the context untouched, so no
+/// connection factory or context options run during setup, and the accessors name the missing keys.
 /// </summary>
 internal sealed class SqlEnlistmentHook<TContext> : IProtoTestHook
     where TContext : DbContext
@@ -19,6 +22,14 @@ internal sealed class SqlEnlistmentHook<TContext> : IProtoTestHook
 
     public async Task BeforeTestAsync(ProtoExecutionContext context)
     {
+        // Check the address rule before resolving the session or the context: resolving either would
+        // run the connection factory during an inert setup, which is the failure the rule exists to
+        // prevent. A test that needs the context is gated by the store capability and skips instead.
+        if (context.TryService<SqlOptions>() is { } options && SqlAddressRule.IsInert(context, options))
+        {
+            return;
+        }
+
         var session = context.Service<ProtoSqlSession>();
         var dbContext = context.Service<TContext>();
 

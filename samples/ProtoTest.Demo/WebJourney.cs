@@ -21,7 +21,7 @@ using ProtoTest.Web;
 /// The journey deliberately ends on the not-found screen without asserting anything there, so page
 /// coverage shows a page that was visited but never verified.
 /// </summary>
-[Application(NorthstarTargets.Api)]
+[Application(NorthstarTargets.Console)]
 [NorthstarTenant(PlanIds.Growth)]
 [Auth<NorthstarAuthenticator>]
 [WebSession("Default", DiscoverRoutes = true)]

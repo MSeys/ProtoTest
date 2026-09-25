@@ -58,7 +58,6 @@ A configured adapter is what makes the `Broker` capability true. The in-memory d
 | `ProtoTest:Messaging:Attachments:MaxDiagnosticBodyLength` | `JsonDiagnosticOptions.MaxDiagnosticBodyLength` | `int` | 65536 (64 KiB) |
 | `ProtoTest:Messaging:Attachments:SensitiveJsonProperties` | `JsonDiagnosticOptions.SensitiveJsonProperties` | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret` |
 | `ProtoTest:Messaging:RabbitMq:ConnectionString` | `RabbitMqOptions.ConnectionString` | `string` | `amqp://guest:guest@localhost:5672/` |
-| `ProtoTest:Messaging:RabbitMq:PollInterval` | `RabbitMqOptions.PollInterval` | `TimeSpan` | 25 ms |
 
 `MessagingAttachmentOptions` derives from `JsonDiagnosticOptions` and binds from `ProtoTest:Messaging:Attachments`; `RabbitMqOptions` binds from `ProtoTest:Messaging:RabbitMq`. Code configuration runs first and the configuration section binds over it. For the connection string the order is: an explicit configuration value wins, then the value a started container filled, then your code callback or the default.
 
@@ -192,7 +191,7 @@ Destinations a suite awaits should be declared before the run, so the RabbitMQ a
 
 From the moment a tap is declared, anything the application publishes is queued for that test, so the usual act-then-await order works. Binding at await time instead would miss everything published in between — which is exactly what happens for an undeclared destination, where the consumer binds just in time and can only see later messages. The in-memory broker needs no declaration because it keeps its own history.
 
-## Tracing and coverage
+## Tracing
 
 Every publish and await is recorded:
 
@@ -201,7 +200,7 @@ Every publish and await is recorded:
 - Resources: the run-scoped `messaging:broker` resource with kind `broker`, and the per-test `messaging:consumer:Default` resource with kind `consumer`. The container adds `broker:rabbitmq`.
 - The event `messaging.attachment.failed` with `attachment.name` when a capture cannot be registered.
 
-The package ships **no collector**. The observations exist, but they never reach a report without a collector of your own (see [coverage](../../observability/coverage.md)).
+The observations are trace evidence, not a coverage promise: `ProtoTest.Messaging` ships **no collector**, so destinations are never aggregated into a report unless you register a collector of your own with the broker's target name (see [coverage](../../observability/coverage.md)).
 
 ## Skip
 
@@ -213,7 +212,7 @@ The package ships **no collector**. The observations exist, but they never reach
     Reason = "No broker is configured; set ProtoTest:Messaging:RabbitMq:ConnectionString.")]
 ```
 
-`AddMessaging` registers the `Messaging` capability only when an adapter is configured. The container alone does not satisfy the condition — the capability comes from `UseRabbitMq`, not from owning a broker.
+`AddMessaging` registers the `Messaging` capability only when an adapter is configured. With `UseRabbitMq` the capability is conditional on `ProtoTest:Messaging:RabbitMq:ConnectionString`: a run with a configured key or a broker container that declares it keeps the capability, while a run with neither loses it and gated tests skip instead of failing at setup or first publish. A callback that sets `RabbitMqOptions.ConnectionString` in code provides the address without a key and keeps the capability; an adapter registered through `UseBroker` without address keys keeps the unconditional declaration.
 
 ## Limits
 
@@ -223,6 +222,7 @@ The package ships **no collector**. The observations exist, but they never reach
 - **UTF-8 strings only.** `ProtoMessage.Payload` is a `string?`; there is no binary payload API.
 - **Destinations are a flat list.** There is no per-test destination declaration API on `ProtoMessageClient`.
 - **Capture is opt-in.** Payload attachments exist only after `CaptureAttachments`.
+- **Destinations are evidence, not coverage.** No Messaging collector ships (a decision, not a gap); the `messaging.publish`, `messaging.receive` and `messaging.contract.shape` observations reach a report only through a collector a suite registers.
 - **One run connection, serialized channels.** RabbitMQ uses a single connection and one publish channel, with consumer operations serialized per channel; the exchange must already exist and there is no retry or backoff.
 
 ## Links

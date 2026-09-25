@@ -127,7 +127,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         // external origin is deliberately not replaced by the target.
         var currentAddress = await TryCurrentAddressAsync(backend, cancellationToken);
         RecordPageObservation(
-            "web.page.visited",
+            WebPageInventory.VisitedObservationKind,
             currentAddress is null ? PagePathFrom(target.ToString()) : PagePathFrom(currentAddress),
             "navigate");
         await _routeDiscovery.DiscoverAsync(backend, cancellationToken);

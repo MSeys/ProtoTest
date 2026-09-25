@@ -6,6 +6,7 @@ on:
       upload_packages:
         type: boolean
         default: false
+  workflow_dispatch:
 
 permissions:
   contents: read

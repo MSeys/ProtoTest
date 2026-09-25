@@ -2,7 +2,6 @@ namespace ProtoTest.Core.Tests;
 
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -112,13 +111,13 @@ public sealed class ReadinessTests
     [Test]
     public async Task HttpReadiness_ShouldWaitForAPublishedAddressToAnswer()
     {
-        var port = FreePort();
+        await using var listener = SingleConnectionListener.Start();
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
         builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>
             {
-                ["ProtoTest:Applications:Api:BaseUrl"] = $"http://127.0.0.1:{port}"
+                ["ProtoTest:Applications:Api:BaseUrl"] = listener.Address
             }));
         builder.ConfigureReadiness(options =>
         {
@@ -129,24 +128,23 @@ public sealed class ReadinessTests
         await using var host = builder.Build();
 
         var start = host.StartAsync();
-        await Task.Delay(150);
-        using var listener = new TcpListener(IPAddress.Loopback, port);
-        listener.Start();
-        var serve = ServeOnceAsync(listener);
+        await listener.RequestReceived.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.That(start.IsCompleted, Is.False, "readiness waits while the address has not answered");
+        listener.Answer();
         await start;
         await host.StopAsync();
-        await serve;
+        await listener.Completed;
 
         var entity = host.Trace.Snapshot().Entities!.Single(candidate => candidate.Kind == "readiness");
         Assert.Multiple(() =>
         {
-            Assert.That(entity.State["readiness.url"], Does.Contain($"127.0.0.1:{port}"));
+            Assert.That(entity.State["readiness.url"], Does.Contain($"127.0.0.1:{listener.Port}"));
             Assert.That(int.Parse(entity.State["readiness.attempts"]!), Is.GreaterThan(0));
         });
     }
 
     [Test]
-    public async Task HttpReadiness_WithoutAPublishedAddress_ShouldSkipAndSaySo()
+    public async Task HttpReadiness_WithoutAnAddressOrAnInProcessServer_ShouldNameTheGap()
     {
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
@@ -157,29 +155,113 @@ public sealed class ReadinessTests
         await host.StopAsync();
 
         var entity = host.Trace.Snapshot().Entities!.Single(candidate => candidate.Kind == "readiness");
-        Assert.That(entity.State["readiness.skipped"], Does.Contain("in-process"));
+        var reason = entity.State["readiness.skipped"];
+        Assert.Multiple(() =>
+        {
+            Assert.That(reason, Does.Contain("no in-process server"));
+            Assert.That(reason, Does.Contain("ProtoTest:Applications:Api:BaseUrl"));
+            Assert.That(reason, Does.Not.Contain("runs in-process"));
+        });
     }
 
-    private static int FreePort()
+    [Test]
+    public async Task HttpReadiness_WithASettingsPublishedAddress_ShouldWaitForIt()
     {
-        var probe = new TcpListener(IPAddress.Loopback, 0);
-        probe.Start();
-        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
-        probe.Stop();
-        return port;
+        await using var listener = SingleConnectionListener.Start();
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddInfrastructure(
+            new PublishedAddressInfrastructure("Api", listener.Address),
+            "ProtoTest:Applications:Api:BaseUrl");
+        builder.ConfigureReadiness(options => options.Interval = TimeSpan.FromMilliseconds(20));
+        builder.AddHttpReadiness("Api");
+        await using var host = builder.Build();
+
+        // The probe's first request must succeed once it is answered; the signal proves it arrived.
+        var start = host.StartAsync();
+        await listener.RequestReceived.WaitAsync(TimeSpan.FromSeconds(10));
+        listener.Answer();
+        await start;
+        await host.StopAsync();
+        await listener.Completed;
+
+        var entity = host.Trace.Snapshot().Entities!.Single(candidate => candidate.Kind == "readiness");
+        Assert.Multiple(() =>
+        {
+            Assert.That(entity.State["readiness.url"], Does.Contain($"127.0.0.1:{listener.Port}"));
+            Assert.That(entity.State["readiness.attempts"], Is.EqualTo("1"), "the first request answers");
+            Assert.That(entity.State, Does.Not.ContainKey("readiness.skipped"));
+        });
     }
 
-    private static async Task ServeOnceAsync(TcpListener listener)
+    [Test]
+    public async Task HttpReadiness_RegisteredBeforeItsAddressPublisher_ShouldRecordTheOrderingReason()
     {
-        using var client = await listener.AcceptTcpClientAsync();
-        // Read the request before answering: writing first and closing makes Windows abort the
-        // connection while the client is still sending, and the probe rightly reports "not ready".
-        var request = new byte[4096];
-        await client.GetStream().ReadAsync(request);
-        var response = Encoding.ASCII.GetBytes(
-            "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok");
-        await client.GetStream().WriteAsync(response);
-        await client.GetStream().FlushAsync();
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddHttpReadiness("Api");
+        builder.AddInfrastructure(
+            new PublishedAddressInfrastructure("Api", "http://127.0.0.1:1"),
+            "ProtoTest:Applications:Api:BaseUrl");
+        await using var host = builder.Build();
+
+        await host.StartAsync();
+        await host.StopAsync();
+
+        var entity = host.Trace.Snapshot().Entities!.Single(candidate => candidate.Kind == "readiness");
+        var reason = entity.State["readiness.skipped"];
+        Assert.Multiple(() =>
+        {
+            Assert.That(reason, Does.Contain("registration position"));
+            Assert.That(reason, Does.Contain("ProtoTest:Applications:Api:BaseUrl"));
+            Assert.That(reason, Does.Not.Contain("runs in-process"), "a later publisher is not an in-process application");
+        });
+    }
+
+    [Test]
+    public async Task ConfigureReadiness_FromConfiguration_ShouldBindOverTheCodeValues()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Readiness:Timeout"] = "00:00:00.200",
+                ["ProtoTest:Readiness:Interval"] = "00:00:00.020"
+            }));
+        builder.AddReadinessProbe("service ready", _ => ValueTask.FromResult(false));
+        await using var host = builder.Build();
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () => await host.StartAsync());
+
+        Assert.That(
+            exception!.Message,
+            Does.Contain("0.2s").Or.Contain("0,2s"),
+            "ProtoTest:Readiness bound over the default timeout");
+    }
+
+    [TestCase("not-a-url")]
+    [TestCase("ftp://127.0.0.1/health")]
+    public async Task HttpReadiness_WhenTheAddressIsNotAnAbsoluteHttpUrl_ShouldFailNamingTheKey(string address)
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Applications:Api:BaseUrl"] = address
+            }));
+        // Short, so a regression that probes the bad address instead of validating it fails fast.
+        builder.ConfigureReadiness(options => options.Timeout = TimeSpan.FromMilliseconds(200));
+        builder.AddHttpReadiness("Api");
+        await using var host = builder.Build();
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () => await host.StartAsync());
+
+        Assert.That(
+            exception!.Message,
+            Does.Contain("ProtoTest:Applications:Api:BaseUrl"),
+            "the malformed address is rejected at run start, naming the key to fix");
     }
 
     private sealed class OrderingInfrastructure(List<string> order) : IProtoInfrastructure

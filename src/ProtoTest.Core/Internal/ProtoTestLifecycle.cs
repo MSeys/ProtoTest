@@ -12,6 +12,7 @@ internal sealed class ProtoTestLifecycle
     private readonly IProtoTestIdGenerator _testIdGenerator;
     private readonly ProtoTraceSession _trace;
     private readonly ProtoClock _clock;
+    private readonly ProtoClockRegistry _clockRegistry;
 
     public ProtoTestLifecycle(
         ProtoHost host,
@@ -19,7 +20,8 @@ internal sealed class ProtoTestLifecycle
         IEnumerable<IProtoTestHook> hooks,
         IProtoTestIdGenerator testIdGenerator,
         ProtoTraceSession trace,
-        ProtoClock clock)
+        ProtoClock clock,
+        ProtoClockRegistry clockRegistry)
     {
         _host = host;
         _rootServiceProvider = rootServiceProvider;
@@ -27,6 +29,7 @@ internal sealed class ProtoTestLifecycle
         _testIdGenerator = testIdGenerator;
         _trace = trace;
         _clock = clock;
+        _clockRegistry = clockRegistry;
     }
 
     public static ProtoExecutionContext CurrentContext => Current.Value?.Context
@@ -73,8 +76,10 @@ internal sealed class ProtoTestLifecycle
             // Each test gets its own clock, seeded from the run's: advancing time inside a test stays
             // inside that test, and parallel tests never share a timeline.
             var clock = new ProtoClock(_clock.GetUtcNow());
-            var context = new ProtoExecutionContext(testName, scope, testId, testMethod, testTrace, clock);
-            ProtoClockLocator.Add(testId.Value, clock);
+            var context = new ProtoExecutionContext(testName, scope, testId, testMethod, testTrace, clock, _clockRegistry);
+            // The registration happens inside the same guard as the rest of the start: a start that
+            // fails below removes its own clock instead of leaking an entry no context will dispose.
+            _clockRegistry.Add(testId.Value, clock);
             state = new ContextState(
                 _host,
                 context,
@@ -84,6 +89,7 @@ internal sealed class ProtoTestLifecycle
         catch
         {
             // Execution has not begun, so no teardown will dispose the scope: release it here.
+            _clockRegistry.Remove(testId.Value);
             LifecycleExceptionHelper.DisposeOrSync(scope);
             throw;
         }

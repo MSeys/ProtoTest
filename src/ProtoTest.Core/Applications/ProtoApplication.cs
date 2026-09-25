@@ -39,24 +39,56 @@ public static class ProtoApplication
         => configuration[$"{SectionPath}:{applicationName}:BaseUrl"];
 
     /// <summary>
+    /// The one application-setting precedence: an address a started piece published through
+    /// <see cref="ProtoInfrastructureSettings"/> wins over static configuration. Readiness, the HTTP
+    /// and gRPC client initializers, browser sessions and device clients all resolve through here.
+    /// </summary>
+    internal static string? ResolveSetting(
+        IConfiguration configuration,
+        ProtoInfrastructureSettings? settings,
+        string key)
+    {
+        if (settings is not null
+            && settings.Values.TryGetValue(key, out var published)
+            && !string.IsNullOrWhiteSpace(published))
+        {
+            return published;
+        }
+
+        return configuration[key];
+    }
+
+    internal static string SettingsKey(string applicationName, string settingPath)
+        => $"{SectionPath}:{applicationName}:{settingPath}";
+
+    /// <summary>
     /// Returns the base address of an application for a running test: an address a started instance
-    /// advertised through infrastructure settings wins over static configuration. Browser sessions use
-    /// this, because a session may run against a process infrastructure started (the same application,
-    /// second instance); HTTP clients stay on static configuration.
+    /// advertised through infrastructure settings wins over static configuration.
     /// </summary>
     public static string? BaseUrl(ProtoExecutionContext context, string applicationName)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(applicationName);
-        var key = $"{SectionPath}:{applicationName}:BaseUrl";
-        if (context.TryService<ProtoInfrastructureSettings>() is { } settings
-            && settings.Values.TryGetValue(key, out var provided)
-            && !string.IsNullOrWhiteSpace(provided))
-        {
-            return provided;
-        }
+        return ResolveSetting(
+            context.Configuration,
+            context.TryService<ProtoInfrastructureSettings>(),
+            SettingsKey(applicationName, "BaseUrl"));
+    }
 
-        return context.Configuration[key];
+    /// <summary>
+    /// Returns an application's gRPC address for a running test, with the same precedence as
+    /// <see cref="BaseUrl(ProtoExecutionContext, string)"/>: a published value wins over
+    /// <c>ProtoTest:Applications:{applicationName}:Grpc:Address</c> in static configuration. Returns
+    /// <see langword="null"/> when neither is set, so the caller can fall back to the base address.
+    /// </summary>
+    public static string? GrpcAddress(ProtoExecutionContext context, string applicationName)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentException.ThrowIfNullOrWhiteSpace(applicationName);
+        return ResolveSetting(
+            context.Configuration,
+            context.TryService<ProtoInfrastructureSettings>(),
+            SettingsKey(applicationName, "Grpc:Address"));
     }
 
     /// <summary>

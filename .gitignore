@@ -487,7 +487,6 @@ FodyWeavers.xsd
 
 /assets/internal
 /eng/internal/
-/RELEASING.md
 .openchamber/
 .opencode/
 

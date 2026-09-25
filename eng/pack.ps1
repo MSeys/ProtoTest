@@ -4,7 +4,8 @@ param(
     [string]$Configuration = "Release",
     [string]$OutputPath = "artifacts/packages",
     [switch]$NoBuild,
-    [switch]$NoRestore
+    [switch]$NoRestore,
+    [switch]$AllowPublishedVersion
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,6 +22,7 @@ if ($PSVersionTable.PSEdition -ne "Core") {
     $forwarded = @("-NoProfile", "-File", $PSCommandPath, "-Configuration", $Configuration, "-OutputPath", $OutputPath)
     if ($NoBuild) { $forwarded += "-NoBuild" }
     if ($NoRestore) { $forwarded += "-NoRestore" }
+    if ($AllowPublishedVersion) { $forwarded += "-AllowPublishedVersion" }
     & $pwsh.Source @forwarded
     if ($LASTEXITCODE -ne 0) {
         throw "PowerShell 7 package validation failed with exit code $LASTEXITCODE."
@@ -84,6 +86,20 @@ if ($extra.Count -gt 0) {
 $unknown = @($packages | Where-Object { -not (Test-Path -LiteralPath (Join-Path $repository $_)) })
 if ($unknown.Count -gt 0) {
     throw "eng/pack.ps1 lists projects that do not exist: $($unknown -join ', ')."
+}
+
+# A package may opt out of validation only while it has no released baseline, and the opt-out carries
+# its reason so the rollover cannot be forgotten. RELEASING.md's baseline rollover removes both.
+$optOutsWithoutReason = @()
+foreach ($project in $packable) {
+    $projectText = Get-Content -Raw -LiteralPath (Join-Path $repository $project)
+    if ($projectText -notmatch '<EnablePackageValidation>\s*false\s*</EnablePackageValidation>') { continue }
+    if ($projectText -notmatch '<PackageValidationOptOutReason>\s*\S.*?</PackageValidationOptOutReason>') {
+        $optOutsWithoutReason += $project
+    }
+}
+if ($optOutsWithoutReason.Count -gt 0) {
+    throw "Packable project(s) disable package validation without a <PackageValidationOptOutReason>: $($optOutsWithoutReason -join ', '). Record why the opt-out exists and when it rolls over (RELEASING.md, 'Baseline rollover')."
 }
 
 $output = if ([IO.Path]::IsPathRooted($OutputPath)) { $OutputPath } else { Join-Path $repository $OutputPath }
@@ -172,6 +188,16 @@ function Get-PortablePdbIdentity {
 $expectedVersion = ([xml](Get-Content -LiteralPath (Join-Path $repository "Directory.Build.props") -Raw)).Project.PropertyGroup.Version | ForEach-Object { $_.Trim() } | Where-Object { $_ } | Select-Object -First 1
 if ([string]::IsNullOrWhiteSpace($expectedVersion)) {
     throw "Directory.Build.props does not declare a <Version>."
+}
+
+# Branch packages must be distinguishable from the published family. The baseline version in
+# Directory.Build.targets is the released version the compatibility guard validates against, so
+# packing it from a branch would recreate the id/version collision that has already poisoned one
+# NuGet global cache. A genuine re-pack of the released version passes -AllowPublishedVersion.
+[xml]$validationTargets = Get-Content -LiteralPath (Join-Path $repository "Directory.Build.targets") -Raw
+$baselineVersion = ($validationTargets.SelectSingleNode("//PackageValidationBaselineVersion")).InnerText.Trim()
+if ($expectedVersion -eq $baselineVersion -and -not $AllowPublishedVersion) {
+    throw "Directory.Build.props packs '$expectedVersion', which is the published baseline version. Branch builds must use a distinct version (for example 1.1.0-alpha.<n>); pass -AllowPublishedVersion only when intentionally re-packing the released version."
 }
 $produced = @(Get-ChildItem -LiteralPath $output -Filter "*.nupkg" -File |
     Where-Object { $_.LastWriteTime -ge $packStarted })

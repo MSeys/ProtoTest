@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\ProtoTest.Devices.WebSocket.AspNetCore\ProtoTest.Devices.WebSocket.AspNetCore.csproj" />
     <ProjectReference Include="..\ProtoTest.AspNetCore.TestApi\ProtoTest.AspNetCore.TestApi.csproj" />
+    <ProjectReference Include="..\ProtoTest.AspNetCore.SecondTestApi\ProtoTest.AspNetCore.SecondTestApi.csproj" />
   </ItemGroup>
 
   <ItemGroup>

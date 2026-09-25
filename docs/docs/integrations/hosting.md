@@ -22,7 +22,7 @@ builder
     .AddWorkerHost<BillingWorker.Program>("Billing");
 ```
 
-The order is the start order: the worker reads what the infrastructure before it provided, so register containers and other pieces first. `AddWorkerHost` can be called more than once with different names; registering the same name twice is one worker.
+The order is the start order: the worker reads what the infrastructure before it provided, so register containers and other pieces first. `AddWorkerHost` can be called more than once with different names; registering the same name twice is one worker, while the same name with a different program throws instead of silently dropping the second registration.
 
 The suite runs the worker's own program (`Host.CreateApplicationBuilder` or `Host.CreateDefaultBuilder`), with the worker's assembly as its content root and application name - its `appsettings.json`, environment overloads and logging behave as they do in production. The worker's own `Run()` never executes; the suite starts and stops its host.
 
@@ -43,10 +43,14 @@ public async Task An_invoice_is_created_for_a_metered_session()
 
 The worker reads, in order of precedence:
 
-1. Its own sources - `appsettings.json`, environment variables, the command line.
+1. Its own sources - `appsettings.json`, environment variables, its own command line.
 2. The suite's configuration - `builder.ConfigureAppConfiguration(...)`.
-3. The run's settings: connection strings from started infrastructure and values from any settings infrastructure, applied as in-memory configuration just before the host is built.
+3. The run's settings: connection strings from started infrastructure and values from any settings infrastructure.
 4. Whatever the suite sets in `AddWorkerHost` options.
+
+The merged overlay reaches the worker's entry point twice: as `--{key}={value}` command-line arguments when the run invokes `Program.Main`, so `Host.CreateApplicationBuilder(args)` and `Host.CreateDefaultBuilder(args)` see final-precedence values in `Main` itself - a connection string read there is the run's - and as an in-memory source applied when the host is built, so an options factory or a hosted service reads the same values. Keys with no value are not passed; `Set(key, null)` is an empty setting, not a dropped key.
+
+The worker builder must be one of the shapes ProtoTest knows: `Host.CreateApplicationBuilder`, `Host.CreateDefaultBuilder`, or `WebApplication.CreateBuilder`. Any other builder fails loudly naming its type, instead of keeping its own configuration and `TimeProvider`.
 
 ```csharp
 builder.AddWorkerHost<BillingWorker.Program>("Billing", worker =>
@@ -64,6 +68,7 @@ Register the worker after the pieces it needs: a [readiness probe](../foundation
 - **In-process only.** A suite pointed at a published environment has no worker to start. Guard the tests that need one with `[RequiresCapability(ProtoCapabilityKinds.Worker)]`.
 - **One instance per run.** The worker is shared by every test in the run, exactly like the in-process application; tests must not assume a fresh worker per test.
 - **No per-test lifetime.** `AddWorkerHost` has no `PerTest` option; a worker that must restart between tests is not supported.
+- **A parameterless or argument-ignoring `Main` cannot see the overlay before `Build()`.** The run passes the overlay as command-line arguments; an entry point whose `Main()` takes no arguments, or that builds its host without passing `args`, still receives the values when the host is built (the in-memory overlay), so options factories and hosted services read them, but code between creating the builder and calling `Build()` reads only the worker's own sources. A parameterless `Main` also never receives the worker's `--contentRoot`/`--applicationName`, so it reads its own `appsettings.json` from the test process's content root. Build the host from `args` when `Main` itself reads configuration.
 - **Start does not wait for readiness.** The host's `StartAsync` completing is the only signal. If a worker must wait for a dependency to be ready, register a [readiness probe](../foundation/infrastructure.md#wait-until-it-is-ready) before `AddWorkerHost`, or wait inside its own service.
 - **The worker host runs in the test process.** Its background threads, loggers and static state are the test process's; a worker that must be killed hard is not a good fit.
 

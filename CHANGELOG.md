@@ -57,9 +57,78 @@ All ProtoTest packages share one version; breaking API changes are called out be
   instead of failing, and `ServerFactory`/`ApplicationServices` throw naming the address. The trace
   records `aspnetcore.server.skipped`. `AddCapabilityUnlessConfigured` is the Core primitive behind it,
   and it is how an integration keeps its capability honest when the environment provides the address.
+- `ProtoCapabilityDescriptor.Instance` names the instance a capability describes - an
+  `AddAspNetCoreServer` name, the application an in-process device transport belongs to. Two instances
+  are two capabilities, in skip checks and in the run trace (`server:ASP.NET Core:A`), so configuring
+  one server's address no longer hides the other.
+- One application-address precedence: an address a started piece published through
+  `ProtoInfrastructureSettings` wins over `ProtoTest:Applications:{app}` configuration for every
+  reader. REST and GraphQL clients, gRPC channels, readiness, web sessions and device clients all
+  resolve through `ProtoApplication` (`GrpcAddress(context, app)` is the gRPC form), so the suite
+  talks to the process the run started; the in-process transport is only the fallback when neither
+  resolves. `AddAspNetCoreServer`'s step-aside still reads static configuration (decided asymmetry),
+  so give a published process its own application name when both must coexist.
+- `ProtoReadinessOptions` implements `IProtoConfigurableOptions` and binds
+  `ProtoTest:Readiness`; the new `ProtoInfrastructureContext.Readiness` hands the run's policy to
+  infrastructure, so `ConfigureReadiness` (or configuration) sets the timeout and interval for host
+  probes and the containers the run starts alike.
+- `AddCapabilityWhenProvided(capability, keys…)` is the missing-address half of the conditional
+  capability pair: the declaration drops when none of its keys can provide the capability — no
+  configured value and no registered infrastructure piece declares one — so an integration whose
+  address cannot exist is absent and `[RequiresCapability]` skips. It composes per declaration with
+  `AddCapabilityUnlessConfigured` and plain declarations, and the `capability.skipped` event names the
+  deciding keys and the reason (`already configured`, or `no key provided`).
+- `SqlOptions.AddressKeys` is a code-declared `SqlAddressKeys` set naming the configuration keys that
+  can provide the SQL connection; no configuration section binds it, because the capability decision is
+  made when the host is built. With at least one declared, `AddSql` declares the `SQL` store capability
+  with `AddCapabilityWhenProvided`; empty (the default) keeps the capability unconditional and the
+  factory owning the address. `AddEntityFrameworkCore` shares the declared keys: it declares its
+  `Entity Framework Core` store capability under the same rule and its enlistment hook stays inert with
+  the SQL integration.
+- `ProtoMessagingBuilder.UseBroker(factory, addressKeys)` lets an adapter name the configuration keys
+  its address comes from, so the `Broker` capability is declared only while one of them is provided.
+- `WebPageInventory.VisitedObservationKind` and `WebPageInventory.VerifiedObservationKind` name the
+  `web.page.visited`/`web.page.verified` observation kinds beside the existing
+  `AvailableObservationKind`, so producers and collectors reference one constant each.
 
 ### Fixed
 
+- `UseRabbitMq` declares the `Broker` capability conditionally on
+  `ProtoTest:Messaging:RabbitMq:ConnectionString`: a run with a configured key or a broker container
+  that declares it keeps the capability, while a run with neither drops it and
+  `[RequiresCapability(ProtoCapabilityKinds.Broker)]` skips instead of failing at setup or first
+  publish. A connection string set in the options callback keeps the unconditional declaration.
+- A SQL run whose declared `AddressKeys` are all unprovided no longer fails at setup or run start: the
+  connection hook, the isolation guard and the Entity Framework Core enlistment hook stay inert, the
+  connection is not opened, and `SqlSession()`/`SqlConnection()`/`SqlTransaction()` (or
+  `Sql<TContext>()`) throw naming the missing keys and the
+  `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate.
+- Conditions are evaluated per declaration: a capability drops only when every conditional declaration
+  for it is satisfied and no plain declaration promises it, and the `capability.skipped` trace event
+  names the deciding keys. Satisfying one server's address no longer skips tests against another server
+  that is still live in-process.
+- `Build()` is terminal for every public registration entry: hooks, run gates, capabilities, the
+  clock, sinks, infrastructure and application entries throw the same single-build message instead of
+  silently registering into a host that already built its provider. A repeated registration that is a
+  no-op by design before `Build()` (the same server or worker name for the same program) stays a
+  no-op; the same name for a different program throws.
+- Only the web backend that wins the first-wins registration declares its browser capability, so
+  referencing both Playwright and Selenium leaves one honest capability behind the one live backend.
+- A conditional declaration's key set compares by content (ordinal, distinct, order-independent), so
+  registering the same declaration twice leaves one declaration.
+- The in-process WebSocket device transport declares its capability only while the application runs
+  in-process; with `BaseUrl` configured the capability is dropped and the socket transport serves.
+- `AddHttpReadiness` no longer records "the application runs in-process" when the piece that publishes
+  its address is registered after it: the skip names the registration position and the later key, and
+  only a probe backed by an in-process server capability claims in-process. Register the probe after
+  the piece that publishes the address.
+- Container readiness honors the run's readiness policy instead of its private 30 s timeout, so a slow
+  image is tuned with `ConfigureReadiness(options => options.Timeout = ...)` or
+  `ProtoTest:Readiness:Timeout`.
+- `AddHttpReadiness` rejects an address that is not an absolute HTTP(S) URL at run start, naming the
+  configuration key, instead of probing it into a timeout.
+- The gRPC missing-address error names the client's application (and the key to set) instead of
+  printing the literal `{app}`.
 - Shape mismatches whose expected shape carries a value constraint now record every mismatch in the
   trace instead of an internal compiler-generated type name (or an opaque constraint object on
   .NET 8).
@@ -79,14 +148,73 @@ All ProtoTest packages share one version; breaking API changes are called out be
   `ProtoTest.Devices.WebSocket` and `ProtoTest.Devices.WebSocket.AspNetCore` were missing from the pack
   gate, so a 1.1 release would have shipped without them. `eng/pack.ps1` now covers all 35 packages
   and verifies the whole set in one run.
+- A worker's `Program.Main` sees the run's configuration: `AddWorkerHost` passes the merged overlay
+  (options over infrastructure settings over suite configuration) to the entry point as
+  `--{key}={value}` arguments, so `Host.CreateApplicationBuilder(args)` and
+  `Host.CreateDefaultBuilder(args)` read final-precedence values before `Build()`; the `HostBuilding`
+  in-memory overlay remains the fallback for an entry point that ignores its arguments. A parameterless
+  `Main` stays the documented limit.
+- The test-clock lookup is scoped to the owning host instead of a process-global map keyed by test id
+  alone: two hosts that share a `RunPrefix` each resolve their own clock, a failed test start leaves no
+  entry, context disposal removes only its own host's entry, and host disposal clears the registry. The
+  in-process ASP.NET Core request linking uses the owning host's registry, so a request sees the clock
+  of the test that caused it even when another host has a test with the same id.
+- `ProtoClock.Advance` performs its read-modify-write under the clock's lock, so concurrent advances on
+  the run clock add up instead of losing updates and each advance records its own `clock.advance`.
+- In-process device transports are keyed by `(TProgram, application)`: a second
+  `AddInProcessWebSocketDevices<TProgram>` is a second transport, and a client is only routed through
+  the transport of the application it was registered under. Two applications exposing the same path
+  each serve their own clients, and a path-only client with no matching transport fails naming the
+  application instead of falling back to another transport.
+- The in-process device transport resolves the registered `WebSocketDeviceOptions` from DI and
+  validates them with the transport, and its `ConnectTimeout` bounds the in-process connect - the
+  `configure` callback is no longer dead.
+- `DeviceSession` connects single-flight and serializes sends: concurrent sends share one connection
+  instead of opening one each and leaking the loser. One receive may be in flight at a time (a second
+  fails fast naming the device), and a send that races a disconnect fails with a device error naming
+  the device instead of a disposed-socket exception or an NRE.
+- Device resource and trace entity ids include the device type (`device:{client}:{type}:{id}`), so two
+  device types with the same id on one client coexist with their own resource and entity.
+- The device release path disconnects: teardown emits `device.disconnect` and finalises
+  `device.connected = false`, so a test that never disconnects still ends disconnected and an explicit
+  disconnect followed by a send reconnects and records both connects.
+- `AddWorkerHost` throws when one name is registered for a different program instead of silently
+  dropping the second registration, matches `IHostApplicationBuilder` (covering
+  `WebApplicationBuilder`), and fails loudly naming an unrecognised builder shape instead of leaving it
+  with its own configuration and `TimeProvider`. `ProtoWorkerOptions.Set(key, null)` now delivers an
+  empty setting, as its documentation always promised, and the parameterless-`Main` fallback
+  (`HostBuilding` overlay) is pinned by a test.
+- Readiness waits ride the shared `ProtoPolling` loop instead of a second stopwatch/delay
+  implementation, so one rule owns every poll interval and deadline (audit VOC-4). Observable behavior
+  is unchanged: exceptions mean "not ready yet", and a timeout still names the probe, the attempts and
+  the last error.
 
 ### Changed
 
+- `IProtoInProcessDeviceTransport.CanConnect` takes the requested application
+  (`CanConnect(context, applicationName)`) instead of a `DeviceEndpoint` it ignored, so a transport
+  answers for the identity it serves. The device transport interface is unreleased 1.1 plumbing; a
+  custom in-process transport updates its one method.
 - REST object request bodies serialize with the shared web defaults (camelCase names), matching
   GraphQL variables. Pass explicit `JsonSerializerOptions` to keep another naming policy.
 - OpenAPI coverage reads specifications with `Microsoft.OpenApi` 3.x (JSON and YAML, including 3.1
   documents). `ProtoTest.OpenApi` references `ProtoTest.Core` directly instead of relying on a
   transitive reference.
+- `ProtoHost.FindClock` is an instance member; the clock lookup is scoped to the host that owns the
+  test. The clock feature is unreleased, so no consumer migration is needed.
+- `ProtoProtocol.CoverageCategory` is optional and `null` for a protocol that ships no collector; a
+  collector with no category falls back to the protocol name, and the shipped REST/GraphQL/gRPC/OpenAPI
+  collectors keep their categories.
+
+### Removed
+
+- `IProtoReadinessProbe` and `ProtoReadinessResult.LastError` were removed: probes are registered as
+  delegates with `AddReadinessProbe`/`AddHttpReadiness`, the wait result carries attempts and waited
+  time only, and the timeout message still carries the last error. Both were unreleased 1.1 plumbing.
+- Messaging's coverage promise was removed rather than shipped: `ProtoMessageClient` no longer documents
+  destination aggregation, and the Messaging protocol descriptor no longer declares a coverage category.
+  The `messaging.*` observations remain trace evidence for a collector a suite registers; no
+  `ProtoTest.Messaging` collector ships, and destinations are deliberately not a coverage category.
 
 ### Breaking
 

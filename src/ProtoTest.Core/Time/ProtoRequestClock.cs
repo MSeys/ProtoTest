@@ -5,6 +5,13 @@ namespace ProtoTest.Core;
 /// in-process pushes the test's clock while it handles a request the test caused, so application code
 /// that resolves <see cref="TimeProvider"/> sees the test's time; background flows see the run's.
 /// </summary>
+/// <remarks>
+/// A push restores whatever clock was in effect before it when its scope is disposed; it does not
+/// revoke the pushed clock from flows that captured it. A fire-and-forget task started inside a
+/// request keeps the finished test's clock after the request and the test end, so long-lived
+/// background work must read the run clock instead of the ambient one. The lookup that links a
+/// request to a test is scoped to the host that owns the test (<see cref="ProtoHost.FindClock"/>).
+/// </remarks>
 public static class ProtoRequestClock
 {
     private static readonly AsyncLocal<ProtoClock?> Ambient = new();
@@ -37,16 +44,4 @@ public static class ProtoRequestClock
             }
         }
     }
-}
-
-/// <summary>Finds a running test's clock by test id, for hosting integrations linking a request back.</summary>
-internal static class ProtoClockLocator
-{
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, ProtoClock> Clocks = new(StringComparer.Ordinal);
-
-    public static void Add(string testId, ProtoClock clock) => Clocks[testId] = clock;
-
-    public static void Remove(string testId) => Clocks.TryRemove(testId, out _);
-
-    public static ProtoClock? Find(string testId) => Clocks.TryGetValue(testId, out var clock) ? clock : null;
 }

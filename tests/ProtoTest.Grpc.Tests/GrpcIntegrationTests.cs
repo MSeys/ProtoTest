@@ -601,6 +601,52 @@ public sealed class GrpcIntegrationTests
         });
     }
 
+    [Test]
+    public async Task ApplicationClient_ShouldResolveAnAddressPublishedByInfrastructure()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddInfrastructure(
+            new PublishedAddressInfrastructure("Echo", GrpcTestServer.Address),
+            "ProtoTest:Applications:Echo:BaseUrl");
+        builder.AddApplication("Echo", app => app.AddGrpc(grpc => grpc.AddClient("Default")));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("grpc published address", ApplicationTransportTestMethod());
+        var client = context.Grpc();
+
+        var reply = await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "published" });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+        Assert.That(
+            reply.Message,
+            Is.EqualTo("published"),
+            "the client resolves the address a settings piece published, not only static configuration");
+    }
+
+    [Test]
+    public async Task ApplicationClient_WithoutAnAddress_ShouldNameTheApplicationInTheError()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddApplication("Echo", app => app.AddGrpc(grpc => grpc.AddClient("Default")));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("grpc missing address", ApplicationTransportTestMethod());
+        var client = context.Grpc();
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "nowhere" }));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("application 'Echo'"));
+            Assert.That(exception.Message, Does.Contain("ProtoTest:Applications:Echo:Grpc:Address"));
+            Assert.That(exception.Message, Does.Not.Contain("{app}"));
+        });
+    }
+
     private sealed class TransportClientInitializer(string name, string address) : IProtoClientInitializer<HttpClient>
     {
         public string Name { get; } = name;

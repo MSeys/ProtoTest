@@ -57,8 +57,12 @@ public static class ProtoHostBuilderExtensions
         serverNames.Add(name);
         // When the environment configures the application's address, the server steps aside at test
         // time; the capability must step aside with it instead of advertising an in-process server.
+        // The server's name is the capability's instance: configuring A must not drop B's capability.
         return builder.AddCapabilityUnlessConfigured(
-            new ProtoCapabilityDescriptor("ASP.NET Core", ProtoCapabilityKinds.Server, "ProtoTest.AspNetCore"),
+            new ProtoCapabilityDescriptor("ASP.NET Core", ProtoCapabilityKinds.Server, "ProtoTest.AspNetCore")
+            {
+                Instance = name
+            },
             $"ProtoTest:Applications:{name}:BaseUrl");
     }
 
@@ -89,7 +93,10 @@ public static class ProtoHostBuilderExtensions
         application.Services.TryAddSingleton(new ProtoApplicationTransport(name, name));
         RegisterApplicationServices<TProgram>(application.Services, name);
         return application.AddCapabilityUnlessConfigured(
-            new ProtoCapabilityDescriptor("ASP.NET Core", ProtoCapabilityKinds.Server, "ProtoTest.AspNetCore"),
+            new ProtoCapabilityDescriptor("ASP.NET Core", ProtoCapabilityKinds.Server, "ProtoTest.AspNetCore")
+            {
+                Instance = name
+            },
             $"ProtoTest:Applications:{name}:BaseUrl");
     }
 

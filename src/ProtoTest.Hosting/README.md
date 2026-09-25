@@ -13,7 +13,8 @@ dotnet add package ProtoTest.Hosting
 - Run-scoped lifetime: started after the infrastructure registered before it, stopped with the run.
 - The suite's configuration, the run's settings - container connection strings and settings
   infrastructure values - and `AddWorkerHost` options reach the worker's normal configuration, in that
-  order of precedence.
+  order of precedence, and are passed to the worker's `Main` as command-line arguments, so
+  `Host.CreateApplicationBuilder(args)` reads final-precedence values before `Build()`.
 - Access from a test through `Proto.Context.Host<TProgram>()` and
   `HostService<TProgram, TService>()`.
 
@@ -23,6 +24,8 @@ dotnet add package ProtoTest.Hosting
   tests with `[RequiresCapability(ProtoCapabilityKinds.Worker)]`.
 - One worker instance per run; the run's state is shared between tests.
 - The worker's `Run()` never runs; the suite starts and stops its host.
+- A parameterless `Main`, or one that builds its host without passing `args`, reads the overlay only
+  when the host is built; options factories and hosted services still see it.
 - Start does not wait for readiness; register a readiness probe before the worker when it depends on a
   container that is still booting.
 

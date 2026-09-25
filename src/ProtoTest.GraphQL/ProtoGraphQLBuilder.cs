@@ -19,6 +19,16 @@ public sealed class ProtoGraphQLBuilder : ProtoHttpProtocolBuilder<ProtoGraphQLB
     internal static readonly ProtoProtocol Protocol = new(
         ProtocolName, "GraphQL", "ProtoTest.GraphQL", "graphql.response", "GraphQL operation");
 
+    /// <summary>
+    /// The observation kind a failed request records. It is deliberately not the response kind: a call
+    /// that failed was attempted, not covered, so the coverage collector ignores it.
+    /// </summary>
+    internal const string FailureObservationKind = "graphql.failure";
+
+    /// <summary>The observation kind a successful shape assertion records; schema coverage consumes
+    /// the <c>graphql.response</c> kind instead, so this is trace evidence, not coverage.</summary>
+    internal const string ShapeObservationKind = "graphql.contract.shape";
+
     internal ProtoGraphQLBuilder(IServiceCollection services, IProtoApplicationBuilder? application = null)
         : base(
             services,

@@ -149,6 +149,13 @@ public sealed class Setup : ProtoTestAssembly
                 sink.OutputPath = Path.Combine("TestResults", "ProtoTest.Demo", "report.html");
                 sink.Title = "Northstar Platform · ProtoTest Demo";
             });
+
+        if (environment.RunsStandaloneConsole)
+        {
+            // The standalone console is its own application: the run publishes its address, and only
+            // the journeys that target it (browser and console-API ones) follow that address.
+            builder.AddApplication(NorthstarTargets.Console, ConfigureConsoleApplication);
+        }
     }
 
     private static void ConfigureTests(
@@ -161,6 +168,7 @@ public sealed class Setup : ProtoTestAssembly
             [$"ProtoTest:Applications:{NorthstarTargets.Api}:OpenApi:Specification"] = Path.Combine(
                 AppContext.BaseDirectory, "northstar.openapi.json"),
             [$"ProtoTest:Applications:{NorthstarTargets.Api}:Endpoints:GraphQL"] = "/graphql",
+            [$"ProtoTest:Applications:{NorthstarTargets.Console}:Endpoints:GraphQL"] = "/graphql",
             ["ProtoTest:Web:Pages:Source"] = ConsoleBuild.SourceFolder,
             ["ProtoTest:Web:Pages:Framework"] = "vue"
         };
@@ -212,6 +220,16 @@ public sealed class Setup : ProtoTestAssembly
                 .WithSubscriptionTransport(GraphQLSubscriptionTransport.WebSocket)
                 .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "northstar.graphql")))
             .AddGrpc(grpc => grpc.CaptureAttachments().AddClient("Projects"));
+    }
+
+    /// <summary>
+    /// The standalone console application: the browser journeys and the REST/GraphQL calls that must
+    /// see the same process. It has no in-process server - the run publishes its address instead.
+    /// </summary>
+    private static void ConfigureConsoleApplication(IProtoApplicationBuilder app)
+    {
+        app.AddRest(rest => rest.AddClient("Api"))
+            .AddGraphQL(graphQL => graphQL.AddClient("GraphQL", endpoint: "GraphQL"));
     }
 
     private static void ConfigureMessaging(IProtoHostBuilder builder, DemoEnvironment environment)

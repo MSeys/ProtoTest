@@ -18,6 +18,9 @@ public sealed class ProtoRestBuilder : ProtoHttpProtocolBuilder<ProtoRestBuilder
     /// <summary>The observation kind a failed request records; the coverage collector ignores it.</summary>
     internal const string FailureObservationKind = "http.failure";
 
+    /// <summary>The observation kind a successful shape assertion records; OpenAPI coverage consumes it.</summary>
+    internal const string ShapeObservationKind = "http.contract.shape";
+
     /// <summary>The protocol's identity: names, trace source, observation kind and coverage category.</summary>
     internal static readonly ProtoProtocol Protocol = new(
         ProtocolName, "REST", "ProtoTest.Rest", "http.response", "REST");

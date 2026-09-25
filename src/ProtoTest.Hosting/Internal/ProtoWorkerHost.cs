@@ -55,9 +55,11 @@ internal sealed class ProtoWorkerHost<TProgram> : IProtoConfiguredInfrastructure
         var factory = _factory ?? throw new InvalidOperationException(
             $"The worker host '{_name}' has no host factory; call builder.AddWorkerHost<{typeof(TProgram).Name}>() instead of registering it directly.");
 
+        IReadOnlyDictionary<string, string?> configuration;
         lock (_gate)
         {
             _configuration = Merge(context, _options.Values);
+            configuration = _configuration;
             _timeProvider = context.TimeProvider;
         }
 
@@ -65,11 +67,12 @@ internal sealed class ProtoWorkerHost<TProgram> : IProtoConfiguredInfrastructure
 
         // The worker's entry point needs its own content root and application name: it runs inside the
         // test process, but reads the worker's appsettings and reports the worker as the application.
-        var arguments = new[]
-        {
-            "--contentRoot", Path.GetDirectoryName(typeof(TProgram).Assembly.Location) ?? AppContext.BaseDirectory,
-            "--applicationName", typeof(TProgram).Assembly.FullName ?? typeof(TProgram).Assembly.GetName().Name ?? typeof(TProgram).FullName!
-        };
+        // The run's merged overlay travels as command-line arguments so an entry point that builds its
+        // host from args reads final-precedence values inside Main, before Build() fires HostBuilding.
+        var arguments = ProtoWorkerArguments.Compose(
+            Path.GetDirectoryName(typeof(TProgram).Assembly.Location) ?? AppContext.BaseDirectory,
+            typeof(TProgram).Assembly.FullName ?? typeof(TProgram).Assembly.GetName().Name ?? typeof(TProgram).FullName!,
+            configuration);
 
         object built;
         try
@@ -118,7 +121,8 @@ internal sealed class ProtoWorkerHost<TProgram> : IProtoConfiguredInfrastructure
     /// <summary>
     /// Applies the run's configuration and the suite's options to the worker builder, whichever hosting
     /// pattern the worker's entry point used, and replaces its <see cref="TimeProvider"/> with the run's
-    /// clock bridge so worker code that reads time sees the suite's clock.
+    /// clock bridge so worker code that reads time sees the suite's clock. The entry point already
+    /// received the same overlay as arguments; this is the fallback for an entry point that ignores them.
     /// </summary>
     internal void ConfigureBuilder(object builder)
     {
@@ -130,6 +134,8 @@ internal sealed class ProtoWorkerHost<TProgram> : IProtoConfiguredInfrastructure
             timeProvider = _timeProvider;
         }
 
+        // A null value has no setting to carry: the overlay's contract is "keys with no value are not
+        // passed" (a ProtoWorkerOptions value is never null - Set turns null into an empty setting).
         var values = configuration
             .Where(pair => pair.Value is not null)
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
@@ -140,10 +146,16 @@ internal sealed class ProtoWorkerHost<TProgram> : IProtoConfiguredInfrastructure
                 hostBuilder.ConfigureAppConfiguration(configurationBuilder => configurationBuilder.AddInMemoryCollection(values));
                 hostBuilder.ConfigureServices(services => ReplaceTimeProvider(services, timeProvider));
                 break;
-            case HostApplicationBuilder applicationBuilder:
+            // HostApplicationBuilder and WebApplicationBuilder are both IHostApplicationBuilder.
+            case IHostApplicationBuilder applicationBuilder:
                 applicationBuilder.Configuration.AddInMemoryCollection(values);
                 ReplaceTimeProvider(applicationBuilder.Services, timeProvider);
                 break;
+            default:
+                throw new InvalidOperationException(
+                    $"The worker host '{_name}' ({typeof(TProgram).FullName}) built a " +
+                    $"{builder?.GetType().FullName ?? "null"} builder, which ProtoTest.Hosting does not recognise. " +
+                    "Build the worker's host with Host.CreateApplicationBuilder, Host.CreateDefaultBuilder or WebApplication.CreateBuilder.");
         }
     }
 

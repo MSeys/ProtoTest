@@ -14,6 +14,24 @@ public sealed class SqlOptions : IProtoConfigurableOptions
     /// <summary>Gets or sets the isolation applied to each test. Defaults to <see cref="SqlIsolation.Transaction"/>.</summary>
     public SqlIsolation Isolation { get; set; } = SqlIsolation.Transaction;
 
+    /// <summary>
+    /// The configuration keys that can provide the connection. When at least one is declared and none
+    /// is provided - no configured value and no registered infrastructure piece declares it - the SQL
+    /// capability is absent and the integration is inert until a key exists: the connection is not
+    /// opened during setup, and <see cref="ProtoExecutionContextExtensions.SqlSession(ProtoExecutionContext)"/>
+    /// and its siblings throw naming the keys and the
+    /// <c>[RequiresCapability(ProtoCapabilityKinds.Store)]</c> gate. Empty by default: the capability
+    /// stays unconditional and the factory owns the address.
+    /// </summary>
+    /// <remarks>
+    /// Declare the keys in the <c>AddSql</c> callback, for example
+    /// <c>sql =&gt; sql.AddressKeys.Add("ConnectionStrings:Orders")</c>. The set is a code API and is
+    /// never bound from configuration, because the capability decision is made when the host is built,
+    /// before options bind. <c>AddEntityFrameworkCore</c> declares its store capability over the same
+    /// keys when it is called after <c>AddSql</c>.
+    /// </remarks>
+    public SqlAddressKeys AddressKeys { get; } = new();
+
     /// <summary>Gets the applications declared as using the test's connection.</summary>
     public IReadOnlyCollection<string> SharedWith => _sharedWith;
 

@@ -176,7 +176,7 @@ public sealed class GraphQLResponse : ProtoHttpResponse
             new Dictionary<string, string?> { ["graphql.operation"] = Identifier! },
             matched => new ProtoObservation(
                 TargetName!,
-                "graphql.contract.shape",
+                ProtoGraphQLBuilder.ShapeObservationKind,
                 Identifier!,
                 new GraphQLShapeMatchData(Identifier!, matched)));
 

@@ -19,8 +19,11 @@ dotnet add package ProtoTest.Devices.WebSocket
 
 ## Limits
 
-- One WebSocket per device; reconnect means a new test.
-- The transport opens a socket, so an in-process application's WebSocket endpoint is not reachable yet.
+- One WebSocket per device instance; an explicit `DisconnectAsync` releases it and the next send
+  reconnects, and the test's end disconnects it either way. One reader at a time: a second concurrent
+  receive fails fast.
+- The transport opens a socket, so an in-process application's WebSocket endpoint needs
+  `ProtoTest.Devices.WebSocket.AspNetCore`.
 - The transport moves frames only: message kinds, commands and coverage are the suite's protocol code
   (a catalog implements `IProtoDeviceProtocol`).
 

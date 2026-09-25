@@ -87,6 +87,9 @@ All ProtoTest packages share one version; breaking API changes are called out be
   the SQL integration.
 - `ProtoMessagingBuilder.UseBroker(factory, addressKeys)` lets an adapter name the configuration keys
   its address comes from, so the `Broker` capability is declared only while one of them is provided.
+- `WebPageInventory.VisitedObservationKind` and `WebPageInventory.VerifiedObservationKind` name the
+  `web.page.visited`/`web.page.verified` observation kinds beside the existing
+  `AvailableObservationKind`, so producers and collectors reference one constant each.
 
 ### Fixed
 
@@ -122,6 +125,8 @@ All ProtoTest packages share one version; breaking API changes are called out be
 - Container readiness honors the run's readiness policy instead of its private 30 s timeout, so a slow
   image is tuned with `ConfigureReadiness(options => options.Timeout = ...)` or
   `ProtoTest:Readiness:Timeout`.
+- `AddHttpReadiness` rejects an address that is not an absolute HTTP(S) URL at run start, naming the
+  configuration key, instead of probing it into a timeout.
 - The gRPC missing-address error names the client's application (and the key to set) instead of
   printing the literal `{app}`.
 - Shape mismatches whose expected shape carries a value constraint now record every mismatch in the
@@ -179,6 +184,10 @@ All ProtoTest packages share one version; breaking API changes are called out be
   with its own configuration and `TimeProvider`. `ProtoWorkerOptions.Set(key, null)` now delivers an
   empty setting, as its documentation always promised, and the parameterless-`Main` fallback
   (`HostBuilding` overlay) is pinned by a test.
+- Readiness waits ride the shared `ProtoPolling` loop instead of a second stopwatch/delay
+  implementation, so one rule owns every poll interval and deadline (audit VOC-4). Observable behavior
+  is unchanged: exceptions mean "not ready yet", and a timeout still names the probe, the attempts and
+  the last error.
 
 ### Changed
 
@@ -193,6 +202,19 @@ All ProtoTest packages share one version; breaking API changes are called out be
   transitive reference.
 - `ProtoHost.FindClock` is an instance member; the clock lookup is scoped to the host that owns the
   test. The clock feature is unreleased, so no consumer migration is needed.
+- `ProtoProtocol.CoverageCategory` is optional and `null` for a protocol that ships no collector; a
+  collector with no category falls back to the protocol name, and the shipped REST/GraphQL/gRPC/OpenAPI
+  collectors keep their categories.
+
+### Removed
+
+- `IProtoReadinessProbe` and `ProtoReadinessResult.LastError` were removed: probes are registered as
+  delegates with `AddReadinessProbe`/`AddHttpReadiness`, the wait result carries attempts and waited
+  time only, and the timeout message still carries the last error. Both were unreleased 1.1 plumbing.
+- Messaging's coverage promise was removed rather than shipped: `ProtoMessageClient` no longer documents
+  destination aggregation, and the Messaging protocol descriptor no longer declares a coverage category.
+  The `messaging.*` observations remain trace evidence for a collector a suite registers; no
+  `ProtoTest.Messaging` collector ships, and destinations are deliberately not a coverage category.
 
 ### Breaking
 

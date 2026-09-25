@@ -1,7 +1,6 @@
 namespace ProtoTest.Grpc.Tests;
 
 using System.Net;
-using System.Net.Sockets;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
@@ -24,7 +23,7 @@ public sealed class GrpcTestServer
     [OneTimeSetUp]
     public async Task StartAsync()
     {
-        var port = FreePort();
+        var port = TestNetworking.FreePort();
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.ConfigureKestrel(kestrel => kestrel.Listen(
             IPAddress.Loopback,
@@ -39,13 +38,4 @@ public sealed class GrpcTestServer
 
     [OneTimeTearDown]
     public async Task StopAsync() => await _server.DisposeAsync();
-
-    private static int FreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
-    }
 }

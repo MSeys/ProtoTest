@@ -27,7 +27,7 @@ marked **already planned** and not re-reported. Counts: P1 = 5, P2 = 7, P3 = 6 (
 | DX-14 | Style | P3 | Samples mix `Assert.Multiple` and `Assert.EnterMultipleScope` in one project | new plan item (samples/template) |
 | DX-15 | Style | P3 | Three test-method naming conventions across samples and the template | new plan item (template/docs) |
 | DX-16 | Style | P3 | The `dotnet new` template teaches `using`s outside the namespace; in-repo samples/tests put them inside | new plan item (template) |
-| DX-17 | Vocabulary | P3 | `*.contract.shape` observation kinds are literals at four producers; VOC-2 names only web kinds and `graphql.failure` | A5/VOC-2 extension |
+| DX-17 | Vocabulary | P3 | `*.contract.shape` observation kinds are literals at four producers; VOC-2 names only web kinds and `graphql.failure` | Done in A5 (constants per protocol) |
 | DX-18 | Capabilities | P3 | The same `Reason = "..."` repeats on every gated test; no suite-level reason source | new plan item |
 
 **Already planned — referenced, not re-reported:** A1 path-based single-value read (feature-plan:47);

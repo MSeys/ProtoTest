@@ -10,7 +10,7 @@ gate turns; do not add per-finding noise. Counts are the severity labels in that
 | 1 — cleanup | 2026-09-23 | `500daf9` | not severity-scored | — | — | — | — | — | Delivered 12 stages; headline fixes: MSTest result masking, Selenium thread affinity, quadratic report flattening, Sheets host leak |
 | 2 — convergence | 2026-09-24 | `fc0afa2` | 21 | 0 | 3 | 9 (incl. F17 medium-high) | 9 | 3 (F1–F3: Core web semantics, client init once per chain, per-axis redaction) | Foundation migrations (RabbitMQ 7.x, OpenApi 3.x) and one outcome/evidence policy |
 | 3 — boundaries | 2026-09-24 | `09d2590` | 51 | 0 | 5 | 18 | 28 (incl. 1 observation) | 5 (A1 raw finding metadata, B1 release re-arm, C1 listener ownership, D1 split client entity, E1 NUnit boundary) | Runner boundaries, evidence boundary, outcome vocabulary; plan closed |
-| 4 — post-feature-push | 2026-09-25 | `61220f5` | 34 | 2 | 8 | 14 | 12 | 0 | The criticals are in the new reference repo (fixed tenant, eager broker read). The highs sit in the P1–P4f seams (conditional capability, worker `Main`, in-process device routing) and release evidence; no finding in pre-push Core |
+| 4 — post-feature-push | 2026-09-25 | `61220f5` | 34 | 2 | 8 | 14 | 12 | 0 | Closed 2026-09-25 (`8382789`): all stages independently reviewed, kernel criticals 0; the criticals were in the new reference repo and are fixed; residuals live in plan-5 as `A1R`–`A7R` |
 
 Reading: the classes the audits keep finding have shifted from "Core model wrong" (Audit 1–3) to "new
 surface built faster than its contracts" (Audit 4). Kernel criticals must stay at 0. If the next audit

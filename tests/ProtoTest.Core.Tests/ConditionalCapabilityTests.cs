@@ -15,48 +15,38 @@ public sealed class ConditionalCapabilityTests
     [Test]
     public async Task AddCapabilityUnlessConfigured_WhenEveryKeyIsConfigured_ShouldDropTheCapability()
     {
-        var output = Path.Combine(Path.GetTempPath(), $"prototest-capability-{Guid.NewGuid():N}.prototrace");
-        try
-        {
-            var builder = new ProtoHostBuilder();
-            builder.ConfigureTracing(options => options.OutputPath = output);
-            builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
-                new Dictionary<string, string?>
-                {
-                    ["ProtoTest:Applications:Api:BaseUrl"] = "https://staging"
-                }));
-            builder.AddCapabilityUnlessConfigured(Capability, "ProtoTest:Applications:Api:BaseUrl");
-            await using var host = builder.Build();
-            await host.StartAsync();
-            await host.StartTestAsync("dropped capability", "00001", TestMethods.Placeholder);
-            await host.CompleteTestAsync(ProtoTestResult.Passed);
-            await host.StopAsync();
+        using var trace = new TemporaryTrace("capability");
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = trace.Path);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Applications:Api:BaseUrl"] = "https://staging"
+            }));
+        builder.AddCapabilityUnlessConfigured(Capability, "ProtoTest:Applications:Api:BaseUrl");
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("dropped capability", "00001", TestMethods.Placeholder);
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
 
-            var snapshot = host.Trace.Snapshot();
-            Assert.Multiple(() =>
-            {
-                Assert.That(
-                    host.HasCapability(ProtoCapabilityKinds.Server, "ASP.NET Core"),
-                    Is.False,
-                    "the environment provides what the integration would");
-                Assert.That(
-                    snapshot.Entities!.Any(entity => entity.Kind == ProtoTraceEntityKinds.Capability
-                        && entity.Name == "ASP.NET Core"),
-                    Is.False,
-                    "the run overview does not show a capability that is not there");
-                Assert.That(
-                    snapshot.Entries!.Any(entry => entry.Kind == "capability.skipped"),
-                    Is.True,
-                    "the trace records the decision");
-            });
-        }
-        finally
+        var snapshot = host.Trace.Snapshot();
+        Assert.Multiple(() =>
         {
-            if (File.Exists(output))
-            {
-                File.Delete(output);
-            }
-        }
+            Assert.That(
+                host.HasCapability(ProtoCapabilityKinds.Server, "ASP.NET Core"),
+                Is.False,
+                "the environment provides what the integration would");
+            Assert.That(
+                snapshot.Entities!.Any(entity => entity.Kind == ProtoTraceEntityKinds.Capability
+                    && entity.Name == "ASP.NET Core"),
+                Is.False,
+                "the run overview does not show a capability that is not there");
+            Assert.That(
+                snapshot.Entries!.Any(entry => entry.Kind == "capability.skipped"),
+                Is.True,
+                "the trace records the decision");
+        });
     }
 
     [Test]
@@ -153,40 +143,30 @@ public sealed class ConditionalCapabilityTests
     [Test]
     public async Task AddCapabilityUnlessConfigured_WhenDropped_ShouldNameTheDecidingKeysInTheTrace()
     {
-        var output = Path.Combine(Path.GetTempPath(), $"prototest-capability-keys-{Guid.NewGuid():N}.prototrace");
-        try
-        {
-            var builder = new ProtoHostBuilder();
-            builder.ConfigureTracing(options => options.OutputPath = output);
-            builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
-                new Dictionary<string, string?>
-                {
-                    [BaseUrlKey] = "https://staging",
-                    [SecondaryUrlKey] = "https://staging-2"
-                }));
-            builder.AddCapabilityUnlessConfigured(Capability, BaseUrlKey, SecondaryUrlKey);
-            await using var host = builder.Build();
-            await host.StartAsync();
-
-            var skipped = host.Trace.Snapshot().Entries!.Single(entry => entry.Kind == "capability.skipped");
-            await host.StopAsync();
-
-            Assert.Multiple(() =>
+        using var trace = new TemporaryTrace("capability-keys");
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = trace.Path);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
             {
-                Assert.That(
-                    skipped.Attributes["capability.keys"],
-                    Does.Contain(BaseUrlKey),
-                    "the skipped record names the keys that decided it");
-                Assert.That(skipped.Attributes["capability.keys"], Does.Contain(SecondaryUrlKey));
-                Assert.That(skipped.Attributes["capability.reason"], Is.EqualTo("already configured"));
-            });
-        }
-        finally
+                [BaseUrlKey] = "https://staging",
+                [SecondaryUrlKey] = "https://staging-2"
+            }));
+        builder.AddCapabilityUnlessConfigured(Capability, BaseUrlKey, SecondaryUrlKey);
+        await using var host = builder.Build();
+        await host.StartAsync();
+
+        var skipped = host.Trace.Snapshot().Entries!.Single(entry => entry.Kind == "capability.skipped");
+        await host.StopAsync();
+
+        Assert.Multiple(() =>
         {
-            if (File.Exists(output))
-            {
-                File.Delete(output);
-            }
-        }
+            Assert.That(
+                skipped.Attributes["capability.keys"],
+                Does.Contain(BaseUrlKey),
+                "the skipped record names the keys that decided it");
+            Assert.That(skipped.Attributes["capability.keys"], Does.Contain(SecondaryUrlKey));
+            Assert.That(skipped.Attributes["capability.reason"], Is.EqualTo("already configured"));
+        });
     }
 }

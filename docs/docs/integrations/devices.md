@@ -99,8 +99,7 @@ builder.ConfigureServices(services => services.AddSingleton<IProtoCollector>(
 
 ## Transport options
 
-The WebSocket backend takes code defaults in `AddWebSocketClient(..., configure)` (or
-`AddInProcessWebSocketDevices(configure)`) and lets configuration override them; the in-process
+The WebSocket backend takes code defaults in `AddWebSocketClient(..., configure)` (or the same callback on `AddInProcessWebSocketDevices<TProgram>(application, configure)`) and lets configuration override them; the in-process
 transport resolves and validates the same registered options, so a bad value fails when the device is
 created and `ConnectTimeout` bounds the in-process connect too:
 

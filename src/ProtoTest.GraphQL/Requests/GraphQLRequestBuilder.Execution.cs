@@ -228,7 +228,7 @@ public sealed partial class GraphQLRequestBuilder
             var diagnostics = ProtoHttpFailureDiagnostics.From(requestUri, exception, cancellationToken, attachmentOptions);
             return new ProtoObservation(
                 TargetName,
-                "graphql.failure",
+                ProtoGraphQLBuilder.FailureObservationKind,
                 identifier,
                 new GraphQLFailureData(
                     operation.Kind.WireName(),

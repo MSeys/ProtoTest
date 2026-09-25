@@ -237,15 +237,51 @@ re-read against the code. Phase 2 is complete.
 
 Execute audit stages **A5–A7**.
 
-- [ ] **A5 Vocabulary and docs** (VOC-1..VOC-4, dead names): kind constants, the Messaging decision,
-  the readiness surface, one poll loop; a docs-gate check that named `Add*` symbols exist.
-- [ ] **A6 Tests and support** (TST-1, TST-2): the missing negative/concurrency tests; shared
-  temp-trace/`FreePort`; deterministic waits; the lint grep.
-- [ ] **A7 Release and evidence hygiene** (TST-5 remainder): changelog rollover, docs deny list from
-  suppressions, package-validation rollover plan, recipe-trace guard, framework patch pins.
+- [x] **A5 Vocabulary and docs** (VOC-1..VOC-4, dead names) — done; independently reviewed
+  (`assets/internal/review-a5.md`, full `-Pack` run; its blocker A5R-01 and should-fix A5R-02 fixed
+  before commit). The Messaging coverage promise was deleted rather than shipped; the web page kinds,
+  `graphql.failure` and the four `*.contract.shape` kinds are constants in their owning layers (wire
+  strings unchanged); `IProtoReadinessProbe`/`ProtoReadinessResult.LastError` are gone;
+  `ProtoReadiness` rides `ProtoPolling`; `check-docs.ps1` gained an `Add*` existence check with a
+  commented allowlist and a deliberate-bogus proof; the stale `AddWebSocketDevices` names were swept
+  from the docs, READMEs and feature plan. Gate: `verify A5 (1.1.0-alpha.1): lint PASS · docs PASS ·
+  test PASS · pack PASS`.
+  - **A5 residuals:** A5R-03 the docs-gate name set is scraped from raw text (comments/strings count);
+    A5R-04 was fixed with the changelog split; `sheets.workbook` stays record-only evidence and is
+    documented as such.
+- [x] **A6 Tests and support** (TST-1, TST-2) — done; gate green (`verify A6 1.1.0-alpha.1: lint PASS ·
+  docs PASS · test PASS`). `TemporaryTrace`, `TestNetworking.FreePort`, `SingleConnectionListener` and
+  the shared published-address double live in `tests/ProtoTest.TestSupport`; the four local `FreePort`
+  copies and the `ServeOnceAsync`/ad-hoc listeners are gone; the readiness wait is deterministic
+  (signal-based, no 150 ms sleep) and the remaining timing probes are named as the subject;
+  `eng/lint.ps1` fails on a local copy of a moved helper (planted-copy proof). Failure paths added:
+  `AddHttpReadiness` rejects a malformed/non-HTTP address naming the key (one production line), a
+  malformed step-aside `BaseUrl` fails naming the key, and a dead published address fails the request
+  instead of falling back in-process. A5R-03 was taken (the docs gate strips comments/strings and scans
+  samples).
+  - **A6 residuals:** `ProtoHttpClientInitializerTests`' malformed-address message names the protocol
+    and client but not the configuration key; the flat inline temp-trace pattern still appears in ~11
+    older suites (the lint rule catches definitions, not inline paths); the test-classification of
+    per-suite doubles stays as is.
+- [x] **A7 Release and evidence hygiene** (TST-5 remainder) — done; gate `verify A7 1.1.0-alpha.1:
+  lint PASS · docs PASS · test PASS · pack PASS` and `eng\release.ps1 -DryRun` green.
+  `eng/cut-release.ps1` rolls `[Unreleased]` into `[<version>] - <date>` and fails on an empty
+  section; `release.yml` fails without a cut instead of falling back to generated notes;
+  `RELEASING.md` is tracked and is the checklist (version, rollover, verify, pack, baseline rollover,
+  tag, docs version); the docs deny list derives the removed-API half from
+  `CompatibilitySuppressions.xml` (it immediately caught a stale messaging options row); the seven
+  package-validation opt-outs carry a reason enforced by `pack.ps1`; the framework packages are pinned
+  to the resolved patches (no floating `*`); `generate-recipe-traces.ps1` guards a zero-match filter
+  and clears stale outputs; the new docs pages are in `lighthouserc.cjs`.
+  - **A7 decisions:** CP0006 is excluded from the derived deny list (it means an interface member was
+    *added*, not removed); the release workflow fails without a cut because it cannot commit — the
+    human step is in `RELEASING.md`; the 0.1.0-alpha-era hand entries were dropped (not in the 1.0.1
+    baseline).
 
-⛳ Checkpoint P3 — every audit finding is fixed or carries a recorded decision; refresh
-`eng/facts/` to the post-audit model and mark the audit closed. Do not reopen it for new work.
+⛳ Checkpoint P3 — met 2026-09-25: every audit finding is fixed or carries a recorded
+decision/residual (A1R–A7R live in the Phase 2/3 rows above), `eng/facts/` was updated with each stage,
+and **Audit 4 is closed** at `8382789`. Do not reopen the audit; new work goes to Phase 3b, Phase 4 or
+the feature plan.
 
 ## Phase 3b — DX and API consistency (`eng/dx-review.md`)
 
@@ -297,7 +333,7 @@ Order is plan-4's demand order; each item is its own stage with the feature-plan
 | 1 — R1a reference suite | Complete | 1.1 `8bf57ce` · 1.2/1.3 `8c0ab21` · 1.4/1.5 `a63be86` · 1.6/1.7 `2cb949f` — container 4/4 ×2, configured 4/4 ×2 (one DB) | Journey, DLQ, both modes, honest README/COVERAGE; Phase 2 (audit A1–A4) next |
 | 1b — R1a review follow-ups | Complete | OpenCSMS `e3cf209` + `92a6d0d`; logs under `artifacts/gates/` | All seven should-fixes done: redelivery test, dead-channel reset, observable clock, at-most-once recorded, API-only migrations, evidence runner, suite polish; R1a-14 anecdotal |
 | 2 — Audit correctness A1–A4 | Complete | A1 · A2a · A2b · A3 · A4, all independently reviewed; pack green on A2b/A3/A4; OpenCSMS 6/6 both modes | Phase 3 (A5–A7 hygiene) next |
-| 3 — Hygiene A5–A7 | Pending | — | Vocab/docs, tests/support, release evidence |
+| 3 — Hygiene A5–A7 | Complete | A5 (`review-a5`) · A6 · A7 (gate + `release.ps1 -DryRun`) | Audit 4 closed at `8382789`; Phase 3b (DX P1s) next |
 | 3b — DX and API consistency | Pending | `eng/dx-review.md`: 5 P1, 7 P2, 6 P3 | DX-01/02/03/05 accepted (DX-04 recorded); P2/P3 by demand; deliberate idioms binding |
 | 4 — Plan-4 resume | Pending | — | R2–R5, P5–P8, X1/X2 |
 

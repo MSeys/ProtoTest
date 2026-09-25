@@ -12,106 +12,86 @@ public sealed class DeviceTests
     [Test]
     public async Task Client_ShouldCreateOneDevicePerIdAndRecordItsExchange()
     {
-        var output = TemporaryTracePath();
-        try
-        {
-            var server = new FakeDeviceServer();
-            var builder = new ProtoHostBuilder();
-            builder.ConfigureTracing(options => options.OutputPath = output);
-            builder.AddDevices(devices => devices
-                .AddClient("Chargers", server.Transport, resolveAddress: ProtoDeviceAddress.Template("memory://cp-001"))
-                    .AddDevice<FakeCharger>()
-                    .AddProtocol<FakeProtocol>());
-            await using var host = builder.Build();
-            await host.StartAsync();
+        using var trace = new TemporaryTrace("devices");
+        var server = new FakeDeviceServer();
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = trace.Path);
+        builder.AddDevices(devices => devices
+            .AddClient("Chargers", server.Transport, resolveAddress: ProtoDeviceAddress.Template("memory://cp-001"))
+                .AddDevice<FakeCharger>()
+                .AddProtocol<FakeProtocol>());
+        await using var host = builder.Build();
+        await host.StartAsync();
 
-            await host.StartTestAsync("device first", "00001", TestMethods.Placeholder);
-            var charger = Proto.Context.Devices("Chargers").For<FakeCharger>("CP-001");
-            var again = Proto.Context.Devices("Chargers").For<FakeCharger>("CP-001");
-            var ack = await charger.BootAsync();
-            await host.CompleteTestAsync(ProtoTestResult.Passed);
-            await host.StopAsync();
+        await host.StartTestAsync("device first", "00001", TestMethods.Placeholder);
+        var charger = Proto.Context.Devices("Chargers").For<FakeCharger>("CP-001");
+        var again = Proto.Context.Devices("Chargers").For<FakeCharger>("CP-001");
+        var ack = await charger.BootAsync();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
 
-            var test = host.Trace.Snapshot().Tests.Single();
-            var entity = test.Entities!.Single(candidate => candidate.Kind == ProtoTraceEntityKinds.Device);
-            Assert.Multiple(() =>
-            {
-                Assert.That(again, Is.SameAs(charger), "one instance per (client, type, id) per test");
-                Assert.That(ack, Is.EqualTo("BOOT_ACK"));
-                Assert.That(entity.Id, Is.EqualTo("device:Chargers:FakeCharger:CP-001"));
-                Assert.That(entity.State["device.client"], Is.EqualTo("Chargers"));
-                Assert.That(entity.State["device.address"], Is.EqualTo("memory://cp-001"));
-                Assert.That(
-                    entity.State["device.connected"],
-                    Is.EqualTo("false"),
-                    "the release path disconnects the device and finalises its state");
-                Assert.That(server.Sent, Is.EqualTo(new[] { "BOOT" }));
-                Assert.That(
-                    test.Entries.Select(entry => entry.Kind),
-                    Does.Contain("device.send").And.Contain("device.receive").And.Contain("device.command")
-                        .And.Contain("device.disconnect"));
-            });
-        }
-        finally
+        var test = host.Trace.Snapshot().Tests.Single();
+        var entity = test.Entities!.Single(candidate => candidate.Kind == ProtoTraceEntityKinds.Device);
+        Assert.Multiple(() =>
         {
-            if (File.Exists(output))
-            {
-                File.Delete(output);
-            }
-        }
+            Assert.That(again, Is.SameAs(charger), "one instance per (client, type, id) per test");
+            Assert.That(ack, Is.EqualTo("BOOT_ACK"));
+            Assert.That(entity.Id, Is.EqualTo("device:Chargers:FakeCharger:CP-001"));
+            Assert.That(entity.State["device.client"], Is.EqualTo("Chargers"));
+            Assert.That(entity.State["device.address"], Is.EqualTo("memory://cp-001"));
+            Assert.That(
+                entity.State["device.connected"],
+                Is.EqualTo("false"),
+                "the release path disconnects the device and finalises its state");
+            Assert.That(server.Sent, Is.EqualTo(new[] { "BOOT" }));
+            Assert.That(
+                test.Entries.Select(entry => entry.Kind),
+                Does.Contain("device.send").And.Contain("device.receive").And.Contain("device.command")
+                    .And.Contain("device.disconnect"));
+        });
     }
 
     [Test]
     public async Task Client_WhenDisconnectedExplicitly_ShouldReconnectAndRecordBothConnects()
     {
-        var output = TemporaryTracePath();
-        try
+        using var trace = new TemporaryTrace("devices");
+        var server = new FakeDeviceServer();
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = trace.Path);
+        builder.AddDevices(devices => devices
+            .AddClient("Chargers", server.Transport, resolveAddress: ProtoDeviceAddress.Template("memory://cp-001"))
+                .AddDevice<FakeCharger>());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("disconnect and reconnect", "00001", TestMethods.Placeholder);
+
+        var charger = Proto.Context.Devices("Chargers").For<FakeCharger>("CP-001");
+        await charger.SendTextAsync("BOOT");
+        await charger.CloseAsync();
+        await charger.SendTextAsync("METER");
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        var test = host.Trace.Snapshot().Tests.Single();
+        var entity = test.Entities!.Single(candidate => candidate.Kind == ProtoTraceEntityKinds.Device);
+        // Identical error-free events collapse into one entry with a count, and the explicit
+        // disconnect and the release one can sit under different parents, so sum the counts.
+        var connects = test.Entries.Where(entry => entry.Kind == "device.connect").Sum(entry => entry.Count);
+        var disconnects = test.Entries.Where(entry => entry.Kind == "device.disconnect").Sum(entry => entry.Count);
+        Assert.Multiple(() =>
         {
-            var server = new FakeDeviceServer();
-            var builder = new ProtoHostBuilder();
-            builder.ConfigureTracing(options => options.OutputPath = output);
-            builder.AddDevices(devices => devices
-                .AddClient("Chargers", server.Transport, resolveAddress: ProtoDeviceAddress.Template("memory://cp-001"))
-                    .AddDevice<FakeCharger>());
-            await using var host = builder.Build();
-            await host.StartAsync();
-            await host.StartTestAsync("disconnect and reconnect", "00001", TestMethods.Placeholder);
-
-            var charger = Proto.Context.Devices("Chargers").For<FakeCharger>("CP-001");
-            await charger.SendTextAsync("BOOT");
-            await charger.CloseAsync();
-            await charger.SendTextAsync("METER");
-
-            await host.CompleteTestAsync(ProtoTestResult.Passed);
-            await host.StopAsync();
-
-            var test = host.Trace.Snapshot().Tests.Single();
-            var entity = test.Entities!.Single(candidate => candidate.Kind == ProtoTraceEntityKinds.Device);
-            // Identical error-free events collapse into one entry with a count, and the explicit
-            // disconnect and the release one can sit under different parents, so sum the counts.
-            var connects = test.Entries.Where(entry => entry.Kind == "device.connect").Sum(entry => entry.Count);
-            var disconnects = test.Entries.Where(entry => entry.Kind == "device.disconnect").Sum(entry => entry.Count);
-            Assert.Multiple(() =>
-            {
-                Assert.That(
-                    connects,
-                    Is.EqualTo(2),
-                    "the explicit disconnect releases the connection, so the next send connects again");
-                Assert.That(
-                    disconnects,
-                    Is.EqualTo(2),
-                    "the explicit disconnect and the release path each record one disconnect");
-                Assert.That(entity.State["device.connected"], Is.EqualTo("false"), "the final state is disconnected");
-                Assert.That(server.Sent, Is.EqualTo(new[] { "BOOT", "METER" }));
-            });
-        }
-        finally
-        {
-            if (File.Exists(output))
-            {
-                File.Delete(output);
-            }
-        }
+            Assert.That(
+                connects,
+                Is.EqualTo(2),
+                "the explicit disconnect releases the connection, so the next send connects again");
+            Assert.That(
+                disconnects,
+                Is.EqualTo(2),
+                "the explicit disconnect and the release path each record one disconnect");
+            Assert.That(entity.State["device.connected"], Is.EqualTo("false"), "the final state is disconnected");
+            Assert.That(server.Sent, Is.EqualTo(new[] { "BOOT", "METER" }));
+        });
     }
 
     [Test]
@@ -172,39 +152,29 @@ public sealed class DeviceTests
     [Test]
     public async Task Client_ShouldUseTheResolverForEachDeviceId()
     {
-        var output = TemporaryTracePath();
-        try
-        {
-            var server = new FakeDeviceServer();
-            var builder = new ProtoHostBuilder();
-            builder.ConfigureTracing(options => options.OutputPath = output);
-            builder.AddDevices(devices => devices
-                .AddClient(
-                    "Chargers",
-                    server.Transport,
-                    resolveAddress: (_, deviceId) => $"memory://resolved/{deviceId}")
-                    .AddDevice<FakeCharger>());
-            await using var host = builder.Build();
-            await host.StartAsync();
-            await host.StartTestAsync("resolver", "00001", TestMethods.Placeholder);
+        using var trace = new TemporaryTrace("devices");
+        var server = new FakeDeviceServer();
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = trace.Path);
+        builder.AddDevices(devices => devices
+            .AddClient(
+                "Chargers",
+                server.Transport,
+                resolveAddress: (_, deviceId) => $"memory://resolved/{deviceId}")
+                .AddDevice<FakeCharger>());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("resolver", "00001", TestMethods.Placeholder);
 
-            var charger = Proto.Context.Devices("Chargers").For<FakeCharger>("CP-009");
-            await charger.SendTextAsync("BOOT");
+        var charger = Proto.Context.Devices("Chargers").For<FakeCharger>("CP-009");
+        await charger.SendTextAsync("BOOT");
 
-            await host.CompleteTestAsync(ProtoTestResult.Passed);
-            await host.StopAsync();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
 
-            var entity = host.Trace.Snapshot().Tests.Single().Entities!
-                .Single(candidate => candidate.Kind == ProtoTraceEntityKinds.Device);
-            Assert.That(entity.State["device.address"], Is.EqualTo("memory://resolved/CP-009"));
-        }
-        finally
-        {
-            if (File.Exists(output))
-            {
-                File.Delete(output);
-            }
-        }
+        var entity = host.Trace.Snapshot().Tests.Single().Entities!
+            .Single(candidate => candidate.Kind == ProtoTraceEntityKinds.Device);
+        Assert.That(entity.State["device.address"], Is.EqualTo("memory://resolved/CP-009"));
     }
 
     [Test]
@@ -244,44 +214,34 @@ public sealed class DeviceTests
     [Test]
     public async Task Expect_WhenNeverObserved_ShouldFailWithDescriptionAndTheFramesSeen()
     {
-        var output = TemporaryTracePath();
-        try
+        using var trace = new TemporaryTrace("devices");
+        var server = new FakeDeviceServer { Responds = false };
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = trace.Path);
+        builder.AddDevices(devices => devices
+            .AddClient("Chargers", server.Transport, resolveAddress: ProtoDeviceAddress.Template("memory://cp-002"))
+                .AddDevice<FakeCharger>());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("timeout", "00001", TestMethods.Placeholder);
+
+        var charger = Proto.Context.Devices("Chargers").For<FakeCharger>("CP-002");
+        await charger.SendTextAsync("BOOT");
+        var exception = Assert.ThrowsAsync<DeviceAssertionException>(async () =>
+            await charger.AwaitAsync("BOOT_ACK", TimeSpan.FromMilliseconds(150)));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception));
+        await host.StopAsync();
+
+        var test = host.Trace.Snapshot().Tests.Single();
+        var command = test.Entries.Single(entry => entry.Kind == "device.command");
+        Assert.Multiple(() =>
         {
-            var server = new FakeDeviceServer { Responds = false };
-            var builder = new ProtoHostBuilder();
-            builder.ConfigureTracing(options => options.OutputPath = output);
-            builder.AddDevices(devices => devices
-                .AddClient("Chargers", server.Transport, resolveAddress: ProtoDeviceAddress.Template("memory://cp-002"))
-                    .AddDevice<FakeCharger>());
-            await using var host = builder.Build();
-            await host.StartAsync();
-            await host.StartTestAsync("timeout", "00001", TestMethods.Placeholder);
-
-            var charger = Proto.Context.Devices("Chargers").For<FakeCharger>("CP-002");
-            await charger.SendTextAsync("BOOT");
-            var exception = Assert.ThrowsAsync<DeviceAssertionException>(async () =>
-                await charger.AwaitAsync("BOOT_ACK", TimeSpan.FromMilliseconds(150)));
-
-            await host.CompleteTestAsync(ProtoTestResult.Failed(exception));
-            await host.StopAsync();
-
-            var test = host.Trace.Snapshot().Tests.Single();
-            var command = test.Entries.Single(entry => entry.Kind == "device.command");
-            Assert.Multiple(() =>
-            {
-                Assert.That(exception!.Message, Does.Contain("server sends BOOT_ACK"));
-                Assert.That(exception.Message, Does.Contain("Frames exchanged"));
-                Assert.That(exception.Message, Does.Contain("→ BOOT"));
-                Assert.That(command.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
-            });
-        }
-        finally
-        {
-            if (File.Exists(output))
-            {
-                File.Delete(output);
-            }
-        }
+            Assert.That(exception!.Message, Does.Contain("server sends BOOT_ACK"));
+            Assert.That(exception.Message, Does.Contain("Frames exchanged"));
+            Assert.That(exception.Message, Does.Contain("→ BOOT"));
+            Assert.That(command.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+        });
     }
 
     [Test]
@@ -364,9 +324,6 @@ public sealed class DeviceTests
 
         Assert.That(exception!.Message, Does.Contain("No device client is registered"));
     }
-
-    private static string TemporaryTracePath()
-        => Path.Combine(Path.GetTempPath(), $"prototest-devices-{Guid.NewGuid():N}.prototrace");
 
     private sealed class FakeCharger : ProtoDevice
     {

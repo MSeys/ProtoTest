@@ -18,8 +18,10 @@ device stack and a reference suite, and the user reports the sessions ran too lo
 suffered. The question this audit answers is what that push bent — not whether the older model is
 sound, which it is.
 
-**Status: open.** Remediation stages A0–A8 below; Stage A8 (the reference suite) is executed by
-`eng/plan-5.md` Track R.
+**Status: closed 2026-09-25.** Stages A0–A8 complete: A0–A7 on `version/1.1` (closing commit
+`8382789`), A8 executed as `eng/plan-5.md` Phase 1/1b with the independent Phase 1 review. Every
+finding is fixed, decided, or carried as a named residual in plan-5 (`A1R`–`A7R`). Do not reopen this
+plan for new work — add it to `eng/plan-5.md` or the feature plan.
 
 ## Executive summary
 

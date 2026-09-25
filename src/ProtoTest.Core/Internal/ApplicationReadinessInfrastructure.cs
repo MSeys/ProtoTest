@@ -60,10 +60,11 @@ internal sealed class ApplicationReadinessInfrastructure : IProtoConfiguredInfra
             return;
         }
 
-        if (!Uri.TryCreate(address, UriKind.Absolute, out var baseUri))
+        if (!Uri.TryCreate(address, UriKind.Absolute, out var baseUri)
+            || (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps))
         {
             throw new InvalidOperationException(
-                $"'{BaseUrlKey}' is '{address}', which is not an absolute URL, so the readiness probe cannot use it.");
+                $"'{BaseUrlKey}' is '{address}', which is not an absolute HTTP or HTTPS URL, so the readiness probe cannot use it.");
         }
 
         var url = new Uri(baseUri, _path);

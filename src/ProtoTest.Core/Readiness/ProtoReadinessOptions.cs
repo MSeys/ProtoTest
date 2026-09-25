@@ -1,22 +1,6 @@
 namespace ProtoTest.Core;
 
 /// <summary>
-/// One readiness check for a piece the run starts: a database that must accept connections, a broker
-/// that must answer, an application address that must respond. A check is polled until it returns
-/// <see langword="true"/> or the run's readiness timeout expires; exceptions are treated as "not ready
-/// yet" and remembered for the failure message, so a connection-refused during a container's boot is
-/// normal.
-/// </summary>
-public interface IProtoReadinessProbe
-{
-    /// <summary>Gets a name for the trace and the timeout message.</summary>
-    string Name { get; }
-
-    /// <summary>Checks once; <see langword="true"/> means ready.</summary>
-    ValueTask<bool> CheckAsync(CancellationToken cancellationToken = default);
-}
-
-/// <summary>
 /// How long the host waits for a readiness probe and how often it asks. One instance governs every
 /// probe of the host and every container the run starts; a probe registered with its own timeout uses
 /// that instead. The section <c>ProtoTest:Readiness</c> binds over code values when the host is built.

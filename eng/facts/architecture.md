@@ -244,8 +244,15 @@ tests resolves per call and never holds a context.
 - One protocol descriptor per protocol (`ProtoProtocol`): trace source, operation names, observation
   kinds, coverage category, capability.
 - Trace sources, observation kinds, coverage categories and entity kinds are constants where they are
-  introduced, not literals at call sites (**→ AUDIT VOC-2**: web page kinds and `graphql.failure` still
-  literals).
+  introduced, not literals at call sites (VOC-2 fixed, DX-17 included: `WebPageInventory` owns
+  `web.page.available|visited|verified`, each protocol's builder owns its `*.failure` and
+  `*.contract.shape` kinds — `ProtoMessagingProtocol.ShapeObservationKind` for Messaging, which has no
+  builder type of its own).
+- `sheets.workbook` is record-only evidence: opening a workbook is not an assertion, so
+  `SheetsCoverageCollector` consumes only `sheets.range` (decided in A5; not changed).
+- Messaging records `messaging.publish`, `messaging.receive` and `messaging.contract.shape` as trace
+  evidence and ships no collector; destinations are deliberately not a coverage category (A5 VOC-1
+  decision: the promise was deleted, not shipped).
 - Entity ids: `client:{type}:{name}`, `context:{type}`, `capability:{kind}:{name}` (with `:{instance}`
   when the descriptor carries one), `device:{client}:{deviceType}:{id}`, infrastructure `Id`, resources
   `Id`, value items `{type}:{identity}`.
@@ -281,7 +288,7 @@ suite; extend it, do not fork it.
 | Redaction | `ProtoMetadataRedaction`, `ProtoUriSanitizer`, `JsonDiagnosticSanitizer` | Core / ProtoTest.Json |
 | Reporting | `IProtoSink`, `IProtoReportSource`, `IProtoCollector`, `ProtoReportItem`, run gates | `src/ProtoTest.Core/Reporting/` |
 | Clock | `ProtoClock`, `ProtoTestTimeProvider`, `ProtoRequestClock`, `ProtoClockRegistry` | `src/ProtoTest.Core/Time/` |
-| Readiness | `ProtoReadiness`, `ProtoReadinessOptions`, `IProtoReadinessProbe` | `src/ProtoTest.Core/Readiness/` |
+| Readiness | `ProtoReadiness`, `ProtoReadinessOptions` | `src/ProtoTest.Core/Readiness/` |
 | Skip | `RequiresCapabilityAttribute`, `RequiresInProcessAttribute`, `ProtoTestSkip` | `src/ProtoTest.Core/Applications/` |
 | Adapters | five runner packages + `tests/ProtoTest.AdapterContract` | `src/`, `tests/` |
 

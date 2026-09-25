@@ -83,11 +83,14 @@ audit plan.
   awaited at their registration position; a probe registered first records `readiness.skipped` naming
   the ordering and the later key instead of claiming "in-process". A truly in-process application
   records "in-process"; an application with neither an address nor an in-process server records both
-  gaps.
+  gaps. A configured address that is not an absolute HTTP/HTTPS URL fails the run start naming
+  `ProtoTest:Applications:{app}:BaseUrl` instead of being probed into a timeout.
 - **One readiness policy owns every wait.** `ConfigureReadiness`/`ProtoTest:Readiness` set
   `ProtoReadinessOptions`, which governs host probes and every container the run starts through
   `ProtoInfrastructureContext.Readiness`; a container started outside a host keeps its own
-  `ReadinessTimeout`/`ReadinessInterval`.
+  `ReadinessTimeout`/`ReadinessInterval`. `ProtoReadiness.WaitAsync` itself rides
+  `ProtoPolling.PollAsync`, so readiness shares the one interval/deadline loop with every other wait
+  (VOC-4 fixed); exceptions still mean "not ready yet" and the timeout message carries the last error.
 - **The consumer rule is adopted by `AddAspNetCoreServer`, the in-process device transport,
   `UseRabbitMq`, `AddSql` (with `SqlOptions.AddressKeys`) and `AddEntityFrameworkCore` (same keys).**
   A missing address means "inert +
@@ -124,6 +127,10 @@ audit plan.
   destinations as exchanges, so a queue (a dead-letter queue) or an `(exchange, routingKey)` pair cannot
   be awaited through the framework. Use a raw `RabbitMQ.Client` helper until the recorded REF-5 addition
   ships (canonical: OpenCSMS `tests/OpenCsms.Suite/Support/RabbitMqRawClient.cs`).
+- **Messaging observations are evidence, not coverage.** The package ships no collector and the
+  protocol descriptor carries no coverage category (A5 VOC-1 decision): `messaging.publish`,
+  `messaging.receive` and `messaging.contract.shape` reach a report only through a collector a suite
+  registers, and destinations are never aggregated by ProtoTest itself.
 
 ## Clock and time
 
@@ -173,8 +180,10 @@ audit plan.
   hide runner-integration breaks (Audit 3 class 7).
 - Registration-shape and report-markup tests are labelled `[Category("Characterization")]`; keep the
   label, they are deliberate refactoring brakes.
-- Shared doubles live in `tests/ProtoTest.TestSupport`. Do not copy temp-trace or `FreePort` helpers
-  into a new suite (audit TST-2).
+- Shared doubles and helpers live in `tests/ProtoTest.TestSupport` (`TemporaryTrace`,
+  `TestNetworking.FreePort`, `SingleConnectionListener`). `eng/lint.ps1` fails a local `FreePort`,
+  `ServeOnceAsync`, `TemporaryTrace` or `SingleConnectionListener` definition outside that project, so
+  the copies cannot drift back (audit TST-2).
 - **Parallel safety rests on per-test ownership, not on the runner policy.** Provisioning names from
   `context.TestId` (the `[CsmsOperator]` pattern) and predicates on test-owned ids are what make
   `ParallelScope.All` safe; the default id generator's random six-digit run prefix also keeps reruns
@@ -188,20 +197,32 @@ audit plan.
   (`4bafa6d`). The old collision (a locally-packed `prototest.* 1.0.1` in the global cache made package
   validation compare the package against itself) is the reason: local consumers use package-source
   mapping and clear `~/.nuget/packages/prototest.*` after a repack.
-- **The branch never meets CI.** `ci.yml` now includes `version/**` and a manual dispatch, but a
-  locally run stage still needs `eng/verify.ps1 -Stage <name>` so the evidence is recorded; the gate
-  auto-scopes to the change (docs-only stages skip lint/tests, code stages format only the projects they
-  touched) and takes `-Pack` when public surface/packaging changed, `-Full` for the CI shape.
-  **→ AUDIT TST-4.**
-- `eng/pack.ps1` is the per-stage pack gate; it verifies the packable set, READMEs, dependency edges
-  and PDB/DLL pairs. Run it whenever packaging changes, then re-pack for consumers before re-running
-  their restore.
-- `eng/check-docs.ps1`'s config-key cross-check depends on the gitignored `assets/internal/docs-facts`
-  and skips itself in CI; it cannot see whether a method name exists. Do not trust it for API
-  existence. **→ AUDIT TST-5.**
-- Six packages (`Hosting`, `Devices*`, `Web.Pages`) opt out of package validation with no rollover plan;
-  at 1.1 they flip to a new baseline. **→ AUDIT TST-5.**
-- `RELEASING.md` is gitignored; `cut-release.ps1` does not roll `[Unreleased]`. **→ AUDIT TST-5.**
+- **The branch meets CI.** `ci.yml` includes `version/**` and a manual dispatch, and every locally run
+  stage records its evidence through `eng/verify.ps1 -Stage <name>`; the gate auto-scopes to the change
+  (docs-only stages skip lint/tests, code stages format only the projects they touched) and takes
+  `-Pack` when public surface/packaging changed, `-Full` for the CI shape.
+- `eng/pack.ps1` is the per-stage pack gate; it verifies the packable set, READMEs, dependency edges,
+  PDB/DLL pairs and that a project disabling package validation carries a
+  `<PackageValidationOptOutReason>`. Run it whenever packaging changes, then re-pack for consumers
+  before re-running their restore.
+- **Package versions are pinned per target framework; raise them deliberately.**
+  `Directory.Packages.props` names the exact patch (`Microsoft.Extensions.*`, EF Core, Mvc.Testing,
+  Sqlite, Npgsql) and no longer enables central floating versions, so a restore cannot silently move a
+  patch under the suite.
+- `eng/check-docs.ps1` fails when a documented `Add*` name is not a method in `src/**` (a small
+  commented allowlist carries the framework and sample helpers the docs reference, such as
+  `AddEnvironmentVariables`, `AddMinutes` and `AddNorthstarDomain`), so a renamed `Add*` symbol cannot
+  stay green. The removed-symbol deny list is derived from `src/**/CompatibilitySuppressions.xml`:
+  CP0001 type removals by short name, CP0002 member removals as `DeclaringType.Member` while no
+  member of that name is left on the declaring type (a changed overload keeps the name), and CP0006 is
+  excluded because it means a member was added to an interface. The config-key cross-check still
+  depends on the gitignored `assets/internal/docs-facts` and skips itself in CI.
+- **The changelog is cut before tagging.** `eng/cut-release.ps1` rolls `[Unreleased]` into
+  `## [<version>] - <date>` from `Directory.Build.props` and fails on an empty section;
+  `.github/workflows/release.yml` refuses to create a GitHub Release without that section instead of
+  falling back to generated notes. `RELEASING.md` is tracked and is the release checklist; after a
+  release publishes, `PackageValidationBaselineVersion` moves to it and the now-baselined packages drop
+  their validation opt-out in the same pass.
 
 ## Repo hygiene
 

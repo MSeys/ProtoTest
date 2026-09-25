@@ -88,6 +88,20 @@ if ($unknown.Count -gt 0) {
     throw "eng/pack.ps1 lists projects that do not exist: $($unknown -join ', ')."
 }
 
+# A package may opt out of validation only while it has no released baseline, and the opt-out carries
+# its reason so the rollover cannot be forgotten. RELEASING.md's baseline rollover removes both.
+$optOutsWithoutReason = @()
+foreach ($project in $packable) {
+    $projectText = Get-Content -Raw -LiteralPath (Join-Path $repository $project)
+    if ($projectText -notmatch '<EnablePackageValidation>\s*false\s*</EnablePackageValidation>') { continue }
+    if ($projectText -notmatch '<PackageValidationOptOutReason>\s*\S.*?</PackageValidationOptOutReason>') {
+        $optOutsWithoutReason += $project
+    }
+}
+if ($optOutsWithoutReason.Count -gt 0) {
+    throw "Packable project(s) disable package validation without a <PackageValidationOptOutReason>: $($optOutsWithoutReason -join ', '). Record why the opt-out exists and when it rolls over (RELEASING.md, 'Baseline rollover')."
+}
+
 $output = if ([IO.Path]::IsPathRooted($OutputPath)) { $OutputPath } else { Join-Path $repository $OutputPath }
 $packArguments = @("--configuration", $Configuration, "--output", $output)
 if ($NoBuild) { $packArguments += "--no-build" }

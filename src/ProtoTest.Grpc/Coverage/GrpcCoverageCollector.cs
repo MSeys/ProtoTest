@@ -10,5 +10,5 @@ public sealed class GrpcCoverageCollector(string targetName)
         // gRPC service and method names are case-sensitive.
         StringComparer.Ordinal)
 {
-    public override string Category => ProtoGrpcBuilder.Protocol.CoverageCategory;
+    public override string Category => ProtoGrpcBuilder.Protocol.CoverageCategory ?? ProtoGrpcBuilder.Protocol.Name;
 }

@@ -407,7 +407,7 @@ public sealed class ProtoContainerResourceTests
     [Test]
     public async Task ReadyWhenTcp_ShouldWaitForThePortReadyOnSelects()
     {
-        var port = FreePort();
+        var port = TestNetworking.FreePort();
         using var listener = new TcpListener(IPAddress.Loopback, port);
         listener.Start();
         var container = new FakeContainer();
@@ -439,15 +439,6 @@ public sealed class ProtoContainerResourceTests
         var exception = Assert.Throws<InvalidOperationException>(() => resource.ReadyOn(2345));
         Assert.That(exception!.Message, Does.Contain("before the run starts"));
         await resource.DisposeAsync();
-    }
-
-    private static int FreePort()
-    {
-        var probe = new TcpListener(IPAddress.Loopback, 0);
-        probe.Start();
-        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
-        probe.Stop();
-        return port;
     }
 
     private sealed class TcpReadinessResource : ProtoContainerResource<FakeContainer>

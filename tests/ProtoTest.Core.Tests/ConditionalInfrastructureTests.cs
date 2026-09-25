@@ -9,50 +9,40 @@ public sealed class ConditionalInfrastructureTests
     public async Task AddInfrastructure_WhenEveryKeyIsConfigured_ShouldSkipTheProvider()
     {
         // Entries are what Enabled = false turns off and the "not owned" claim needs them.
-        var output = Path.Combine(Path.GetTempPath(), $"prototest-skip-{Guid.NewGuid():N}.prototrace");
-        try
-        {
-            var provider = new TrackingConnectionInfrastructure("database:tracked", "Host=container");
-            var builder = new ProtoHostBuilder();
-            builder.ConfigureTracing(options => options.OutputPath = output);
-            builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
-                new Dictionary<string, string?>
-                {
-                    ["ConnectionStrings:App"] = "Host=configured"
-                }));
-            builder.AddInfrastructure(provider, "ConnectionStrings:App");
-            await using var host = builder.Build();
-            await host.StartAsync();
-            await host.StartTestAsync("skipped", "00001", TestMethods.Placeholder);
-
-            var values = Proto.Context.TryService<ProtoInfrastructureSettings>()!.Values;
-            var configured = Proto.Context.Configuration["ConnectionStrings:App"];
-            await host.CompleteTestAsync(ProtoTestResult.Passed);
-            await host.StopAsync();
-
-            var snapshot = host.Trace.Snapshot();
-            var entity = snapshot.Entities!.Single(candidate => candidate.Id == "database:tracked");
-            Assert.Multiple(() =>
+        using var trace = new TemporaryTrace("skip");
+        var provider = new TrackingConnectionInfrastructure("database:tracked", "Host=container");
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = trace.Path);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
             {
-                Assert.That(provider.StartCount, Is.Zero, "the configured environment does not need the piece");
-                Assert.That(provider.ReleaseCount, Is.Zero, "a piece that never started is not released");
-                Assert.That(values.ContainsKey("ConnectionStrings:App"), Is.False, "the piece fills nothing");
-                Assert.That(configured, Is.EqualTo("Host=configured"));
-                Assert.That(entity.State["infrastructure.state"], Is.EqualTo("skipped"));
-                Assert.That(entity.State["infrastructure.reason"], Is.EqualTo("already configured"));
-                Assert.That(
-                    snapshot.Entries!.Any(entry => entry.Kind == "resource.owned"),
-                    Is.False,
-                    "a skipped piece is not recorded as owned");
-            });
-        }
-        finally
+                ["ConnectionStrings:App"] = "Host=configured"
+            }));
+        builder.AddInfrastructure(provider, "ConnectionStrings:App");
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("skipped", "00001", TestMethods.Placeholder);
+
+        var values = Proto.Context.TryService<ProtoInfrastructureSettings>()!.Values;
+        var configured = Proto.Context.Configuration["ConnectionStrings:App"];
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        var snapshot = host.Trace.Snapshot();
+        var entity = snapshot.Entities!.Single(candidate => candidate.Id == "database:tracked");
+        Assert.Multiple(() =>
         {
-            if (File.Exists(output))
-            {
-                File.Delete(output);
-            }
-        }
+            Assert.That(provider.StartCount, Is.Zero, "the configured environment does not need the piece");
+            Assert.That(provider.ReleaseCount, Is.Zero, "a piece that never started is not released");
+            Assert.That(values.ContainsKey("ConnectionStrings:App"), Is.False, "the piece fills nothing");
+            Assert.That(configured, Is.EqualTo("Host=configured"));
+            Assert.That(entity.State["infrastructure.state"], Is.EqualTo("skipped"));
+            Assert.That(entity.State["infrastructure.reason"], Is.EqualTo("already configured"));
+            Assert.That(
+                snapshot.Entries!.Any(entry => entry.Kind == "resource.owned"),
+                Is.False,
+                "a skipped piece is not recorded as owned");
+        });
     }
 
     [Test]

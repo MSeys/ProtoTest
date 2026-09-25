@@ -20,6 +20,39 @@ if (-not $NoRestore) {
     }
 }
 
+# One home for the shared test helpers (audit TST-2). A local definition of a helper that lives in
+# tests/ProtoTest.TestSupport fails here with the file and line, so the copies cannot drift back.
+# The rule is deliberately narrow: only the known helper names, not a general duplicate-code scan.
+$supportRoot = [IO.Path]::GetFullPath((Join-Path $repository "tests/ProtoTest.TestSupport"))
+$duplicationRules = @(
+    @{ Name = "FreePort"; Pattern = '\bstatic\b[^\r\n;{}=]*\bFreePort\s*\(' },
+    @{ Name = "ServeOnceAsync"; Pattern = '\bstatic\b[^\r\n;{}=]*\bServeOnceAsync\s*\(' },
+    @{ Name = "TemporaryTrace"; Pattern = '\bclass\s+TemporaryTrace\b' },
+    @{ Name = "SingleConnectionListener"; Pattern = '\bclass\s+SingleConnectionListener\b' }
+)
+
+$duplicates = New-Object System.Collections.Generic.List[string]
+$testFiles = Get-ChildItem -LiteralPath (Join-Path $repository "tests") -Recurse -File -Filter *.cs |
+    Where-Object {
+        -not $_.FullName.StartsWith($supportRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and
+        $_.FullName -notmatch '[\\/](bin|obj)[\\/]'
+    }
+
+foreach ($file in $testFiles) {
+    foreach ($rule in $duplicationRules) {
+        foreach ($match in Select-String -LiteralPath $file.FullName -Pattern $rule.Pattern) {
+            $relative = $file.FullName.Substring($repository.Length + 1).Replace('\', '/')
+            $duplicates.Add(("{0}:{1}: a local {2} belongs in tests/ProtoTest.TestSupport" -f $relative, $match.LineNumber, $rule.Name))
+        }
+    }
+}
+
+if ($duplicates.Count -gt 0) {
+    Write-Host "Test-support duplication found (audit TST-2):"
+    foreach ($duplicate in $duplicates) { Write-Host "  $duplicate" }
+    throw "use the shared helpers in tests/ProtoTest.TestSupport instead of copying them."
+}
+
 # The build enforces analyzers and the repository .editorconfig with warnings as errors; the format
 # check additionally proves no file needs rewriting. Both run on every verify so a style regression
 # fails the same run that would have introduced it.

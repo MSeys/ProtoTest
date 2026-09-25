@@ -9,47 +9,37 @@ public sealed class TestClockTests
     public async Task Clock_ShouldBePerTestSeededFromTheRunAndRecordedInTheTrace()
     {
         // Entries are what Enabled = false turns off; this test needs them, so it writes a temp archive.
-        var output = Path.Combine(Path.GetTempPath(), $"prototest-clock-{Guid.NewGuid():N}.prototrace");
-        try
+        using var trace = new TemporaryTrace("clock");
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureClock(new ProtoClock(Seed));
+        builder.ConfigureTracing(options => options.OutputPath = trace.Path);
+        await using var host = builder.Build();
+        await host.StartAsync();
+
+        await host.StartTestAsync("first", "00001", TestMethods.Placeholder);
+        var first = Proto.Context.Clock;
+        Assert.That(first.GetUtcNow(), Is.EqualTo(Seed), "a test clock starts where the run clock points");
+
+        first.Advance(TimeSpan.FromHours(5));
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        await host.StartTestAsync("second", "00002", TestMethods.Placeholder);
+        var second = Proto.Context.Clock;
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        var snapshot = host.Trace.Snapshot();
+        var firstTrace = snapshot.Tests.Single(test => test.Name == "first");
+        var advance = firstTrace.Entries.Single(entry => entry.Kind == "clock.advance");
+        var entity = firstTrace.Entities!.Single(candidate => candidate.Kind == ProtoTraceEntityKinds.Clock);
+        Assert.Multiple(() =>
         {
-            var builder = new ProtoHostBuilder();
-            builder.ConfigureClock(new ProtoClock(Seed));
-            builder.ConfigureTracing(options => options.OutputPath = output);
-            await using var host = builder.Build();
-            await host.StartAsync();
-
-            await host.StartTestAsync("first", "00001", TestMethods.Placeholder);
-            var first = Proto.Context.Clock;
-            Assert.That(first.GetUtcNow(), Is.EqualTo(Seed), "a test clock starts where the run clock points");
-
-            first.Advance(TimeSpan.FromHours(5));
-            await host.CompleteTestAsync(ProtoTestResult.Passed);
-
-            await host.StartTestAsync("second", "00002", TestMethods.Placeholder);
-            var second = Proto.Context.Clock;
-            await host.CompleteTestAsync(ProtoTestResult.Passed);
-            await host.StopAsync();
-
-            var snapshot = host.Trace.Snapshot();
-            var firstTrace = snapshot.Tests.Single(test => test.Name == "first");
-            var advance = firstTrace.Entries.Single(entry => entry.Kind == "clock.advance");
-            var entity = firstTrace.Entities!.Single(candidate => candidate.Kind == ProtoTraceEntityKinds.Clock);
-            Assert.Multiple(() =>
-            {
-                Assert.That(second.GetUtcNow(), Is.EqualTo(Seed), "the next test starts from the seed, not the previous test's advances");
-                Assert.That(first.GetUtcNow(), Is.EqualTo(Seed.AddHours(5)));
-                Assert.That(advance.Attributes["clock.delta"], Is.EqualTo("5:00:00"));
-                Assert.That(advance.EntityKind, Is.EqualTo(ProtoTraceEntityKinds.Clock));
-                Assert.That(entity.State["clock.utcNow"], Is.EqualTo(Seed.AddHours(5).ToString("O")));
-            });
-        }
-        finally
-        {
-            if (File.Exists(output))
-            {
-                File.Delete(output);
-            }
-        }
+            Assert.That(second.GetUtcNow(), Is.EqualTo(Seed), "the next test starts from the seed, not the previous test's advances");
+            Assert.That(first.GetUtcNow(), Is.EqualTo(Seed.AddHours(5)));
+            Assert.That(advance.Attributes["clock.delta"], Is.EqualTo("5:00:00"));
+            Assert.That(advance.EntityKind, Is.EqualTo(ProtoTraceEntityKinds.Clock));
+            Assert.That(entity.State["clock.utcNow"], Is.EqualTo(Seed.AddHours(5).ToString("O")));
+        });
     }
 
     [Test]

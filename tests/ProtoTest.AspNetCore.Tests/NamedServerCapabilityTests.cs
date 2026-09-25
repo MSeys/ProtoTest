@@ -123,6 +123,14 @@ public sealed class NamedServerCapabilityTests
                 capabilityIds,
                 Is.EqualTo(new[] { "server:ASP.NET Core:A", "server:ASP.NET Core:B" }),
                 "two named servers are two capabilities, not one collapsed descriptor");
+            Assert.That(
+                host.HasCapability(ProtoCapabilityKinds.Server, "ASP.NET Core"),
+                Is.True,
+                "the second argument matches the descriptor name");
+            Assert.That(
+                host.HasCapability(ProtoCapabilityKinds.Server, "A"),
+                Is.False,
+                "the second argument never matches the instance (A1R-05)");
         });
     }
 

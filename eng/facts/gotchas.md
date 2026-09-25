@@ -1,0 +1,235 @@
+# ProtoTest engineering facts — gotchas
+
+Verified traps, each with the action to take. Items marked **→ AUDIT** are open findings in
+`eng/audit-plan-4.md`; once fixed, replace the entry with the new behavior and keep the history in the
+audit plan.
+
+## Configuration timing
+
+- **A worker's `Program.Main` sees the run's configuration as arguments.** `AddWorkerHost` hands the
+  merged overlay (options over infrastructure settings over suite configuration) to the entry point as
+  `--{key}={value}` pairs, so `Host.CreateApplicationBuilder(args)`/`Host.CreateDefaultBuilder(args)`
+  see final-precedence values before their `Main` code runs; the `HostBuilding` in-memory overlay stays
+  as the fallback at `Build()`. A parameterless `Main` or one that does not pass its args to the
+  builder cannot see the overlay before `Build()` - an options factory or hosted service still does -
+  and it also does not receive `--contentRoot`/`--applicationName`, so it reads its own appsettings
+  from the test process's content root. Build the host from `args` when `Main` itself reads
+  configuration.
+- **`ProtoWorkerOptions.Set(key, null)` is an empty setting, not a dropped key.** `Set` stores an
+  empty value, so the worker sees the key as `""` in `Main` (command line) and at `Build` (in-memory
+  overlay) and a suite can deliberately clear a value the run provides. Nulls from the run's own
+  configuration are still not passed: the overlay carries no setting for them.
+- **A worker builder shape ProtoTest does not recognise fails loudly.** `Host.CreateApplicationBuilder`
+  and `WebApplication.CreateBuilder` (both `IHostApplicationBuilder`) and `Host.CreateDefaultBuilder`
+  (`IHostBuilder`) get the overlay and the run's clock; any other builder throws naming its type
+  instead of silently keeping its own configuration and `TimeProvider`.
+- **Eager configuration reads at registration are still wrong for addresses the run can provide
+  later.** A worker's `Main` now sees the run's static overlay (CFG-1 fixed), but a started piece's
+  published settings are resolved at use time, and a process that also runs standalone reads its own
+  environment. Resolve the address at use time (the P4f consumer rule) - this is what made the
+  reference product's publisher inert. **→ AUDIT CFG-2 / REF-2.**
+- **Static configuration decides `AddAspNetCoreServer`'s step-aside, not settings.** A settings-published
+  address does not step the in-process server aside (decided asymmetry); the address readers still
+  follow the published address, so give a published process its own application name when both must
+  coexist (the demo's standalone console is its own application).
+- **A suite's configuration has no environment source unless it adds one.** `ConfigureAppConfiguration`
+  composes exactly the sources it is passed; a configured-mode recipe's exported keys are invisible
+  until the setup adds `.AddEnvironmentVariables()`. Without it the containers still start and the
+  product still reads the exported addresses, so a green run proves nothing about the mode. (Found by
+  the OpenCSMS run, fixed in its `2cb949f`; R1a 1.7.)
+
+## Capabilities and registration
+
+- **Conditions are per declaration, not per descriptor.** A capability drops only when every
+  conditional declaration for it drops and no plain (unconditional) declaration exists. Two named
+  servers with one `BaseUrl` configured: the configured server steps aside, the other stays in-process
+  and its capability stays. The `capability.skipped` event names the deciding keys (`capability.keys`)
+  and the reason (`capability.reason`).
+- **`AddCapabilityWhenProvided` is the missing-address half of the rule.** It drops when none of its
+  keys is provided, where provided means a configured value or a key a registered infrastructure piece
+  declares - including a piece the build skips because configuration already fills its keys. Use it
+  when an address must exist for the integration to serve; `AddCapabilityUnlessConfigured` is the
+  environment-provides-it-elsewhere half.
+- **Capabilities that describe an instance carry it** (`ProtoCapabilityDescriptor.Instance`). Two
+  named servers are two capabilities and two run entities (`server:ASP.NET Core:A`), so configuring
+  one address drops only that server's capability. `HasCapability(kind)` matches any instance;
+  `HasCapability(kind, name)` matches the descriptor `Name`, not the instance.
+- **Only the web backend that wins the first-wins registration declares a browser capability.** The
+  losing Playwright/Selenium backend declares nothing, so `[RequiresCapability(browser, "Selenium")]`
+  cannot pass while Selenium never registered.
+- **`AddInProcessWebSocketDevices<TProgram>(application)` declares its transport capability
+  conditionally on the application's `BaseUrl`.** A published application drops the capability (the
+  socket transport serves); the capability only exists while the application is hosted in-process.
+- **`Build()` is terminal for every public registration entry that would mutate composition.** Hooks,
+  gates, capabilities, the clock, sinks, infrastructure and application entries throw the same
+  single-build message after `Build`; a captured application builder throws too. Internal registration
+  during `Build` uses the fields directly, so it stays composable. A repeated registration that is a
+  no-op by design before `Build` (the same server or worker name) stays a no-op.
+- **A conditional declaration's key set compares by content** (ordinal, duplicates removed,
+  order-independent), so registering the same declaration twice in any order leaves one declaration.
+- **First-wins guards can hide a conflict.** `AddWorkerHost` now compares the program: a repeated name
+  with a different program throws instead of being ignored. `AddAspNetCoreServer(name)` still wins by
+  name alone (A1R-01 residual): a different `TProgram` under one server name is a silent no-op.
+  The in-process device transport compares `(TProgram, application)` (audit DEV-1 fixed).
+
+## Addresses and readiness
+
+- **One address precedence: published settings → configuration, transport last.**
+  `ProtoApplication.ResolveSetting` (public forms `BaseUrl(context, app)` / `GrpcAddress(context, app)`)
+  is the only resolver readiness, REST/GraphQL/gRPC clients, web sessions and device clients use.
+  Configuring `BaseUrl` and starting a piece that publishes it are different decisions: the published
+  address wins at use time.
+- **`AddHttpReadiness` must be registered after the piece that publishes the address.** Probes are
+  awaited at their registration position; a probe registered first records `readiness.skipped` naming
+  the ordering and the later key instead of claiming "in-process". A truly in-process application
+  records "in-process"; an application with neither an address nor an in-process server records both
+  gaps. A configured address that is not an absolute HTTP/HTTPS URL fails the run start naming
+  `ProtoTest:Applications:{app}:BaseUrl` instead of being probed into a timeout.
+- **One readiness policy owns every wait.** `ConfigureReadiness`/`ProtoTest:Readiness` set
+  `ProtoReadinessOptions`, which governs host probes and every container the run starts through
+  `ProtoInfrastructureContext.Readiness`; a container started outside a host keeps its own
+  `ReadinessTimeout`/`ReadinessInterval`. `ProtoReadiness.WaitAsync` itself rides
+  `ProtoPolling.PollAsync`, so readiness shares the one interval/deadline loop with every other wait
+  (VOC-4 fixed); exceptions still mean "not ready yet" and the timeout message carries the last error.
+- **The consumer rule is adopted by `AddAspNetCoreServer`, the in-process device transport,
+  `UseRabbitMq`, `AddSql` (with `SqlOptions.AddressKeys`) and `AddEntityFrameworkCore` (same keys).**
+  A missing address means "inert +
+  capability absent" and tests skip. The HTTP family is the recorded A2b exception: one protocol
+  capability covers every client and an application-scoped client is legitimately served in-process,
+  so a missing address still fails at first use with the resolver message. Web's absolute-URL sessions
+  stay the documented domain exception.
+- **`SqlOptions.AddressKeys` is code-declared, not configuration-bindable.** `SqlAddressKeys.Add` (or a
+  `SqlOptions` instance registered before `AddSql`) is the only way in; the `ProtoTest:Sql:AddressKeys`
+  configuration section is ignored, because the Build-time capability decision committed the run to the
+  code-declared keys, and a key configuration adds later would make the runtime rule disagree with it.
+  `AddEntityFrameworkCore` follows the keys `AddSql` recorded when it is called after `AddSql`; called
+  first, it keeps the unconditional capability and the SQL keys are not part of its decision.
+- **Containers must declare every key they fill.** `AddInfrastructure` skips only when *all* declared
+  keys are configured; a missing one starts the container anyway (a configured CI without Docker then
+  fails). Check the README recipes for all keys.
+
+## Messaging
+
+- **A tap misses messages published before its destination is prepared.** `UseRabbitMq` declares the
+  destinations listed in `ProtoTest:Messaging:Destinations:<n>` during test setup; any other destination
+  is declared at the first `AwaitAsync`, so an act-then-await flow loses a message the act published.
+  Pre-bind every destination the act publishes to. (Canonical:
+  `tests/ProtoTest.Messaging.RabbitMq.Tests/RabbitMqTests.cs`; used by OpenCSMS `Setup.cs`.)
+- **`UseRabbitMq` declares the `Broker` capability conditionally on
+  `ProtoTest:Messaging:RabbitMq:ConnectionString`.** A run with a configured key or a broker container
+  that declares it keeps the capability; with neither it is absent and gated tests skip instead of
+  failing setup/first publish. A callback that sets `RabbitMqOptions.ConnectionString` in code provides
+  the address without a key and keeps the capability unconditional. An adapter registered with the
+  key-less `UseBroker(factory)` overload keeps the unconditional declaration too.
+- **A pre-bound destination still connects at test setup when the capability is present.** The
+  pre-bind failure mode is unchanged; the address rule only decides whether the run gets that far.
+- **`ProtoMessage` carries the exchange as `Destination` and drops the routing key.** Taps bind
+  destinations as exchanges, so a queue (a dead-letter queue) or an `(exchange, routingKey)` pair cannot
+  be awaited through the framework. Use a raw `RabbitMQ.Client` helper until the recorded REF-5 addition
+  ships (canonical: OpenCSMS `tests/OpenCsms.Suite/Support/RabbitMqRawClient.cs`).
+- **Messaging observations are evidence, not coverage.** The package ships no collector and the
+  protocol descriptor carries no coverage category (A5 VOC-1 decision): `messaging.publish`,
+  `messaging.receive` and `messaging.contract.shape` reach a report only through a collector a suite
+  registers, and destinations are never aggregated by ProtoTest itself.
+
+## Clock and time
+
+- **One `ProtoClockRegistry` belongs to each host.** `ProtoHost.FindClock(testId)` is an instance
+  lookup on the owning host, and the in-process ASP.NET request linking pushes the owning host's
+  clock; two hosts that share a `RunPrefix`/test id each resolve their own clock, a failed test start
+  removes its entry, context disposal removes it, and host disposal clears the registry. There is no
+  process-global clock map (CFG-3 fixed).
+- **`ProtoClock.Advance` moves under the clock's lock.** Concurrent advances on the run clock sum
+  instead of losing updates, and each advance records its own `clock.advance` (CFG-4 fixed).
+- **`ProtoRequestClock`'s ambient is restored, not revoked** (documented, CFG-4). A task started
+  inside a request captures the pushed clock in its own execution context and keeps it after the
+  scope and the test end; long-lived background work must read the run clock.
+- **Only `GetUtcNow` is virtual in `ProtoClock`; timers are real, and `DateTime.UtcNow` is unaffected.**
+  Application code that calls `DateTime.UtcNow` directly will not see the test clock; use
+  `TimeProvider`.
+
+## Devices
+
+- **In-process transports are keyed by `(TProgram, application)`.** Two applications, or two programs,
+  are two transports; `IProtoInProcessDeviceTransport.CanConnect(context, applicationName)` answers for
+  the requested application and the server factory it needs, so a client for application B is never
+  routed through application A's `TestServer` at the same path. A path-only client whose application
+  has no matching transport fails naming the application instead of trying another transport.
+- **The in-process path uses the registered `WebSocketDeviceOptions`.** They resolve from DI with the
+  transport (so `Validate` runs and a bad value fails when the device is created), and `ConnectTimeout`
+  bounds the in-process connect like the socket path. `ReceiveBufferBytes`/`KeepAliveInterval` feed the
+  same `WebSocketDeviceConnection` the socket path uses.
+- **`DeviceSession` has one conversation contract.** Connect is single-flight, sends are serialized,
+  one receive may be in flight (a second fails fast naming the device), and a send that races a
+  disconnect fails with a device error naming the device instead of a disposed-socket exception.
+  Sends and receives may run concurrently; do not fan out readers over one device.
+- **Device resource and entity ids include the device type**: `device:{client}:{type}:{id}`. Two device
+  types with one id on one client coexist, each with its own resource and entity.
+- **The release path is a disconnect.** Teardown disposes the connection, writes
+  `device.connected = false` and emits `device.disconnect`, so a test that never disconnects still ends
+  with a final disconnected state; an explicit `DisconnectAsync` then a send reconnects and records
+  both connects.
+
+## Tests and parallelism
+
+- NUnit test projects that already run in parallel link `tests/NUnitParallelization.cs`; the projects
+  that stay single-threaded do so because they share run-scoped resources (gRPC state was fixed; Sql,
+  Testcontainers and RabbitMQ share containers; Web shares browser pools; SampleApp.Domain shares
+  in-memory state). A new parallel suite needs an isolation story before it links the file.
+- Adapter tests must go through the runner (`dotnet test`). Tests that call lifecycle hooks directly
+  hide runner-integration breaks (Audit 3 class 7).
+- Registration-shape and report-markup tests are labelled `[Category("Characterization")]`; keep the
+  label, they are deliberate refactoring brakes.
+- Shared doubles and helpers live in `tests/ProtoTest.TestSupport` (`TemporaryTrace`,
+  `TestNetworking.FreePort`, `SingleConnectionListener`). `eng/lint.ps1` fails a local `FreePort`,
+  `ServeOnceAsync`, `TemporaryTrace` or `SingleConnectionListener` definition outside that project, so
+  the copies cannot drift back (audit TST-2).
+- **Parallel safety rests on per-test ownership, not on the runner policy.** Provisioning names from
+  `context.TestId` (the `[CsmsOperator]` pattern) and predicates on test-owned ids are what make
+  `ParallelScope.All` safe; the default id generator's random six-digit run prefix also keeps reruns
+  against a persistent database collision-free. A shared fixture or a fixed identifier reintroduces the
+  repeatability bug (REF-1).
+
+## Versioning, feeds and gates
+
+- **Branch packages must never reuse the published version.** `Directory.Build.props` carries
+  `1.1.0-alpha.<n>` and `eng/pack.ps1` refuses to pack the `PackageValidationBaselineVersion`
+  (`4bafa6d`). The old collision (a locally-packed `prototest.* 1.0.1` in the global cache made package
+  validation compare the package against itself) is the reason: local consumers use package-source
+  mapping and clear `~/.nuget/packages/prototest.*` after a repack.
+- **The branch meets CI.** `ci.yml` includes `version/**` and a manual dispatch, and every locally run
+  stage records its evidence through `eng/verify.ps1 -Stage <name>`; the gate auto-scopes to the change
+  (docs-only stages skip lint/tests, code stages format only the projects they touched) and takes
+  `-Pack` when public surface/packaging changed, `-Full` for the CI shape.
+- `eng/pack.ps1` is the per-stage pack gate; it verifies the packable set, READMEs, dependency edges,
+  PDB/DLL pairs and that a project disabling package validation carries a
+  `<PackageValidationOptOutReason>`. Run it whenever packaging changes, then re-pack for consumers
+  before re-running their restore.
+- **Package versions are pinned per target framework; raise them deliberately.**
+  `Directory.Packages.props` names the exact patch (`Microsoft.Extensions.*`, EF Core, Mvc.Testing,
+  Sqlite, Npgsql) and no longer enables central floating versions, so a restore cannot silently move a
+  patch under the suite.
+- `eng/check-docs.ps1` fails when a documented `Add*` name is not a method in `src/**` (a small
+  commented allowlist carries the framework and sample helpers the docs reference, such as
+  `AddEnvironmentVariables`, `AddMinutes` and `AddNorthstarDomain`), so a renamed `Add*` symbol cannot
+  stay green. The removed-symbol deny list is derived from `src/**/CompatibilitySuppressions.xml`:
+  CP0001 type removals by short name, CP0002 member removals as `DeclaringType.Member` while no
+  member of that name is left on the declaring type (a changed overload keeps the name), and CP0006 is
+  excluded because it means a member was added to an interface. The config-key cross-check still
+  depends on the gitignored `assets/internal/docs-facts` and skips itself in CI.
+- **The changelog is cut before tagging.** `eng/cut-release.ps1` rolls `[Unreleased]` into
+  `## [<version>] - <date>` from `Directory.Build.props` and fails on an empty section;
+  `.github/workflows/release.yml` refuses to create a GitHub Release without that section instead of
+  falling back to generated notes. `RELEASING.md` is tracked and is the release checklist; after a
+  release publishes, `PackageValidationBaselineVersion` moves to it and the now-baselined packages drop
+  their validation opt-out in the same pass.
+
+## Repo hygiene
+
+- `assets/internal/` is gitignored (`.gitignore:488`). Its `docs-facts/` set was written at `db9d7aa`
+  against `0.1.0-alpha` and is **archived input, not guidance**. The `.opencode/skills` file references
+  several `assets/internal/*` files that no longer exist for that reason. Engineering facts now live in
+  `eng/facts/` (tracked).
+- The viewer must not be started from an agent shell (a detached dev server keeps the session
+  attached and looks like a hang). See `.opencode/skills/prototrace-design/SKILL.md`.
+- The docs site and viewer have their own stylelint/typecheck gates; run them for UI changes.

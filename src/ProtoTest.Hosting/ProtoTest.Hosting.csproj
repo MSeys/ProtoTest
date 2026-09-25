@@ -9,6 +9,7 @@
     <!-- New in 1.1: no released baseline exists yet, so there is nothing to validate against. -->
     <IsPackable>true</IsPackable>
     <EnablePackageValidation>false</EnablePackageValidation>
+    <PackageValidationOptOutReason>New in 1.1; no released baseline exists yet. Validate against the 1.1.0 baseline after it publishes (RELEASING.md).</PackageValidationOptOutReason>
     <Description>Run background workers and generic hosts in-process with a ProtoTest suite.</Description>
     <PackageTags>testing;integration-testing;worker;generic-host;backgroundservice;dotnet</PackageTags>
   </PropertyGroup>

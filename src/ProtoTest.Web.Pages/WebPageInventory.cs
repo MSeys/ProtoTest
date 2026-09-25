@@ -12,6 +12,12 @@ public static class WebPageInventory
     /// <summary>The observation kind an available page is recorded under; every producer uses it.</summary>
     public const string AvailableObservationKind = "web.page.available";
 
+    /// <summary>The observation kind a page the session opened is recorded under; it is evidence, not coverage.</summary>
+    public const string VisitedObservationKind = "web.page.visited";
+
+    /// <summary>The observation kind a passing page assertion is recorded under; only this kind marks a page covered.</summary>
+    public const string VerifiedObservationKind = "web.page.verified";
+
     /// <summary>The metadata key naming the producer that recorded an inventory entry.</summary>
     public const string SourceMetadataKey = "web.page.source";
 

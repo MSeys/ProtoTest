@@ -158,7 +158,8 @@ Hidden sheets are skipped unless `ProtoTest:Sheets:IncludeHiddenSheets` (or the 
 - `sheets.open` (source `ProtoTest.Sheets`) carries `sheets.name` and a Fields section listing every sheet read as `name · {rows}x{columns}[ hidden]`.
 - `sheets.model` carries `sheets.sheet` and `sheets.columns` when a typed model is read.
 - Every assertion is an `assert.sheets` operation with attributes such as `sheets.cell`, `sheets.header`, `sheets.range`, `sheets.column`, `sheets.expected` and `sheets.actual`. The operation opens before the check, so a failure still leaves evidence with the fixed polarity.
-- Reading a cell or range records a `sheets.range` observation (`"{Sheet}!{reference}"`), and opening a workbook records `sheets.workbook` with a `sheets.count` metadata value. `SheetsCoverageCollector` (category `Sheets`) aggregates the range reads.
+- Reading a cell or range records a `sheets.range` observation (`"{Sheet}!{reference}"`); `SheetsCoverageCollector` (category `Sheets`) aggregates those reads.
+- Opening a workbook records a `sheets.workbook` observation with a `sheets.count` metadata value. It is evidence, not coverage: opening a workbook is not an assertion and covers nothing, so only `sheets.range` marks a range covered.
 
 Reads are recorded by cell and range reads, `Table.Column`, `RowWhere`, `Rows`, the `ProtoTableRow` indexer, and model `Rows`, `Column` and `Verify`. Building a table view records nothing, and a malformed reference throws before any read is recorded. Coverage therefore means **"verified"**, not "present in the file":
 
@@ -187,7 +188,7 @@ The capability is name `"Sheets"`, kind `document` (`ProtoCapabilityKinds.Docume
 - **Dates are a heuristic.** A numeric cell counts as a date when its style or number format says so; the rule is not a schema.
 - **Cached formula values only.** ProtoTest never recalculates; the formula text and the cached result are what the file holds.
 - **`ShouldAll` has no negated counterpart**, and typed columns read the whole declared range whether or not the test looks at every value.
-- **Coverage is read-based.** A column present in the file but never read is uncovered; hidden sheets are excluded by default.
+- **Coverage is read-based.** A column present in the file but never read is uncovered; hidden sheets are excluded by default. Opening a workbook records `sheets.workbook` evidence but covers nothing.
 - **Header paths are ordinal.** Matching is case-sensitive, and a suffix match is only allowed when exactly one column matches.
 
 ## Links

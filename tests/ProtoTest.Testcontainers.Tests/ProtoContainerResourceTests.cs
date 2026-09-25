@@ -1,5 +1,6 @@
 namespace ProtoTest.Testcontainers.Tests;
 
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -345,6 +346,40 @@ public sealed class ProtoContainerResourceTests
         Assert.That(resource.IsStarted, Is.True);
     }
 
+    [Test]
+    public async Task StartAsync_UnderAHost_ShouldUseTheRunReadinessTimeout()
+    {
+        var container = new FakeContainer();
+        var resource = new ReadinessResource(
+            () => container,
+            "port answers",
+            (_, _) => ValueTask.FromResult(false),
+            TimeSpan.FromSeconds(30));
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureReadiness(options =>
+        {
+            options.Timeout = TimeSpan.FromMilliseconds(200);
+            options.Interval = TimeSpan.FromMilliseconds(20);
+        });
+        builder.AddInfrastructure(resource, "ConnectionStrings:NeverReady");
+        await using var host = builder.Build();
+
+        var stopwatch = Stopwatch.StartNew();
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () => await host.StartAsync());
+        stopwatch.Stop();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                exception!.Message,
+                Does.Contain("0.2s").Or.Contain("0,2s"),
+                "ConfigureReadiness governs the container wait, not the container's private 30 s default");
+            Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(10)));
+            Assert.That(container.DisposeCount, Is.EqualTo(1), "a container that never became ready is released");
+        });
+    }
+
     private sealed class ReadinessResource : ProtoContainerResource<FakeContainer>
     {
         public ReadinessResource(
@@ -372,7 +407,7 @@ public sealed class ProtoContainerResourceTests
     [Test]
     public async Task ReadyWhenTcp_ShouldWaitForThePortReadyOnSelects()
     {
-        var port = FreePort();
+        var port = TestNetworking.FreePort();
         using var listener = new TcpListener(IPAddress.Loopback, port);
         listener.Start();
         var container = new FakeContainer();
@@ -404,15 +439,6 @@ public sealed class ProtoContainerResourceTests
         var exception = Assert.Throws<InvalidOperationException>(() => resource.ReadyOn(2345));
         Assert.That(exception!.Message, Does.Contain("before the run starts"));
         await resource.DisposeAsync();
-    }
-
-    private static int FreePort()
-    {
-        var probe = new TcpListener(IPAddress.Loopback, 0);
-        probe.Start();
-        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
-        probe.Stop();
-        return port;
     }
 
     private sealed class TcpReadinessResource : ProtoContainerResource<FakeContainer>

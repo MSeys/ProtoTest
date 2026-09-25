@@ -297,5 +297,32 @@ public sealed class ApplicationRestTests
         Assert.That(handler.LastRequest!.RequestUri, Is.EqualTo(new Uri("http://transport.test/api/v1/orders/42")));
     }
 
+    [Test]
+    public async Task Rest_ShouldResolveAnAddressPublishedByInfrastructure()
+    {
+        var handler = new TestHttpMessageHandler
+        {
+            ResponseFactory = () => new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        };
+        var builder = new ProtoHostBuilder();
+        builder.AddInfrastructure(
+            new PublishedAddressInfrastructure("ControlPlane", "http://published.test:5080/"),
+            "ProtoTest:Applications:ControlPlane:BaseUrl");
+        builder.AddApplication("ControlPlane", app => app.AddRest(rest => rest.AddClient(
+            "Orders",
+            configure: http => http.ConfigurePrimaryHttpMessageHandler(() => handler))));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync(
+            "rest published address", TestMethods.Placeholder, [new ApplicationAttribute("ControlPlane")]);
 
+        using var response = await context.Rest("Orders").GetAsync("orders/42");
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        Assert.That(
+            handler.LastRequest!.RequestUri,
+            Is.EqualTo(new Uri("http://published.test:5080/orders/42")),
+            "the client resolves the address a settings piece published, not only static configuration");
+    }
 }

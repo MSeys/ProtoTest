@@ -1,5 +1,6 @@
 namespace ProtoTest.Hosting.TestWorker;
 
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -13,11 +14,80 @@ public sealed class Program
     public static void Main(string[] args)
     {
         var builder = Host.CreateApplicationBuilder(args);
+        WorkerMainCapture.Capture(builder.Configuration);
         builder.Services.AddSingleton<WorkerProbe>();
         builder.Services.AddHostedService<ProbeWorker>();
         builder.Build().Run();
     }
 }
+
+/// <summary>
+/// Captures what the worker's <see cref="Program.Main"/> read from its own configuration before the host
+/// was built, keyed by a probe id the starting test sets on its flow. The run hands the merged overlay
+/// to the entry point as command-line arguments (audit CFG-1), so a worker that builds from its args
+/// sees final-precedence values inside <c>Main</c>; this probe is how that is asserted.
+/// </summary>
+public static class WorkerMainCapture
+{
+    private static readonly AsyncLocal<string?> ProbeId = new();
+    private static readonly ConcurrentDictionary<string, WorkerMainProbe> Probes = new(StringComparer.Ordinal);
+
+    /// <summary>Marks the current flow as the one a worker's entry point will run on.</summary>
+    public static IDisposable Begin(string probeId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(probeId);
+        var previous = ProbeId.Value;
+        ProbeId.Value = probeId;
+        return new Scope(previous);
+    }
+
+    /// <summary>What <c>Main</c> saw for a probe id, or <see langword="null"/> when the entry point did not run.</summary>
+    public static WorkerMainProbe? Find(string probeId) =>
+        Probes.TryGetValue(probeId, out var probe) ? probe : null;
+
+    internal static void Capture(IConfiguration configuration)
+    {
+        if (ProbeId.Value is not { } probeId)
+        {
+            return;
+        }
+
+        Probes[probeId] = new WorkerMainProbe(
+            configuration["Worker:Value"],
+            configuration["Worker:FromConfig"],
+            configuration["Worker:FromRun"],
+            configuration["Worker:Probe"],
+            configuration.GetConnectionString("WorkerProbe"));
+    }
+
+    private sealed class Scope(string? previous) : IDisposable
+    {
+        private int _disposed;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                ProbeId.Value = previous;
+            }
+        }
+    }
+}
+
+/// <summary>
+/// A second entry-point-shaped type in this assembly, for the same-name/different-program guard (audit
+/// DEV-6): <c>AddWorkerHost</c> resolves the host factory from the assembly's entry point, so any class
+/// in the assembly can stand in for a different program in a registration-conflict test.
+/// </summary>
+public sealed class OtherWorkerProgram;
+
+/// <summary>What the worker's entry point read in <c>Main</c>, before its host was built.</summary>
+public sealed record WorkerMainProbe(
+    string? Value,
+    string? ConfigValue,
+    string? RunValue,
+    string? Probe,
+    string? ConnectionString);
 
 /// <summary>What the worker's hosted service observed, for tests to assert against.</summary>
 public sealed class WorkerProbe

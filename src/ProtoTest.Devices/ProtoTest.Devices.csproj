@@ -9,6 +9,7 @@
     <!-- New in 1.1: no released baseline exists yet, so there is nothing to validate against. -->
     <IsPackable>true</IsPackable>
     <EnablePackageValidation>false</EnablePackageValidation>
+    <PackageValidationOptOutReason>New in 1.1; no released baseline exists yet. Validate against the 1.1.0 baseline after it publishes (RELEASING.md).</PackageValidationOptOutReason>
     <Description>Talk to devices - simulators or hardware - from the same test context, lifecycle and trace.</Description>
     <PackageTags>testing;integration-testing;devices;iot;ocpp;dotnet</PackageTags>
   </PropertyGroup>

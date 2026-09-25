@@ -15,13 +15,34 @@ public sealed class ProtoMessagingBuilder
     internal Func<IServiceProvider, IProtoMessageBroker>? AdapterFactory { get; private set; }
 
     /// <summary>
+    /// The configuration keys the configured adapter reads its address from; empty for an adapter that
+    /// does not declare them, which keeps the <c>Broker</c> capability unconditional.
+    /// </summary>
+    internal IReadOnlyList<string> BrokerAddressKeys { get; private set; } = [];
+
+    /// <summary>
     /// Replaces the default in-memory broker with an adapter, for example RabbitMQ. The broker the
     /// factory returns is owned by ProtoTest: it is released with the run.
     /// </summary>
     public ProtoMessagingBuilder UseBroker(Func<IServiceProvider, IProtoMessageBroker> factory)
+        => UseBroker(factory, []);
+
+    /// <summary>
+    /// Replaces the default in-memory broker with an adapter that reads its address from
+    /// <paramref name="addressKeys"/>. The <c>Broker</c> capability is then declared only while at
+    /// least one key can provide an address - a configured value, or a key registered infrastructure
+    /// declares and fills when it starts - so a run without one skips instead of failing at setup or
+    /// first use. An adapter that provides its address without configuration keys keeps the
+    /// unconditional declaration. The broker the factory returns is owned by ProtoTest: it is released
+    /// with the run.
+    /// </summary>
+    public ProtoMessagingBuilder UseBroker(
+        Func<IServiceProvider, IProtoMessageBroker> factory,
+        params string[] addressKeys)
     {
         ArgumentNullException.ThrowIfNull(factory);
         AdapterFactory = factory;
+        BrokerAddressKeys = addressKeys ?? [];
         return this;
     }
 
@@ -41,7 +62,11 @@ public static class ProtoHostBuilderExtensions
     /// <summary>
     /// Adds the messaging capability: publish and await messages over a broker. Without an adapter the
     /// run uses the in-memory broker, so the API works anywhere; a real adapter replaces it, registers
-    /// the Broker capability and is released with the run as an owned resource.
+    /// the Broker capability and is released with the run as an owned resource. An adapter that
+    /// declares its address keys (see
+    /// <see cref="ProtoMessagingBuilder.UseBroker(Func{IServiceProvider, IProtoMessageBroker}, string[])"/>)
+    /// declares the capability conditionally: it is absent while no key can provide the address, so
+    /// <c>[RequiresCapability(ProtoCapabilityKinds.Broker)]</c> skips instead of failing.
     /// </summary>
     /// <remarks>
     /// A repeated call is not a no-op: its <c>configure</c> callback always runs, so a later call can add
@@ -72,7 +97,26 @@ public static class ProtoHostBuilderExtensions
                     ProtoResourceScope.Run));
             }
 
-            registration.Configure(services, messaging.AdapterFactory);
+            if (!registration.Configure(services, messaging.AdapterFactory))
+            {
+                return;
+            }
+
+            // A real adapter is what makes the Broker capability true: the in-memory default is a test
+            // double, so [RequiresCapability(ProtoCapabilityKinds.Broker)] skips where no broker is
+            // reachable and runs where one is, instead of always passing against the double. An
+            // adapter that names its address keys is honest in both directions: a run with neither a
+            // configured value nor a piece that declares one drops the capability and skips.
+            var capability = new ProtoCapabilityDescriptor(
+                ProtoMessagingProtocol.Protocol.Name, ProtoCapabilityKinds.Broker, ProtoMessagingProtocol.Protocol.TraceSource);
+            if (messaging.BrokerAddressKeys.Count == 0)
+            {
+                builder.AddCapability(capability);
+            }
+            else
+            {
+                builder.AddCapabilityWhenProvided(capability, [.. messaging.BrokerAddressKeys]);
+            }
         });
         return builder;
     }
@@ -106,15 +150,16 @@ public static class ProtoHostBuilderExtensions
 
         /// <summary>
         /// Applies this call's adapter, if any. An adapter always replaces the in-memory default, so a
-        /// later call can supply one; the first adapter configured wins.
+        /// later call can supply one; the first adapter configured wins. Returns whether this call's
+        /// adapter is the one that will serve, so the caller declares the capability for it once.
         /// </summary>
-        public void Configure(IServiceCollection services, Func<IServiceProvider, IProtoMessageBroker>? adapterFactory)
+        public bool Configure(IServiceCollection services, Func<IServiceProvider, IProtoMessageBroker>? adapterFactory)
         {
             if (adapterFactory is not null)
             {
                 if (_adapterConfigured)
                 {
-                    return;
+                    return false;
                 }
 
                 _adapterConfigured = true;
@@ -125,9 +170,7 @@ public static class ProtoHostBuilderExtensions
                     Holder.Attach(broker);
                     return broker;
                 });
-                services.AddSingleton(new ProtoCapabilityDescriptor(
-                    ProtoMessagingProtocol.Protocol.Name, ProtoCapabilityKinds.Broker, ProtoMessagingProtocol.Protocol.TraceSource));
-                return;
+                return true;
             }
 
             // A real adapter is what makes the Broker capability true: the in-memory default is a test
@@ -142,6 +185,8 @@ public static class ProtoHostBuilderExtensions
                     return broker;
                 });
             }
+
+            return false;
         }
     }
 }

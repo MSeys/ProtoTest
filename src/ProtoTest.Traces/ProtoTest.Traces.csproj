@@ -4,6 +4,7 @@
     <IsPackable>true</IsPackable>
     <!-- New in 1.1: no baseline package exists yet; enable once 1.1 ships. -->
     <EnablePackageValidation>false</EnablePackageValidation>
+    <PackageValidationOptOutReason>New in 1.1; no released baseline exists yet. Validate against the 1.1.0 baseline after it publishes (RELEASING.md).</PackageValidationOptOutReason>
     <PackageId>ProtoTest.Traces</PackageId>
     <Description>Reader for .prototrace archives: the run, its tests and each test's operations without a dependency on ProtoTest.Core.</Description>
     <PackageTags>testing;trace;diagnostics;reader;dotnet</PackageTags>

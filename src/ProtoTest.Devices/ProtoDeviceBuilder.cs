@@ -93,6 +93,7 @@ public sealed class ProtoDeviceBuilder
 
         var registration = new DeviceClientRegistration(name)
         {
+            ApplicationName = ApplicationName,
             ResolveAddress = resolveAddress,
             Path = path,
             TransportName = transportName

@@ -19,7 +19,9 @@ internal static class NorthstarDomainAccess
     {
         if (InProcess(execution))
         {
-            return execution.ApplicationServices<Program>(ApplicationName(execution))
+            // The in-process application is the domain's writer whatever application a test targets:
+            // a console test still provisions through it, so events and the outbox behave as coded.
+            return execution.ApplicationServices<Program>(NorthstarTargets.Api)
                 .GetRequiredService<NorthstarStore>();
         }
 
@@ -34,7 +36,9 @@ internal static class NorthstarDomainAccess
 
     public static Uri ApiBaseUrl(ProtoExecutionContext execution)
     {
-        var configured = execution.Configuration[$"ProtoTest:Applications:{ApplicationName(execution)}:BaseUrl"];
+        // The application-setting precedence: an address the run published wins over configuration,
+        // so a console test records the standalone process's address.
+        var configured = ProtoApplication.BaseUrl(execution, ApplicationName(execution));
         if (!string.IsNullOrWhiteSpace(configured))
         {
             return new Uri(configured);
@@ -42,7 +46,7 @@ internal static class NorthstarDomainAccess
 
         if (InProcess(execution))
         {
-            return execution.ServerFactory<Program>(ApplicationName(execution)).Server.BaseAddress;
+            return execution.ServerFactory<Program>(NorthstarTargets.Api).Server.BaseAddress;
         }
 
         return new Uri("http://localhost");

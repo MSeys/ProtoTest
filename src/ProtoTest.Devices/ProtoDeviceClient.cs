@@ -44,14 +44,16 @@ public sealed class ProtoDeviceClient
         }
 
         // An in-process transport wins when it applies, so the same registration works whether the
-        // application runs in the test process or behind an address.
+        // application runs in the test process or behind an address. The transport must serve the
+        // client's own application: a client for application B must never be routed through
+        // application A's TestServer, even when both expose the same path (audit DEV-1).
         var transports = _context.Service<IEnumerable<IProtoDeviceTransport>>().ToArray();
         var endpoint = new DeviceEndpoint(deviceId, string.Empty);
         var inProcess = _registration.Path is null
             ? null
             : transports
                 .OfType<IProtoInProcessDeviceTransport>()
-                .FirstOrDefault(candidate => candidate.CanConnect(_context, endpoint));
+                .FirstOrDefault(candidate => candidate.CanConnect(_context, _registration.ApplicationName));
         IProtoDeviceTransport transport;
         string address;
         if (inProcess is not null)
@@ -61,20 +63,31 @@ public sealed class ProtoDeviceClient
         }
         else
         {
+            if (_registration.Path is not null && _registration.ResolveAddress is null)
+            {
+                // The client has an in-process path and no address to fall back to, so a missing
+                // matching transport is a configuration error, not a reason to try another transport.
+                var application = _registration.ApplicationName ?? "(no application)";
+                throw new InvalidOperationException(
+                    $"Device client '{Name}' expects the in-process application '{application}' at " +
+                    $"'{_registration.Path}', but no in-process transport serves it. Register it with " +
+                    $"AddInProcessWebSocketDevices<TProgram>(\"{application}\"), or give the client an address resolver.");
+            }
+
             transport = ResolveTransport(transports);
             address = ResolveAddress(deviceId);
         }
 
         endpoint = endpoint with { Address = address };
         var protocol = ResolveProtocol();
-        var session = new DeviceSession(_context, Name, transport, endpoint, protocol);
+        var session = new DeviceSession(_context, Name, typeof(TDevice), transport, endpoint, protocol);
 
         var device = Activator.CreateInstance<TDevice>() ?? throw new InvalidOperationException(
             $"{typeof(TDevice).FullName} could not be created; device classes need a public parameterless constructor.");
         device.Attach(session);
         _context.RegisterClient(device, key);
         _context.RegisterResource(ProtoResource.From(
-            $"device:{Name}:{deviceId}",
+            $"device:{Name}:{typeof(TDevice).Name}:{deviceId}",
             "device",
             $"{typeof(TDevice).Name} · {deviceId}",
             (release, _) => session.DisposeAsync()));

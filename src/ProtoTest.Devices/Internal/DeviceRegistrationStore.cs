@@ -11,6 +11,9 @@ internal sealed class DeviceClientRegistration(string name)
 {
     public string Name { get; } = name;
 
+    /// <summary>The application the client was registered under, or null for a host-level client.</summary>
+    public string? ApplicationName { get; set; }
+
     /// <summary>Resolves the address for one device id.</summary>
     public Func<ProtoExecutionContext, string, string>? ResolveAddress { get; set; }
 

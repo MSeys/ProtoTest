@@ -13,7 +13,8 @@ workbook.Sheet("Summary").Cell("B1").Should.Be(42.0);
 workbook.Sheet("Sales").Model<SalesRow>().Verify();
 ```
 
-Workbook reads and assertions are recorded in the trace and can contribute to Sheets coverage.
+Workbook reads and assertions are recorded in the trace; cell and range reads contribute to Sheets
+coverage, while opening a workbook is recorded as `sheets.workbook` evidence and covers nothing.
 
 The package is read-only and supports OpenXML `.xlsx` files, not `.xls` or CSV.
 

@@ -1,7 +1,6 @@
 namespace ProtoTest.Grpc.Clients;
 
 using global::Grpc.Net.Client;
-using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 using ProtoTest.Http;
 
@@ -28,7 +27,7 @@ public sealed class ProtoGrpcClientInitializer(
 
     public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
     {
-        var configured = ResolveConfiguredAddress(context.Configuration);
+        var configured = ResolveConfiguredAddress(context);
         if (configured is null && !allowMissingAddress)
         {
             return Task.FromResult(false);
@@ -39,6 +38,7 @@ public sealed class ProtoGrpcClientInitializer(
             : explicitAddress is null ? "configuration" : "registration";
         var client = new ProtoGrpcClient(context, Name, options, (_, ct) => CreateChannelAsync(
             context,
+            Name,
             configured,
             addressResolver,
             application,
@@ -48,7 +48,7 @@ public sealed class ProtoGrpcClientInitializer(
         return Task.FromResult(true);
     }
 
-    private Uri? ResolveConfiguredAddress(IConfiguration configuration)
+    private Uri? ResolveConfiguredAddress(ProtoExecutionContext context)
     {
         if (!string.IsNullOrWhiteSpace(explicitAddress))
         {
@@ -56,8 +56,10 @@ public sealed class ProtoGrpcClientInitializer(
         }
 
         var applicationName = application ?? Name;
-        var configured = ProtoApplication.Section(configuration, applicationName)["Grpc:Address"]
-            ?? ProtoApplication.BaseUrl(configuration, applicationName);
+        // The one application-address precedence - settings first, configuration second - for both the
+        // gRPC address and the base-address fallback.
+        var configured = ProtoApplication.GrpcAddress(context, applicationName)
+            ?? ProtoApplication.BaseUrl(context, applicationName);
         return string.IsNullOrWhiteSpace(configured) ? null : ParseAddress(configured);
     }
 
@@ -69,6 +71,7 @@ public sealed class ProtoGrpcClientInitializer(
 
     private static async ValueTask<GrpcChannel> CreateChannelAsync(
         ProtoExecutionContext context,
+        string clientName,
         Uri? configured,
         Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>>? addressResolver,
         string? application,
@@ -82,10 +85,14 @@ public sealed class ProtoGrpcClientInitializer(
             ?? transport?.BaseAddress;
         if (address is null)
         {
+            var applicationName = application ?? clientName;
+            var scope = application is null
+                ? $"client '{clientName}'"
+                : $"client '{clientName}' in application '{application}'";
             throw new InvalidOperationException(
-                "No gRPC address is available for this client. Pass one to AddClient, set " +
-                "'ProtoTest:Applications:{app}:Grpc:Address' or 'BaseUrl', or back the application with " +
-                "AddAspNetCoreServer.");
+                $"No gRPC address is available for {scope}. Pass one to AddClient, set " +
+                $"'{ProtoApplication.SectionPath}:{applicationName}:Grpc:Address' or 'BaseUrl', or back " +
+                "the application with AddAspNetCoreServer.");
         }
 
         // An address that came from the application's in-process transport runs over the test server.

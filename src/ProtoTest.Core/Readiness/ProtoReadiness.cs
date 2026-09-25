@@ -1,11 +1,10 @@
 namespace ProtoTest.Core;
 
-using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Sockets;
 
 /// <summary>What a readiness wait observed, for the trace evidence and failure messages.</summary>
-public sealed record ProtoReadinessResult(int Attempts, TimeSpan Waited, string? LastError);
+public sealed record ProtoReadinessResult(int Attempts, TimeSpan Waited);
 
 /// <summary>The readiness checks and the wait loop the host, containers and applications share.</summary>
 public static class ProtoReadiness
@@ -69,7 +68,9 @@ public static class ProtoReadiness
     /// <summary>
     /// Polls a check until it returns <see langword="true"/> or the timeout expires. Exceptions count as
     /// "not ready yet" and are remembered as the last error, so a refused connection while a container
-    /// boots is normal; a timeout throws with the name, the attempts and the last error.
+    /// boots is normal; a timeout throws with the name, the attempts and the last error. The wait rides
+    /// <see cref="ProtoPolling.PollAsync{T}"/>, so readiness shares one interval and deadline rule with
+    /// every other wait in the framework.
     /// </summary>
     public static async ValueTask<ProtoReadinessResult> WaitAsync(
         string name,
@@ -83,43 +84,48 @@ public static class ProtoReadiness
         if (timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout), timeout, "The readiness timeout must be positive.");
         if (interval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(interval), interval, "The readiness interval must be positive.");
 
-        var stopwatch = Stopwatch.StartNew();
         var attempts = 0;
         string? lastError = null;
-        while (true)
+        var result = await ProtoPolling.PollAsync(
+            async token =>
+            {
+                attempts++;
+                try
+                {
+                    if (await check(token).ConfigureAwait(false))
+                    {
+                        return true;
+                    }
+
+                    lastError = null;
+                    return false;
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    lastError = $"{exception.GetType().Name}: {exception.Message}";
+                    return false;
+                }
+            },
+            ready => ready,
+            timeout,
+            interval,
+            cancellationToken).ConfigureAwait(false);
+
+        if (!result.Satisfied)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            attempts++;
-            try
+            var message = $"Readiness probe '{name}' was not satisfied within {timeout.TotalSeconds:0.#}s after {attempts} attempt(s).";
+            if (lastError is not null)
             {
-                if (await check(cancellationToken).ConfigureAwait(false))
-                {
-                    return new ProtoReadinessResult(attempts, stopwatch.Elapsed, lastError);
-                }
-
-                lastError = null;
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                lastError = $"{exception.GetType().Name}: {exception.Message}";
+                message += $" Last error: {lastError}";
             }
 
-            if (stopwatch.Elapsed >= timeout)
-            {
-                var message = $"Readiness probe '{name}' was not satisfied within {timeout.TotalSeconds:0.#}s after {attempts} attempt(s).";
-                if (lastError is not null)
-                {
-                    message += $" Last error: {lastError}";
-                }
-
-                throw new InvalidOperationException(message);
-            }
-
-            await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
+            throw new InvalidOperationException(message);
         }
+
+        return new ProtoReadinessResult(attempts, result.Elapsed);
     }
 }

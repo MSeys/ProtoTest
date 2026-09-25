@@ -63,7 +63,17 @@ public static class ProtoHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(factory);
         // One backend per host: browsers are the tool a run uses, not a per-session choice. A second
         // backend package keeps the first registration, so referencing both is a no-op, not a conflict.
-        services.TryAddSingleton<IWebBackendFactory>(factory);
+        if (!services.Any(descriptor => descriptor.ServiceType == typeof(IWebBackendFactory)))
+        {
+            services.AddSingleton<IWebBackendFactory>(factory);
+            // Only the registration that wins the first-wins race declares the browser capability: a
+            // losing backend keeps no capability that would outlive it.
+            ProtoCapabilityExtensions.AddCapability(services, new ProtoCapabilityDescriptor(
+                factory.Name,
+                ProtoCapabilityKinds.Browser,
+                factory.GetType().Assembly.GetName().Name ?? factory.Name));
+        }
+
         // Every backend gets page coverage: Playwright and Selenium both register through this method.
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoCollector, WebCoverageCollector>());
         return services;

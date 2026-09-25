@@ -165,7 +165,8 @@ Gates: D1/D2 dogfooded on the demo suite; record the session; external launch po
   an in-memory transport. Design: `assets/internal/devices-design.md` (internal). Packing and docs wait
   for P4b's WebSocket backend.
 - [x] **F2 WebSocket backend first** (plan-4 P4b): `ProtoTest.Devices.WebSocket` shipped with
-  `AddWebSocketDevices()`, options bound from `ProtoTest:Devices:WebSocket`, and tests against a real
+  `AddDevices(devices => devices.AddWebSocketClient(...))`, options bound from
+  `ProtoTest:Devices:WebSocket`, and tests against a real
   Kestrel WebSocket server. MQTT against a Mosquitto container follows a real MQTT user;
   `[RequiresDevice<T>]` gating is in place.
 - [ ] **F3 Whole-journey scenario** as the acceptance demo: device frame → platform processing → command

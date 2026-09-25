@@ -7,7 +7,8 @@ using ProtoTest.Json;
 /// <summary>
 /// The test-side messaging API over the configured broker. Publishes and awaits are traced as
 /// <c>messaging.publish</c> and <c>messaging.await</c> operations with the payload as a section, and
-/// recorded as observations so coverage can aggregate destinations.
+/// recorded as observations for the trace and for a collector a suite registers; the package itself
+/// ships no collector and aggregates no destinations.
 /// </summary>
 public sealed class ProtoMessageClient
 {

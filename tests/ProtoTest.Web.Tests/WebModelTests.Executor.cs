@@ -57,6 +57,8 @@ public sealed partial class WebModelTests
         var first = backend.CountAsync(reference).AsTask();
         Assert.That(entered.Wait(TimeSpan.FromSeconds(5)), Is.True, "the first call reached the driver");
         var second = backend.CountAsync(reference).AsTask();
+        // A deliberate timing probe: the blocked second call has no observable signal of its own, so a
+        // short window is how a race against the serialization pump would show up.
         await Task.Delay(50);
         Assert.That(calls, Is.EqualTo(1), "the second call waits for the pump instead of racing the driver");
         release.Set();

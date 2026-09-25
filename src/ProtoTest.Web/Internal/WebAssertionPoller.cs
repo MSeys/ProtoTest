@@ -1,6 +1,7 @@
 namespace ProtoTest.Web.Internal;
 
 using ProtoTest.Core;
+using ProtoTest.Web.Pages;
 
 /// <summary>
 /// The polling engine behind element assertions and <c>WaitUntilAsync</c>: it retries until a condition
@@ -180,7 +181,7 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
         // A passing assertion is what makes a page covered; the address is the page it was checked on.
         var backend = await session.GetOrCreateBackendAsync(cancellationToken);
         session.RecordPageObservation(
-            "web.page.verified",
+            WebPageInventory.VerifiedObservationKind,
             session.PagePathFrom(await WebSession.TryCurrentAddressAsync(backend, cancellationToken)),
             "assert");
     }

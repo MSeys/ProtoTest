@@ -150,7 +150,7 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
             matched => Context is not null && !string.IsNullOrEmpty(TargetName) && !string.IsNullOrEmpty(Identifier)
                 ? new ProtoObservation(
                     TargetName: TargetName,
-                    Kind: "http.contract.shape",
+                    Kind: ProtoRestBuilder.ShapeObservationKind,
                     Identifier: Identifier,
                     Data: new RestShapeMatchData(
                         RequestIdentifier: Identifier,

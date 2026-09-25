@@ -1,30 +1,46 @@
 namespace ProtoTest.Devices.WebSocket.AspNetCore;
 
+using System.Globalization;
 using System.Net.WebSockets;
 using Microsoft.AspNetCore.TestHost;
 using ProtoTest.AspNetCore;
 using ProtoTest.Core;
 using ProtoTest.Devices;
+using ProtoTest.Devices.WebSocket;
 
 /// <summary>
 /// Connects to an in-process application's WebSocket endpoint through its <c>TestServer</c>, with no
 /// listening socket. The address's path and query are used; host and scheme are ignored. The deviating
 /// twin of <see cref="WebSocketDeviceTransport"/>, for endpoints that exist only inside the test process.
 /// </summary>
-public sealed class InProcessWebSocketDeviceTransport<TProgram>(string? applicationName = null) : IProtoInProcessDeviceTransport
+public sealed class InProcessWebSocketDeviceTransport<TProgram>(
+    string? applicationName = null,
+    WebSocketDeviceOptions? options = null) : IProtoInProcessDeviceTransport
     where TProgram : class
 {
+    private readonly string? _applicationName = applicationName;
+    private readonly WebSocketDeviceOptions _options = options ?? new WebSocketDeviceOptions();
+
     /// <summary>The transport's name, as registrations and configuration refer to it.</summary>
     public const string TransportName = "InProcessWebSocket";
 
     /// <inheritdoc />
     public string Name => TransportName;
 
+    /// <summary>Gets the application this transport serves, or <see langword="null"/> for the test's selected application.</summary>
+    public string? ApplicationName => _applicationName;
+
+    /// <summary>Gets the WebSocket options this transport connects and reads with.</summary>
+    public WebSocketDeviceOptions Options => _options;
+
     /// <inheritdoc />
-    public bool CanConnect(ProtoExecutionContext context, DeviceEndpoint endpoint)
+    public bool CanConnect(ProtoExecutionContext context, string? applicationName)
     {
         ArgumentNullException.ThrowIfNull(context);
-        return context.TryServerFactory<TProgram>(applicationName) is not null;
+        // Identity decides, never the endpoint: a client for another application must not be routed
+        // through this application's TestServer, even when both expose the same path (audit DEV-1).
+        return string.Equals(applicationName, _applicationName, StringComparison.OrdinalIgnoreCase)
+            && context.TryServerFactory<TProgram>(_applicationName) is not null;
     }
 
     /// <inheritdoc />
@@ -35,14 +51,30 @@ public sealed class InProcessWebSocketDeviceTransport<TProgram>(string? applicat
         ArgumentNullException.ThrowIfNull(endpoint);
         var context = ProtoHost.CurrentContextOrNull ?? throw new InvalidOperationException(
             $"An in-process device connection needs a running test; '{endpoint.DeviceId}' was reached outside one.");
-        var factory = context.ServerFactory<TProgram>(applicationName);
+        var factory = context.ServerFactory<TProgram>(_applicationName);
         var path = Uri.TryCreate(endpoint.Address, UriKind.Absolute, out var absolute)
             ? absolute.PathAndQuery
             : endpoint.Address;
         // TestServer needs an absolute URI and ignores the authority; the path is what routes.
-        var socket = await factory.Server.CreateWebSocketClient()
-            .ConnectAsync(new Uri($"ws://localhost{path}"), cancellationToken)
-            .ConfigureAwait(false);
-        return new WebSocketDeviceConnection(socket, $"in-process:{path}", new WebSocketDeviceOptions());
+        var uri = new Uri($"ws://localhost{path}");
+        using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        attempt.CancelAfter(_options.ConnectTimeout);
+        WebSocket socket;
+        try
+        {
+            socket = await factory.Server.CreateWebSocketClient()
+                .ConnectAsync(uri, attempt.Token)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (attempt.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            // TestServer can surface an aborted handshake as an incomplete-handshake response instead
+            // of an OperationCanceledException; the attempt token is the timeout authority either way.
+            throw new TimeoutException(
+                $"Connecting to '{path}' in-process timed out after {_options.ConnectTimeout.TotalSeconds.ToString("0.#", CultureInfo.InvariantCulture)}s.",
+                exception);
+        }
+
+        return new WebSocketDeviceConnection(socket, $"in-process:{path}", _options);
     }
 }

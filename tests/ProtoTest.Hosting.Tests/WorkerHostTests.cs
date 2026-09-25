@@ -77,6 +77,51 @@ public sealed class WorkerHostTests
     }
 
     [Test]
+    public async Task WorkerMain_ShouldSeeTheRunsConfigurationAndItsPrecedence()
+    {
+        var probeId = $"cfg1-{Guid.NewGuid():N}";
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["Worker:Value"] = "from-config",
+                ["Worker:FromConfig"] = "config-only",
+                ["Worker:FromRun"] = "from-config",
+                ["Worker:Probe"] = "from-suite"
+            }));
+        builder.AddInfrastructure(new FakeBroker(), "ConnectionStrings:WorkerProbe");
+        builder.AddInfrastructure(new FakeSettings());
+        builder.AddWorkerHost<Program>("MainCapture", options => options.Set("Worker:Value", "from-suite"));
+        await using var host = builder.Build();
+
+        using (WorkerMainCapture.Begin(probeId))
+        {
+            await host.StartAsync();
+        }
+
+        await host.StartTestAsync("main capture", "00001", TestMethods.Placeholder);
+        var probe = Proto.Context.HostService<Program, WorkerProbe>("MainCapture");
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        var main = WorkerMainCapture.Find(probeId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(main, Is.Not.Null, "the entry point ran and captured its own view");
+            Assert.That(main!.Value, Is.EqualTo("from-suite"), "the suite's options win inside Main");
+            Assert.That(
+                main.RunValue,
+                Is.EqualTo("from-run"),
+                "infrastructure settings win over the suite's configuration inside Main");
+            Assert.That(main.ConfigValue, Is.EqualTo("config-only"), "the suite's configuration reaches Main");
+            Assert.That(main.Probe, Is.EqualTo("from-suite"), "a suite-only key reaches Main");
+            Assert.That(main.ConnectionString, Is.EqualTo("amqp://probe"), "the run's settings reach Main");
+            Assert.That(probe.Value, Is.EqualTo("from-suite"), "the hosted service agrees at StartAsync");
+        });
+    }
+
+    [Test]
     public async Task WorkerHost_ShouldReadTheRunsClock()
     {
         var seed = new DateTimeOffset(2026, 2, 2, 8, 0, 0, TimeSpan.Zero);
@@ -186,6 +231,47 @@ public sealed class WorkerHostTests
     }
 
     [Test]
+    public void AddWorkerHost_WhenTheSameNameHostsADifferentProgram_ShouldThrow()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddWorkerHost<Program>("Billing");
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => builder.AddWorkerHost<OtherWorkerProgram>("Billing"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("'Billing'"), "the failure names the worker");
+            Assert.That(exception.Message, Does.Contain(typeof(Program).FullName!));
+            Assert.That(exception.Message, Does.Contain(typeof(OtherWorkerProgram).FullName!));
+        });
+    }
+
+    [Test]
+    public async Task WorkerHost_WhenAnOptionIsSetToNull_ShouldDeliverAnEmptySetting()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["Worker:FromConfig"] = "config-only"
+            }));
+        builder.AddWorkerHost<Program>("EmptySetting", options => options.Set("Worker:FromConfig", null));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("empty option", "00001", TestMethods.Placeholder);
+        var probe = Proto.Context.HostService<Program, WorkerProbe>("EmptySetting");
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        Assert.That(
+            probe.ConfigValue,
+            Is.EqualTo(string.Empty),
+            "a null option stays an empty setting and overrides the run's value");
+    }
+
+    [Test]
     public async Task HostAccessor_WithoutHosting_ShouldExplain()
     {
         var builder = new ProtoHostBuilder();
@@ -274,7 +360,11 @@ public sealed class WorkerHostTests
         public ProtoResourceScope Scope => ProtoResourceScope.Run;
 
         public IReadOnlyDictionary<string, string> Settings { get; } =
-            new Dictionary<string, string> { ["Worker:Value"] = "from-run" };
+            new Dictionary<string, string>
+            {
+                ["Worker:Value"] = "from-run",
+                ["Worker:FromRun"] = "from-run"
+            };
 
         public ValueTask StartAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 

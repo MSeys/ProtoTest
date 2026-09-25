@@ -17,7 +17,7 @@ using ProtoTest.Web;
 /// The API-first half of the cross-layer showcase: a project created through REST is absent from the
 /// console until it refreshes, then the screen renders what the API wrote.
 /// </summary>
-[Application(NorthstarTargets.Api)]
+[Application(NorthstarTargets.Console)]
 [NorthstarTenant(PlanIds.Growth)]
 [Auth<NorthstarAuthenticator>]
 [WebSession("Default", DiscoverRoutes = true)]
@@ -59,7 +59,7 @@ public sealed class ApiThenBrowserJourney
 /// The browser-first half of the cross-layer showcase: a project created on the console's form is
 /// asserted back through REST and GraphQL, so the UI write is proven on the protocol side.
 /// </summary>
-[Application(NorthstarTargets.Api)]
+[Application(NorthstarTargets.Console)]
 [NorthstarTenant(PlanIds.Growth)]
 [Auth<NorthstarAuthenticator>]
 [WebSession("Default", DiscoverRoutes = true)]

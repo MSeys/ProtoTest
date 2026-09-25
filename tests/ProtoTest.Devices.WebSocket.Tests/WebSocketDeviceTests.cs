@@ -41,7 +41,10 @@ public sealed class WebSocketDeviceTests
             Assert.That(entity.State["device.client"], Is.EqualTo("Chargers"));
             Assert.That(entity.State["device.transport"], Is.EqualTo("WebSocket"));
             Assert.That(entity.State["device.address"], Is.EqualTo($"{server.Address}/ws/CP-001"));
-            Assert.That(entity.State["device.connected"], Is.EqualTo("true"));
+            Assert.That(
+                entity.State["device.connected"],
+                Is.EqualTo("false"),
+                "the release path disconnects the device and finalises its state");
         });
     }
 
@@ -71,7 +74,7 @@ public sealed class WebSocketDeviceTests
     [Test]
     public async Task WebSocketClient_WhenConnectFails_ShouldNameTheAddress()
     {
-        var port = FreePort();
+        var port = TestNetworking.FreePort();
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
         builder.AddDevices(devices => devices
@@ -147,15 +150,6 @@ public sealed class WebSocketDeviceTests
                 await socket.SendAsync(payload, WebSocketMessageType.Binary, endOfMessage: true, CancellationToken.None);
             }
         }
-    }
-
-    private static int FreePort()
-    {
-        var probe = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
-        probe.Start();
-        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
-        probe.Stop();
-        return port;
     }
 
     private sealed class EchoDevice : ProtoDevice

@@ -77,7 +77,7 @@ Set them in code with `ConfigureResponses(...)` and `CaptureAttachments(...)`, o
 RestRequestBuilder Rest(this ProtoExecutionContext context, string? clientName = null);
 ```
 
-`Proto.Context.Rest(name)` resolves the client in this order: the requested name, the client bound by `[Application(…)]` for REST, the application's first registered REST client, then `"Default"`. A client with no base address and no owner for its address falls back to the application's in-process transport, rooted at the endpoint the client registered, then the requested name — looking up `ProtoTest:Applications:{application}:Endpoints:{name}`. A per-test resolver beats `HttpClient.BaseAddress` at request time. If nothing resolves, the call throws `InvalidOperationException`.
+`Proto.Context.Rest(name)` resolves the client in this order: the requested name, the client bound by `[Application(…)]` for REST, the application's first registered REST client, then `"Default"`. The client's base address is the application's, resolved with the shared precedence (an address a started piece published wins over configuration). A client with no base address and no owner for its address falls back to the application's in-process transport, rooted at the endpoint the client registered, then the requested name — looking up `ProtoTest:Applications:{application}:Endpoints:{name}`. A per-test resolver beats `HttpClient.BaseAddress` at request time. If nothing resolves, the call throws `InvalidOperationException`.
 
 ## Quick start
 

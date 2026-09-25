@@ -16,6 +16,10 @@ public sealed class ProtoGrpcBuilder
     /// </summary>
     internal const string FailureObservationKind = "grpc.failure";
 
+    /// <summary>The observation kind a successful shape assertion records; service coverage consumes
+    /// the <c>grpc.response</c> kind instead, so this is trace evidence, not coverage.</summary>
+    internal const string ShapeObservationKind = "grpc.contract.shape";
+
     private readonly IProtoApplicationBuilder? _application;
 
     internal ProtoGrpcBuilder(IServiceCollection services, IProtoApplicationBuilder? application = null)

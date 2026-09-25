@@ -6,6 +6,13 @@ using global::ProtoTest.Core;
 public static class NorthstarTargets
 {
     public const string Api = "Northstar";
+
+    /// <summary>
+    /// The standalone console process the suite starts when it owns the store. It is its own
+    /// application, so one address authority per application holds: browser journeys target the
+    /// published process, API journeys target the in-process one.
+    /// </summary>
+    public const string Console = "Northstar console";
 }
 
 /// <summary>The organization provisioned for the current test, plus its owner token.</summary>

@@ -39,7 +39,7 @@ public static class ProtoMessagingAssertions
                 options,
                 observation: matched => new ProtoObservation(
                     targetName,
-                    "messaging.contract.shape",
+                    ProtoMessagingProtocol.ShapeObservationKind,
                     message.Destination,
                     new MessagingShapeMatchData(message.Destination, matched)));
         }

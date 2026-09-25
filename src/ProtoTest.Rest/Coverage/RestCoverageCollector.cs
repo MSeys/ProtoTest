@@ -6,5 +6,5 @@ using ProtoTest.Core;
 public sealed class RestCoverageCollector(string targetName)
     : ProtoCoverageCollector(targetName, ProtoRestBuilder.Protocol.ResponseObservationKind)
 {
-    public override string Category => ProtoRestBuilder.Protocol.CoverageCategory;
+    public override string Category => ProtoRestBuilder.Protocol.CoverageCategory ?? ProtoRestBuilder.Protocol.Name;
 }

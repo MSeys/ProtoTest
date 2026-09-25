@@ -198,16 +198,16 @@ The `HttpClient` is a regular ProtoTest client, so its REST and GraphQL calls ar
 
 ## Real server or in-process?
 
-An application's HTTP clients reuse its in-process server when no URL is configured, and switch to a deployed environment when one is:
+An application's HTTP clients reuse its in-process server when no address resolves for the application, and switch to a real process when one does:
 
-| `ProtoTest:Applications:Api:BaseUrl` set? | Result |
+| An address resolves for `ProtoTest:Applications:Api`? | Result |
 | --- | --- |
-| yes | real server at the configured URL |
+| yes - configured, or published by a started infrastructure piece | real server at that address |
 | no | the application's in-process server |
 
-The same suite runs in-process on a developer machine and against a deployed environment in CI, just by setting `BaseUrl` there. With an address configured, `AddAspNetCoreServer` **steps aside**: no test server starts, the application's HTTP clients talk to the configured address, and the device clients resolve it the same way. The `ASP.NET Core` capability is dropped with the server, so `[RequiresInProcess]` tests skip instead of failing, and `ServerFactory`/`ApplicationServices` throw naming the address — there is no in-process container to reach.
+The same suite runs in-process on a developer machine and against a deployed environment in CI, just by setting `BaseUrl` there. With the address **configured**, `AddAspNetCoreServer` **steps aside**: no test server starts, the application's HTTP clients talk to the configured address, and the device clients resolve it the same way. The `ASP.NET Core` capability is dropped with the server, so `[RequiresInProcess]` tests skip instead of failing, and `ServerFactory`/`ApplicationServices` throw naming the address — there is no in-process container to reach.
 
-This reads **configuration**, not addresses a started piece published: when the run starts a standalone instance and registers it as settings-only infrastructure, the in-process server stays for the HTTP clients while [web sessions](./web/index.md) deliberately drive the started process.
+The step-aside reads **static configuration only**: an address a started piece published does not step the in-process server aside, so `ServerFactory` and the in-process device transport keep working. The HTTP clients do follow the published address (one application-address precedence everywhere), so an application with both a live in-process server and a published address serves its API from the published process. Give the published process **its own application name** when the suite needs both: the demo registers its standalone console as its own application for exactly that reason.
 
 Without an address, the application's HTTP clients fall back to its transport automatically, so there is nothing to point at by hand, and with the default `PerRun` lifetime the server only starts the first time a test actually needs it.
 

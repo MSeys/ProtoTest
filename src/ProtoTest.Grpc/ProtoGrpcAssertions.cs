@@ -43,7 +43,7 @@ public static class ProtoGrpcAssertions
             options,
             observation: matched => new ProtoObservation(
                 typeof(TResponse).Name,
-                "grpc.contract.shape",
+                ProtoGrpcBuilder.ShapeObservationKind,
                 typeof(TResponse).FullName ?? typeof(TResponse).Name,
                 new GrpcShapeMatchData(typeof(TResponse), matched)));
     }

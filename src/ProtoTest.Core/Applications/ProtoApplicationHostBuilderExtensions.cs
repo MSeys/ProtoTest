@@ -22,7 +22,11 @@ public static class ProtoApplicationHostBuilderExtensions
         return builder.ConfigureServices(services =>
         {
             var clients = new List<ProtoApplicationClient>();
-            configure(new ProtoApplicationBuilder(applicationName, services, clients));
+            configure(new ProtoApplicationBuilder(
+                applicationName,
+                services,
+                clients,
+                builder is ProtoHostBuilder hostBuilder ? () => hostBuilder.IsBuilt : null));
             services.AddSingleton(new ProtoApplicationClients(applicationName, clients));
             services.TryAddSingleton<ProtoApplicationRegistry>();
         });

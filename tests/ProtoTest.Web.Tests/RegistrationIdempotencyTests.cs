@@ -163,5 +163,56 @@ public sealed class RegistrationIdempotencyTests
         Assert.That(configureCalls, Is.EqualTo(2), "every call's configure callback runs");
     }
 
+    [Test]
+    public async Task AddWeb_PlaywrightThenSelenium_ShouldDeclareOnlyTheWinningBrowserCapability()
+    {
+        var builder = new ProtoHostBuilder();
+        IServiceCollection? services = null;
+        builder.ConfigureServices(collection => services = collection);
+        builder.AddWeb();
+        builder.AddWeb(static () => throw new InvalidOperationException("The losing backend's driver factory must not run."));
 
+        await using var host = builder.Build();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                services!.Count(descriptor => descriptor.ServiceType == typeof(IWebBackendFactory)),
+                Is.EqualTo(1),
+                "one backend per host, first wins");
+            Assert.That(
+                services!.Count(descriptor => descriptor.ServiceType == typeof(ProtoCapabilityDescriptor)),
+                Is.EqualTo(1),
+                "only the winning backend declares a browser capability");
+            Assert.That(host.HasCapability(ProtoCapabilityKinds.Browser, "Playwright"), Is.True);
+            Assert.That(
+                host.HasCapability(ProtoCapabilityKinds.Browser, "Selenium"),
+                Is.False,
+                "the losing backend declares nothing, so no capability outlives it");
+        });
+    }
+
+    [Test]
+    public async Task AddWeb_SeleniumThenPlaywright_ShouldDeclareOnlyTheWinningBrowserCapability()
+    {
+        var builder = new ProtoHostBuilder();
+        IServiceCollection? services = null;
+        builder.ConfigureServices(collection => services = collection);
+        builder.AddWeb(static () => throw new InvalidOperationException("The losing backend's driver factory must not run."));
+        builder.AddWeb();
+
+        await using var host = builder.Build();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                services!.Count(descriptor => descriptor.ServiceType == typeof(IWebBackendFactory)),
+                Is.EqualTo(1));
+            Assert.That(
+                services!.Count(descriptor => descriptor.ServiceType == typeof(ProtoCapabilityDescriptor)),
+                Is.EqualTo(1));
+            Assert.That(host.HasCapability(ProtoCapabilityKinds.Browser, "Selenium"), Is.True);
+            Assert.That(host.HasCapability(ProtoCapabilityKinds.Browser, "Playwright"), Is.False);
+        });
+    }
 }

@@ -125,7 +125,23 @@ public sealed class DiagnosticsShowcase
             planId = "nonexistent-plan"
         });
     }
+}
 
+/// <summary>
+/// The console half of the diagnostics showcase: the intentional web failure runs against the
+/// standalone console application, whose published address the browser sessions follow.
+/// </summary>
+[Application(NorthstarTargets.Console)]
+[NorthstarTenant]
+[Auth<NorthstarAuthenticator>]
+[WebSession("Default", DiscoverRoutes = true)]
+[RequiresCapability(
+    ProtoCapabilityKinds.Server,
+    CapabilityName = "Northstar standalone",
+    Reason = "The standalone application is only started when the suite owns the store.")]
+[RequiresConsoleBuild]
+public sealed class ConsoleDiagnosticsShowcase
+{
     /// <summary>
     /// The demo's intentional web failure: the dashboard shows the tenant's real plan, but this assertion
     /// expects another one, so the failure exercises the web diagnostics end to end - the Playwright trace
@@ -135,11 +151,6 @@ public sealed class DiagnosticsShowcase
     [ProtoTest]
     [SignedInAs]
     [LoginAs<NorthstarConsoleLogin>("owner")]
-    [RequiresCapability(
-        ProtoCapabilityKinds.Server,
-        CapabilityName = "Northstar standalone",
-        Reason = "The standalone application is only started when the suite owns the store.")]
-    [RequiresConsoleBuild]
     public async Task TheDashboardNeverShowsAnotherTenantsPlan()
     {
         // Arrange

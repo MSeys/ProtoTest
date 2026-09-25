@@ -6,7 +6,8 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
 
-    <!-- No 1.0.1 baseline exists for this package; validate once 1.1 ships. -->
+    <!-- New in 1.1: no released baseline exists yet, so there is nothing to validate against. -->
+    <IsPackable>true</IsPackable>
     <EnablePackageValidation>false</EnablePackageValidation>
     <Description>Run background workers and generic hosts in-process with a ProtoTest suite.</Description>
     <PackageTags>testing;integration-testing;worker;generic-host;backgroundservice;dotnet</PackageTags>

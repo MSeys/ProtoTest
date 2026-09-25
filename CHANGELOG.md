@@ -51,6 +51,12 @@ All ProtoTest packages share one version; breaking API changes are called out be
   would fill the same address. `AddInfrastructureAlways` opts a piece out, settings-only infrastructure
   may declare keys too, and a skipped piece is recorded as a `skipped` run entity without being owned
   or released.
+- `AddAspNetCoreServer` steps aside when the application's `BaseUrl` is configured: no test server
+  starts, the application's `HttpClient` talks to the configured address (the same address web sessions
+  and device clients resolve), the `ASP.NET Core` capability is dropped so `[RequiresInProcess]` skips
+  instead of failing, and `ServerFactory`/`ApplicationServices` throw naming the address. The trace
+  records `aspnetcore.server.skipped`. `AddCapabilityUnlessConfigured` is the Core primitive behind it,
+  and it is how an integration keeps its capability honest when the environment provides the address.
 
 ### Fixed
 
@@ -68,6 +74,11 @@ All ProtoTest packages share one version; breaking API changes are called out be
 - RabbitMQ uses `RabbitMQ.Client` 7.x end to end (async connection, channel, publish and consume), and
   a delivery is converted to the broker-neutral message inside the consumer handler, where its body
   buffer is still valid.
+- Every package packs again: `ProtoTest.AspNetCore`, `ProtoTest.Web`, `ProtoTest.Web.Playwright` and
+  `ProtoTest.Web.Selenium` had lost their `IsPackable` setting, and `ProtoTest.Hosting`,
+  `ProtoTest.Devices.WebSocket` and `ProtoTest.Devices.WebSocket.AspNetCore` were missing from the pack
+  gate, so a 1.1 release would have shipped without them. `eng/pack.ps1` now covers all 35 packages
+  and verifies the whole set in one run.
 
 ### Changed
 
@@ -96,6 +107,13 @@ All ProtoTest packages share one version; breaking API changes are called out be
 - `ProtoTest:Web:Sessions:{name}` settings no longer configure sessions. Put addresses under
   `ProtoTest:Applications:{application}` and select the session with `[WebSession]` or `Web()`;
   backend options remain under `ProtoTest:Web:Playwright` or `ProtoTest:Web:Selenium`.
+- The web reshape removed members instead of obsoleting them: `IWebBackend.CurrentAddress` and its
+  backend implementations, the old `Web()` overload, `WebFlow<TComponent>.Check(Func<TComponent,
+  WebElement>, bool)`, `WebOperationContext.Result`, `PlaywrightWebOptions.Context`,
+  `RequiresPlaywrightBrowserAttribute.Session`, and Selenium's download surface
+  (`IWebBackendDownloads` and `SeleniumWebBackend.DownloadAsync`). Each package's
+  `CompatibilitySuppressions.xml` records exactly these removals; the web pages describe the
+  replacement surfaces.
 
 ### Changed
 

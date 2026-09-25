@@ -51,14 +51,20 @@ $packages = @(
     "src/ProtoTest.Messaging.RabbitMq.Testcontainers/ProtoTest.Messaging.RabbitMq.Testcontainers.csproj",
     "src/ProtoTest.Sheets/ProtoTest.Sheets.csproj",
     "src/ProtoTest.AspNetCore/ProtoTest.AspNetCore.csproj",
+    "src/ProtoTest.Devices/ProtoTest.Devices.csproj",
+    "src/ProtoTest.Devices.WebSocket/ProtoTest.Devices.WebSocket.csproj",
+    "src/ProtoTest.Devices.WebSocket.AspNetCore/ProtoTest.Devices.WebSocket.AspNetCore.csproj",
+    "src/ProtoTest.Hosting/ProtoTest.Hosting.csproj",
     "src/ProtoTest.OpenApi/ProtoTest.OpenApi.csproj",
     "src/ProtoTest.OpenTelemetry/ProtoTest.OpenTelemetry.csproj",
     "src/ProtoTest.Reporting/ProtoTest.Reporting.csproj",
+    "src/ProtoTest.Traces/ProtoTest.Traces.csproj",
     "src/ProtoTest.Web.Pages/ProtoTest.Web.Pages.csproj",
     "src/ProtoTest.Web/ProtoTest.Web.csproj",
     "src/ProtoTest.Web.Playwright/ProtoTest.Web.Playwright.csproj",
     "src/ProtoTest.Web.Selenium/ProtoTest.Web.Selenium.csproj",
-    "src/ProtoTest.Templates/ProtoTest.Templates.csproj"
+    "src/ProtoTest.Templates/ProtoTest.Templates.csproj",
+    "src/ProtoTest.Cli/ProtoTest.Cli.csproj"
 )
 
 $packable = Get-ChildItem -Path (Join-Path $repository "src/*/*.csproj") |

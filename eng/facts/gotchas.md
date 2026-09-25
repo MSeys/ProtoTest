@@ -6,14 +6,28 @@ audit plan.
 
 ## Configuration timing
 
-- **A worker's `Program.Main` cannot read the run's configuration before `Build()`.** The overlay is
-  applied at the `HostBuilding` event, which fires inside `Build()`; only hosted services at
-  `StartAsync` see it. Read connection strings from `IConfiguration` inside an options factory, or
-  wait for the audit CFG-1 args-overlay fix. **→ AUDIT CFG-1.**
-- **Eager configuration reads at registration are wrong by construction.** `AddX(configuration[...])`
-  in a `Program.Main` captures the value before the run's settings exist. Resolve the address at use
-  time (the P4f consumer rule) — this is what made the reference product's publisher inert.
-  **→ AUDIT CFG-2 / REF-2.**
+- **A worker's `Program.Main` sees the run's configuration as arguments.** `AddWorkerHost` hands the
+  merged overlay (options over infrastructure settings over suite configuration) to the entry point as
+  `--{key}={value}` pairs, so `Host.CreateApplicationBuilder(args)`/`Host.CreateDefaultBuilder(args)`
+  see final-precedence values before their `Main` code runs; the `HostBuilding` in-memory overlay stays
+  as the fallback at `Build()`. A parameterless `Main` or one that does not pass its args to the
+  builder cannot see the overlay before `Build()` - an options factory or hosted service still does -
+  and it also does not receive `--contentRoot`/`--applicationName`, so it reads its own appsettings
+  from the test process's content root. Build the host from `args` when `Main` itself reads
+  configuration.
+- **`ProtoWorkerOptions.Set(key, null)` is an empty setting, not a dropped key.** `Set` stores an
+  empty value, so the worker sees the key as `""` in `Main` (command line) and at `Build` (in-memory
+  overlay) and a suite can deliberately clear a value the run provides. Nulls from the run's own
+  configuration are still not passed: the overlay carries no setting for them.
+- **A worker builder shape ProtoTest does not recognise fails loudly.** `Host.CreateApplicationBuilder`
+  and `WebApplication.CreateBuilder` (both `IHostApplicationBuilder`) and `Host.CreateDefaultBuilder`
+  (`IHostBuilder`) get the overlay and the run's clock; any other builder throws naming its type
+  instead of silently keeping its own configuration and `TimeProvider`.
+- **Eager configuration reads at registration are still wrong for addresses the run can provide
+  later.** A worker's `Main` now sees the run's static overlay (CFG-1 fixed), but a started piece's
+  published settings are resolved at use time, and a process that also runs standalone reads its own
+  environment. Resolve the address at use time (the P4f consumer rule) - this is what made the
+  reference product's publisher inert. **→ AUDIT CFG-2 / REF-2.**
 - **Static configuration decides `AddAspNetCoreServer`'s step-aside, not settings.** A settings-published
   address does not step the in-process server aside (decided asymmetry); the address readers still
   follow the published address, so give a published process its own application name when both must
@@ -53,9 +67,10 @@ audit plan.
   no-op by design before `Build` (the same server or worker name) stays a no-op.
 - **A conditional declaration's key set compares by content** (ordinal, duplicates removed,
   order-independent), so registering the same declaration twice in any order leaves one declaration.
-- **First-wins guards can hide a conflict.** `AddWorkerHost` with the same name and a different program
-  is ignored; the second in-process device transport is dropped by one non-generic marker.
-  **→ AUDIT DEV-1 / DEV-6.**
+- **First-wins guards can hide a conflict.** `AddWorkerHost` now compares the program: a repeated name
+  with a different program throws instead of being ignored. `AddAspNetCoreServer(name)` still wins by
+  name alone (A1R-01 residual): a different `TProgram` under one server name is a silent no-op.
+  The in-process device transport compares `(TProgram, application)` (audit DEV-1 fixed).
 
 ## Addresses and readiness
 
@@ -112,30 +127,41 @@ audit plan.
 
 ## Clock and time
 
-- **`ProtoClockLocator` is process-global and keyed by test id alone.** Two hosts with the same
-  `RunPrefix` overwrite/remove each other's mapping; use distinct prefixes or wait for the host-scoped
-  fix. **→ AUDIT CFG-3.**
-- **`ProtoRequestClock`'s ambient is restored, not revoked.** A fire-and-forget task started inside a
-  request keeps the finished test's clock; long-lived background work should read the run clock.
-  **→ AUDIT CFG-4.**
+- **One `ProtoClockRegistry` belongs to each host.** `ProtoHost.FindClock(testId)` is an instance
+  lookup on the owning host, and the in-process ASP.NET request linking pushes the owning host's
+  clock; two hosts that share a `RunPrefix`/test id each resolve their own clock, a failed test start
+  removes its entry, context disposal removes it, and host disposal clears the registry. There is no
+  process-global clock map (CFG-3 fixed).
+- **`ProtoClock.Advance` moves under the clock's lock.** Concurrent advances on the run clock sum
+  instead of losing updates, and each advance records its own `clock.advance` (CFG-4 fixed).
+- **`ProtoRequestClock`'s ambient is restored, not revoked** (documented, CFG-4). A task started
+  inside a request captures the pushed clock in its own execution context and keeps it after the
+  scope and the test end; long-lived background work must read the run clock.
 - **Only `GetUtcNow` is virtual in `ProtoClock`; timers are real, and `DateTime.UtcNow` is unaffected.**
   Application code that calls `DateTime.UtcNow` directly will not see the test clock; use
   `TimeProvider`.
 
 ## Devices
 
-- **One in-process device transport registers, ever.** A second `AddInProcessWebSocketDevices<TProgram>`
-  is silently dropped, and `CanConnect` ignores the endpoint, so a client for application B can be
-  routed through A's `TestServer` when both expose the same path. **→ AUDIT DEV-1.**
-- **The in-process path ignores `WebSocketDeviceOptions`.** `configure` is registered and never read;
-  validation never runs. **→ AUDIT DEV-2.**
-- **`DeviceSession` connect/disconnect is not concurrency-safe.** Concurrent sends can open two
-  connections (one leaked, untraced); a disconnect racing a send can NRE. Serialize per session or
-  wait for the fix. **→ AUDIT DEV-3.**
-- **Device resource ids omit the device type**, so two device types with the same id collide in one
-  test. **→ AUDIT DEV-4.**
-- **`device.connected` is not finalised at test end** unless the test calls `DisconnectAsync`.
-  **→ AUDIT DEV-5.**
+- **In-process transports are keyed by `(TProgram, application)`.** Two applications, or two programs,
+  are two transports; `IProtoInProcessDeviceTransport.CanConnect(context, applicationName)` answers for
+  the requested application and the server factory it needs, so a client for application B is never
+  routed through application A's `TestServer` at the same path. A path-only client whose application
+  has no matching transport fails naming the application instead of trying another transport.
+- **The in-process path uses the registered `WebSocketDeviceOptions`.** They resolve from DI with the
+  transport (so `Validate` runs and a bad value fails when the device is created), and `ConnectTimeout`
+  bounds the in-process connect like the socket path. `ReceiveBufferBytes`/`KeepAliveInterval` feed the
+  same `WebSocketDeviceConnection` the socket path uses.
+- **`DeviceSession` has one conversation contract.** Connect is single-flight, sends are serialized,
+  one receive may be in flight (a second fails fast naming the device), and a send that races a
+  disconnect fails with a device error naming the device instead of a disposed-socket exception.
+  Sends and receives may run concurrently; do not fan out readers over one device.
+- **Device resource and entity ids include the device type**: `device:{client}:{type}:{id}`. Two device
+  types with one id on one client coexist, each with its own resource and entity.
+- **The release path is a disconnect.** Teardown disposes the connection, writes
+  `device.connected = false` and emits `device.disconnect`, so a test that never disconnects still ends
+  with a final disconnected state; an explicit `DisconnectAsync` then a send reconnects and records
+  both connects.
 
 ## Tests and parallelism
 

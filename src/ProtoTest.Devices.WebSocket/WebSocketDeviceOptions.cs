@@ -3,9 +3,9 @@ namespace ProtoTest.Devices.WebSocket;
 using ProtoTest.Core;
 
 /// <summary>
-/// How the WebSocket transport connects and reads. Code sets defaults through
-/// <c>AddWebSocketDevices(configure)</c>; <c>ProtoTest:Devices:WebSocket</c> overrides them per
-/// environment.
+/// How the WebSocket transport connects and reads. Code sets defaults through the client registration
+/// (<c>AddWebSocketClient(..., configure)</c>) or <c>AddInProcessWebSocketDevices(configure)</c>;
+/// <c>ProtoTest:Devices:WebSocket</c> overrides them per environment.
 /// </summary>
 public sealed class WebSocketDeviceOptions : IProtoConfigurableOptions
 {

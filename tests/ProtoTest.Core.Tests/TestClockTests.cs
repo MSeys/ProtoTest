@@ -80,6 +80,47 @@ public sealed class TestClockTests
     }
 
     [Test]
+    public async Task RunClock_WhenAdvancedInParallel_ShouldSumEveryDeltaAndRecordEachAdvance()
+    {
+        var seed = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureClock(new ProtoClock(seed));
+        builder.ConfigureTracing(options => options.Enabled = false);
+        await using var host = builder.Build();
+        await host.StartAsync();
+
+        const int Workers = 8;
+        const int AdvancesPerWorker = 250;
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var workers = Enumerable.Range(0, Workers).Select(_ => Task.Run(async () =>
+        {
+            await start.Task.ConfigureAwait(false);
+            for (var index = 0; index < AdvancesPerWorker; index++)
+            {
+                host.Clock.Advance(TimeSpan.FromTicks(1));
+            }
+        })).ToArray();
+
+        start.SetResult();
+        await Task.WhenAll(workers);
+
+        var entries = host.Trace.Snapshot().Entries!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                host.Clock.GetUtcNow(),
+                Is.EqualTo(seed.AddTicks((long)Workers * AdvancesPerWorker)),
+                "concurrent advances add up instead of losing updates");
+            Assert.That(
+                entries.Count(entry => entry.Kind == "clock.advance"),
+                Is.EqualTo(Workers * AdvancesPerWorker),
+                "each advance records its own event");
+        });
+
+        await host.StopAsync();
+    }
+
+    [Test]
     public async Task Clock_WithoutASeed_ShouldStartAtRealTime()
     {
         var before = DateTimeOffset.UtcNow;

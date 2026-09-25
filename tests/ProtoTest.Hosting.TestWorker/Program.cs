@@ -23,10 +23,9 @@ public sealed class Program
 
 /// <summary>
 /// Captures what the worker's <see cref="Program.Main"/> read from its own configuration before the host
-/// was built, keyed by a probe id the starting test sets on its flow. This is how the P1-gap (audit
-/// CFG-1) is observed: the run's settings and the suite's configuration are only overlaid at
-/// <c>HostBuilding</c>, inside <c>Build()</c>, so an entry point that reads configuration in
-/// <c>Main</c> sees its own sources alone.
+/// was built, keyed by a probe id the starting test sets on its flow. The run hands the merged overlay
+/// to the entry point as command-line arguments (audit CFG-1), so a worker that builds from its args
+/// sees final-precedence values inside <c>Main</c>; this probe is how that is asserted.
 /// </summary>
 public static class WorkerMainCapture
 {
@@ -56,6 +55,7 @@ public static class WorkerMainCapture
         Probes[probeId] = new WorkerMainProbe(
             configuration["Worker:Value"],
             configuration["Worker:FromConfig"],
+            configuration["Worker:FromRun"],
             configuration["Worker:Probe"],
             configuration.GetConnectionString("WorkerProbe"));
     }
@@ -74,10 +74,18 @@ public static class WorkerMainCapture
     }
 }
 
-/// <summary>What the worker's entry point read in <c>Main</c>, before the run's overlay existed.</summary>
+/// <summary>
+/// A second entry-point-shaped type in this assembly, for the same-name/different-program guard (audit
+/// DEV-6): <c>AddWorkerHost</c> resolves the host factory from the assembly's entry point, so any class
+/// in the assembly can stand in for a different program in a registration-conflict test.
+/// </summary>
+public sealed class OtherWorkerProgram;
+
+/// <summary>What the worker's entry point read in <c>Main</c>, before its host was built.</summary>
 public sealed record WorkerMainProbe(
     string? Value,
     string? ConfigValue,
+    string? RunValue,
     string? Probe,
     string? ConnectionString);
 

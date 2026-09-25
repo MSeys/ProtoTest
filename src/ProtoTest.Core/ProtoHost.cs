@@ -18,6 +18,7 @@ public sealed class ProtoHost : IAsyncDisposable
     private readonly ProtoTestLifecycle _testLifecycle;
     private readonly ProtoTraceSession _trace;
     private readonly ProtoClock _clock;
+    private readonly ProtoClockRegistry _clockRegistry;
     private readonly ProtoRunStateMachine _runState = new();
     private readonly List<IProtoRunHook> _startedHooks = [];
 
@@ -35,9 +36,13 @@ public sealed class ProtoHost : IAsyncDisposable
         _trace = _rootServiceProvider.GetService<ProtoTraceSession>() ?? new ProtoTraceSession();
         // A host built through the builder always has a clock; a provider assembled by hand gets one here.
         _clock = _rootServiceProvider.GetService<ProtoClock>() ?? new ProtoClock();
+        // The registry is a host service so hosting integrations resolve the owning host's; a provider
+        // assembled by hand gets a host-local one, cleared when the host is disposed.
+        _clockRegistry = _rootServiceProvider.GetService<ProtoClockRegistry>() ?? new ProtoClockRegistry();
 
         _runHooks = new ProtoRunHooks(runHooks);
-        _testLifecycle = new ProtoTestLifecycle(this, _rootServiceProvider, testHooks, testIdGenerator, _trace, _clock);
+        _testLifecycle = new ProtoTestLifecycle(
+            this, _rootServiceProvider, testHooks, testIdGenerator, _trace, _clock, _clockRegistry);
         _clock.Advanced += OnRunClockAdvanced;
         ProtoHostRegistry.Register(this);
     }
@@ -49,11 +54,13 @@ public sealed class ProtoHost : IAsyncDisposable
     public ProtoClock Clock => _clock;
 
     /// <summary>
-    /// Finds the clock of the test with the given id, or <see langword="null"/> when no such test is
-    /// running. This is the lookup an in-process hosting integration uses to link a request the test
-    /// caused back to the test's clock.
+    /// Finds this host's clock of the test with the given id, or <see langword="null"/> when no such
+    /// test is running. The lookup is scoped to the owning host: two hosts that share a test id each
+    /// resolve their own clock, and a finished test's clock only leaves its own host's registry. This
+    /// is the lookup an in-process hosting integration uses to link a request the test caused back to
+    /// the test's clock.
     /// </summary>
-    public static ProtoClock? FindClock(string testId) => ProtoClockLocator.Find(testId);
+    public ProtoClock? FindClock(string testId) => _clockRegistry.Find(testId);
 
     private void OnRunClockAdvanced(ProtoClockChange change)
     {
@@ -514,6 +521,8 @@ public sealed class ProtoHost : IAsyncDisposable
         {
             _trace.StopListening();
             _trace.CompleteRun();
+            // No test clock may survive the host: a disposed host has no running tests to link to.
+            _clockRegistry.Clear();
             ProtoHostRegistry.Unregister(this);
         }
 

@@ -204,6 +204,7 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
     {
         var settings = context.TryService<ProtoInfrastructureSettings>()?.Values;
         var clock = context.TryService<TimeProvider>();
+        var clockRegistry = context.TryService<ProtoClockRegistry>();
         if ((settings is null || settings.Count == 0) && clock is null && _configureWebHost is null)
         {
             return null;
@@ -227,7 +228,11 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
                     services.AddSingleton(clock);
                     // The request flow has no test context of its own: this filter pushes the clock of
                     // the test that sent the request for the duration of the application's handling.
-                    services.AddTransient<IStartupFilter, ProtoClockStartupFilter>();
+                    // The registry is the owning host's, so the lookup cannot steal another host's clock.
+                    if (clockRegistry is not null)
+                    {
+                        services.AddSingleton<IStartupFilter>(new ProtoClockStartupFilter(clockRegistry));
+                    }
                 });
             }
 

@@ -38,14 +38,18 @@ public sealed class DeviceTests
             {
                 Assert.That(again, Is.SameAs(charger), "one instance per (client, type, id) per test");
                 Assert.That(ack, Is.EqualTo("BOOT_ACK"));
-                Assert.That(entity.Id, Is.EqualTo("device:Chargers:CP-001"));
+                Assert.That(entity.Id, Is.EqualTo("device:Chargers:FakeCharger:CP-001"));
                 Assert.That(entity.State["device.client"], Is.EqualTo("Chargers"));
                 Assert.That(entity.State["device.address"], Is.EqualTo("memory://cp-001"));
-                Assert.That(entity.State["device.connected"], Is.EqualTo("true"));
+                Assert.That(
+                    entity.State["device.connected"],
+                    Is.EqualTo("false"),
+                    "the release path disconnects the device and finalises its state");
                 Assert.That(server.Sent, Is.EqualTo(new[] { "BOOT" }));
                 Assert.That(
                     test.Entries.Select(entry => entry.Kind),
-                    Does.Contain("device.send").And.Contain("device.receive").And.Contain("device.command"));
+                    Does.Contain("device.send").And.Contain("device.receive").And.Contain("device.command")
+                        .And.Contain("device.disconnect"));
             });
         }
         finally
@@ -55,6 +59,90 @@ public sealed class DeviceTests
                 File.Delete(output);
             }
         }
+    }
+
+    [Test]
+    public async Task Client_WhenDisconnectedExplicitly_ShouldReconnectAndRecordBothConnects()
+    {
+        var output = TemporaryTracePath();
+        try
+        {
+            var server = new FakeDeviceServer();
+            var builder = new ProtoHostBuilder();
+            builder.ConfigureTracing(options => options.OutputPath = output);
+            builder.AddDevices(devices => devices
+                .AddClient("Chargers", server.Transport, resolveAddress: ProtoDeviceAddress.Template("memory://cp-001"))
+                    .AddDevice<FakeCharger>());
+            await using var host = builder.Build();
+            await host.StartAsync();
+            await host.StartTestAsync("disconnect and reconnect", "00001", TestMethods.Placeholder);
+
+            var charger = Proto.Context.Devices("Chargers").For<FakeCharger>("CP-001");
+            await charger.SendTextAsync("BOOT");
+            await charger.CloseAsync();
+            await charger.SendTextAsync("METER");
+
+            await host.CompleteTestAsync(ProtoTestResult.Passed);
+            await host.StopAsync();
+
+            var test = host.Trace.Snapshot().Tests.Single();
+            var entity = test.Entities!.Single(candidate => candidate.Kind == ProtoTraceEntityKinds.Device);
+            // Identical error-free events collapse into one entry with a count, and the explicit
+            // disconnect and the release one can sit under different parents, so sum the counts.
+            var connects = test.Entries.Where(entry => entry.Kind == "device.connect").Sum(entry => entry.Count);
+            var disconnects = test.Entries.Where(entry => entry.Kind == "device.disconnect").Sum(entry => entry.Count);
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    connects,
+                    Is.EqualTo(2),
+                    "the explicit disconnect releases the connection, so the next send connects again");
+                Assert.That(
+                    disconnects,
+                    Is.EqualTo(2),
+                    "the explicit disconnect and the release path each record one disconnect");
+                Assert.That(entity.State["device.connected"], Is.EqualTo("false"), "the final state is disconnected");
+                Assert.That(server.Sent, Is.EqualTo(new[] { "BOOT", "METER" }));
+            });
+        }
+        finally
+        {
+            if (File.Exists(output))
+            {
+                File.Delete(output);
+            }
+        }
+    }
+
+    [Test]
+    public async Task Client_WhenNoInProcessTransportServesItsApplication_ShouldNameTheApplication()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddApplication("Api", app => app
+            .AddDevices(devices => devices
+                // A path-only client expects the application in-process; no transport serves it.
+                .AddClient("Chargers", "InProcessWebSocket", path: "/ws/{deviceId}")
+                    .AddDevice<FakeCharger>()));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("missing in-process transport", "00001", TestMethods.Placeholder);
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => Proto.Context.Devices("Chargers").For<FakeCharger>("CP-001"));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("'Api'"), "the failure names the application");
+            Assert.That(exception.Message, Does.Contain("AddInProcessWebSocketDevices"));
+            Assert.That(
+                exception.Message,
+                Does.Not.Contain("which is not registered"),
+                "the client does not fall back to a generic missing-transport error");
+        });
     }
 
     [Test]
@@ -287,6 +375,8 @@ public sealed class DeviceTests
         public ValueTask<string> AwaitAsync(string expected, TimeSpan timeout) => ExpectTextAsync(expected, timeout);
 
         public ValueTask SendTextAsync(string text) => SendAsync(DeviceFrame.Text(text));
+
+        public ValueTask CloseAsync() => DisconnectAsync();
 
         private async ValueTask<string> ExchangeAsync(string send, string expect, TimeSpan timeout)
         {

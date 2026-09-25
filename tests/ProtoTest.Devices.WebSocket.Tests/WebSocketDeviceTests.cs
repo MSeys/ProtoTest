@@ -41,7 +41,10 @@ public sealed class WebSocketDeviceTests
             Assert.That(entity.State["device.client"], Is.EqualTo("Chargers"));
             Assert.That(entity.State["device.transport"], Is.EqualTo("WebSocket"));
             Assert.That(entity.State["device.address"], Is.EqualTo($"{server.Address}/ws/CP-001"));
-            Assert.That(entity.State["device.connected"], Is.EqualTo("true"));
+            Assert.That(
+                entity.State["device.connected"],
+                Is.EqualTo("false"),
+                "the release path disconnects the device and finalises its state");
         });
     }
 

@@ -3,16 +3,16 @@ namespace ProtoTest.Devices.Tests;
 using ProtoTest.Core;
 
 /// <summary>
-/// Pins the device resource id shape (audit Stage A0): <c>device:{client}:{id}</c> omits the device
-/// type, so a second device type with the same id collides in the resource registry even though the
-/// client registry is keyed by type.
+/// Pins the device resource and entity id shape (audit DEV-4): the device type is part of both, so two
+/// device types with the same id on one client coexist, each with its own resource and entity, instead
+/// of colliding in the resource registry.
 /// </summary>
 [TestFixture]
 [Category("Characterization")]
 public sealed class DeviceResourceIdCharacterizationTests
 {
     [Test]
-    public async Task TwoDeviceTypesWithTheSameId_ShouldFailOnTheSecondRegistration()
+    public async Task TwoDeviceTypesWithTheSameId_ShouldCoexistWithTheirOwnResourceAndEntity()
     {
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
@@ -25,20 +25,23 @@ public sealed class DeviceResourceIdCharacterizationTests
         await host.StartTestAsync("same id, two types", "00001", TestMethods.Placeholder);
 
         var charger = Proto.Context.Devices("Chargers").For<FakeCharger>("CP-001");
-        var exception = Assert.Throws<InvalidOperationException>(
-            () => Proto.Context.Devices("Chargers").For<FakeMeter>("CP-001"));
-
+        var meter = Proto.Context.Devices("Chargers").For<FakeMeter>("CP-001");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
 
+        var entities = host.Trace.Snapshot().Tests.Single().Entities!
+            .Where(entity => entity.Kind == ProtoTraceEntityKinds.Device)
+            .Select(entity => entity.Id)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
         Assert.Multiple(() =>
         {
-            // Pins current behavior; audit DEV-4 flips this once the resource id includes the device
-            // type, when both types can share one id on one client.
             Assert.That(charger.Id, Is.EqualTo("CP-001"));
+            Assert.That(meter.Id, Is.EqualTo("CP-001"));
             Assert.That(
-                exception!.Message,
-                Is.EqualTo("A resource with id 'device:Chargers:CP-001' is already registered in the current ProtoExecutionContext."));
+                entities,
+                Is.EqualTo(new[] { "device:Chargers:FakeCharger:CP-001", "device:Chargers:FakeMeter:CP-001" }),
+                "the device type is part of the entity id, so the two types do not share one identity");
         });
     }
 

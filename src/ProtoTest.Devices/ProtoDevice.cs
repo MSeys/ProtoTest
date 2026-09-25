@@ -9,6 +9,15 @@ using ProtoTest.Devices.Internal;
 /// protocol primitives; the instance is created per test by
 /// <c>Proto.Context.Devices().For&lt;TDevice&gt;("id")</c> and released with the test.
 /// </summary>
+/// <remarks>
+/// Concurrency: one device instance is one conversation. Connection creation is single-flight and sends
+/// are serialized, so concurrent sends share one connection instead of opening one each. One receive may
+/// be in flight at a time - a second concurrent receive fails fast with an error naming the device,
+/// because it would steal frames from the first. A send that races a disconnect fails with the same
+/// named device error instead of a disposed-socket exception. Sends and receives may run concurrently
+/// (one in each direction), and the test's end disconnects the device, records
+/// <c>device.connected = false</c> and emits the same <c>device.disconnect</c> an explicit call does.
+/// </remarks>
 public abstract class ProtoDevice
 {
     private DeviceSession? _session;

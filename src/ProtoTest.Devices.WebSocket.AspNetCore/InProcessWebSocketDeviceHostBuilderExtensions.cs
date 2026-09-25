@@ -1,5 +1,6 @@
 namespace ProtoTest.Devices.WebSocket.AspNetCore;
 
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Devices;
@@ -12,6 +13,10 @@ using ProtoTest.Devices.WebSocket;
 /// </summary>
 public static class InProcessWebSocketDeviceHostBuilderExtensions
 {
+    // One registration per (program, application): a second TProgram, or the same program under
+    // another application, is a second transport instead of a silently dropped duplicate (audit DEV-1).
+    private static readonly ConditionalWeakTable<IServiceCollection, HashSet<(Type Program, string Application)>> Registrations = new();
+
     /// <summary>
     /// Makes <typeparamref name="TProgram"/>'s endpoints reachable in-process for device clients. Call
     /// it unconditionally; whether it applies is decided per test from whether
@@ -29,11 +34,17 @@ public static class InProcessWebSocketDeviceHostBuilderExtensions
         builder.ConfigureServices(services =>
         {
             ProtoOptionsRegistration.Configure<WebSocketDeviceOptions>(services, () => new WebSocketDeviceOptions(), configure);
-            registeredTransport = ProtoRegistrationGuard.TryRegisterOnce<InProcessWebSocketRegistration>(services);
+            var registrations = Registrations.GetValue(services, static _ => new HashSet<(Type, string)>());
+            registeredTransport = registrations.Add((typeof(TProgram), applicationName));
             if (registeredTransport)
             {
-                services.AddSingleton<IProtoDeviceTransport>(
-                    new InProcessWebSocketDeviceTransport<TProgram>(applicationName));
+                // The registered options resolve (and validate) when the transport resolves, exactly
+                // like the socket transport, so configured values are the ones the connection uses
+                // (audit DEV-2).
+                services.AddSingleton<IProtoDeviceTransport>(provider =>
+                    new InProcessWebSocketDeviceTransport<TProgram>(
+                        applicationName,
+                        provider.GetRequiredService<WebSocketDeviceOptions>()));
             }
         });
 
@@ -55,6 +66,4 @@ public static class InProcessWebSocketDeviceHostBuilderExtensions
             },
             $"ProtoTest:Applications:{applicationName}:BaseUrl");
     }
-
-    private sealed class InProcessWebSocketRegistration;
 }

@@ -3,19 +3,21 @@ namespace ProtoTest.Devices.WebSocket.AspNetCore.Tests;
 using ProtoTest.AspNetCore;
 using ProtoTest.Core;
 using ProtoTest.Devices;
+using ProtoTest.Devices.WebSocket;
 using SampleApi = ProtoTest.AspNetCore.SampleApi;
 
 /// <summary>
-/// Pins the in-process WebSocket device transport before the audit fixes it (audit Stage A0):
-/// registrations collapse to one non-generic marker, <c>CanConnect</c> ignores the endpoint, and the
-/// configured transport options are registered but never consumed or validated.
+/// Pins the in-process WebSocket device transport after the audit fixes it (audit DEV-1/DEV-2): the
+/// registration is keyed by (program, application) so a second application keeps its transport,
+/// <c>CanConnect</c> answers for the client's application instead of ignoring it, and the registered
+/// <see cref="WebSocketDeviceOptions"/> are resolved and validated instead of being dead.
 /// </summary>
 [TestFixture]
 [Category("Characterization")]
 public sealed class InProcessDeviceCharacterizationTests
 {
     [Test]
-    public async Task TwoInProcessRegistrations_ShouldKeepOnlyTheFirstTransport()
+    public async Task TwoInProcessRegistrations_ShouldRegisterOneTransportPerApplication()
     {
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
@@ -23,7 +25,7 @@ public sealed class InProcessDeviceCharacterizationTests
             .AddInProcessWebSocketDevices<SampleApi.Program>("Api")
             .AddInProcessWebSocketDevices<SampleApi.Program>("Second")
             // Only the second registration's application is hosted: a transport for "Second" would
-            // connect here, while the surviving first transport looks up "Api" and finds nothing.
+            // connect here, while the transport for "Api" has no server to reach.
             .AddApplication("Second", app => app.AddAspNetCoreServer<SampleApi.Program>());
         await using var host = builder.Build();
         await host.StartAsync();
@@ -31,31 +33,25 @@ public sealed class InProcessDeviceCharacterizationTests
 
         var transports = Proto.Context.Service<IEnumerable<IProtoDeviceTransport>>().ToArray();
         var inProcess = transports.OfType<IProtoInProcessDeviceTransport>().ToArray();
-        var reachingSecond = inProcess[0].CanConnect(
-            Proto.Context,
-            new DeviceEndpoint("CP-001", "/ws/CP-001"));
+        var secondReachable = inProcess.Any(transport => transport.CanConnect(Proto.Context, "Second"));
+        var apiReachable = inProcess.Any(transport => transport.CanConnect(Proto.Context, "Api"));
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
 
         Assert.Multiple(() =>
         {
-            // Pins current behavior; audit DEV-1 flips this once the marker is keyed by
-            // (TProgram, application) and the transport is matched to the client's application.
             Assert.That(
-                transports,
-                Has.Length.EqualTo(1),
-                "the second in-process transport is silently dropped by one non-generic marker");
-            Assert.That(inProcess, Has.Length.EqualTo(1));
-            Assert.That(
-                reachingSecond,
-                Is.False,
-                "the surviving transport carries the first application name ('Api'), so it cannot reach 'Second', which is the only application hosted");
+                inProcess,
+                Has.Length.EqualTo(2),
+                "the registration is keyed by (program, application), so the second application is not dropped");
+            Assert.That(secondReachable, Is.True, "the hosted application has a transport");
+            Assert.That(apiReachable, Is.False, "application 'Api' is not hosted, so no transport claims it");
         });
     }
 
     [Test]
-    public async Task CanConnect_ForAnUnrelatedEndpoint_ShouldReturnTrue()
+    public async Task CanConnect_ForAnotherApplication_ShouldReturnFalse()
     {
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
@@ -64,28 +60,29 @@ public sealed class InProcessDeviceCharacterizationTests
             .AddApplication("Api", app => app.AddAspNetCoreServer<SampleApi.Program>());
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("endpoint-blind transport", "00001", TestMethods.Placeholder);
+        await host.StartTestAsync("identity-checked transport", "00001", TestMethods.Placeholder);
 
         var transport = Proto.Context.Service<IEnumerable<IProtoDeviceTransport>>()
             .OfType<InProcessWebSocketDeviceTransport<SampleApi.Program>>()
             .Single();
-        var reachable = transport.CanConnect(
-            Proto.Context,
-            new DeviceEndpoint("CP-001", "http://unrelated.example.test/definitely/not/a/route"));
+        var ownApplication = transport.CanConnect(Proto.Context, "Api");
+        var otherApplication = transport.CanConnect(Proto.Context, "Second");
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
 
-        // Pins current behavior; audit DEV-1 flips this once CanConnect consults the endpoint or the
-        // client's application instead of only this transport's own application.
-        Assert.That(
-            reachable,
-            Is.True,
-            "CanConnect only checks that the transport's application is hosted; the endpoint is not consulted");
+        Assert.Multiple(() =>
+        {
+            Assert.That(ownApplication, Is.True, "the transport serves the application it was registered for");
+            Assert.That(
+                otherApplication,
+                Is.False,
+                "a client for another application is never routed through this application's TestServer, even at the same path");
+        });
     }
 
     [Test]
-    public async Task InProcessOptions_ShouldNotBeValidatedOrConsumed()
+    public async Task InProcessOptions_WhenConfiguredInvalidly_ShouldFailValidation()
     {
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
@@ -102,8 +99,7 @@ public sealed class InProcessDeviceCharacterizationTests
                 .AddAspNetCoreServer<SampleApi.Program>()
                 .AddDevices(devices => devices
                     // Registered by transport name on purpose: AddWebSocketClient would add the socket
-                    // transport, whose construction resolves the options and validates them before the
-                    // in-process path could be chosen.
+                    // transport too, and this pin is about the in-process transport's own options.
                     .AddClient(
                         "Chargers",
                         InProcessWebSocketDeviceTransport<SampleApi.Program>.TransportName,
@@ -111,17 +107,60 @@ public sealed class InProcessDeviceCharacterizationTests
                         .AddDevice<EchoDevice>()));
         await using var host = builder.Build();
         await host.StartAsync();
-        await host.StartTestAsync("dead in-process options", "00001", TestMethods.Placeholder);
+        await host.StartTestAsync("validated in-process options", "00001", TestMethods.Placeholder);
 
-        var device = Proto.Context.Devices("Chargers").For<EchoDevice>("CP-001");
-        var ack = await device.BootAsync();
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(
+            () => Proto.Context.Devices("Chargers").For<EchoDevice>("CP-001"));
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
 
-        // Pins current behavior; audit DEV-2 flips this once the in-process transport consumes the
-        // registered options and validation runs (this configuration would then fail).
-        Assert.That(ack, Is.EqualTo("BOOT_ACK"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.ParamName, Is.EqualTo(nameof(WebSocketDeviceOptions.ConnectTimeout)));
+            Assert.That(exception.Message, Does.Contain("must be positive"));
+        });
+    }
+
+    [Test]
+    public async Task InProcessTransport_ShouldUseTheRegisteredOptionsInstance()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder
+            .AddInProcessWebSocketDevices<SampleApi.Program>(
+                "Api",
+                options =>
+                {
+                    options.ConnectTimeout = TimeSpan.FromSeconds(30);
+                    options.ReceiveBufferBytes = 4096;
+                })
+            .AddApplication("Api", app => app
+                .AddAspNetCoreServer<SampleApi.Program>()
+                .AddDevices(devices => devices
+                    .AddClient(
+                        "Chargers",
+                        InProcessWebSocketDeviceTransport<SampleApi.Program>.TransportName,
+                        path: "/ws/{deviceId}")
+                        .AddDevice<EchoDevice>()));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("live in-process options", "00001", TestMethods.Placeholder);
+
+        var registered = Proto.Context.Service<WebSocketDeviceOptions>();
+        var transport = Proto.Context.Service<IEnumerable<IProtoDeviceTransport>>()
+            .OfType<InProcessWebSocketDeviceTransport<SampleApi.Program>>()
+            .Single();
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(transport.Options, Is.SameAs(registered), "the transport connects and reads with the registered options");
+            Assert.That(registered.ConnectTimeout, Is.EqualTo(TimeSpan.FromSeconds(30)));
+            Assert.That(registered.ReceiveBufferBytes, Is.EqualTo(4096));
+        });
     }
 
     private sealed class EchoDevice : ProtoDevice

@@ -221,6 +221,9 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
             .OfType<ProtoClock>()
             .LastOrDefault() ?? new ProtoClock();
         _services.TryAddSingleton(clock);
+        // One clock registry per host: a test's clock is found through the host that owns it, so two
+        // hosts sharing a test id never overwrite or remove each other's clock.
+        _services.TryAddSingleton(new ProtoClockRegistry());
         _services.TryAddSingleton<TimeProvider>(new ProtoTestTimeProvider(clock));
         _services.TryAddSingleton<IProtoTestIdGenerator>(
             _ => new NumericProtoTestIdGenerator(_testIdOptions));

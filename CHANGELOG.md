@@ -107,7 +107,8 @@ All ProtoTest packages share one version; breaking API changes are called out be
 - `Build()` is terminal for every public registration entry: hooks, run gates, capabilities, the
   clock, sinks, infrastructure and application entries throw the same single-build message instead of
   silently registering into a host that already built its provider. A repeated registration that is a
-  no-op by design before `Build()` (the same server or worker name) stays a no-op.
+  no-op by design before `Build()` (the same server or worker name for the same program) stays a
+  no-op; the same name for a different program throws.
 - Only the web backend that wins the first-wins registration declares its browser capability, so
   referencing both Playwright and Selenium leaves one honest capability behind the one live backend.
 - A conditional declaration's key set compares by content (ordinal, distinct, order-independent), so
@@ -142,14 +143,56 @@ All ProtoTest packages share one version; breaking API changes are called out be
   `ProtoTest.Devices.WebSocket` and `ProtoTest.Devices.WebSocket.AspNetCore` were missing from the pack
   gate, so a 1.1 release would have shipped without them. `eng/pack.ps1` now covers all 35 packages
   and verifies the whole set in one run.
+- A worker's `Program.Main` sees the run's configuration: `AddWorkerHost` passes the merged overlay
+  (options over infrastructure settings over suite configuration) to the entry point as
+  `--{key}={value}` arguments, so `Host.CreateApplicationBuilder(args)` and
+  `Host.CreateDefaultBuilder(args)` read final-precedence values before `Build()`; the `HostBuilding`
+  in-memory overlay remains the fallback for an entry point that ignores its arguments. A parameterless
+  `Main` stays the documented limit.
+- The test-clock lookup is scoped to the owning host instead of a process-global map keyed by test id
+  alone: two hosts that share a `RunPrefix` each resolve their own clock, a failed test start leaves no
+  entry, context disposal removes only its own host's entry, and host disposal clears the registry. The
+  in-process ASP.NET Core request linking uses the owning host's registry, so a request sees the clock
+  of the test that caused it even when another host has a test with the same id.
+- `ProtoClock.Advance` performs its read-modify-write under the clock's lock, so concurrent advances on
+  the run clock add up instead of losing updates and each advance records its own `clock.advance`.
+- In-process device transports are keyed by `(TProgram, application)`: a second
+  `AddInProcessWebSocketDevices<TProgram>` is a second transport, and a client is only routed through
+  the transport of the application it was registered under. Two applications exposing the same path
+  each serve their own clients, and a path-only client with no matching transport fails naming the
+  application instead of falling back to another transport.
+- The in-process device transport resolves the registered `WebSocketDeviceOptions` from DI and
+  validates them with the transport, and its `ConnectTimeout` bounds the in-process connect - the
+  `configure` callback is no longer dead.
+- `DeviceSession` connects single-flight and serializes sends: concurrent sends share one connection
+  instead of opening one each and leaking the loser. One receive may be in flight at a time (a second
+  fails fast naming the device), and a send that races a disconnect fails with a device error naming
+  the device instead of a disposed-socket exception or an NRE.
+- Device resource and trace entity ids include the device type (`device:{client}:{type}:{id}`), so two
+  device types with the same id on one client coexist with their own resource and entity.
+- The device release path disconnects: teardown emits `device.disconnect` and finalises
+  `device.connected = false`, so a test that never disconnects still ends disconnected and an explicit
+  disconnect followed by a send reconnects and records both connects.
+- `AddWorkerHost` throws when one name is registered for a different program instead of silently
+  dropping the second registration, matches `IHostApplicationBuilder` (covering
+  `WebApplicationBuilder`), and fails loudly naming an unrecognised builder shape instead of leaving it
+  with its own configuration and `TimeProvider`. `ProtoWorkerOptions.Set(key, null)` now delivers an
+  empty setting, as its documentation always promised, and the parameterless-`Main` fallback
+  (`HostBuilding` overlay) is pinned by a test.
 
 ### Changed
 
+- `IProtoInProcessDeviceTransport.CanConnect` takes the requested application
+  (`CanConnect(context, applicationName)`) instead of a `DeviceEndpoint` it ignored, so a transport
+  answers for the identity it serves. The device transport interface is unreleased 1.1 plumbing; a
+  custom in-process transport updates its one method.
 - REST object request bodies serialize with the shared web defaults (camelCase names), matching
   GraphQL variables. Pass explicit `JsonSerializerOptions` to keep another naming policy.
 - OpenAPI coverage reads specifications with `Microsoft.OpenApi` 3.x (JSON and YAML, including 3.1
   documents). `ProtoTest.OpenApi` references `ProtoTest.Core` directly instead of relying on a
   transitive reference.
+- `ProtoHost.FindClock` is an instance member; the clock lookup is scoped to the host that owns the
+  test. The clock feature is unreleased, so no consumer migration is needed.
 
 ### Breaking
 

@@ -203,15 +203,35 @@ rule lands (audit ADDR-1), with the reference suite as its first external proof.
     A2aR-03/04/05 and A2bR-04/05/06 wording/pins (nice-to-have); `AddEntityFrameworkCore` must follow
     `AddSql` to inherit the address rule (documented order requirement); A2bR-06 (host `SqlOptions`
     after `AddSql`) recorded.
-- [ ] **A3 Configuration timing and clock identity** (CFG-1, CFG-3, CFG-4): the worker `Main` args
-  overlay with its capture test and documented limit; host-scoped clock locator. Update
-  `hosting.md`, changelog and `eng/facts/gotchas.md`. OpenCSMS may then delete its deferred reads.
-- [ ] **A4 Device stack correctness** (DEV-1..DEV-6): routing identity, options, concurrency, resource
-  ids, disconnect state, worker registration conflicts — then freeze the device surface until R2.
+- [x] **A3 Configuration timing and clock identity** (CFG-1, CFG-3, CFG-4). Complete; independently
+  reviewed (`assets/internal/review-a3.md`, 0 blockers). The worker `Main` overlay rides the entry
+  point's args (options > infrastructure settings > suite configuration; `HostBuilding` stays the
+  fallback; the parameterless/arg-ignoring limit is documented in `hosting.md` Limits);
+  `ProtoClockLocator` is replaced by a host-owned, failure-safe `ProtoClockRegistry` (`ProtoHost.FindClock`
+  is now instance API; requests link through the owning host); `ProtoClock.Advance` is atomic under its
+  lock; the request-ambient lifetime is documented with a labelled characterization. Evidence:
+  independent `-Full -Pack` run `verify A3-review ff9badb* (1.1.0-alpha.1): lint PASS · docs PASS ·
+  test PASS · pack PASS`; the stage's scoped record is `artifacts/gates/A3.json`.
+  - **A3 residuals:** A3R-01 parameterless-entry-point boundary test belongs with DEV-6/A4 (the audit
+    asked for it; the only test worker passes args, so the `HostBuilding` fallback is unpinned) — bind
+    it in A4; A3R-02 value edge cases (space/`=`/`;`), A3R-03 the overlay not reserving
+    `contentRoot`/`applicationName`, A3R-04 a missing registry dropping the filter silently, A3R-05 the
+    hand-built-provider fallback, A3R-06 `Advanced` outside the clock lock are nice-to-haves.
+- [x] **A4 Device stack correctness** (DEV-1..DEV-6): routing identity, options, concurrency, resource
+  ids, disconnect state, worker registration conflicts — done; the device surface is frozen until R2.
+  Independently reviewed (`assets/internal/review-a4.md`; its three should-fixes fixed before commit:
+  the facts section order, the `IHostApplicationBuilder` test, the changelog contradiction). A3R-01 is
+  pinned at the `ConfigureBuilder` seam with the caveat recorded (a second worker program is
+  disproportionate). Gate: `verify A4 (1.1.0-alpha.1): lint PASS · docs PASS · test PASS · pack PASS`.
+  - **A4 residuals:** A4R-04 the in-process `KeepAliveInterval` phrasing in gotchas; A4R-05 the same
+    client name under two applications still collides; A4R-06 a canceled connect task poisons the
+    session; A4R-07 the disconnect token after start and the null-option `Main` path are unpinned;
+    `AddAspNetCoreServer(name)` still compares only the name (A1R-01 residual, where a different
+    `TProgram` under one name is a no-op) is recorded in `architecture.md`/`gotchas.md`.
 
-⛳ Checkpoint P2 — after A2, verify the reference suite still runs with no conditionals and that its
-capability gates behave; after A4, re-read `eng/facts/architecture.md` against the code and correct
-it before starting A5.
+⛳ Checkpoint P2 — met 2026-09-25: after A2 the reference suite stayed 6/6 in both modes after the
+repack; after A4 `eng/facts/architecture.md` was corrected (device stack section, worker shapes) and
+re-read against the code. Phase 2 is complete.
 
 ## Phase 3 — Hygiene and the gates that let drift through
 
@@ -276,7 +296,7 @@ Order is plan-4's demand order; each item is its own stage with the feature-plan
 | 0b — Audit A0 characterization | Complete | `A0-core` 586ed00 · `A0-devices` (lint/docs/test PASS, stage trees 244eee9*/586ed00*, 1.1.0-alpha.1) | All characterizations pass pinning current behavior: mixed conditionals, two named servers, Web backend pair, post-`Build`, clock locator, worker `Main`, in-process transport marker/endpoint/options, connect race, device resource id |
 | 1 — R1a reference suite | Complete | 1.1 `8bf57ce` · 1.2/1.3 `8c0ab21` · 1.4/1.5 `a63be86` · 1.6/1.7 `2cb949f` — container 4/4 ×2, configured 4/4 ×2 (one DB) | Journey, DLQ, both modes, honest README/COVERAGE; Phase 2 (audit A1–A4) next |
 | 1b — R1a review follow-ups | Complete | OpenCSMS `e3cf209` + `92a6d0d`; logs under `artifacts/gates/` | All seven should-fixes done: redelivery test, dead-channel reset, observable clock, at-most-once recorded, API-only migrations, evidence runner, suite polish; R1a-14 anecdotal |
-| 2 — Audit correctness A1–A4 | In progress | A1 `2e84e65` · A2a `f8da0c2` · A2b (this commit), all independently reviewed; gates PASS; OpenCSMS 6/6 both modes | A3 (config timing/clock) next |
+| 2 — Audit correctness A1–A4 | Complete | A1 · A2a · A2b · A3 · A4, all independently reviewed; pack green on A2b/A3/A4; OpenCSMS 6/6 both modes | Phase 3 (A5–A7 hygiene) next |
 | 3 — Hygiene A5–A7 | Pending | — | Vocab/docs, tests/support, release evidence |
 | 3b — DX and API consistency | Pending | `eng/dx-review.md`: 5 P1, 7 P2, 6 P3 | DX-01/02/03/05 accepted (DX-04 recorded); P2/P3 by demand; deliberate idioms binding |
 | 4 — Plan-4 resume | Pending | — | R2–R5, P5–P8, X1/X2 |

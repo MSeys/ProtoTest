@@ -46,11 +46,27 @@ public sealed class ProtoClock : TimeProvider
             throw new ArgumentOutOfRangeException(nameof(delta), delta, "A clock can only advance; use SetUtcNow to move it backwards.");
         }
 
-        Move(GetUtcNow().Add(delta));
+        // The whole read-modify-write stays under the lock: concurrent advances each add their delta
+        // to the value another advance just wrote instead of overwriting each other.
+        Move(delta);
     }
 
     /// <summary>Sets the clock to an exact instant, for tests that jump rather than elapse.</summary>
     public void SetUtcNow(DateTimeOffset utcNow) => Move(utcNow);
+
+    private void Move(TimeSpan delta)
+    {
+        Action<ProtoClockChange>? advanced;
+        ProtoClockChange change;
+        lock (_gate)
+        {
+            change = new ProtoClockChange(_utcNow, _utcNow.Add(delta));
+            _utcNow = change.CurrentUtc;
+            advanced = Advanced;
+        }
+
+        advanced?.Invoke(change);
+    }
 
     private void Move(DateTimeOffset utcNow)
     {

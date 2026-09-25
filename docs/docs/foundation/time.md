@@ -44,7 +44,7 @@ public sealed class TariffService(TimeProvider timeProvider)
 }
 ```
 
-Two things must be true for this to work: the application resolves `TimeProvider` from dependency injection (not `DateTime.UtcNow`, and not a cached `TimeProvider.System`), and the request comes from the test's own client.
+Two things must be true for this to work: the application resolves `TimeProvider` from dependency injection (not `DateTime.UtcNow`, and not a cached `TimeProvider.System`), and the request comes from the test's own client. The lookup is scoped to the host that owns the test, so two hosts configured with the same `RunPrefix` each link their requests to their own clock.
 
 A [worker host](../integrations/hosting.md) runs on background flows with no test, so it sees the run clock. Advance the run clock to move a worker's time:
 
@@ -62,4 +62,5 @@ Advancing a test's clock records a `clock` entity with its new value and writes 
 - **Direct wall-clock calls are not affected.** `DateTime.UtcNow`, `DateTimeOffset.UtcNow` and `Environment.TickCount` bypass the clock. Application code must read its `TimeProvider`.
 - **Published environments cannot be faked.** A deployed process keeps its own time, so time-dependent journeys are in-process journeys - guard them with `[RequiresInProcess]` or a capability skip.
 - **An application that caches time fails the same way it would in production.** A service that resolves the clock once and stores a value it computed earlier stays stale; the fake clock makes that visible rather than causing it.
+- **A pushed clock outlives its request in flows that captured it.** `ProtoRequestClock.Push` restores the previous clock when its scope ends, but it cannot revoke the value from a task that captured it: a fire-and-forget task started inside a request keeps the finished test's clock. Long-lived background work must read the run clock.
 - **The clock is per test, the run is per suite.** Advancing `Proto.Context.Clock` does not touch infrastructure or workers; use `ProtoHost.CurrentHost.Clock` when the whole run should move.

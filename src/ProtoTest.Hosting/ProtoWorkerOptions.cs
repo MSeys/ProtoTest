@@ -12,12 +12,13 @@ public sealed class ProtoWorkerOptions
 
     /// <summary>
     /// Sets one configuration key the worker reads, for example <c>Worker:RetryLimit</c>. A
-    /// <see langword="null"/> value removes nothing; it stays an empty setting.
+    /// <see langword="null"/> value removes nothing; it stays an empty setting: the worker sees the key
+    /// with an empty value, on the command line and in the in-memory overlay alike.
     /// </summary>
     public ProtoWorkerOptions Set(string key, string? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        _values[key] = value;
+        _values[key] = value ?? string.Empty;
         return this;
     }
 }

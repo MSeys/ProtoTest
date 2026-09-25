@@ -54,9 +54,11 @@ and the device client (`ProtoDeviceClient` + registration store). The shared rul
 - Record the client as a trace entity (`ProtoTraceEntityKinds.Client`) with the same id shape the
   other protocols use; one entity per instance.
 - First registration wins per name; a repeated registration must not silently replace an initializing
-  client. If a losing registration describes a *different* thing, fail loudly (audit DEV-1/DEV-6).
-- An in-process application transport is preferred when the application is hosted; otherwise the
-  configured address. Do not branch on environment in user code.
+  client. If a losing registration describes a *different* thing, fail loudly (`AddWorkerHost` compares
+  the program; the in-process device transport compares `(program, application)`).
+- An in-process application transport is preferred when the application it belongs to is hosted;
+  otherwise the configured address. The transport is selected by the client's application identity,
+  never by path or first match. Do not branch on environment in user code.
 
 ## Recipe: infrastructure (a run-owned piece)
 

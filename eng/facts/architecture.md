@@ -1,8 +1,7 @@
 # ProtoTest engineering facts — architecture
 
-Current at commit `61220f5` (branch `version/1.1`). Source wins over this document: when it disagrees,
-the code is right and this file is the bug to fix in the same commit. Items marked **→ AUDIT** are
-changes `eng/audit-plan-4.md` requires; the text describes today's behavior and the target rule.
+Current at the A4 stage tree (branch `version/1.1`; audit A1–A4 landed). Source wins over this
+document: when it disagrees, the code is right and this file is the bug to fix in the same commit.
 
 ## The model in one paragraph
 
@@ -52,7 +51,7 @@ or `Sheets` type names.
 6. Builds the provider and **constructs every `IProtoCollector`** so a bad OpenAPI/GQL schema fails
    construction, not the first test.
 7. Second `Build()` throws; every public registration entry that would mutate composition throws
-   after `Build()` (a repeated same-name `AddAspNetCoreServer`/`AddWorkerHost` no-op stays a no-op).
+   after `Build()` (a repeated same-name registration of the *same* program/type stays a no-op).
 
 `StartAsync()`:
 
@@ -63,8 +62,10 @@ or `Sheets` type names.
    receives the run's readiness policy (`ProtoInfrastructureContext.Readiness`) and, for an address
    probe, the keys later pieces declare; readiness probes are ordinary infrastructure and are awaited
    at their registration position (a probe registered before its publisher records the ordering, not a
-   mode lie); workers are infrastructure and start after everything registered before them
-   (**→ AUDIT CFG-1**: the worker's `Program.Main` does not yet see the run's configuration).
+   mode lie); workers are infrastructure and start after everything registered before them; each
+   worker receives the merged overlay (options over settings over configuration) as `--{key}={value}`
+   arguments, so the worker's `Program.Main` sees final-precedence values, and the `HostBuilding`
+   in-memory overlay stays as the fallback for an entry point that ignores args.
 4. Starts the trace listener. A start failure rolls back completed run hooks in reverse, clears
    infrastructure settings, and returns the host to Created for a retry.
 
@@ -82,9 +83,11 @@ provider, stops listening, unregisters. Start/stop/dispose racing is rejected, n
 
 1. The adapter evaluates skip conditions **before** `StartTestAsync`; a skipped test has no context,
    no trace entry and no setup/teardown.
-2. `StartTestAsync` creates the DI scope, trace recorder and context, sorts attributes by `Order`, sets
-   the ambient context, then runs hooks ascending (the built-in client initializer has
-   `Order = int.MinValue`) and attributes ascending. It opens `test.execution` and makes it the parent.
+2. `StartTestAsync` creates the DI scope, trace recorder and context, registers the test's clock in the
+   host's `ProtoClockRegistry` (a failed start removes it; context disposal removes it), sorts
+   attributes by `Order`, sets the ambient context, then runs hooks ascending (the built-in client
+   initializer has `Order = int.MinValue`) and attributes ascending. It opens `test.execution` and
+   makes it the parent.
 3. A setup failure records the test `Failed`, rolls back only the completed components (attributes and
    hooks in reverse), and rethrows.
 4. Teardown runs attributes reverse, hooks reverse, publishes attachments, disposes the context
@@ -123,7 +126,7 @@ starts again after a failed rollback is re-armed and released once per ownership
 | `AddInfrastructure` | same instance merges keys; different instance with the same id throws; skipped when every declared key is configured, unless `AddInfrastructureAlways` | throws |
 | `AddApplication` | named; first client per protocol is the default | throws (application entries too) |
 | Integration `AddClient` | first registration that initializes wins (keyed factory + resolver first match) | throws |
-| `AddWorkerHost` / `AddAspNetCoreServer(name)` | first per name wins; **→ AUDIT DEV-6** compares the program/type | a new registration throws; a repeated name is a no-op |
+| `AddWorkerHost` / `AddAspNetCoreServer(name)` | `AddWorkerHost`: first per name wins and a repeated name with a **different program throws**; `AddAspNetCoreServer(name)` is still first-name-wins (A1R-01 residual, different `TProgram` under one name is a no-op) | a new registration throws; a repeated name is a no-op |
 | `AddData` | composes onto one registry per builder | throws |
 | `AddWeb` | one backend per host, first wins; only the winner declares the browser capability | throws |
 
@@ -173,8 +176,24 @@ source. A first-reader-wins divergence is a bug (audit ADDR-2, fixed).
 | Readiness (`AddHttpReadiness`) | same precedence at its registration position; a probe before the publisher records `readiness.skipped` naming the ordering requirement, and claims "in-process" only when a server capability backs the application |
 | ASP.NET Core server | step-aside reads static configuration only (decided asymmetry); a settings-published address leaves the server in place while every address reader follows the published process |
 | Web sessions | same precedence; absolute-URL sessions stay addressless |
-| Devices | same precedence; registration-time throw when neither resolves |
+| Devices | same precedence; registration-time throw when neither resolves. A device client carries the application it was registered under, and the in-process transport is selected by that identity: a transport serves one `(TProgram, application)` pair, so a client for B is never routed through A's `TestServer` at the same path. A path-only client (no resolver) with no matching transport fails naming the application |
 | Sql / Messaging | connection resolved through DI factories/options; the capability is declared with `AddCapabilityWhenProvided` over the keys that can provide the address (`SqlOptions.AddressKeys`, `RabbitMqOptions.ConnectionStringSetting`), so a run with none drops it and skips; the SQL connection hook and the Entity Framework Core enlistment hook (same keys) stay inert (no open, no context), and the accessors name the keys |
+
+## Device stack (A4, frozen until R2 needs more)
+
+- Routing identity: `AddInProcessWebSocketDevices<TProgram>(application)` registers one transport per
+  `(TProgram, application)`; `IProtoInProcessDeviceTransport.CanConnect(context, applicationName)`
+  answers for the requested application and the server factory it needs. The interface is unreleased
+  1.1 plumbing; the endpoint parameter was dropped rather than ignored.
+- Options: the in-process transport resolves the registered `WebSocketDeviceOptions` from DI (validated
+  with the transport, like the socket path) and applies `ConnectTimeout` to the in-process connect.
+- Concurrency contract on `ProtoDevice`: connection creation is single-flight, sends are serialized,
+  one receive is in flight at a time (a second fails fast naming the device), a send that races a
+  disconnect fails with a device error naming the device, and send/receive may run concurrently.
+- Identity: resource and trace entity ids are `device:{client}:{type}:{id}`; the entity state carries
+  `device.type` and `device.connected`, and the release path is a real disconnect
+  (`device.disconnect` + `device.connected = false`), so an explicit disconnect-then-reconnect and a
+  test that never disconnects both end disconnected.
 
 ## Options
 
@@ -228,8 +247,8 @@ tests resolves per call and never holds a context.
   introduced, not literals at call sites (**→ AUDIT VOC-2**: web page kinds and `graphql.failure` still
   literals).
 - Entity ids: `client:{type}:{name}`, `context:{type}`, `capability:{kind}:{name}` (with `:{instance}`
-  when the descriptor carries one), `device:{client}:{id}` (target: include the device type, audit
-  DEV-4), infrastructure `Id`, resources `Id`, value items `{type}:{identity}`.
+  when the descriptor carries one), `device:{client}:{deviceType}:{id}`, infrastructure `Id`, resources
+  `Id`, value items `{type}:{identity}`.
 - New vocabulary is additive to the wire; the viewer contract is not edited casually.
 
 ## Runner adapters
@@ -261,7 +280,7 @@ suite; extend it, do not fork it.
 | Tracing | `ProtoTraceRecorder`, `ProtoTraceSession`, `ProtoTraceWire`, `ProtoTraceContracts` | `src/ProtoTest.Core/Tracing/` |
 | Redaction | `ProtoMetadataRedaction`, `ProtoUriSanitizer`, `JsonDiagnosticSanitizer` | Core / ProtoTest.Json |
 | Reporting | `IProtoSink`, `IProtoReportSource`, `IProtoCollector`, `ProtoReportItem`, run gates | `src/ProtoTest.Core/Reporting/` |
-| Clock | `ProtoClock`, `ProtoTestTimeProvider`, `ProtoRequestClock` | `src/ProtoTest.Core/Time/` |
+| Clock | `ProtoClock`, `ProtoTestTimeProvider`, `ProtoRequestClock`, `ProtoClockRegistry` | `src/ProtoTest.Core/Time/` |
 | Readiness | `ProtoReadiness`, `ProtoReadinessOptions`, `IProtoReadinessProbe` | `src/ProtoTest.Core/Readiness/` |
 | Skip | `RequiresCapabilityAttribute`, `RequiresInProcessAttribute`, `ProtoTestSkip` | `src/ProtoTest.Core/Applications/` |
 | Adapters | five runner packages + `tests/ProtoTest.AdapterContract` | `src/`, `tests/` |

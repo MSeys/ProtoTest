@@ -20,8 +20,8 @@ dotnet add package ProtoTest.Devices.WebSocket.AspNetCore   # in-process endpoin
 - Addresses resolve per test: an explicit template (`{deviceId}` filled in), a resolver, or the
   application's address when the client is registered inside `AddApplication` - no per-device
   configuration.
-- Trace operations (`device.connect/send/receive/command`) and a `device` entity with client,
-  transport, address and connection state.
+- Trace operations (`device.connect/send/receive/command`) and a `device` entity with client, type,
+  transport, address and connection state; the release path disconnects the device and records it.
 - Assertion-level coverage: a matched expectation records its message kind, and the client's protocol
   catalog reports kinds no test asserted as gaps.
 - `[RequiresDevice<TDevice>]` skips tests the environment cannot run.
@@ -29,8 +29,10 @@ dotnet add package ProtoTest.Devices.WebSocket.AspNetCore   # in-process endpoin
 ## Limits
 
 - One instance per (client, type, id) per test; devices are not shared across tests.
+- One conversation per device instance: connect is single-flight, sends are serialized, one receive is
+  in flight at a time, and a send racing a disconnect fails with a device error naming the device.
 - An in-process endpoint needs `ProtoTest.Devices.WebSocket.AspNetCore`; the socket transport reaches
-  published addresses.
+  published addresses. A client is only routed through its own application's in-process transport.
 - `ExpectAsync` consumes frames; the bounded exchange log is for failure messages.
 - Replay (`device.replay`) is designed but not shipped.
 

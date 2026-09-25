@@ -112,11 +112,12 @@ Milestones are the spec's (§8); each is stage-sized and leaves the demo runnabl
   (no remote yet); README states what it is, the run modes and an honest "what this proves"; MIT;
   linked from the docs as *the reference suite* (never as a sample) once it has a public remote. One
   command: `docker compose up` (M4) or `dotnet test`.
-- [ ] **R1 CSMS API + Postgres + billing worker + REST suite + one journey** (M1, 2–3 weeks; needs P1, P2) —
-  **in progress**: the product is written and committed in OpenCSMS, the suite exists but its first
-  journey has never run green and the user mandated a critical audit of it before anything else. See
-  the R1a/R1b/R1c rows and the P1-gap finding in the progress section, and
-  `assets/internal/handoff-r1.md` for the full handoff.
+- [x] **R1 CSMS API + Postgres + billing worker + REST suite + one journey** (M1, 2–3 weeks; needs P1, P2) —
+  **done (2026-09-25)**: the audit ran first (`eng/audit-plan-4.md` Track R, REF-1..REF-6), then the
+  fixes. The suite is green 4/4 in container mode and 4/4 in configured mode twice against one
+  PostgreSQL (no mode conditionals, no code change between modes), the dead-letter path is asserted
+  (`x-opencsms-attempts: 3`), and `COVERAGE.md` is linked from the README. The fix log is
+  `eng/plan-5.md` Phase 1.
   REST/OpenAPI surface, tariff rules, `AddWorker<Program>`-hosted billing worker consuming RabbitMQ events
   with retry and dead-letter, Testcontainers Postgres/RabbitMQ, first end-to-end journey, and the
   documented coverage gap. Its `Setup` is P4f's acceptance: providers and consumers declared once, the
@@ -238,19 +239,18 @@ Record `git diff --shortstat` per stage split by `src`, `tests`, `docs`, with th
 | P4e — One device registration per mode | Complete | src +151 / −61 · tests +141 / −21 · docs +9 / −7 | Devices now follow the REST model exactly: `IProtoInProcessDeviceTransport.CanConnect` lets the client prefer an in-process transport when the application is hosted, so `AddWebSocketClient("Chargers", path: "/ocpp/{deviceId}")` is the only registration and `AddInProcessWebSocketDevices<TProgram>("Api")` is called once per host (harmless when published). Address resolvers gained an optional transform (`http(s)`→`ws(s)`), `TryServerFactory<TProgram>` was added to AspNetCore, and the separate in-process client API is gone. 3 AspNetCore-for-devices tests include the acceptance pair: the same client goes through the `TestServer` when the app is hosted and over the socket when `AddAspNetCoreServer` is absent. Core device tests (8) and socket tests (4) updated; docs, READMEs, fact sheet and changelog describe one registration. Full suite, format gate, docs check, docs build and pack green. |
 | P4f.2a — Packaging repair (found while packing P4f.2) | Complete | eng +8 / −1 · src csproj +14 / −17 · 3 suppression files (264 lines) | Stage 8's package-validation edit had dropped `IsPackable` from `ProtoTest.AspNetCore`, `ProtoTest.Web`, `ProtoTest.Web.Playwright` and `ProtoTest.Web.Selenium`, and the packages added on this branch (`ProtoTest.Hosting`, `ProtoTest.Devices.WebSocket`, `ProtoTest.Devices.WebSocket.AspNetCore`) were never added to the pack gate - a 1.1 release would have shipped without them, and `eng/pack.ps1` failed its own consistency check because `ProtoTest.Devices`, `ProtoTest.Traces` and `ProtoTest.Cli` were missing from its list. All nine projects are packable again, the list covers all 35 packages, and the web family's baselines run again with the intentional 1.1 API changes recorded in `CompatibilitySuppressions.xml` (and named in the changelog's Breaking section). `eng/pack.ps1` is now the per-stage pack gate: 35 packages, 150 ProtoTest dependency references and 99 PDB/DLL pairs verified at 1.0.1. |
 | R0 — Repository discipline | Complete (local) | OpenCSms repo 4088672 + README/MIT/NuGet.config | `C:\Development\OpenCsms` exists with its own git history on `main` (local only, no remote yet): MIT license, a README that says what the repo is, the run-mode table and the honesty contract, `Directory.Build.props` (warnings as errors, analyzers), and a `NuGet.config` whose package-source mapping pins `ProtoTest.*` to the sibling checkout's `artifacts/packages` (the branch and the published 1.0.1 share a version; mapping prevents a wrong resolve). First commit: "Start OpenCSMS: what it is, how it runs, and its honesty contract". |
-| R1a — Critical audit of the reference suite (user mandate) | Pending — next stage | handoff: `assets/internal/handoff-r1.md` | The user stopped the R1 session: the suite "is not written properly" and the structure is "meh"; the order is audit first, fix, then continue. The handoff file names the findings: repeatability against a persistent database (fixed tenant `acme` + fixed tariff names collide on unique `(TenantId, Name)` indexes in configured mode), test-style/idiom review against the demo, Setup shape, parallelism/state, missing `COVERAGE.md`, README honesty, and project structure. Also the P1 finding below. |
-| R1b — M1 product (domain, API, worker) | In progress | OpenCSms 73736ec + e9fffcb | Domain billing rules with 10 unit tests; EF Core 8 + Npgsql context and initial migration; minimal API (tariffs, stations, sessions, meter values, end, invoice, `/healthz`, Swagger); Generic Host billing worker consuming `session.ended` with in-process retries and a dead-letter queue; shared lazy RabbitMQ publisher/topology; `OpenCsms.Messaging`. Working tree not yet committed: deferred connection-string read, `AddCsmsData()` signature, suite project. |
-| R1c — First journey through the suite | Blocked on R1a | OpenCSms `tests/OpenCsms.Suite` (untracked) | The suite's Setup registers Postgres/RabbitMQ containers, the worker and the in-process API with **no mode conditionals**, and three tests exist. Containers and settings were verified; the first journey has never run green: the worker's `Program.Main` could not see the run's configuration (see finding below), mitigated by deferring the `AddDbContext` connection-string read. The fix is unverified and the last run was aborted by the user. |
+| R1a — Critical audit of the reference suite (user mandate) | Complete | `eng/audit-plan-4.md` (REF-1..REF-6) + `eng/plan-5.md` Phase 1 | Delivered as ProtoTest Audit 4's Track R: the repeatability collision, the eager broker read, the REST-polling journey, the missing idioms, the flat layout and the missing `COVERAGE.md` were found, then fixed in OpenCSMS (`8bf57ce`, `8c0ab21`, `a63be86`, `2cb949f`). The P1-gap decision is in the finding below. |
+| R1b — M1 product (domain, API, worker) | Complete | OpenCSMS `73736ec`, `e9fffcb`, `8bf57ce`, `2cb949f` | Domain billing rules with 10 unit tests; EF Core 8 + Npgsql context and initial migration; minimal API (tariffs, stations, sessions, meter values, end, invoice, `/healthz`, Swagger); Generic Host billing worker consuming `session.ended` with in-process retries and a dead-letter queue; shared lazy RabbitMQ publisher/topology; `OpenCsms.Messaging`. The broker address is resolved at use time and the invoice is stamped from the run clock. |
+| R1c — First journey through the suite | Complete | OpenCSMS `2cb949f`: container 4/4 (twice), configured 4/4 (twice, one database) | Green in the spec layout (`Journeys/`, `Api/`, `Billing/`, `Support/`), with a per-test operator, the broker await, JSON/HTML sinks and REST route coverage, a proven parallel policy, and the DLQ test. README and `COVERAGE.md` describe exactly what runs. |
 
 ### Findings pulled by R1
 
-- **P1-gap — worker configuration timing (open).** A worker that reads `builder.Configuration` in its
-  `Program.Main` before `Build` does not see the run's settings/suite configuration; the same keys are
-  visible from a hosted service at `StartAsync`, which is all `ProtoTest.Hosting.Tests` asserts today.
-  OpenCSms works around it by reading the connection string inside the `AddDbContext` options factory.
-  Decide in the R1a audit: fix `ProtoTest.Hosting` (apply the overlay before the entry point reads it)
-  or document the limit; either way add a worker test that captures configuration inside `Main`, and
-  update docs/changelog/fact sheet. Evidence and repro notes: `assets/internal/handoff-r1.md` §3.
+- **P1-gap — worker configuration timing (decision recorded; implementation in plan-5 Phase 2/A3).**
+  Audit 4 `CFG-1` decided the fix: apply the merged overlay to the worker entry point's arguments
+  before it reads configuration, keep the `HostBuilding` overlay as the fallback, and document the
+  parameterless-entry-point limit. The test that captures configuration inside `Main` landed in
+  plan-5 Phase 0b (it currently pins the gap). OpenCSMS keeps its deferred `AddDbContext` read until
+  A3 lands, then may simplify. Original evidence and repro notes: `assets/internal/handoff-r1.md` §3.
 - **Packaging regression (fixed).** Stage 8 dropped `IsPackable` from four shipped web-family packages
   and the branch's new packages were missing from the pack gate; `3480b9e` repaired all 35 packages.
   `eng/pack.ps1` is the per-stage gate from now on.

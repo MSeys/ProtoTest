@@ -96,30 +96,77 @@ Exit met: all characterizations pass and name their finding. Evidence: `verify A
 
 Finding list: `REF-1`..`REF-6`; product fixes do not change ProtoTest source.
 
-- [ ] **1.1 Product correctness first.** Resolve the broker address at use time (CFG-2/REF-2);
+- [x] **1.1 Product correctness first.** Resolve the broker address at use time (CFG-2/REF-2);
   re-publish `invoice.issued` on redelivery and stop swallowing publish failures (REF-4); inject
-  `TimeProvider` into the billing consumer.
-- [ ] **1.2 Repeatability (REF-1).** A `[CsmsOperator]` `ProtoAttribute` provisions tenant, tariff and
-  station from `context.TestId`; delete every fixed identifier. Fail state: a second `dotnet test`
-  against one persistent configured database is green and `grep "acme"` over the suite returns
-  nothing.
-- [ ] **1.3 The ProtoTest way (REF-3).** Compose `AddMessaging(m => m.CaptureAttachments().UseRabbitMq())`
-  after the application; await `invoice.issued` (with the REST read as a side-check); replace
-  `PostAsync<T>`/raw asserts with `Should.HaveHttpStatus`/`ShouldMatchShape`; gate with worker/broker
-  capabilities. Fail state: removing `AddWorkerHost` makes the journey fail, not pass.
-- [ ] **1.4 Structure and evidence (REF-6).** Split `Api/` contract tests from `Journeys/`; register
+  `TimeProvider` into the billing consumer. Done in OpenCSMS `8bf57ce`; the existing journey is green
+  in container mode: `dotnet test tests/OpenCsms.Suite` → 3/3, twice, fresh PostgreSQL and RabbitMQ.
+  The publisher now reads the address on first use, the consumer republishes on every delivery and
+  fails the handler when the publish fails, and the invoice is stamped with the run clock.
+- [x] **1.2 Repeatability (REF-1).** A `[CsmsOperator]` `ProtoAttribute` provisions tenant, tariff and
+  station from `context.TestId`; every fixed identifier is gone (`grep` clean). Done in OpenCSMS
+  `8c0ab21`; the persistent-database proof (second configured-mode run) is 1.7's acceptance.
+- [x] **1.3 The ProtoTest way (REF-3).** Compose `AddMessaging(m => m.CaptureAttachments().UseRabbitMq())`
+  after the application; the journey awaits the product's `csms.events` exchange (pre-bound tap,
+  session-id + invoice-id predicate, 30 s timeout) with the REST read as a side-check; status/shape
+  assertions are fluent; worker/broker capability gates are on the class. Done in OpenCSMS `8c0ab21`.
+  Worker-absent experiment (anecdotal, R1a-14; not pinned by a committed test): with the gate in
+  place the journey skips; without the worker and gate, the await fails with the expected
+  `TimeoutException` rather than passing.
+- [x] **1.4 Structure and evidence (REF-6).** Split `Api/` contract tests from `Journeys/`; register
   JSON/HTML sinks and the REST coverage collector; add the parallelism policy file; align NUnit
-  majors; drop dead refs; extract `MigrateCsmsData()`.
-- [ ] **1.5 Honesty (REF-6).** Write `COVERAGE.md` (OCPP, dashboard, published mode, multi-tenancy
+  majors; drop dead refs; extract `MigrateCsmsData()`. Done in OpenCSMS `a63be86`; two consecutive
+  container-mode runs green with `LevelOfParallelism(8)` and `ParallelScope.All`, and the suite writes
+  trace, JSON and HTML evidence under `TestResults/OpenCsms/`.
+- [x] **1.5 Honesty (REF-6).** Write `COVERAGE.md` (OCPP, dashboard, published mode, multi-tenancy
   negative, DLQ, payments) and link it; correct the configured-mode recipe to all three keys; qualify
-  the mode claims; add the gap log with CFG-1/CFG-2 as entries until A3 lands.
-- [ ] **1.6 DLQ decision (REF-5).** Choose support-helper vs a framework `(exchange, routingKey)`
-  addition; implement the choice; if the framework changes, that work is a ProtoTest stage with its
-  own pack/verify, and OpenCSMS re-runs after it.
-- [ ] **1.7 Green in both modes.** Container mode with Docker; configured mode with the three keys and
+  the mode claims; add the gap log with CFG-1/CFG-2 as entries until A3 lands. Done in OpenCSMS
+  `a63be86`: `COVERAGE.md` lists tested vs untested honestly, the README recipe names all three keys
+  and the mode table says what runs today; CFG-2 is gone from the gap log, CFG-1 stays until A3.
+- [x] **1.6 DLQ decision (REF-5).** **Decision:** implement the DLQ assertion with a suite-side support
+  helper (raw `RabbitMQ.Client` publisher/consumer) rather than changing ProtoTest now. The framework
+  gap is recorded for a future `ProtoTest.Messaging` addition: `ProtoMessage` drops the routing key
+  and the client cannot address an `(exchange, routingKey)` pair, so a tap cannot filter by routing
+  key and a poisonous event cannot be published through it. Revisit when a second consumer needs it.
+  Implemented in OpenCSMS `2cb949f`: `Support/RabbitMqRawClient.cs` publishes the poison on the
+  product exchange and routing key and polls `billing.session-ended.dlq`; `Billing/DeadLetterTests.cs`
+  asserts the session id and `x-opencsms-attempts: 3`.
+- [x] **1.7 Green in both modes.** Container mode with Docker; configured mode with the three keys and
   no code change; record both evidence lines; update `eng/plan-4.md`'s R1 rows and commit both repos.
+  Done in OpenCSMS `2cb949f`: container 4/4 twice (fresh Testcontainers) and configured 4/4 twice
+  against one PostgreSQL with the three keys exported; plan-4's R1 rows and the quality ledger are
+  updated. The worker also found and fixed a real configured-mode blocker: `Setup` had no
+  environment-variable configuration source, so the documented recipe could not have skipped the
+  containers at all.
 
 Exit: R1 green, documented, evidenced; plan-4's R1 row updated.
+
+## Phase 1b — R1a review follow-ups (from `assets/internal/review-phase1.md`) — done
+
+An independent review of Phase 1 found no blockers and seven should-fixes; all are fixed and the facts
+updates (R1a-06) landed in `eng/facts/`. Done in OpenCSMS `e3cf209` + `92a6d0d`.
+
+- [x] **R1a-01 — republish-on-redelivery test.** `Billing/RedeliveryTests.cs` delivers the same
+  `session.ended` twice through the raw helper, awaits the second `invoice.issued`, and asserts one
+  REST row and one database row. Red-proven: reverting the republish branch makes it time out.
+- [x] **R1a-03 — the publisher must not cache a dead channel.** `RabbitMqEventPublisher` now requires
+  `IsOpen`, disposes and resets a stale or half-created pair inside the gate, and retries from scratch;
+  `Messaging/RabbitMqEventPublisherTests.cs` proves a closed channel is replaced.
+- [x] **R1a-04 — the clock is observable.** `SuiteClock` pins the run clock at `2030-06-15T12:00:00Z`
+  and the journey asserts the event's and the stored invoice's `IssuedAtUtc`; reverting to
+  `DateTimeOffset.UtcNow` fails.
+- [x] **R1a-02 — post-commit publish loss (decision).** At-most-once is accepted for M1 and recorded in
+  the OpenCSMS README and `COVERAGE.md`; a transactional outbox is scheduled for R4 fault injection.
+- [x] **R1a-07 — migrations run from the API only (decision).** EF Core 8 has no migration lock; the
+  worker no longer migrates, the API does, and M4 revisits with an advisory lock or a designated
+  migrator.
+- [x] **R1a-05 — OpenCSMS run evidence.** `eng/run-suite.ps1 -Mode container|configured` writes
+  `artifacts/gates/opencsms-<mode>-<timestamp>.log`; container and configured runs both green 6/6
+  twice (`opencsms-container-20260925-145104/145156.log`,
+  `opencsms-configured-20260925-145233/145242.log`).
+- [x] **Nice-to-haves R1a-08..15.** Handoff corrected; `x-opencsms-retries` naming; per-method
+  `[CsmsOperator]`; one `CsmsTargets.Api` constant; duplicate journey assertions removed; the tap
+  pre-bind consequence recorded in the README/`COVERAGE.md`; the helper's cancel guard added. R1a-14
+  (the worker-absent experiment) is marked anecdotal in Phase 1.3 rather than pinned.
 
 ## Phase 2 — Audit correctness fixes (plan-4 P4f.3 and the bent contracts)
 
@@ -154,13 +201,35 @@ Execute audit stages **A5–A7**.
 ⛳ Checkpoint P3 — every audit finding is fixed or carries a recorded decision; refresh
 `eng/facts/` to the post-audit model and mark the audit closed. Do not reopen it for new work.
 
+## Phase 3b — DX and API consistency (`eng/dx-review.md`)
+
+The register turns the reference suite's friction and a cross-integration API review into 18 findings
+(P1 = 5, P2 = 7, P3 = 6), with the deliberate idioms listed so they are not "fixed". The P1s are part of
+the 1.1 experience bar; P2/P3 land by demand, each as its own stage with the worker-cycle review.
+
+- [ ] **DX-01 — one assertion surface.** Every assertable subject exposes `Should`/`ShouldNot` and
+  chainable members; `ShouldX` extensions remain only where C# forbids a facade (gRPC messages and
+  exceptions, generic model rows). Add facade members to Sheets/Web and the GraphQL error assertions;
+  deprecate the old names first.
+- [ ] **DX-02 — shape failures name their subject.** The protocol producer prefixes the identifier
+  (route/destination/operation) to the mismatch message; trace attributes unchanged.
+- [ ] **DX-03 — a code API for a messaging tap.** `UseRabbitMq().Tap("invoice.issued")` (or
+  `Destinations(...)`) so the reliability declaration lives in the test, with the config key staying as
+  the environment override.
+- [ ] **DX-05 — required reads.** `ReadRequired<T>()` (and `ReadRequired<T>(path)` composing with A1)
+  throws a protocol exception naming the identifier when the body is missing; the nullable reads stay.
+- [ ] **DX-04** is already a plan-5 decision (routing key); promote it when DX-03/DX-10 need it.
+
+P2/P3: the register is the order; each becomes a stage when scheduled, and its "Deliberate idioms —
+do not change" section is binding.
+
 ## Phase 4 — Resume plan-4 on a clean base
 
 Order is plan-4's demand order; each item is its own stage with the feature-plan launch checklist
 (README + docs with Limits, failure-path tests, trace conventions, demo coverage, changelog).
 
-- [ ] **R1b Finish M1** (if Phase 1 left acceptance items): trace showpiece link, coverage-gap
-  honesty, plan-4 rows.
+- [x] **R1b Finish M1** — accepted in Phase 1: first journey green in both modes, DLQ asserted,
+  `COVERAGE.md` linked, README honest. The trace showpiece link belongs to R5.
 - [ ] **R2 OCPP gateway + simulator** (needs A3 clock, A4 devices, P4b/P4e). This is the first real
   device workload: it must not need device code changes to land — if it does, that is a finding, not
   a silent extension.
@@ -179,9 +248,11 @@ Order is plan-4's demand order; each item is its own stage with the feature-plan
 | --- | --- | --- | --- |
 | 0a — Evidence, facts, guardrails | Complete | `4bafa6d` · verify P0-guardrails (lint/docs/test/pack PASS, stage tree 61220f5*, 1.1.0-alpha.1) | Facts + contract + ledger tracked; version/CI/verify landed; the pack run proved the TST-3 cache collision before passing |
 | 0b — Audit A0 characterization | Complete | `A0-core` 586ed00 · `A0-devices` (lint/docs/test PASS, stage trees 244eee9*/586ed00*, 1.1.0-alpha.1) | All characterizations pass pinning current behavior: mixed conditionals, two named servers, Web backend pair, post-`Build`, clock locator, worker `Main`, in-process transport marker/endpoint/options, connect race, device resource id |
-| 1 — R1a reference suite | Pending | — | REF-1..REF-6; product fixes before suite rewrite |
+| 1 — R1a reference suite | Complete | 1.1 `8bf57ce` · 1.2/1.3 `8c0ab21` · 1.4/1.5 `a63be86` · 1.6/1.7 `2cb949f` — container 4/4 ×2, configured 4/4 ×2 (one DB) | Journey, DLQ, both modes, honest README/COVERAGE; Phase 2 (audit A1–A4) next |
+| 1b — R1a review follow-ups | Complete | OpenCSMS `e3cf209` + `92a6d0d`; logs under `artifacts/gates/` | All seven should-fixes done: redelivery test, dead-channel reset, observable clock, at-most-once recorded, API-only migrations, evidence runner, suite polish; R1a-14 anecdotal |
 | 2 — Audit correctness A1–A4 | Pending | — | Registration, address, config/clock, devices |
 | 3 — Hygiene A5–A7 | Pending | — | Vocab/docs, tests/support, release evidence |
+| 3b — DX and API consistency | Pending | `eng/dx-review.md`: 5 P1, 7 P2, 6 P3 | DX-01/02/03/05 accepted (DX-04 recorded); P2/P3 by demand; deliberate idioms binding |
 | 4 — Plan-4 resume | Pending | — | R2–R5, P5–P8, X1/X2 |
 
 ## How this plan keeps sessions from drifting
@@ -204,6 +275,11 @@ Order is plan-4's demand order; each item is its own stage with the feature-plan
 6. **Features have a definition of done.** The feature-plan launch checklist is enforced at the stage
    boundary: no README, docs Limits, failure tests, trace conventions, demo coverage, changelog — no
    "done".
+7. **Every worker gets a review step.** The controller verifies the gate line and the diff, then checks
+   the change against `eng/facts/recipes.md` and `eng/dx-review.md` (a public surface follows the
+   recorded idiom, or the register is updated with why). A public-surface stage gets an independent
+   review worker before it is committed; Phase 1's review is the template
+   (`assets/internal/review-phase1.md`).
 
 ## Decisions taken
 
@@ -212,8 +288,13 @@ Order is plan-4's demand order; each item is its own stage with the feature-plan
   only documented limit.
 - P4f.3 (the consumer rule) is not a standalone stage; it is audit A2 with the reference suite as its
   acceptance case.
-- The DLQ question (REF-5) is a Phase 1 decision with a framework option; it is recorded here either
-  way.
+- The DLQ question (REF-5): decided — suite-side support helper now (raw RabbitMQ.Client); the
+  framework `(exchange, routingKey)` addition is a recorded future gap, not a 1.1 change. Revisit when
+  a second consumer needs routing-key addressing.
+- Phase 1b: at-most-once publish is accepted for M1 (recorded in OpenCSMS `COVERAGE.md` and the README
+  gap log); the transactional outbox is R4 work, where fault injection can test it.
+- Phase 1b: migrations run from the API only. EF Core 8 does not serialize concurrent migrations; M4
+  revisits concurrency with an advisory lock or a designated migrator.
 - RELEASING.md, the fact base and the handoff template become tracked; `assets/internal/` stays local
   scratch.
 - R2 does not start before A4; if R2 needs device changes, those are findings first.

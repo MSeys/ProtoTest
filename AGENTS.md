@@ -9,7 +9,8 @@ This file is the operating contract for contributors and coding agents working i
 
 1. `eng/plan-5.md` — the plan of record; work only from its next unchecked item.
 2. `eng/facts/architecture.md`, `recipes.md`, `gotchas.md` — the model, the way to add things, the
-   known traps.
+   known traps; `eng/dx-review.md` — the API/DX consistency register (public surface follows it, or the
+   register is updated with the reason).
 3. `eng/audit-plan-4.md` — open findings; `eng/plan-4.md` — scope and binding decisions (Track W done,
    R/P/X open); `eng/feature-plan.md` — feature scope.
 4. `eng/handoff-template.md` — the handoff you write before stopping.
@@ -50,6 +51,22 @@ This file is the operating contract for contributors and coding agents working i
 4. Run the gates; fix everything before claiming the stage.
 5. Commit one stage: code + tests + docs + changelog + facts together, message naming the plan item.
 6. Update the plan row with the evidence line. If stopping, write the handoff.
+
+## Orchestrated sessions (worker cycle)
+
+When a controller session runs workers:
+
+1. Dispatch one bounded stage per worker, with the handoff, the stage ID, the acceptance criteria and
+   the gate command.
+2. A worker never commits and never starts a second stage; a worker that cannot finish writes the
+   handoff from `eng/handoff-template.md` and stops.
+3. The controller verifies the worker's gate line and diff, then runs the consistency pass: naming and
+   API shape against `eng/facts/recipes.md` and `eng/dx-review.md` (a public surface follows the recorded
+   idiom, or the register is updated with the reason), and facts/plan/changelog updates in the same
+   commit.
+4. A stage that changes the public surface also gets an independent review worker before the controller
+   commits. Phase 1's review is the template: verdict, findings table with evidence, proposed facts
+   lines, and what could not be verified.
 
 ## Gates
 

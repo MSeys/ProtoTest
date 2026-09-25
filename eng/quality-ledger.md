@@ -24,9 +24,9 @@ its design needs a deliberate decision, not another fix.
 | Full suite + lint + docs green on `main` | last release (1.0.1) | CI `main` run |
 | Branch verified (`version/1.1`) | green (P0a/P0b) | `verify P0-guardrails` (lint/docs/test/pack PASS at `1.1.0-alpha.1`, `4bafa6d`), `verify A0-core`, `verify A0-devices`; per-stage files in `artifacts/gates/` |
 | Distinct branch version (`1.1.0-alpha.<n>`) | green (`4bafa6d`) | `Directory.Build.props`; pack guard refuses the published baseline |
-| Reference suite green, container mode | red (first journey never green) | plan-5 Phase 1; date recorded here |
-| Reference suite green, configured mode, no code change | red | plan-5 Phase 1 |
-| `COVERAGE.md` honest and linked | missing | plan-5 Phase 1 |
+| Reference suite green, container mode | green 2026-09-25 | 6/6 twice from fresh Testcontainers; logs `artifacts/gates/opencsms-container-*`; OpenCSMS `92a6d0d` |
+| Reference suite green, configured mode, no code change | green 2026-09-25 | 6/6 twice against one PostgreSQL with the three documented keys; logs `artifacts/gates/opencsms-configured-*` |
+| `COVERAGE.md` honest and linked | green 2026-09-25 | OpenCSMS `a63be86`; lists tested vs untested and is linked from the README |
 | Docs versioned at 1.1 (`docs:version`) | not cut | plan-5 Phase 4 / release checklist |
 | Package validation rollover (post-1.0.1 opt-outs) | pending | audit TST-5 / Stage A7 |
 

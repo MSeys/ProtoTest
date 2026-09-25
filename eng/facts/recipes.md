@@ -72,6 +72,20 @@ and fills each declared key with `IProtoConnectionInfrastructure.ConnectionStrin
   `Task.Delay` in setup.
 - Add a conditional path test (keys configured → not started, never owned) and an error-path test.
 
+## Recipe: a product under test that resolves its addresses at use time
+
+A product hosted by the suite sees the run's settings only after its entry point has run, so an eager
+`configuration[...]` read in `Program.Main` is inert in container and configured modes (`Main` itself is
+audit CFG-1, fixed in A3).
+
+- Messaging: copy `OpenCsms.Messaging.RabbitMqEventPublisher` — take `IConfiguration`, resolve the
+  connection string on first publish, connect lazily, and implement `IAsyncDisposable` so the host
+  disposes what it created.
+- Data: read the connection string inside the provider's options factory (`OpenCsms.Data.AddCsmsData`);
+  do not capture it at registration.
+- The configuration error then surfaces at first use, naming the key; the suite's capability gates keep
+  tests from reaching that path when the address is absent.
+
 ## Recipe: a conditional capability / an integration that can be inert
 
 ```csharp

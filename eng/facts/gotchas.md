@@ -17,6 +17,11 @@ audit plan.
 - **Static configuration decides `AddAspNetCoreServer`'s step-aside, not settings.** A settings-published
   address does not step the in-process server aside (decision, Northstar compatibility). Do not assume
   the two agree. **→ AUDIT ADDR-2.**
+- **A suite's configuration has no environment source unless it adds one.** `ConfigureAppConfiguration`
+  composes exactly the sources it is passed; a configured-mode recipe's exported keys are invisible
+  until the setup adds `.AddEnvironmentVariables()`. Without it the containers still start and the
+  product still reads the exported addresses, so a green run proves nothing about the mode. (Found by
+  the OpenCSMS run, fixed in its `2cb949f`; R1a 1.7.)
 
 ## Capabilities and registration
 
@@ -48,6 +53,21 @@ audit plan.
 - **Containers must declare every key they fill.** `AddInfrastructure` skips only when *all* declared
   keys are configured; a missing one starts the container anyway (a configured CI without Docker then
   fails). Check the README recipes for all keys.
+
+## Messaging
+
+- **A tap misses messages published before its destination is prepared.** `UseRabbitMq` declares the
+  destinations listed in `ProtoTest:Messaging:Destinations:<n>` during test setup; any other destination
+  is declared at the first `AwaitAsync`, so an act-then-await flow loses a message the act published.
+  Pre-bind every destination the act publishes to. (Canonical:
+  `tests/ProtoTest.Messaging.RabbitMq.Tests/RabbitMqTests.cs`; used by OpenCSMS `Setup.cs`.)
+- **`UseRabbitMq` declares the `Broker` capability unconditionally, and a pre-bound destination connects
+  at test setup.** A missing broker address cannot be expressed as a skip yet, and even tests that never
+  touch messaging fail setup rather than skip. **→ AUDIT ADDR-1.**
+- **`ProtoMessage` carries the exchange as `Destination` and drops the routing key.** Taps bind
+  destinations as exchanges, so a queue (a dead-letter queue) or an `(exchange, routingKey)` pair cannot
+  be awaited through the framework. Use a raw `RabbitMQ.Client` helper until the recorded REF-5 addition
+  ships (canonical: OpenCSMS `tests/OpenCsms.Suite/Support/RabbitMqRawClient.cs`).
 
 ## Clock and time
 
@@ -88,13 +108,19 @@ audit plan.
   label, they are deliberate refactoring brakes.
 - Shared doubles live in `tests/ProtoTest.TestSupport`. Do not copy temp-trace or `FreePort` helpers
   into a new suite (audit TST-2).
+- **Parallel safety rests on per-test ownership, not on the runner policy.** Provisioning names from
+  `context.TestId` (the `[CsmsOperator]` pattern) and predicates on test-owned ids are what make
+  `ParallelScope.All` safe; the default id generator's random six-digit run prefix also keeps reruns
+  against a persistent database collision-free. A shared fixture or a fixed identifier reintroduces the
+  repeatability bug (REF-1).
 
 ## Versioning, feeds and gates
 
-- **Branch packages use the published version today.** `Directory.Build.props` says `1.0.1` while
-  nuget.org also has a different `1.0.1`; the NuGet global cache is keyed by id/version, and this has
-  already caused a `TypeLoadException`. Local consumers need package-source mapping plus
-  `~/.nuget/packages/prototest.*` cleared after a repack. **→ AUDIT TST-3.**
+- **Branch packages must never reuse the published version.** `Directory.Build.props` carries
+  `1.1.0-alpha.<n>` and `eng/pack.ps1` refuses to pack the `PackageValidationBaselineVersion`
+  (`4bafa6d`). The old collision (a locally-packed `prototest.* 1.0.1` in the global cache made package
+  validation compare the package against itself) is the reason: local consumers use package-source
+  mapping and clear `~/.nuget/packages/prototest.*` after a repack.
 - **The branch never meets CI.** `ci.yml` now includes `version/**` and a manual dispatch, but a
   locally run stage still needs `eng/verify.ps1 -Stage <name>` (add `-Pack` when packaging changed)
   so the evidence is recorded. **→ AUDIT TST-4.**

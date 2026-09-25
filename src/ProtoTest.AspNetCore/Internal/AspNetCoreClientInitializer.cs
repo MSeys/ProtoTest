@@ -50,6 +50,18 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
             return Task.FromResult(true);
         }
 
+        // A configured address means the application runs elsewhere - published, container-backed, or
+        // started by infrastructure. The in-process server steps aside and the address serves the
+        // application's HTTP clients instead; this is the same registration a suite makes for every
+        // environment, with no mode conditional in Setup. HTTP clients read static configuration only:
+        // an address a started piece published belongs to the sessions that drive that process.
+        var address = ProtoApplication.BaseUrl(context.Configuration, Name);
+        if (!string.IsNullOrWhiteSpace(address))
+        {
+            InitializePublished(context, address);
+            return Task.FromResult(true);
+        }
+
         var lease = _serverLifetime.Acquire(context, Name, CombinedConfigure);
         var server = lease.Server;
         var clientOptions = new WebApplicationFactoryClientOptions();
@@ -85,6 +97,62 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
             entityId: serverState.EntityId);
         RecordPageInventory(context, server);
         return Task.FromResult(true);
+    }
+
+    /// <summary>
+    /// Serves the application's HTTP clients from its configured address without starting a test server.
+    /// The address is also where the web session and the address-relative device clients look, so every
+    /// consumer of the application agrees on where it runs.
+    /// </summary>
+    private void InitializePublished(ProtoExecutionContext context, string address)
+    {
+        if (!Uri.TryCreate(address, UriKind.Absolute, out var baseAddress)
+            || (baseAddress.Scheme != Uri.UriSchemeHttp && baseAddress.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new InvalidOperationException(
+                $"Application '{Name}' has the configured base address '{address}', which is not an absolute " +
+                $"HTTP or HTTPS URL, so the in-process server cannot step aside for it. " +
+                $"Fix '{ProtoApplication.SectionPath}:{Name}:BaseUrl'.");
+        }
+
+        var clientOptions = new WebApplicationFactoryClientOptions();
+        _configureClientOptions?.Invoke(clientOptions);
+        if (clientOptions.BaseAddress != new Uri("http://localhost"))
+        {
+            baseAddress = clientOptions.BaseAddress;
+        }
+
+        var handlers = CreateClientHandlers(clientOptions)
+            .Append(new ProtoTraceContextHandler())
+            .ToArray();
+        context.RegisterClient(CreateSocketClient(baseAddress, handlers), Name);
+        context.Trace.WriteEvent(
+            "aspnetcore.server.skipped",
+            $"ASP.NET Core server · {Name} runs at {baseAddress}",
+            "ProtoTest.AspNetCore",
+            ProtoTracePhase.Setup,
+            ProtoTraceOutcome.Skipped,
+            new Dictionary<string, string?>
+            {
+                ["aspnetcore.application"] = Name,
+                ["aspnetcore.mode"] = "published",
+                ["aspnetcore.address"] = baseAddress.ToString(),
+                ["aspnetcore.reason"] = $"'{ProtoApplication.SectionPath}:{Name}:BaseUrl' is configured"
+            });
+    }
+
+    // The socket path mirrors what WebApplicationFactory does for the in-process path: the framework's
+    // redirect and cookie behavior, then the context propagator, over the real transport.
+    private static HttpClient CreateSocketClient(Uri baseAddress, IReadOnlyList<DelegatingHandler> handlers)
+    {
+        HttpMessageHandler handler = new HttpClientHandler();
+        for (var index = handlers.Count - 1; index >= 0; index--)
+        {
+            handlers[index].InnerHandler = handler;
+            handler = handlers[index];
+        }
+
+        return new HttpClient(handler, disposeHandler: true) { BaseAddress = baseAddress };
     }
 
     /// <summary>

@@ -188,6 +188,27 @@ public sealed class ProtoHost : IAsyncDisposable
                     change: "activated");
             }
 
+            if (_rootServiceProvider.GetService<ProtoSkippedCapabilities>() is { Capabilities.Count: > 0 } skippedCapabilities)
+            {
+                // The capability is absent from the run overview: the environment provides what the
+                // dropped integration would have. The event keeps the decision visible in the trace.
+                foreach (var capability in skippedCapabilities.Capabilities)
+                {
+                    _trace.RunWriter.WriteEvent(
+                        "capability.skipped",
+                        $"Skipped · {capability.Name}",
+                        capability.Source,
+                        phase: ProtoTracePhase.Run,
+                        outcome: ProtoTraceOutcome.Skipped,
+                        attributes: new Dictionary<string, string?>
+                        {
+                            ["capability.name"] = capability.Name,
+                            ["capability.kind"] = capability.Kind,
+                            ["capability.reason"] = "already configured"
+                        });
+                }
+            }
+
             // Infrastructure starts before any test: the run owns it, records it, and lets an in-process
             // application receive the connection strings as host settings. Hosts built without the builder
             // (tests, embedded use) simply have none.

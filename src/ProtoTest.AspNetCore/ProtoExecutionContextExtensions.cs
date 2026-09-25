@@ -24,6 +24,21 @@ public static class ProtoExecutionContextExtensions
     {
         ArgumentNullException.ThrowIfNull(context);
         var key = name ?? context.TryResolve<ProtoApplicationState>()?.ApplicationName ?? "Default";
+        var factory = context.TryClient<WebApplicationFactory<TProgram>>(AspNetCoreClientInitializer<TProgram>.FactoryName(key));
+        if (factory is not null)
+        {
+            return factory;
+        }
+
+        var address = ProtoApplication.BaseUrl(context.Configuration, key);
+        if (!string.IsNullOrWhiteSpace(address))
+        {
+            throw new InvalidOperationException(
+                $"Application '{key}' runs at '{address}', so it has no in-process server to reach. " +
+                $"ServerFactory and ApplicationServices need AddAspNetCoreServer without a configured " +
+                $"'{ProtoApplication.SectionPath}:{key}:BaseUrl'.");
+        }
+
         return context.Client<WebApplicationFactory<TProgram>>(AspNetCoreClientInitializer<TProgram>.FactoryName(key));
     }
 

@@ -130,6 +130,42 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
 
         _services.AddSingleton(new ProtoSkippedInfrastructure(skippedInfrastructure));
 
+        // A capability declared with an address condition is dropped when the environment already
+        // provides that address: HasCapability then answers false and [RequiresCapability] skips,
+        // exactly as if the integration that would have served it were never registered. A descriptor
+        // also registered unconditionally stays.
+        var skippedCapabilities = new List<ProtoCapabilityDescriptor>();
+        var satisfiedConditionals = _services
+            .Where(descriptor => descriptor.ImplementationInstance is ProtoConditionalCapability)
+            .Select(descriptor => (ProtoConditionalCapability)descriptor.ImplementationInstance!)
+            .Distinct()
+            .Where(registration => registration.IsSatisfiedBy(configuration))
+            .ToArray();
+        foreach (var conditional in satisfiedConditionals)
+        {
+            var registeredUnconditionally = _services
+                .Where(descriptor => descriptor.ImplementationInstance is ProtoConditionalCapability)
+                .Select(descriptor => (ProtoConditionalCapability)descriptor.ImplementationInstance!)
+                .Any(registration => registration.Capability == conditional.Capability && registration.Keys.Count == 0);
+            if (registeredUnconditionally || skippedCapabilities.Contains(conditional.Capability))
+            {
+                continue;
+            }
+
+            for (var index = _services.Count - 1; index >= 0; index--)
+            {
+                if (_services[index].ImplementationInstance is ProtoCapabilityDescriptor descriptor
+                    && descriptor == conditional.Capability)
+                {
+                    _services.RemoveAt(index);
+                }
+            }
+
+            skippedCapabilities.Add(conditional.Capability);
+        }
+
+        _services.AddSingleton(new ProtoSkippedCapabilities(skippedCapabilities));
+
         // The run's clock: the suite's when ConfigureClock registered one, otherwise a clock starting now.
         // Each test seeds its own clock from it, and applications and workers receive the bridge that
         // resolves the active test's clock (or the run's on background flows).

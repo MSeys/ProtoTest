@@ -65,6 +65,9 @@ public sealed class InProcessWebSocketDeviceTests
         builder
             .AddInProcessWebSocketDevices<SampleApi.Program>("Api")
             .AddApplication("Api", app => app
+                // The same registration in every mode: with an address configured the server steps
+                // aside, and the device client falls back to the socket.
+                .AddAspNetCoreServer<SampleApi.Program>()
                 .AddDevices(devices => devices
                     .AddWebSocketClient("Chargers", path: "/ws/{deviceId}")
                         .AddDevice<EchoDevice>()));
@@ -84,7 +87,7 @@ public sealed class InProcessWebSocketDeviceTests
         {
             Assert.That(ack, Is.EqualTo("BOOT_ACK"), "without an in-process server the address is used");
             Assert.That(entity.State["device.transport"], Is.EqualTo("WebSocket"));
-            Assert.That(entity.State["device.address"], Is.EqualTo($"{server.Address}/ws/CP-002"));
+            Assert.That(entity.State["device.address"], Is.EqualTo($"{server.DeviceAddress}/ws/CP-002"));
         });
     }
 
@@ -141,13 +144,18 @@ public sealed class InProcessWebSocketDeviceTests
     {
         private readonly WebApplication _app;
 
-        private KestrelEchoServer(WebApplication app, string address)
+        private KestrelEchoServer(WebApplication app, string address, string deviceAddress)
         {
             _app = app;
             Address = address;
+            DeviceAddress = deviceAddress;
         }
 
+        /// <summary>The application address an HTTP consumer would use.</summary>
         public string Address { get; }
+
+        /// <summary>The same address as the device client transforms it: http becomes ws.</summary>
+        public string DeviceAddress { get; }
 
         public static async Task<KestrelEchoServer> StartAsync()
         {
@@ -197,7 +205,8 @@ public sealed class InProcessWebSocketDeviceTests
                 .GetRequiredService<IServer>()
                 .Features.Get<IServerAddressesFeature>()!
                 .Addresses.First();
-            return new KestrelEchoServer(app, $"ws://127.0.0.1:{new Uri(address).Port}");
+            var host = $"127.0.0.1:{new Uri(address).Port}";
+            return new KestrelEchoServer(app, $"http://{host}", $"ws://{host}");
         }
 
         public async ValueTask DisposeAsync()

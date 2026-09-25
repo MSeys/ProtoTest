@@ -44,6 +44,11 @@ IProtoHostBuilder AddInfrastructure(
     this IProtoHostBuilder builder,
     IProtoInfrastructure infrastructure,
     params string[] settings);
+
+IProtoHostBuilder AddInfrastructureAlways(
+    this IProtoHostBuilder builder,
+    IProtoInfrastructure infrastructure,
+    params string[] settings);
 ```
 
 Every key in `settings` receives the started connection string, so one started container can feed the tests and an in-process application under the configuration roots each of them reads:
@@ -55,7 +60,25 @@ builder.AddInfrastructure(
     "Messaging:RabbitMq:ConnectionString");         // the in-process application's key
 ```
 
-Passing keys requires an `IProtoConnectionInfrastructure`; a settings-only resource keeps its own `Settings` dictionary and doesn't need keys.
+Passing keys requires a piece that provides addresses — an `IProtoConnectionInfrastructure` (a connection string per key) or an `IProtoSettingsInfrastructure` (the values it will fill). A settings-only piece that declares no keys always starts.
+
+## When the environment already provides the addresses
+
+The host decides before starting anything: a registration whose every declared key already has a configured value is not started. The environment has the address the piece would fill, so a container or process would only shadow it.
+
+```csharp
+// ConnectionStrings:Northstar is configured - environment variables, user secrets,
+// appsettings in the runner project, an earlier configuration source. The container is not needed.
+builder.AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar");
+```
+
+The rule is per piece and all-or-nothing: one unconfigured key means the piece starts and fills all of its keys, and a piece with no keys always starts. Use `AddInfrastructureAlways` when a piece must start regardless:
+
+```csharp
+builder.AddInfrastructureAlways(LocalRelay.Sidecar(), "Relay:Url");
+```
+
+A skipped piece is not started, not owned and not released, and its values stay absent from `ProtoInfrastructureSettings`; readers that resolve an address at use time find the configured value in `IConfiguration`. The trace records the decision on the piece's run entity with `infrastructure.state: skipped` and `infrastructure.reason: already configured`.
 
 ## The demo's two real flows
 
@@ -88,7 +111,7 @@ It starts the sample application as a standalone process and fills `ProtoTest:Ap
 
 1. the **run hooks** — `BeforeRunAsync`, ascending `Order`;
 2. the host's **capabilities**, recorded as run entities;
-3. each **infrastructure** registration, in registration order — `StartAsync` on each piece, then its settings;
+3. each **infrastructure** registration, in registration order — a piece every declared key of which is already configured is recorded as skipped instead — `StartAsync` on each piece, then its settings;
 4. trace listening begins.
 
 Runner assembly setups call `StartAsync` before any test (see the [runner overview](../runners/overview.md)), so infrastructure is guaranteed to be started and its settings filled before the first test lifecycle begins. Each started piece is recorded in the trace as a run entity with `change: "started"` and its settings keys.
@@ -177,7 +200,7 @@ Infrastructure is released with the run, after the run stops and the reports are
 
 | | `AddInfrastructure` | `AddResource` |
 | --- | --- | --- |
-| Starts with the run | yes, `StartAsync` | no |
+| Starts with the run | yes, unless every declared key is already configured (`AddInfrastructureAlways` opts out) | no |
 | Fills `ProtoInfrastructureSettings` | connection string per key, plus settings | no |
 | Registered as run entity and released | yes | yes |
 
@@ -186,6 +209,7 @@ Use `AddInfrastructure` when the piece must start with the run or publish values
 ## Limits
 
 - **Once per run.** Infrastructure starts and stops at run boundaries. Per-test setup is a [hook or attribute](./hooks.md) job.
+- **A configured environment wins.** Declare the keys a piece fills; when all of them are configured the host skips the piece instead of shadowing the environment. `AddInfrastructureAlways` forces a start (see [above](#when-the-environment-already-provides-the-addresses)).
 - **Failures are run failures.** There is no automatic skip for infrastructure that cannot start; use `TryStart` and decide before registering.
 - **Readiness fails, it does not skip.** A probe that times out fails the run before the first test. It also runs once, at run start - waiting inside a test is a hook's job, not a probe's.
 - **Settings don't change `IConfiguration`.** They live in `ProtoInfrastructureSettings`; a reader that only looks at `IConfiguration` won't see them. The built-in readers — the in-process web host, the RabbitMQ adapter and web sessions — do.

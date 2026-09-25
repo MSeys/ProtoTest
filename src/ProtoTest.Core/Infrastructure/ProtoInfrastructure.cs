@@ -78,14 +78,28 @@ public interface IProtoSettingsInfrastructure : IProtoInfrastructure
 }
 
 /// <summary>
-/// Registered infrastructure with the configuration keys it provides, for example
-/// <c>ConnectionStrings:Northstar</c> for the application and <c>ProtoTest:...</c> for the adapter. The
-/// host exposes started values through <see cref="ProtoInfrastructureSettings"/>, and the in-process
-/// application receives them as host settings automatically.
+/// Registered infrastructure with the configuration keys it provides - a connection string per key, or
+/// the keys a settings-only piece will fill. The host exposes started values through
+/// <see cref="ProtoInfrastructureSettings"/>, and the in-process application receives them as host
+/// settings automatically.
 /// </summary>
 internal sealed record ProtoInfrastructureRegistration(
     IProtoInfrastructure Infrastructure,
-    IReadOnlyList<string> Settings);
+    IReadOnlyList<string> Settings,
+    bool AlwaysStart = false)
+{
+    /// <summary>
+    /// Whether every key this piece declares already has a configured value, so the environment
+    /// provides its addresses and the piece must not start and shadow them.
+    /// </summary>
+    public bool IsSatisfiedBy(IConfiguration configuration)
+        => !AlwaysStart
+           && Settings.Count > 0
+           && Settings.All(key => !string.IsNullOrWhiteSpace(configuration[key]));
+}
+
+/// <summary>The infrastructure pieces the environment already satisfies, so the host skips them.</summary>
+internal sealed record ProtoSkippedInfrastructure(IReadOnlySet<string> Ids);
 
 /// <summary>The configuration values started infrastructure provided, keyed as the application reads them.</summary>
 public sealed class ProtoInfrastructureSettings

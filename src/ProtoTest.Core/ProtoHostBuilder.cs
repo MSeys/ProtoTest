@@ -114,6 +114,22 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
         _services.AddSingleton(configuration);
         _services.AddSingleton(new ProtoInfrastructureSettings());
 
+        // Run-owned pieces whose declared keys the environment already configures are not needed:
+        // configuration wins, and the piece is not started, owned or released. The decision is fixed
+        // here, while configuration is static; AddInfrastructureAlways opts a piece out.
+        var skippedInfrastructure = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var descriptor in _services)
+        {
+            if (descriptor.ImplementationInstance is ProtoInfrastructureRegistration registration
+                && registration.IsSatisfiedBy(configuration))
+            {
+                skippedInfrastructure.Add(registration.Infrastructure.Id);
+                _runResources.Remove(registration.Infrastructure.Id);
+            }
+        }
+
+        _services.AddSingleton(new ProtoSkippedInfrastructure(skippedInfrastructure));
+
         // The run's clock: the suite's when ConfigureClock registered one, otherwise a clock starting now.
         // Each test seeds its own clock from it, and applications and workers receive the bridge that
         // resolves the active test's clock (or the run's on background flows).

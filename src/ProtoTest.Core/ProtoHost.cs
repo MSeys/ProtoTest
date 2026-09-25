@@ -197,9 +197,30 @@ public sealed class ProtoHost : IAsyncDisposable
                 settings,
                 configuration,
                 _rootServiceProvider.GetService<TimeProvider>() ?? new ProtoTestTimeProvider(_clock));
+            var skippedInfrastructure = _rootServiceProvider.GetService<ProtoSkippedInfrastructure>()?.Ids;
             foreach (var registration in _rootServiceProvider.GetServices<ProtoInfrastructureRegistration>())
             {
                 var infrastructure = registration.Infrastructure;
+
+                if (skippedInfrastructure is not null && skippedInfrastructure.Contains(infrastructure.Id))
+                {
+                    // Every address this piece would fill is already configured; starting it would
+                    // shadow the environment's values, so the run records it as skipped, not owned.
+                    _trace.RunWriter.SetEntityState(
+                        infrastructure.Kind,
+                        infrastructure.Id,
+                        infrastructure.Description,
+                        new Dictionary<string, string?>
+                        {
+                            ["infrastructure.kind"] = infrastructure.Kind,
+                            ["infrastructure.settings"] = string.Join(", ", registration.Settings),
+                            ["infrastructure.state"] = "skipped",
+                            ["infrastructure.reason"] = "already configured"
+                        },
+                        scope: "run",
+                        change: "skipped");
+                    continue;
+                }
 
                 // Starting it again makes this a new ownership period: its release must run again.
                 runResources?.Rearm(infrastructure);

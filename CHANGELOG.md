@@ -46,6 +46,11 @@ All ProtoTest packages share one version; breaking API changes are called out be
   registration never branches on the environment.
 - `IProtoConfiguredInfrastructure` hands infrastructure the run's state as it starts - settings and the
   suite's configuration - which is how an in-process worker reads a broker a container just started.
+- Infrastructure registered with `AddInfrastructure` is skipped when every key it declares already has
+  a configured value, so a configured environment is never shadowed by a container or process that
+  would fill the same address. `AddInfrastructureAlways` opts a piece out, settings-only infrastructure
+  may declare keys too, and a skipped piece is recorded as a `skipped` run entity without being owned
+  or released.
 
 ### Fixed
 

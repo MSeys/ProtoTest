@@ -92,13 +92,25 @@ Order is the recommendations' own priority (§2). W1–W5 are independent and sm
 
 Milestones are the spec's (§8); each is stage-sized and leaves the demo runnable.
 
+- [ ] **P4f Address providers (validated by OpenCSMS)** (spec item 2, generalised): the uniform swap
+  model. One primitive: `AddInfrastructure(provider, keys)` does not start (and does not fill) when
+  every key is already configured, with an `.Always()` opt-out. One consumer rule: `AddSql`,
+  `AddMessaging(UseRabbitMq)`, `AddApplication` and the hosting registration resolve their address at
+  run time; no address means the integration is inert and its capability is absent, so tests skip via
+  `[RequiresCapability]` instead of failing configuration. One hosting rule: `AddAspNetCoreServer`
+  steps aside when the application's `BaseUrl` is configured. Acceptance: OpenCSMS's Setup declares
+  providers and consumers once and runs in-process, container-backed and published with **no mode
+  conditionals**; the Northstar demo is left as is. P4f.1 (conditional infrastructure) is complete;
+  P4f.2 (`AddAspNetCoreServer` steps aside) and P4f.3 (consumer resolution and inert capabilities)
+  remain.
 - [ ] **R0 Repository discipline** — created at `opencsms` on its own git history when R1 starts; README
   states what it is, the three run modes and an honest "what this proves"; MIT; linked from the docs as
   *the reference suite* (never as a sample). One command: `docker compose up` or `dotnet test`.
 - [ ] **R1 CSMS API + Postgres + billing worker + REST suite + one journey** (M1, 2–3 weeks; needs P1, P2):
   REST/OpenAPI surface, tariff rules, `AddWorker<Program>`-hosted billing worker consuming RabbitMQ events
   with retry and dead-letter, Testcontainers Postgres/RabbitMQ, first end-to-end journey, and the
-  documented coverage gap.
+  documented coverage gap. Its `Setup` is P4f's acceptance: providers and consumers declared once, the
+  same suite in-process and container-backed with no mode conditionals (published mode arrives with R4).
 - [ ] **R2 OCPP gateway + charge-point simulator + device journey** (M2, 2 weeks; needs P3, P4): OCPP 1.6J
   core subset (BootNotification, Heartbeat, StatusNotification, Start/StopTransaction, MeterValues,
   RemoteStart/Stop), the simulator built on `ProtoTest.Devices.WebSocket`, the idle-fee journey with
@@ -214,6 +226,7 @@ Record `git diff --shortstat` per stage split by `src`, `tests`, `docs`, with th
 | P4c — Device clients (design revision) | Complete | src +501 / −395 · tests +148 / −69 · docs +21 / −10 | Redesigned at the user's request: per-id registration and `ProtoTest:Devices:Endpoints` are removed. Named clients (`AddWebSocketClient("Chargers", path: "/ocpp/{deviceId}").AddDevice<AcCharger>()`) and `Proto.Context.Devices("Chargers")` mirror REST/GraphQL; address resolvers (`ProtoDeviceAddress.Template`/`.FromApplication`, application-relative with http→ws) replace per-device configuration; WebSocket options use `ProtoOptionsRegistration.Configure`. 8 device tests and 4 WebSocket tests updated; docs, READMEs, fact sheet and changelog rewritten. Full suite, format gate, docs check, docs build and pack green. |
 | P4d — In-process WebSocket client (R2 prerequisite) | Complete | src +131 / −8 · tests +165 / −0 · docs +13 / −2 | `ProtoTest.Devices.WebSocket.AspNetCore` reaches an application's WebSocket endpoint through its `TestServer` with `AddInProcessWebSocketClient<TProgram>("Chargers", path: "/ocpp/{deviceId}")`, so an in-process gateway (R2's OCPP server) needs no listening socket. `WebSocketDeviceConnection` is now public over a plain `WebSocket`, so both transports share the frame handling; the socket transport stays for published addresses. TestApi gained a `/ws/{deviceId}` echo endpoint and 2 in-process tests (text and binary) prove the round-trip and the trace entity; docs, READMEs, fact sheet and changelog updated. Full suite, format gate, docs check, docs build and pack green. (Superseded by P4e: the separate client method became one registration with transport precedence.) |
 | P4e — One device registration per mode | Complete | src +151 / −61 · tests +141 / −21 · docs +9 / −7 | Devices now follow the REST model exactly: `IProtoInProcessDeviceTransport.CanConnect` lets the client prefer an in-process transport when the application is hosted, so `AddWebSocketClient("Chargers", path: "/ocpp/{deviceId}")` is the only registration and `AddInProcessWebSocketDevices<TProgram>("Api")` is called once per host (harmless when published). Address resolvers gained an optional transform (`http(s)`→`ws(s)`), `TryServerFactory<TProgram>` was added to AspNetCore, and the separate in-process client API is gone. 3 AspNetCore-for-devices tests include the acceptance pair: the same client goes through the `TestServer` when the app is hosted and over the socket when `AddAspNetCoreServer` is absent. Core device tests (8) and socket tests (4) updated; docs, READMEs, fact sheet and changelog describe one registration. Full suite, format gate, docs check, docs build and pack green. |
+| P4f.1 — Conditional infrastructure | Complete | src +112 / −10 · tests +209 / −0 · docs +29 / −5 · eng +3 / −1 | The first P4f piece: `AddInfrastructure(provider, keys)` declines to start when every declared key is already configured, so a configured environment is never shadowed. The skip set is computed once at `Build` (configuration is static there), skipped pieces are removed from the run store before anything can own them, and `StartAsync` records them as run entities with `infrastructure.state: skipped` instead of starting them - never owned, never released, nothing filled. `AddInfrastructureAlways` opts a piece out, declared keys are now allowed on `IProtoSettingsInfrastructure` (an address-providing piece declares the key it fills), repeated registration ORs the flag, and one declared key left unconfigured still starts the piece and fills all of its keys. 6 Core tests cover full/partial/missing configuration, the Always opt-out, settings-only pieces and repeated registration. Docs (infrastructure, configuration) and changelog updated. Full suite, format gate, docs check, docs build and pack green. |
 
 ## Decisions taken
 
@@ -297,6 +310,11 @@ Record `git diff --shortstat` per stage split by `src`, `tests`, `docs`, with th
   (a Core `AddInfrastructureUnlessConfigured`-style helper), and tests branch only through
   capabilities/skips; no Core environment enum is planned, because real setups mix modes. That helper
   lands with R1's Setup where the demand is concrete.
+- P4f / OpenCSMS (user decision): the address-provider model is **not** prototyped on Northstar.
+  It is implemented in ProtoTest as P4f and validated by OpenCSMS's `Setup`, which must express all
+  three run modes with zero mode conditionals - that is R1's acceptance for the model. Integrations
+  adopt the consumer rule (resolve at use time; no address means inert plus absent capability) as R1
+  demands them, so the old demo keeps working unchanged.
 
 ## Stop criteria
 

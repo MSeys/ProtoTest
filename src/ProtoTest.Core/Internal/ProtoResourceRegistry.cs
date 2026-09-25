@@ -43,6 +43,26 @@ internal sealed class ProtoResourceRegistry
         }
     }
 
+    /// <summary>
+    /// Forgets a resource that will not be used, so it is neither owned nor released. Only valid
+    /// before any release started, which is where the host drops infrastructure the environment
+    /// already provides.
+    /// </summary>
+    public bool TryRemove(string id)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        lock (_gate)
+        {
+            if (_releaseStarted != 0 || !_byId.Remove(id))
+            {
+                return false;
+            }
+
+            _registrationOrder.Remove(id);
+            return true;
+        }
+    }
+
     public IReadOnlyList<ProtoResourceSnapshot> Snapshot()
     {
         lock (_gate)

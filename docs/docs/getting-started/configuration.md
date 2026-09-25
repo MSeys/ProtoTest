@@ -81,14 +81,14 @@ The rule of thumb: **infrastructure registers once, clients compose, config call
 | `AddTestHook`, `AddRunHook`, `AddRunGate` | adds another hook or gate; there is **no dedupe** |
 | `AddCapability` | an equal descriptor registers once |
 | `AddSink<TSink>` | the first registration of the sink type wins; a repeated generic call appends its `configure` callback |
-| `AddInfrastructure`, `AddResource` | the same instance is a no-op (`AddInfrastructure` also merges the repeated call's settings keys); a different instance under the same id throws *"already owned by the run"* |
+| `AddInfrastructure`, `AddResource` | the same instance is a no-op (`AddInfrastructure` also merges the repeated call's settings keys, and `AddInfrastructureAlways` still forces a start); a different instance under the same id throws *"already owned by the run"* |
 | `AddClient` | clients compose and the first registration that initializes for a type and name wins |
 | `ConfigureResponses`, `CaptureAttachments` (all protocols) | callbacks compose; the known configuration section is bound over the result |
 | `AddSql`, `AddSheets`, `AddEntityFrameworkCore` | the first call wins; later calls are no-ops |
 | `AddData` | composes onto one registry; every call's callback runs |
 | `AddCollector<TCollector>` | the same collector type for the same target registers once |
 
-Some repeat rules are errors rather than no-ops: a different run resource under an existing id throws, `AddInfrastructure` rejects a resource whose `Scope` is not `Run` and rejects settings keys without an `IProtoConnectionInfrastructure`, and a duplicate client type and name throws during setup. A `configure` callback that throws is not remembered — a later successful call can still compose the integration.
+Some repeat rules are errors rather than no-ops: a different run resource under an existing id throws, `AddInfrastructure` rejects a resource whose `Scope` is not `Run` and rejects settings keys on a piece that provides no addresses, and a duplicate client type and name throws during setup. A `configure` callback that throws is not remembered — a later successful call can still compose the integration.
 
 ## Which value wins
 

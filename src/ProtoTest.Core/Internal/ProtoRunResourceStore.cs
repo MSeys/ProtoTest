@@ -35,6 +35,12 @@ internal sealed class ProtoRunResourceStore : IProtoReportSource
     }
 
     /// <summary>
+    /// Drops a resource the host decided not to use, because the environment already provides the
+    /// addresses it would fill; it is then neither recorded as owned nor released.
+    /// </summary>
+    public bool Remove(string id) => _resources.TryRemove(id);
+
+    /// <summary>
     /// Re-owns the run's resources after a failed start released them, so a retried start can release
     /// them again when the run actually ends.
     /// </summary>

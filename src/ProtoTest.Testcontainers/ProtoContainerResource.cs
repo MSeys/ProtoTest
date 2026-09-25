@@ -8,17 +8,20 @@ using ProtoTest.Core;
 /// run releases it after the reports are written. Technology packages supply the builder and the
 /// connection accessor; the base depends on no container library.
 /// </summary>
-public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfrastructure, IAsyncDisposable
+public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfrastructure, IProtoStartupEvidence, IAsyncDisposable
     where TContainer : IAsyncDisposable
 {
     private readonly Func<TContainer> _build;
     private readonly Func<TContainer, CancellationToken, Task> _start;
     private readonly Func<TContainer, string> _connectionString;
+    private readonly List<(string Name, Func<TContainer, CancellationToken, ValueTask<bool>> Check)> _readiness = [];
     private readonly object _containerGate = new();
     private TContainer? _container;
     private Task? _startTask;
     private int _started;
     private int _released;
+    private int? _readinessPort;
+    private Dictionary<string, string?> _startupEvidence = new(StringComparer.Ordinal);
 
     protected ProtoContainerResource(
         Func<TContainer> build,
@@ -40,6 +43,74 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
 
     /// <summary>Gets the connection string; empty until the container started.</summary>
     public string ConnectionString { get; private set; } = string.Empty;
+
+    /// <summary>Gets what the readiness checks observed while the container started.</summary>
+    public IReadOnlyDictionary<string, string?> StartupEvidence => _startupEvidence;
+
+    /// <summary>
+    /// Gets or sets how long the readiness checks may take after the container starts. Defaults to 30
+    /// seconds; a technology package may tighten it.
+    /// </summary>
+    protected TimeSpan ReadinessTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>Gets or sets the pause between readiness checks. Defaults to 100 milliseconds.</summary>
+    protected TimeSpan ReadinessInterval { get; set; } = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>
+    /// Registers a readiness check evaluated against the started container before the host moves on;
+    /// use <see cref="ReadyWhenTcp"/> for the common "the endpoint answers" case. A check that never
+    /// becomes ready fails the start with the probe's name, and the container is released like any
+    /// failed start.
+    /// </summary>
+    protected void ReadyWhen(string name, Func<TContainer, CancellationToken, ValueTask<bool>> ready)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(ready);
+        _readiness.Add((name, ready));
+    }
+
+    /// <summary>
+    /// Declares the container's default readiness check: a TCP connection to the endpoint the
+    /// <paramref name="endpoint"/> resolver returns for the image's standard
+    /// <paramref name="defaultPort"/> must succeed. Override the port with <see cref="ReadyOn"/> when
+    /// the image listens elsewhere.
+    /// </summary>
+    protected void ReadyWhenTcp(
+        string name,
+        int defaultPort,
+        Func<TContainer, int, (string Host, int Port)> endpoint)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(defaultPort, 1);
+        ArgumentNullException.ThrowIfNull(endpoint);
+        ReadyWhen(name, (container, cancellationToken) =>
+        {
+            var (host, port) = endpoint(container, EffectiveReadinessPort(defaultPort));
+            return ProtoReadiness.Tcp(host, port)(cancellationToken);
+        });
+    }
+
+    /// <summary>
+    /// Gets the port a readiness check should use: the one <see cref="ReadyOn"/> set, or the image's
+    /// standard port.
+    /// </summary>
+    protected int EffectiveReadinessPort(int defaultPort) => _readinessPort ?? defaultPort;
+
+    /// <summary>
+    /// Sets the container port the default readiness check waits for, for images that do not listen on
+    /// their standard port. Returns the resource for chaining; call it before the run starts.
+    /// </summary>
+    public ProtoContainerResource<TContainer> ReadyOn(int port)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(port, 1);
+        if (IsStarted)
+        {
+            throw new InvalidOperationException(
+                "The container already started; set the readiness port before the run starts.");
+        }
+
+        _readinessPort = port;
+        return this;
+    }
 
     public bool IsStarted => Volatile.Read(ref _started) != 0;
 
@@ -95,6 +166,7 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
             // Awaiting instead of blocking keeps the caller's synchronization context free; a UI or
             // single-threaded host must not deadlock on a container that starts on another thread.
             await _start(container, cancellationToken).ConfigureAwait(false);
+            await AwaitReadinessAsync(container, cancellationToken).ConfigureAwait(false);
             var connectionString = _connectionString(container);
 
             lock (_containerGate)
@@ -142,6 +214,30 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
             _startTask = null;
             Volatile.Write(ref _started, 0);
         }
+    }
+
+    /// <summary>
+    /// Runs the registered readiness checks against the started container and records what each
+    /// observed, so the trace shows the wait instead of an opaque start duration.
+    /// </summary>
+    private async Task AwaitReadinessAsync(TContainer container, CancellationToken cancellationToken)
+    {
+        if (_readiness.Count == 0)
+        {
+            return;
+        }
+
+        var evidence = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var (name, check) in _readiness)
+        {
+            var result = await ProtoReadiness
+                .WaitAsync(name, token => check(container, token), ReadinessTimeout, ReadinessInterval, cancellationToken)
+                .ConfigureAwait(false);
+            evidence[$"readiness.{name}.attempts"] = result.Attempts.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            evidence[$"readiness.{name}.waitedMs"] = ((long)result.Waited.TotalMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        _startupEvidence = evidence;
     }
 
     /// <summary>

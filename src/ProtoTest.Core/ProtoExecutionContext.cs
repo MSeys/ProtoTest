@@ -36,7 +36,8 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         IServiceScope scope,
         ProtoTestId id,
         MethodInfo testMethod,
-        ProtoTestTraceRecorder trace)
+        ProtoTestTraceRecorder trace,
+        ProtoClock? clock = null)
     {
         TestName = testName ?? throw new ArgumentNullException(nameof(testName));
         _scope = scope ?? throw new ArgumentNullException(nameof(scope));
@@ -48,7 +49,44 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         // the store up lazily any more. The store itself is a root singleton and stays valid.
         _findings = _scope.ServiceProvider.GetService<ProtoFindingStore>();
         Trace = trace;
+        Clock = clock ?? new ProtoClock();
+        Clock.Advanced += OnClockAdvanced;
     }
+
+    /// <summary>
+    /// Gets this test's clock. Time-dependent code reads it, and the test advances it instead of
+    /// sleeping; the application under test receives it as its <see cref="TimeProvider"/>.
+    /// </summary>
+    public ProtoClock Clock { get; }
+
+    private void OnClockAdvanced(ProtoClockChange change)
+    {
+        RecordClockState("advanced");
+        Trace.WriteEvent(
+            "clock.advance",
+            $"Clock advanced by {change.Delta:g}",
+            "ProtoTest.Core",
+            attributes: new Dictionary<string, string?>
+            {
+                ["clock.delta"] = change.Delta.ToString("g"),
+                ["clock.previousUtc"] = change.PreviousUtc.ToString("O"),
+                ["clock.utcNow"] = change.CurrentUtc.ToString("O")
+            },
+            entityKind: ProtoTraceEntityKinds.Clock,
+            entityId: $"clock:{Id.Value}");
+    }
+
+    private void RecordClockState(string change)
+        => Trace.SetEntityState(
+            ProtoTraceEntityKinds.Clock,
+            $"clock:{Id.Value}",
+            "Test clock",
+            new Dictionary<string, string?>
+            {
+                ["clock.utcNow"] = Clock.GetUtcNow().ToString("O"),
+                ["clock.timezone"] = Clock.LocalTimeZone.Id
+            },
+            change: change);
 
     public string TestName { get; }
     public MethodInfo TestMethod { get; }
@@ -426,6 +464,8 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
             return;
         }
 
+        // The test is over: a request that still carries its id finds the run clock from here on.
+        ProtoClockLocator.Remove(Id.Value);
         _clients.Seal();
         using var releaseOperation = Trace
             .Operation("resources.release", "Release owned resources", "ProtoTest.Core")

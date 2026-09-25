@@ -80,6 +80,14 @@ No ASP.NET Core server is registered and no standalone process is started: HTTP 
 var composeDomainInTests = hostedInProcess || configuredDatabase is not null || postgresStore;
 ```
 
+Because the application is not started by the run, nothing guarantees it is up when the first test runs. `AddHttpReadiness(application)` waits for its published address instead of sleeping in setup, and records the wait in the trace:
+
+```csharp
+builder.AddHttpReadiness(NorthstarTargets.Api);   // waits for ProtoTest:Applications:{app}:BaseUrl
+```
+
+An in-process application has no address to wait for, so the probe is skipped there and says why.
+
 ## What doesn't change
 
 - The journeys and their `[ProtoTest]` tests, attributes, authenticators and provisioners.

@@ -55,8 +55,11 @@ public static class ProtoHostBuilderExtensions
         });
         // The name is claimed only once the registration succeeded, so a failed call leaves no guard.
         serverNames.Add(name);
-        return builder.AddCapability(new ProtoCapabilityDescriptor(
-            "ASP.NET Core", ProtoCapabilityKinds.Server, "ProtoTest.AspNetCore"));
+        // When the environment configures the application's address, the server steps aside at test
+        // time; the capability must step aside with it instead of advertising an in-process server.
+        return builder.AddCapabilityUnlessConfigured(
+            new ProtoCapabilityDescriptor("ASP.NET Core", ProtoCapabilityKinds.Server, "ProtoTest.AspNetCore"),
+            $"ProtoTest:Applications:{name}:BaseUrl");
     }
 
     /// <summary>
@@ -85,8 +88,9 @@ public static class ProtoHostBuilderExtensions
         // The application's HTTP clients with no configured base reuse this transport.
         application.Services.TryAddSingleton(new ProtoApplicationTransport(name, name));
         RegisterApplicationServices<TProgram>(application.Services, name);
-        return application.AddCapability(new ProtoCapabilityDescriptor(
-            "ASP.NET Core", ProtoCapabilityKinds.Server, "ProtoTest.AspNetCore"));
+        return application.AddCapabilityUnlessConfigured(
+            new ProtoCapabilityDescriptor("ASP.NET Core", ProtoCapabilityKinds.Server, "ProtoTest.AspNetCore"),
+            $"ProtoTest:Applications:{name}:BaseUrl");
     }
 
     /// <summary>

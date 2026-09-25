@@ -11,19 +11,22 @@ internal sealed class ProtoTestLifecycle
     private readonly IReadOnlyList<IProtoTestHook> _hooks;
     private readonly IProtoTestIdGenerator _testIdGenerator;
     private readonly ProtoTraceSession _trace;
+    private readonly ProtoClock _clock;
 
     public ProtoTestLifecycle(
         ProtoHost host,
         IServiceProvider rootServiceProvider,
         IEnumerable<IProtoTestHook> hooks,
         IProtoTestIdGenerator testIdGenerator,
-        ProtoTraceSession trace)
+        ProtoTraceSession trace,
+        ProtoClock clock)
     {
         _host = host;
         _rootServiceProvider = rootServiceProvider;
         _hooks = [.. hooks.OrderBy(hook => hook.Order)];
         _testIdGenerator = testIdGenerator;
         _trace = trace;
+        _clock = clock;
     }
 
     public static ProtoExecutionContext CurrentContext => Current.Value?.Context
@@ -67,7 +70,11 @@ internal sealed class ProtoTestLifecycle
         try
         {
             var testTrace = _trace.StartTest(testName, testId, testMethod);
-            var context = new ProtoExecutionContext(testName, scope, testId, testMethod, testTrace);
+            // Each test gets its own clock, seeded from the run's: advancing time inside a test stays
+            // inside that test, and parallel tests never share a timeline.
+            var clock = new ProtoClock(_clock.GetUtcNow());
+            var context = new ProtoExecutionContext(testName, scope, testId, testMethod, testTrace, clock);
+            ProtoClockLocator.Add(testId.Value, clock);
             state = new ContextState(
                 _host,
                 context,

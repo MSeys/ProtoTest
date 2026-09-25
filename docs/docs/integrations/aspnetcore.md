@@ -47,7 +47,7 @@ public static IProtoHostBuilder AddAspNetCoreServer<TProgram>(
     where TProgram : class;
 ```
 
-Both overloads register a `server` capability named `ASP.NET Core` and expose the application's client under the server name — `"{name}:Factory"` for the `WebApplicationFactory<TProgram>` and `{name}` for the `HttpClient`. Registration is per server name: the host overload keeps the first registration for a name and ignores a repeat, while the application overload has no whole-call guard and lets the client initializer pick the first server that initializes. The application overload also registers the application's default transport, so an HTTP client with no configured base URL reuses this server.
+Both overloads register a `server` capability named `ASP.NET Core` and expose the application's client under the server name — `"{name}:Factory"` for the `WebApplicationFactory<TProgram>` and `{name}` for the `HttpClient`. Registration is per server name: the host overload keeps the first registration for a name and ignores a repeat, while the application overload has no whole-call guard and lets the client initializer pick the first server that initializes. The application overload also registers the application's default transport, so an HTTP client with no configured base URL reuses this server. When the environment configures the application's address, both the server and its capability step aside — see [Real server or in-process?](#real-server-or-in-process).
 
 ## One application, or one per test
 
@@ -90,7 +90,7 @@ TService ServerService<TProgram, TService>(this ProtoExecutionContext context, s
     where TProgram : class where TService : notnull;
 ```
 
-When `name` is omitted, each method targets the application selected for the test, then falls back to `"Default"`. `ServerFactory` returns the registered factory; `CreateServerScope` creates a scope from its container that **you** own and dispose. `ApplicationServices` returns the test's own keyed scope over the application — created on first use, disposed with the test — so scoped domain services (repositories, handlers, a `DbContext`) resolve from it; when no server is registered under the resolved name it throws an `InvalidOperationException` naming the expected `AddAspNetCoreServer<TProgram>("{key}")` call. `ServerService` is `ApplicationServices(...).GetRequiredService<TService>()`.
+When `name` is omitted, each method targets the application selected for the test, then falls back to `"Default"`. `ServerFactory` returns the registered factory; `CreateServerScope` creates a scope from its container that **you** own and dispose. `ApplicationServices` returns the test's own keyed scope over the application — created on first use, disposed with the test — so scoped domain services (repositories, handlers, a `DbContext`) resolve from it; when no server is registered under the resolved name it throws an `InvalidOperationException` naming the expected `AddAspNetCoreServer<TProgram>("{key}")` call — or, when the application's address is configured, that address and the missing in-process server. `ServerService` is `ApplicationServices(...).GetRequiredService<TService>()`.
 
 ```csharp
 var emails = Proto.Context.ServerService<Program, IEmailSender>("Api");
@@ -137,7 +137,7 @@ builder.AddAspNetCoreServer<Program>(
     configureClientOptions: options => options.AllowAutoRedirect = false);
 ```
 
-The handler chain mirrors `WebApplicationFactoryClientOptions`: a redirect handler when `AllowAutoRedirect` is set and a cookie container when `HandleCookies` is set, with ProtoTest's `ProtoTraceContextHandler` appended after them.
+The handler chain mirrors `WebApplicationFactoryClientOptions`: a redirect handler when `AllowAutoRedirect` is set and a cookie container when `HandleCookies` is set, with ProtoTest's `ProtoTraceContextHandler` appended after them. In published mode the same chain wraps a real socket, and an explicitly set `options.BaseAddress` overrides the configured address.
 
 ### Settings from infrastructure
 
@@ -184,10 +184,11 @@ A published application never starts in-process, so its inventory comes from the
 
 ## Tracing
 
-The server is both an event and a state entity:
+The server is both an event and a state entity — or a single skipped event when it steps aside:
 
 - event `aspnetcore.server.initialize`, in the setup phase, outcome `Succeeded`, carrying `aspnetcore.application.type`, `aspnetcore.server.lifetime`, `aspnetcore.server.reused`, `aspnetcore.web_host.customized` and `aspnetcore.client.customized`;
-- entity id `server:{typeof(TProgram).FullName}`, kind `server`, name `Server · {typeof(TProgram).Name}`, scope = the test name, change `"initialized"`, with the same attributes as its state.
+- entity id `server:{typeof(TProgram).FullName}`, kind `server`, name `Server · {typeof(TProgram).Name}`, scope = the test name, change `"initialized"`, with the same attributes as its state;
+- when an address is configured, event `aspnetcore.server.skipped`, in the setup phase, outcome `Skipped`, carrying `aspnetcore.mode`, `aspnetcore.address` and `aspnetcore.reason`; no server entity is recorded, because nothing in-process exists.
 
 The `HttpClient` is a regular ProtoTest client, so its REST and GraphQL calls are traced by those packages. In addition, `ProtoTraceContextHandler` propagates the current trace context: when an `Activity.Current` exists and the outgoing request has no `traceparent`, the handler adds `00-{TraceId}-{SpanId}-{01|00}`; an existing `traceparent` is left untouched.
 
@@ -204,17 +205,20 @@ An application's HTTP clients reuse its in-process server when no URL is configu
 | yes | real server at the configured URL |
 | no | the application's in-process server |
 
-The same suite runs in-process on a developer machine and against a deployed environment in CI, just by setting `BaseUrl` there. A configured `BaseUrl` takes precedence and leaves the in-process server unstarted; without one, the application's HTTP clients fall back to its transport automatically, so there is nothing to point at by hand.
+The same suite runs in-process on a developer machine and against a deployed environment in CI, just by setting `BaseUrl` there. With an address configured, `AddAspNetCoreServer` **steps aside**: no test server starts, the application's HTTP clients talk to the configured address, and the device clients resolve it the same way. The `ASP.NET Core` capability is dropped with the server, so `[RequiresInProcess]` tests skip instead of failing, and `ServerFactory`/`ApplicationServices` throw naming the address — there is no in-process container to reach.
 
-In the first row the application is never started — with the default `PerRun` lifetime it only starts the first time a test actually needs it.
+This reads **configuration**, not addresses a started piece published: when the run starts a standalone instance and registers it as settings-only infrastructure, the in-process server stays for the HTTP clients while [web sessions](./web/index.md) deliberately drive the started process.
+
+Without an address, the application's HTTP clients fall back to its transport automatically, so there is nothing to point at by hand, and with the default `PerRun` lifetime the server only starts the first time a test actually needs it.
 
 ## Skip
 
-- The registration adds the capability `server` / `ASP.NET Core`, so `[RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "ASP.NET Core")]` proves composition. `[RequiresInProcess]` is the derived form for tests that need in-process services or transactions; it skips when the suite runs against a published environment. See [skip conditions](../foundation/skip-conditions.md).
+- The registration adds the capability `server` / `ASP.NET Core`, so `[RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "ASP.NET Core")]` proves composition. `[RequiresInProcess]` is the derived form for tests that need in-process services or transactions; with `BaseUrl` configured the capability is absent and the test skips. See [skip conditions](../foundation/skip-conditions.md).
 
 ## Limits
 
 - `PerRun` shares application state across tests; isolate at the data level (the sample uses a tenant per test id). `PerTest` pays the startup cost per test.
+- With `BaseUrl` configured there is no in-process server, container, page inventory or `configureWebHost` callback in play — `configureWebHost` customizes a server that never starts. Tests that need them skip through `[RequiresInProcess]` or a capability condition.
 - The host overload allows one registration per server name per builder; the application overload has no whole-call guard, and repeated calls can register several initializers, with the first successful one winning.
 - `ServerFactory`/`ApplicationServices` require a registration under the resolved name; `ApplicationServices` throws naming the expected call when none is found.
 - In-process page inventory is limited to concrete, explicitly-GET, page-like endpoints; parameterized and catch-all routes and API-shaped JSON routes are excluded.

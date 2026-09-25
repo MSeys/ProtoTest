@@ -48,14 +48,14 @@ internal sealed class ApplicationReadinessInfrastructure : IProtoConfiguredInfra
         ArgumentNullException.ThrowIfNull(context);
         _options.Validate();
 
-        // A started instance published by a settings piece is the address the suite actually talks to.
-        var address = context.Settings.Values.TryGetValue(BaseUrlKey, out var published) ? published : null;
-        address = string.IsNullOrWhiteSpace(address) ? context.Configuration[BaseUrlKey] : address;
+        // The application-setting precedence every reader shares: a started instance published by a
+        // settings piece wins over static configuration.
+        var address = ProtoApplication.ResolveSetting(context.Configuration, context.Settings, BaseUrlKey);
         if (string.IsNullOrWhiteSpace(address))
         {
             _evidence = new Dictionary<string, string?>(StringComparer.Ordinal)
             {
-                ["readiness.skipped"] = "no published address; the application runs in-process"
+                ["readiness.skipped"] = SkipReason(context)
             };
             return;
         }
@@ -81,6 +81,29 @@ internal sealed class ApplicationReadinessInfrastructure : IProtoConfiguredInfra
             ["readiness.attempts"] = result.Attempts.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["readiness.waitedMs"] = ((long)result.Waited.TotalMilliseconds).ToString(System.Globalization.CultureInfo.InvariantCulture)
         };
+    }
+
+    /// <summary>
+    /// Explains a skip without claiming a mode the run cannot prove. A probe registered before the
+    /// piece that publishes the address is the common mistake: probes are awaited at their position,
+    /// so nothing has published yet - that is an ordering problem, not an in-process application.
+    /// </summary>
+    private string SkipReason(ProtoInfrastructureContext context)
+    {
+        if (context.PendingSettings.Contains(BaseUrlKey))
+        {
+            return $"no published address at this registration position; '{BaseUrlKey}' is declared by " +
+                   "infrastructure registered after this probe - register AddHttpReadiness after the " +
+                   "piece that publishes it";
+        }
+
+        if (context.InProcessServerApplications.Contains(_applicationName))
+        {
+            return "no published address; the application runs in-process";
+        }
+
+        return $"no published address and no in-process server for application '{_applicationName}'; " +
+               $"set '{BaseUrlKey}' or back the application with AddAspNetCoreServer";
     }
 
     public ValueTask ReleaseAsync(ProtoResourceReleaseContext context) => ValueTask.CompletedTask;

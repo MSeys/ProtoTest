@@ -129,6 +129,13 @@ public sealed class ProtoHost : IAsyncDisposable
             && (name is null || string.Equals(capability.Name, name, StringComparison.Ordinal)));
     }
 
+    // A capability that describes one instance carries it in the entity id, so two live instances of
+    // the same named capability stay two run entities instead of overwriting each other.
+    private static string CapabilityId(ProtoCapabilityDescriptor capability)
+        => capability.Instance is { Length: > 0 } instance
+            ? $"{capability.Kind}:{capability.Name}:{instance}"
+            : $"{capability.Kind}:{capability.Name}";
+
     public IConfiguration Configuration => _rootServiceProvider.GetRequiredService<IConfiguration>();
 
     // A disposed provider throws on lookup, and disposal is exactly when the settings must be cleared:
@@ -176,13 +183,14 @@ public sealed class ProtoHost : IAsyncDisposable
             {
                 _trace.RunWriter.SetEntityState(
                     ProtoTraceEntityKinds.Capability,
-                    $"{capability.Kind}:{capability.Name}",
+                    CapabilityId(capability),
                     capability.Name,
                     new Dictionary<string, string?>
                     {
                         ["capability.name"] = capability.Name,
                         ["capability.kind"] = capability.Kind,
-                        ["capability.source"] = capability.Source
+                        ["capability.source"] = capability.Source,
+                        ["capability.instance"] = capability.Instance
                     },
                     scope: "run",
                     change: "activated");
@@ -190,10 +198,13 @@ public sealed class ProtoHost : IAsyncDisposable
 
             if (_rootServiceProvider.GetService<ProtoSkippedCapabilities>() is { Capabilities.Count: > 0 } skippedCapabilities)
             {
-                // The capability is absent from the run overview: the environment provides what the
-                // dropped integration would have. The event keeps the decision visible in the trace.
-                foreach (var capability in skippedCapabilities.Capabilities)
+                // The capability is absent from the run overview: the environment either already
+                // provides what the dropped integration would serve, or cannot provide the address it
+                // needs. The event keeps the decision visible in the trace, names the deciding keys
+                // and says which condition decided it.
+                foreach (var skipped in skippedCapabilities.Capabilities)
                 {
+                    var capability = skipped.Capability;
                     _trace.RunWriter.WriteEvent(
                         "capability.skipped",
                         $"Skipped · {capability.Name}",
@@ -204,7 +215,9 @@ public sealed class ProtoHost : IAsyncDisposable
                         {
                             ["capability.name"] = capability.Name,
                             ["capability.kind"] = capability.Kind,
-                            ["capability.reason"] = "already configured"
+                            ["capability.instance"] = capability.Instance,
+                            ["capability.keys"] = string.Join(", ", skipped.Keys),
+                            ["capability.reason"] = skipped.Reason
                         });
                 }
             }
@@ -214,13 +227,18 @@ public sealed class ProtoHost : IAsyncDisposable
             // (tests, embedded use) simply have none.
             var settings = _rootServiceProvider.GetService<ProtoInfrastructureSettings>() ?? new ProtoInfrastructureSettings();
             var configuration = _rootServiceProvider.GetService<IConfiguration>() ?? new ConfigurationBuilder().Build();
-            var infrastructureContext = new ProtoInfrastructureContext(
-                settings,
-                configuration,
-                _rootServiceProvider.GetService<TimeProvider>() ?? new ProtoTestTimeProvider(_clock));
+            var timeProvider = _rootServiceProvider.GetService<TimeProvider>() ?? new ProtoTestTimeProvider(_clock);
+            var readinessOptions = _rootServiceProvider.GetService<ProtoReadinessOptions>();
             var skippedInfrastructure = _rootServiceProvider.GetService<ProtoSkippedInfrastructure>()?.Ids;
-            foreach (var registration in _rootServiceProvider.GetServices<ProtoInfrastructureRegistration>())
+            var registrations = _rootServiceProvider.GetServices<ProtoInfrastructureRegistration>().ToArray();
+            var inProcessServers = _rootServiceProvider.GetServices<ProtoCapabilityDescriptor>()
+                .Where(capability => string.Equals(capability.Kind, ProtoCapabilityKinds.Server, StringComparison.Ordinal)
+                    && !string.IsNullOrWhiteSpace(capability.Instance))
+                .Select(capability => capability.Instance!)
+                .ToHashSet(StringComparer.Ordinal);
+            for (var index = 0; index < registrations.Length; index++)
             {
+                var registration = registrations[index];
                 var infrastructure = registration.Infrastructure;
 
                 if (skippedInfrastructure is not null && skippedInfrastructure.Contains(infrastructure.Id))
@@ -242,6 +260,28 @@ public sealed class ProtoHost : IAsyncDisposable
                         change: "skipped");
                     continue;
                 }
+
+                // What a piece starting here cannot see yet: the settings keys infrastructure
+                // registered after it declares, and the applications an in-process server backs. The
+                // application readiness probe uses them to name an ordering mistake honestly.
+                var pendingSettings = new HashSet<string>(StringComparer.Ordinal);
+                for (var later = index + 1; later < registrations.Length; later++)
+                {
+                    if (skippedInfrastructure is not null
+                        && skippedInfrastructure.Contains(registrations[later].Infrastructure.Id))
+                    {
+                        continue;
+                    }
+
+                    pendingSettings.UnionWith(registrations[later].Settings);
+                }
+
+                var infrastructureContext = new ProtoInfrastructureContext(settings, configuration, timeProvider)
+                {
+                    Readiness = readinessOptions,
+                    PendingSettings = pendingSettings,
+                    InProcessServerApplications = inProcessServers
+                };
 
                 // Starting it again makes this a new ownership period: its release must run again.
                 runResources?.Rearm(infrastructure);

@@ -125,16 +125,16 @@ With `disposeWithContext: false` the test registers the client as shared and doe
 
 Several initializers can offer the same protocol, client type and name. They're tried **in registration order**, and the first to return `true` wins. Returning `false` means "not me" — and the initializer must leave the context untouched when it does. An initializer without `Protocol` can serve as a fallback for matching protocol chains.
 
-This is how a client bound to an application is served by a real URL when the application has a `BaseUrl`, and by the [in-process ASP.NET Core server](../integrations/aspnetcore.md) otherwise:
+This is how a client bound to an application is served by a real URL when the application has an address - configured, or published by a started infrastructure piece - and by the [in-process ASP.NET Core server](../integrations/aspnetcore.md) otherwise:
 
 ```csharp
-public async Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
+public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
 {
-    var url = context.Configuration[$"ProtoTest:Applications:{Name}:BaseUrl"];
-    if (url is null) return false;           // let the next initializer try
+    var url = ProtoApplication.BaseUrl(context, Name);   // settings first, then configuration
+    if (url is null) return Task.FromResult(false);      // let the next initializer try
 
     context.RegisterClient(new HttpClient { BaseAddress = new Uri(url) }, Name);
-    return true;
+    return Task.FromResult(true);
 }
 ```
 

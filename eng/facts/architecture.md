@@ -40,25 +40,31 @@ or `Sheets` type names.
 1. Builds `IConfiguration`; registers it with `ProtoInfrastructureSettings`.
 2. Computes the conditional-infrastructure skip set and removes skipped pieces from the run store
    **before** anything can own them.
-3. Computes dropped conditional capabilities (**→ AUDIT REG-1/REG-2**: per declaration and per
-   instance).
+3. Computes dropped conditional capabilities: a declaration drops under its own condition -
+   `AddCapabilityUnlessConfigured` when every key is configured, `AddCapabilityWhenProvided` when none
+   of its keys is provided (a configured value or a key registered infrastructure declares, including
+   pieces this build skips) - and a descriptor drops only when **every** declaration for it drops and
+   no plain declaration promises it; the decision names the deciding keys and the reason in the trace.
 4. Selects the run clock (a `ProtoClock` registered by `ConfigureClock`, else one starting now) and
    registers the `TimeProvider` bridge.
 5. Registers the internal hooks (client initializer and completion, trace export, run gates, run
    resources) and report sources.
 6. Builds the provider and **constructs every `IProtoCollector`** so a bad OpenAPI/GQL schema fails
    construction, not the first test.
-7. Second `Build()` throws; some builder entries throw after Build and some do not (**→ AUDIT REG-3**).
+7. Second `Build()` throws; every public registration entry that would mutate composition throws
+   after `Build()` (a repeated same-name `AddAspNetCoreServer`/`AddWorkerHost` no-op stays a no-op).
 
 `StartAsync()`:
 
 1. Run hooks in ascending `Order` — trace export (`int.MinValue`), run resources (`int.MinValue + 1`),
    sink export (`+2`), run gates (`+3`), HTTP auth (`100`).
 2. Resets run-resource ownership for a retry, records capability descriptors as run entities.
-3. Starts infrastructure in registration order; each started piece fills its declared settings keys;
-   readiness probes are ordinary infrastructure and are awaited at their registration position;
-   workers are infrastructure and start after everything registered before them (**→ AUDIT CFG-1**: the
-   worker's `Program.Main` does not yet see the run's configuration).
+3. Starts infrastructure in registration order; each started piece fills its declared settings keys,
+   receives the run's readiness policy (`ProtoInfrastructureContext.Readiness`) and, for an address
+   probe, the keys later pieces declare; readiness probes are ordinary infrastructure and are awaited
+   at their registration position (a probe registered before its publisher records the ordering, not a
+   mode lie); workers are infrastructure and start after everything registered before them
+   (**→ AUDIT CFG-1**: the worker's `Program.Main` does not yet see the run's configuration).
 4. Starts the trace listener. A start failure rolls back completed run hooks in reverse, clears
    infrastructure settings, and returns the host to Created for a retry.
 
@@ -107,46 +113,68 @@ starts again after a failed rollback is re-armed and released once per ownership
 
 | API | Repeat behavior | After `Build()` |
 | --- | --- | --- |
-| `ConfigureServices` / `ConfigureAppConfiguration` / `ConfigureTestIds` | composes (appends) | no-op today (**→ AUDIT REG-3**) |
-| `ConfigureTracing` / `AddResource` | composes / same instance no-op | throws today |
-| `AddTestHook` / `AddRunHook` / `AddRunGate` | every call adds another descriptor (no dedupe) | no-op today |
-| `AddCapability` | dedupes by descriptor value | no-op today |
-| `AddCapabilityUnlessConfigured` | conditional declaration; target rule: per declaration + per instance (**→ AUDIT REG-1/REG-2**) | no-op today |
-| `AddSink<TSink>` | first per sink type wins; a repeated generic call appends its configure callback; direct DI registrations are wrapped once | no-op today |
-| `AddInfrastructure` | same instance merges keys; different instance with the same id throws; skipped when every declared key is configured, unless `AddInfrastructureAlways` | no-op today |
-| `AddApplication` | named; first client per protocol is the default | no-op today |
-| Integration `AddClient` | first registration that initializes wins (keyed factory + resolver first match) | no-op today |
-| `AddWorkerHost` / `AddAspNetCoreServer(name)` | first per name wins | no-op today; **→ AUDIT DEV-6** should throw on a different program/type |
-| `AddData` | composes onto one registry per builder | no-op today |
-| `AddWeb` | one backend per host, first wins | no-op today |
+| `ConfigureServices` / `ConfigureAppConfiguration` / `ConfigureTestIds` | composes (appends) | throws |
+| `ConfigureTracing` / `AddResource` | composes / same instance no-op | throws |
+| `AddTestHook` / `AddRunHook` / `AddRunGate` | every call adds another descriptor (no dedupe) | throws |
+| `AddCapability` | dedupes by descriptor value (instance included) | throws |
+| `AddCapabilityUnlessConfigured` | conditional declaration; drops when every key is configured; a descriptor drops only when every declaration for it drops and no plain declaration exists; key sets compare by content | throws |
+| `AddCapabilityWhenProvided` | conditional declaration; drops when none of its keys is provided (configured value, or a key a registered infrastructure piece declares); composes with the other declaration kinds per declaration | throws |
+| `AddSink<TSink>` | first per sink type wins; a repeated generic call appends its configure callback; direct DI registrations are wrapped once | throws |
+| `AddInfrastructure` | same instance merges keys; different instance with the same id throws; skipped when every declared key is configured, unless `AddInfrastructureAlways` | throws |
+| `AddApplication` | named; first client per protocol is the default | throws (application entries too) |
+| Integration `AddClient` | first registration that initializes wins (keyed factory + resolver first match) | throws |
+| `AddWorkerHost` / `AddAspNetCoreServer(name)` | first per name wins; **→ AUDIT DEV-6** compares the program/type | a new registration throws; a repeated name is a no-op |
+| `AddData` | composes onto one registry per builder | throws |
+| `AddWeb` | one backend per host, first wins; only the winner declares the browser capability | throws |
 
 The one rule to internalize: **first-wins guards must compare identity, not just the name**. A dropped
 duplicate that is actually a different program, server, backend or device type is a silent wrong state
-(audit REG-2, DEV-1, DEV-6).
+(audit DEV-1, DEV-6).
 
 ## Capabilities and skips
 
-- `ProtoCapabilityDescriptor(Name, Kind, Source)`; built-in kinds in `ProtoCapabilityKinds`
+- `ProtoCapabilityDescriptor(Name, Kind, Source)` plus `Instance`: the name of one server, transport
+  or application when the capability describes an instance, null when it describes the host as a
+  whole. Built-in kinds live in `ProtoCapabilityKinds`
   (`server`, `worker`, `device`, `protocol`, `browser`, `store`, `broker`, `data`, `document`).
 - `[RequiresCapability(kind, CapabilityName = ...)]` is evaluated by the adapter before the test starts;
   a skip has no lifecycle. `[RequiresInProcess]` is `[RequiresCapability(server)]`.
 - Honesty rule: a capability may only be declared by an integration that can serve it.
-  `AddCapabilityUnlessConfigured` drops it when the environment provides the address — adopted only by
-  `AddAspNetCoreServer` today (**→ AUDIT ADDR-1** completes the rule for Sql, Messaging, REST/GraphQL/
-  gRPC; Web's absolute-URL case is a documented exception).
-- Multi-instance capabilities must carry their instance (server name, backend name); today they do not
-  (**→ AUDIT REG-2**).
+  `AddCapabilityUnlessConfigured` decides **per declaration**: a descriptor drops only when every
+  conditional declaration for it drops and no plain declaration promises it, so one satisfied
+  declaration never drops a capability another unsatisfied declaration and its live integration still
+  need. The skipped record carries the deciding keys (`capability.keys`) and the reason
+  (`capability.reason`: `already configured`, or `no key provided`).
+  `AddAspNetCoreServer` and `AddInProcessWebSocketDevices` use `AddCapabilityUnlessConfigured`;
+  `UseRabbitMq`, `AddSql` and `AddEntityFrameworkCore` (the last sharing `SqlOptions.AddressKeys`)
+  use `AddCapabilityWhenProvided`, so a missing address drops the capability and tests skip (ADDR-1,
+  done for these). The HTTP family
+  (REST/GraphQL/gRPC) keeps the unconditional protocol capability: one capability covers every client
+  of the protocol, and an application-scoped client is legitimately served in-process with no address,
+  so a per-key drop cannot be expressed without skipping configured clients or hiding the in-process
+  path; the missing-address failure stays at first use with the resolver message (decided in A2b).
+  Web's absolute-URL case is the documented domain exception.
+- Multi-instance capabilities carry their instance: two named servers are two descriptors, two
+  capabilities and two run entities (`server:ASP.NET Core:A`), so configuring A's address drops only
+  A's. `HasCapability(kind)` matches any instance; `HasCapability(kind, name)` matches the descriptor
+  `Name`, not the instance. The Web pair leaves exactly the winning backend's browser capability.
 
-## Address resolution (today vs target)
+## Address resolution (one authority per application)
 
-| Integration | Today | Target (audit ADDR-1/ADDR-2) |
-| --- | --- | --- |
-| REST / GraphQL / gRPC | static configuration only; throws at first use | one authority: settings → configuration; missing ⇒ inert + capability absent |
-| ASP.NET Core server | static configuration decides step-aside; settings-published addresses do not step it aside (decided) | keep, document the asymmetry |
-| Web sessions | settings first, then configuration; relative navigation throws without one | same authority; absolute-URL sessions stay addressless |
-| Devices | settings first, then configuration; registration-time throw if neither | same authority |
-| Readiness | settings → configuration, resolved at its registration position; may silently report "in-process" for a settings-published app | re-resolve after infrastructure starts before claiming in-process; one timeout owner (ADDR-3) |
-| Sql / Messaging | connection resolved through DI factories/options; capability unconditional today | conditional capability on the address keys; inert until first use |
+An application-scoped setting resolves through one named precedence, `ProtoApplication.ResolveSetting`
+(a started piece's published settings → static configuration), exposed as
+`ProtoApplication.BaseUrl(context, app)` and `ProtoApplication.GrpcAddress(context, app)`. Every
+address reader uses it; the in-process transport is the client resolver's fallback, never a competing
+source. A first-reader-wins divergence is a bug (audit ADDR-2, fixed).
+
+| Integration | Rule |
+| --- | --- |
+| REST / GraphQL / gRPC | settings-published address first, then configuration (gRPC: `Grpc:Address`, then `BaseUrl`); the in-process transport serves only when neither resolves. A missing address fails at first use with the resolver message; the protocol capability stays (A2b decision: one capability covers every client of the protocol, and an application-scoped client is legitimately in-process with no address) |
+| Readiness (`AddHttpReadiness`) | same precedence at its registration position; a probe before the publisher records `readiness.skipped` naming the ordering requirement, and claims "in-process" only when a server capability backs the application |
+| ASP.NET Core server | step-aside reads static configuration only (decided asymmetry); a settings-published address leaves the server in place while every address reader follows the published process |
+| Web sessions | same precedence; absolute-URL sessions stay addressless |
+| Devices | same precedence; registration-time throw when neither resolves |
+| Sql / Messaging | connection resolved through DI factories/options; the capability is declared with `AddCapabilityWhenProvided` over the keys that can provide the address (`SqlOptions.AddressKeys`, `RabbitMqOptions.ConnectionStringSetting`), so a run with none drops it and skips; the SQL connection hook and the Entity Framework Core enlistment hook (same keys) stay inert (no open, no context), and the accessors name the keys |
 
 ## Options
 
@@ -156,9 +184,18 @@ section over them (configuration wins), and resolves one instance per consumer. 
 options resolve; a bad value fails there, not the first test.
 
 Known outliers (sanctioned or audit-owed): Web backends validate through static delegates instead of
-the interface method; `ProtoReadinessOptions` is not configuration-bindable and containers own a
-second timeout (**→ ADDR-3**); the sink path binds but does not validate; OpenAPI/GraphQL schema
-sources are read directly from configuration (decided in Audit 3 D5).
+the interface method; the sink path binds but does not validate; OpenAPI/GraphQL schema sources are
+read directly from configuration (decided in Audit 3 D5). `ProtoReadinessOptions` implements
+`IProtoConfigurableOptions` (section `ProtoTest:Readiness`), is bound at `Build`, and is handed to
+infrastructure through `ProtoInfrastructureContext.Readiness`, so one policy governs host probes and
+the containers the run starts (ADDR-3 fixed); a container started outside a host keeps its own
+`ReadinessTimeout`/`ReadinessInterval`.
+
+`SqlOptions.AddressKeys` is a `SqlAddressKeys` value object, deliberately outside configuration
+binding: the keys are declared in code because the Build-time capability decision cannot see a value
+that binds later, and a bound-in key would let the runtime rule disagree with the decision.
+`AddEntityFrameworkCore` reads the declaration `AddSql` recorded when it registers, so it shares the
+same key set when it is called after `AddSql`.
 
 ## Evidence boundary
 
@@ -190,9 +227,9 @@ tests resolves per call and never holds a context.
 - Trace sources, observation kinds, coverage categories and entity kinds are constants where they are
   introduced, not literals at call sites (**→ AUDIT VOC-2**: web page kinds and `graphql.failure` still
   literals).
-- Entity ids: `client:{type}:{name}`, `context:{type}`, `capability:{kind}:{name}`,
-  `device:{client}:{id}` (target: include the device type, audit DEV-4), infrastructure `Id`, resources
-  `Id`, value items `{type}:{identity}`.
+- Entity ids: `client:{type}:{name}`, `context:{type}`, `capability:{kind}:{name}` (with `:{instance}`
+  when the descriptor carries one), `device:{client}:{id}` (target: include the device type, audit
+  DEV-4), infrastructure `Id`, resources `Id`, value items `{type}:{identity}`.
 - New vocabulary is additive to the wire; the viewer contract is not edited casually.
 
 ## Runner adapters
@@ -215,7 +252,7 @@ suite; extend it, do not fork it.
 | Test lifecycle | `ProtoTestLifecycle` | `src/ProtoTest.Core/Internal/` |
 | Resource registry | `ProtoResourceRegistry`, `ProtoRunResourceStore` | `src/ProtoTest.Core/Internal/` |
 | Infrastructure registration | `ProtoInfrastructureRegistration`, `ProtoInfrastructureSettings`, `IProtoConfiguredInfrastructure`, `ProtoInfrastructureContext` | `src/ProtoTest.Core/Infrastructure/` |
-| Capability | `ProtoCapabilityDescriptor`, `ProtoCapabilityKinds`, `AddCapabilityUnlessConfigured` | `src/ProtoTest.Core/Applications/ProtoCapability.cs` |
+| Capability | `ProtoCapabilityDescriptor`, `ProtoCapabilityKinds`, `AddCapabilityUnlessConfigured`, `AddCapabilityWhenProvided` | `src/ProtoTest.Core/Applications/ProtoCapability.cs` |
 | Client resolution | `ProtoClientRegistry`, `ProtoClientInitializerHook`, `ProtoClientResolution` | `src/ProtoTest.Core/Internal/` |
 | Application resolution | `ProtoApplication`, `ProtoApplicationResolution`, `[Application]` | `src/ProtoTest.Core/Applications/` |
 | Options | `IProtoConfigurableOptions`, `ProtoOptionsRegistration` | `src/ProtoTest.Core/` |
@@ -241,6 +278,6 @@ suite; extend it, do not fork it.
 6. `Cancelled` / `Failed` / `Skipped` / `Unknown` mean one thing per producer and adapter.
 7. Configuration errors fail configuration or resolve, not the first test observation.
 8. A capability is declared only by something that can serve it; a dropped capability changes skips,
-   never silently disables a live integration (**→ AUDIT REG-1**).
+   never silently disables a live integration.
 9. Core stays free of protocol/web/document vocabulary.
 10. No user-facing artifact teaches a symbol that does not exist.

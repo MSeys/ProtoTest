@@ -173,10 +173,36 @@ updates (R1a-06) landed in `eng/facts/`. Done in OpenCSMS `e3cf209` + `92a6d0d`.
 Execute `eng/audit-plan-4.md` stages **A1–A4** in order; this is also where plan-4's P4f.3 consumer
 rule lands (audit ADDR-1), with the reference suite as its first external proof.
 
-- [ ] **A1 Registration semantics** (REG-1..REG-5): per-declaration conditions, per-instance
-  capabilities, one post-`Build` rule, canonical key equality.
-- [ ] **A2 Address authority** (ADDR-1..ADDR-4): the consumer rule for Sql, Messaging,
-  REST/GraphQL/gRPC; one precedence shared by readiness/HTTP/web/devices; one readiness timeout owner.
+- [x] **A1 Registration semantics** (REG-1..REG-5): per-declaration conditions, per-instance
+  capabilities (`ProtoCapabilityDescriptor.Instance`), one post-`Build` rule, canonical key equality,
+  winner-only Web capability and the conditional in-process device transport. Independently reviewed
+  (`assets/internal/review-a1.md`, 0 blockers). Gate: `verify A1 935c2e0* (1.1.0-alpha.1): lint PASS ·
+  docs PASS · test PASS · pack PASS`.
+  - **A1 residuals (from review-a1.md, nice-to-have):** A1R-02 application-builder `Services` direct
+    mutation bypasses the guard (land with A2/A4); A1R-04 pin `AddApplication`/`RegisterClient`
+    post-`Build`; A1R-05 pin `HasCapability(kind, instance)` as negative; A1R-07 a direct-DI
+    `IWebBackendFactory` loses its browser capability (Web/DX); A1R-01 pin the repeated same-name
+    no-op. A1R-03/A1R-06 are fixed in this commit.
+- [x] **A2 Address authority** (ADDR-1..ADDR-4). Complete; both halves independently reviewed
+  (`assets/internal/review-a2a.md`, `review-a2b.md`).
+  - **A2a** (commit `f8da0c2`): one settings → configuration precedence shared by
+    readiness/HTTP/REST/GraphQL/gRPC/Web/devices with transport last; the before-publisher probe
+    records an honest ordering reason; `ProtoReadinessOptions` binds `ProtoTest:Readiness`, reaches
+    containers through `ProtoInfrastructureContext.Readiness`, and owns the timeout; the gRPC message
+    names the application.
+  - **A2b** (this commit): `AddCapabilityWhenProvided` (drop when no declared key is provided by
+    configuration or a registered infrastructure piece); `UseRabbitMq` declares `Broker` through it;
+    `SqlOptions.AddressKeys` (code-declared, non-bindable) makes SQL inert with the `Store` capability
+    absent, including `AddEntityFrameworkCore` when it follows `AddSql`; `UseBroker(factory,
+    addressKeys)` is the adapter seam. **HTTP/gRPC deliberately not adopted** (audit site 3): one
+    protocol capability cannot express per-client keys, and an application-scoped client is
+    legitimately served in-process; the failure stays at first use with the A2a resolver message
+    (recorded in `architecture.md`/`gotchas.md`). External proof: OpenCSMS 6/6 in container and
+    configured modes after a repack.
+  - **Residuals:** A2aR-01 intermittent demo teardown NRE (watch; investigate if it recurs);
+    A2aR-03/04/05 and A2bR-04/05/06 wording/pins (nice-to-have); `AddEntityFrameworkCore` must follow
+    `AddSql` to inherit the address rule (documented order requirement); A2bR-06 (host `SqlOptions`
+    after `AddSql`) recorded.
 - [ ] **A3 Configuration timing and clock identity** (CFG-1, CFG-3, CFG-4): the worker `Main` args
   overlay with its capture test and documented limit; host-scoped clock locator. Update
   `hosting.md`, changelog and `eng/facts/gotchas.md`. OpenCSMS may then delete its deferred reads.
@@ -250,7 +276,7 @@ Order is plan-4's demand order; each item is its own stage with the feature-plan
 | 0b — Audit A0 characterization | Complete | `A0-core` 586ed00 · `A0-devices` (lint/docs/test PASS, stage trees 244eee9*/586ed00*, 1.1.0-alpha.1) | All characterizations pass pinning current behavior: mixed conditionals, two named servers, Web backend pair, post-`Build`, clock locator, worker `Main`, in-process transport marker/endpoint/options, connect race, device resource id |
 | 1 — R1a reference suite | Complete | 1.1 `8bf57ce` · 1.2/1.3 `8c0ab21` · 1.4/1.5 `a63be86` · 1.6/1.7 `2cb949f` — container 4/4 ×2, configured 4/4 ×2 (one DB) | Journey, DLQ, both modes, honest README/COVERAGE; Phase 2 (audit A1–A4) next |
 | 1b — R1a review follow-ups | Complete | OpenCSMS `e3cf209` + `92a6d0d`; logs under `artifacts/gates/` | All seven should-fixes done: redelivery test, dead-channel reset, observable clock, at-most-once recorded, API-only migrations, evidence runner, suite polish; R1a-14 anecdotal |
-| 2 — Audit correctness A1–A4 | Pending | — | Registration, address, config/clock, devices |
+| 2 — Audit correctness A1–A4 | In progress | A1 `2e84e65` · A2a `f8da0c2` · A2b (this commit), all independently reviewed; gates PASS; OpenCSMS 6/6 both modes | A3 (config timing/clock) next |
 | 3 — Hygiene A5–A7 | Pending | — | Vocab/docs, tests/support, release evidence |
 | 3b — DX and API consistency | Pending | `eng/dx-review.md`: 5 P1, 7 P2, 6 P3 | DX-01/02/03/05 accepted (DX-04 recorded); P2/P3 by demand; deliberate idioms binding |
 | 4 — Plan-4 resume | Pending | — | R2–R5, P5–P8, X1/X2 |
@@ -266,7 +292,9 @@ Order is plan-4's demand order; each item is its own stage with the feature-plan
    semantics; `recipes.md` says which existing pattern to copy for each kind of change; `gotchas.md`
    records the traps this audit found. A behavior change updates the owning fact in the same commit.
 3. **Evidence replaces assertion.** `eng/verify.ps1` writes machine-readable gate results; plan rows
-   quote them. A stage that cannot show its evidence is not done.
+   quote them. A stage that cannot show its evidence is not done. The gate is scoped to the change:
+   docs-only stages run the docs check only, code stages format-check the projects they touched, and
+   pack stays opt-in — `-Full` restores the CI shape for release or shared-boundary stages.
 4. **The branch is verifiable.** A distinct `1.1.0-alpha.<n>` version, CI on the branch, pack
    self-checks, and a demand-pulled plan mean a session can stop at any point without leaving a
    half-verifiable tree.

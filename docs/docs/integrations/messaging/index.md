@@ -213,7 +213,7 @@ The package ships **no collector**. The observations exist, but they never reach
     Reason = "No broker is configured; set ProtoTest:Messaging:RabbitMq:ConnectionString.")]
 ```
 
-`AddMessaging` registers the `Messaging` capability only when an adapter is configured. The container alone does not satisfy the condition — the capability comes from `UseRabbitMq`, not from owning a broker.
+`AddMessaging` registers the `Messaging` capability only when an adapter is configured. With `UseRabbitMq` the capability is conditional on `ProtoTest:Messaging:RabbitMq:ConnectionString`: a run with a configured key or a broker container that declares it keeps the capability, while a run with neither loses it and gated tests skip instead of failing at setup or first publish. A callback that sets `RabbitMqOptions.ConnectionString` in code provides the address without a key and keeps the capability; an adapter registered through `UseBroker` without address keys keeps the unconditional declaration.
 
 ## Limits
 

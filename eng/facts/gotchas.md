@@ -15,8 +15,9 @@ audit plan.
   time (the P4f consumer rule) — this is what made the reference product's publisher inert.
   **→ AUDIT CFG-2 / REF-2.**
 - **Static configuration decides `AddAspNetCoreServer`'s step-aside, not settings.** A settings-published
-  address does not step the in-process server aside (decision, Northstar compatibility). Do not assume
-  the two agree. **→ AUDIT ADDR-2.**
+  address does not step the in-process server aside (decided asymmetry); the address readers still
+  follow the published address, so give a published process its own application name when both must
+  coexist (the demo's standalone console is its own application).
 - **A suite's configuration has no environment source unless it adds one.** `ConfigureAppConfiguration`
   composes exactly the sources it is passed; a configured-mode recipe's exported keys are invisible
   until the setup adds `.AddEnvironmentVariables()`. Without it the containers still start and the
@@ -25,31 +26,66 @@ audit plan.
 
 ## Capabilities and registration
 
-- **A capability is dropped when *one* conditional declaration is satisfied, even if another remains
-  unsatisfied.** Two named servers sharing the `("ASP.NET Core", server, ...)` descriptor: configure
-  one `BaseUrl` and `[RequiresInProcess]` skips tests against both. **→ AUDIT REG-1.**
-- **Capabilities that describe an instance must carry the instance.** `AddCapability` dedupes by value,
-  so two servers/backends collapse into one capability. **→ AUDIT REG-2.**
-- **`Build()` is terminal, but only some entries say so.** `ConfigureServices`-based entries
-  (hooks, gates, capabilities, clock) silently no-op after `Build`. **→ AUDIT REG-3.**
+- **Conditions are per declaration, not per descriptor.** A capability drops only when every
+  conditional declaration for it drops and no plain (unconditional) declaration exists. Two named
+  servers with one `BaseUrl` configured: the configured server steps aside, the other stays in-process
+  and its capability stays. The `capability.skipped` event names the deciding keys (`capability.keys`)
+  and the reason (`capability.reason`).
+- **`AddCapabilityWhenProvided` is the missing-address half of the rule.** It drops when none of its
+  keys is provided, where provided means a configured value or a key a registered infrastructure piece
+  declares - including a piece the build skips because configuration already fills its keys. Use it
+  when an address must exist for the integration to serve; `AddCapabilityUnlessConfigured` is the
+  environment-provides-it-elsewhere half.
+- **Capabilities that describe an instance carry it** (`ProtoCapabilityDescriptor.Instance`). Two
+  named servers are two capabilities and two run entities (`server:ASP.NET Core:A`), so configuring
+  one address drops only that server's capability. `HasCapability(kind)` matches any instance;
+  `HasCapability(kind, name)` matches the descriptor `Name`, not the instance.
+- **Only the web backend that wins the first-wins registration declares a browser capability.** The
+  losing Playwright/Selenium backend declares nothing, so `[RequiresCapability(browser, "Selenium")]`
+  cannot pass while Selenium never registered.
+- **`AddInProcessWebSocketDevices<TProgram>(application)` declares its transport capability
+  conditionally on the application's `BaseUrl`.** A published application drops the capability (the
+  socket transport serves); the capability only exists while the application is hosted in-process.
+- **`Build()` is terminal for every public registration entry that would mutate composition.** Hooks,
+  gates, capabilities, the clock, sinks, infrastructure and application entries throw the same
+  single-build message after `Build`; a captured application builder throws too. Internal registration
+  during `Build` uses the fields directly, so it stays composable. A repeated registration that is a
+  no-op by design before `Build` (the same server or worker name) stays a no-op.
+- **A conditional declaration's key set compares by content** (ordinal, duplicates removed,
+  order-independent), so registering the same declaration twice in any order leaves one declaration.
 - **First-wins guards can hide a conflict.** `AddWorkerHost` with the same name and a different program
   is ignored; the second in-process device transport is dropped by one non-generic marker.
   **→ AUDIT DEV-1 / DEV-6.**
-- **A conditional declaration with a `Keys` list never dedupes** (record equality on a collection).
-  **→ AUDIT REG-4.**
 
 ## Addresses and readiness
 
-- **Address precedence differs by integration:** readiness/Web/devices read settings then
-  configuration; REST/GraphQL/gRPC read static configuration only; transport fallback comes last.
-  Do not assume one reader sees what another resolved. **→ AUDIT ADDR-2.**
-- **`AddHttpReadiness` registered before the piece that publishes the address waits for nothing and
-  records "runs in-process"** for an application that does not. **→ AUDIT ADDR-2.**
-- **Container readiness ignores `ConfigureReadiness`.** `ProtoContainerResource` owns a private
-  30 s timeout; a slow image cannot be tuned. **→ AUDIT ADDR-3.**
-- **The consumer rule is adopted only by `AddAspNetCoreServer`.** Sql fails in setup; RabbitMQ at
-  setup/first use; HTTP at first use; a missing address must mean "inert + capability absent", not a
-  setup failure. **→ AUDIT ADDR-1.**
+- **One address precedence: published settings → configuration, transport last.**
+  `ProtoApplication.ResolveSetting` (public forms `BaseUrl(context, app)` / `GrpcAddress(context, app)`)
+  is the only resolver readiness, REST/GraphQL/gRPC clients, web sessions and device clients use.
+  Configuring `BaseUrl` and starting a piece that publishes it are different decisions: the published
+  address wins at use time.
+- **`AddHttpReadiness` must be registered after the piece that publishes the address.** Probes are
+  awaited at their registration position; a probe registered first records `readiness.skipped` naming
+  the ordering and the later key instead of claiming "in-process". A truly in-process application
+  records "in-process"; an application with neither an address nor an in-process server records both
+  gaps.
+- **One readiness policy owns every wait.** `ConfigureReadiness`/`ProtoTest:Readiness` set
+  `ProtoReadinessOptions`, which governs host probes and every container the run starts through
+  `ProtoInfrastructureContext.Readiness`; a container started outside a host keeps its own
+  `ReadinessTimeout`/`ReadinessInterval`.
+- **The consumer rule is adopted by `AddAspNetCoreServer`, the in-process device transport,
+  `UseRabbitMq`, `AddSql` (with `SqlOptions.AddressKeys`) and `AddEntityFrameworkCore` (same keys).**
+  A missing address means "inert +
+  capability absent" and tests skip. The HTTP family is the recorded A2b exception: one protocol
+  capability covers every client and an application-scoped client is legitimately served in-process,
+  so a missing address still fails at first use with the resolver message. Web's absolute-URL sessions
+  stay the documented domain exception.
+- **`SqlOptions.AddressKeys` is code-declared, not configuration-bindable.** `SqlAddressKeys.Add` (or a
+  `SqlOptions` instance registered before `AddSql`) is the only way in; the `ProtoTest:Sql:AddressKeys`
+  configuration section is ignored, because the Build-time capability decision committed the run to the
+  code-declared keys, and a key configuration adds later would make the runtime rule disagree with it.
+  `AddEntityFrameworkCore` follows the keys `AddSql` recorded when it is called after `AddSql`; called
+  first, it keeps the unconditional capability and the SQL keys are not part of its decision.
 - **Containers must declare every key they fill.** `AddInfrastructure` skips only when *all* declared
   keys are configured; a missing one starts the container anyway (a configured CI without Docker then
   fails). Check the README recipes for all keys.
@@ -61,9 +97,14 @@ audit plan.
   is declared at the first `AwaitAsync`, so an act-then-await flow loses a message the act published.
   Pre-bind every destination the act publishes to. (Canonical:
   `tests/ProtoTest.Messaging.RabbitMq.Tests/RabbitMqTests.cs`; used by OpenCSMS `Setup.cs`.)
-- **`UseRabbitMq` declares the `Broker` capability unconditionally, and a pre-bound destination connects
-  at test setup.** A missing broker address cannot be expressed as a skip yet, and even tests that never
-  touch messaging fail setup rather than skip. **→ AUDIT ADDR-1.**
+- **`UseRabbitMq` declares the `Broker` capability conditionally on
+  `ProtoTest:Messaging:RabbitMq:ConnectionString`.** A run with a configured key or a broker container
+  that declares it keeps the capability; with neither it is absent and gated tests skip instead of
+  failing setup/first publish. A callback that sets `RabbitMqOptions.ConnectionString` in code provides
+  the address without a key and keeps the capability unconditional. An adapter registered with the
+  key-less `UseBroker(factory)` overload keeps the unconditional declaration too.
+- **A pre-bound destination still connects at test setup when the capability is present.** The
+  pre-bind failure mode is unchanged; the address rule only decides whether the run gets that far.
 - **`ProtoMessage` carries the exchange as `Destination` and drops the routing key.** Taps bind
   destinations as exchanges, so a queue (a dead-letter queue) or an `(exchange, routingKey)` pair cannot
   be awaited through the framework. Use a raw `RabbitMQ.Client` helper until the recorded REF-5 addition
@@ -122,8 +163,10 @@ audit plan.
   validation compare the package against itself) is the reason: local consumers use package-source
   mapping and clear `~/.nuget/packages/prototest.*` after a repack.
 - **The branch never meets CI.** `ci.yml` now includes `version/**` and a manual dispatch, but a
-  locally run stage still needs `eng/verify.ps1 -Stage <name>` (add `-Pack` when packaging changed)
-  so the evidence is recorded. **→ AUDIT TST-4.**
+  locally run stage still needs `eng/verify.ps1 -Stage <name>` so the evidence is recorded; the gate
+  auto-scopes to the change (docs-only stages skip lint/tests, code stages format only the projects they
+  touched) and takes `-Pack` when public surface/packaging changed, `-Full` for the CI shape.
+  **→ AUDIT TST-4.**
 - `eng/pack.ps1` is the per-stage pack gate; it verifies the packable set, READMEs, dependency edges
   and PDB/DLL pairs. Run it whenever packaging changes, then re-pack for consumers before re-running
   their restore.

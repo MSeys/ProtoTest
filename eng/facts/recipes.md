@@ -24,9 +24,13 @@ Copy the shape of `ProtoTest.Messaging` or `ProtoTest.Devices` (small) or `Proto
    `IProtoApplicationBuilder` overload. In the call: register options (see the options recipe),
    declare the capability with a `ProtoCapabilityDescriptor`, and register lifecycles
    (`TryAddEnumerable` for hooks) so repeated calls compose.
-3. If the integration owns addresses, make it inert when the address is missing and declare its
-   capability conditionally (`AddCapabilityUnlessConfigured`) — that is the P4f consumer rule
-   (audit ADDR-1). A missing address must produce a skip, not a setup failure.
+3. If the integration owns an address, pick the conditional registration that matches the failure
+   direction: `AddCapabilityWhenProvided` when a missing address must make the integration inert (drop
+   → skip, never a setup failure) — `AddSql`/`SqlOptions.AddressKeys`, `AddEntityFrameworkCore` (same
+   keys) and `UseRabbitMq` are the canonical examples — and `AddCapabilityUnlessConfigured` when the
+   environment already provides what the integration would start (`AddAspNetCoreServer`, the in-process
+   device transport). That is the P4f consumer rule (audit ADDR-1). A missing address must produce a
+   skip, not a setup failure.
 4. Options implement `IProtoConfigurableOptions` with a section name and `Validate()`; register through
    `ProtoOptionsRegistration.Configure` (callbacks compose, configuration binds over them).
 5. Trace vocabulary: one trace-source constant, operation names and observation kinds as constants at
@@ -89,15 +93,24 @@ audit CFG-1, fixed in A3).
 ## Recipe: a conditional capability / an integration that can be inert
 
 ```csharp
+// Drop when the environment already provides the address elsewhere:
 builder.AddCapabilityUnlessConfigured(
+    new ProtoCapabilityDescriptor("MyAdapter", ProtoCapabilityKinds.Protocol, "ProtoTest.MyAdapter"),
+    "ProtoTest:MyAdapter:Address");
+
+// Drop when no address can exist (configured value or a key registered infrastructure declares):
+builder.AddCapabilityWhenProvided(
     new ProtoCapabilityDescriptor("MyAdapter", ProtoCapabilityKinds.Protocol, "ProtoTest.MyAdapter"),
     "ProtoTest:MyAdapter:Address");
 ```
 
-The rule being built (audit REG-1/REG-2): the descriptor is dropped only when the declaration's
-condition is satisfied, and a capability that describes an *instance* carries the instance name.
-`[RequiresCapability]` then skips instead of failing. Never declare a capability from a registration
-that lost a first-wins race (audit REG-2).
+The rule (audit REG-1/REG-2, landed in A1; ADDR-1 in A2b): a descriptor drops only when every
+conditional declaration for it drops and no plain declaration promises it; a capability that describes
+an *instance* carries `Instance`; and a capability is declared only by the registration that won a
+first-wins race. `[RequiresCapability]` then skips instead of failing. When the integration would fail
+at setup or first use without an address, pair `AddCapabilityWhenProvided` with an inert use path that
+names the missing keys (`AddSql`/`SqlOptions.AddressKeys` and `UseRabbitMq` are the canonical
+examples).
 
 ## Recipe: configurable options
 

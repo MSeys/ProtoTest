@@ -146,7 +146,7 @@ public sealed class ReadinessTests
     }
 
     [Test]
-    public async Task HttpReadiness_WithoutAPublishedAddress_ShouldSkipAndSaySo()
+    public async Task HttpReadiness_WithoutAnAddressOrAnInProcessServer_ShouldNameTheGap()
     {
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
@@ -157,7 +157,89 @@ public sealed class ReadinessTests
         await host.StopAsync();
 
         var entity = host.Trace.Snapshot().Entities!.Single(candidate => candidate.Kind == "readiness");
-        Assert.That(entity.State["readiness.skipped"], Does.Contain("in-process"));
+        var reason = entity.State["readiness.skipped"];
+        Assert.Multiple(() =>
+        {
+            Assert.That(reason, Does.Contain("no in-process server"));
+            Assert.That(reason, Does.Contain("ProtoTest:Applications:Api:BaseUrl"));
+            Assert.That(reason, Does.Not.Contain("runs in-process"));
+        });
+    }
+
+    [Test]
+    public async Task HttpReadiness_WithASettingsPublishedAddress_ShouldWaitForIt()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddInfrastructure(
+            new PublishedAddressInfrastructure("Api", $"http://127.0.0.1:{port}"),
+            "ProtoTest:Applications:Api:BaseUrl");
+        builder.ConfigureReadiness(options => options.Interval = TimeSpan.FromMilliseconds(20));
+        builder.AddHttpReadiness("Api");
+        await using var host = builder.Build();
+
+        // The listener is already accepting, so the probe's first HTTP attempt must succeed; no sleep.
+        var start = host.StartAsync();
+        var serve = ServeOnceAsync(listener);
+        await start;
+        await host.StopAsync();
+        await serve;
+
+        var entity = host.Trace.Snapshot().Entities!.Single(candidate => candidate.Kind == "readiness");
+        Assert.Multiple(() =>
+        {
+            Assert.That(entity.State["readiness.url"], Does.Contain($"127.0.0.1:{port}"));
+            Assert.That(entity.State, Does.Not.ContainKey("readiness.skipped"));
+        });
+    }
+
+    [Test]
+    public async Task HttpReadiness_RegisteredBeforeItsAddressPublisher_ShouldRecordTheOrderingReason()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddHttpReadiness("Api");
+        builder.AddInfrastructure(
+            new PublishedAddressInfrastructure("Api", "http://127.0.0.1:1"),
+            "ProtoTest:Applications:Api:BaseUrl");
+        await using var host = builder.Build();
+
+        await host.StartAsync();
+        await host.StopAsync();
+
+        var entity = host.Trace.Snapshot().Entities!.Single(candidate => candidate.Kind == "readiness");
+        var reason = entity.State["readiness.skipped"];
+        Assert.Multiple(() =>
+        {
+            Assert.That(reason, Does.Contain("registration position"));
+            Assert.That(reason, Does.Contain("ProtoTest:Applications:Api:BaseUrl"));
+            Assert.That(reason, Does.Not.Contain("runs in-process"), "a later publisher is not an in-process application");
+        });
+    }
+
+    [Test]
+    public async Task ConfigureReadiness_FromConfiguration_ShouldBindOverTheCodeValues()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Readiness:Timeout"] = "00:00:00.200",
+                ["ProtoTest:Readiness:Interval"] = "00:00:00.020"
+            }));
+        builder.AddReadinessProbe("service ready", _ => ValueTask.FromResult(false));
+        await using var host = builder.Build();
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () => await host.StartAsync());
+
+        Assert.That(
+            exception!.Message,
+            Does.Contain("0.2s").Or.Contain("0,2s"),
+            "ProtoTest:Readiness bound over the default timeout");
     }
 
     private static int FreePort()

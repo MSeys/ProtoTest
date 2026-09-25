@@ -123,20 +123,42 @@ public sealed class PublishedApplicationTests
             TestMethods.Placeholder,
             [new ApplicationAttribute("Api")]);
 
-        using var response = await context.Rest().GetAsync("/ping");
+        var baseAddress = context.Client<HttpClient>("Api:Api").BaseAddress;
         var factory = context.TryServerFactory<SampleApi.Program>("Api");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();
 
         Assert.Multiple(() =>
         {
-            Assert.That(response.Content, Does.Contain("pong"), "the in-process server serves HTTP clients");
+            Assert.That(
+                baseAddress,
+                Is.EqualTo(new Uri("http://127.0.0.1:1")),
+                "HTTP clients follow the address a settings piece published, one precedence everywhere");
             Assert.That(
                 factory,
                 Is.Not.Null,
-                "an address a started piece published belongs to the sessions that drive that process");
+                "the in-process server stays: step-aside reads static configuration only (decided)");
             Assert.That(host.HasCapability(ProtoCapabilityKinds.Server, "ASP.NET Core"), Is.True);
         });
+    }
+
+    [Test]
+    public async Task AddHttpReadiness_ForAnInProcessApplication_ShouldSkipAndSayInProcess()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddApplication("Api", app => app.AddAspNetCoreServer<SampleApi.Program>());
+        builder.AddHttpReadiness("Api");
+        await using var host = builder.Build();
+
+        await host.StartAsync();
+        await host.StopAsync();
+
+        var entity = host.Trace.Snapshot().Entities!.Single(candidate => candidate.Kind == "readiness");
+        Assert.That(
+            entity.State["readiness.skipped"],
+            Does.Contain("runs in-process"),
+            "the server capability proves the in-process mode the probe reports");
     }
 
     private sealed class PublishedAddressInfrastructure(string application, string address) : IProtoSettingsInfrastructure

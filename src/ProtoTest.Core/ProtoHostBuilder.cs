@@ -17,10 +17,18 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     private readonly ProtoRunResourceStore _runResources = new();
     private bool _built;
 
+    /// <summary>The one message every entry that is called after <see cref="Build"/> reports.</summary>
+    internal const string BuiltMessage =
+        "The ProtoHostBuilder has already built a ProtoHost; configure a new builder instead.";
+
+    /// <summary>Whether a host was already built; the application builder shares this terminal rule.</summary>
+    internal bool IsBuilt => _built;
+
     /// <inheritdoc />
     public IProtoHostBuilder ConfigureServices(Action<IServiceCollection> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
+        ThrowIfBuilt();
         configure(_services);
         return this;
     }
@@ -28,6 +36,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     public IProtoHostBuilder ConfigureAppConfiguration(Action<IConfigurationBuilder> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
+        ThrowIfBuilt();
         configure(_configurationBuilder);
         return this;
     }
@@ -36,6 +45,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     public IProtoHostBuilder ConfigureTestIds(Action<ProtoTestIdOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
+        ThrowIfBuilt();
         configure(_testIdOptions);
         return this;
     }
@@ -52,6 +62,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     /// <inheritdoc />
     public IProtoHostBuilder AddTestHook<THook>() where THook : class, IProtoTestHook
     {
+        ThrowIfBuilt();
         _services.AddSingleton<IProtoTestHook, THook>();
         return this;
     }
@@ -59,6 +70,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     /// <inheritdoc />
     public IProtoHostBuilder AddRunHook<TRunHook>() where TRunHook : class, IProtoRunHook
     {
+        ThrowIfBuilt();
         _services.AddSingleton<IProtoRunHook, TRunHook>();
         return this;
     }
@@ -66,6 +78,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     /// <inheritdoc />
     public IProtoHostBuilder AddRunGate<TGate>() where TGate : class, IProtoRunGate
     {
+        ThrowIfBuilt();
         _services.AddSingleton<IProtoRunGate, TGate>();
         return this;
     }
@@ -73,6 +86,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     /// <inheritdoc />
     public IProtoHostBuilder AddRunGate(string name, Func<ProtoRunGateContext, ProtoRunGateResult> evaluate)
     {
+        ThrowIfBuilt();
         _services.AddSingleton<IProtoRunGate>(new ProtoRunGate(name, evaluate));
         return this;
     }
@@ -94,8 +108,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     {
         if (_built)
         {
-            throw new InvalidOperationException(
-                "The ProtoHostBuilder has already built a ProtoHost; configure a new builder instead.");
+            throw new InvalidOperationException(BuiltMessage);
         }
     }
 
@@ -114,6 +127,14 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
         _services.AddSingleton(configuration);
         _services.AddSingleton(new ProtoInfrastructureSettings());
 
+        // The run's readiness policy: the instance ConfigureReadiness/probes share, with the
+        // ProtoTest:Readiness section bound over the code values, so one owner governs host probes and
+        // the containers the run starts.
+        var readinessOptions = ProtoReadinessExtensions.ResolveOptions(this);
+        readinessOptions.BindFromConfiguration(configuration);
+        readinessOptions.Validate();
+        _services.TryAddSingleton(readinessOptions);
+
         // Run-owned pieces whose declared keys the environment already configures are not needed:
         // configuration wins, and the piece is not started, owned or released. The decision is fixed
         // here, while configuration is static; AddInfrastructureAlways opts a piece out.
@@ -130,38 +151,63 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
 
         _services.AddSingleton(new ProtoSkippedInfrastructure(skippedInfrastructure));
 
-        // A capability declared with an address condition is dropped when the environment already
-        // provides that address: HasCapability then answers false and [RequiresCapability] skips,
-        // exactly as if the integration that would have served it were never registered. A descriptor
-        // also registered unconditionally stays.
-        var skippedCapabilities = new List<ProtoCapabilityDescriptor>();
-        var satisfiedConditionals = _services
+        // A capability declared with an address condition is dropped when the environment cannot
+        // provide that address (WhenProvided) or already provides it elsewhere (UnlessConfigured):
+        // HasCapability then answers false and [RequiresCapability] skips, exactly as if the
+        // integration that would have served it were never registered. The rule is per declaration,
+        // not per descriptor: satisfying one conditional declaration must not drop a capability
+        // another, still-unsatisfied declaration and its live integration promise, and a plain
+        // declaration stays whatever the environment provides.
+        //
+        // A key counts as provided when configuration has a value for it or a registered
+        // infrastructure piece declares it, including a piece this build skips because configuration
+        // already fills its keys, so a container that will fill a key counts before it starts.
+        var declaredKeys = _services
+            .Where(descriptor => descriptor.ImplementationInstance is ProtoInfrastructureRegistration)
+            .SelectMany(descriptor =>
+                ((ProtoInfrastructureRegistration)descriptor.ImplementationInstance!).Settings)
+            .ToHashSet(StringComparer.Ordinal);
+        var declarations = _services
             .Where(descriptor => descriptor.ImplementationInstance is ProtoConditionalCapability)
             .Select(descriptor => (ProtoConditionalCapability)descriptor.ImplementationInstance!)
             .Distinct()
-            .Where(registration => registration.IsSatisfiedBy(configuration))
             .ToArray();
-        foreach (var conditional in satisfiedConditionals)
+        var capabilities = _services
+            .Where(descriptor => descriptor.ImplementationInstance is ProtoCapabilityDescriptor)
+            .Select(descriptor => (ProtoCapabilityDescriptor)descriptor.ImplementationInstance!)
+            .Distinct()
+            .ToArray();
+        var skippedCapabilities = new List<ProtoSkippedCapability>();
+        foreach (var capability in capabilities)
         {
-            var registeredUnconditionally = _services
-                .Where(descriptor => descriptor.ImplementationInstance is ProtoConditionalCapability)
-                .Select(descriptor => (ProtoConditionalCapability)descriptor.ImplementationInstance!)
-                .Any(registration => registration.Capability == conditional.Capability && registration.Keys.Count == 0);
-            if (registeredUnconditionally || skippedCapabilities.Contains(conditional.Capability))
+            var declaredFor = declarations
+                .Where(declaration => declaration.Capability == capability)
+                .ToArray();
+            if (declaredFor.Length == 0 || declaredFor.Any(declaration => declaration.IsUnconditional))
             {
+                continue;
+            }
+
+            if (!declaredFor.All(declaration => declaration.IsDropped(configuration, declaredKeys)))
+            {
+                // At least one declaration's integration is still live, so the capability must stay.
                 continue;
             }
 
             for (var index = _services.Count - 1; index >= 0; index--)
             {
-                if (_services[index].ImplementationInstance is ProtoCapabilityDescriptor descriptor
-                    && descriptor == conditional.Capability)
+                if (_services[index].ImplementationInstance is ProtoCapabilityDescriptor registered
+                    && registered == capability)
                 {
                     _services.RemoveAt(index);
                 }
             }
 
-            skippedCapabilities.Add(conditional.Capability);
+            var keys = new ProtoKeySet(declaredFor.SelectMany(declaration => declaration.Keys));
+            var reason = string.Join(
+                "; ",
+                declaredFor.Select(declaration => declaration.DropReason).Distinct(StringComparer.Ordinal));
+            skippedCapabilities.Add(new ProtoSkippedCapability(capability, keys, reason));
         }
 
         _services.AddSingleton(new ProtoSkippedCapabilities(skippedCapabilities));

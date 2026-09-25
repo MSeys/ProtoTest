@@ -7,16 +7,19 @@ using ProtoTest.Core;
 /// that were not declared as sharing the test's connection. The transaction only covers that connection,
 /// so an undeclared application would keep writing outside it and appear to be isolated when it is not.
 /// Applications hosted without being declared through <c>AddApplication</c> cannot be detected here.
+/// The guard applies only while the Store capability is present: an inert integration opens no
+/// transaction to protect, so a missing address must not fail the run.
 /// </summary>
 internal sealed class SqlIsolationGuardHook(
     SqlOptions options,
-    IEnumerable<ProtoApplicationClients> applications) : IProtoRunHook
+    IEnumerable<ProtoApplicationClients> applications,
+    bool storeCapabilityPresent) : IProtoRunHook
 {
     public int Order => -500;
 
     public Task BeforeRunAsync(CancellationToken cancellationToken = default)
     {
-        if (options.Isolation != SqlIsolation.Transaction)
+        if (!storeCapabilityPresent || options.Isolation != SqlIsolation.Transaction)
         {
             return Task.CompletedTask;
         }

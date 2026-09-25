@@ -65,8 +65,11 @@ When a controller session runs workers:
    idiom, or the register is updated with the reason), and facts/plan/changelog updates in the same
    commit.
 4. A stage that changes the public surface also gets an independent review worker before the controller
-   commits. Phase 1's review is the template: verdict, findings table with evidence, proposed facts
-   lines, and what could not be verified.
+   commits. The reviewer verifies the evidence record and the diff and re-runs the affected test
+   projects; it re-runs the full gate (`-Full`, add `-Pack` when packaging changed) when the evidence is
+   missing, red, or the change touches shared lifecycle/registration/evidence boundaries. Phase 1's
+   review is the template: verdict, findings table with evidence, proposed facts lines, and what could
+   not be verified.
 
 ## Gates
 
@@ -76,7 +79,7 @@ When a controller session runs workers:
 | `eng/lint.ps1` | every stage |
 | `eng/check-docs.ps1` | docs, README or site changes |
 | `eng/pack.ps1` | packaging, csproj, version or new-project changes |
-| `eng/verify.ps1 -Stage <name>` | every stage; writes `artifacts/gates/<name>.json` (add `-Pack` when packaging changed) |
+| `eng/verify.ps1 -Stage <name>` | every stage; auto-scopes format to the touched projects, skips lint/tests when no code changed, `-Pack` when public surface or packaging changed, `-Full` to force the CI shape; writes `artifacts/gates/<name>.json` |
 | `npm run build` in `docs/` | docs site content or navigation changes |
 
 Do not commit with a red gate, and do not describe a gate as green without the command output.

@@ -39,10 +39,7 @@ public static class PlaywrightWebHostBuilderExtensions
                 configuration.Sources.Insert(0, PlaywrightWebDefaults.Source(defaults)));
         }
 
-        return builder
-            .AddCapability(new ProtoCapabilityDescriptor(
-                "Playwright", ProtoCapabilityKinds.Browser, PlaywrightWebBackend.TraceSource))
-            .AddWebBackend(new PlaywrightWebBackendFactory(configure));
+        return builder.AddWebBackend(new PlaywrightWebBackendFactory(configure));
     }
 
     /// <summary>Exposes web under an application. The application's sessions share this backend.</summary>
@@ -65,7 +62,6 @@ public static class PlaywrightWebHostBuilderExtensions
             application.RegisterClient("Web", "Default");
         }
 
-        return application.AddCapability(new ProtoCapabilityDescriptor(
-            "Playwright", ProtoCapabilityKinds.Browser, PlaywrightWebBackend.TraceSource));
+        return application;
     }
 }

@@ -3,8 +3,8 @@ namespace ProtoTest.Core.Tests;
 using Microsoft.Extensions.Configuration;
 
 /// <summary>
-/// Pins how a descriptor declared conditionally under several keys is treated today: the build loop
-/// decides per descriptor, so satisfying one declaration drops a capability another still promises.
+/// Pins the per-declaration condition rule (audit REG-1): a descriptor stays while any conditional
+/// declaration for it is unsatisfied, because the integration behind that declaration is still live.
 /// </summary>
 [TestFixture]
 [Category("Characterization")]
@@ -17,7 +17,7 @@ public sealed class MixedConditionalCapabilityTests
     private const string KeyB = "ProtoTest:Applications:B:BaseUrl";
 
     [Test]
-    public async Task SameDescriptorUnderTwoKeys_WhenOnlyOneKeyIsConfigured_ShouldDropTheCapability()
+    public async Task SameDescriptorUnderTwoKeys_WhenOnlyOneKeyIsConfigured_ShouldKeepTheCapability()
     {
         var builder = BuilderWith(KeyA);
         builder.AddCapabilityUnlessConfigured(Capability, KeyA);
@@ -25,12 +25,10 @@ public sealed class MixedConditionalCapabilityTests
 
         await using var host = builder.Build();
 
-        // Pins current behavior; audit REG-1 flips this once conditions are evaluated per declaration:
-        // B's integration is still registered, so the descriptor must stay.
         Assert.That(
             host.HasCapability(Capability.Kind, Capability.Name),
-            Is.False,
-            "A's satisfied declaration removes the descriptor B's unsatisfied declaration still stands for");
+            Is.True,
+            "B's unsatisfied declaration still promises a live integration, so A's satisfied one cannot drop it");
     }
 
     [Test]
@@ -42,7 +40,7 @@ public sealed class MixedConditionalCapabilityTests
 
         await using var host = builder.Build();
 
-        // Pins current behavior; audit REG-1 keeps this outcome once every declaration is satisfied.
+        // Every declaration is satisfied, so no live integration needs the capability: it drops.
         Assert.That(host.HasCapability(Capability.Kind, Capability.Name), Is.False);
     }
 

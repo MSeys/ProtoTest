@@ -1,6 +1,5 @@
 namespace ProtoTest.Http;
 
-using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 
 /// <summary>
@@ -27,7 +26,7 @@ public sealed class ProtoHttpClientInitializer(
 
     public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
     {
-        var baseUrl = ResolveBaseUrl(context.Configuration);
+        var baseUrl = ResolveBaseUrl(context);
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
             if (!allowMissingBaseUrl) return Task.FromResult(false);
@@ -43,7 +42,7 @@ public sealed class ProtoHttpClientInitializer(
         return Task.FromResult(true);
     }
 
-    private string? ResolveBaseUrl(IConfiguration configuration)
+    private string? ResolveBaseUrl(ProtoExecutionContext context)
     {
         if (!string.IsNullOrWhiteSpace(explicitBaseUrl))
         {
@@ -51,13 +50,15 @@ public sealed class ProtoHttpClientInitializer(
         }
 
         var applicationName = application ?? Name;
-        var applicationBase = ProtoApplication.BaseUrl(configuration, applicationName);
+        // The one application-address precedence: a started piece's published address wins over
+        // configuration, so the client talks to the process the run started.
+        var applicationBase = ProtoApplication.BaseUrl(context, applicationName);
         if (string.IsNullOrWhiteSpace(applicationBase))
         {
             return null;
         }
 
-        var endpointPath = endpoint is null ? null : ProtoApplication.Endpoint(configuration, applicationName, endpoint);
+        var endpointPath = endpoint is null ? null : ProtoApplication.Endpoint(context.Configuration, applicationName, endpoint);
         if (string.IsNullOrWhiteSpace(endpointPath))
         {
             return applicationBase;

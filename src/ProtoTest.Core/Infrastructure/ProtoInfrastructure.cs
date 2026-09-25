@@ -28,7 +28,22 @@ public interface IProtoConnectionInfrastructure : IProtoInfrastructure
 public sealed record ProtoInfrastructureContext(
     ProtoInfrastructureSettings Settings,
     IConfiguration Configuration,
-    TimeProvider TimeProvider);
+    TimeProvider TimeProvider)
+{
+    /// <summary>
+    /// Gets the run's readiness policy, so a piece that waits - a container - uses the same instance
+    /// and timeout <c>ConfigureReadiness</c> set for the host's probes. <see langword="null"/> when the
+    /// host has none (a provider assembled by hand, or a piece started outside a host).
+    /// </summary>
+    public ProtoReadinessOptions? Readiness { get; init; }
+
+    // The configuration keys infrastructure registered after the piece being started declares, and
+    // the applications an in-process server is registered for. The application readiness probe uses
+    // them to tell "the publisher starts later" from "the application really is in-process".
+    internal IReadOnlySet<string> PendingSettings { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+
+    internal IReadOnlySet<string> InProcessServerApplications { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+}
 
 /// <summary>
 /// Infrastructure that needs the run's collected state while it starts - settings earlier pieces

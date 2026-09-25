@@ -32,10 +32,7 @@ public static class SeleniumWebHostBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(createDriver);
-        return builder
-            .AddCapability(new ProtoCapabilityDescriptor(
-                "Selenium", ProtoCapabilityKinds.Browser, SeleniumWebBackend.TraceSource))
-            .AddWebBackend(new SeleniumWebBackendFactory(createDriver, configure));
+        return builder.AddWebBackend(new SeleniumWebBackendFactory(createDriver, configure));
     }
 
     /// <summary>Exposes web under an application. The application's sessions share this backend.</summary>
@@ -53,7 +50,6 @@ public static class SeleniumWebHostBuilderExtensions
 
         application.Services.AddWebBackend(new SeleniumWebBackendFactory(createDriver, configure));
         application.RegisterClient("Web", "Default");
-        return application.AddCapability(new ProtoCapabilityDescriptor(
-            "Selenium", ProtoCapabilityKinds.Browser, SeleniumWebBackend.TraceSource));
+        return application;
     }
 }

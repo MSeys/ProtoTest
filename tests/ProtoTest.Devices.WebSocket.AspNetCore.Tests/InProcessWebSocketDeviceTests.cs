@@ -117,6 +117,58 @@ public sealed class InProcessWebSocketDeviceTests
         Assert.That(echoed, Is.EqualTo(payload));
     }
 
+    [Test]
+    public async Task InProcessTransportCapability_WhenTheApplicationIsHosted_ShouldBeDeclared()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder
+            .AddInProcessWebSocketDevices<SampleApi.Program>("Api")
+            .AddApplication("Api", app => app.AddAspNetCoreServer<SampleApi.Program>());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StopAsync();
+
+        Assert.That(
+            host.HasCapability(
+                ProtoCapabilityKinds.Device,
+                InProcessWebSocketDeviceTransport<SampleApi.Program>.TransportName),
+            Is.True,
+            "the in-process transport serves the hosted application");
+    }
+
+    [Test]
+    public async Task InProcessTransportCapability_WhenTheApplicationIsPublished_ShouldBeDropped()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Applications:Api:BaseUrl"] = "https://published.example.test"
+            }));
+        builder
+            .AddInProcessWebSocketDevices<SampleApi.Program>("Api")
+            .AddApplication("Api", app => app.AddAspNetCoreServer<SampleApi.Program>());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var skipped = host.Trace.Snapshot().Entries!
+            .Single(entry => entry.Kind == "capability.skipped"
+                && entry.Attributes["capability.name"] == InProcessWebSocketDeviceTransport<SampleApi.Program>.TransportName);
+        await host.StopAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                host.HasCapability(
+                    ProtoCapabilityKinds.Device,
+                    InProcessWebSocketDeviceTransport<SampleApi.Program>.TransportName),
+                Is.False,
+                "a published application is served over the socket, so the in-process capability is absent");
+            Assert.That(skipped.Attributes["capability.keys"], Does.Contain("ProtoTest:Applications:Api:BaseUrl"));
+        });
+    }
+
     private sealed class EchoDevice : ProtoDevice
     {
         public async ValueTask<string> BootAsync()

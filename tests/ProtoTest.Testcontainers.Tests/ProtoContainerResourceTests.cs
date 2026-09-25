@@ -1,5 +1,6 @@
 namespace ProtoTest.Testcontainers.Tests;
 
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -343,6 +344,40 @@ public sealed class ProtoContainerResourceTests
         ready = true;
         await resource.StartAsync();
         Assert.That(resource.IsStarted, Is.True);
+    }
+
+    [Test]
+    public async Task StartAsync_UnderAHost_ShouldUseTheRunReadinessTimeout()
+    {
+        var container = new FakeContainer();
+        var resource = new ReadinessResource(
+            () => container,
+            "port answers",
+            (_, _) => ValueTask.FromResult(false),
+            TimeSpan.FromSeconds(30));
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureReadiness(options =>
+        {
+            options.Timeout = TimeSpan.FromMilliseconds(200);
+            options.Interval = TimeSpan.FromMilliseconds(20);
+        });
+        builder.AddInfrastructure(resource, "ConnectionStrings:NeverReady");
+        await using var host = builder.Build();
+
+        var stopwatch = Stopwatch.StartNew();
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () => await host.StartAsync());
+        stopwatch.Stop();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                exception!.Message,
+                Does.Contain("0.2s").Or.Contain("0,2s"),
+                "ConfigureReadiness governs the container wait, not the container's private 30 s default");
+            Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(10)));
+            Assert.That(container.DisposeCount, Is.EqualTo(1), "a container that never became ready is released");
+        });
     }
 
     private sealed class ReadinessResource : ProtoContainerResource<FakeContainer>

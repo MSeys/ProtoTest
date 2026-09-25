@@ -1,12 +1,16 @@
 namespace ProtoTest.Core.Tests;
 
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 [TestFixture]
 public sealed class ConditionalCapabilityTests
 {
     private static readonly ProtoCapabilityDescriptor Capability =
         new("ASP.NET Core", ProtoCapabilityKinds.Server, "Tests");
+
+    private const string BaseUrlKey = "ProtoTest:Applications:Api:BaseUrl";
+    private const string SecondaryUrlKey = "ProtoTest:Applications:Api:SecondaryUrl";
 
     [Test]
     public async Task AddCapabilityUnlessConfigured_WhenEveryKeyIsConfigured_ShouldDropTheCapability()
@@ -117,5 +121,72 @@ public sealed class ConditionalCapabilityTests
             host.HasCapability(ProtoCapabilityKinds.Server, "ASP.NET Core"),
             Is.True,
             "an unconditional declaration is a promise the environment cannot withdraw");
+    }
+
+    [Test]
+    public void AddCapabilityUnlessConfigured_CalledTwiceWithTheSameKeysInAnyOrder_ShouldRegisterOneDeclaration()
+    {
+        var builder = new ProtoHostBuilder();
+        IServiceCollection? services = null;
+        builder.ConfigureServices(collection => services = collection);
+        builder.AddCapabilityUnlessConfigured(Capability, BaseUrlKey, SecondaryUrlKey);
+        builder.AddCapabilityUnlessConfigured(Capability, SecondaryUrlKey, BaseUrlKey);
+
+        var declarations = services!
+            .Where(descriptor => descriptor.ServiceType == typeof(ProtoConditionalCapability))
+            .Select(descriptor => (ProtoConditionalCapability)descriptor.ImplementationInstance!)
+            .ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                declarations,
+                Has.Length.EqualTo(1),
+                "a key list is a set: content equality merges a repeated registration");
+            Assert.That(
+                declarations[0].Keys.ToArray(),
+                Is.EqualTo(new[] { BaseUrlKey, SecondaryUrlKey }),
+                "keys are canonical: ordinal, distinct and order-independent");
+        });
+    }
+
+    [Test]
+    public async Task AddCapabilityUnlessConfigured_WhenDropped_ShouldNameTheDecidingKeysInTheTrace()
+    {
+        var output = Path.Combine(Path.GetTempPath(), $"prototest-capability-keys-{Guid.NewGuid():N}.prototrace");
+        try
+        {
+            var builder = new ProtoHostBuilder();
+            builder.ConfigureTracing(options => options.OutputPath = output);
+            builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    [BaseUrlKey] = "https://staging",
+                    [SecondaryUrlKey] = "https://staging-2"
+                }));
+            builder.AddCapabilityUnlessConfigured(Capability, BaseUrlKey, SecondaryUrlKey);
+            await using var host = builder.Build();
+            await host.StartAsync();
+
+            var skipped = host.Trace.Snapshot().Entries!.Single(entry => entry.Kind == "capability.skipped");
+            await host.StopAsync();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    skipped.Attributes["capability.keys"],
+                    Does.Contain(BaseUrlKey),
+                    "the skipped record names the keys that decided it");
+                Assert.That(skipped.Attributes["capability.keys"], Does.Contain(SecondaryUrlKey));
+                Assert.That(skipped.Attributes["capability.reason"], Is.EqualTo("already configured"));
+            });
+        }
+        finally
+        {
+            if (File.Exists(output))
+            {
+                File.Delete(output);
+            }
+        }
     }
 }

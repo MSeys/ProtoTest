@@ -57,9 +57,72 @@ All ProtoTest packages share one version; breaking API changes are called out be
   instead of failing, and `ServerFactory`/`ApplicationServices` throw naming the address. The trace
   records `aspnetcore.server.skipped`. `AddCapabilityUnlessConfigured` is the Core primitive behind it,
   and it is how an integration keeps its capability honest when the environment provides the address.
+- `ProtoCapabilityDescriptor.Instance` names the instance a capability describes - an
+  `AddAspNetCoreServer` name, the application an in-process device transport belongs to. Two instances
+  are two capabilities, in skip checks and in the run trace (`server:ASP.NET Core:A`), so configuring
+  one server's address no longer hides the other.
+- One application-address precedence: an address a started piece published through
+  `ProtoInfrastructureSettings` wins over `ProtoTest:Applications:{app}` configuration for every
+  reader. REST and GraphQL clients, gRPC channels, readiness, web sessions and device clients all
+  resolve through `ProtoApplication` (`GrpcAddress(context, app)` is the gRPC form), so the suite
+  talks to the process the run started; the in-process transport is only the fallback when neither
+  resolves. `AddAspNetCoreServer`'s step-aside still reads static configuration (decided asymmetry),
+  so give a published process its own application name when both must coexist.
+- `ProtoReadinessOptions` implements `IProtoConfigurableOptions` and binds
+  `ProtoTest:Readiness`; the new `ProtoInfrastructureContext.Readiness` hands the run's policy to
+  infrastructure, so `ConfigureReadiness` (or configuration) sets the timeout and interval for host
+  probes and the containers the run starts alike.
+- `AddCapabilityWhenProvided(capability, keys…)` is the missing-address half of the conditional
+  capability pair: the declaration drops when none of its keys can provide the capability — no
+  configured value and no registered infrastructure piece declares one — so an integration whose
+  address cannot exist is absent and `[RequiresCapability]` skips. It composes per declaration with
+  `AddCapabilityUnlessConfigured` and plain declarations, and the `capability.skipped` event names the
+  deciding keys and the reason (`already configured`, or `no key provided`).
+- `SqlOptions.AddressKeys` is a code-declared `SqlAddressKeys` set naming the configuration keys that
+  can provide the SQL connection; no configuration section binds it, because the capability decision is
+  made when the host is built. With at least one declared, `AddSql` declares the `SQL` store capability
+  with `AddCapabilityWhenProvided`; empty (the default) keeps the capability unconditional and the
+  factory owning the address. `AddEntityFrameworkCore` shares the declared keys: it declares its
+  `Entity Framework Core` store capability under the same rule and its enlistment hook stays inert with
+  the SQL integration.
+- `ProtoMessagingBuilder.UseBroker(factory, addressKeys)` lets an adapter name the configuration keys
+  its address comes from, so the `Broker` capability is declared only while one of them is provided.
 
 ### Fixed
 
+- `UseRabbitMq` declares the `Broker` capability conditionally on
+  `ProtoTest:Messaging:RabbitMq:ConnectionString`: a run with a configured key or a broker container
+  that declares it keeps the capability, while a run with neither drops it and
+  `[RequiresCapability(ProtoCapabilityKinds.Broker)]` skips instead of failing at setup or first
+  publish. A connection string set in the options callback keeps the unconditional declaration.
+- A SQL run whose declared `AddressKeys` are all unprovided no longer fails at setup or run start: the
+  connection hook, the isolation guard and the Entity Framework Core enlistment hook stay inert, the
+  connection is not opened, and `SqlSession()`/`SqlConnection()`/`SqlTransaction()` (or
+  `Sql<TContext>()`) throw naming the missing keys and the
+  `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate.
+- Conditions are evaluated per declaration: a capability drops only when every conditional declaration
+  for it is satisfied and no plain declaration promises it, and the `capability.skipped` trace event
+  names the deciding keys. Satisfying one server's address no longer skips tests against another server
+  that is still live in-process.
+- `Build()` is terminal for every public registration entry: hooks, run gates, capabilities, the
+  clock, sinks, infrastructure and application entries throw the same single-build message instead of
+  silently registering into a host that already built its provider. A repeated registration that is a
+  no-op by design before `Build()` (the same server or worker name) stays a no-op.
+- Only the web backend that wins the first-wins registration declares its browser capability, so
+  referencing both Playwright and Selenium leaves one honest capability behind the one live backend.
+- A conditional declaration's key set compares by content (ordinal, distinct, order-independent), so
+  registering the same declaration twice leaves one declaration.
+- The in-process WebSocket device transport declares its capability only while the application runs
+  in-process; with `BaseUrl` configured the capability is dropped and the socket transport serves.
+- `AddHttpReadiness` no longer records "the application runs in-process" when the piece that publishes
+  its address is registered after it: the skip names the registration position and the later key, and
+  only a probe backed by an in-process server capability claims in-process. Register the probe after
+  the piece that publishes the address.
+- Container readiness honors the run's readiness policy instead of its private 30 s timeout, so a slow
+  image is tuned with `ConfigureReadiness(options => options.Timeout = ...)` or
+  `ProtoTest:Readiness:Timeout`.
+- The gRPC missing-address error names the client's application (and the key to set) instead of
+  printing the literal `{app}`.
 - Shape mismatches whose expected shape carries a value constraint now record every mismatch in the
   trace instead of an internal compiler-generated type name (or an opaque constraint object on
   .NET 8).

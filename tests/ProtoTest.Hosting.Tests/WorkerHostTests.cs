@@ -77,6 +77,47 @@ public sealed class WorkerHostTests
     }
 
     [Test]
+    public async Task WorkerMain_ShouldNotSeeTheRunsConfiguration_WhileTheHostedServiceDoes()
+    {
+        var probeId = $"cfg1-{Guid.NewGuid():N}";
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["Worker:Value"] = "from-config",
+                ["Worker:FromConfig"] = "config-only",
+                ["Worker:Probe"] = "from-suite"
+            }));
+        builder.AddInfrastructure(new FakeBroker(), "ConnectionStrings:WorkerProbe");
+        builder.AddWorkerHost<Program>("MainCapture", options => options.Set("Worker:Value", "from-suite"));
+        await using var host = builder.Build();
+
+        using (WorkerMainCapture.Begin(probeId))
+        {
+            await host.StartAsync();
+        }
+
+        await host.StartTestAsync("main capture", "00001", TestMethods.Placeholder);
+        var probe = Proto.Context.HostService<Program, WorkerProbe>("MainCapture");
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        var main = WorkerMainCapture.Find(probeId);
+        Assert.Multiple(() =>
+        {
+            // Pins the P1-gap; audit CFG-1 appends the run's overlay to the entry point's arguments.
+            Assert.That(main, Is.Not.Null, "the entry point ran and captured its own view");
+            Assert.That(main!.ConnectionString, Is.Null, "the run's settings are absent inside Main");
+            Assert.That(main.ConfigValue, Is.Null, "the suite's configuration is absent inside Main");
+            Assert.That(main.Probe, Is.Null, "a suite-only key is absent inside Main");
+            Assert.That(probe.ConnectionString, Is.EqualTo("amqp://probe"), "the hosted service sees the run's settings");
+            Assert.That(probe.ConfigValue, Is.EqualTo("config-only"), "the hosted service sees the suite's configuration");
+            Assert.That(probe.Value, Is.EqualTo("from-suite"), "the suite's options win at StartAsync");
+        });
+    }
+
+    [Test]
     public async Task WorkerHost_ShouldReadTheRunsClock()
     {
         var seed = new DateTimeOffset(2026, 2, 2, 8, 0, 0, TimeSpan.Zero);

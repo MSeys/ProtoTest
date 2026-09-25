@@ -1,5 +1,6 @@
 namespace ProtoTest.Hosting.TestWorker;
 
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -13,11 +14,72 @@ public sealed class Program
     public static void Main(string[] args)
     {
         var builder = Host.CreateApplicationBuilder(args);
+        WorkerMainCapture.Capture(builder.Configuration);
         builder.Services.AddSingleton<WorkerProbe>();
         builder.Services.AddHostedService<ProbeWorker>();
         builder.Build().Run();
     }
 }
+
+/// <summary>
+/// Captures what the worker's <see cref="Program.Main"/> read from its own configuration before the host
+/// was built, keyed by a probe id the starting test sets on its flow. This is how the P1-gap (audit
+/// CFG-1) is observed: the run's settings and the suite's configuration are only overlaid at
+/// <c>HostBuilding</c>, inside <c>Build()</c>, so an entry point that reads configuration in
+/// <c>Main</c> sees its own sources alone.
+/// </summary>
+public static class WorkerMainCapture
+{
+    private static readonly AsyncLocal<string?> ProbeId = new();
+    private static readonly ConcurrentDictionary<string, WorkerMainProbe> Probes = new(StringComparer.Ordinal);
+
+    /// <summary>Marks the current flow as the one a worker's entry point will run on.</summary>
+    public static IDisposable Begin(string probeId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(probeId);
+        var previous = ProbeId.Value;
+        ProbeId.Value = probeId;
+        return new Scope(previous);
+    }
+
+    /// <summary>What <c>Main</c> saw for a probe id, or <see langword="null"/> when the entry point did not run.</summary>
+    public static WorkerMainProbe? Find(string probeId) =>
+        Probes.TryGetValue(probeId, out var probe) ? probe : null;
+
+    internal static void Capture(IConfiguration configuration)
+    {
+        if (ProbeId.Value is not { } probeId)
+        {
+            return;
+        }
+
+        Probes[probeId] = new WorkerMainProbe(
+            configuration["Worker:Value"],
+            configuration["Worker:FromConfig"],
+            configuration["Worker:Probe"],
+            configuration.GetConnectionString("WorkerProbe"));
+    }
+
+    private sealed class Scope(string? previous) : IDisposable
+    {
+        private int _disposed;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                ProbeId.Value = previous;
+            }
+        }
+    }
+}
+
+/// <summary>What the worker's entry point read in <c>Main</c>, before the run's overlay existed.</summary>
+public sealed record WorkerMainProbe(
+    string? Value,
+    string? ConfigValue,
+    string? Probe,
+    string? ConnectionString);
 
 /// <summary>What the worker's hosted service observed, for tests to assert against.</summary>
 public sealed class WorkerProbe

@@ -1,0 +1,34 @@
+namespace ProtoTest.AspNetCore.Internal;
+
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using ProtoTest.Core;
+
+/// <summary>
+/// Pushes the clock of the test that caused a request while the application handles it. ASP.NET Core
+/// does not carry the test's ambient context into the request pipeline, but it does carry the test id
+/// the in-process client sends, so the exchange is linked by that.
+/// </summary>
+internal sealed class ProtoClockStartupFilter : IStartupFilter
+{
+    public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => application =>
+    {
+        application.Use(async (context, nextMiddleware) =>
+        {
+            var testId = context.Request.Headers[ProtoTraceContextHandler.TestIdHeader].ToString();
+            var clock = string.IsNullOrEmpty(testId) ? null : ProtoHost.FindClock(testId);
+            if (clock is null)
+            {
+                await nextMiddleware().ConfigureAwait(false);
+                return;
+            }
+
+            using (ProtoRequestClock.Push(clock))
+            {
+                await nextMiddleware().ConfigureAwait(false);
+            }
+        });
+
+        next(application);
+    };
+}

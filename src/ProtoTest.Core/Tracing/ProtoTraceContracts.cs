@@ -89,6 +89,8 @@ public static class ProtoTraceEntityKinds
     public const string Auth = "auth";
     public const string Server = "server";
     public const string Capability = "capability";
+    public const string Clock = "clock";
+    public const string Device = "device";
 }
 
 public sealed record ProtoTestTrace(

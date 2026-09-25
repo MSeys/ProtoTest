@@ -1,5 +1,7 @@
 namespace ProtoTest.Testcontainers.Tests;
 
+using System.Net;
+using System.Net.Sockets;
 using System.Reflection;
 using ProtoTest.Core;
 using ProtoTest.Testcontainers;
@@ -289,6 +291,149 @@ public sealed class ProtoContainerResourceTests
     }
 
 
+
+    [Test]
+    public async Task StartAsync_ShouldAwaitReadinessAndRecordEvidence()
+    {
+        var attempts = 0;
+        var container = new FakeContainer();
+        var resource = new ReadinessResource(
+            () => container,
+            "port answers",
+            (_, _) =>
+            {
+                attempts++;
+                return ValueTask.FromResult(attempts >= 3);
+            },
+            TimeSpan.FromSeconds(5));
+
+        await resource.StartAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(attempts, Is.EqualTo(3));
+            Assert.That(resource.IsStarted, Is.True);
+            Assert.That(resource.StartupEvidence["readiness.port answers.attempts"], Is.EqualTo("3"));
+            Assert.That(resource.StartupEvidence, Contains.Key("readiness.port answers.waitedMs"));
+        });
+    }
+
+    [Test]
+    public async Task StartAsync_WhenReadinessNeverArrives_ShouldFailAndReleaseTheContainer()
+    {
+        var ready = false;
+        var container = new FakeContainer();
+        var resource = new ReadinessResource(
+            () => container,
+            "port answers",
+            (_, _) => ValueTask.FromResult(ready),
+            TimeSpan.FromMilliseconds(150));
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () => await resource.StartAsync());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("port answers"));
+            Assert.That(exception.Message, Does.Contain("not satisfied"));
+            Assert.That(container.DisposeCount, Is.EqualTo(1), "a container that never became ready is released");
+            Assert.That(resource.IsStarted, Is.False);
+        });
+
+        // The failure left the resource retryable, like any other failed start.
+        ready = true;
+        await resource.StartAsync();
+        Assert.That(resource.IsStarted, Is.True);
+    }
+
+    private sealed class ReadinessResource : ProtoContainerResource<FakeContainer>
+    {
+        public ReadinessResource(
+            Func<FakeContainer> build,
+            string name,
+            Func<FakeContainer, CancellationToken, ValueTask<bool>> ready,
+            TimeSpan timeout)
+            : base(
+                build,
+                (container, cancellationToken) => container.StartAsync(cancellationToken),
+                container => container.ConnectionString)
+        {
+            ReadinessTimeout = timeout;
+            ReadinessInterval = TimeSpan.FromMilliseconds(10);
+            ReadyWhen(name, ready);
+        }
+
+        public override string Id => "container:readiness";
+
+        public override string Kind => "container";
+
+        public override string Description => "Readiness fake container";
+    }
+
+    [Test]
+    public async Task ReadyWhenTcp_ShouldWaitForThePortReadyOnSelects()
+    {
+        var port = FreePort();
+        using var listener = new TcpListener(IPAddress.Loopback, port);
+        listener.Start();
+        var container = new FakeContainer();
+        var resource = new TcpReadinessResource(() => container);
+        resource.ReadyOn(port);
+
+        await resource.StartAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resource.IsStarted, Is.True, "the overridden port is the one the check waits for");
+            Assert.That(resource.StartupEvidence, Contains.Key("readiness.endpoint answers.attempts"));
+        });
+
+        await resource.DisposeAsync();
+    }
+
+    [Test]
+    public async Task ReadyOn_ShouldValidateThePortAndRejectChangesAfterStart()
+    {
+        var container = new FakeContainer();
+        var resource = new FakeResource(() => container);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => resource.ReadyOn(0));
+        Assert.That(resource.ReadyOn(1234), Is.SameAs(resource));
+
+        await resource.StartAsync();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => resource.ReadyOn(2345));
+        Assert.That(exception!.Message, Does.Contain("before the run starts"));
+        await resource.DisposeAsync();
+    }
+
+    private static int FreePort()
+    {
+        var probe = new TcpListener(IPAddress.Loopback, 0);
+        probe.Start();
+        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        return port;
+    }
+
+    private sealed class TcpReadinessResource : ProtoContainerResource<FakeContainer>
+    {
+        public TcpReadinessResource(Func<FakeContainer> build)
+            : base(
+                build,
+                (container, cancellationToken) => container.StartAsync(cancellationToken),
+                container => container.ConnectionString)
+        {
+            ReadinessTimeout = TimeSpan.FromSeconds(5);
+            ReadinessInterval = TimeSpan.FromMilliseconds(10);
+            ReadyWhenTcp("endpoint answers", defaultPort: 5432, (_, port) => ("127.0.0.1", port));
+        }
+
+        public override string Id => "container:tcp-readiness";
+
+        public override string Kind => "container";
+
+        public override string Description => "TCP readiness fake container";
+    }
 
     private sealed class FakeResource(
         Func<FakeContainer> build,

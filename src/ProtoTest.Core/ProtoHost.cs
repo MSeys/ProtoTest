@@ -17,6 +17,7 @@ public sealed class ProtoHost : IAsyncDisposable
     private readonly ProtoRunHooks _runHooks;
     private readonly ProtoTestLifecycle _testLifecycle;
     private readonly ProtoTraceSession _trace;
+    private readonly ProtoClock _clock;
     private readonly ProtoRunStateMachine _runState = new();
     private readonly List<IProtoRunHook> _startedHooks = [];
 
@@ -32,10 +33,53 @@ public sealed class ProtoHost : IAsyncDisposable
         var testIdGenerator = _rootServiceProvider.GetService<IProtoTestIdGenerator>()
             ?? new NumericProtoTestIdGenerator();
         _trace = _rootServiceProvider.GetService<ProtoTraceSession>() ?? new ProtoTraceSession();
+        // A host built through the builder always has a clock; a provider assembled by hand gets one here.
+        _clock = _rootServiceProvider.GetService<ProtoClock>() ?? new ProtoClock();
 
         _runHooks = new ProtoRunHooks(runHooks);
-        _testLifecycle = new ProtoTestLifecycle(this, _rootServiceProvider, testHooks, testIdGenerator, _trace);
+        _testLifecycle = new ProtoTestLifecycle(this, _rootServiceProvider, testHooks, testIdGenerator, _trace, _clock);
+        _clock.Advanced += OnRunClockAdvanced;
         ProtoHostRegistry.Register(this);
+    }
+
+    /// <summary>
+    /// Gets the run's clock. Tests get their own clock seeded from it, so advancing time inside a test
+    /// stays inside that test; advancing this one moves the whole run, including worker hosts.
+    /// </summary>
+    public ProtoClock Clock => _clock;
+
+    /// <summary>
+    /// Finds the clock of the test with the given id, or <see langword="null"/> when no such test is
+    /// running. This is the lookup an in-process hosting integration uses to link a request the test
+    /// caused back to the test's clock.
+    /// </summary>
+    public static ProtoClock? FindClock(string testId) => ProtoClockLocator.Find(testId);
+
+    private void OnRunClockAdvanced(ProtoClockChange change)
+    {
+        _trace.RunWriter.SetEntityState(
+            ProtoTraceEntityKinds.Clock,
+            "clock:run",
+            "Run clock",
+            new Dictionary<string, string?>
+            {
+                ["clock.utcNow"] = change.CurrentUtc.ToString("O"),
+                ["clock.timezone"] = _clock.LocalTimeZone.Id
+            },
+            scope: "run",
+            change: "advanced");
+        _trace.RunWriter.WriteEvent(
+            "clock.advance",
+            $"Run clock advanced by {change.Delta:g}",
+            "ProtoTest.Core",
+            attributes: new Dictionary<string, string?>
+            {
+                ["clock.delta"] = change.Delta.ToString("g"),
+                ["clock.previousUtc"] = change.PreviousUtc.ToString("O"),
+                ["clock.utcNow"] = change.CurrentUtc.ToString("O")
+            },
+            entityKind: ProtoTraceEntityKinds.Clock,
+            entityId: "clock:run");
     }
 
     /// <summary>
@@ -148,18 +192,39 @@ public sealed class ProtoHost : IAsyncDisposable
             // application receive the connection strings as host settings. Hosts built without the builder
             // (tests, embedded use) simply have none.
             var settings = _rootServiceProvider.GetService<ProtoInfrastructureSettings>() ?? new ProtoInfrastructureSettings();
+            var configuration = _rootServiceProvider.GetService<IConfiguration>() ?? new ConfigurationBuilder().Build();
+            var infrastructureContext = new ProtoInfrastructureContext(
+                settings,
+                configuration,
+                _rootServiceProvider.GetService<TimeProvider>() ?? new ProtoTestTimeProvider(_clock));
             foreach (var registration in _rootServiceProvider.GetServices<ProtoInfrastructureRegistration>())
             {
                 var infrastructure = registration.Infrastructure;
 
                 // Starting it again makes this a new ownership period: its release must run again.
                 runResources?.Rearm(infrastructure);
-                await infrastructure.StartAsync(cancellationToken);
+                if (infrastructure is IProtoConfiguredInfrastructure configured)
+                {
+                    // Pieces that need the run's collected state (a worker reading a broker a container
+                    // just started, a readiness probe reading a published address) receive it here.
+                    await configured.StartAsync(infrastructureContext, cancellationToken);
+                }
+                else
+                {
+                    await infrastructure.StartAsync(cancellationToken);
+                }
                 var state = new Dictionary<string, string?>
                 {
                     ["infrastructure.kind"] = infrastructure.Kind,
                     ["infrastructure.settings"] = string.Join(", ", registration.Settings)
                 };
+                if (infrastructure is IProtoStartupEvidence evidence)
+                {
+                    foreach (var (key, value) in evidence.StartupEvidence)
+                    {
+                        state[key] = value;
+                    }
+                }
                 if (infrastructure is IProtoConnectionInfrastructure connection)
                 {
                     foreach (var key in registration.Settings)

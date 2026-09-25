@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+
+    <!-- No 1.0.1 baseline exists for this package; validate once 1.1 ships. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <Description>In-process WebSocket device connections for ProtoTest: reach an application's endpoint through its TestServer, no socket.</Description>
+    <PackageTags>testing;integration-testing;devices;websocket;aspnetcore;ocpp;dotnet</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.AspNetCore\ProtoTest.AspNetCore.csproj" />
+    <ProjectReference Include="..\ProtoTest.Devices.WebSocket\ProtoTest.Devices.WebSocket.csproj" />
+    <ProjectReference Include="..\ProtoTest.Devices\ProtoTest.Devices.csproj" />
+  </ItemGroup>
+
+</Project>

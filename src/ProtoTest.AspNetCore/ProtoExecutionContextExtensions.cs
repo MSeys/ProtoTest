@@ -28,6 +28,20 @@ public static class ProtoExecutionContextExtensions
     }
 
     /// <summary>
+    /// Gets the in-process server factory for an application, or <see langword="null"/> when the
+    /// application is not hosted in-process (published or container-backed runs). This is the lookup an
+    /// integration uses to prefer an in-process path only when one exists.
+    /// </summary>
+    public static WebApplicationFactory<TProgram>? TryServerFactory<TProgram>(
+        this ProtoExecutionContext context,
+        string? name = null) where TProgram : class
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var key = name ?? context.TryResolve<ProtoApplicationState>()?.ApplicationName ?? "Default";
+        return context.TryClient<WebApplicationFactory<TProgram>>(AspNetCoreClientInitializer<TProgram>.FactoryName(key));
+    }
+
+    /// <summary>
     /// Creates a dedicated <see cref="IServiceScope"/> from the specified ASP.NET Core server's DI container.
     /// The caller owns the returned scope and must dispose it.
     /// </summary>

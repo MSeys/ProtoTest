@@ -113,6 +113,17 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
         IConfiguration configuration = _configurationBuilder.Build();
         _services.AddSingleton(configuration);
         _services.AddSingleton(new ProtoInfrastructureSettings());
+
+        // The run's clock: the suite's when ConfigureClock registered one, otherwise a clock starting now.
+        // Each test seeds its own clock from it, and applications and workers receive the bridge that
+        // resolves the active test's clock (or the run's on background flows).
+        var clock = _services
+            .Where(descriptor => descriptor.ServiceType == typeof(ProtoClock))
+            .Select(descriptor => descriptor.ImplementationInstance)
+            .OfType<ProtoClock>()
+            .LastOrDefault() ?? new ProtoClock();
+        _services.TryAddSingleton(clock);
+        _services.TryAddSingleton<TimeProvider>(new ProtoTestTimeProvider(clock));
         _services.TryAddSingleton<IProtoTestIdGenerator>(
             _ => new NumericProtoTestIdGenerator(_testIdOptions));
         _services.TryAddSingleton(_traceOptions);

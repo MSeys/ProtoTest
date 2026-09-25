@@ -7,8 +7,12 @@
   <Folder Name="/2. Integrations/">
     <Project Path="src/ProtoTest.AspNetCore/ProtoTest.AspNetCore.csproj" Id="dafd8b60-e20d-44cc-a746-68ec3136e256" />
     <Project Path="src/ProtoTest.Data/ProtoTest.Data.csproj" />
+    <Project Path="src/ProtoTest.Devices/ProtoTest.Devices.csproj" />
+    <Project Path="src/ProtoTest.Devices.WebSocket/ProtoTest.Devices.WebSocket.csproj" />
+    <Project Path="src/ProtoTest.Devices.WebSocket.AspNetCore/ProtoTest.Devices.WebSocket.AspNetCore.csproj" />
     <Project Path="src/ProtoTest.GraphQL/ProtoTest.GraphQL.csproj" Id="81af1d3a-d24c-465e-b1a0-ee742ca6bf6e" />
     <Project Path="src/ProtoTest.Grpc/ProtoTest.Grpc.csproj" Id="f13ed54f-e401-4cd6-ba89-efebd1861e89" />
+    <Project Path="src/ProtoTest.Hosting/ProtoTest.Hosting.csproj" />
     <Project Path="src/ProtoTest.Messaging/ProtoTest.Messaging.csproj" />
     <Project Path="src/ProtoTest.Messaging.RabbitMq/ProtoTest.Messaging.RabbitMq.csproj" />
     <Project Path="src/ProtoTest.Messaging.RabbitMq.Testcontainers/ProtoTest.Messaging.RabbitMq.Testcontainers.csproj" />
@@ -55,8 +59,13 @@
     <Project Path="tests/ProtoTest.AspNetCore.TestApi/ProtoTest.AspNetCore.TestApi.csproj" />
     <Project Path="tests/ProtoTest.AspNetCore.Tests/ProtoTest.AspNetCore.Tests.csproj" Id="8fe93cb3-774c-4dd1-a1c0-f3ad589708fe" />
     <Project Path="tests/ProtoTest.Data.Tests/ProtoTest.Data.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Devices.Tests/ProtoTest.Devices.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Devices.WebSocket.Tests/ProtoTest.Devices.WebSocket.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Devices.WebSocket.AspNetCore.Tests/ProtoTest.Devices.WebSocket.AspNetCore.Tests.csproj" />
     <Project Path="tests/ProtoTest.GraphQL.Tests/ProtoTest.GraphQL.Tests.csproj" />
     <Project Path="tests/ProtoTest.Grpc.Tests/ProtoTest.Grpc.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Hosting.TestWorker/ProtoTest.Hosting.TestWorker.csproj" />
+    <Project Path="tests/ProtoTest.Hosting.Tests/ProtoTest.Hosting.Tests.csproj" />
     <Project Path="tests/ProtoTest.OpenApi.Tests/ProtoTest.OpenApi.Tests.csproj" Id="4d4c7e56-9c4e-4193-b73e-64b067c9268b" />
     <Project Path="tests/ProtoTest.OpenTelemetry.Tests/ProtoTest.OpenTelemetry.Tests.csproj" />
     <Project Path="tests/ProtoTest.Reporting.Tests/ProtoTest.Reporting.Tests.csproj" />

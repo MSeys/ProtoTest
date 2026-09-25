@@ -1,5 +1,7 @@
 namespace ProtoTest.Core;
 
+using Microsoft.Extensions.Configuration;
+
 /// <summary>
 /// Something the run provides for itself - a database, a broker, a storage emulator. The host starts
 /// every registered piece after the run hooks, records it as a run entity, and releases it with the
@@ -16,6 +18,53 @@ public interface IProtoConnectionInfrastructure : IProtoInfrastructure
 {
     /// <summary>Gets the connection string of the started piece.</summary>
     string ConnectionString { get; }
+}
+
+/// <summary>
+/// The run's collected state, handed to infrastructure as it starts: the settings earlier
+/// infrastructure provided, the suite's own configuration, and the clock in effect (the active test's,
+/// or the run's on a background flow).
+/// </summary>
+public sealed record ProtoInfrastructureContext(
+    ProtoInfrastructureSettings Settings,
+    IConfiguration Configuration,
+    TimeProvider TimeProvider);
+
+/// <summary>
+/// Infrastructure that needs the run's collected state while it starts - settings earlier pieces
+/// provided and the suite's configuration, which are complete only once those pieces have started. The
+/// host prefers this overload over <see cref="IProtoInfrastructure.StartAsync(CancellationToken)"/>
+/// when a piece implements it, so an in-process worker can read the database or broker a container just
+/// started, and a readiness probe can read the address a settings piece published.
+/// </summary>
+public interface IProtoConfiguredInfrastructure : IProtoInfrastructure
+{
+    /// <summary>
+    /// The host prefers the configured overload and always calls it; this default exists so an
+    /// implementer only writes the overload it needs. Starting without the run's state is only
+    /// reachable from a host that does not offer it.
+    /// </summary>
+    ValueTask IProtoInfrastructure.StartAsync(CancellationToken cancellationToken)
+        => StartAsync(
+            new ProtoInfrastructureContext(
+                new ProtoInfrastructureSettings(),
+                new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(),
+                TimeProvider.System),
+            cancellationToken);
+
+    /// <summary>Starts the piece with the run's collected state.</summary>
+    ValueTask StartAsync(ProtoInfrastructureContext context, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Infrastructure that can report what happened while it started - attempts, the wait it spent, the
+/// last error it saw. The host merges the evidence into the run entity it records for the piece, so a
+/// readiness wait is visible in the trace without an integration of its own.
+/// </summary>
+public interface IProtoStartupEvidence
+{
+    /// <summary>Gets the evidence to merge into the piece's run entity after it started.</summary>
+    IReadOnlyDictionary<string, string?> StartupEvidence { get; }
 }
 
 /// <summary>

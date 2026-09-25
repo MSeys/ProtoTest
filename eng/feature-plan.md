@@ -47,9 +47,9 @@ checkboxes below stay the source of truth for scope, and `eng/plan-4.md` is the 
 - [ ] **A1 Path-based single-value read** — `ReadAsJson<int>("$.id")` on responses, so one value does not
   need a wrapper record. Add to `ProtoTest.Http`/`Rest`/`GraphQL` where the response type already reads
   JSON. Tests: missing path, wrong type, JSON null, numeric precision. Effort: days.
-- [ ] **A2 Clock sweep** — the brief reported an `IClock` sample still present; no `IClock`/`TimeProvider`
-  reference exists in `samples/` at this baseline. Verify against the published samples, then record the
-  item as already resolved or migrate to `TimeProvider` + `FakeTimeProvider`. Effort: hours to days.
+- [x] **A2 Clock sweep** (brief item): resolved by plan-4 P3 - no `IClock` or `TimeProvider` reference
+  existed in the samples to migrate, and the framework now provides a test clock for the code that
+  needs one.
 - [ ] **A3 Failure-mode tests the brief asked for** (open questions 4): application throws during startup;
   a container dies mid-run. These are tests and documentation, not features; add them to the reliability
   suites and fix only what they prove broken.
@@ -67,9 +67,11 @@ checkboxes below stay the source of truth for scope, and `eng/plan-4.md` is the 
 - [x] **A7 Benchmark page** (brief item 17 / open question 2): done in `eng/plan-4.md` W6 - the
   benchmarks page carries the trace-size table and the `WebApplicationFactory` overhead comparison
   (per-test lifecycle with tracing on/off, startup, allocations). Re-run on the reference demo by P8.
-- [ ] **A8 Test clock** (plan-4 P3): `TimeProvider` integration — `Proto.Context.Clock()` backed by the
-  host's `TimeProvider`, `FakeTimeProvider` in tests — for tariff, expiry and idle-fee behavior.
-  Acceptance: a test advances time without sleeping and the advancement is visible in the trace.
+- [x] **A8 Test clock** (plan-4 P3): done - `ProtoClock` in Core, `ConfigureClock(seed)`, per-test
+  `Proto.Context.Clock` with `Advance`/`SetUtcNow`, automatic `TimeProvider` injection into in-process
+  applications (linked per request) and worker hosts, run clock through `ProtoHost.CurrentHost.Clock`,
+  and `clock.advance` trace evidence. A2 is resolved with it: no `IClock`/`TimeProvider` reference
+  existed in the samples to migrate.
 
 ## Track B — Alba-parity release (1.2)
 
@@ -111,13 +113,16 @@ checkboxes below stay the source of truth for scope, and `eng/plan-4.md` is the 
   in-process assertions).
 - [ ] **C4 Wolverine.Tracking bridge** (optional, ecosystem adjacency to Alba): same shape as C2; only if
   a user asks.
-- [ ] **C5 Background-worker hosting** (plan-4 P1): host a worker (generic host / `IHostedService`
-  application) the way the API is hosted — `AddWorker<Program>` or generic-host support — with lifecycle,
-  readiness and trace. Acceptance: the reference demo's billing worker runs in-process under the suite
-  and its consumption is traced.
-- [ ] **C6 Readiness waiting** (plan-4 P2): `AwaitReady`/health probes for resources and applications so
-  suites wait for readiness instead of sleeping. Acceptance: Testcontainers and hosted applications
-  expose readiness; the demo uses it with no `Task.Delay` in setup.
+- [x] **C5 Background-worker hosting** (plan-4 P1): done - `ProtoTest.Hosting` with
+  `AddWorkerHost<TProgram>()`, run-scoped lifecycle after the infrastructure registered before it,
+  run settings and suite options into the worker's configuration, `context.Host<TProgram>()` /
+  `HostService<TProgram, TService>()` accessors, `worker` trace entity and capability, and a docs page
+  with limits. The demo's R1 proves the acceptance criterion (its billing worker runs in-process).
+- [x] **C6 Readiness waiting** (plan-4 P2): done - `AddReadinessProbe` awaited at run start with
+  timeout, interval and trace evidence; `ProtoReadiness.Tcp`/`.Http`; `AddHttpReadiness(application)`
+  for published addresses; `ProtoContainerResource.ReadyWhen`/`ReadyOn(port)` with the PostgreSQL and
+  RabbitMQ containers probing their standard ports. Acceptance for the demo (no `Task.Delay` in setup)
+  is proven by R1's setup.
 
 ## Track D — Agentic evidence layer (highest strategic leverage; parallel after Stage 3)
 
@@ -153,12 +158,16 @@ Gates: D1/D2 dogfooded on the demo suite; record the session; external launch po
 
 ## Track F — Device/IoT (strategic bet; explicit decision required)
 
-- [ ] **F1 Design spike for `ProtoTest.Devices`**: device model, virtual device, replay, assertion-level
-  device coverage, trace kinds (`device.connect/send/command/replay`, category `Device`). One-page design
-  with a working vertical slice, mirroring `ProtoTest.Web` + backends.
-- [ ] **F2 WebSocket backend first** (reordered by plan-4 P4; the reference demo's OCPP gateway earns it),
-  then MQTT against a Mosquitto container when a real MQTT user exists; capabilities
-  (`[RequiresDevice<T>]`) so the same suite runs against hardware in a lab.
+- [x] **F1 Design spike for `ProtoTest.Devices`**: done in `eng/plan-4.md` P4a - typed device
+  classes with per-test instances, the transport abstraction backends implement, `device.*` trace
+  operations and the `device` entity, protocol-catalog coverage with gaps,
+  `ProtoCapabilityKinds.Device` and `[RequiresDevice<TDevice>]`, proven by a five-test slice against
+  an in-memory transport. Design: `assets/internal/devices-design.md` (internal). Packing and docs wait
+  for P4b's WebSocket backend.
+- [x] **F2 WebSocket backend first** (plan-4 P4b): `ProtoTest.Devices.WebSocket` shipped with
+  `AddWebSocketDevices()`, options bound from `ProtoTest:Devices:WebSocket`, and tests against a real
+  Kestrel WebSocket server. MQTT against a Mosquitto container follows a real MQTT user;
+  `[RequiresDevice<T>]` gating is in place.
 - [ ] **F3 Whole-journey scenario** as the acceptance demo: device frame → platform processing → command
   back → report, one `.prototrace` (the reference demo's R2 is this scenario).
 - [ ] **F4 TCP/Serial/Sigfox** only after a real transport user exists.

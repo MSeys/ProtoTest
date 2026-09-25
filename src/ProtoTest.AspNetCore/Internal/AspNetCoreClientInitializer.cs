@@ -3,6 +3,9 @@ namespace ProtoTest.AspNetCore.Internal;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Mvc.Testing.Handlers;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
 using ProtoTest.Web.Pages;
 
@@ -125,21 +128,39 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
     /// <summary>
     /// Started infrastructure provides its connection strings as host settings, so an in-process
     /// application reads the same values the tests do; explicit user configuration still wins because
-    /// it is applied afterwards.
+    /// it is applied afterwards. The application's <see cref="TimeProvider"/> is replaced with the run's
+    /// clock bridge too, so application code sees the active test's clock; a suite that registers its
+    /// own inside <c>configureWebHost</c> runs later and wins.
     /// </summary>
     private Action<IWebHostBuilder>? CombinedConfigure(ProtoExecutionContext context)
     {
         var settings = context.TryService<ProtoInfrastructureSettings>()?.Values;
-        if (settings is null || settings.Count == 0)
+        var clock = context.TryService<TimeProvider>();
+        if ((settings is null || settings.Count == 0) && clock is null && _configureWebHost is null)
         {
-            return _configureWebHost;
+            return null;
         }
 
         return webHost =>
         {
-            foreach (var (key, value) in settings)
+            if (settings is not null)
             {
-                webHost.UseSetting(key, value);
+                foreach (var (key, value) in settings)
+                {
+                    webHost.UseSetting(key, value);
+                }
+            }
+
+            if (clock is not null)
+            {
+                webHost.ConfigureTestServices(services =>
+                {
+                    services.RemoveAll<TimeProvider>();
+                    services.AddSingleton(clock);
+                    // The request flow has no test context of its own: this filter pushes the clock of
+                    // the test that sent the request for the duration of the application's handling.
+                    services.AddTransient<IStartupFilter, ProtoClockStartupFilter>();
+                });
             }
 
             _configureWebHost?.Invoke(webHost);

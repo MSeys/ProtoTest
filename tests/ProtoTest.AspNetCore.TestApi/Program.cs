@@ -41,6 +41,46 @@ public sealed class Program
         var app = builder.Build();
         app.MapControllers();
         app.MapGet("/ping", () => Results.Ok(new { Message = "pong" }));
+        app.MapGet("/time", (HttpContext context) =>
+            Results.Ok(new { UtcNow = context.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow() }));
+        app.UseWebSockets();
+        app.Map("/ws/{deviceId}", async context =>
+        {
+            var socket = await context.WebSockets.AcceptWebSocketAsync();
+            try
+            {
+                var buffer = new byte[4096];
+                while (socket.State == System.Net.WebSockets.WebSocketState.Open)
+                {
+                    var result = await socket.ReceiveAsync(buffer, CancellationToken.None);
+                    if (result.MessageType == System.Net.WebSockets.WebSocketMessageType.Close)
+                    {
+                        await socket.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, null, CancellationToken.None);
+                        return;
+                    }
+
+                    var payload = buffer.AsSpan(0, result.Count).ToArray();
+                    if (result.MessageType == System.Net.WebSockets.WebSocketMessageType.Text)
+                    {
+                        var text = System.Text.Encoding.UTF8.GetString(payload);
+                        var response = text == "BOOT" ? "BOOT_ACK" : $"{text}_ACK";
+                        await socket.SendAsync(
+                            System.Text.Encoding.UTF8.GetBytes(response),
+                            System.Net.WebSockets.WebSocketMessageType.Text,
+                            endOfMessage: true,
+                            CancellationToken.None);
+                    }
+                    else
+                    {
+                        await socket.SendAsync(payload, System.Net.WebSockets.WebSocketMessageType.Binary, endOfMessage: true, CancellationToken.None);
+                    }
+                }
+            }
+            finally
+            {
+                socket.Dispose();
+            }
+        });
         app.MapGet("/message", (ITestMessageService service) => Results.Ok(new { Message = service.GetMessage() }));
         app.MapGet("/redirect", () => Results.Redirect("/ping"));
         app.MapGet("/welcome", () => Results.Content("<h1>Welcome</h1>", "text/html"))

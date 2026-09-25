@@ -120,15 +120,59 @@ Milestones are the spec's (§8); each is stage-sized and leaves the demo runnabl
 IDs below are `eng/feature-plan.md` items; the demo is their demand proof, the feature plan is their
 scope. Plan-4 fixes their order; done means the feature-plan acceptance criteria.
 
-- [ ] **P1 Background-worker hosting** (spec item 1) → feature-plan **C5**: `AddWorker<Program>` or
-  generic-host support so the billing worker is hostable the way the API is, with lifecycle, readiness
-  and trace.
-- [ ] **P2 Readiness waiting** (spec item 2) → feature-plan **C6**: `AwaitReady`/health probes on
-  resources and applications instead of sleeps.
-- [ ] **P3 Clock control** (spec item 5) → feature-plan **A8**: `TimeProvider` integration
-  (`Proto.Context.Clock()`, `FakeTimeProvider` in tests) for tariff and expiry behavior.
-- [ ] **P4 `ProtoTest.Devices.WebSocket`** (spec item 4) → feature-plan **F2** reordered: WebSocket is the
-  first device backend, earned by OCPP; MQTT follows a real MQTT user.
+- [x] **P1 Background-worker hosting** (spec item 1) → feature-plan **C5**: shipped as the
+  `ProtoTest.Hosting` package. `AddWorkerHost<TProgram>()` hosts a worker's real entry point once per
+  run - started after the infrastructure registered before it, given the run's settings (connection
+  strings and settings infrastructure values, plus suite options), recorded as a `worker` run entity
+  and capability, and stopped with the run; tests reach it through `Proto.Context.Host<TProgram>()`
+  and `HostService<TProgram, TService>()`. One small Core seam was added
+  (`IProtoConfiguredInfrastructure`); the host factory is Microsoft's vendored, MIT-licensed
+  `HostFactoryResolver`. 9 tests cover start/stop, settings and precedence, start and stop failures,
+  duplicate registration, ambiguity and the missing-worker messages. Readiness waiting is P2.
+- [x] **P2 Readiness waiting** (spec item 2) → feature-plan **C6**: readiness lives in Core. One
+  `ProtoReadinessOptions` (`Timeout` 30 s, `Interval` 100 ms) governs `AddReadinessProbe(name, check)`,
+  which registers a run-scoped piece awaited at its registration position, records attempts and wait as
+  a `readiness` run entity, and fails the run naming the probe, attempts and last error.
+  `ProtoReadiness.Tcp`/`.Http` are the common checks; `AddHttpReadiness(application)` waits for a
+  published `BaseUrl` (settings first, then configuration) and skips in-process applications with
+  evidence. `ProtoContainerResource` owns `ReadyWhen`/`ReadyWhenTcp`/`ReadyOn(port)`; the PostgreSQL
+  and RabbitMQ containers wait for their standard ports. `IProtoConfiguredInfrastructure` now carries
+  the suite's configuration too, so workers read it and probes can resolve published addresses. 6 Core
+  readiness tests plus container-base tests (including a real TCP listener proving `ReadyOn` override)
+  and a worker configuration-precedence test; full suite green.
+- [x] **P3 Clock control** (spec item 5) → feature-plan **A8**: `ProtoClock : TimeProvider` in Core -
+  `ConfigureClock(new ProtoClock(seed))` seeds the run; each test gets its own clock seeded from the
+  run, so `Proto.Context.Clock.Advance(...)`/`SetUtcNow(...)` never leaks across parallel tests.
+  In-process ASP.NET Core applications receive the clock as their `TimeProvider`, linked per request by
+  the test-id header the client already carries (the pipeline does not inherit the test's ambient
+  context), and worker hosts receive it too (background flows fall back to the run clock, which
+  `ProtoHost.CurrentHost.Clock` advances). Every move records a `clock.advance` event and updates a
+  `clock` entity; 3 Core clock tests, 2 host-level trace/isolation tests and an application test prove
+  it. A2 is resolved: no `IClock` or `TimeProvider` existed in the samples to migrate.
+- [x] **P4a `ProtoTest.Devices` (feature-plan F1)** (spec item 4, first half): shipped as an internal
+  spike (`IsPackable=false`, no README/docs/changelog until P4b has a real transport). The model:
+  a suite derives `ProtoDevice` classes and gets one instance per (type, id) per test through
+  `Proto.Context.Devices().For<TDevice>("id")`; the protected primitives (`ConnectAsync`, `SendAsync`,
+  `ReceiveAsync`, `ExpectAsync`) record `device.connect/send/receive/command` operations and a `device`
+  entity (transport, address, connected). Transports implement `IProtoDeviceTransport`; address and
+  transport are overrideable per environment through `ProtoTest:Devices:{id}`. A protocol catalog
+  (`IProtoDeviceProtocol`) drives `DeviceCoverageCollector`: asserted kinds count, catalog kinds no test
+  asserted report as gaps. `ProtoCapabilityKinds.Device` and `[RequiresDevice<TDevice>]` let a suite
+  skip what the environment cannot provide. 5 tests prove the slice against an in-memory transport:
+  per-test instances, configuration override, trace entity and operations, a timeout failure carrying
+  the description and frames, coverage gaps, and the capability skip. Replay (`device.replay`) is
+  designed but deferred.
+- [x] **P4b `ProtoTest.Devices.WebSocket` (feature-plan F2)** (spec item 4, second half): the real
+  WebSocket backend shipped and the pair became public (`ProtoTest.Devices` flipped to `IsPackable`,
+  both with READMEs, a docs page with limits and changelog entries). `AddWebSocketDevices(configure)`
+  follows the `AddWeb` shape: it registers the transport, contributes the `WebSocket` device
+  capability and inserts the code defaults as the first configuration source;
+  `WebSocketDeviceOptions : IProtoConfigurableOptions` binds `ProtoTest:Devices:WebSocket` over them
+  and validates. Endpoint overrides moved to `ProtoTest:Devices:Endpoints:{deviceId}` via
+  `ProtoDeviceEndpoints`, mirroring `ProtoApplication`. Text and binary frames round-trip, close
+  frames end the exchange with a clear error, and connect failures name the address. 4 tests run
+  against a real Kestrel WebSocket server; full suite, format gate, docs check, docs build and pack
+  green. MQTT remains demand-gated.
 - [ ] **P5 WireMock integration** (spec item 6 prerequisite) → feature-plan **C1**.
 - [ ] **P6 Per-test substitution and fault injection** (spec item 6) → feature-plan **B1**.
 - [ ] **P7 Aspire adapter** (spec item 3) → feature-plan **C3**.
@@ -162,6 +206,14 @@ Record `git diff --shortstat` per stage split by `src`, `tests`, `docs`, with th
 | W8 — Small wins | Complete | docs +105 / −2 · eng +61 / −0 · src 0 · tests 0 | The homepage gains a release feed (`releases.ts` + `ReleaseFeed`) showing the latest version, date and summary plus the release before it; `eng/check-docs.ps1` cross-checks versions and dates against `CHANGELOG.md` and the drift was verified to fail the gate. The AI-usage page is surfaced from Why ProtoTest; the docs search was checked for "integration testing .NET" (64 hits, intro and integrations first), "trace" (100) and "coverage" (98) and lands on the right pages. GitHub Discussions is enabled and linked from the sustainability page, the FAQ, the footer and `SUPPORT.md`; the screencast was dropped in W5. |
 | W7 — Versioned docs | Complete | docs +9,106 / −1 · src 0 · tests 0 | The released 1.0 documentation is frozen as `versioned_docs/version-1.0` (78 pages cut from `main`) with `versions.json`; `lastVersion: '1.0'` serves it at `/docs/`, `docs/` moves to `/docs/next/` as "1.1 (in progress)", the navbar shows the version dropdown and the announcement bar points at 1.0 and the 1.1 roadmap. The 1.0 snapshot's repo file links gained one `../` (a versioned page is one directory deeper); everything else is untouched. Verified by the throwing build and by serving `/docs/`, `/docs/next/`, `/docs/next/roadmap` and old paths, and by content checks that split the versions. |
 | W9 — One changelog source | Complete | docs +281 / −44 · eng +23 / −36 · src 0 · tests 0 | `docs/scripts/generate-changelog.mjs` parses the repository `CHANGELOG.md` into the changelog page and `changelog.generated.ts` (summary = the release's opening paragraph, or its first sentence as a bullet; `Unreleased` and the link-reference tail stay in the repository file). `Releases.ts` is deleted, `ReleaseFeed` imports the generated data, the docs build and start run the generator, and `check-docs` runs `--check` with deliberate drift verified to fail the gate. The page now carries the repository wording and gains `Fixed`/`Added`/`Changed` navigation; `RELEASING.md` says one edit per release. |
+| P1 — Background-worker hosting | Complete | src +856 / −1 · tests +425 / −0 · docs +73 / −0 | New `ProtoTest.Hosting` package (net8/9/10, packed, README, docs page with limits): `AddWorkerHost<TProgram>()` resolves the worker's own program through Microsoft's vendored `HostFactoryResolver` (MIT, attributed), builds and starts its `IHost` once per run after the infrastructure registered before it, feeds it the run's settings plus `ProtoWorkerOptions` (options win), records a `worker` entity and capability, and stops/disposes it with the run; `context.Host<TProgram>()` and `HostService<TProgram, TService>()` reach it from tests, with clear errors for missing/ambiguous workers. One additive Core seam (`IProtoConfiguredInfrastructure`) passes the run's settings to infrastructure at start; `ProtoCapabilityKinds.Worker` is the new kind. 9 tests cover lifecycle, settings precedence, start/stop failures, duplicate registration, ambiguity and diagnostics. Full suite, format gate, docs check, docs build and pack green. |
+| P2 — Readiness waiting | Complete | src +561 / −25 · tests +379 / −3 · docs +49 / −6 | Readiness in Core: `IProtoReadinessProbe` + `ProtoReadinessOptions` (30 s / 100 ms), `AddReadinessProbe(name, check)` awaited at its registration position with attempts and wait recorded as a `readiness` run entity, and a timeout failure naming the probe, attempts and last error; `ProtoReadiness.Tcp`/`.Http` helpers; `AddHttpReadiness(application)` waits for a published `BaseUrl` (settings first) and skips in-process applications with evidence. `ProtoContainerResource` owns `ReadyWhen`/`ReadyWhenTcp`/`ReadyOn(port)`; the PostgreSQL and RabbitMQ containers probe their standard ports (5432/5672). `IProtoConfiguredInfrastructure` now takes a `ProtoInfrastructureContext` (settings + suite configuration) with a default plain `StartAsync`, which also gives P1's worker the suite configuration in its precedence chain. 6 Core readiness tests, 4 container-base tests (including a real TCP listener proving the `ReadyOn` override) and the updated worker precedence test. Full suite, format gate, docs check, docs build and pack green. |
+| P3 — Clock control | Complete | src +366 / −14 · tests +214 / −3 · docs +65 / −0 | `ProtoClock` in Core with `ConfigureClock(seed)`: each test gets its own clock seeded from the run's, exposed as `Proto.Context.Clock` (`Advance`/`SetUtcNow`), so advancing time never leaks into parallel tests. In-process ASP.NET Core applications receive it as their `TimeProvider`; since the pipeline does not inherit the test's ambient context, the client's test-id header plus an injected startup filter push the clock for the request's duration (verified by a test that failed before the fix). Workers receive the clock too, falling back to the run clock on background flows (`ProtoHost.CurrentHost.Clock` advances run time). Moves record a `clock` entity and a `clock.advance` event with delta and instants; the entity appears only once time moves. 3 clock unit tests, 2 host-level isolation/trace tests, 1 application test and 1 worker-clock test. Full suite, format gate, docs check, docs build and pack green. |
+| P4a — `ProtoTest.Devices` spike | Complete | src +873 / −0 · tests +348 / −0 · docs 0 | The device package and its vertical slice, kept internal (`IsPackable=false`, no README/docs/changelog until P4b). Typed `ProtoDevice` classes are created per (type, id) and test through `Proto.Context.Devices().For<TDevice>("id")`; the protected primitives record `device.connect/send/receive/command` operations and a `device` entity (transport, address, connected), and configuration overrides address and transport per environment (`ProtoTest:Devices:{id}`). Backends implement `IProtoDeviceTransport`; `IProtoDeviceProtocol` catalogs drive `DeviceCoverageCollector`, which reports asserted kinds as covered and catalog kinds no test asserted as gaps. `ProtoCapabilityKinds.Device` and `[RequiresDevice<TDevice>]` gate tests the environment cannot run. 5 slice tests (per-test instances, config override, trace entity/operations, timeout failure with frames, coverage gaps, capability skip) against an in-memory transport; full suite and format gate green. |
+| P4b — WebSocket backend | Complete | src +429 / −36 · tests +278 / −1 · docs +96 / −0 | `ProtoTest.Devices.WebSocket` and the public device pair: `AddWebSocketDevices(configure)` (the `AddWeb` shape) registers the transport, contributes the `WebSocket` capability and inserts code defaults as the first configuration source; `WebSocketDeviceOptions : IProtoConfigurableOptions` binds `ProtoTest:Devices:WebSocket` over them and validates. Endpoint overrides live in `ProtoDeviceEndpoints` (`ProtoTest:Devices:Endpoints:{deviceId}`), mirroring `ProtoApplication`; `DeviceAssertionException` derives `ProtoAssertionException`; registrations use `ProtoRegistrationGuard`; the source is one constant. 4 tests against a real Kestrel WebSocket server cover text and binary round-trips, connect failures naming the address, and close frames; READMEs, the docs page with limits, the devices fact sheet and changelog entries land with it. Full suite, format gate, docs check, docs build and pack green. |
+| P4c — Device clients (design revision) | Complete | src +501 / −395 · tests +148 / −69 · docs +21 / −10 | Redesigned at the user's request: per-id registration and `ProtoTest:Devices:Endpoints` are removed. Named clients (`AddWebSocketClient("Chargers", path: "/ocpp/{deviceId}").AddDevice<AcCharger>()`) and `Proto.Context.Devices("Chargers")` mirror REST/GraphQL; address resolvers (`ProtoDeviceAddress.Template`/`.FromApplication`, application-relative with http→ws) replace per-device configuration; WebSocket options use `ProtoOptionsRegistration.Configure`. 8 device tests and 4 WebSocket tests updated; docs, READMEs, fact sheet and changelog rewritten. Full suite, format gate, docs check, docs build and pack green. |
+| P4d — In-process WebSocket client (R2 prerequisite) | Complete | src +131 / −8 · tests +165 / −0 · docs +13 / −2 | `ProtoTest.Devices.WebSocket.AspNetCore` reaches an application's WebSocket endpoint through its `TestServer` with `AddInProcessWebSocketClient<TProgram>("Chargers", path: "/ocpp/{deviceId}")`, so an in-process gateway (R2's OCPP server) needs no listening socket. `WebSocketDeviceConnection` is now public over a plain `WebSocket`, so both transports share the frame handling; the socket transport stays for published addresses. TestApi gained a `/ws/{deviceId}` echo endpoint and 2 in-process tests (text and binary) prove the round-trip and the trace entity; docs, READMEs, fact sheet and changelog updated. Full suite, format gate, docs check, docs build and pack green. (Superseded by P4e: the separate client method became one registration with transport precedence.) |
+| P4e — One device registration per mode | Complete | src +151 / −61 · tests +141 / −21 · docs +9 / −7 | Devices now follow the REST model exactly: `IProtoInProcessDeviceTransport.CanConnect` lets the client prefer an in-process transport when the application is hosted, so `AddWebSocketClient("Chargers", path: "/ocpp/{deviceId}")` is the only registration and `AddInProcessWebSocketDevices<TProgram>("Api")` is called once per host (harmless when published). Address resolvers gained an optional transform (`http(s)`→`ws(s)`), `TryServerFactory<TProgram>` was added to AspNetCore, and the separate in-process client API is gone. 3 AspNetCore-for-devices tests include the acceptance pair: the same client goes through the `TestServer` when the app is hosted and over the socket when `AddAspNetCoreServer` is absent. Core device tests (8) and socket tests (4) updated; docs, READMEs, fact sheet and changelog describe one registration. Full suite, format gate, docs check, docs build and pack green. |
 
 ## Decisions taken
 
@@ -183,6 +235,68 @@ Record `git diff --shortstat` per stage split by `src`, `tests`, `docs`, with th
   wording (the hand-written copy is gone); the homepage feed's summary is the release's opening
   paragraph, falling back to its first bullet. One edit per release; the announcement bar stays manual
   because it names the docs-version split.
+- P1: `ProtoTest.Hosting` runs a worker's own entry point through Microsoft's **vendored**
+  `HostFactoryResolver` (MIT, attributed, re-sync note) because the runtime ships it as source only -
+  ASP.NET Core's `WebApplicationFactory` and EF Core tooling compile the same file. The one Core seam is
+  additive: `IProtoConfiguredInfrastructure` lets infrastructure receive the run's state at start,
+  which is how a worker reads a broker a container just started. Workers are run-scoped (no per-test
+  lifetime), read infrastructure settings plus `ProtoWorkerOptions` (options win) and explicitly do not
+  merge the suite's own configuration; `ProtoCapabilityKinds.Worker` is the new capability kind.
+- P2: readiness is run-start only - no per-test `AwaitReady` - because that is where the sleeps were.
+  A probe is ordinary infrastructure, so its position is its ordering; exceptions mean "not ready yet"
+  and the last one rides in the timeout failure. `IProtoConfiguredInfrastructure` now takes a
+  `ProtoInfrastructureContext` (settings + configuration) instead of settings alone, and provides a
+  default implementation of the plain `StartAsync`, so P1's worker gained the suite's configuration in
+  its precedence chain (worker sources < suite config < infrastructure settings < options) and
+  implementers write one method. The container base owns the TCP-check plumbing (`ReadyWhenTcp`,
+  `ReadyOn`); the shipped containers probe their standard ports (5432, 5672) and `ReadyOn` covers
+  custom images. `AddHttpReadiness` accepts any HTTP response as "up" by default and takes a predicate
+  for health endpoints.
+- P3: the clock is per test seeded from the run clock, and it reaches in-process applications by
+  **linking the request to the test** - the client already carried a test-id header; a startup filter
+  pushes that test's clock for the request's duration - because ASP.NET Core's pipeline does not
+  inherit the test's ambient `AsyncLocal` (proven by a failing test before the fix). Workers see the
+  run clock (`ProtoHost.CurrentHost.Clock` moves it). `ProtoClock` is ours, not Microsoft's
+  `FakeTimeProvider`, to keep Core dependency-free; only `GetUtcNow` is virtual, so timers stay real,
+  and direct `DateTime.UtcNow` calls are unaffected - both documented limits.
+- P4a: the device package stays `IsPackable=false` with no README, docs page or changelog entry until
+  P4b ships a real transport - nothing unusable gets published or advertised. `AddTransport` and
+  `AddProtocol` accept instances as well as types so tests and suite-configured backends do not need a
+  DI factory. The frame log is bounded and only feeds failure messages; replay is designed
+  (`device.replay`) but deferred rather than half-built. Device coverage is assertion-level: only a
+  matched expectation records an observation, and the catalog supplies the gaps.
+- P4b (consistency pass, user-requested): device options implement `IProtoConfigurableOptions` and
+  bind through `BindFromConfiguration`; the backend exposes `AddWebSocketDevices(configure)` and
+  inserts its code defaults as the first configuration source, mirroring `AddWeb` and
+  `PlaywrightWebDefaults`; endpoint overrides moved to `ProtoDeviceEndpoints` with a `SectionPath`,
+  mirroring `ProtoApplication`; `DeviceAssertionException` derives from `ProtoAssertionException`;
+  registrations use `ProtoRegistrationGuard`; the trace source is one constant
+  (`ProtoDeviceDiagnostics.TraceSource`); the skip attribute carries the same `AttributeUsage` as
+  `RequiresPlaywrightBrowser`. `ProtoTest:Devices:Endpoints` stays a reserved section so a device id
+  can never collide with a backend's option section. (The client/address shape below supersedes the endpoint-section part.)
+- P4c (user design review): per-id registration and the `ProtoTest:Devices:Endpoints` section were the
+  wrong shape and are gone. Devices now mirror REST/GraphQL clients - a named client declares its
+  transport and address resolver once, typed devices and protocol catalogs hang off it
+  (`devices.AddWebSocketClient("Chargers", path: "/ocpp/{deviceId}").AddDevice<AcCharger>()`) - and
+  `Proto.Context.Devices("Chargers").For<AcCharger>("CP-001")` mirrors `Rest("client")`. The resolver
+  helpers (`ProtoDeviceAddress.Template`/`.FromApplication`) replace per-id config: inside
+  `AddApplication` a client uses the application's address (`http(s)` -> `ws(s)`), so one suite covers
+  every environment. No Data-style defaults or provisioners were adopted (devices are not test-data
+  objects; provisioning stays with ProtoTest.Data), and the in-process WebSocket gap is documented as
+  a limit until R2.
+- P4d (scheduled for R2): the socket transport cannot reach an in-process endpoint, so
+  `ProtoTest.Devices.WebSocket.AspNetCore` adds `AddInProcessWebSocketClient<TProgram>`, which connects
+  through the application's `TestServer`. The two are separate registrations on purpose - in-process
+  vs published - and the shared frame handling lives in the public `WebSocketDeviceConnection` over a
+  plain `WebSocket`, so future transports (MQTT aside) reuse it rather than re-implementing framing.
+- P4e (user design review): the separate in-process client was the wrong shape, so devices were brought
+  to the REST model. `IProtoInProcessDeviceTransport.CanConnect` lets the client prefer an in-process
+  transport at connect time; `AddInProcessWebSocketDevices<TProgram>(application)` registers it once
+  and the same `AddWebSocketClient(name, path)` works in every mode. **The rest of the swap-ability
+  direction:** run-owned pieces should start only when the environment did not provide their endpoint
+  (a Core `AddInfrastructureUnlessConfigured`-style helper), and tests branch only through
+  capabilities/skips; no Core environment enum is planned, because real setups mix modes. That helper
+  lands with R1's Setup where the demand is concrete.
 
 ## Stop criteria
 

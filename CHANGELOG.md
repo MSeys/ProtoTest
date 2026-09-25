@@ -7,6 +7,46 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ## [Unreleased]
 
+### Added
+
+- `ProtoTest.Hosting` runs a background worker or generic host in-process with the suite:
+  `AddWorkerHost<TProgram>()` starts the worker's own entry point once per run, after the
+  infrastructure registered before it, feeds it the suite's configuration, the run's settings
+  (container connection strings and settings infrastructure values) and `AddWorkerHost` options and
+  stops it with the run. Tests reach it through `Proto.Context.Host<TProgram>()` and
+  `HostService<TProgram, TService>()`; the run records the worker as a `worker` entity and capability,
+  and `ProtoCapabilityKinds.Worker` guards tests that need it.
+- Readiness probes replace setup sleeps: `AddReadinessProbe(name, check)` waits at its registration
+  position with a configurable timeout and interval, records attempts and wait in the trace, and fails
+  the run naming the probe and the last error. `ProtoReadiness.Tcp`/`.Http` cover the common checks;
+  `AddHttpReadiness(application)` waits for a published application's address and skips in-process ones.
+  Containers declare a default TCP check - the PostgreSQL and RabbitMQ containers wait for their
+  standard ports, overridable with `ReadyOn(port)` for custom images.
+- A test clock replaces sleeping in time-dependent tests: `ConfigureClock(new ProtoClock(seed))` seeds
+  the run, `Proto.Context.Clock` is a per-test `ProtoClock` that `Advance`s or `SetUtcNow`s, and the
+  in-process application receives it as its `TimeProvider` (each request is linked to the test that
+  caused it). Workers see the run clock, which `ProtoHost.CurrentHost.Clock` advances for the whole
+  run. Every move records a `clock.advance` event and updates a `clock` entity, and each test starts
+  from the run's seed so parallel tests never share a timeline.
+- `ProtoTest.Devices` talks to devices - a simulator or real hardware - from the same context and
+  trace: declare a named client once (`devices.AddWebSocketClient("Chargers", path:
+  "/ocpp/{deviceId}").AddDevice<AcCharger>()`), then get typed instances per test by id through
+  `Proto.Context.Devices("Chargers").For<AcCharger>("CP-001")`. Addresses resolve per test - an
+  explicit template, a resolver, or the application's address when the client is registered inside
+  `AddApplication` - so there is no per-device configuration. Transports implement
+  `IProtoDeviceTransport`; `ProtoTest.Devices.WebSocket` is the first (`ws://`/`wss://`, options under
+  `ProtoTest:Devices:WebSocket`). A matched `ExpectAsync` contributes protocol coverage with the
+  catalog gaps a registered `IProtoDeviceProtocol` declares, and `[RequiresDevice<TDevice>]` skips what
+  an environment cannot provide. New vocabulary: `ProtoCapabilityKinds.Device`,
+  `ProtoTraceEntityKinds.Device`, and the `device.connect/send/receive/command` operations.
+- Device clients reach an in-process application automatically: register the transport once with
+  `AddInProcessWebSocketDevices<TProgram>(application)` and the same
+  `AddWebSocketClient("Chargers", path: "/ocpp/{deviceId}")` uses the application's `TestServer` when
+  it is hosted in-process and the configured address over a socket when it is published - the client
+  registration never branches on the environment.
+- `IProtoConfiguredInfrastructure` hands infrastructure the run's state as it starts - settings and the
+  suite's configuration - which is how an in-process worker reads a broker a container just started.
+
 ### Fixed
 
 - Shape mismatches whose expected shape carries a value constraint now record every mismatch in the

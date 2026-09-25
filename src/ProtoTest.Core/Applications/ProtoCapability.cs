@@ -13,6 +13,8 @@ public sealed record ProtoCapabilityDescriptor(string Name, string Kind, string 
 public static class ProtoCapabilityKinds
 {
     public const string Server = "server";
+    public const string Worker = "worker";
+    public const string Device = "device";
     public const string Protocol = "protocol";
     public const string Browser = "browser";
     public const string Store = "store";

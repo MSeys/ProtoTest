@@ -95,6 +95,40 @@ Runner assembly setups call `StartAsync` before any test (see the [runner overvi
 
 If a registered piece throws during `StartAsync`, the run fails to start: `ProtoHost.StartAsync` releases the pieces that had already started, clears the settings it filled, and rethrows - leaving the host in `Created` for a retry. A retry starts the released pieces again, and each piece it starts again is released with its new ownership period; a piece the retry never restarts is not released a second time. The runner's host lifetime then disposes the host. The container packages offer `TryStart`, which reports *why* a container could not start instead of throwing, so a suite can fall back or decide to [skip](./skip-conditions.md) before registering it.
 
+## Wait until it is ready
+
+A running container is not necessarily serving, and a published application may still be coming up. Readiness probes replace the sleep at the top of setup:
+
+```csharp
+builder
+    .AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar")
+    .AddReadinessProbe("Northstar API", ProtoReadiness.Http(new Uri("http://localhost:5080/health")))
+    .ConfigureReadiness(readiness =>
+    {
+        readiness.Timeout = TimeSpan.FromSeconds(60);
+        readiness.Interval = TimeSpan.FromMilliseconds(200);
+    });
+```
+
+- A probe is infrastructure: the host awaits it at its registration position, and it is recorded as a `readiness` run entity carrying the attempts and the wait it spent.
+- `ProtoReadiness.Tcp(host, port)` is ready when a connection succeeds. `ProtoReadiness.Http(url)` is ready when the address answers at all - pass an acceptance check to demand a status or a health payload. Any delegate returning `ValueTask<bool>` works too.
+- An exception is "not ready yet": a connection refusal while a container boots is normal, and the last error appears in the timeout failure. The default timeout is 30 seconds.
+- A probe that never becomes ready fails the run before the first test, naming the probe, its attempts and the last error.
+
+The shipped containers declare their own checks: a [PostgreSQL container](../integrations/sql/index.md) waits for its standard port to accept connections, [RabbitMQ](../integrations/messaging/index.md) for the AMQP port. When a custom image listens elsewhere, override the port:
+
+```csharp
+builder.AddInfrastructure(PostgresDatabase.Container().ReadyOn(5433), "ConnectionStrings:Northstar");
+```
+
+A published application is waited for where its address is declared - `ProtoTest:Applications:{application}:BaseUrl`, or the address a settings piece published:
+
+```csharp
+builder.AddHttpReadiness("Northstar API");
+```
+
+An in-process application has no address to wait for, so the probe is skipped and records why.
+
 ## How settings reach tests
 
 The host fills the single `ProtoInfrastructureSettings` instance for the run. Its `Values` is a snapshot of key/value pairs, and it is an ordinary service:
@@ -153,6 +187,7 @@ Use `AddInfrastructure` when the piece must start with the run or publish values
 
 - **Once per run.** Infrastructure starts and stops at run boundaries. Per-test setup is a [hook or attribute](./hooks.md) job.
 - **Failures are run failures.** There is no automatic skip for infrastructure that cannot start; use `TryStart` and decide before registering.
+- **Readiness fails, it does not skip.** A probe that times out fails the run before the first test. It also runs once, at run start - waiting inside a test is a hook's job, not a probe's.
 - **Settings don't change `IConfiguration`.** They live in `ProtoInfrastructureSettings`; a reader that only looks at `IConfiguration` won't see them. The built-in readers — the in-process web host, the RabbitMQ adapter and web sessions — do.
 - **No ordering control.** Registrations start in the order they were added, and there is no dependency graph between pieces.
 - **`ProtoInfrastructureSettings.Set` is internal.** Only the host fills it; tests read `Values`.

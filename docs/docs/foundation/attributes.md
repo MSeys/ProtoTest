@@ -174,4 +174,4 @@ Most of the capabilities in a real suite are ones you write — that's the point
 - C# attributes are created by reflection: no constructor injection. Resolve services from the context inside `BeforeTestAsync`/`AfterTestAsync`, and pass only compile-time constants to constructors.
 - Only `Order` decides sequencing, and ties put class-level attributes first; a failed setup rolls back only the components that completed, so teardown must tolerate partial state (`TryResolve`, early return).
 - A skip condition only sees [registered capabilities](./skip-conditions.md): an integration that is not configured makes its tests skip, which is the point.
-- `[RequiresInProcess]` inspects capability registration only — it does not look at `BaseUrl`.
+- `[RequiresInProcess]` inspects capability registration only — it does not itself look at `BaseUrl`. Integrations make that registration honest: `AddAspNetCoreServer` drops its `server` capability when an address is configured, so the condition skips a published run.

@@ -44,6 +44,11 @@ IProtoHostBuilder AddInfrastructure(
     this IProtoHostBuilder builder,
     IProtoInfrastructure infrastructure,
     params string[] settings);
+
+IProtoHostBuilder AddInfrastructureAlways(
+    this IProtoHostBuilder builder,
+    IProtoInfrastructure infrastructure,
+    params string[] settings);
 ```
 
 Every key in `settings` receives the started connection string, so one started container can feed the tests and an in-process application under the configuration roots each of them reads:
@@ -55,7 +60,25 @@ builder.AddInfrastructure(
     "Messaging:RabbitMq:ConnectionString");         // the in-process application's key
 ```
 
-Passing keys requires an `IProtoConnectionInfrastructure`; a settings-only resource keeps its own `Settings` dictionary and doesn't need keys.
+Passing keys requires a piece that provides addresses — an `IProtoConnectionInfrastructure` (a connection string per key) or an `IProtoSettingsInfrastructure` (the values it will fill). A settings-only piece that declares no keys always starts.
+
+## When the environment already provides the addresses
+
+The host decides before starting anything: a registration whose every declared key already has a configured value is not started. The environment has the address the piece would fill, so a container or process would only shadow it.
+
+```csharp
+// ConnectionStrings:Northstar is configured - environment variables, user secrets,
+// appsettings in the runner project, an earlier configuration source. The container is not needed.
+builder.AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar");
+```
+
+The rule is per piece and all-or-nothing: one unconfigured key means the piece starts and fills all of its keys, and a piece with no keys always starts. Use `AddInfrastructureAlways` when a piece must start regardless:
+
+```csharp
+builder.AddInfrastructureAlways(LocalRelay.Sidecar(), "Relay:Url");
+```
+
+A skipped piece is not started, not owned and not released, and its values stay absent from `ProtoInfrastructureSettings`; readers that resolve an address at use time find the configured value in `IConfiguration`. The trace records the decision on the piece's run entity with `infrastructure.state: skipped` and `infrastructure.reason: already configured`.
 
 ## The demo's two real flows
 
@@ -88,12 +111,46 @@ It starts the sample application as a standalone process and fills `ProtoTest:Ap
 
 1. the **run hooks** — `BeforeRunAsync`, ascending `Order`;
 2. the host's **capabilities**, recorded as run entities;
-3. each **infrastructure** registration, in registration order — `StartAsync` on each piece, then its settings;
+3. each **infrastructure** registration, in registration order — a piece every declared key of which is already configured is recorded as skipped instead — `StartAsync` on each piece, then its settings;
 4. trace listening begins.
 
 Runner assembly setups call `StartAsync` before any test (see the [runner overview](../runners/overview.md)), so infrastructure is guaranteed to be started and its settings filled before the first test lifecycle begins. Each started piece is recorded in the trace as a run entity with `change: "started"` and its settings keys.
 
 If a registered piece throws during `StartAsync`, the run fails to start: `ProtoHost.StartAsync` releases the pieces that had already started, clears the settings it filled, and rethrows - leaving the host in `Created` for a retry. A retry starts the released pieces again, and each piece it starts again is released with its new ownership period; a piece the retry never restarts is not released a second time. The runner's host lifetime then disposes the host. The container packages offer `TryStart`, which reports *why* a container could not start instead of throwing, so a suite can fall back or decide to [skip](./skip-conditions.md) before registering it.
+
+## Wait until it is ready
+
+A running container is not necessarily serving, and a published application may still be coming up. Readiness probes replace the sleep at the top of setup:
+
+```csharp
+builder
+    .AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar")
+    .AddReadinessProbe("Northstar API", ProtoReadiness.Http(new Uri("http://localhost:5080/health")))
+    .ConfigureReadiness(readiness =>
+    {
+        readiness.Timeout = TimeSpan.FromSeconds(60);
+        readiness.Interval = TimeSpan.FromMilliseconds(200);
+    });
+```
+
+- A probe is infrastructure: the host awaits it at its registration position, and it is recorded as a `readiness` run entity carrying the attempts and the wait it spent.
+- `ProtoReadiness.Tcp(host, port)` is ready when a connection succeeds. `ProtoReadiness.Http(url)` is ready when the address answers at all - pass an acceptance check to demand a status or a health payload. Any delegate returning `ValueTask<bool>` works too.
+- An exception is "not ready yet": a connection refusal while a container boots is normal, and the last error appears in the timeout failure. The default timeout is 30 seconds.
+- A probe that never becomes ready fails the run before the first test, naming the probe, its attempts and the last error.
+
+The shipped containers declare their own checks: a [PostgreSQL container](../integrations/sql/index.md) waits for its standard port to accept connections, [RabbitMQ](../integrations/messaging/index.md) for the AMQP port. When a custom image listens elsewhere, override the port:
+
+```csharp
+builder.AddInfrastructure(PostgresDatabase.Container().ReadyOn(5433), "ConnectionStrings:Northstar");
+```
+
+A published application is waited for where its address is declared - `ProtoTest:Applications:{application}:BaseUrl`, or the address a settings piece published:
+
+```csharp
+builder.AddHttpReadiness("Northstar API");
+```
+
+An in-process application has no address to wait for, so the probe is skipped and records why.
 
 ## How settings reach tests
 
@@ -143,7 +200,7 @@ Infrastructure is released with the run, after the run stops and the reports are
 
 | | `AddInfrastructure` | `AddResource` |
 | --- | --- | --- |
-| Starts with the run | yes, `StartAsync` | no |
+| Starts with the run | yes, unless every declared key is already configured (`AddInfrastructureAlways` opts out) | no |
 | Fills `ProtoInfrastructureSettings` | connection string per key, plus settings | no |
 | Registered as run entity and released | yes | yes |
 
@@ -152,7 +209,9 @@ Use `AddInfrastructure` when the piece must start with the run or publish values
 ## Limits
 
 - **Once per run.** Infrastructure starts and stops at run boundaries. Per-test setup is a [hook or attribute](./hooks.md) job.
+- **A configured environment wins.** Declare the keys a piece fills; when all of them are configured the host skips the piece instead of shadowing the environment. `AddInfrastructureAlways` forces a start (see [above](#when-the-environment-already-provides-the-addresses)).
 - **Failures are run failures.** There is no automatic skip for infrastructure that cannot start; use `TryStart` and decide before registering.
+- **Readiness fails, it does not skip.** A probe that times out fails the run before the first test. It also runs once, at run start - waiting inside a test is a hook's job, not a probe's.
 - **Settings don't change `IConfiguration`.** They live in `ProtoInfrastructureSettings`; a reader that only looks at `IConfiguration` won't see them. The built-in readers — the in-process web host, the RabbitMQ adapter and web sessions — do.
 - **No ordering control.** Registrations start in the order they were added, and there is no dependency graph between pieces.
 - **`ProtoInfrastructureSettings.Set` is internal.** Only the host fills it; tests read `Values`.

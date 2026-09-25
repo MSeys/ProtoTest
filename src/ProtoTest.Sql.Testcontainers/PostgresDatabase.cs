@@ -2,6 +2,7 @@ namespace ProtoTest.Sql.Testcontainers;
 
 // global:: because this assembly's own namespace ends in Testcontainers.
 using global::Testcontainers.PostgreSql;
+using ProtoTest.Core;
 using ProtoTest.Testcontainers;
 
 /// <summary>
@@ -23,6 +24,12 @@ public sealed class PostgresDatabase : ProtoContainerResource<PostgreSqlContaine
             (container, cancellationToken) => container.StartAsync(cancellationToken),
             container => container.GetConnectionString())
     {
+        // Testcontainers waits for pg_isready while starting; this check is the run's own, named and
+        // traced, and it is the one that matters when a custom image skips the module's wait strategy.
+        ReadyWhenTcp(
+            "PostgreSQL accepts connections",
+            defaultPort: 5432,
+            (container, port) => (container.Hostname, container.GetMappedPublicPort(port)));
     }
 
     public override string Id => "database:postgres";

@@ -2,6 +2,7 @@ namespace ProtoTest.Messaging.RabbitMq.Testcontainers;
 
 // global:: because this assembly's own namespace ends in Testcontainers.
 using global::Testcontainers.RabbitMq;
+using ProtoTest.Core;
 using ProtoTest.Testcontainers;
 
 /// <summary>
@@ -23,6 +24,12 @@ public sealed class RabbitMqBroker : ProtoContainerResource<RabbitMqContainer>
             (container, cancellationToken) => container.StartAsync(cancellationToken),
             container => container.GetConnectionString())
     {
+        // Testcontainers waits for rabbitmq-diagnostics while starting; this check is the run's own,
+        // named and traced, and covers a custom image whose wait strategy differs.
+        ReadyWhenTcp(
+            "RabbitMQ accepts connections",
+            defaultPort: 5672,
+            (container, port) => (container.Hostname, container.GetMappedPublicPort(port)));
     }
 
     public override string Id => "broker:rabbitmq";

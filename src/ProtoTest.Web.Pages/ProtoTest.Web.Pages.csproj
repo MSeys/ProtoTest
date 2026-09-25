@@ -3,9 +3,9 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     
-    <!-- No 1.0.1 baseline exists for this package (or its Web.Pages dependency); validate once 1.1 ships. -->
+    <!-- New in 1.1: no released baseline exists yet, so there is nothing to validate against. -->
+    <IsPackable>true</IsPackable>
     <EnablePackageValidation>false</EnablePackageValidation>
-    <PackageId>ProtoTest.Web.Pages</PackageId>
     <Description>Shared page identity and inventory for ProtoTest web integrations.</Description>
     <PackageTags>testing;integration-testing;web;coverage;dotnet</PackageTags>
   </PropertyGroup>

@@ -113,6 +113,69 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
         IConfiguration configuration = _configurationBuilder.Build();
         _services.AddSingleton(configuration);
         _services.AddSingleton(new ProtoInfrastructureSettings());
+
+        // Run-owned pieces whose declared keys the environment already configures are not needed:
+        // configuration wins, and the piece is not started, owned or released. The decision is fixed
+        // here, while configuration is static; AddInfrastructureAlways opts a piece out.
+        var skippedInfrastructure = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var descriptor in _services)
+        {
+            if (descriptor.ImplementationInstance is ProtoInfrastructureRegistration registration
+                && registration.IsSatisfiedBy(configuration))
+            {
+                skippedInfrastructure.Add(registration.Infrastructure.Id);
+                _runResources.Remove(registration.Infrastructure.Id);
+            }
+        }
+
+        _services.AddSingleton(new ProtoSkippedInfrastructure(skippedInfrastructure));
+
+        // A capability declared with an address condition is dropped when the environment already
+        // provides that address: HasCapability then answers false and [RequiresCapability] skips,
+        // exactly as if the integration that would have served it were never registered. A descriptor
+        // also registered unconditionally stays.
+        var skippedCapabilities = new List<ProtoCapabilityDescriptor>();
+        var satisfiedConditionals = _services
+            .Where(descriptor => descriptor.ImplementationInstance is ProtoConditionalCapability)
+            .Select(descriptor => (ProtoConditionalCapability)descriptor.ImplementationInstance!)
+            .Distinct()
+            .Where(registration => registration.IsSatisfiedBy(configuration))
+            .ToArray();
+        foreach (var conditional in satisfiedConditionals)
+        {
+            var registeredUnconditionally = _services
+                .Where(descriptor => descriptor.ImplementationInstance is ProtoConditionalCapability)
+                .Select(descriptor => (ProtoConditionalCapability)descriptor.ImplementationInstance!)
+                .Any(registration => registration.Capability == conditional.Capability && registration.Keys.Count == 0);
+            if (registeredUnconditionally || skippedCapabilities.Contains(conditional.Capability))
+            {
+                continue;
+            }
+
+            for (var index = _services.Count - 1; index >= 0; index--)
+            {
+                if (_services[index].ImplementationInstance is ProtoCapabilityDescriptor descriptor
+                    && descriptor == conditional.Capability)
+                {
+                    _services.RemoveAt(index);
+                }
+            }
+
+            skippedCapabilities.Add(conditional.Capability);
+        }
+
+        _services.AddSingleton(new ProtoSkippedCapabilities(skippedCapabilities));
+
+        // The run's clock: the suite's when ConfigureClock registered one, otherwise a clock starting now.
+        // Each test seeds its own clock from it, and applications and workers receive the bridge that
+        // resolves the active test's clock (or the run's on background flows).
+        var clock = _services
+            .Where(descriptor => descriptor.ServiceType == typeof(ProtoClock))
+            .Select(descriptor => descriptor.ImplementationInstance)
+            .OfType<ProtoClock>()
+            .LastOrDefault() ?? new ProtoClock();
+        _services.TryAddSingleton(clock);
+        _services.TryAddSingleton<TimeProvider>(new ProtoTestTimeProvider(clock));
         _services.TryAddSingleton<IProtoTestIdGenerator>(
             _ => new NumericProtoTestIdGenerator(_testIdOptions));
         _services.TryAddSingleton(_traceOptions);

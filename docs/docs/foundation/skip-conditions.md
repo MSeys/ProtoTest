@@ -44,6 +44,8 @@ Integrations register a capability when they are configured, so the condition an
 [RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "Northstar standalone")]
 ```
 
+An integration whose capability depends on an address can declare it conditionally: `AddCapabilityUnlessConfigured(capability, "ProtoTest:Applications:Api:BaseUrl")` drops the declaration when every listed key is already configured — the environment provides the address, so the capability stays honest and the tests that require it skip. `AddAspNetCoreServer` uses this: with `BaseUrl` configured its `ASP.NET Core` capability is absent and `[RequiresInProcess]` skips.
+
 Class-level and method-level conditions accumulate like any other attribute; the first one that applies supplies the reason.
 
 ## In-process only

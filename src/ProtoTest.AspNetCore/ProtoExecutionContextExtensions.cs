@@ -24,7 +24,36 @@ public static class ProtoExecutionContextExtensions
     {
         ArgumentNullException.ThrowIfNull(context);
         var key = name ?? context.TryResolve<ProtoApplicationState>()?.ApplicationName ?? "Default";
+        var factory = context.TryClient<WebApplicationFactory<TProgram>>(AspNetCoreClientInitializer<TProgram>.FactoryName(key));
+        if (factory is not null)
+        {
+            return factory;
+        }
+
+        var address = ProtoApplication.BaseUrl(context.Configuration, key);
+        if (!string.IsNullOrWhiteSpace(address))
+        {
+            throw new InvalidOperationException(
+                $"Application '{key}' runs at '{address}', so it has no in-process server to reach. " +
+                $"ServerFactory and ApplicationServices need AddAspNetCoreServer without a configured " +
+                $"'{ProtoApplication.SectionPath}:{key}:BaseUrl'.");
+        }
+
         return context.Client<WebApplicationFactory<TProgram>>(AspNetCoreClientInitializer<TProgram>.FactoryName(key));
+    }
+
+    /// <summary>
+    /// Gets the in-process server factory for an application, or <see langword="null"/> when the
+    /// application is not hosted in-process (published or container-backed runs). This is the lookup an
+    /// integration uses to prefer an in-process path only when one exists.
+    /// </summary>
+    public static WebApplicationFactory<TProgram>? TryServerFactory<TProgram>(
+        this ProtoExecutionContext context,
+        string? name = null) where TProgram : class
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var key = name ?? context.TryResolve<ProtoApplicationState>()?.ApplicationName ?? "Default";
+        return context.TryClient<WebApplicationFactory<TProgram>>(AspNetCoreClientInitializer<TProgram>.FactoryName(key));
     }
 
     /// <summary>

@@ -3,9 +3,7 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     
-    <!-- No 1.0.1 baseline exists for this package (or its Web.Pages dependency); validate once 1.1 ships. -->
-    <EnablePackageValidation>false</EnablePackageValidation>
-    <PackageId>ProtoTest.Web.Playwright</PackageId>
+    <IsPackable>true</IsPackable>
     <Description>Playwright execution backend for ProtoTest.Web.</Description>
     <PackageTags>testing;integration-testing;web;playwright;browser;dotnet</PackageTags>
   </PropertyGroup>

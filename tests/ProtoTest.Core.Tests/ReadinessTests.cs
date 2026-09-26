@@ -295,6 +295,22 @@ public sealed class ReadinessTests
         });
     }
 
+    [Test]
+    public void Build_WhenTheReadinessOptionsAreInvalid_ShouldFailConfigurationNotTheFirstProbe()
+    {
+        // Audit 5 A5-18: the options register through ProtoOptionsRegistration, and the host forces that
+        // resolve at Build, so validation runs once and a bad ProtoTest:Readiness is configuration error.
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Readiness:Timeout"] = "00:00:00"
+            }));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.Build());
+    }
+
     private sealed class OrderingInfrastructure(List<string> order) : IProtoInfrastructure
     {
         public string Id => "piece";

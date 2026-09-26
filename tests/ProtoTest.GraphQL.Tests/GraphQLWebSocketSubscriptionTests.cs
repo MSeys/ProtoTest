@@ -226,6 +226,51 @@ public sealed class GraphQLWebSocketSubscriptionTests
     }
 
 
+    [Test]
+    public async Task Enumeration_ShouldDisposeEachEventAsItAdvances()
+    {
+        // Audit 5 A5-42 (B-17): await foreach without a per-element using must not leak a document
+        // and response per event; the enumerator disposes the previous event when the next arrives.
+        var socket = new StubWebSocket(
+            """{"type":"connection_ack"}""",
+            """{"id":"1","type":"next","payload":{"data":{"value":1}}}""",
+            """{"id":"1","type":"next","payload":{"data":{"value":2}}}""",
+            """{"id":"1","type":"complete"}""");
+        var builder = new ProtoHostBuilder();
+        builder.AddGraphQL(graphQL => graphQL.AddClient("Default", "https://example.test/graphql"));
+        builder.ConfigureServices(services => services.AddSingleton<IGraphQLWebSocketFactory>(
+            new StubWebSocketFactory(socket)));
+        await using var host = builder.Build();
+        await host.StartTestAsync("websocket enumeration", "6", TestMethods.Placeholder);
+        try
+        {
+            await using var subscription = await Proto.Context.GraphQL()
+                .Subscription("orderCreated")
+                .Select(new { value = Gql.Field })
+                .SubscribeAsync();
+
+            var events = new List<GraphQLResponse>();
+            await foreach (var response in subscription)
+            {
+                events.Add(response);
+            }
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(events, Has.Count.EqualTo(2));
+                Assert.That(
+                    Assert.ThrowsAsync<ObjectDisposedException>(
+                        () => events[0].RawResponse.Content.ReadAsStringAsync()),
+                    Is.Not.Null,
+                    "the previous event is disposed when the enumerator advances");
+                Assert.That(events[1].ReadDataAs<int>("$.value"), Is.EqualTo(2),
+                    "the last event stays with the caller, like an event from NextAsync");
+            });
+            events[1].Dispose();
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
     private sealed class StubWebSocketFactory(StubWebSocket socket) : IGraphQLWebSocketFactory
     {
         public Uri? Endpoint { get; private set; }

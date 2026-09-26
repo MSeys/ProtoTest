@@ -179,7 +179,7 @@ public sealed record ProtoReportItem(
     string TargetName,
     string Category,
     string Identifier,
-    string Kind = ProtoReportItemKinds.Observation,               // observation, coverage, finding, gate, metric, resource, or your own
+    string Kind = ProtoReportItemKinds.Observation,               // observation, coverage, finding, gate, metric, resource, run_metadata, or your own
     ProtoReportStatus Status = ProtoReportStatus.Neutral,         // Neutral, Info, Success, Warning, Error
     int Count = 0,
     bool? IsCovered = null,
@@ -193,7 +193,7 @@ public sealed record ProtoReportItem(
     string? DisplayGroup = null);
 ```
 
-Items nest through `Children`, and the kinds cover more than coverage: a `Metric` with a `Value` and `Unit`, or a `Finding` with a `Warning` status and a `Message`, show up in the same reports. A kind is an open string, so an integration can define its own; the built-in ones are named by `ProtoReportItemKinds`. The HTML report keeps the kinds in their own sections — coverage, findings, run gates, resources — and gives an unknown kind its own section titled after it, so a passed gate is never read as a finding.
+Items nest through `Children`, and the kinds cover more than coverage: a `Metric` with a `Value` and `Unit`, or a `Finding` with a `Warning` status and a `Message`, show up in the same reports. A kind is an open string, so an integration can define its own; the built-in ones are named by `ProtoReportItemKinds`. The HTML report keeps the kinds in their own sections — coverage, findings, run gates, resources, run metadata — and gives an unknown kind its own section titled after it, so a passed gate is never read as a finding.
 
 ## Links
 

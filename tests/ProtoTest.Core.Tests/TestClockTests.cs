@@ -3,6 +3,48 @@ namespace ProtoTest.Core.Tests;
 [TestFixture]
 public sealed class TestClockTests
 {
+    [Test]
+    public async Task AmbientClock_AfterTheTestCompletes_ShouldFallBackToTheRunClock()
+    {
+        // Audit 5 A5-16: the ambient owner is the one lookup the TimeProvider bridges to. A task the
+        // test started captured the test's flow; once the test completes, that flow must read the run
+        // clock instead of a finished test's.
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureClock(new ProtoClock(Seed));
+        builder.ConfigureTracing(options => options.Enabled = false);
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("ambient", "00001", TestMethods.Placeholder);
+        var timeProvider = context.Service<TimeProvider>();
+        var readAfterCompletion = new TaskCompletionSource<DateTimeOffset>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var background = Task.Run(async () =>
+        {
+            await release.Task;
+            readAfterCompletion.SetResult(timeProvider.GetUtcNow());
+        });
+
+        context.Clock.Advance(TimeSpan.FromHours(3));
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        release.SetResult();
+        var observed = await readAfterCompletion.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await background;
+        await host.StopAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                observed,
+                Is.EqualTo(host.Clock.GetUtcNow()),
+                "a background flow reads the run clock after the test completed");
+            Assert.That(
+                observed,
+                Is.Not.EqualTo(Seed.AddHours(3)),
+                "the finished test's clock is gone from the flow");
+        });
+    }
+
     private static readonly DateTimeOffset Seed = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
 
     [Test]

@@ -53,6 +53,10 @@ or `Sheets` type names.
 7. Second `Build()` throws; every public registration entry that would mutate composition throws
    after `Build()` (a repeated same-name registration of the *same* program/type stays a no-op).
 
+Both conditional decisions read one evaluator, `ProtoEnvironment.IsSatisfied`: the infrastructure skip
+asks the all-configured verdict and the capability drop the per-declaration verdict over configured
+values plus the keys a registered piece declares.
+
 `StartAsync()`:
 
 1. Run hooks in ascending `Order` — trace export (`int.MinValue`), run resources (`int.MinValue + 1`),
@@ -95,7 +99,9 @@ provider, stops listening, unregisters. Start/stop/dispose racing is rejected, n
    initializer has `Order = int.MinValue`) and attributes ascending. It opens `test.execution` and
    makes it the parent. The caller's token becomes `ProtoExecutionContext.CancellationToken`, which
    hooks and attributes read and `ProtoTest.Sql` passes to the connection open and transaction begin;
-   no runner adapter supplies one yet.
+   no runner adapter supplies one yet. The `[Application]` selection carries `Order = -100`, before
+   session declarations (-10) and logins (0): a session created before the selection would target its
+   own name instead of the application.
 3. A setup failure records the test `Failed`, rolls back only the completed components (attributes and
    hooks in reverse), and rethrows.
 4. Teardown runs attributes reverse, hooks reverse, publishes attachments, disposes the context
@@ -187,7 +193,9 @@ An application-scoped setting resolves through one named precedence, `ProtoAppli
 (a started piece's published settings → static configuration), exposed as
 `ProtoApplication.BaseUrl(context, app)` and `ProtoApplication.GrpcAddress(context, app)`. Every
 address reader uses it; the in-process transport is the client resolver's fallback, never a competing
-source. A first-reader-wins divergence is a bug (audit ADDR-2, fixed).
+source. A first-reader-wins divergence is a bug (audit ADDR-2, fixed). The raw lookup,
+`ResolveSetting(configuration, settings, key)`, is public for a suite that reads one application
+setting outside a client (a blank published value is ignored).
 
 | Integration | Rule |
 | --- | --- |
@@ -229,7 +237,10 @@ binds first and the current section binds over it, so the old key keeps working 
 deprecated) and the current key wins. `GrpcClientOptions` is the example — `ProtoTest:Grpc:Client` over
 the legacy `ProtoTest:Grpc` — and it is registered **per named client**: the keyed registration
 composes each client's callbacks in order, the shared section binds over each client's callback, and
-the unkeyed instance is the run-wide default a transport-backed fallback client reads.
+the unkeyed instance is the run-wide default a transport-backed fallback client reads. The HTTP
+response and attachment defaults follow the same shape: `ProtoTest:Http:Responses` and `:Attachments`
+bind through `ProtoOptionsRegistration` when no explicit registration exists, and a resolver returning
+null keeps attachment capture opt-in.
 
 Known outliers (sanctioned or audit-owed): Web backends validate through static delegates instead of
 the interface method; the sink path binds but does not validate; OpenAPI/GraphQL schema sources are
@@ -250,6 +261,11 @@ same key set when it is called after `AddSql`.
 - Findings, observations, attachments and archive entries are serialized and redacted **once**, where
   evidence is created — `ProtoMetadataRedaction`, `ProtoDataRedactionPolicy`, `JsonDiagnosticSanitizer`
   and `ProtoUriSanitizer` are the policies. No exit boundary may serialize a raw `object`.
+- The run resource is the run's identity: `runId`, `runStartedAtUtc`, `runCompletedAtUtc` and its
+  environment as flat `environment.*` attributes. `ProtoTraceOptions.RunMetadata` and
+  `RunMetadataEnvironmentVariables` (A5.15) extend the same namespace with facts captured at Build: one
+  `environment.{key}` attribute and one `run_metadata` report item per key; unset variables contribute
+  nothing and a key that would hide a built-in `environment.*` fact fails the build.
 - The trace records operations/events on a recorder; observations are intentional facts the test
   states and the only input coverage collectors consume; findings are for the report and run gates;
   attachments materialize files and are published in teardown.
@@ -335,6 +351,11 @@ suite; extend it, do not fork it.
 | Test lifecycle | `ProtoTestLifecycle` | `src/ProtoTest.Core/Internal/` |
 | Resource registry | `ProtoResourceRegistry`, `ProtoRunResourceStore` | `src/ProtoTest.Core/Internal/` |
 | Infrastructure registration | `ProtoInfrastructureRegistration`, `ProtoInfrastructureSettings`, `IProtoConfiguredInfrastructure`, `ProtoInfrastructureContext` | `src/ProtoTest.Core/Infrastructure/` |
+| Run lifecycle (start/stop sequencing) | `ProtoRunLifecycle` | `src/ProtoTest.Core/Internal/` |
+| Build composer | `ProtoHostComposer` | `src/ProtoTest.Core/Internal/` |
+| Ambient state | `ProtoAmbient`, `ProtoTestLifecycleState` | `src/ProtoTest.Core/Internal/` |
+| Environment evaluator | `ProtoEnvironment` | `src/ProtoTest.Core/Internal/` |
+| Once-only registration | `ProtoRegistration`, `ProtoRegistrationGuard` | `src/ProtoTest.Core/` |
 | Run setup | `ProtoRunSetupContext`, `AddRunSetup` | `src/ProtoTest.Core/Infrastructure/` |
 | Capability | `ProtoCapabilityDescriptor`, `ProtoCapabilityKinds`, `AddCapabilityUnlessConfigured`, `AddCapabilityWhenProvided` | `src/ProtoTest.Core/Applications/ProtoCapability.cs` |
 | Client resolution | `ProtoClientRegistry`, `ProtoClientInitializerHook`, `ProtoClientResolution` | `src/ProtoTest.Core/Internal/` |

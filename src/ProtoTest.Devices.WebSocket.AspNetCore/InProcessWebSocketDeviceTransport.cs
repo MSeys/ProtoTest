@@ -44,13 +44,25 @@ public sealed class InProcessWebSocketDeviceTransport<TProgram>(
     }
 
     /// <inheritdoc />
+    public ValueTask<IProtoDeviceConnection> ConnectAsync(
+        DeviceEndpoint endpoint,
+        CancellationToken cancellationToken = default)
+        => ConnectAsync(
+            ProtoHost.CurrentContextOrNull ?? throw new InvalidOperationException(
+                $"An in-process device connection needs a running test; '{endpoint.DeviceId}' was reached outside one."),
+            endpoint,
+            cancellationToken);
+
+    /// <inheritdoc />
     public async ValueTask<IProtoDeviceConnection> ConnectAsync(
+        ProtoExecutionContext context,
         DeviceEndpoint endpoint,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(endpoint);
-        var context = ProtoHost.CurrentContextOrNull ?? throw new InvalidOperationException(
-            $"An in-process device connection needs a running test; '{endpoint.DeviceId}' was reached outside one.");
+        // The context that decided routing opens the connection: re-reading ambient host state here
+        // would throw on a flow without it after CanConnect already said yes (audit A5-63).
         var factory = context.ServerFactory<TProgram>(_applicationName);
         var path = Uri.TryCreate(endpoint.Address, UriKind.Absolute, out var absolute)
             ? absolute.PathAndQuery

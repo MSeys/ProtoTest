@@ -23,9 +23,9 @@ internal static class ProtoHostRegistry
         }
     }
 
-    public static ProtoHost GetCurrent(ProtoHost? contextualHost)
+    public static ProtoHost GetCurrent()
     {
-        if (contextualHost is not null)
+        if (ProtoAmbient.Host is { } contextualHost)
         {
             return contextualHost;
         }

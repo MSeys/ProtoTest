@@ -112,9 +112,7 @@ public static class ProtoHostBuilderSinkExtensions
     }
 
     private static SinkRegistration? FindRegistration(IServiceCollection services, Type sinkType)
-        => services.FirstOrDefault(descriptor => descriptor.ServiceType == typeof(SinkRegistration)
-            && descriptor.ImplementationInstance is SinkRegistration registration
-            && registration.SinkType == sinkType)?.ImplementationInstance as SinkRegistration;
+        => ProtoRegistration.Find<SinkRegistration>(services, registration => registration.SinkType == sinkType);
 
     /// <summary>
     /// Finds a sink the caller registered directly in the service collection. Only registrations whose

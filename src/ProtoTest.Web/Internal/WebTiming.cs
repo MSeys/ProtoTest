@@ -7,7 +7,7 @@ using ProtoTest.Core;
 /// often it probes. Polling, the wait registrations and both backends read these, so every backend
 /// fails at the same speed unless a test configures otherwise.
 /// </summary>
-public static class WebTiming
+internal static class WebTiming
 {
     /// <summary>The default timeout for a wait condition or a bounded element assertion.</summary>
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(5);

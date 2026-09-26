@@ -380,6 +380,42 @@ public sealed class ProtoContainerResourceTests
         });
     }
 
+    [Test]
+    public async Task Release_ShouldBoundTheWaitForAnInFlightStartAndRecordTheAbandonedOne()
+    {
+        // Audit 5 A5-55 (C-12): release sets the released flag, awaits the racing start under a
+        // bound, and records the start still running instead of returning as if nothing were.
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var container = new FakeContainer { StartGate = gate.Task };
+        var resource = new FakeResource(() => container);
+        var builder = new ProtoHostBuilder();
+        await using var host = builder.Build();
+        var context = await host.StartTestAsync("abandoned container start", TestMethods.Placeholder);
+        context.RegisterResource(ProtoResource.From(
+            "container:abandoned-start",
+            "container",
+            "Releases the container resource while its start is in flight",
+            (release, _) => resource.ReleaseAsync(release)));
+
+        var starting = resource.StartAsync().AsTask();
+        await container.Started!.Task;
+
+        var stopwatch = Stopwatch.StartNew();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        stopwatch.Stop();
+
+        var entry = host.Trace.Snapshot().Tests.Single().Entries
+            .Single(candidate => candidate.Kind == "container.start.abandoned");
+        Assert.Multiple(() =>
+        {
+            Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(30)),
+                "the release is bounded instead of hanging on the start");
+            Assert.That(starting.IsCompleted, Is.False, "the abandoned start is not adopted by the release");
+            Assert.That(entry.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(entry.Attributes["container.release_bound_ms"], Is.EqualTo("5000"));
+        });
+    }
+
     private sealed class ReadinessResource : ProtoContainerResource<FakeContainer>
     {
         public ReadinessResource(

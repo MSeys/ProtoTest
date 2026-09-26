@@ -163,11 +163,22 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
         }
     }
 
+    /// <summary>
+    /// Iterates the subscription's events. The enumerator disposes the previous event as it advances, so
+    /// <c>await foreach</c> without a per-element <c>using</c> does not leak a document and response per
+    /// event; the event currently yielded - and the last one - stay yours to use (and dispose), like an
+    /// event from <see cref="NextAsync"/>.
+    /// </summary>
     public async IAsyncEnumerator<GraphQLResponse> GetAsyncEnumerator(
         CancellationToken cancellationToken = default)
     {
+        GraphQLResponse? previous = null;
         while (await NextAsync(cancellationToken) is { } response)
+        {
+            previous?.Dispose();
+            previous = response;
             yield return response;
+        }
     }
 
     public async ValueTask DisposeAsync()

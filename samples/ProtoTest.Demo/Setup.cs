@@ -255,10 +255,11 @@ public sealed class Setup : ProtoTestAssembly
     }
 
     private static string ResolveDatabase(IServiceProvider provider, string fallback)
-        => provider.GetService<ProtoInfrastructureSettings>() is { } settings
-            && settings.Values.TryGetValue("ConnectionStrings:Northstar", out var connection)
-            ? connection
-            : fallback;
+        => ProtoApplication.ResolveSetting(
+               provider.GetRequiredService<IConfiguration>(),
+               provider.GetService<ProtoInfrastructureSettings>(),
+               "ConnectionStrings:Northstar")
+           ?? fallback;
 
     private static DbConnection CreateDatabaseConnection(string connectionString, bool postgres)
         => postgres

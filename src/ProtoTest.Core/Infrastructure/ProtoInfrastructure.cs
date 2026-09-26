@@ -1,6 +1,7 @@
 namespace ProtoTest.Core;
 
 using Microsoft.Extensions.Configuration;
+using ProtoTest.Core.Internal;
 
 /// <summary>
 /// Something the run provides for itself - a database, a broker, a storage emulator. The host starts
@@ -105,12 +106,14 @@ internal sealed record ProtoInfrastructureRegistration(
 {
     /// <summary>
     /// Whether every key this piece declares already has a configured value, so the environment
-    /// provides its addresses and the piece must not start and shadow them.
+    /// provides its addresses and the piece must not start and shadow them. Read through the shared
+    /// <see cref="ProtoEnvironment"/> evaluator with the capability declarations, so the two skip rules
+    /// cannot drift.
     /// </summary>
-    public bool IsSatisfiedBy(IConfiguration configuration)
+    public bool IsSatisfiedBy(IConfiguration configuration, IReadOnlySet<string> declaredKeys)
         => !AlwaysStart
-           && Settings.Count > 0
-           && Settings.All(key => !string.IsNullOrWhiteSpace(configuration[key]));
+           && ProtoEnvironment.IsSatisfied(
+               configuration, Settings, ProtoEnvironmentMode.AllConfigured, declaredKeys);
 }
 
 /// <summary>The infrastructure pieces the environment already satisfies, so the host skips them.</summary>

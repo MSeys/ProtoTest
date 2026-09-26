@@ -39,7 +39,6 @@ internal sealed class ReadinessProbeInfrastructure : IProtoInfrastructure, IProt
     public async ValueTask StartAsync(CancellationToken cancellationToken = default)
     {
         var timeout = _timeoutOverride ?? _options.Timeout;
-        _options.Validate();
         var result = await ProtoReadiness.WaitAsync(Name, _probe, timeout, _options.Interval, cancellationToken).ConfigureAwait(false);
         _evidence = new Dictionary<string, string?>(StringComparer.Ordinal)
         {

@@ -12,7 +12,5 @@ internal sealed class ProtoTestTimeProvider(ProtoClock runClock) : TimeProvider
     public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Local;
 
     public override DateTimeOffset GetUtcNow()
-        => ProtoRequestClock.Current?.GetUtcNow()
-            ?? ProtoTestLifecycle.TryGetCurrentContext?.Clock.GetUtcNow()
-            ?? runClock.GetUtcNow();
+        => ProtoAmbient.Clock?.GetUtcNow() ?? runClock.GetUtcNow();
 }

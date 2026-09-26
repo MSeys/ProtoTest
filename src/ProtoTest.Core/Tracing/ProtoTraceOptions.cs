@@ -17,6 +17,24 @@ public sealed class ProtoTraceOptions
     public IList<string> ActivitySources { get; } = new List<string>();
 
     /// <summary>
+    /// Explicit facts about the environment the run executed in - the CI build and run it came from -
+    /// recorded with the run as <c>environment.{key}</c> attributes on its trace and as run-metadata
+    /// items in its reports. A key must not be empty and must not collide with a built-in environment
+    /// fact (<c>runtime</c>, <c>os</c>, <c>processArchitecture</c>, <c>osArchitecture</c>); values are
+    /// recorded as-is, so record only what may travel in a trace.
+    /// </summary>
+    public IDictionary<string, string> RunMetadata { get; } = new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Names of environment variables lifted into <see cref="RunMetadata"/>, such as
+    /// <c>GITHUB_RUN_ID</c> on GitHub Actions. They are read once, when the host is built; a variable
+    /// that is unset or empty contributes nothing, so a local run records no metadata. An explicit
+    /// <see cref="RunMetadata"/> entry with the same name wins; a name must not be empty or collide with
+    /// a built-in environment fact.
+    /// </summary>
+    public IList<string> RunMetadataEnvironmentVariables { get; } = new List<string>();
+
+    /// <summary>
     /// Records where in the suite's code each operation started (<c>code.file.path</c>, <c>code.line.number</c>,
     /// <c>code.function.name</c>), read from the stack and the suite's symbols. On by default.
     /// </summary>

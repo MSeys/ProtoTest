@@ -283,11 +283,21 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
         }
     }
 
-    public ValueTask ReleaseAsync(ProtoResourceReleaseContext context) => DisposeAsync();
+    public ValueTask ReleaseAsync(ProtoResourceReleaseContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return ReleaseCoreAsync(context.Trace, context.CancellationToken);
+    }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync() => ReleaseCoreAsync(trace: null, cancellationToken: CancellationToken.None);
+
+    /// <summary>How long a release waits for an in-flight start before recording it as abandoned.</summary>
+    private static readonly TimeSpan AbandonedStartBound = TimeSpan.FromSeconds(5);
+
+    private async ValueTask ReleaseCoreAsync(IProtoTraceWriter? trace, CancellationToken cancellationToken)
     {
         TContainer? container;
+        Task? inFlight;
         lock (_containerGate)
         {
             if (_released != 0)
@@ -303,7 +313,8 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
             Volatile.Write(ref _started, 0);
 
             // A settled start is replaced by the next ownership period's start; an in-flight start
-            // is left to observe the release and fault itself.
+            // is awaited below, bounded, so a stuck start cannot hang the release.
+            inFlight = _startTask;
             if (_startTask is { IsCompletedSuccessfully: true })
             {
                 _startTask = null;
@@ -312,7 +323,45 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
 
         if (container is not null)
         {
-            await container.DisposeAsync();
+            await container.DisposeAsync().ConfigureAwait(false);
+        }
+
+        if (inFlight is null || inFlight.IsCompleted)
+        {
+            return;
+        }
+
+        // Release must terminate: wait for the racing start under a small bound, then record the start
+        // that outlived its release instead of returning as if nothing were still running (audit A5-55).
+        using var bound = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        bound.CancelAfter(AbandonedStartBound);
+        try
+        {
+            await inFlight.WaitAsync(bound.Token).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            if (exception is OperationCanceledException && bound.IsCancellationRequested)
+            {
+                trace?.WriteEvent(
+                    "container.start.abandoned",
+                    $"Container start abandoned after {AbandonedStartBound.TotalSeconds:0.#}s",
+                    "ProtoTest.Testcontainers",
+                    ProtoTracePhase.Teardown,
+                    ProtoTraceOutcome.Failed,
+                    new Dictionary<string, string?>
+                    {
+                        ["container.id"] = Id,
+                        ["container.type"] = GetType().Name,
+                        ["container.release_bound_ms"] = AbandonedStartBound.TotalMilliseconds.ToString(
+                            System.Globalization.CultureInfo.InvariantCulture)
+                    },
+                    exception);
+                return;
+            }
+
+            // The racing start's own failure (the release-won ObjectDisposedException, say) was already
+            // reported to whoever awaited the start; the release does not adopt it.
         }
     }
 }

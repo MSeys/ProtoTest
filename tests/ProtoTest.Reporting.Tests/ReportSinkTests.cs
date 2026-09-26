@@ -167,6 +167,36 @@ public sealed class ReportSinkTests
     }
 
     [Test]
+    public async Task HtmlSink_ShouldRenderRunMetadataAsItsOwnSection()
+    {
+        // A5.15 (Audit 5, A5-83): the run metadata a suite records reaches the shipped report, in its
+        // own section, one root item per key.
+        var directory = CreateTempDirectory();
+        var path = Path.Combine(directory, "report.html");
+        try
+        {
+            var items = new[]
+            {
+                new ProtoReportItem("Run", "Metadata", "GITHUB_RUN_ID",
+                    ProtoReportItemKinds.RunMetadata, ProtoReportStatus.Info, Message: "123456")
+            };
+            var sink = new HtmlReportSink(new HtmlReportSinkOptions { OutputPath = path });
+
+            await sink.ExportAsync(items);
+
+            var html = await File.ReadAllTextAsync(path);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(html, Does.Contain("data-report-section data-kind=\"run_metadata\""));
+                Assert.That(html, Does.Contain(">Run metadata</h3>"));
+                Assert.That(html, Does.Contain("GITHUB_RUN_ID"));
+                Assert.That(html, Does.Contain("123456"));
+            }
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
     public async Task HtmlSink_ShouldEncodeContentAndRenderSemanticStyling()
     {
         var directory = CreateTempDirectory();

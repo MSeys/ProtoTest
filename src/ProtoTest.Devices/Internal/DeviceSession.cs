@@ -14,6 +14,8 @@ internal sealed class DeviceSession : IAsyncDisposable
 {
     private const int MaxLoggedFrames = 50;
     private static readonly TimeSpan DefaultExpectTimeout = TimeSpan.FromSeconds(5);
+    /// <summary>How long a disconnect (or the test's release) waits for an in-flight connect.</summary>
+    private static readonly TimeSpan ConnectReleaseBound = TimeSpan.FromSeconds(5);
 
     private readonly ProtoExecutionContext _context;
     private readonly string _clientName;
@@ -243,8 +245,9 @@ internal sealed class DeviceSession : IAsyncDisposable
         try
         {
             // The shared connect is not tied to one caller's token: a caller that stops waiting must
-            // not cancel the connection another send is about to use.
-            connection = await _transport.ConnectAsync(_endpoint, CancellationToken.None).ConfigureAwait(false);
+            // not cancel the connection another send is about to use. The session's context rides the
+            // connect so an in-process transport does not re-read ambient state on another flow.
+            connection = await _transport.ConnectAsync(_context, _endpoint, CancellationToken.None).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -293,7 +296,21 @@ internal sealed class DeviceSession : IAsyncDisposable
         IProtoDeviceConnection connection;
         try
         {
-            connection = await pending.ConfigureAwait(false);
+            connection = await pending.WaitAsync(ConnectReleaseBound).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            // Release must terminate: a transport that never completes its connect is recorded and
+            // left behind instead of hanging the test's teardown (audit A5-62).
+            _context.Trace.WriteEvent(
+                "device.disconnect.abandoned",
+                $"Device · {_endpoint.DeviceId} · disconnect abandoned after {ConnectReleaseBound.TotalSeconds:0.#}s",
+                ProtoDeviceDiagnostics.TraceSource,
+                outcome: ProtoTraceOutcome.Failed,
+                attributes: State(connected: false),
+                entityKind: ProtoTraceEntityKinds.Device,
+                entityId: EntityId);
+            return;
         }
         catch (Exception)
         {

@@ -281,6 +281,9 @@ All ProtoTest packages share one version; breaking API changes are called out be
 - A sink registered directly in the service collection is exported at run end like one added with
   `AddSink`; the export hook is registered once by the host build, so mixing both paths still exports
   once.
+- `[Application]` runs at `ProtoAttributeOrder.Application` (`int.MinValue`), before every other setup
+  attribute, so a web session declaration or a login always sees the selected application; a session
+  created before the selection falls back to its own name and cannot resolve an address.
 - A failed run start unwinds every completed run hook that owns state, in reverse, so a suite-setup
   hook's `BeforeRunAsync` state is released by its `AfterRunAsync`; gates, reports and the trace
   archive stay silent for a run that never started.
@@ -387,6 +390,21 @@ All ProtoTest packages share one version; breaking API changes are called out be
   mapped port with the run's readiness policy. A run that configures the key skips the container;
   `TryStart` reports why a container could not start so a suite can skip without a runtime; a
   containerized application advertises no in-process server, so `[RequiresInProcess]` tests skip.
+- `ProtoApplication.ResolveSetting(configuration, settings, key)` is public: one
+  published-settings-over-configuration precedence for suites that read an application setting, with a
+  blank published value ignored.
+- `ProtoAttributeOrder` names the setup order bands (`Application`, `SessionDeclaration`, `Default`), so
+  an attribute sequences itself against the built-ins without raw numbers and the deliberate bands live
+  in one place.
+- A trace can name the CI run that produced it: `ConfigureTracing` gains `RunMetadata` (explicit
+  key/value facts) and `RunMetadataEnvironmentVariables` (names read from the process environment, such
+  as `GITHUB_RUN_ID`), captured once when the host is built. Each fact is recorded as
+  `environment.{key}` on the run resource in `spans.json` and as a `run_metadata` report item
+  (`ProtoReportItemKinds.RunMetadata`); an unset variable contributes nothing, so a local run's trace
+  and report are unchanged, and a key that would hide a built-in `environment.*` fact fails the build.
+- `IProtoDeviceTransport.ConnectAsync(context, endpoint, cancellationToken)` has a default
+  implementation forwarding to the context-free overload; the in-process transport overrides it, so a
+  connect from a flow without ambient context still reaches the registered application.
 - A readiness timeout names the probed URL and the last error; a rejected GraphQL subscription names
   the server's errors; an oversized WebSocket frame fails naming the address and limit; a stuck
   Selenium pump is reported (`web.selenium.executor_abandoned`) instead of abandoned silently; a
@@ -404,6 +422,20 @@ All ProtoTest packages share one version; breaking API changes are called out be
 - One wait timing per session: assertions poll at `IWebBackend.PollInterval` (Selenium's `PollInterval`,
   the shared default otherwise), and REST request-URI validation uses the shared wording
   (`REST request URI '…' must be an absolute HTTP or HTTPS URI`).
+- `ProtoApplicationResolution.ResolveState` returns only the state the `[Application]` attribute set
+  during the test's lifecycle; a context started without the resolved attribute reports "No application
+  is selected" instead of re-reading the method. Adapters pass the resolved attributes, so suite
+  behavior is unchanged.
+- An untraced GraphQL response tolerates a null execution like the REST contract, and enumerating a
+  subscription disposes each event as it advances (the final event stays the caller's).
+- Container and device release are bounded: an in-flight container start is awaited for at most five
+  seconds and recorded as `container.start.abandoned`; a device connect is awaited the same way and
+  recorded as `device.disconnect.abandoned`; normal release with nothing in flight is unchanged.
+- Framework routes (`/_…`, `/.well-known…`) are never page-inventoried, and a table row's shape
+  assertion uses the table's own context instead of the ambient one.
+- The HTTP response and attachment defaults bind `ProtoTest:Http:Responses` through the shared options
+  registration when no explicit registration exists; a resolver that returns null still means capture
+  is opt-in, so attachments stay off unless asked for.
 
 ### Removed
 
@@ -414,6 +446,10 @@ All ProtoTest packages share one version; breaking API changes are called out be
   destination aggregation, and the Messaging protocol descriptor no longer declares a coverage category.
   The `messaging.*` observations remain trace evidence for a collector a suite registers; no
   `ProtoTest.Messaging` collector ships, and destinations are deliberately not a coverage category.
+- `ProtoHttpAssertions<TResponse, TAssertions>` loses the unused `TAssertions` parameter
+  (`ProtoHttpAssertions<TResponse>`); unreleased 1.1 plumbing, a deriver updates one base-type argument.
+- `WebTiming` and `WebNames` are internal (web timing defaults and artifact naming are plumbing, not
+  consumer promises); the web pages teach the public surface.
 
 ### Breaking
 

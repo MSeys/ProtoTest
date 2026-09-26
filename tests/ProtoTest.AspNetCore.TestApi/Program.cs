@@ -95,6 +95,10 @@ public sealed class Program
             .WithMetadata(new ProducesResponseTypeMetadata(StatusCodes.Status200OK, typeof(string), ["text/html"]));
         app.MapGet("/portal/legacy/old", () => Results.Content("<h1>Old</h1>", "text/html"))
             .WithMetadata(new ProducesResponseTypeMetadata(StatusCodes.Status200OK, typeof(string), ["text/html"]));
+        app.MapGet("/_framework/page", () => Results.Content("<h1>Framework</h1>", "text/html"))
+            .WithMetadata(new ProducesResponseTypeMetadata(StatusCodes.Status200OK, typeof(string), ["text/html"]));
+        app.MapGet("/.well-known/probe", () => Results.Content("<h1>Well known</h1>", "text/html"))
+            .WithMetadata(new ProducesResponseTypeMetadata(StatusCodes.Status200OK, typeof(string), ["text/html"]));
         app.Map("/any-method", async context =>
             {
                 context.Response.ContentType = "text/html";

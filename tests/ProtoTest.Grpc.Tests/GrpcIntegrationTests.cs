@@ -636,7 +636,7 @@ public sealed class GrpcIntegrationTests
         builder.AddApplication("Echo", app => app.AddGrpc(grpc => grpc.AddClient("Default")));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc transport", ApplicationTransportTestMethod());
+        var context = await host.StartTestAsync("grpc transport", ApplicationTransportTestMethod(), [new ApplicationAttribute("Echo")]);
         var client = context.Grpc();
 
         var reply = await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "transport" });
@@ -676,7 +676,7 @@ public sealed class GrpcIntegrationTests
         builder.AddApplication("Echo", _ => { });
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc fallback options", ApplicationTransportTestMethod());
+        var context = await host.StartTestAsync("grpc fallback options", ApplicationTransportTestMethod(), [new ApplicationAttribute("Echo")]);
         var client = context.Grpc("Unregistered");
 
         var reply = await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "options" });
@@ -711,7 +711,7 @@ public sealed class GrpcIntegrationTests
         builder.AddApplication("Echo", app => app.AddGrpc());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc transport without address", ApplicationTransportTestMethod());
+        var context = await host.StartTestAsync("grpc transport without address", ApplicationTransportTestMethod(), [new ApplicationAttribute("Echo")]);
         var client = context.Grpc();
 
         var exception = Assert.ThrowsAsync<InvalidOperationException>(
@@ -739,7 +739,7 @@ public sealed class GrpcIntegrationTests
         builder.AddApplication("Echo", app => app.AddGrpc(grpc => grpc.AddClient("Default")));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc published address", ApplicationTransportTestMethod());
+        var context = await host.StartTestAsync("grpc published address", ApplicationTransportTestMethod(), [new ApplicationAttribute("Echo")]);
         var client = context.Grpc();
 
         var reply = await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "published" });
@@ -759,7 +759,7 @@ public sealed class GrpcIntegrationTests
         builder.AddApplication("Echo", app => app.AddGrpc(grpc => grpc.AddClient("Default")));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc missing address", ApplicationTransportTestMethod());
+        var context = await host.StartTestAsync("grpc missing address", ApplicationTransportTestMethod(), [new ApplicationAttribute("Echo")]);
         var client = context.Grpc();
 
         var exception = Assert.ThrowsAsync<InvalidOperationException>(

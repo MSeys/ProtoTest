@@ -7,8 +7,9 @@ using ProtoTest.Json;
 /// <summary>
 /// Row-level shape assertions for record models and table rows. A row serializes with its property
 /// names (record models) or its leaf header names (table rows) and is matched by the same
-/// <see cref="ProtoShapeAssertion"/> the protocol integrations use, traced on the ambient
-/// <see cref="Proto.Context"/> like every other assertion that runs inside a test body.
+/// <see cref="ProtoShapeAssertion"/> the protocol integrations use. A model row traces on the ambient
+/// <see cref="Proto.Context"/>; a table row traces on the context its table carries, so a row asserted
+/// from a helper flow that does not see the ambient context still lands under the owning test.
 /// </summary>
 public static class SheetModelAssertions
 {
@@ -27,7 +28,7 @@ public static class SheetModelAssertions
         ArgumentNullException.ThrowIfNull(row);
         ArgumentNullException.ThrowIfNull(expectedShape);
         var actual = JsonSerializer.SerializeToElement(row, options);
-        AssertShape(actual, typeof(TRow).Name, typeof(TRow).Name, expectedShape, options);
+        AssertShape(actual, typeof(TRow).Name, typeof(TRow).Name, expectedShape, options, Proto.Context);
         return row;
     }
 
@@ -50,18 +51,20 @@ public static class SheetModelAssertions
 
     /// <summary>
     /// The one traced shape assertion behind the model-row extension and
-    /// <see cref="ProtoTableRowAssertions.MatchShape"/>. A matcher failure is rethrown as a
-    /// <see cref="SpreadsheetAssertionException"/> whose message starts with the row's subject, with
-    /// the matcher exception - and its mismatch list - as the inner exception.
+    /// <see cref="ProtoTableRowAssertions.MatchShape"/>. The caller supplies the context the
+    /// assertion belongs to: the ambient one for a model row, the owning table's for a table row. A
+    /// matcher failure is rethrown as a <see cref="SpreadsheetAssertionException"/> whose message
+    /// starts with the row's subject, with the matcher exception - and its mismatch list - as the
+    /// inner exception.
     /// </summary>
     internal static void AssertShape(
         JsonElement actual,
         string rowType,
         string subject,
         object expectedShape,
-        JsonSerializerOptions? options)
+        JsonSerializerOptions? options,
+        ProtoExecutionContext? context)
     {
-        var context = Proto.Context;
         try
         {
             ProtoShapeAssertion.Assert(

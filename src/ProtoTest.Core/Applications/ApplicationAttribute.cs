@@ -14,6 +14,9 @@ public sealed class ApplicationAttribute : ProtoAttribute
             ? throw new ArgumentException("An application name is required.", nameof(name))
             : name;
         Bindings = Parse(clients ?? []);
+        // The selection is a prerequisite for every other attribute: a session declaration or a login
+        // reads it, so it runs before anything else.
+        Order = ProtoAttributeOrder.Application;
     }
 
     /// <summary>Gets the application name.</summary>
@@ -22,10 +25,16 @@ public sealed class ApplicationAttribute : ProtoAttribute
     /// <summary>Gets the protocol-to-client bindings, keyed by protocol name.</summary>
     public IReadOnlyDictionary<string, string> Bindings { get; }
 
+    /// <summary>
+    /// Creates the one <see cref="ProtoApplicationState"/> a test's selection produces. The attribute's
+    /// <see cref="BeforeTestAsync"/> is the only writer, so the binding rules live here once.
+    /// </summary>
+    internal ProtoApplicationState CreateState() => new(Name, Bindings);
+
     public override Task BeforeTestAsync(ProtoExecutionContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        context.SetContext(new ProtoApplicationState(Name, Bindings));
+        context.SetContext(CreateState());
         return Task.CompletedTask;
     }
 

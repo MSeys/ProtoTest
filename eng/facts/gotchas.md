@@ -37,6 +37,11 @@ audit plan.
   until the setup adds `.AddEnvironmentVariables()`. Without it the containers still start and the
   product still reads the exported addresses, so a green run proves nothing about the mode. (Found by
   the OpenCSMS run, fixed in its `2cb949f`; R1a 1.7.)
+- **Run metadata is captured at `Build()` straight from the process environment, not from the suite's
+  configuration.** `ProtoTraceOptions.RunMetadata`/`RunMetadataEnvironmentVariables` (A5.15) read once
+  when the host is built; a named variable that is unset or empty contributes nothing, an explicit value
+  wins, a built-in `environment.*` key is rejected, and values are recorded as-is - list only variables
+  safe to carry in a trace.
 
 ## Capabilities and registration
 
@@ -197,6 +202,11 @@ last error.
   `device.connected = false` and emits `device.disconnect`, so a test that never disconnects still ends
   with a final disconnected state; an explicit `DisconnectAsync` then a send reconnects and records
   both connects.
+- **Container and device release are bounded.** An in-flight container start is awaited at most five
+  seconds (`container.start.abandoned`), and a device connect the same way
+  (`device.disconnect.abandoned`); normal release with nothing in flight is unchanged.
+  `IProtoDeviceTransport.ConnectAsync(context, endpoint, cancellationToken)` carries the context, so an
+  in-process connect works from a flow without ambient `Proto.Context`.
 - **Selenium actions verify the resulting state.** `Check`/`SelectOption` fail with
   `WebActionabilityException` when the click did not take, matching Playwright; a stub-driver test is
   the proof where no real driver is installed.
@@ -205,6 +215,13 @@ last error.
 - **Sheet record models construct through the constructor their columns map**, and a throwing
   constructor guard propagates with its original stack; an unmapped constructor parameter fails naming
   it. In `ProtoTest.Data`, a declared optional constructor-parameter default wins over a generated value.
+- **Framework routes are never pages, and a table row asserts on its own context.** `/_…` and
+  `/.well-known…` paths are excluded from the in-process page inventory whatever their content type,
+  and `ProtoTableRow`'s shape assertion uses the table's context, so it works on a flow without ambient
+  `Proto.Context`.
+- **Some caches are process-lifetime by design.** The source-locator maps,
+  `ProtoReadiness.SharedHttpClient` and `ProtoDocumentSource.SharedClient` are bounded by the
+  assembly/source set and are not evicted (A5-27 decision; the register records the scope limit).
 
 ## Tests and parallelism
 
@@ -222,6 +239,10 @@ last error.
   `SingleConnectionListener`) outside that project, so `GetFreePort` or `LazyTemporaryTrace` cannot
   drift back either (audit TST-2/A5-64). The rule is a deny list, not a shape scan: a helper renamed
   completely away from those roots (say `AcquirePort`) is not detected.
+- **A worktree checkout has no built SPA.** `samples/ProtoTest.SampleApp/Ui/dist` is untracked, so the
+  demo's console journeys skip in a worktree and a green worktree gate does not cover them; run those
+  tests in the main checkout (or build the console there) before trusting a gate on setup or attribute
+  changes.
 - The MTP runs carry per-project run-test minimums in `eng/test.ps1`: TUnit 14 (its
   `--minimum-expected-tests` counts tests that actually ran, so the deliberate adapter skips are
   excluded from the 15 discovered) and xUnit.net v3 17 (the JUnit total it writes includes the skip).

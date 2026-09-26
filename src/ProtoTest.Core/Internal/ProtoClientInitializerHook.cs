@@ -55,9 +55,11 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
         var resolved = new List<InitializedClient>();
 
         // An unscoped provider serves every chain that names it, so it runs once per test and the
-        // chains after the first reuse the client it registered. Without the memo, two protocols
-        // sharing a client name would each invoke it and the second registration would conflict.
-        var fallbacks = new Dictionary<IProtoClientInitializer, InitializedClient?>(ReferenceEqualityComparer.Instance);
+        // chains after the first reuse the client it registered. The memo is keyed by the provider
+        // *and the chain's own name*, so a reused entry can only ever be the registration made for
+        // that name - a differently named chain can never be served another chain's client (A5-24).
+        var fallbacks = new Dictionary<(IProtoClientInitializer Initializer, string Name), InitializedClient?>(
+            FallbackKeyComparer.Instance);
         foreach (var chain in chains)
         {
             await InitializeChainAsync(context, chain, resolved, fallbacks);
@@ -84,7 +86,7 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
         ProtoExecutionContext context,
         ClientChain chain,
         List<InitializedClient> resolved,
-        Dictionary<IProtoClientInitializer, InitializedClient?> fallbacks)
+        Dictionary<(IProtoClientInitializer Initializer, string Name), InitializedClient?> fallbacks)
     {
         var clientId = $"client:{chain.ClientType.FullName}:{chain.ScopedName}";
         var clientName = $"Client {chain.ClientType.Name} '{chain.ScopedName}'";
@@ -105,8 +107,9 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
             try
             {
                 // An unscoped provider has already served its one invocation for this test when a
-                // previous chain reached it: reuse what it registered, or its decline, as it stands.
-                if (initializer.Protocol is null && fallbacks.TryGetValue(initializer, out var cached))
+                // previous chain reached it for the same name: reuse what it registered, or its
+                // decline, as it stands.
+                if (initializer.Protocol is null && fallbacks.TryGetValue((initializer, chain.Name), out var cached))
                 {
                     if (cached.HasValue)
                     {
@@ -134,7 +137,7 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
                         ProtoClientResolution.ScopedName(initializer.Protocol, initializer.Name));
                     if (initializer.Protocol is null)
                     {
-                        fallbacks[initializer] = entry;
+                        fallbacks[(initializer, chain.Name)] = entry;
                     }
 
                     resolved.Add(entry);
@@ -144,7 +147,7 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
 
                 if (initializer.Protocol is null)
                 {
-                    fallbacks[initializer] = null;
+                    fallbacks[(initializer, chain.Name)] = null;
                 }
             }
             catch (Exception exception)
@@ -175,6 +178,24 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
         string Name,
         string ScopedName,
         IReadOnlyList<IProtoClientInitializer> Providers);
+
+    // The memo identity: the provider instance plus the chain name it served, compared the same way
+    // the chain join compares names (case-insensitively), because client names are case-insensitive.
+    private sealed class FallbackKeyComparer : IEqualityComparer<(IProtoClientInitializer Initializer, string Name)>
+    {
+        public static FallbackKeyComparer Instance { get; } = new();
+
+        public bool Equals(
+            (IProtoClientInitializer Initializer, string Name) x,
+            (IProtoClientInitializer Initializer, string Name) y)
+            => ReferenceEquals(x.Initializer, y.Initializer)
+               && StringComparer.OrdinalIgnoreCase.Equals(x.Name, y.Name);
+
+        public int GetHashCode((IProtoClientInitializer Initializer, string Name) obj)
+            => HashCode.Combine(
+                System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj.Initializer),
+                StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Name));
+    }
 
     private readonly record struct InitializedClient(string Name, Type ClientType, string RegisteredName);
 }

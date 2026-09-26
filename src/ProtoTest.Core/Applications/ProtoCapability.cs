@@ -103,18 +103,20 @@ internal sealed record ProtoConditionalCapability(
     /// Whether the run's environment makes this declaration unnecessary. A key counts as provided when
     /// it has a configured value or a registered infrastructure piece declares it - including a piece
     /// the build skips because configuration already provides its keys, so the predicate is the same
-    /// before and after the piece starts.
+    /// before and after the piece starts. Both conditions read the shared
+    /// <see cref="ProtoEnvironment"/> evaluator, the same one the infrastructure-skip rule uses.
     /// </summary>
     public bool IsDropped(IConfiguration configuration, IReadOnlySet<string> declaredKeys)
-        => Condition switch
+        => Keys.Count > 0 && (Condition switch
         {
             ProtoCapabilityCondition.UnlessConfigured =>
-                Keys.Count > 0 && Keys.All(key => !string.IsNullOrWhiteSpace(configuration[key])),
+                ProtoEnvironment.IsSatisfied(
+                    configuration, Keys, ProtoEnvironmentMode.AllConfigured, declaredKeys),
             ProtoCapabilityCondition.WhenProvided =>
-                Keys.Count > 0 && !Keys.Any(key =>
-                    !string.IsNullOrWhiteSpace(configuration[key]) || declaredKeys.Contains(key)),
+                !ProtoEnvironment.IsSatisfied(
+                    configuration, Keys, ProtoEnvironmentMode.AnyProvided, declaredKeys),
             _ => false
-        };
+        });
 
     /// <summary>The reason recorded when this declaration decides a drop.</summary>
     public string DropReason => Condition switch

@@ -98,6 +98,20 @@ public sealed class ProvidedAddressCapabilityTests
     }
 
     [Test]
+    public async Task UseRabbitMq_WhenDeclarationsExistButNoAddressIsProvided_ShouldStillDropTheBrokerCapability()
+    {
+        var builder = BuilderWith();
+        builder.AddMessaging(messaging => messaging.Declare("suite.owned").UseRabbitMq());
+
+        await using var host = builder.Build();
+
+        Assert.That(
+            host.HasCapability(ProtoCapabilityKinds.Broker),
+            Is.False,
+            "a declaration changes no address rule: without a configured key or a container there is no broker to declare on");
+    }
+
+    [Test]
     public async Task AddMessaging_WithoutAnAdapter_ShouldNotRegisterTheBrokerCapability()
     {
         var builder = BuilderWith();

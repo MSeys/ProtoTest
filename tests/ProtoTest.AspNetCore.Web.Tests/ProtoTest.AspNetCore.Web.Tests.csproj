@@ -5,6 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="NUnit" />
     <PackageReference Include="NUnit.Analyzers">
@@ -12,25 +13,23 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="NUnit3TestAdapter" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ProtoTest.Sql\ProtoTest.Sql.csproj" />
-    <ProjectReference Include="..\..\src\ProtoTest.Sql.EntityFrameworkCore\ProtoTest.Sql.EntityFrameworkCore.csproj" />
-    <ProjectReference Include="..\..\src\ProtoTest.Sql.Testcontainers\ProtoTest.Sql.Testcontainers.csproj" />
+    <ProjectReference Include="..\ProtoTest.AspNetCore.TestApi\ProtoTest.AspNetCore.TestApi.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.NUnit\ProtoTest.NUnit.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Rest\ProtoTest.Rest.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Testcontainers\ProtoTest.Testcontainers.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Web\ProtoTest.Web.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Web.Playwright\ProtoTest.Web.Playwright.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\NUnitParallelization.cs" Link="NUnitParallelization.cs" />
-    <Using Include="NUnit.Framework" />
-  </ItemGroup>
-
 
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.TestSupport\ProtoTest.TestSupport.csproj" />
   </ItemGroup>
+
   <ItemGroup>
+    <Using Include="NUnit.Framework" />
   </ItemGroup>
+
 </Project>

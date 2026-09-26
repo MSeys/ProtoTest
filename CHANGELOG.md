@@ -367,6 +367,26 @@ All ProtoTest packages share one version; breaking API changes are called out be
   propagates with its original stack.
 - Optional constructor-parameter defaults win over generated values in `ProtoTest.Data`, so a declared
   default (including `null`) is honored.
+- Messaging destinations a suite owns can be declared with `Declare(...)` on the `AddMessaging` chain
+  or under `ProtoTest:Messaging:DeclaredDestinations`: the adapter creates them during test setup,
+  before any tap binds, so a suite that owns the broker and publishes its own events works from the
+  documented path. RabbitMQ creates a fanout, durable, non-auto-delete exchange once per run and
+  leaves an existing one as it is; the in-memory broker treats a declaration as a no-op.
+  `IProtoMessageBroker.DeclareAsync` is the adapter seam and its default implementation refuses,
+  naming the adapter, instead of pretending.
+- `AddRunSetup(name, delegate)` registers a run-scoped setup step: infrastructure that starts at its
+  registration position — after the pieces registered before it, so it reads the connection string a
+  container published — over the existing start/stop machinery. The step receives
+  `ProtoRunSetupContext` (`Settings`, `Configuration`, the run's `CancellationToken`), owns nothing to
+  release (stop and dispose never call it again), and a throwing step fails the run start with its own
+  exception and leaves the host retryable, like failing infrastructure.
+- An application under test runs in its own container image: `ApplicationContainer`
+  (`ProtoTest.Testcontainers`) starts the image as run infrastructure
+  (`AddInfrastructure(api, api.BaseUrlKey)`), maps the port the application listens on, publishes
+  `http://{hostname}:{mapped port}` as `ProtoTest:Applications:{application}:BaseUrl`, and waits for the
+  mapped port with the run's readiness policy. A run that configures the key skips the container;
+  `TryStart` reports why a container could not start so a suite can skip without a runtime; a
+  containerized application advertises no in-process server, so `[RequiresInProcess]` tests skip.
 - A readiness timeout names the probed URL and the last error; a rejected GraphQL subscription names
   the server's errors; an oversized WebSocket frame fails naming the address and limit; a stuck
   Selenium pump is reported (`web.selenium.executor_abandoned`) instead of abandoned silently; a
@@ -378,8 +398,9 @@ All ProtoTest packages share one version; breaking API changes are called out be
 - TUnit parameterized rows record their arguments in the trace name (`…MethodName[1]`) instead of the
   method name alone, so parallel rows stay distinguishable.
 - Failure evidence is one record: gRPC and messaging record `ProtoFailureDiagnostics` through the
-  protocol-identified guard (`{protocol}.diagnostics.failed`), so a non-`RpcException` and a failed
-  publish/await are observations.
+  protocol-identified guard, so a non-`RpcException` and a failed publish/await are observations; the
+  capture-failure event is `{protocol}.diagnostics.failed` with the protocol's trace source (the old
+  `http.diagnostics.failed`/`ProtoTest.Http` literal is gone).
 - One wait timing per session: assertions poll at `IWebBackend.PollInterval` (Selenium's `PollInterval`,
   the shared default otherwise), and REST request-URI validation uses the shared wording
   (`REST request URI '…' must be an absolute HTTP or HTTPS URI`).

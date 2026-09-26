@@ -51,7 +51,7 @@ public async Task ...() { ... }
 
 It probes the installed browser before the lifecycle starts, without launching one, and skips with a reason naming Playwright and the install options; `InstallBrowsers = true` never skips. Selenium has no equivalent probe, so its tests combine `[RequiresCapability(ProtoCapabilityKinds.Browser, CapabilityName = "Selenium")]` with a try/catch around the first session. Both patterns are documented under [skip conditions](../../foundation/skip-conditions.md#requiring-a-playwright-browser) and summarized under [Skip](#skip).
 
-A session follows its application's address: `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with `ProtoTest:Applications:{application}:Endpoints:{endpoint}`. Infrastructure that started an application with the run advertises that same setting, so a browser journey can run against a standalone instance without fixture code.
+A session follows its application's address: `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with `ProtoTest:Applications:{application}:Endpoints:{endpoint}`. Infrastructure that started an application with the run advertises that same setting, so a browser journey can run against a standalone instance, an application image in its own container or an in-process loopback listener without fixture code ([ASP.NET Core](../aspnetcore.md#hosting-a-browser-journey) has both recipes).
 
 ## Registering
 

@@ -108,6 +108,9 @@ last error.
 - **Containers must declare every key they fill.** `AddInfrastructure` skips only when *all* declared
   keys are configured; a missing one starts the container anyway (a configured CI without Docker then
   fails). Check the README recipes for all keys.
+- **A containerized application declares no `server` capability.** `ApplicationContainer` publishes an
+  address, not an in-process server: `[RequiresInProcess]` skips with its default reason, and a suite
+  needing the test host gives the published instance its own application name.
 
 ## Messaging
 
@@ -129,6 +132,14 @@ last error.
   failing setup/first publish. A callback that sets `RabbitMqOptions.ConnectionString` in code provides
   the address without a key and keeps the capability unconditional. An adapter registered with the
   key-less `UseBroker(factory)` overload keeps the unconditional declaration too.
+- **`Declare` creates the destinations the suite owns; `Tap` only binds them.** `Declare(...)` on the
+  `AddMessaging` chain (or `ProtoTest:Messaging:DeclaredDestinations`) is read by the messaging client
+  initializer before any tap is prepared; RabbitMQ declares each as a fanout, durable, non-auto-delete
+  exchange once per run (an existing one is left as is, a repeat is a no-op), and the in-memory broker
+  treats a declaration as a no-op. A refused declaration fails setup with the destination named; a tap
+  nobody declares still fails only the tests that await it. `IProtoMessageBroker.DeclareAsync` is the
+  adapter seam; its default throws `NotSupportedException` naming the adapter. (Canonical:
+  `RabbitMqTests.Declare_Should...`, `tests/ProtoTest.Messaging.Tests/MessagingDeclareTests.cs`.)
 - **A pre-bound destination still connects at test setup when the capability is present.** A destination
   whose exchange cannot be declared fails only the tests that await it, with the named error — not the
   whole class at setup — because each tap owns its channel.
@@ -223,6 +234,11 @@ last error.
   `ParallelScope.All` safe. The default id generator's random six-digit run prefix also keeps reruns
   against a persistent database collision-free. A shared fixture or a fixed identifier reintroduces the
   repeatability bug (REF-1).
+- **A test's setup runs inside the per-test transaction.** `ProtoTest.Sql` opens the connection and
+  begins the transaction before hooks and attributes run, so DDL in a test hook or body is rolled back
+  with the test (the postgres-ef trial: a table created in one test is gone in the next). Run-owned
+  state goes through `AddRunSetup(name, delegate)`, registered after the piece that publishes its
+  address; the round trip is `tests/ProtoTest.Sql.Tests/RunSetupSchemaTests.cs`.
 
 ## Versioning, feeds and gates
 

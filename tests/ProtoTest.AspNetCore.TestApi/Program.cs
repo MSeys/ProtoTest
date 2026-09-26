@@ -32,7 +32,13 @@ public sealed class ScopedProbe : IScopedProbe, IDisposable
 
 public sealed class Program
 {
-    public static void Main(string[] args)
+    public static void Main(string[] args) => CreateApp(args).Run();
+
+    /// <summary>
+    /// Builds the application without running it, so a suite can host it on its own loopback listener
+    /// for a browser journey (<c>Program.CreateApp(["--urls", "http://127.0.0.1:0"])</c>).
+    /// </summary>
+    public static WebApplication CreateApp(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
         builder.Services.AddSingleton<ITestMessageService, TestMessageService>();
@@ -124,7 +130,7 @@ public sealed class Program
                     ["text/html"]));
         }
 
-        app.Run();
+        return app;
     }
 }
 

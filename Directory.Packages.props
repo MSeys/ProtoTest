@@ -30,6 +30,7 @@
     <PackageVersion Include="OpenTelemetry.Exporter.InMemory" Version="1.18.0" />
     <PackageVersion Include="RabbitMQ.Client" Version="7.2.2" />
     <PackageVersion Include="Selenium.WebDriver" Version="4.49.0" />
+    <PackageVersion Include="Testcontainers" Version="4.15.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
     <PackageVersion Include="Testcontainers.RabbitMq" Version="4.15.0" />
     <PackageVersion Include="TUnit" Version="1.66.0" />

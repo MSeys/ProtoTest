@@ -88,6 +88,15 @@ and fills each declared key with `IProtoConnectionInfrastructure.ConnectionStrin
 - Long waits go through readiness (`AddReadinessProbe` or `ProtoContainerResource.ReadyOn`), never a
   `Task.Delay` in setup.
 - Add a conditional path test (keys configured → not started, never owned) and an error-path test.
+- A run-scoped action that is not a piece — create a schema, seed a catalogue — registers with
+  `AddRunSetup(name, delegate)`: it starts at its registration position like a piece, reads the
+  settings the pieces before it published, and owns nothing to release. Use it over a run hook when the
+  step needs infrastructure's addresses, and over a test hook when its work must survive the per-test
+  transaction.
+- An application under test can be a piece too: `ApplicationContainer.Container(application, image, port)`
+  publishes its mapped address as the declared `ProtoTest:Applications:{application}:BaseUrl` and defaults
+  readiness to the mapped port; add `AddHttpReadiness` after it (canonical:
+  `tests/ProtoTest.AspNetCore.Web.Tests/Setup.cs`).
 
 ## Recipe: a product under test that resolves its addresses at use time
 

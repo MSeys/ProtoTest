@@ -8,6 +8,8 @@ description: "Run your ASP.NET Core application in-process with WebApplicationFa
 
 `ProtoTest.AspNetCore` runs your ASP.NET Core application in-process with `WebApplicationFactory`, and hands its `HttpClient` to the REST and GraphQL clients. No deployed environment, no ports.
 
+The in-memory test host has no address a browser can open; [Hosting a browser journey](#hosting-a-browser-journey) puts the same application on a real loopback port or in its own container when a test needs one.
+
 ```bash
 dotnet add package ProtoTest.AspNetCore
 ```
@@ -211,6 +213,37 @@ The step-aside reads **static configuration only**: an address a started piece p
 
 Without an address, the application's HTTP clients fall back to its transport automatically, so there is nothing to point at by hand, and with the default `PerRun` lifetime the server only starts the first time a test actually needs it.
 
+### Hosting a browser journey
+
+A browser can only open a real address, and the in-memory test host has none. Two registrations publish one: the application's own listener hosted in the test process on port 0 (the recipe on [Created through the API, shown in the browser](../recipes/api-then-browser.md#compose) uses this), or the application's own image started as a container.
+
+Host the listener in-process:
+
+```csharp
+var loopback = new LoopbackApplication("Api", App.Create);
+builder
+    .AddInfrastructure(loopback, loopback.BaseUrlKey)   // starts Api on http://127.0.0.1:0 and publishes the bound address
+    .AddApplication("Api", app => app
+        .AddRest(rest => rest.AddClient("Api"))
+        .AddWeb());
+```
+
+Or start the application's image as a container with `ApplicationContainer` from `ProtoTest.Testcontainers`:
+
+```csharp
+var api = ApplicationContainer.Container("Api", "my-registry.example.test/orders-api:1.4", port: 8080);
+builder
+    .AddInfrastructure(api, api.BaseUrlKey)             // a configured key skips the container
+    .AddHttpReadiness(api.Application, "/health")       // register the probe after the piece that publishes the address
+    .AddApplication("Api", app => app
+        .AddRest(rest => rest.AddClient("Api"))
+        .AddWeb());
+```
+
+The piece assumes only the image and the port it listens on: it maps that port to a random host port, publishes `http://{hostname}:{mapped port}` as the application's `BaseUrl`, and its default readiness check waits for the port to accept a connection. The image, the health path and any container build options (an environment, a command, a Testcontainers wait strategy) belong to the suite; `TryStart` reports why the container could not start so a machine without a container runtime can skip before registering it.
+
+Either way the published instance is a real application, not the test host, so it is registered **instead of** `AddAspNetCoreServer` for that application: `ServerFactory`, `ApplicationServices` and `[RequiresInProcess]` need the test host, and the in-process page inventory and the run's clock bridge run only with it. A run that configures `ProtoTest:Applications:Api:BaseUrl` skips both pieces — the key each one fills is satisfied — and the same journey runs against that environment. When a suite needs both the test host and a browser, give the published instance its own application name; the demo registers its standalone console that way.
+
 ## Skip
 
 - The registration adds the capability `server` / `ASP.NET Core` with the server name as its instance, so `[RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "ASP.NET Core")]` proves composition and `[RequiresServer("Api")]` proves the named instance. `[RequiresInProcess]` is the derived form for tests that need in-process services or transactions; with `BaseUrl` configured the capability is absent and the test skips. See [skip conditions](../foundation/skip-conditions.md).
@@ -223,7 +256,7 @@ Without an address, the application's HTTP clients fall back to its transport au
   cleared and no server or client survives it), and the next test starts the application again - the
   fault is retried, not cached. Nothing of the half-started server keeps running.
 - `PerRun` shares application state across tests; isolate at the data level (the sample uses a tenant per test id). `PerTest` pays the startup cost per test.
-- With `BaseUrl` configured there is no in-process server, container, page inventory or `configureWebHost` callback in play — `configureWebHost` customizes a server that never starts. Tests that need them skip through `[RequiresInProcess]` or a capability condition.
+- With `BaseUrl` configured there is no in-process server, service container, page inventory or `configureWebHost` callback in play — `configureWebHost` customizes a server that never starts. Tests that need them skip through `[RequiresInProcess]` or a capability condition. A containerized or loopback application is likewise not the test host.
 - The host overload allows one registration per server name per builder; the application overload has no whole-call guard, and repeated calls can register several initializers, with the first successful one winning.
 - `ServerFactory`/`ApplicationServices` require a registration under the resolved name; `ApplicationServices` throws naming the expected call when none is found.
 - In-process page inventory is limited to concrete, explicitly-GET, page-like endpoints; parameterized and catch-all routes and API-shaped JSON routes are excluded.

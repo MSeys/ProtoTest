@@ -33,6 +33,25 @@ protected override void Configure(IProtoHostBuilder builder) =>
 
 `Tap` declares the destination in code, where the test's intent lives. The `ProtoTest:Messaging:Destinations` configuration key still applies over it, so an environment can add its own destinations.
 
+## When the suite owns the broker
+
+The composition above lets the application declare its exchanges at startup. A run that owns the broker itself and publishes its own events has no application initializer to declare them, so the suite declares the destinations it owns with `Declare`:
+
+```csharp
+builder
+    .AddInfrastructure(
+        RabbitMqBroker.Container(),
+        RabbitMqOptions.ConnectionStringSetting,
+        "Messaging:RabbitMq:ConnectionString")
+    .AddMessaging(messaging => messaging
+        // The suite owns this event: create it during setup, before any tap binds.
+        .Declare("invoice.paid")
+        .Tap("invoice.paid")
+        .UseRabbitMq());
+```
+
+`Declare` creates each destination once per run, during test setup and before the first tap binds: on RabbitMQ a fanout, durable, non-auto-delete exchange — the shape the sample application declares. It is idempotent, so a destination that already exists with that shape, or a repeated declaration, is a no-op, and a broker that refuses the declaration fails setup with the destination named. `Tap` still does the awaiting; `Declare` only makes the destination exist.
+
 ## The test
 
 ```csharp
@@ -74,5 +93,5 @@ The `200` says the payment was accepted; the awaited message says the applicatio
 
 - **The await proves arrival, not delivery guarantees.** One matching message on this test's tap says nothing about duplicates, ordering or broker durability.
 - **Match on something this test owns.** Parallel tests pay invoices too; a predicate on the invoice id awaits *this* test's event, not the first `invoice.paid` that happens to arrive.
-- **Declare before you await.** An undeclared destination is bound when `AwaitAsync` is called, and an event published before that is missed. See [Destinations](../integrations/messaging/index.md).
+- **Declare before you await, and make sure the destination exists.** An undeclared destination is bound when `AwaitAsync` is called, and an event published before that is missed; the adapter never creates a destination nobody asked for — the application declares its topology, and a suite that owns the broker declares its own with `Declare`. See [Destinations](../integrations/messaging/index.md#suite-owned-topology).
 - **Where there is no broker, skip.** `[RequiresCapability(ProtoCapabilityKinds.Broker)]` skips the test in an environment without one, instead of passing against the in-memory double. See [Skip conditions](../foundation/skip-conditions.md).

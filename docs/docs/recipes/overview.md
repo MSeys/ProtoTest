@@ -9,7 +9,7 @@ description: Scenarios that combine several ProtoTest capabilities in one test �
 
 Each integration page explains one capability. Real scenarios cross several: the API call is only half of it when what matters is the event it publishes, the row it writes or the page that shows the result. These recipes show how the capabilities compose in one test — what the host needs, what the test looks like, what it proves and where it stops.
 
-Every recipe uses one application, `Api`, and adds only what the scenario needs. Most host it in-process as in [Your first test](../getting-started/first-test.md); the browser recipe is the exception — it needs an address a browser can open. The snippets use NUnit's `[ProtoTest]`; the test bodies work unchanged with any runner — swap the attribute as described in [Test runners](../runners/overview.md).
+Every recipe uses one application, `Api`, and adds only what the scenario needs. Most use the in-process test host as in [Your first test](../getting-started/first-test.md); the browser recipe additionally hosts that application on a real loopback port, because a browser can only open a socket. The snippets use NUnit's `[ProtoTest]`; the test bodies work unchanged with any runner — swap the attribute as described in [Test runners](../runners/overview.md).
 
 | Recipe | Composes |
 | --- | --- |

@@ -59,6 +59,7 @@
     <Project Path="tests/ProtoTest.AspNetCore.TestApi/ProtoTest.AspNetCore.TestApi.csproj" />
     <Project Path="tests/ProtoTest.AspNetCore.SecondTestApi/ProtoTest.AspNetCore.SecondTestApi.csproj" />
     <Project Path="tests/ProtoTest.AspNetCore.Tests/ProtoTest.AspNetCore.Tests.csproj" Id="8fe93cb3-774c-4dd1-a1c0-f3ad589708fe" />
+    <Project Path="tests/ProtoTest.AspNetCore.Web.Tests/ProtoTest.AspNetCore.Web.Tests.csproj" />
     <Project Path="tests/ProtoTest.Data.Tests/ProtoTest.Data.Tests.csproj" />
     <Project Path="tests/ProtoTest.Devices.Tests/ProtoTest.Devices.Tests.csproj" />
     <Project Path="tests/ProtoTest.Devices.WebSocket.Tests/ProtoTest.Devices.WebSocket.Tests.csproj" />

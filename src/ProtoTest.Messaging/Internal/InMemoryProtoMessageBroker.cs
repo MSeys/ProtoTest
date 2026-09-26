@@ -47,6 +47,18 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
         return ValueTask.CompletedTask;
     }
 
+    /// <summary>
+    /// A declaration is a no-op: the in-memory broker has no topology to create, and every destination
+    /// already exists - publishing creates its history entry and awaiting reads it.
+    /// </summary>
+    public ValueTask DeclareAsync(
+        IReadOnlyCollection<string> destinations,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(destinations);
+        return ValueTask.CompletedTask;
+    }
+
     /// <summary>Returns the first message after <paramref name="position"/> that matches, or null.</summary>
     private MatchedMessage? Find(
         string destination,

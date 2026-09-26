@@ -93,7 +93,7 @@ export default function CoverageMap(): ReactNode {
       }
       foot={
         <>
-          Property-level hits come from <code>ShouldMatchShape</code> — the paths your assertion actually
+          Property-level hits come from <code>Should.MatchShape</code> — the paths your assertion actually
           matched.
         </>
       }>

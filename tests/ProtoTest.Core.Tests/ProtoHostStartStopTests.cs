@@ -191,6 +191,68 @@ public sealed class ProtoHostStartStopTests
     }
 
     [Test]
+    public async Task StartAsync_WhenInfrastructureFails_ShouldUnwindCompletedUserHooks()
+    {
+        // A5.2 (Audit 5, A5-02): every completed hook that owns state unwinds on a failed start, while
+        // gates, sinks and the archive stay silent for a run that never started (Audit 3 B4).
+        var events = new List<string>();
+        var first = new TrackingRunHook("First", events);
+        var second = new TrackingRunHook("Second", events);
+        var sink = new CountingSink();
+        var output = Path.Combine(Path.GetTempPath(), $"prototest-hook-rollback-{Guid.NewGuid():N}.prototrace");
+        try
+        {
+            var builder = new ProtoHostBuilder();
+            builder.AddSink(sink);
+            builder.ConfigureTracing(options => options.OutputPath = output);
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IProtoRunHook>(first);
+                services.AddSingleton<IProtoRunHook>(second);
+            });
+            builder.AddInfrastructure(new TrackingInfrastructure("failing", failuresBeforeStart: 1));
+            await using var host = builder.Build();
+
+            // Act
+            Assert.CatchAsync(async () => await host.StartAsync());
+
+            // Assert: the user hooks unwound in reverse, and nothing was exported or archived.
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    events,
+                    Is.EqualTo(new[] { "First:Before", "Second:Before", "Second:After", "First:After" }),
+                    "completed user hooks unwind in reverse");
+                Assert.That(first.AfterRunCount, Is.EqualTo(1));
+                Assert.That(second.AfterRunCount, Is.EqualTo(1));
+                Assert.That(sink.ExportCount, Is.Zero, "no report is exported for a run that never started");
+                Assert.That(File.Exists(output), Is.False, "no archive is written for a run that never started");
+            });
+
+            // A retry runs normally and unwinds them again at the run's real end.
+            events.Clear();
+            await host.StartAsync();
+            await host.StopAsync();
+            Assert.Multiple(() =>
+            {
+                Assert.That(
+                    events,
+                    Is.EqualTo(new[] { "First:Before", "Second:Before", "Second:After", "First:After" }),
+                    "the real run end unwinds the hooks again");
+                Assert.That(sink.ExportCount, Is.EqualTo(1));
+                Assert.That(File.Exists(output), Is.True);
+            });
+        }
+        finally
+        {
+            if (File.Exists(output))
+            {
+                File.Delete(output);
+            }
+        }
+    }
+
+    [Test]
     public async Task StartTest_DuringStartAsync_ShouldBeRejected()
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -355,6 +417,24 @@ public sealed class ProtoHostStartStopTests
         public Task AfterRunAsync(CancellationToken cancellationToken = default)
         {
             AfterRunCount++;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TrackingRunHook(string name, List<string> events) : IProtoRunHook
+    {
+        public int AfterRunCount { get; private set; }
+
+        public Task BeforeRunAsync(CancellationToken cancellationToken = default)
+        {
+            events.Add($"{name}:Before");
+            return Task.CompletedTask;
+        }
+
+        public Task AfterRunAsync(CancellationToken cancellationToken = default)
+        {
+            AfterRunCount++;
+            events.Add($"{name}:After");
             return Task.CompletedTask;
         }
     }

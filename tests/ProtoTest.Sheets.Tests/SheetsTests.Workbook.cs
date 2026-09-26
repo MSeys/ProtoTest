@@ -207,6 +207,39 @@ public sealed partial class SheetsTests
             new Row(Number("A3", 200), Text("B3", "second")));
         keysPart.Worksheet.Save();
 
+        // Layered headers whose leaves collide: a table row shape cannot name them apart.
+        var groupsPart = workbookPart.AddNewPart<WorksheetPart>();
+        var groupsData = new SheetData();
+        groupsPart.Worksheet = new Worksheet(groupsData);
+        sheets.Append(new Sheet
+        {
+            Id = workbookPart.GetIdOfPart(groupsPart),
+            SheetId = 13,
+            Name = "Groups"
+        });
+        groupsData.Append(
+            new Row(Text("A1", "FY26"), Text("B1", "FY25")),
+            new Row(Text("A2", "Amount"), Text("B2", "Amount")),
+            new Row(Number("A3", 1200), Number("B3", 900)));
+        groupsPart.Worksheet.Save();
+
+        // Layered headers whose leaves differ only by case: the case-insensitive shape lookup cannot
+        // tell them apart either.
+        var caseGroupsPart = workbookPart.AddNewPart<WorksheetPart>();
+        var caseGroupsData = new SheetData();
+        caseGroupsPart.Worksheet = new Worksheet(caseGroupsData);
+        sheets.Append(new Sheet
+        {
+            Id = workbookPart.GetIdOfPart(caseGroupsPart),
+            SheetId = 14,
+            Name = "CaseGroups"
+        });
+        caseGroupsData.Append(
+            new Row(Text("A1", "FY26"), Text("B1", "FY25")),
+            new Row(Text("A2", "Amount"), Text("B2", "amount")),
+            new Row(Number("A3", 1200), Number("B3", 900)));
+        caseGroupsPart.Worksheet.Save();
+
         // Dates for Min/Max constraints, and text-vs-number values for uniqueness.
         var datedPart = workbookPart.AddNewPart<WorksheetPart>();
         var datedData = new SheetData();
@@ -320,5 +353,35 @@ public sealed partial class SheetsTests
                 new MergeCell { Reference = "A1:XFD1048576" },
                 new MergeCell { Reference = "B2:A1" }));
         corruptPart.Worksheet.Save();
+
+        // Numeric cells an integer read must refuse: a whole number that still converts, a fraction, an
+        // out-of-range double and NaN. Each target lives on its own sheet so one failing read cannot
+        // hide another.
+        Cell Single(string reference, double value) => new()
+        {
+            CellReference = reference,
+            CellValue = new CellValue(value.ToString(CultureInfo.InvariantCulture))
+        };
+
+        void SingleValueSheet(string name, uint sheetId, Cell value)
+        {
+            var part = workbookPart.AddNewPart<WorksheetPart>();
+            var data = new SheetData();
+            part.Worksheet = new Worksheet(data);
+            sheets.Append(new Sheet
+            {
+                Id = workbookPart.GetIdOfPart(part),
+                SheetId = sheetId,
+                Name = name
+            });
+            data.Append(new Row(Text("A1", "Value")), new Row(value));
+            part.Worksheet.Save();
+        }
+
+        SingleValueSheet("StrictWhole", 15, Single("A2", 1200));
+        SingleValueSheet("StrictFraction", 16, Single("A2", 1200.75));
+        SingleValueSheet("StrictHuge", 17, Single("A2", 1e20));
+        SingleValueSheet("StrictNan", 18, Single("A2", double.NaN));
+        SingleValueSheet("Guarded", 19, Single("A2", -1));
     }
 }

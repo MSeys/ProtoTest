@@ -55,6 +55,48 @@ public sealed class ProtoMessagingBuilder
         ProtoOptionsRegistration.Configure(Services, () => new MessagingAttachmentOptions(), configure);
         return this;
     }
+
+    /// <summary>
+    /// Declares the destinations this suite taps, in code, so the adapter can bind each test's tap
+    /// during setup rather than at the first await. Repeated calls compose; configuration under
+    /// <c>ProtoTest:Messaging:Destinations</c> still applies over these values, so an environment can
+    /// add its own.
+    /// </summary>
+    /// <remarks>
+    /// <c>Tap</c> is a reliability declaration, not just a convenience: pre-bind every destination the
+    /// act publishes to. A destination declared only at the first <c>AwaitAsync</c> is bound then, so it
+    /// misses every message published before that await.
+    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="destinations"/> is empty, or contains a null, empty or whitespace destination.
+    /// </exception>
+    public ProtoMessagingBuilder Tap(params string[] destinations)
+    {
+        ArgumentNullException.ThrowIfNull(destinations);
+        if (destinations.Length == 0)
+        {
+            throw new ArgumentException("Provide at least one destination.", nameof(destinations));
+        }
+
+        foreach (var destination in destinations)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(destination);
+        }
+
+        // An options callback, like every other messaging option: repeated calls compose in order and
+        // the configuration section binds over the result, so the environment can add destinations.
+        ProtoOptionsRegistration.Configure(Services, () => new MessagingOptions(), options =>
+        {
+            foreach (var destination in destinations)
+            {
+                if (!options.Destinations.Contains(destination, StringComparer.Ordinal))
+                {
+                    options.Destinations.Add(destination);
+                }
+            }
+        });
+        return this;
+    }
 }
 
 public static class ProtoHostBuilderExtensions

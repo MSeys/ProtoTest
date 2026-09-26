@@ -5,14 +5,20 @@ using ProtoTest.Core;
 
 /// <summary>
 /// Per-client gRPC choices: metadata added to every call from the client, the hook that builds
-/// per-call metadata, and the default deadline. Values layer from <c>ProtoTest:Grpc</c> over the
-/// code-based registration.
+/// per-call metadata, and the default deadline. Values layer from <c>ProtoTest:Grpc:Client</c> over the
+/// code-based registration; the legacy <c>ProtoTest:Grpc</c> section still binds as a deprecated
+/// fallback, so an existing suite keeps working.
 /// </summary>
 public sealed class GrpcClientOptions : IProtoConfigurableOptions
 {
-    public const string ConfigurationSectionName = "ProtoTest:Grpc";
+    public const string ConfigurationSectionName = "ProtoTest:Grpc:Client";
+
+    /// <summary>The pre-1.1 section; it still binds, after <see cref="ConfigurationSectionName"/>. Deprecated.</summary>
+    public const string LegacyConfigurationSectionName = "ProtoTest:Grpc";
 
     string IProtoConfigurableOptions.ConfigurationSectionName => ConfigurationSectionName;
+
+    string? IProtoConfigurableOptions.FallbackConfigurationSectionName => LegacyConfigurationSectionName;
 
     /// <summary>Metadata added to every call from this client, keyed by its metadata name.</summary>
     public IDictionary<string, string> Metadata { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -26,7 +32,7 @@ public sealed class GrpcClientOptions : IProtoConfigurableOptions
     /// <summary>
     /// Metadata keys whose values are redacted in the trace. Matching is case-insensitive and by
     /// substring, so <c>authorization</c> also covers <c>proxy-authorization</c>. Configuration
-    /// under <c>ProtoTest:Grpc:SensitiveMetadataKeys</c> extends these defaults.
+    /// under <c>ProtoTest:Grpc:Client:SensitiveMetadataKeys</c> extends these defaults.
     /// </summary>
     public List<string> SensitiveMetadataKeys { get; set; } =
         ["authorization", "cookie", "set-cookie", "x-api-key", "api-key", "token", "x-auth-token"];

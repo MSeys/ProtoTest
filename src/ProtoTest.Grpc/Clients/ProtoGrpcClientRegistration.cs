@@ -1,6 +1,7 @@
 namespace ProtoTest.Grpc.Clients;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
 using ProtoTest.Http;
 
@@ -29,15 +30,16 @@ internal static class ProtoGrpcClientRegistration
                 nameof(address));
         }
 
+        var scopedName = ProtoClientResolution.ScopedName(protocolName, name);
         services.AddSingleton<IProtoClientInitializer>(serviceProvider =>
             new ProtoGrpcClientInitializer(
                 protocolName,
                 name,
-                serviceProvider.GetRequiredService<GrpcClientOptions>(),
+                serviceProvider.GetRequiredKeyedService<GrpcClientOptions>(scopedName),
                 address,
                 allowMissingAddress: allowMissingAddress,
                 application: application));
-        ProtoOptionsRegistration.Configure(services, () => new GrpcClientOptions(), configure);
+        RegisterOptions(services, scopedName, configure);
         services.AddSingleton(new ProtoApplicationTarget(name, application ?? name));
         return new ProtoTargetBuilder(name, services);
     }
@@ -55,17 +57,50 @@ internal static class ProtoGrpcClientRegistration
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(addressResolver);
 
+        var scopedName = ProtoClientResolution.ScopedName(protocolName, name);
         services.AddSingleton<IProtoClientInitializer>(serviceProvider =>
             new ProtoGrpcClientInitializer(
                 protocolName,
                 name,
-                serviceProvider.GetRequiredService<GrpcClientOptions>(),
+                serviceProvider.GetRequiredKeyedService<GrpcClientOptions>(scopedName),
                 allowMissingAddress: true,
                 application: application,
                 addressResolver: addressResolver));
-        ProtoOptionsRegistration.Configure(services, () => new GrpcClientOptions(), configure);
+        RegisterOptions(services, scopedName, configure);
         services.AddSingleton(new ProtoApplicationTarget(name, application ?? name));
         return new ProtoTargetBuilder(name, services);
     }
-}
 
+    /// <summary>
+    /// Registers the named client's own options: its callbacks compose in registration order, then the
+    /// shared <c>ProtoTest:Grpc:Client</c> section binds over the result, so one client's metadata,
+    /// deadline or sensitive keys never leak into another client.
+    /// </summary>
+    private static void RegisterOptions(
+        IServiceCollection services,
+        string scopedName,
+        Action<GrpcClientOptions>? configure)
+    {
+        if (configure is not null)
+        {
+            services.AddKeyedSingleton(scopedName, new ConfigureCallback(configure));
+        }
+
+        services.TryAddKeyedSingleton<GrpcClientOptions>(scopedName, (serviceProvider, _) =>
+            ProtoOptionsRegistration.Resolve<GrpcClientOptions>(serviceProvider, options =>
+            {
+                foreach (var callback in serviceProvider.GetKeyedServices<ConfigureCallback>(scopedName))
+                {
+                    callback.Callback(options);
+                }
+            }));
+
+        // The unkeyed instance is the run-wide default: the transport-backed client the accessor
+        // creates for a target with no registration of its own reads it, and it binds the shared
+        // section without any named client's callbacks.
+        services.TryAddSingleton(serviceProvider =>
+            ProtoOptionsRegistration.Resolve<GrpcClientOptions>(serviceProvider));
+    }
+
+    private sealed record ConfigureCallback(Action<GrpcClientOptions> Callback);
+}

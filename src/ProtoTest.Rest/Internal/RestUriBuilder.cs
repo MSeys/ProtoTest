@@ -29,13 +29,9 @@ internal static partial class RestUriBuilder
         {
             if (!Uri.TryCreate(target, UriKind.Absolute, out var absoluteUri))
                 throw new InvalidOperationException($"REST request URI '{target}' is not a valid absolute URI.");
-            if (!ProtoHttpUri.IsHttpUri(absoluteUri))
-            {
-                throw new InvalidOperationException(
-                    $"REST requests require an HTTP or HTTPS URI, but '{absoluteUri.Scheme}' was supplied.");
-            }
-
-            return absoluteUri;
+            // The shared rule: an absolute HTTP or HTTPS address, validated by ProtoHttpEndpoint the
+            // same way GraphQL's per-test endpoint is.
+            return ProtoHttpEndpoint.RequireHttpAddress(absoluteUri, $"REST request URI '{target}'");
         }
 
         var baseAddress = baseAddressResolver is null
@@ -48,13 +44,9 @@ internal static partial class RestUriBuilder
                 "A relative REST request requires a configured or per-test base address.");
         }
 
-        if (!baseAddress.IsAbsoluteUri || !ProtoHttpUri.IsHttpUri(baseAddress))
-        {
-            throw new InvalidOperationException(
-                "A REST base address must be an absolute HTTP or HTTPS URI.");
-        }
-
-        return new Uri(baseAddress, MakeRelativeTarget(target));
+        return new Uri(
+            ProtoHttpEndpoint.RequireHttpAddress(baseAddress, "A REST base address"),
+            MakeRelativeTarget(target));
     }
 
     /// <summary>

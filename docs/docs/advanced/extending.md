@@ -51,9 +51,9 @@ internal sealed class BusClientInitializer(string name, BusOptions options) : IP
 {
     public string Name => name;
 
-    public async Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
+    public async Task<bool> TryInitializeAsync(ProtoExecutionContext context)
     {
-        var connection = await Connection.OpenAsync(options.Endpoint, cancellationToken);
+        var connection = await Connection.OpenAsync(options.Endpoint, context.CancellationToken);
         context.RegisterClient(new BusClient(connection, context), name);
         return true;
     }

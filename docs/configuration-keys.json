@@ -1,0 +1,51 @@
+{
+  "comment": "The public configuration-key list. 'sections' is the set of ConfigurationSectionName/SectionName/SectionPath constants in src/**/*.cs; eng/check-docs.ps1 compares this array with the source on every run and fails on drift, so update it with the constant. 'allowedKeys' are documented keys that are not section constants, each with its reason and each required to stay mentioned in a docs page. The gate cross-checks every ProtoTest:* key a docs page names against these two lists, which is the half that runs in CI; the private docs-facts sheets add the fact-sheet-to-docs direction where the records checkout exists.",
+  "sections": [
+    "ProtoTest:Applications",
+    "ProtoTest:Devices:WebSocket",
+    "ProtoTest:GraphQL:Attachments",
+    "ProtoTest:GraphQL:Responses",
+    "ProtoTest:Grpc",
+    "ProtoTest:Grpc:Attachments",
+    "ProtoTest:Grpc:Client",
+    "ProtoTest:Messaging",
+    "ProtoTest:Messaging:Attachments",
+    "ProtoTest:Messaging:RabbitMq",
+    "ProtoTest:Readiness",
+    "ProtoTest:Reporting:Html",
+    "ProtoTest:Reporting:Json",
+    "ProtoTest:Rest:Attachments",
+    "ProtoTest:Rest:Responses",
+    "ProtoTest:Sheets",
+    "ProtoTest:Sql",
+    "ProtoTest:Web:Pages",
+    "ProtoTest:Web:Playwright",
+    "ProtoTest:Web:Selenium"
+  ],
+  "allowedKeys": [
+    {
+      "key": "ProtoTest:Data",
+      "reason": "named in the docs and the fact sheet only to say ProtoTest.Data has no configuration section"
+    },
+    {
+      "key": "ProtoTest:Database",
+      "reason": "the demo's environment switch; sample-side, not a package option"
+    },
+    {
+      "key": "ProtoTest:Http:Attachments",
+      "reason": "the shared default section of the HTTP attachment options when a protocol names none"
+    },
+    {
+      "key": "ProtoTest:Http:Responses",
+      "reason": "the shared default section of the HTTP response options when a protocol names none"
+    },
+    {
+      "key": "ProtoTest:TargetUrl",
+      "reason": "the demo's published-target switch; sample-side, not a package option"
+    },
+    {
+      "key": "ProtoTest:TestSupport",
+      "reason": "the sample application's test-support convention, documented as sample-side"
+    }
+  ]
+}

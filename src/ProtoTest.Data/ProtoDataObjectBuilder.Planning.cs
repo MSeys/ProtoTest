@@ -129,14 +129,17 @@ public sealed partial class ProtoDataObjectBuilder<T>
             }
         }
 
-        if (TryBuiltIn(valueType, valueContext, out var generated, out var source))
-        {
-            return new(memberName, valueType, generated, "BuiltIn", source, isConstructorParameter);
-        }
-
+        // An optional constructor parameter keeps the default its declaration gives it: the author wrote
+        // the default as the intended value, and generating over it would silently produce data the
+        // constructor never asked for. Built-in generation serves the members that have no default.
         if (hasDefaultValue)
         {
             return new(memberName, valueType, defaultValue, "ConstructorDefault", "Optional parameter default", true);
+        }
+
+        if (TryBuiltIn(valueType, valueContext, out var generated, out var source))
+        {
+            return new(memberName, valueType, generated, "BuiltIn", source, isConstructorParameter);
         }
 
         var exception = new ProtoDataException(

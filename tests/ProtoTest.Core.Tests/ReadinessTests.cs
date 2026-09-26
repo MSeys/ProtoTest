@@ -264,6 +264,37 @@ public sealed class ReadinessTests
             "the malformed address is rejected at run start, naming the key to fix");
     }
 
+    [Test]
+    public async Task HttpReadiness_WhenNothingAnswers_ShouldFailNamingTheUrlAndTheLastError()
+    {
+        var port = TestNetworking.FreePort();
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Applications:Api:BaseUrl"] = $"http://127.0.0.1:{port}"
+            }));
+        builder.ConfigureReadiness(options =>
+        {
+            options.Timeout = TimeSpan.FromMilliseconds(400);
+            options.Interval = TimeSpan.FromMilliseconds(50);
+        });
+        builder.AddHttpReadiness("Api");
+        await using var host = builder.Build();
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () => await host.StartAsync());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain($"http://127.0.0.1:{port}/"),
+                "the failure names the URL that was probed");
+            Assert.That(exception.Message, Does.Contain("Last error:"), "the failure carries the last error");
+            Assert.That(exception.Message, Does.Contain("HttpRequestException"),
+                "a refused connection is the error the trial needed to see");
+        });
+    }
+
     private sealed class OrderingInfrastructure(List<string> order) : IProtoInfrastructure
     {
         public string Id => "piece";

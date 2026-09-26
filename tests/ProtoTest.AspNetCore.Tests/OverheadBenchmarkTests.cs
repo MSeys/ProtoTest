@@ -132,7 +132,7 @@ public sealed class OverheadBenchmarkTests
             .PostAsync("/benchmark/orders");
         created
             .Should.HaveHttpStatus(HttpStatusCode.Created)
-            .ShouldMatchShape(new { product = "notebook", quantity = 2, status = "pending" });
+            .Should.MatchShape(new { product = "notebook", quantity = 2, status = "pending" });
 
         var id = created.ReadAsJson<JsonElement>().GetProperty("id").GetString()
             ?? throw new InvalidOperationException("The create returned no id.");
@@ -140,7 +140,7 @@ public sealed class OverheadBenchmarkTests
         using var read = await context.Rest().GetAsync($"/benchmark/orders/{id}");
         read
             .Should.HaveHttpStatus(HttpStatusCode.OK)
-            .ShouldMatchShape(new { id, product = "notebook", quantity = 2, status = "pending" });
+            .Should.MatchShape(new { id, product = "notebook", quantity = 2, status = "pending" });
     }
 
     private static async Task PingAsync(ProtoExecutionContext context)

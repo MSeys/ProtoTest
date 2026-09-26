@@ -164,6 +164,9 @@ Conditions run before `StartTestAsync`, so a skipped test has no context and no 
 | [`[Auth<T>]`](../integrations/rest/authentication.md) | metadata read by the HTTP hooks — one authenticator for REST and GraphQL, narrowed with `Protocols` |
 | `[Application("Name", "Protocol:Client")]` | `ProtoAttribute` — selects the application under test and, optionally, which client each protocol uses |
 | [`[RequiresCapability(kind)]`](./skip-conditions.md) | `ProtoAttribute` — skips the test unless the host has the capability |
+| [`[RequiresWorker<TProgram>]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute` — skips unless `AddWorkerHost<TProgram>()` hosts the worker |
+| [`[RequiresServer(name)]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute` — skips unless the named `AddAspNetCoreServer` instance is composed |
+| [`[RequiresApplication(name)]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute` — skips unless `AddApplication` declared the application |
 | [`[RequiresInProcess]`](./skip-conditions.md) | `ProtoAttribute` — `[RequiresCapability("server")]` |
 | `[ProtoTest]`, `[ProtoTestFact]`, `[ProtoTestTheory]` | [runner](../runners/overview.md) entry points |
 

@@ -12,7 +12,7 @@ public sealed class GraphQLResponse : ProtoHttpResponse
 {
     private readonly JsonDocument _document;
     private readonly string? _selectedRootField;
-    private GraphQLAssertions? _should;
+    private GraphQLShouldAssertions? _should;
     private GraphQLAssertions? _shouldNot;
 
     internal GraphQLResponse(
@@ -49,12 +49,16 @@ public sealed class GraphQLResponse : ProtoHttpResponse
         Errors = ReadErrors(_document.RootElement);
     }
 
-    /// <summary>Positive assertions on this response, such as <c>Should.HaveHttpStatus(...)</c>.</summary>
-    public GraphQLAssertions Should => _should ??= new GraphQLAssertions(this, negated: false);
+    /// <summary>
+    /// The positive assertions on this response, such as <c>Should.HaveHttpStatus(...)</c> and
+    /// <c>Should.MatchShape(...)</c>.
+    /// </summary>
+    public GraphQLShouldAssertions Should => _should ??= new GraphQLShouldAssertions(this);
 
     /// <summary>
-    /// Assertions that must not hold, such as <c>ShouldNot.HaveHttpStatus(...)</c>. Error and shape
-    /// assertions keep their own positive and negative forms.
+    /// Assertions that must not hold, such as <c>ShouldNot.HaveHttpStatus(...)</c> or
+    /// <c>ShouldNot.HaveErrors()</c>. A negated shape match is not meaningful, so shape lives on
+    /// <see cref="Should"/>.
     /// </summary>
     public GraphQLAssertions ShouldNot => _shouldNot ??= new GraphQLAssertions(this, negated: true);
 
@@ -88,66 +92,83 @@ public sealed class GraphQLResponse : ProtoHttpResponse
                     expected,
                     StatusCode,
                     negated,
-                    ProtoHttpDiagnosticSanitizer.SanitizeBody(Content, ResolveStatusDiagnosticOptions()))));
+                    ProtoHttpDiagnosticSanitizer.SanitizeBody(Content, ResolveStatusDiagnosticOptions(ProtoGraphQLBuilder.ProtocolName)))));
         return this;
     }
 
-    private ProtoHttpAttachmentOptions ResolveStatusDiagnosticOptions()
-    {
-        // The resolved ProtoTest:GraphQL:Responses section bounds the failure body even when the protocol
-        // never opted into attachment capture; attachment options, when present, keep their own
-        // redaction rules and may tighten the limit further.
-        var responseLimit = Context!.ResolveResponseOptions(ProtoGraphQLBuilder.ProtocolName).MaxDiagnosticBodyLength;
-        if (AttachmentOptions is null)
-            return new ProtoHttpAttachmentOptions { MaxDiagnosticBodyLength = responseLimit };
-        if (responseLimit >= AttachmentOptions.MaxDiagnosticBodyLength)
-            return AttachmentOptions;
+    /// <summary>Asserts the response carries no GraphQL errors.</summary>
+    /// <remarks>Obsolete: use <c>response.Should.HaveNoErrors()</c>.</remarks>
+    [Obsolete("Use response.Should.HaveNoErrors() instead.")]
+    public GraphQLResponse ShouldHaveNoErrors() => AssertNoErrors(negated: false);
 
-        return new ProtoHttpAttachmentOptions
-        {
-            RedactSensitiveData = AttachmentOptions.RedactSensitiveData,
-            SensitiveJsonProperties = [.. AttachmentOptions.SensitiveJsonProperties],
-            MaxDiagnosticBodyLength = responseLimit
-        };
-    }
+    /// <summary>Asserts the response carries at least one GraphQL error.</summary>
+    /// <remarks>Obsolete: use <c>response.Should.HaveErrors()</c>.</remarks>
+    [Obsolete("Use response.Should.HaveErrors() instead.")]
+    public GraphQLResponse ShouldHaveErrors() => AssertHasErrors(negated: false);
 
-    public GraphQLResponse ShouldHaveNoErrors()
+    /// <summary>Asserts a GraphQL error carries <paramref name="code"/> in <c>extensions.code</c>.</summary>
+    /// <remarks>Obsolete: use <c>response.Should.HaveError(code)</c>.</remarks>
+    [Obsolete("Use response.Should.HaveError(code) instead.")]
+    public GraphQLResponse ShouldHaveError(string code) => AssertHasError(code, negated: false);
+
+    // A negated title states the opposite assertion rather than prefixing the positive one, so it
+    // reads "Assert GraphQL has errors" instead of "not Assert no GraphQL errors"; the status
+    // assertion expresses its polarity the same way, inside the sentence.
+    internal GraphQLResponse AssertNoErrors(bool negated)
         => Assert(
             "assert.graphql.no_errors",
-            "Assert no GraphQL errors",
+            negated ? "Assert GraphQL has errors" : "Assert no GraphQL errors",
+            negated,
             new Dictionary<string, string?> { ["actual.error_count"] = Errors.Count.ToString() },
-            () =>
-            {
-                if (HasErrors)
-                    throw new GraphQLAssertionException($"Expected no GraphQL errors, but received {Errors.Count}: {string.Join("; ", Errors.Select(e => e.Message))}");
-            });
+            () => !HasErrors,
+            () => negated
+                ? "Expected GraphQL errors, but the response contained none."
+                : $"Expected no GraphQL errors, but received {Errors.Count}: {ErrorMessages()}");
 
-    public GraphQLResponse ShouldHaveErrors()
+    internal GraphQLResponse AssertHasErrors(bool negated)
         => Assert(
             "assert.graphql.has_errors",
-            "Assert GraphQL has errors",
+            negated ? "Assert GraphQL has no errors" : "Assert GraphQL has errors",
+            negated,
             new Dictionary<string, string?> { ["actual.error_count"] = Errors.Count.ToString() },
-            () =>
-            {
-                if (!HasErrors) throw new GraphQLAssertionException("Expected at least one GraphQL error, but the response contained none.");
-            });
+            () => HasErrors,
+            () => negated
+                ? $"Expected no GraphQL errors, but received {Errors.Count}: {ErrorMessages()}"
+                : "Expected at least one GraphQL error, but the response contained none.");
 
-    public GraphQLResponse ShouldHaveError(string code)
+    internal GraphQLResponse AssertHasError(string code, bool negated)
         => Assert(
             "assert.graphql.error_code",
-            $"Assert GraphQL error · {code}",
+            negated
+                ? $"Assert GraphQL does not have an error with code '{code}'"
+                : $"Assert GraphQL error · {code}",
+            negated,
             new Dictionary<string, string?>
             {
                 ["expected.error_code"] = code,
-                ["actual.error_codes"] = string.Join(", ", Errors.Select(error => error.Code ?? "<none>"))
+                ["actual.error_codes"] = ErrorCodes()
             },
-            () =>
-            {
-                if (!Errors.Any(error => string.Equals(error.Code, code, StringComparison.OrdinalIgnoreCase)))
-                    throw new GraphQLAssertionException($"Expected a GraphQL error with code '{code}', but found: {string.Join(", ", Errors.Select(e => e.Code ?? "<none>"))}.");
-            });
+            () => Errors.Any(error => string.Equals(error.Code, code, StringComparison.OrdinalIgnoreCase)),
+            () => negated
+                ? $"Expected no GraphQL error with code '{code}', but found: {ErrorCodes()}."
+                : $"Expected a GraphQL error with code '{code}', but found: {ErrorCodes()}.");
 
+    /// <summary>
+    /// Matches the selected data against an expected shape through the same matcher REST, GraphQL,
+    /// gRPC and messaging share.
+    /// </summary>
+    /// <remarks>Obsolete: use <c>response.Should.MatchShape(shape)</c>.</remarks>
+    [Obsolete("Use response.Should.MatchShape(shape) instead.")]
     public GraphQLResponse ShouldMatchShape(object expectedShape, JsonSerializerOptions? options = null)
+        => AssertResponseShape(expectedShape, options);
+
+    /// <summary>
+    /// The shape assertion behind <see cref="GraphQLShouldAssertions.MatchShape"/> and the obsolete
+    /// <see cref="ShouldMatchShape"/> shim. A matcher failure is rethrown as a
+    /// <see cref="GraphQLAssertionException"/> whose message starts with the operation identifier,
+    /// with the matcher exception - and its mismatch list - as the inner exception.
+    /// </summary>
+    internal GraphQLResponse AssertResponseShape(object expectedShape, JsonSerializerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
         if (SelectedData is not { } selected || selected.ValueKind == JsonValueKind.Null)
@@ -163,45 +184,137 @@ public sealed class GraphQLResponse : ProtoHttpResponse
                     ParentOperationId: RequestTraceId,
                     ExtraAttributes: new Dictionary<string, string?> { ["graphql.operation"] = Identifier! }),
                 expectedShape,
-                () => new GraphQLAssertionException(
-                    "Expected GraphQL data, but the response did not contain data."));
+                () => new GraphQLAssertionException(DescribeMissingData()));
         }
 
-        AssertShape(
-            ProtoGraphQLBuilder.Protocol.TraceSource,
-            "Assert GraphQL data shape",
-            SelectedData?.GetRawText(),
-            expectedShape,
-            options,
-            new Dictionary<string, string?> { ["graphql.operation"] = Identifier! },
-            matched => new ProtoObservation(
-                TargetName!,
-                ProtoGraphQLBuilder.ShapeObservationKind,
-                Identifier!,
-                new GraphQLShapeMatchData(Identifier!, matched)));
+        try
+        {
+            AssertShape(
+                ProtoGraphQLBuilder.Protocol.TraceSource,
+                "Assert GraphQL data shape",
+                SelectedData?.GetRawText(),
+                expectedShape,
+                options,
+                new Dictionary<string, string?> { ["graphql.operation"] = Identifier! },
+                matched => new ProtoObservation(
+                    TargetName!,
+                    ProtoGraphQLBuilder.ShapeObservationKind,
+                    Identifier!,
+                    new GraphQLShapeMatchData(Identifier!, matched)));
+        }
+        catch (JsonShapeMismatchException exception)
+        {
+            throw new GraphQLAssertionException(PrefixIdentifier(exception.Message), exception);
+        }
+        catch (JsonDocumentAssertionException exception)
+        {
+            throw new GraphQLAssertionException(PrefixIdentifier(exception.Message), exception);
+        }
 
         return this;
     }
 
+    // The operation identifier the protocol reported the call under is the subject a mismatch or a
+    // required read names; a response asserted without one keeps the message unchanged.
+    private string PrefixIdentifier(string message)
+        => string.IsNullOrEmpty(Identifier) ? message : $"{Identifier} — {message}";
+
+    // An errors-only response has nothing to match, and the server's own message is what the author
+    // needs to see: a rejected subscription or a failed operation must not read as "no data".
+    private string DescribeMissingData()
+        => HasErrors
+            ? $"Expected GraphQL data, but the response did not contain data. Server errors: {ErrorMessages()}."
+            : "Expected GraphQL data, but the response did not contain data.";
+
+    private GraphQLAssertionException RequiredFailure<T>(string? jsonPath, string reason)
+        => new(PrefixIdentifier($"{ProtoJsonRead.DescribeRequired<T>(jsonPath)} failed: {reason}."));
+
+    /// <summary>
+    /// Deserializes the selected data as <typeparamref name="T"/>, or returns <c>default</c> when the
+    /// response has no data. A failure records a <c>graphql.response.deserialize</c> operation and
+    /// rethrows.
+    /// </summary>
     public T? ReadDataAs<T>(JsonSerializerOptions? options = null)
+        => ReadDataAsCore<T>(jsonPath: null, required: false, options);
+
+    /// <summary>
+    /// Reads a single value from the selected data at <paramref name="jsonPath"/> and deserializes it
+    /// as <typeparamref name="T"/>, for example <c>ReadDataAs&lt;int&gt;("$.order.total")</c>. The
+    /// supported subset is <c>$</c>, dot members and <c>[n]</c> indices (see
+    /// <see cref="JsonPathResolver"/>); a leading member without <c>$</c> is accepted. A response with
+    /// no data returns <c>default</c>; a path that does not resolve throws
+    /// <see cref="GraphQLAssertionException"/> naming the operation and the path.
+    /// </summary>
+    public T? ReadDataAs<T>(string jsonPath, JsonSerializerOptions? options = null)
     {
-        using var operation = Context!.Trace
+        ArgumentException.ThrowIfNullOrWhiteSpace(jsonPath);
+        return ReadDataAsCore<T>(jsonPath, required: false, options);
+    }
+
+    /// <summary>
+    /// Reads the selected data as <typeparamref name="T"/> and fails when there is nothing to return: a
+    /// response without data, or data that is JSON <c>null</c>, throws
+    /// <see cref="GraphQLAssertionException"/> naming the operation instead of returning <c>default</c>.
+    /// Use it where the value is required; <see cref="ReadDataAs{T}(JsonSerializerOptions?)"/> stays
+    /// nullable.
+    /// </summary>
+    public T ReadRequired<T>(JsonSerializerOptions? options = null)
+    {
+        EnsureDataIsNotNull<T>(jsonPath: null);
+        return ReadDataAsCore<T>(jsonPath: null, required: true, options)!;
+    }
+
+    /// <summary>
+    /// Reads the value at <paramref name="jsonPath"/> as <typeparamref name="T"/> and fails when the
+    /// response has no data or the path holds JSON <c>null</c> — for every <typeparamref name="T"/>,
+    /// including value types, because the null check runs before the deserializer. A path that does not
+    /// resolve fails through <see cref="ReadDataAs{T}(string, JsonSerializerOptions?)"/> with the
+    /// operation and the path.
+    /// </summary>
+    public T ReadRequired<T>(string jsonPath, JsonSerializerOptions? options = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jsonPath);
+        EnsureDataIsNotNull<T>(jsonPath);
+        return ReadDataAsCore<T>(jsonPath, required: true, options)!;
+    }
+
+    // GraphQL's half of the shared read: its exception type and its graphql.response.deserialize
+    // operation. The sink fails the operation for every failure the read detects, once.
+    private T? ReadDataAsCore<T>(string? jsonPath, bool required, JsonSerializerOptions? options)
+    {
+        var scope = Context!.Trace
             .Operation("graphql.response.deserialize", $"Deserialize GraphQL data · {typeof(T).Name}", ProtoGraphQLBuilder.Protocol.TraceSource)
             .With("target.type", typeof(T).FullName)
-            .Parent(RequestTraceId)
-            .Begin();
-        try
+            .Parent(RequestTraceId);
+        if (jsonPath is not null)
         {
-            var result = SelectedData.HasValue
-                ? SelectedData.Value.Deserialize<T>(options ?? ProtoJsonDefaults.Reader)
-                : default;
-            operation.Succeed();
-            return result;
+            scope = scope.With("graphql.path", jsonPath);
         }
-        catch (Exception exception)
+
+        using var operation = scope.Begin();
+        var value = ProtoJsonRead.Read<T>(
+            SelectedData?.GetRawText(),
+            jsonPath,
+            required,
+            new ProtoJsonReadSemantics(
+                RequiredFailure: message => new GraphQLAssertionException(PrefixIdentifier(message)),
+                PathMissFailure: (message, inner) => new GraphQLAssertionException(PrefixIdentifier(message), inner),
+                EmptyBodyReason: "the response did not contain data",
+                NullBodyReason: "the response data was JSON null",
+                TraceFailure: (exception, _) => operation.Fail(exception),
+                NullRootReturnsDefault: true),
+            options);
+        operation.Succeed();
+        return value;
+    }
+
+    // A required read without data fails before the read: there is nothing to resolve, and the message
+    // names the missing data rather than a path that could never have resolved.
+    private void EnsureDataIsNotNull<T>(string? jsonPath)
+    {
+        if (SelectedData is not { } data || data.ValueKind == JsonValueKind.Null)
         {
-            operation.Fail(exception);
-            throw;
+            throw RequiredFailure<T>(jsonPath, "the response did not contain data");
         }
     }
 
@@ -215,17 +328,29 @@ public sealed class GraphQLResponse : ProtoHttpResponse
     private GraphQLResponse Assert(
         string kind,
         string name,
+        bool negated,
         IReadOnlyDictionary<string, string?> attributes,
-        Action assertion)
+        Func<bool> holds,
+        Func<string> describeFailure)
     {
-        using var operation = Context!.Trace
+        var scope = Context!.Trace
             .Operation(kind, name, ProtoGraphQLBuilder.Protocol.TraceSource)
-            .With(attributes)
-            .Parent(RequestTraceId)
-            .Begin();
+            .With(attributes);
+        if (negated)
+        {
+            // The positive evidence is unchanged from the pre-facade assertions; the polarity is only
+            // recorded when there is one.
+            scope = scope.With("assertion.negated", "true");
+        }
+
+        using var operation = scope.Parent(RequestTraceId).Begin();
         try
         {
-            assertion();
+            if (!ProtoAssertion.IsSatisfied(holds(), negated))
+            {
+                throw new GraphQLAssertionException(describeFailure());
+            }
+
             operation.Succeed();
             return this;
         }
@@ -235,6 +360,10 @@ public sealed class GraphQLResponse : ProtoHttpResponse
             throw;
         }
     }
+
+    private string ErrorMessages() => string.Join("; ", Errors.Select(error => error.Message));
+
+    private string ErrorCodes() => string.Join(", ", Errors.Select(error => error.Code ?? "<none>"));
 
     private static IReadOnlyList<GraphQLError> ReadErrors(JsonElement root)
     {

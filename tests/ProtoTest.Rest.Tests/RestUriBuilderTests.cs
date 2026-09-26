@@ -151,4 +151,32 @@ public class RestUriBuilderTests
 
         Assert.That(result, Is.EqualTo(new Uri("https://example.test/api/orders:search")));
     }
+
+    [Test]
+    public async Task BuildRequestUri_ShouldValidateThroughTheSharedEndpointRule()
+    {
+        // Audit 5 A5.12 (B03): REST validates base addresses and absolute request URIs through the same
+        // ProtoHttpEndpoint rule GraphQL uses, so the wording and the rule cannot drift.
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                async () => await RestUriBuilder.BuildRequestUriAsync(
+                    "/orders",
+                    null,
+                    new Uri("file:///temporary/base/"),
+                    null,
+                    null!,
+                    CancellationToken.None),
+                Throws.TypeOf<InvalidOperationException>().With.Message.Contains("A REST base address must be an absolute HTTP or HTTPS URI"));
+            Assert.That(
+                async () => await RestUriBuilder.BuildRequestUriAsync(
+                    "ftp://example.test/orders",
+                    null,
+                    null,
+                    null,
+                    null!,
+                    CancellationToken.None),
+                Throws.TypeOf<InvalidOperationException>().With.Message.Contains("must be an absolute HTTP or HTTPS URI"));
+        }
+    }
 }

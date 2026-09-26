@@ -11,7 +11,8 @@ A client is anything a test talks to — an `HttpClient`, a browser session, a m
 ## The context API
 
 ```csharp
-void RegisterClient<TClient>(TClient client, string name = "Default", bool disposeWithContext = true)
+void RegisterClient<TClient>(TClient client, string name = "Default",
+    ProtoClientOwnership ownership = ProtoClientOwnership.Context)
     where TClient : class;
 TClient Client<TClient>(string name = "Default") where TClient : class;
 TClient? TryClient<TClient>(string name = "Default") where TClient : class;
@@ -29,7 +30,7 @@ public interface IProtoClientInitializer
     string Name { get; }
     string? Protocol => null;
     Type ClientType { get; }
-    Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default);
+    Task<bool> TryInitializeAsync(ProtoExecutionContext context);
 }
 
 public interface IProtoClientInitializer<TClient> : IProtoClientInitializer where TClient : class
@@ -52,7 +53,7 @@ public sealed class ScenarioProbeInitializer : IProtoClientInitializer<ScenarioP
 {
     public string Name => "ScenarioProbe";
 
-    public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
+    public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
     {
         context.RegisterClient(new ScenarioProbe(), Name);
         return Task.FromResult(true);
@@ -103,9 +104,9 @@ public sealed class SharedBusInitializer : IProtoClientInitializer<BusConnection
 
     public string Name => "Bus";
 
-    public Task<bool> TryInitializeAsync(ProtoExecutionContext context, CancellationToken cancellationToken = default)
+    public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
     {
-        context.RegisterClient(_connection.Value, Name, disposeWithContext: false);
+        context.RegisterClient(_connection.Value, Name, ProtoClientOwnership.Caller);
         return Task.FromResult(true);
     }
 
@@ -119,7 +120,7 @@ builder.ConfigureServices(services =>
     services.AddSingleton<IProtoClientInitializer>(_ => new SharedBusInitializer()));
 ```
 
-With `disposeWithContext: false` the test registers the client as shared and does not dispose it at teardown — the trace marks the entity `client.owned = false`, and the release writes state, not a dispose. Registering through a factory delegate, as above, lets the host's service provider dispose the initializer — and with it the shared client — when the run ends. This is how the [ASP.NET Core integration](../integrations/aspnetcore.md) shares one application across tests. Remember that tests running in parallel will use a shared client concurrently.
+With `ProtoClientOwnership.Caller` the test registers the client as shared and does not dispose it at teardown — the trace marks the entity `client.owned = false`, and the release writes state, not a dispose. Registering through a factory delegate, as above, lets the host's service provider dispose the initializer — and with it the shared client — when the run ends. This is how the [ASP.NET Core integration](../integrations/aspnetcore.md) shares one application across tests. Remember that tests running in parallel will use a shared client concurrently.
 
 ## Fallback chains
 

@@ -2,9 +2,11 @@ namespace ProtoTest.Rest.Tests;
 
 using System.Net;
 using System.Reflection;
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Http;
+using ProtoTest.Json;
 using ProtoTest.Rest.Exceptions;
 
 [TestFixture]
@@ -143,16 +145,61 @@ public class RestResponseTests
     }
 
     [Test]
-    public void ShouldMatchShape_Should_Throw_On_Null_ExpectedShape()
+    public void Should_Assertions_ShouldChainStatusShapeAndStatus()
+    {
+        var response = new RestResponse(
+            new HttpResponseMessage(HttpStatusCode.OK),
+            """{"id":42,"name":"ProtoTest"}""",
+            TimeSpan.Zero,
+            new ProtoHttpResponseContext(
+                Execution: _context,
+                TargetName: "Orders",
+                Identifier: "GET /orders/42"));
+
+        var returned = response.Should.HaveHttpStatus(HttpStatusCode.OK)
+            .Should.MatchShape(new { id = 42 })
+            .Should.HaveHttpStatus(HttpStatusCode.OK);
+
+        Assert.That(returned, Is.SameAs(response));
+    }
+
+    [Test]
+    public void MatchShape_Should_Throw_On_Null_ExpectedShape()
     {
         var rawResponse = new HttpResponseMessage(HttpStatusCode.OK);
         var response = new RestResponse(rawResponse, "{}", TimeSpan.FromMilliseconds(10));
 
-        Assert.Throws<ArgumentNullException>(() => response.ShouldMatchShape(null!));
+        Assert.Throws<ArgumentNullException>(() => response.Should.MatchShape(null!));
     }
 
     [Test]
-    public void ShouldMatchShape_Should_Record_Observation_When_Context_Is_Provided()
+    public void MatchShape_ShouldNameTheRequestIdentifierOnMismatch()
+    {
+        var response = new RestResponse(
+            new HttpResponseMessage(HttpStatusCode.OK),
+            """{"id":42,"name":"ProtoTest"}""",
+            TimeSpan.Zero,
+            new ProtoHttpResponseContext(
+                Execution: _context,
+                TargetName: "Orders",
+                Identifier: "GET /orders/42"));
+
+        var exception = Assert.Throws<RestAssertionException>(
+            () => response.Should.MatchShape(new { id = 7 }));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.Message, Does.StartWith(
+                "GET /orders/42 — Shape mismatch failed with 1 error(s):"));
+            Assert.That(exception.Message, Does.Contain("$.id"));
+            Assert.That(exception.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
+                "the shared mismatch data stays reachable");
+            Assert.That(((JsonShapeMismatchException)exception.InnerException!).Mismatches, Has.Count.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void MatchShape_Should_Record_Observation_When_Context_Is_Provided()
     {
         // Arrange
         var rawResponse = new HttpResponseMessage(HttpStatusCode.OK);
@@ -169,7 +216,7 @@ public class RestResponseTests
                 Identifier: "GET /api/test"));
 
         // Act
-        response.ShouldMatchShape(expectedShape);
+        response.Should.MatchShape(expectedShape);
 
         // Assert
         var hit = _context.RecordedObservations.FirstOrDefault(h => h.Data is RestShapeMatchData);
@@ -183,7 +230,7 @@ public class RestResponseTests
     }
 
     [Test]
-    public void ShouldMatchShape_ShouldUseUniqueAttachmentNamesForRepeatedAssertions()
+    public void MatchShape_ShouldUseUniqueAttachmentNamesForRepeatedAssertions()
     {
         var response = new RestResponse(
             new HttpResponseMessage(HttpStatusCode.OK),
@@ -196,14 +243,40 @@ public class RestResponseTests
                 AttachmentOptions: new ProtoHttpAttachmentOptions(),
                 AttachmentPrefix: "rest-01"));
 
-        response.ShouldMatchShape(new { id = 42 });
-        response.ShouldMatchShape(new { name = "ProtoTest" });
+        response.Should.MatchShape(new { id = 42 });
+        response.Should.MatchShape(new { name = "ProtoTest" });
 
         Assert.That(_context.Attachments.Select(item => item.Name), Is.EqualTo(new[]
         {
             "00001-rest-01-expected-shape",
             "00001-rest-01-expected-shape-02"
         }));
+    }
+
+    [Test]
+    public void Obsolete_ShouldMatchShape_ShouldStillDelegateToTheFacade()
+    {
+        var response = new RestResponse(
+            new HttpResponseMessage(HttpStatusCode.OK),
+            """{"id":42,"name":"ProtoTest"}""",
+            TimeSpan.Zero,
+            new ProtoHttpResponseContext(
+                Execution: _context,
+                TargetName: "Orders",
+                Identifier: "GET /orders/42"));
+
+        // Intentional: pins the obsolete shim while it delegates to the facade; CS0618 is expected.
+#pragma warning disable CS0618
+        var returned = response.ShouldMatchShape(new { id = 42 });
+        var exception = Assert.Throws<RestAssertionException>(
+            () => response.ShouldMatchShape(new { id = 7 }));
+#pragma warning restore CS0618
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(returned, Is.SameAs(response));
+            Assert.That(exception!.Message, Does.StartWith("GET /orders/42 — Shape mismatch"));
+        }
     }
 
     [Test]
@@ -236,6 +309,215 @@ public class RestResponseTests
     }
 
 
+
+    [Test]
+    public void ReadAsJson_WithPath_ShouldReadSingleValuesAndIndices()
+    {
+        var response = ReadableResponse(
+            """{"id":42,"customer":{"name":"Ada"},"items":[{"sku":"A"},{"sku":"B"}]}""");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.ReadAsJson<int>("$.id"), Is.EqualTo(42));
+            Assert.That(response.ReadAsJson<string>("customer.name"), Is.EqualTo("Ada"));
+            Assert.That(response.ReadAsJson<string>("$.items[1].sku"), Is.EqualTo("B"));
+        }
+    }
+
+    [Test]
+    public void ReadAsJson_WithPath_ShouldPreserveDecimalPrecision()
+    {
+        var response = ReadableResponse("""{"amount":123456789.123456789}""");
+
+        var amount = response.ReadAsJson<decimal>("$.amount");
+
+        Assert.That(amount, Is.EqualTo(123456789.123456789m));
+    }
+
+    [Test]
+    public void ReadAsJson_WithPath_ShouldReturnNullForJsonNull()
+    {
+        var response = ReadableResponse("""{"note":null}""");
+
+        Assert.That(response.ReadAsJson<string?>("$.note"), Is.Null);
+    }
+
+    [Test]
+    public void ReadAsJson_WithPath_ShouldThrowOnWrongType()
+    {
+        var response = ReadableResponse("""{"name":"ProtoTest"}""");
+
+        Assert.Throws<JsonException>(() => response.ReadAsJson<int>("$.name"));
+    }
+
+    [Test]
+    public void ReadAsJson_WithPath_ShouldNameTheIdentifierAndThePathWhenMissing()
+    {
+        var response = ReadableResponse("""{"id":42}""");
+
+        var exception = Assert.Throws<RestAssertionException>(() => response.ReadAsJson<int>("$.missing"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.Message, Does.StartWith(
+                "GET /orders/42 — The JSON path '$.missing' did not match: the member 'missing' was not found."));
+            Assert.That(exception.InnerException, Is.TypeOf<JsonPathException>());
+        }
+    }
+
+    [Test]
+    public void ReadRequired_ShouldReturnTheValue()
+    {
+        var response = ReadableResponse("""{"id":42,"name":"ProtoTest"}""");
+
+        var dto = response.ReadRequired<SampleDto>();
+
+        Assert.That(dto.Id, Is.EqualTo(42));
+    }
+
+    [Test]
+    public void ReadRequired_ShouldThrowNamingTheIdentifierOnAnEmptyBody()
+    {
+        var response = ReadableResponse(string.Empty);
+
+        var exception = Assert.Throws<RestAssertionException>(() => response.ReadRequired<SampleDto>());
+
+        Assert.That(exception!.Message, Is.EqualTo(
+            "GET /orders/42 — ReadRequired<SampleDto> failed: the response body was empty."));
+    }
+
+    [Test]
+    public void ReadRequired_ShouldThrowOnAJsonNullBody()
+    {
+        var response = ReadableResponse("null");
+
+        var exception = Assert.Throws<RestAssertionException>(() => response.ReadRequired<SampleDto>());
+
+        Assert.That(exception!.Message, Does.Contain("the response body was JSON null"));
+    }
+
+    [Test]
+    public void ReadRequired_ShouldThrowOnAJsonNullBodyForAValueType()
+    {
+        var response = ReadableResponse("null");
+
+        var exception = Assert.Throws<RestAssertionException>(() => response.ReadRequired<int>());
+
+        Assert.That(exception!.Message, Is.EqualTo(
+            "GET /orders/42 — ReadRequired<Int32> failed: the response body was JSON null."));
+    }
+
+    [Test]
+    public void ReadRequired_WithPath_ShouldComposeWithThePathRead()
+    {
+        var response = ReadableResponse("""{"id":42,"customer":{"id":null}}""");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.ReadRequired<int>("$.id"), Is.EqualTo(42));
+            Assert.That(
+                Assert.Throws<RestAssertionException>(() => response.ReadRequired<string>("$.customer.id"))!.Message,
+                Does.Contain("$.customer.id"));
+            Assert.That(
+                Assert.Throws<RestAssertionException>(() => response.ReadRequired<string>("$.customer.name"))!.Message,
+                Does.Contain("the member 'name' was not found"));
+        }
+    }
+
+    [Test]
+    public void ReadRequired_WithPath_ShouldThrowOnAJsonNullValueForAValueType()
+    {
+        var response = ReadableResponse("""{"note":null}""");
+
+        var exception = Assert.Throws<RestAssertionException>(() => response.ReadRequired<int>("$.note"));
+
+        Assert.That(exception!.Message, Is.EqualTo(
+            "GET /orders/42 — ReadRequired<Int32>('$.note') failed: the value at '$.note' was JSON null."));
+    }
+
+    [Test]
+    public void ReadRequired_ShouldChainWithShapeAndStatus()
+    {
+        var response = ReadableResponse("""{"id":42}""");
+
+        var id = response.Should.HaveHttpStatus(HttpStatusCode.OK)
+            .Should.MatchShape(new { id = 42 })
+            .ReadRequired<int>("$.id");
+
+        Assert.That(id, Is.EqualTo(42));
+    }
+
+    [Test]
+    public async Task ReadRequired_ShouldRecordTheFailedDeserializeEventOnAnEmptyBody()
+    {
+        var builder = new ProtoHostBuilder();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("rest required empty trace", TestMethods.Placeholder);
+        var response = new RestResponse(
+            new HttpResponseMessage(HttpStatusCode.OK),
+            string.Empty,
+            TimeSpan.Zero,
+            new ProtoHttpResponseContext(Execution: context));
+
+        var exception = Assert.Throws<RestAssertionException>(() => response.ReadRequired<SampleDto>());
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        var entry = host.Trace.Snapshot().Tests.Single().Entries
+            .Single(item => item.Kind == "http.response.deserialize");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(entry.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(entry.Attributes["target.type"], Is.EqualTo(typeof(SampleDto).FullName));
+            Assert.That(entry.Attributes.ContainsKey("json.path"), Is.False);
+            Assert.That(entry.Error!.Type, Is.EqualTo(typeof(RestAssertionException).FullName));
+            Assert.That(entry.Error!.Message, Does.Contain("the response body was empty"));
+        }
+        await host.StopAsync();
+    }
+
+    [Test]
+    public async Task ReadRequired_WithPath_ShouldRecordTheFailedDeserializeEventWhenThePathIsMissing()
+    {
+        var builder = new ProtoHostBuilder();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("rest required path trace", TestMethods.Placeholder);
+        var response = new RestResponse(
+            new HttpResponseMessage(HttpStatusCode.OK),
+            """{"id":42}""",
+            TimeSpan.Zero,
+            new ProtoHttpResponseContext(
+                Execution: context,
+                TargetName: "Orders",
+                Identifier: "GET /orders/42"));
+
+        var exception = Assert.Throws<RestAssertionException>(() => response.ReadRequired<int>("$.missing"));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        var entry = host.Trace.Snapshot().Tests.Single().Entries
+            .Single(item => item.Kind == "http.response.deserialize");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(entry.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(entry.Attributes["target.type"], Is.EqualTo(typeof(int).FullName));
+            Assert.That(entry.Attributes["json.path"], Is.EqualTo("$.missing"));
+            Assert.That(entry.Error!.Type, Is.EqualTo(typeof(RestAssertionException).FullName));
+            Assert.That(entry.Error!.Message, Does.StartWith(
+                "GET /orders/42 — The JSON path '$.missing' did not match"));
+        }
+        await host.StopAsync();
+    }
+
+    private RestResponse ReadableResponse(string json)
+        => new(
+            new HttpResponseMessage(HttpStatusCode.OK),
+            json,
+            TimeSpan.Zero,
+            new ProtoHttpResponseContext(
+                Execution: _context,
+                TargetName: "Orders",
+                Identifier: "GET /orders/42"));
 
     private class SampleDto
     {

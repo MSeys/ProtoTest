@@ -45,7 +45,7 @@ public async Task
             }
         });
 
-    projects.ShouldHaveNoErrors();
+    projects.Should.HaveNoErrors();
 }`,
     footnote:
       'One journey writes through REST and reads through GraphQL. Tenant, sign-in, lifecycle, cleanup and trace are shared automatically.',
@@ -103,7 +103,7 @@ public sealed class DiagnosticsShowcase
 
         organization
             .Should.HaveHttpStatus(HttpStatusCode.OK)
-            .ShouldMatchShape(new
+            .Should.MatchShape(new
             {
                 projectCount = 99,
                 planId = "nonexistent-plan"
@@ -149,7 +149,7 @@ public async Task A_placed_order_can_be_read_back()
         Orders.GetOrder,
         new GetOrderRequest { Id = 42 });
 
-    order.ShouldMatchShape(new
+    ProtoGrpcAssertions.For(order).Should.MatchShape(new
     {
         id = 42,
         status = "PENDING",
@@ -200,7 +200,7 @@ var admin = Proto.Context.Resolve<SampleUserContext>();
 using var response = await Proto.Context.Rest()
     .GetAsync("/api/admin/users");
 
-response.ShouldMatchShape(new
+response.Should.MatchShape(new
 {
     tenant = admin.Tenant,
     memberCount = members.Count + 1   // the seven, and the admin
@@ -266,7 +266,7 @@ public async Task The_sales_report_ranks_regions_by_amount()
         .GetAsync("/api/v1/reports/sales.xlsx");
 
     var sales = Proto.Context.Sheets().Open(response).Model<SalesRow>();
-    sales.Verify();
+    sales.Should.MatchModel();
 
     sales.Column(row => row.Amount).Should.BeSortedBy(ProtoSortDirection.Descending);
     sales.Row(row => row.Region == "EMEA")

@@ -15,4 +15,20 @@ public sealed class RabbitMqOptions : IProtoConfigurableOptions
     /// <summary>AMQP connection string of the broker, for example the deployed environment's.</summary>
     public string ConnectionString { get; set; } = "amqp://guest:guest@localhost:5672/";
 
+    /// <inheritdoc />
+    public void Validate()
+    {
+        if (string.IsNullOrWhiteSpace(ConnectionString) || !IsAmqpUri(ConnectionString))
+        {
+            throw new ArgumentException(
+                $"RabbitMqOptions.ConnectionString must be a non-empty absolute amqp:// or amqps:// URI naming " +
+                $"the broker. Set it in code or under '{ConnectionStringSetting}'.",
+                nameof(ConnectionString));
+        }
+    }
+
+    private static bool IsAmqpUri(string value)
+        => Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            && (string.Equals(uri.Scheme, "amqp", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(uri.Scheme, "amqps", StringComparison.OrdinalIgnoreCase));
 }

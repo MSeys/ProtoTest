@@ -43,7 +43,7 @@ using var response = await Proto.Context.GraphQL()
 
 ### Select and assert in one step
 
-`ExpectAsync(shape)` is `Select(shape)` + `ExecuteAsync()` + `ShouldMatchShape(shape)`; on a shape mismatch it disposes the response and rethrows:
+`ExpectAsync(shape)` is `Select(shape)` + `ExecuteAsync()` + `Should.MatchShape(shape)`; on a shape mismatch it disposes the response and rethrows:
 
 ```csharp
 using var controlPlane = await Proto.Context.GraphQL()
@@ -56,7 +56,7 @@ using var controlPlane = await Proto.Context.GraphQL()
         monthlyRecurringRevenue = 199m
     });
 
-controlPlane.ShouldHaveNoErrors();
+controlPlane.Should.HaveNoErrors();
 ```
 
 Arrays work too — the element shape becomes the selection, and the whole array is asserted:
@@ -170,7 +170,7 @@ using var response = await Proto.Context.GraphQL()
             .TotalCount()))
     .ExecuteAsync();
 
-response.ShouldHaveNoErrors().ShouldMatchShape(new
+response.Should.HaveNoErrors().Should.MatchShape(new
 {
     orders = new
     {
@@ -193,7 +193,7 @@ response.ShouldHaveNoErrors().ShouldMatchShape(new
 The filter builder emits the `{ field: { op: value } }` convention used by Hot Chocolate: `Equal`, `NotEqual`, `Contains`, `StartsWith`, `EndsWith`, `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual`, `In`, plus `Nested(field, …)`, `Some(field, …)` for lists, and `Or(...)`.
 
 :::note[Fluent responses aren't unwrapped]
-With shape-driven operations, `ShouldMatchShape` compares against the **root field's value**. With fluent and raw operations there's no single root, so it compares against the whole `data` object — which is why the example above wraps its shape in `orders = …`.
+With shape-driven operations, `Should.MatchShape` compares against the **root field's value**. With fluent and raw operations there's no single root, so it compares against the whole `data` object — which is why the example above wraps its shape in `orders = …`.
 :::
 
 ## Raw documents
@@ -211,7 +211,7 @@ using var response = await Proto.Context.GraphQL()
         operationName: "ViewerCard")
     .ExecuteAsync();
 
-response.ShouldHaveNoErrors().ShouldMatchShape(new
+response.Should.HaveNoErrors().Should.MatchShape(new
 {
     viewer = new
     {
@@ -254,7 +254,7 @@ using var uploaded = await Proto.Context.GraphQL()
     .Select(expected)
     .ExecuteAsync();
 
-uploaded.ShouldHaveNoErrors().ShouldMatchShape(expected);
+uploaded.Should.HaveNoErrors().Should.MatchShape(expected);
 ```
 
 ```csharp

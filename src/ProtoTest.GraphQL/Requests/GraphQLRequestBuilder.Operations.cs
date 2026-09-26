@@ -59,7 +59,7 @@ public sealed partial class GraphQLRequestBuilder
         var response = await ExecuteAsync(cancellationToken);
         try
         {
-            response.ShouldMatchShape(expectedShape);
+            response.Should.MatchShape(expectedShape);
             return response;
         }
         catch

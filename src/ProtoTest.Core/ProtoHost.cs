@@ -129,11 +129,57 @@ public sealed class ProtoHost : IAsyncDisposable
     /// can actually do rather than what it was asked to do.
     /// </summary>
     public bool HasCapability(string kind, string? name = null)
+        => HasCapability(kind, name, instance: null);
+
+    /// <summary>
+    /// Returns whether the host is composed with a capability of the given kind narrowed by the
+    /// descriptor <paramref name="name"/> and/or the <paramref name="instance"/> it describes (an
+    /// <c>AddAspNetCoreServer</c> name, an application an in-process device transport belongs to). A
+    /// <see langword="null"/> filter matches anything; every non-null filter must match. The two-argument
+    /// form matches the descriptor name only - use this overload to address an instance such as a named
+    /// server.
+    /// </summary>
+    public bool HasCapability(string kind, string? name, string? instance)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(kind);
         return _rootServiceProvider.GetServices<ProtoCapabilityDescriptor>().Any(capability =>
             string.Equals(capability.Kind, kind, StringComparison.Ordinal)
-            && (name is null || string.Equals(capability.Name, name, StringComparison.Ordinal)));
+            && (name is null || string.Equals(capability.Name, name, StringComparison.Ordinal))
+            && (instance is null || string.Equals(capability.Instance, instance, StringComparison.Ordinal)));
+    }
+
+    /// <summary>
+    /// Returns whether the host declares an application of this name through <c>AddApplication</c>, so a
+    /// skip condition can answer whether the suite composed the application under test rather than
+    /// whether an address happens to be configured.
+    /// </summary>
+    public bool HasApplication(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return _rootServiceProvider.GetServices<ProtoApplicationClients>()
+            .Any(application => string.Equals(application.ApplicationName, name, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Finds the suite-level reason a capability gate reports when it skips, declared through
+    /// <c>AddCapabilityReason</c>. A reason declared for the exact <paramref name="name"/> wins over one
+    /// declared for <paramref name="kind"/> as a whole; <see langword="null"/> when the suite declared no
+    /// reason (the gate then uses its own default).
+    /// </summary>
+    public string? FindCapabilityReason(string kind, string? name = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
+        var reasons = _rootServiceProvider.GetServices<ProtoCapabilityReason>().ToArray();
+        return reasons
+                .FirstOrDefault(reason => string.Equals(reason.Kind, kind, StringComparison.Ordinal)
+                    && string.Equals(reason.Name, name, StringComparison.Ordinal))
+                ?.Reason
+            ?? (name is null
+                ? null
+                : reasons
+                    .FirstOrDefault(reason => string.Equals(reason.Kind, kind, StringComparison.Ordinal)
+                        && reason.Name is null)
+                    ?.Reason);
     }
 
     // A capability that describes one instance carries it in the entity id, so two live instances of
@@ -344,12 +390,13 @@ public sealed class ProtoHost : IAsyncDisposable
         }
         catch (Exception exception)
         {
-            // Nothing that did start may leak: the run-resource hook releases the infrastructure started
-            // so far, in reverse registration order. Gates, reports and the archive do not run for a run
-            // that never finished starting, and the state returns to Created so a retry is possible.
+            // Nothing that owns state may leak: every completed hook unwinds in reverse, so a user
+            // hook's BeforeRun setup is undone. Hooks whose AfterRun writes run evidence (gates,
+            // reports, the archive) are not unwound: a run that never finished starting produces no
+            // evidence, and the state returns to Created so a retry is possible.
             var failures = new List<Exception> { exception };
             IReadOnlyList<IProtoRunHook> rollbackHooks =
-                [.. _startedHooks.OfType<ProtoRunResourceHook>().Cast<IProtoRunHook>()];
+                [.. _startedHooks.Where(hook => hook is not IProtoRunEvidenceHook)];
             await _runHooks.RunAfterAsync(rollbackHooks, failures, cancellationToken);
             _startedHooks.Clear();
             _runState.RollbackStart();
@@ -413,6 +460,27 @@ public sealed class ProtoHost : IAsyncDisposable
     }
 
     /// <summary>
+    /// Starts a test lifecycle with an explicit numeric ID and a cancellation token for the test.
+    /// Setup I/O that can observe cancellation - the SQL connection open and transaction begin - does;
+    /// the token reaches hooks and attributes through <see cref="ProtoExecutionContext.CancellationToken"/>.
+    /// </summary>
+    public Task<ProtoExecutionContext> StartTestAsync(
+        string testName,
+        string testId,
+        MethodInfo testMethod,
+        CancellationToken cancellationToken)
+    {
+        EnsureTestCanStart();
+        return _testLifecycle.StartAsync(
+            testName,
+            ProtoTestId.Parse(testId),
+            testMethod,
+            attributes: null,
+            attachmentPublisher: null,
+            cancellationToken);
+    }
+
+    /// <summary>
     /// Starts a test lifecycle with an ID generated by this host.
     /// </summary>
     public Task<ProtoExecutionContext> StartTestAsync(
@@ -423,6 +491,23 @@ public sealed class ProtoHost : IAsyncDisposable
     {
         EnsureTestCanStart();
         return _testLifecycle.StartAsync(testName, testMethod, attributes, attachmentPublisher);
+    }
+
+    /// <summary>
+    /// Starts a test lifecycle with an ID generated by this host and a cancellation token for the test.
+    /// </summary>
+    public Task<ProtoExecutionContext> StartTestAsync(
+        string testName,
+        MethodInfo testMethod,
+        CancellationToken cancellationToken)
+    {
+        EnsureTestCanStart();
+        return _testLifecycle.StartAsync(
+            testName,
+            testMethod,
+            attributes: null,
+            attachmentPublisher: null,
+            cancellationToken);
     }
 
     /// <summary>

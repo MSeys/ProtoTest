@@ -91,7 +91,7 @@ using var response = await Proto.Context.Rest()
 
 response
     .Should.HaveHttpStatus(HttpStatusCode.Forbidden)
-    .ShouldMatchShape(new { error = "tenant-access-denied" });
+    .Should.MatchShape(new { error = "tenant-access-denied" });
 ```
 
 ## Precedence

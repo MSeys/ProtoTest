@@ -99,8 +99,39 @@ public sealed class ProtoHostLifecycleTests
         Assert.DoesNotThrowAsync(async () => await host.CompleteTestAsync(ProtoTestResult.Skipped));
     }
 
+    [Test]
+    public async Task StartTest_ShouldCarryTheCallersCancellationTokenToTheContextAndHooks()
+    {
+        var hook = new TokenRecordingHook();
+        var services = new ServiceCollection();
+        services.AddSingleton<IProtoTestHook>(hook);
+        await using var host = new ProtoHost(services.BuildServiceProvider());
+        using var cancellation = new CancellationTokenSource();
+
+        var context = await host.StartTestAsync("Token", "00001", TestMethods.Placeholder, cancellation.Token);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(context.CancellationToken, Is.EqualTo(cancellation.Token));
+            Assert.That(hook.Token, Is.EqualTo(cancellation.Token),
+                "a hook reaches the same token through the context");
+        });
+        await host.CompleteTestAsync();
+    }
+
     private static ProtoHost CreateHost()
         => new(new ServiceCollection().BuildServiceProvider());
+
+    private sealed class TokenRecordingHook : IProtoTestHook
+    {
+        public CancellationToken Token { get; private set; }
+
+        public Task BeforeTestAsync(ProtoExecutionContext context)
+        {
+            Token = context.CancellationToken;
+            return Task.CompletedTask;
+        }
+    }
 
     private sealed class FailOnceRunHook : IProtoRunHook
     {

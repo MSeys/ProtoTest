@@ -14,4 +14,17 @@ public static class ProtoTestName
         ArgumentNullException.ThrowIfNull(method);
         return method.DeclaringType is null ? method.Name : $"{method.DeclaringType.FullName}.{method.Name}";
     }
+
+    /// <summary>
+    /// Composes one parameterized row's trace name from the method's stable name and the row's
+    /// arguments - "DeclaringType.FullName.MethodName[1, admin]" - so rows of one method stay
+    /// distinguishable in traces and reports. MSTest and TUnit share this form; NUnit and xUnit
+    /// record their own runner's display name instead.
+    /// </summary>
+    public static string ForRow(MethodInfo method, IEnumerable<object?> arguments)
+    {
+        ArgumentNullException.ThrowIfNull(method);
+        ArgumentNullException.ThrowIfNull(arguments);
+        return $"{FromMethod(method)}[{string.Join(", ", arguments.Select(argument => argument?.ToString() ?? "null"))}]";
+    }
 }

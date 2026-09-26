@@ -71,7 +71,7 @@ A `[ProtoTestTheory]` behaves the same way; each `[InlineData]` row is a test of
 
 ## Per-test lifecycle
 
-`ProtoXunitTestRunner.InvokeTestMethodAsync` starts the context with xUnit's display name, runs the test, then completes it with the outcome xUnit recorded. If setup fails the context is already rolled back, the failure goes into xUnit's aggregator, and the test fails.
+`ProtoXunitTestRunner.InvokeTestMethodAsync` starts the context with xUnit's display name, runs the test, then completes it in a `finally` with the outcome xUnit recorded, so the context completes even if xUnit's own pipeline throws. If setup fails the context is already rolled back, the failure goes into xUnit's aggregator, and the test fails.
 
 Each theory row is its own test: the runner creates one `ProtoXunitTestRunner` per row, recorded under xUnit's display name with the arguments included — `….Invoices_filter_by_state(state: "open")` — so the trace keeps them apart.
 
@@ -81,6 +81,7 @@ Each theory row is its own test: the runner creates one `ProtoXunitTestRunner` p
 | --- | --- | --- |
 | passed | `Passed` | nothing failed in xUnit's aggregator |
 | failed | `Failed` with the exception | the aggregator's exception is recorded and rethrown by xUnit |
+| failed with an `OperationCanceledException` | `Cancelled` | the test was interrupted, not broken |
 | cancelled | `Cancelled` | the runner's `CancellationTokenSource` was signalled |
 | skipped | nothing | xUnit never invokes a skipped test, so no context starts |
 
@@ -103,7 +104,7 @@ ProtoTest attachment 'rest-01-response': /path/to/TestResults/.../rest-01-respon
 - No native attachments — artifacts land next to the trace, not in xUnit's output.
 - No dynamic skip: the reason is decided before the test method is invoked, so a condition cannot depend on the body.
 - Every test class must join the collection; the host is never initialized otherwise.
-- Theory rows are recorded under xUnit's display name; NUnit and MSTest also append the row's arguments, while a plain method keeps the fully qualified name.
+- Theory rows are recorded under xUnit's display name; NUnit, MSTest and TUnit also append the row's arguments, while a plain method keeps the fully qualified name.
 
 ## Next
 

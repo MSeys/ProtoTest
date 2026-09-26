@@ -55,7 +55,7 @@ public sealed class MonthlyReportTests
 
         var report = Proto.Context.Sheets().Open(response).Model<ProjectReportRow>();
 
-        report.Verify();
+        report.Should.MatchModel();
         report.Row(row => row.Name == name)
             .ShouldMatchShape(new { Status = "active", Environments = 0 });
     }
@@ -64,7 +64,7 @@ public sealed class MonthlyReportTests
 
 ## What it proves
 
-`Verify()` checks the model's rules across every row — uniqueness, patterns, minimums — and `Row(...)` proves the report actually contains the project this test created. The workbook is read as OpenXML, so it makes no difference whether the application wrote it with ClosedXML, EPPlus or anything else.
+`Should.MatchModel()` checks the model's rules across every row - uniqueness, patterns, minimums - and `Row(...)` proves the report actually contains the project this test created. The workbook is read as OpenXML, so it makes no difference whether the application wrote it with ClosedXML, EPPlus or anything else.
 
 <TraceExample
   demo="workbook"
@@ -75,7 +75,7 @@ public sealed class MonthlyReportTests
 ## Limits
 
 - **`Open(response)` needs no file.** A REST response is named content, so the workbook is read straight from it. Turn on [REST capture](../integrations/rest/attachments.md) to keep the exact file with the test.
-- **`Verify()` reports everything at once.** A missing header fails when the model is read, naming it; broken column rules are collected, each with its cell reference, into one failure.
+- **`Should.MatchModel()` reports everything at once.** A missing header fails when the model is read, naming it; broken column rules are collected, each with its cell reference, into one failure.
 - **OpenXML `.xlsx` only.** There is no `.xls`, no CSV and no writing.
 - **Formulas are cached values.** Nothing is recalculated, and dates are detected from the cell's style, not a schema.
 - **Ranges are capped at 1,000,000 cells**, and hidden sheets are skipped unless the options ask for them.

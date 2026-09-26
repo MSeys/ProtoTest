@@ -10,7 +10,7 @@ dotnet add package ProtoTest.Sheets
 var workbook = Proto.Context.Sheets().Open("monthly-report.xlsx");
 
 workbook.Sheet("Summary").Cell("B1").Should.Be(42.0);
-workbook.Sheet("Sales").Model<SalesRow>().Verify();
+workbook.Sheet("Sales").Model<SalesRow>().Should.MatchModel();
 ```
 
 Workbook reads and assertions are recorded in the trace; cell and range reads contribute to Sheets

@@ -113,7 +113,14 @@ public sealed partial class WebModelTests
         public string? CurrentAddress { get; set; }
 
         public ValueTask<string?> GetCurrentAddressAsync(CancellationToken cancellationToken = default)
-            => ValueTask.FromResult(CurrentAddress);
+        {
+            CallOrder.Add("address");
+            return ValueTask.FromResult(CurrentAddress);
+        }
+
+        /// <summary>The order backend calls happened in; the coverage test proves the address read is
+        /// inside the assertion operation.</summary>
+        public List<string> CallOrder { get; } = [];
 
         public ValueTask NavigateAsync(Uri address, CancellationToken cancellationToken = default)
         {
@@ -127,6 +134,17 @@ public sealed partial class WebModelTests
             CancellationToken cancellationToken = default)
         {
             BegunOperations.Add(operation);
+            CallOrder.Add("begin");
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask EndOperationAsync(
+            WebBackendOperationContext operation,
+            ProtoTraceOutcome outcome,
+            Exception? exception = null,
+            CancellationToken cancellationToken = default)
+        {
+            CallOrder.Add("end");
             return ValueTask.CompletedTask;
         }
 
@@ -304,24 +322,35 @@ public sealed partial class WebModelTests
         public string TagName => "div";
         public string Text { get; } = text;
         public bool Enabled => true;
-        public bool Selected => false;
+
+        /// <summary>What a click does. The default is nothing, which models a click the page swallowed.</summary>
+        public Action? OnClick { get; set; }
+
+        /// <summary>The DOM <c>value</c> the element reports; a select option is matched by it.</summary>
+        public string? DomValue { get; set; }
+
+        /// <summary>The options a select returns for <c>FindElements(By.TagName("option"))</c>.</summary>
+        public IReadOnlyList<OpenQA.Selenium.IWebElement> Options { get; set; } = [];
+
+        public bool Selected { get; set; }
         public System.Drawing.Point Location => default;
         public System.Drawing.Size Size => default;
         public bool Displayed => true;
         public void Clear() { }
         public void SendKeys(string value) { }
         public void Submit() { }
-        public void Click() { }
+        public void Click() => OnClick?.Invoke();
         public string GetAttribute(string attributeName) => string.Empty;
         public string GetCssValue(string propertyName) => string.Empty;
         public string? GetDomAttribute(string attributeName) => null;
-        public string? GetDomProperty(string propertyName) => null;
+        public string? GetDomProperty(string propertyName)
+            => string.Equals(propertyName, "value", StringComparison.Ordinal) ? DomValue : null;
         public string? GetProperty(string propertyName) => null;
         public OpenQA.Selenium.ISearchContext GetShadowRoot() => throw new NotSupportedException();
         public OpenQA.Selenium.IWebElement FindElement(OpenQA.Selenium.By by)
             => throw new OpenQA.Selenium.NoSuchElementException();
         public System.Collections.ObjectModel.ReadOnlyCollection<OpenQA.Selenium.IWebElement> FindElements(
-            OpenQA.Selenium.By by) => new([]);
+            OpenQA.Selenium.By by) => new(Options.ToList());
         public void Dispose() { }
     }
 

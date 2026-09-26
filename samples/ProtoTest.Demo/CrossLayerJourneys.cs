@@ -22,10 +22,7 @@ using ProtoTest.Web;
 [Auth<NorthstarAuthenticator>]
 [WebSession("Default", DiscoverRoutes = true)]
 [LoginAs<NorthstarConsoleLogin>("owner")]
-[RequiresCapability(
-    ProtoCapabilityKinds.Server,
-    CapabilityName = "Northstar standalone",
-    Reason = "The standalone application is only started when the suite owns the store.")]
+[RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "Northstar standalone")]
 [RequiresConsoleBuild]
 public sealed class ApiThenBrowserJourney
 {
@@ -64,10 +61,7 @@ public sealed class ApiThenBrowserJourney
 [Auth<NorthstarAuthenticator>]
 [WebSession("Default", DiscoverRoutes = true)]
 [LoginAs<NorthstarConsoleLogin>("owner")]
-[RequiresCapability(
-    ProtoCapabilityKinds.Server,
-    CapabilityName = "Northstar standalone",
-    Reason = "The standalone application is only started when the suite owns the store.")]
+[RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "Northstar standalone")]
 [RequiresConsoleBuild]
 public sealed class BrowserThenApiJourney
 {
@@ -101,6 +95,6 @@ public sealed class BrowserThenApiJourney
                 totalCount = 1,
                 nodes = new[] { new { name = ProjectName, status = ProjectStatuses.Active } }
             });
-        graph.ShouldHaveNoErrors();
+        graph.Should.HaveNoErrors();
     }
 }

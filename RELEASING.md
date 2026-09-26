@@ -58,11 +58,14 @@ git push origin v<version>
 
 `release.yml` triggers on `v*` tags. Its verify job runs the CI shape and uploads the packages it
 built; the release job publishes exactly those packages with `eng/release.ps1` (NuGet OIDC login
-against the `NUGET_USER` secret, or `NUGET_API_KEY` for a local push) and creates the GitHub Release
-from the changelog section. `eng/release.ps1` fails when the tag does not match the packed version,
-when the folder holds two versions, or when a ProtoTest dependency is not part of the same release.
-`workflow_dispatch` runs the same job with `dry_run: true` by default, which packs and plans without
-pushing.
+against the `NUGET_USER` secret, or `NUGET_API_KEY` with `-AllowBranch` for a deliberate local push)
+and creates the GitHub Release from the changelog section. Publishing is tag-gated: the workflow logs
+in and publishes only from a `v*` tag, a dispatch with `dry_run: false` from a branch fails at the
+guard instead of pushing, and `eng/release.ps1` refuses a real push from any non-tag ref (or a local
+run with no CI ref) unless `-AllowBranch` is passed. `eng/release.ps1` fails when the tag does not
+match the packed version, when the folder holds two versions, or when a ProtoTest dependency is not
+part of the same release. `workflow_dispatch` validates the plan without pushing (`dry_run: true`,
+the default).
 
 ## 5. Baseline rollover (after the release publishes)
 

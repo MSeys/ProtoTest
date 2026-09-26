@@ -14,7 +14,7 @@ public sealed partial class SeleniumWebBackend : IWebBackend, IWebBackendJavaScr
     private readonly ProtoExecutionContext _context;
     private readonly SeleniumWebOptions _options;
     private readonly string _sessionName;
-    private readonly SeleniumDriverExecutor _executor = new();
+    private readonly SeleniumDriverExecutor _executor;
     private readonly WebProbeLoop _probes;
     private readonly ConcurrentQueue<SeleniumDiagnosticEntry> _diagnostics = new();
     private readonly DateTimeOffset _startedAtUtc = DateTimeOffset.UtcNow;
@@ -27,17 +27,23 @@ public sealed partial class SeleniumWebBackend : IWebBackend, IWebBackendJavaScr
         ProtoExecutionContext context,
         IWebDriver driver,
         SeleniumWebOptions options,
-        string sessionName)
+        string sessionName,
+        TimeSpan? pumpJoinTimeout = null)
     {
         _context = context;
         Driver = driver;
         _options = options;
         _sessionName = sessionName;
-        _probes = new WebProbeLoop(options.PollInterval);
+        _executor = new SeleniumDriverExecutor(pumpJoinTimeout);
+        _probes = new WebProbeLoop(() => _options.PollInterval);
     }
 
     public string Name => "Selenium";
     public IWebDriver Driver { get; }
+
+    /// <summary>The session assertion poll interval is this option, so one setting retimes the backend's
+    /// action retries and the session's element assertions together.</summary>
+    public TimeSpan PollInterval => _options.PollInterval;
 
     public ValueTask<string?> GetCurrentAddressAsync(CancellationToken cancellationToken = default)
         => _executor.RunAsync<string?>(() => Driver.Url, cancellationToken);
@@ -46,19 +52,34 @@ public sealed partial class SeleniumWebBackend : IWebBackend, IWebBackendJavaScr
         => _executor.RunAsync(() => Driver.Navigate().GoToUrl(address), cancellationToken);
 
     public ValueTask ClickAsync(WebElementReference element, CancellationToken cancellationToken = default)
-        => ExecuteActionableAsync(element, WebOperationKind.Click, resolved => resolved.Click(), cancellationToken);
+        => ExecuteActionableAsync(element, WebOperationKind.Click, resolved =>
+        {
+            resolved.Click();
+            return null;
+        }, cancellationToken);
 
     public ValueTask FillAsync(WebElementReference element, string value, CancellationToken cancellationToken = default)
         => ExecuteActionableAsync(element, WebOperationKind.Fill, resolved =>
         {
             resolved.Clear();
             resolved.SendKeys(value);
+            return null;
         }, cancellationToken);
 
     public ValueTask CheckAsync(WebElementReference element, bool isChecked, CancellationToken cancellationToken = default)
         => ExecuteActionableAsync(element, WebOperationKind.Check, resolved =>
         {
-            if (resolved.Selected != isChecked) resolved.Click();
+            if (resolved.Selected != isChecked)
+            {
+                resolved.Click();
+                if (resolved.Selected != isChecked)
+                {
+                    return $"checked={resolved.Selected.ToString().ToLowerInvariant()} after the click, " +
+                           $"expected checked={isChecked.ToString().ToLowerInvariant()}";
+                }
+            }
+
+            return null;
         }, cancellationToken);
 
     public ValueTask SelectOptionAsync(WebElementReference element, string value, CancellationToken cancellationToken = default)
@@ -71,10 +92,17 @@ public sealed partial class SeleniumWebBackend : IWebBackend, IWebBackendJavaScr
                 throw new WebElementResolutionException(
                     $"Expected one option with the requested value in '{element.ComponentPath}.{element.Name}', but found {matches.Length}.");
             matches[0].Click();
+            return matches[0].Selected
+                ? null
+                : $"option with value '{value}' is not selected after the click";
         }, cancellationToken);
 
     public ValueTask PressAsync(WebElementReference element, WebKey key, CancellationToken cancellationToken = default)
-        => ExecuteActionableAsync(element, WebOperationKind.Press, resolved => resolved.SendKeys(MapKey(key)), cancellationToken);
+        => ExecuteActionableAsync(element, WebOperationKind.Press, resolved =>
+        {
+            resolved.SendKeys(MapKey(key));
+            return null;
+        }, cancellationToken);
 
     public ValueTask<int> CountAsync(WebElementReference elements, CancellationToken cancellationToken = default)
         => _executor.RunAsync(

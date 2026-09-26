@@ -29,14 +29,14 @@ public sealed class DatabaseProviderTests
     {
         var environment = CreateEnvironment();
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(environment.UsesLocalApplications, Is.True);
             Assert.That(environment.RunsStandaloneConsole, Is.True);
             Assert.That(environment.UsesPostgres, Is.False);
             Assert.That(environment.CanComposeDomain, Is.True);
             Assert.That(environment.UsesMessaging, Is.False);
-        });
+        }
     }
 
     [Test]
@@ -44,12 +44,12 @@ public sealed class DatabaseProviderTests
     {
         var environment = CreateEnvironment(("ProtoTest:TargetUrl", "https://northstar.example"));
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(environment.UsesLocalApplications, Is.False);
             Assert.That(environment.RunsStandaloneConsole, Is.False);
             Assert.That(environment.CanComposeDomain, Is.False);
-        });
+        }
     }
 
     [Test]
@@ -59,14 +59,14 @@ public sealed class DatabaseProviderTests
             ("ProtoTest:Database", "postgres"),
             ("ProtoTest:Messaging:Broker", "container"));
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(environment.OwnsPostgres, Is.True);
             Assert.That(environment.UsesPostgres, Is.True);
             Assert.That(environment.RunsStandaloneConsole, Is.False);
             Assert.That(environment.OwnsMessagingBroker, Is.True);
             Assert.That(environment.UsesMessaging, Is.True);
-        });
+        }
     }
 
     [Test]
@@ -77,14 +77,14 @@ public sealed class DatabaseProviderTests
             ("ConnectionStrings:Northstar", "Host=db;Database=northstar;Username=app;Password=secret"),
             ("ProtoTest:Messaging:RabbitMq:ConnectionString", "amqp://guest:guest@broker"));
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(environment.OwnsPostgres, Is.False);
             Assert.That(environment.UsesPostgres, Is.True);
             Assert.That(environment.CanComposeDomain, Is.True);
             Assert.That(environment.OwnsMessagingBroker, Is.False);
             Assert.That(environment.UsesMessaging, Is.True);
-        });
+        }
     }
 
     private static DemoEnvironment CreateEnvironment(params (string Key, string? Value)[] settings)

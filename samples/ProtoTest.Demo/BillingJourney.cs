@@ -31,7 +31,7 @@ public sealed class BillingJourney
             .GetAsync("/api/v1/usage/summary", new { metric = UsageMetrics.DeployMinutes });
 
         // Assert
-        summary.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        summary.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new
         {
             metric = UsageMetrics.DeployMinutes,
             total = 100_500d,
@@ -56,7 +56,7 @@ public sealed class BillingJourney
         // Assert
         using var invoices = await Proto.Context.Rest()
             .GetAsync("/api/v1/invoices", new { status = InvoiceStatuses.Open });
-        invoices.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        invoices.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new
         {
             items = new[]
             {
@@ -95,7 +95,7 @@ public sealed class BillingJourney
             .PostAsync("/api/v1/invoices/{invoiceId}/pay", new { invoiceId = invoice.Id });
 
         // Assert
-        paid.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        paid.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new
         {
             status = InvoiceStatuses.Paid,
             paidAtUtc = JsonValue.NotNull(),
@@ -123,7 +123,7 @@ public sealed class BillingJourney
             .PostAsync("/api/v1/invoices/{invoiceId}/pay", new { invoiceId = invoice.Id });
 
         // Assert
-        declined.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        declined.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new
         {
             status = InvoiceStatuses.Open,
             paidAtUtc = JsonValue.Null(),
@@ -146,7 +146,7 @@ public sealed class BillingJourney
         declined.Should.HaveHttpStatus(HttpStatusCode.OK);
         using var pastDue = await Proto.Context.Rest().GetAsync("/api/v1/organization");
         pastDue.Should.HaveHttpStatus(HttpStatusCode.OK)
-            .ShouldMatchShape(new { status = SubscriptionStatuses.PastDue });
+            .Should.MatchShape(new { status = SubscriptionStatuses.PastDue });
 
         // Act
         using var project = await Proto.Context.Rest()
@@ -155,7 +155,7 @@ public sealed class BillingJourney
 
         // Assert
         project.Should.HaveHttpStatus(HttpStatusCode.PaymentRequired)
-            .ShouldMatchShape(new { code = ProblemCodes.PaymentRequired });
+            .Should.MatchShape(new { code = ProblemCodes.PaymentRequired });
     }
 
     [ProtoTest]
@@ -176,7 +176,7 @@ public sealed class BillingJourney
 
         // Assert
         recovered.Should.HaveHttpStatus(HttpStatusCode.OK)
-            .ShouldMatchShape(new { status = InvoiceStatuses.Paid });
+            .Should.MatchShape(new { status = InvoiceStatuses.Paid });
         using var project = await Proto.Context.Rest()
             .Body(new CreateProjectRequest("recovered"))
             .PostAsync("/api/v1/projects");
@@ -196,7 +196,7 @@ public sealed class BillingJourney
             .PostAsync("/api/v1/subscription");
 
         // Assert
-        upgraded.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        upgraded.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new
         {
             planId = PlanIds.Enterprise,
             planName = "Enterprise",
@@ -233,7 +233,7 @@ public sealed class BillingJourney
         using var canceled = await Proto.Context.Rest().PostAsync("/api/v1/subscription/cancel");
 
         // Assert
-        canceled.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        canceled.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new
         {
             cancelAtPeriodEnd = true,
             status = SubscriptionStatuses.Active
@@ -256,9 +256,9 @@ public sealed class BillingJourney
 
         // Assert
         project.Should.HaveHttpStatus(HttpStatusCode.PaymentRequired)
-            .ShouldMatchShape(new { code = ProblemCodes.PaymentRequired });
+            .Should.MatchShape(new { code = ProblemCodes.PaymentRequired });
         using var subscription = await Proto.Context.Rest().GetAsync("/api/v1/subscription");
-        subscription.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        subscription.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new
         {
             status = SubscriptionStatuses.Canceled,
             cancelAtPeriodEnd = false

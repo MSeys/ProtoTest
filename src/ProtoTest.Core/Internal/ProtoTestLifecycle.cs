@@ -33,7 +33,11 @@ internal sealed class ProtoTestLifecycle
     }
 
     public static ProtoExecutionContext CurrentContext => Current.Value?.Context
-        ?? throw new InvalidOperationException("No active ProtoExecutionContext available on this thread.");
+        ?? throw new InvalidOperationException(
+            "No active ProtoExecutionContext is available on this flow. Proto.Context only works inside a " +
+            "test body, in the test-author code it calls, and in the attributes and hooks that run around " +
+            "it. Off-flow telemetry uses ProtoHost.FindTraceWriter(Activity?) to reach the owning test's " +
+            "trace, and run-level code uses ProtoHost.CurrentHost or the host reference a hook receives.");
 
     /// <summary>Gets the current test context, or <see langword="null"/> when none is active on this flow.</summary>
     public static ProtoExecutionContext? TryGetCurrentContext => Current.Value?.Context;
@@ -44,10 +48,17 @@ internal sealed class ProtoTestLifecycle
         string testName,
         MethodInfo testMethod,
         IEnumerable<ProtoAttribute>? attributes,
-        IProtoTestAttachmentPublisher? attachmentPublisher)
+        IProtoTestAttachmentPublisher? attachmentPublisher,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(testMethod);
-        return StartAsync(testName, _testIdGenerator.Next(testMethod), testMethod, attributes, attachmentPublisher);
+        return StartAsync(
+            testName,
+            _testIdGenerator.Next(testMethod),
+            testMethod,
+            attributes,
+            attachmentPublisher,
+            cancellationToken);
     }
 
     public Task<ProtoExecutionContext> StartAsync(
@@ -55,7 +66,8 @@ internal sealed class ProtoTestLifecycle
         ProtoTestId testId,
         MethodInfo testMethod,
         IEnumerable<ProtoAttribute>? attributes,
-        IProtoTestAttachmentPublisher? attachmentPublisher)
+        IProtoTestAttachmentPublisher? attachmentPublisher,
+        CancellationToken cancellationToken = default)
     {
         if (Current.Value?.Context is not null)
         {
@@ -76,7 +88,8 @@ internal sealed class ProtoTestLifecycle
             // Each test gets its own clock, seeded from the run's: advancing time inside a test stays
             // inside that test, and parallel tests never share a timeline.
             var clock = new ProtoClock(_clock.GetUtcNow());
-            var context = new ProtoExecutionContext(testName, scope, testId, testMethod, testTrace, clock, _clockRegistry);
+            var context = new ProtoExecutionContext(
+                testName, scope, testId, testMethod, testTrace, clock, _clockRegistry, cancellationToken);
             // The registration happens inside the same guard as the rest of the start: a start that
             // fails below removes its own clock instead of leaking an entry no context will dispose.
             _clockRegistry.Add(testId.Value, clock);

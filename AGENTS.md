@@ -7,13 +7,17 @@ This file is the operating contract for contributors and coding agents working i
 
 ## Read before you act
 
-1. `eng/plan-5.md` — the plan of record; work only from its next unchecked item.
+1. `assets/internal/records/plan-6.md` — the plan of record for the consolidation phases (C0–C4); its
+   final phase hands back to `plan-5.md`/`plan-4.md` for features. Work only from its next unchecked
+   item. The process records — plans, audits, handoffs, reviews — live in the private `records`
+   checkout at `assets/internal/records/` (a separate git repository); a contributor without that
+   checkout uses the public docs and `CONTRIBUTING.md`.
 2. `eng/facts/architecture.md`, `recipes.md`, `gotchas.md` — the model, the way to add things, the
-   known traps; `eng/dx-review.md` — the API/DX consistency register (public surface follows it, or the
-   register is updated with the reason).
-3. `eng/audit-plan-4.md` — open findings; `eng/plan-4.md` — scope and binding decisions (Track W done,
-   R/P/X open); `eng/feature-plan.md` — feature scope.
-4. `eng/handoff-template.md` — the handoff you write before stopping.
+   known traps; `assets/internal/records/dx-review.md` — the API/DX consistency register (public
+   surface follows it, or the register is updated with the reason).
+3. `assets/internal/records/audit-plan-4.md` — the closed audit; `audit-plan-5.md` — the open one when
+   it exists; `plan-5.md`/`plan-4.md` — scope and binding decisions; `feature-plan.md` — feature scope.
+4. `assets/internal/records/handoff-template.md` — the handoff you write before stopping.
 
 ## Non-negotiables
 
@@ -44,7 +48,8 @@ This file is the operating contract for contributors and coding agents working i
 
 ## Workflow
 
-1. Pick the next unchecked item in `eng/plan-5.md` (or an audit stage it references).
+1. Pick the next unchecked item in the records plan of record (`assets/internal/records/plan-6.md`;
+   after C4, `plan-5.md` Phase 4).
 2. Check `gotchas.md` for the area; read the canonical example for the recipe.
 3. For a deliberate behavior change: pin the current behavior with a test, then change it, then flip
    the test.
@@ -59,11 +64,11 @@ When a controller session runs workers:
 1. Dispatch one bounded stage per worker, with the handoff, the stage ID, the acceptance criteria and
    the gate command.
 2. A worker never commits and never starts a second stage; a worker that cannot finish writes the
-   handoff from `eng/handoff-template.md` and stops.
+   handoff from `assets/internal/records/handoff-template.md` and stops.
 3. The controller verifies the worker's gate line and diff, then runs the consistency pass: naming and
-   API shape against `eng/facts/recipes.md` and `eng/dx-review.md` (a public surface follows the recorded
-   idiom, or the register is updated with the reason), and facts/plan/changelog updates in the same
-   commit.
+   API shape against `eng/facts/recipes.md` and `assets/internal/records/dx-review.md` (a public surface
+   follows the recorded idiom, or the register is updated with the reason), and facts/plan/changelog
+   updates in the same commit.
 4. A stage that changes the public surface also gets an independent review worker before the controller
    commits. The reviewer verifies the evidence record and the diff and re-runs the affected test
    projects; it re-runs the full gate (`-Full`, add `-Pack` when packaging changed) when the evidence is
@@ -79,7 +84,8 @@ When a controller session runs workers:
 | `eng/lint.ps1` | every stage |
 | `eng/check-docs.ps1` | docs, README or site changes |
 | `eng/pack.ps1` | packaging, csproj, version or new-project changes |
-| `eng/verify.ps1 -Stage <name>` | every stage; auto-scopes format to the touched projects, skips lint/tests when no code changed, `-Pack` when public surface or packaging changed, `-Full` to force the CI shape; writes `artifacts/gates/<name>.json` |
+| `eng/verify.ps1 -Stage <name>` | every stage; scopes to the working-tree change, or the HEAD commit on a clean tree; a docs-only stage records `docs-only`, a stage that only touched gate scripts/workflows records `tooling` and runs the gate fixtures, and a code stage whose lint/tests were skipped records `incomplete` (non-green) unless `-AllowSkippedCodeGates` names the exception; `-Pack` when public surface or packaging changed, `-Full` to force the CI shape; writes `artifacts/gates/<name>.json` |
+| `eng/test-gates.ps1` | the gate scripts' own fixtures; runs inside `verify.ps1` when `eng/**.ps1` or workflows changed, and in CI |
 | `npm run build` in `docs/` | docs site content or navigation changes |
 
 Do not commit with a red gate, and do not describe a gate as green without the command output.
@@ -100,7 +106,9 @@ Do not commit with a red gate, and do not describe a gate as green without the c
 - Branch packages carry `1.1.0-alpha.<n>` once plan-5 Phase 0 lands; never the published version.
 - Consumers resolve ProtoTest packages from the local feed produced by `eng/pack.ps1` with
   package-source mapping, and clear `~/.nuget/packages/prototest.*` after a repack.
-- `assets/internal/` is gitignored scratch; durable engineering facts live in `eng/facts/`.
+- `assets/internal/` is gitignored scratch; its `records/` subdirectory is a private git repository
+  holding the process records (plan of record, audits, handoffs, reviews). Engineering facts that the
+  code evolves with live in the tracked `eng/facts/`.
 
 ## If you are unsure
 

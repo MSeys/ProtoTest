@@ -91,13 +91,18 @@ internal static class ProtoTestLifecycleHandler
         ProtoTestAsync.RunSync(() => scope.DisposeAsync());
     }
 
-    /// <summary>Maps an xUnit test result state onto the outcome ProtoTest records.</summary>
+    /// <summary>
+    /// Maps an xUnit test result state onto the outcome ProtoTest records. xUnit reports the result
+    /// state, not the exception object, so cancellation is decided by the shared rule's type-name half
+    /// (<see cref="ProtoTestResult.IsCancellation(string)"/>).
+    /// </summary>
     internal static ProtoTestResult MapResult(global::Xunit.TestResultState? state)
         => state?.Result switch
         {
             global::Xunit.TestResult.Passed => ProtoTestResult.Passed,
             global::Xunit.TestResult.Skipped or global::Xunit.TestResult.NotRun => ProtoTestResult.Skipped,
-            global::Xunit.TestResult.Failed when IsCancellation(state) => ProtoTestResult.Cancelled(
+            global::Xunit.TestResult.Failed when ProtoTestResult.IsCancellation(
+                state.ExceptionTypes?.FirstOrDefault()) => ProtoTestResult.Cancelled(
                 state.ExceptionTypes?.FirstOrDefault() ?? DefaultErrorType,
                 "Cancelled",
                 state.ExceptionMessages?.FirstOrDefault() ?? "The xUnit test was cancelled.",
@@ -108,11 +113,4 @@ internal static class ProtoTestLifecycleHandler
                 state.ExceptionStackTraces?.FirstOrDefault())),
             _ => ProtoTestResult.Unknown
         };
-
-    private static bool IsCancellation(global::Xunit.TestResultState state)
-        => state.ExceptionTypes?.Any(type =>
-            type == typeof(OperationCanceledException).FullName
-            || type == typeof(TaskCanceledException).FullName
-            || type == typeof(OperationCanceledException).Name
-            || type == typeof(TaskCanceledException).Name) == true;
 }

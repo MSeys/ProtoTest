@@ -53,7 +53,7 @@ public sealed class ProjectReadModelTests
                 nodes = new[] { new { name, status = "ACTIVE" } }
             });
 
-        projects.ShouldHaveNoErrors();
+        projects.Should.HaveNoErrors();
     }
 }
 ```

@@ -242,7 +242,6 @@ internal sealed class ProtoResourceRegistry
         private ProtoResourceState _state = ProtoResourceState.Registered;
         private TimeSpan? _releaseDuration;
         private string? _error;
-        private bool _releasing;
 
         public IProtoResource Resource { get; } = resource;
 
@@ -259,18 +258,19 @@ internal sealed class ProtoResourceRegistry
 
         /// <summary>
         /// Claims the one release this entry permits. The transition happens under the entry's lock, so
-        /// two concurrent callers cannot both run the resource's release callback.
+        /// two concurrent callers cannot both run the resource's release callback and a snapshot taken
+        /// while the callback runs reports <see cref="ProtoResourceState.Releasing"/>.
         /// </summary>
         public bool TryBeginRelease()
         {
             lock (_releaseGate)
             {
-                if (_state != ProtoResourceState.Registered || _releasing)
+                if (_state != ProtoResourceState.Registered)
                 {
                     return false;
                 }
 
-                _releasing = true;
+                _state = ProtoResourceState.Releasing;
                 return true;
             }
         }
@@ -301,7 +301,6 @@ internal sealed class ProtoResourceRegistry
                 _state = ProtoResourceState.Registered;
                 _releaseDuration = null;
                 _error = null;
-                _releasing = false;
             }
         }
 

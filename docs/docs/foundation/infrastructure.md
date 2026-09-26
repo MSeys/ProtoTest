@@ -210,6 +210,7 @@ Use `AddInfrastructure` when the piece must start with the run or publish values
 ## Limits
 
 - **Once per run.** Infrastructure starts and stops at run boundaries. Per-test setup is a [hook or attribute](./hooks.md) job.
+- **A started container is not watched.** The host waits for readiness once, at run start, and never polls the container again: if a container dies mid-run, the next call through its published connection string fails with the transport's own error in that test, and the run's release disposes what is left. There is no restart, failover or liveness probe, and the published setting keeps the dead address until the run is released.
 - **A configured environment wins.** Declare the keys a piece fills; when all of them are configured the host skips the piece instead of shadowing the environment. `AddInfrastructureAlways` forces a start (see [above](#when-the-environment-already-provides-the-addresses)).
 - **Failures are run failures.** There is no automatic skip for infrastructure that cannot start; use `TryStart` and decide before registering.
 - **Readiness fails, it does not skip.** A probe that times out fails the run before the first test. It also runs once, at run start - waiting inside a test is a hook's job, not a probe's.

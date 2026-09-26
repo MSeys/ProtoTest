@@ -30,7 +30,7 @@ public sealed class DeliveryJourney
             .PostAsync("/api/v1/environments/{environmentId}/deployments", new { environmentId = preview.Id });
 
         // Assert
-        deployment.Should.HaveHttpStatus(HttpStatusCode.Created).ShouldMatchShape(new
+        deployment.Should.HaveHttpStatus(HttpStatusCode.Created).Should.MatchShape(new
         {
             environmentId = preview.Id,
             version = "2026.09.1",
@@ -39,7 +39,7 @@ public sealed class DeliveryJourney
         });
         using var environments = await Proto.Context.Rest()
             .GetAsync("/api/v1/projects/{projectId}/environments", new { projectId = project.Id });
-        environments.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        environments.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new
         {
             items = new[]
             {
@@ -64,7 +64,7 @@ public sealed class DeliveryJourney
             .PostAsync("/api/v1/environments/{environmentId}/deployments", new { environmentId = production.Id });
 
         // Assert
-        promoted.Should.HaveHttpStatus(HttpStatusCode.Created).ShouldMatchShape(new
+        promoted.Should.HaveHttpStatus(HttpStatusCode.Created).Should.MatchShape(new
         {
             environmentId = production.Id,
             status = DeploymentStatuses.Succeeded,
@@ -72,7 +72,7 @@ public sealed class DeliveryJourney
         });
         using var deployments = await Proto.Context.Rest()
             .GetAsync("/api/v1/deployments", new { projectId = project.Id });
-        deployments.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new { totalCount = 2 });
+        deployments.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new { totalCount = 2 });
     }
 
     [ProtoTest]
@@ -89,7 +89,7 @@ public sealed class DeliveryJourney
             .PostAsync("/api/v1/environments/{environmentId}/deployments", new { environmentId = preview.Id });
 
         // Assert
-        failed.Should.HaveHttpStatus(HttpStatusCode.Created).ShouldMatchShape(new
+        failed.Should.HaveHttpStatus(HttpStatusCode.Created).Should.MatchShape(new
         {
             version = "2.0.0",
             status = DeploymentStatuses.Failed
@@ -115,7 +115,7 @@ public sealed class DeliveryJourney
             .PostAsync("/api/v1/deployments/{deploymentId}/rollback", new { deploymentId = current.Id });
 
         // Assert
-        rolledBack.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        rolledBack.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new
         {
             id = current.Id,
             status = DeploymentStatuses.RolledBack

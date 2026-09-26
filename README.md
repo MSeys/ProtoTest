@@ -94,7 +94,7 @@ public async Task RestWritesAreVisibleThroughGraphQL()
             nodes = new[] { new { name = "atlas", status = ProjectStatuses.Active } }
         });
 
-    projects.ShouldHaveNoErrors();
+    projects.Should.HaveNoErrors();
 }
 ```
 

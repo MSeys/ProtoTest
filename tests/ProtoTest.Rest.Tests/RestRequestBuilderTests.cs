@@ -153,7 +153,7 @@ public class RestRequestBuilderTests
         // Assert - Response Verification & Shape Hit Recording
         response
             .Should.HaveHttpStatus(HttpStatusCode.Created)
-            .ShouldMatchShape(new { id = JsonValue.GreaterThan(0), created = true });
+            .Should.MatchShape(new { id = JsonValue.GreaterThan(0), created = true });
 
         var shapeHit = _context.RecordedObservations.FirstOrDefault(h => h.Data is RestShapeMatchData);
         Assert.That(shapeHit, Is.Not.Null);
@@ -161,6 +161,12 @@ public class RestRequestBuilderTests
         var shapeData = (RestShapeMatchData)shapeHit!.Data!;
         Assert.That(shapeData.MatchedProperties, Contains.Item("$.id"));
         Assert.That(shapeData.MatchedProperties, Contains.Item("$.created"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(shapeData.Method, Is.EqualTo("POST"),
+                "the shape hit carries the structured method, not only the display identifier");
+            Assert.That(shapeData.RouteTemplate, Is.EqualTo("/users"));
+        });
         Assert.That(_context.Attachments.Select(attachment => attachment.Name), Is.EqualTo(new[]
         {
             "00000-rest-01-request",

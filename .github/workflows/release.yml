@@ -48,7 +48,9 @@ jobs:
 
       - name: NuGet login (OIDC to temporary key)
         id: login
-        if: inputs.dry_run != true
+        # Publishing is tag-gated (audit A5-07): a dry run needs no key, and a real publish only
+        # happens from the v* tag the release was cut for.
+        if: github.ref_type == 'tag' && inputs.dry_run != true
         uses: NuGet/login@v1
         with:
           user: ${{ secrets.NUGET_USER }}
@@ -58,11 +60,17 @@ jobs:
         env:
           NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
         run: |
+          # A dispatch from a branch must never reach nuget.org; versions are immutable, so a
+          # mistaken publish cannot be undone. Dry runs stay available everywhere; the real path
+          # also re-checks the ref here so the guard cannot be lost with a step condition.
           if ('${{ inputs.dry_run }}' -eq 'true') {
             ./eng/release.ps1 -Configuration Release -DryRun
-          } else {
-            ./eng/release.ps1 -Configuration Release
+            exit 0
           }
+          if ('${{ github.ref_type }}' -ne 'tag') {
+            throw "Refusing to publish from '${{ github.ref }}': this workflow publishes only from a v* tag. Dispatch with dry_run: true to validate without publishing."
+          }
+          ./eng/release.ps1 -Configuration Release
 
       - name: Create or update GitHub Release
         if: github.ref_type == 'tag' && inputs.dry_run != true

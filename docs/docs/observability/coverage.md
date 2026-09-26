@@ -55,12 +55,12 @@ Three different gaps, three different fixes:
 
 - **An endpoint was never called** — there's a feature with no test at all.
 - **A response status was never reached** — the error path is untested. `403` and `404` are the usual suspects.
-- **A property was never asserted** — the test calls the endpoint but doesn't check that field. Add it to a `ShouldMatchShape`.
+- **A property was never asserted** — the test calls the endpoint but doesn't check that field. Add it to a `Should.MatchShape`.
 
 The summary at the top of each report gives the total, covered and uncovered counts and a coverage percentage.
 
 :::tip[Coverage rewards shape assertions]
-Property coverage comes from the paths `ShouldMatchShape` matched. A test that only checks the status code covers the endpoint and the status, but none of the fields. That's deliberate — a field nobody asserts is a field that can break silently.
+Property coverage comes from the paths `Should.MatchShape` matched. A test that only checks the status code covers the endpoint and the status, but none of the fields. That's deliberate — a field nobody asserts is a field that can break silently.
 :::
 
 ## How it works
@@ -74,13 +74,13 @@ flowchart LR
     Sinks --> Archive[".prototrace"]
 ```
 
-1. Integrations record **observations** as tests run. REST records `http.response` for every response and `http.contract.shape` for every successful shape assertion; GraphQL records `graphql.response` and `graphql.contract.shape`; gRPC records `grpc.response` per call and `grpc.contract.shape`; messaging records `messaging.publish` and `messaging.receive`, plus `messaging.contract.shape` from a message shape assertion.
+1. Integrations record **observations** as tests run. REST records `http.response` for every response and `http.contract.shape` for every successful shape assertion; GraphQL records `graphql.response` and `graphql.contract.shape`; gRPC records `grpc.response` per call and `grpc.contract.shape`; messaging records `messaging.published` and `messaging.receive`, plus `messaging.contract.shape` from a message shape assertion.
 2. Each observation is offered to every registered **collector** whose `CanCollect` accepts it. Collectors live for the whole run, so they aggregate across all tests.
 3. When the run stops, every collector's **report items** are gathered, sorted by target, category and identifier, and passed to every **sink**.
 4. Files the sinks wrote are added to the `.prototrace` archive.
 
 :::warning[Messaging ships no collector, by decision]
-`ProtoTest.Messaging` records `messaging.publish`, `messaging.receive` and `messaging.contract.shape` observations as trace evidence, but destinations are deliberately not a built-in coverage category and the package ships no collector, so they never appear in a report unassisted. Register a collector of your own with the broker's target name (`RabbitMQ`, or `InMemory` for the default broker) if you want destinations aggregated. The same is true of `ProtoTest.Messaging.RabbitMq`.
+`ProtoTest.Messaging` records `messaging.published`, `messaging.receive` and `messaging.contract.shape` observations as trace evidence, but destinations are deliberately not a built-in coverage category and the package ships no collector, so they never appear in a report unassisted. Register a collector of your own with the broker's target name (`RabbitMQ`, or `InMemory` for the default broker) if you want destinations aggregated. The same is true of `ProtoTest.Messaging.RabbitMq`.
 :::
 
 ## Observations

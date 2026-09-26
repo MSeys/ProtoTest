@@ -1,5 +1,9 @@
 namespace ProtoTest.Messaging;
 
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using ProtoTest.Json;
+
 /// <summary>
 /// A message observed on or sent to a broker. Adapters map their technology's message onto this shape;
 /// the test-side API and the trace never see a broker-specific type.
@@ -8,7 +12,51 @@ public sealed record ProtoMessage(
     string Destination,
     string? Payload = null,
     IReadOnlyDictionary<string, string?>? Headers = null,
-    string? ContentType = null);
+    string? ContentType = null)
+{
+    /// <summary>The assertions of this message, for example <c>Should.MatchShape(shape)</c>.</summary>
+    [JsonIgnore]
+    public ProtoMessageAssertions Should => new(this);
+
+    /// <summary>
+    /// Deserializes the payload as <typeparamref name="T"/>, or returns <c>default</c> for an empty
+    /// payload. Uses <see cref="ProtoJsonDefaults.Reader"/> (case-insensitive property names) unless
+    /// <paramref name="options"/> overrides it. A payload of the wrong shape throws
+    /// <see cref="JsonException"/>; use <see cref="ReadRequired{T}(JsonSerializerOptions?)"/> when the
+    /// payload must exist.
+    /// </summary>
+    public T? ReadAsJson<T>(JsonSerializerOptions? options = null)
+        => ProtoJsonRead.Read<T>(Payload, jsonPath: null, required: false, ReadSemantics<T>(), options);
+
+    /// <summary>
+    /// Deserializes the payload as <typeparamref name="T"/> and fails when there is nothing to return:
+    /// an empty payload or JSON <c>null</c> throws <see cref="MessagingAssertionException"/> naming the
+    /// destination. The null check runs before the deserializer, so a value type reports the messaging
+    /// assertion rather than a raw <see cref="JsonException"/>.
+    /// </summary>
+    public T ReadRequired<T>(JsonSerializerOptions? options = null)
+        => ProtoJsonRead.Read<T>(Payload, jsonPath: null, required: true, ReadSemantics<T>(), options)!;
+
+    /// <summary>
+    /// Reads the value at <paramref name="jsonPath"/> as <typeparamref name="T"/> and fails when the
+    /// payload is empty, the path does not resolve or the value is JSON <c>null</c>. The supported subset
+    /// is <c>$</c>, dot members and <c>[n]</c> indices (see <see cref="JsonPathResolver"/>); a miss throws
+    /// <see cref="MessagingAssertionException"/> naming the destination and the path.
+    /// </summary>
+    public T ReadRequired<T>(string jsonPath, JsonSerializerOptions? options = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jsonPath);
+        return ProtoJsonRead.Read<T>(Payload, jsonPath, required: true, ReadSemantics<T>(), options)!;
+    }
+
+    // Messaging's half of the shared read: its exception type and destination subject. Messaging records
+    // no deserialize trace event (the assertion exception is the evidence), so the sink stays null.
+    private ProtoJsonReadSemantics ReadSemantics<T>() => new(
+        RequiredFailure: message => new MessagingAssertionException($"{Destination} — {message}"),
+        PathMissFailure: (message, inner) => new MessagingAssertionException($"{Destination} — {message}", inner),
+        EmptyBodyReason: "the payload was empty",
+        NullBodyReason: "the payload was JSON null");
+}
 
 /// <summary>
 /// The broker capability's state-free adapter contract. The capability owns the broker resource and the

@@ -60,6 +60,12 @@ public class ProtoTestAttribute : TestAttribute, IWrapSetUpTearDown
         }
     }
 
+    /// <summary>
+    /// Maps the result NUnit recorded. NUnit exposes only its own result state - the exception object
+    /// never reaches the adapter - so the shared <see cref="ProtoTestResult.FromException"/> rule is
+    /// deliberately not applied here: a cancelled body reads as Failed because NUnit reports it as a
+    /// plain failure (pinned by <c>OutcomeTests.CancelledSubject_ShouldRecordFailedOutcomeBecauseNUnitExposesNoExceptionType</c>).
+    /// </summary>
     private static ProtoTestResult MapResult(TestExecutionContext context)
     {
         var nunitResult = context.CurrentResult;

@@ -496,6 +496,49 @@ public sealed class ProtoTracingTests
     }
 
     [Test]
+    public async Task TelemetryCaptureFailure_ShouldCoalesceIntoOneRunEvent()
+    {
+        // A5.3 (Audit 5, A5-22): a broken capture must never break the application, but it must be
+        // visible: the first failure is one run event, later failures coalesce into it.
+        var sourceName = $"ProtoTest.Core.Tests.CaptureFailure.{Guid.NewGuid():N}";
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options =>
+        {
+            options.OutputPath = TemporaryTracePath();
+            options.ActivitySources.Add(sourceName);
+        });
+        await using var host = builder.Build();
+        await host.StartAsync();
+        using var source = new ActivitySource(sourceName);
+
+        // Act: a tag value whose ToString throws fails the capture of both spans.
+        using (var first = source.StartActivity("capture.failure.first"))
+        {
+            first!.SetTag("probe.bad", new ThrowingTagValue());
+        }
+        using (var second = source.StartActivity("capture.failure.second"))
+        {
+            second!.SetTag("probe.bad", new ThrowingTagValue());
+        }
+        await host.StopAsync();
+
+        // Assert
+        var events = host.Trace.Snapshot().Entries!
+            .Where(item => item.Kind == "telemetry.capture_failed")
+            .ToArray();
+        Assert.That(events, Has.Exactly(1).Items, "every capture failure coalesces into one event");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(events[0].Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(events[0].Error, Is.Not.Null);
+            Assert.That(events[0].Error!.Type, Is.EqualTo(typeof(InvalidOperationException).FullName));
+            Assert.That(events[0].Error!.Message, Is.EqualTo("tag value failed"));
+            Assert.That(events[0].Error!.StackTrace, Is.Not.Null.And.Not.Empty);
+            Assert.That(events[0].Attributes["telemetry.source"], Is.EqualTo(sourceName));
+        }
+    }
+
+    [Test]
     public async Task ExecuteAsync_WithOperationHandle_ShouldExposeLiveAttributes()
     {
         var builder = new ProtoHostBuilder();
@@ -732,6 +775,12 @@ public sealed class ProtoTracingTests
 
     private sealed record DiagnosticContext(string Name, string Token) : IProtoContext;
     private sealed record CallbackContext(string Name, Action Callback) : IProtoContext;
+
+    /// <summary>A tag value whose <c>ToString</c> throws, to force a telemetry capture failure.</summary>
+    private sealed class ThrowingTagValue
+    {
+        public override string ToString() => throw new InvalidOperationException("tag value failed");
+    }
 
     private sealed class PhaseWritingHook : IProtoTestHook
     {

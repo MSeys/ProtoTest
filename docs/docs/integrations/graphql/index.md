@@ -33,7 +33,7 @@ using var response = await Proto.Context.GraphQL()
         status = "pending"
     });
 
-response.ShouldHaveNoErrors();
+response.Should.HaveNoErrors();
 ```
 
 `ExpectAsync` turns the shape into `{ id product total status }`, sends the mutation with `$input` declared as `CreateOrderInput!`, and asserts the result against the same shape.
@@ -131,7 +131,7 @@ public sealed class ViewerTests
             .Query("controlPlane")
             .ExpectAsync(new { workspaceCount = JsonValue.GreaterThan(0) });
 
-        response.ShouldHaveNoErrors();
+        response.Should.HaveNoErrors();
     }
 }
 ```

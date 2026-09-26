@@ -8,6 +8,7 @@ using ProtoTest.Http;
 using ProtoTest.Json;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
+using ProtoTest.Rest.Exceptions;
 using ProtoTest.SampleApp.Contracts;
 using ProtoTest.Web;
 
@@ -30,27 +31,28 @@ public sealed class DiagnosticsShowcase
         organization.Should.HaveHttpStatus(HttpStatusCode.OK);
 
         // Act
-        JsonShapeMismatchException? mismatch = null;
+        RestAssertionException? mismatch = null;
         try
         {
-            organization.ShouldMatchShape(new
+            organization.Should.MatchShape(new
             {
                 projectCount = 99,
                 planThatDoesNotExist = "enterprise"
             });
         }
-        catch (JsonShapeMismatchException exception)
+        catch (RestAssertionException exception)
         {
             mismatch = exception;
         }
 
-        // Assert
+        // Assert: the failure names the route, and the shared mismatch list rides the inner exception.
         Assert.That(mismatch, Is.Not.Null);
+        var details = (JsonShapeMismatchException)mismatch!.InnerException!;
         Proto.Context.RecordObservation(
             "TraceViewer",
             "failure.shape.captured",
             Proto.Context.TestId,
-            new { mismatch!.Message, MismatchCount = mismatch.Mismatches.Count });
+            new { mismatch.Message, MismatchCount = details.Mismatches.Count });
     }
 
     [ProtoTest]
@@ -119,7 +121,7 @@ public sealed class DiagnosticsShowcase
         using var organization = await Proto.Context.Rest().GetAsync("/api/v1/organization");
 
         // Assert
-        organization.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        organization.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new
         {
             projectCount = 99,
             planId = "nonexistent-plan"
@@ -135,10 +137,7 @@ public sealed class DiagnosticsShowcase
 [NorthstarTenant]
 [Auth<NorthstarAuthenticator>]
 [WebSession("Default", DiscoverRoutes = true)]
-[RequiresCapability(
-    ProtoCapabilityKinds.Server,
-    CapabilityName = "Northstar standalone",
-    Reason = "The standalone application is only started when the suite owns the store.")]
+[RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "Northstar standalone")]
 [RequiresConsoleBuild]
 public sealed class ConsoleDiagnosticsShowcase
 {

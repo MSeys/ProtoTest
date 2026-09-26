@@ -153,7 +153,7 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
             ?? throw new GraphQLAssertionException("Expected another GraphQL subscription event, but the stream completed.");
         try
         {
-            response.ShouldMatchShape(expectedShape);
+            response.Should.MatchShape(expectedShape);
             return response;
         }
         catch

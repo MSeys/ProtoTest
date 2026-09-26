@@ -17,7 +17,7 @@ const source = {
     [118, 'using var organization = await Proto.Context.Rest().GetAsync("/api/v1/organization");'],
     [119, ''],
     [120, '// Assert'],
-    [121, 'organization.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new'],
+    [121, 'organization.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new'],
     [122, '{'],
     [123, '    projectCount = 99,'],
   ] as const,

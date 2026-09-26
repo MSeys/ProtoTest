@@ -30,25 +30,28 @@ public sealed class ProtoCellAssertions
 
     /// <summary>
     /// Asserts the cell holds the expected text, number, boolean or date typed from the file. A null
-    /// expectation asserts the cell holds no text.
+    /// expectation asserts the cell holds no text. Returns the cell.
     /// </summary>
-    public void Be(object? expected)
+    public ProtoCell Be(object? expected)
     {
         var (holds, expectation) = Compare(expected);
-        Assert(holds, expectation);
+        return Assert(holds, expectation);
     }
 
-    /// <summary>Asserts the cell holds text.</summary>
-    public void BeText() => Assert(_cell.Text is not null, "hold text");
+    /// <summary>Asserts the cell holds text. Returns the cell.</summary>
+    public ProtoCell BeText() => Assert(_cell.Text is not null, "hold text");
 
-    /// <summary>Asserts the cell is empty.</summary>
-    public void BeBlank() => Assert(_cell.IsEmpty, "be blank");
+    /// <summary>Asserts the cell is empty. Returns the cell.</summary>
+    public ProtoCell BeBlank() => Assert(_cell.IsEmpty, "be blank");
 
-    /// <summary>Asserts the cell holds exactly this formula (the cached value stays in the typed values).</summary>
-    public void HaveFormula(string formula)
+    /// <summary>
+    /// Asserts the cell holds exactly this formula (the cached value stays in the typed values).
+    /// Returns the cell.
+    /// </summary>
+    public ProtoCell HaveFormula(string formula)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(formula);
-        Assert(string.Equals(_cell.Formula, formula, StringComparison.Ordinal), $"hold the formula '{formula}'");
+        return Assert(string.Equals(_cell.Formula, formula, StringComparison.Ordinal), $"hold the formula '{formula}'");
     }
 
     private (bool Holds, string Expectation) Compare(object? expected)
@@ -76,7 +79,7 @@ public sealed class ProtoCellAssertions
 
     private static string Format(double value) => value.ToString(CultureInfo.InvariantCulture);
 
-    private void Assert(bool holds, string expectation)
+    private ProtoCell Assert(bool holds, string expectation)
     {
         var reference = $"{_sheetName}!{_cell.Reference}";
         SheetAssertion.Run(
@@ -92,5 +95,6 @@ public sealed class ProtoCellAssertions
             () => holds,
             () => new SheetAssertionFailure(
                 $"{SheetAssertion.Describe(reference, expectation, _negated)} but it was {_cell.Display()}."));
+        return _cell;
     }
 }

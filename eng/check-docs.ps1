@@ -11,7 +11,7 @@ $repository = Split-Path -Parent $PSScriptRoot
 $docsRoot = Join-Path $repository "docs"
 $docsContentRoot = Join-Path $docsRoot "docs"
 $docsSourceRoot = Join-Path $docsRoot "src"
-$factsRoot = Join-Path $repository "assets\internal\docs-facts"
+$factsRoot = Join-Path $repository "assets\internal\records\docs-facts"
 
 $generatedFolders = '[\\/](build|\.docusaurus|node_modules|obj|bin)[\\/]'
 
@@ -20,8 +20,9 @@ $docsContentFiles = @(Get-ChildItem -LiteralPath $docsContentRoot -Recurse -File
 $docsSourceFiles = @(Get-ChildItem -LiteralPath $docsSourceRoot -Recurse -File |
     Where-Object { $_.Extension -in '.ts', '.tsx', '.md', '.mdx' -and $_.FullName -notmatch $generatedFolders })
 
-# The fact sheets are internal and gitignored; a fresh CI checkout has none. The key cross-check
-# runs where they exist and reports itself as skipped where they do not.
+# The fact sheets are internal and live in the private records checkout; a fresh CI checkout has none.
+# The public key list (docs/configuration-keys.json) carries the half that runs everywhere; the fact
+# sheets add the fact-to-docs direction where the checkout exists.
 $factFiles = @()
 if (Test-Path -LiteralPath $factsRoot) {
     $factFiles = @(Get-ChildItem -LiteralPath $factsRoot -File -Filter *.md)
@@ -160,9 +161,46 @@ foreach ($file in @($docsContentFiles + $docsSourceFiles)) {
 
 $keyPattern = [regex]'ProtoTest:[A-Za-z:]+[A-Za-z]'
 
-# The demo's environment switches are sample conventions, not package options: they select the
-# environment the demo's Setup builds and have no section in a package fact sheet.
-$sampleSideKeys = @('ProtoTest:TargetUrl', 'ProtoTest:Database')
+# The public key list is tracked at docs/configuration-keys.json so the cross-check runs in CI too,
+# where the private docs-facts checkout does not exist. `sections` is generated from the source
+# section constants and verified against them below; `allowedKeys` carries the documented keys that
+# are not section constants (sample-side switches and shared defaults), each with its reason. The
+# private fact sheets stay the richer source and add the fact-to-docs direction where present.
+$keyListPath = Join-Path $docsRoot "configuration-keys.json"
+$publicSections = @()
+$publicAllowedKeys = @()
+if (-not (Test-Path -LiteralPath $keyListPath)) {
+    $keyFailures.Add("docs/configuration-keys.json is missing; it is the public configuration-key list the docs check cross-checks against.")
+}
+else {
+    try {
+        $keyList = Get-Content -Raw -LiteralPath $keyListPath | ConvertFrom-Json
+        $publicSections = @($keyList.sections | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        $publicAllowedKeys = @($keyList.allowedKeys | ForEach-Object { $_.key } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    }
+    catch {
+        $keyFailures.Add("docs/configuration-keys.json cannot be read: $($_.Exception.Message)")
+    }
+}
+
+# The section constants in src/**/*.cs are the authority: a rename that leaves the tracked list
+# behind fails here instead of silently detaching the list from the code.
+$sourceSections = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
+foreach ($file in Get-ChildItem -Path (Join-Path $repository "src") -Recurse -File -Filter *.cs |
+    Where-Object { $_.FullName -notmatch $generatedFolders }) {
+    $text = Get-Content -Raw -LiteralPath $file.FullName
+    foreach ($match in [regex]::Matches($text, '\b\w*(?:SectionName|SectionPath)\s*=\s*"(ProtoTest:[^"]+)"')) {
+        [void]$sourceSections.Add($match.Groups[1].Value)
+    }
+}
+
+if ($publicSections.Count -gt 0 -or $sourceSections.Count -gt 0) {
+    $missingFromList = @($sourceSections | Where-Object { $publicSections -notcontains $_ } | Sort-Object)
+    $extraInList = @($publicSections | Where-Object { -not $sourceSections.Contains($_) } | Sort-Object)
+    if ($missingFromList.Count -gt 0 -or $extraInList.Count -gt 0) {
+        $keyFailures.Add("docs/configuration-keys.json 'sections' is stale against the src/**/*.cs section constants (missing from the list: $($missingFromList -join ', '); not in the source: $($extraInList -join ', ')).")
+    }
+}
 
 function Get-ConfigurationKeys {
     param([string[]]$Files)
@@ -209,16 +247,24 @@ function Test-KeyCovered {
 $docsKeys = Get-ConfigurationKeys -Files @($docsContentFiles + $docsSourceFiles | ForEach-Object { $_.FullName })
 $factKeys = Get-ConfigurationKeys -Files @($factFiles | ForEach-Object { $_.FullName })
 $keyCrossCheckSkipped = $factFiles.Count -eq 0
+$publicCandidates = @($publicSections) + @($publicAllowedKeys)
+
+# Every key a docs page names must exist: a source section constant covers it, the tracked allowlist
+# covers it, or a fact sheet covers it. The allowlist and the sections must stay taught, so the
+# tracked list cannot rot into fiction. The fact sheets add the fact-to-docs direction when present.
+foreach ($key in $docsKeys) {
+    if (Test-TruncatedKey -Key $key -Keys $docsKeys) { continue }
+    if ((Test-KeyCovered -Key $key -Candidates $publicCandidates) -or
+        (Test-KeyCovered -Key $key -Candidates $factKeys)) { continue }
+    $keyFailures.Add("docs mention '$key' but no source section constant or fact sheet covers it")
+}
+
+foreach ($key in $publicCandidates) {
+    if (Test-KeyCovered -Key $key -Candidates $docsKeys) { continue }
+    $keyFailures.Add("docs/configuration-keys.json lists '$key' but no docs page mentions it")
+}
 
 if (-not $keyCrossCheckSkipped) {
-    foreach ($key in $docsKeys) {
-        if ($sampleSideKeys -contains $key) { continue }
-        if (Test-TruncatedKey -Key $key -Keys $docsKeys) { continue }
-        if (-not (Test-KeyCovered -Key $key -Candidates $factKeys)) {
-            $keyFailures.Add("docs mention '$key' but no fact sheet does")
-        }
-    }
-
     foreach ($key in $factKeys) {
         if (Test-TruncatedKey -Key $key -Keys $factKeys) { continue }
         if (-not (Test-KeyCovered -Key $key -Candidates $docsKeys)) {
@@ -313,7 +359,7 @@ if ($totalFailures -gt 0) {
 $summary = "check-docs: checked {0} files ({1} docs pages, {2} source files, {3} fact sheets); {4} failure(s)." -f
     $checkedFiles, $docsContentFiles.Count, $docsSourceFiles.Count, $factFiles.Count, $totalFailures
 if ($keyCrossCheckSkipped) {
-    $summary += " Configuration-key cross-check skipped: assets/internal/docs-facts is not present (internal, gitignored)."
+    $summary += " The private fact sheets are absent; the key cross-check ran against docs/configuration-keys.json (source section constants and documented exceptions), so a docs key no source section backs still fails. The fact-sheet-to-docs half needs the private records checkout."
 }
 Write-Host $summary
 

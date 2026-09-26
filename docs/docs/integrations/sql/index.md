@@ -49,7 +49,7 @@ builder.AddSql(
     sql => sql.AddressKeys.Add("ConnectionStrings:Orders"));
 ```
 
-With at least one key declared, `AddSql` declares the `SQL` store capability only while one of them can provide a connection — a configured value, or a key a registered container declares and fills. When none can, the integration is inert: the connection is not opened during setup, and `Proto.Context.SqlSession()`, `SqlConnection()` and `SqlTransaction()` throw naming the missing keys and the `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate. `AddressKeys` is a code API — a `SqlAddressKeys` set that only `Add` (or a `SqlOptions` instance registered before `AddSql`) fills. No configuration section binds it, because the capability decision is made when the host is built and a key that only configuration knows could not have promised the connection the decision was made against. It is empty by default, which keeps the capability unconditional and the factory owning the address.
+With at least one key declared, `AddSql` declares the `SQL` store capability only while one of them can provide a connection — a configured value, or a key a registered container declares and fills. When none can, the integration is inert: the connection is not opened during setup, and `Proto.Context.Sql()`, `SqlConnection()` and `SqlTransaction()` throw naming the missing keys and the `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate. `AddressKeys` is a code API — a `SqlAddressKeys` set that only `Add` (or a `SqlOptions` instance registered before `AddSql`) fills. No configuration section binds it, because the capability decision is made when the host is built and a key that only configuration knows could not have promised the connection the decision was made against. It is empty by default, which keeps the capability unconditional and the factory owning the address.
 
 ## Isolation
 
@@ -85,7 +85,7 @@ An undeclared application fails the run at start with an explanation telling you
 
 ```csharp
 DbConnection connection = Proto.Context.SqlConnection();
-ProtoSqlSession session = Proto.Context.SqlSession();
+ProtoSqlSession session = Proto.Context.Sql();          // SqlSession() is the historical alias
 DbTransaction? transaction = Proto.Context.SqlTransaction();   // null with SqlIsolation.None
 ```
 
@@ -187,6 +187,7 @@ With `AddressKeys` declared and none of them provided, the `SQL` capability is a
 - **The guard only sees registered applications.** An application hosted without `AddApplication` cannot be detected, so nothing fails the run if it writes outside the transaction.
 - **`AddSql` is once per host.** A second call is a no-op rather than layering a second connection: the first registration's factory and options win, matching [repeated registration](../../getting-started/configuration.md#repeated-registration).
 - **A rollback failure still disposes everything.** The transaction and the connection are disposed in their own `finally` blocks even when rollback throws; the release failure is aggregated like any other teardown failure.
+- **The connect timeout is provider-owned.** The connection open and transaction begin observe `ProtoExecutionContext.CancellationToken` when the caller supplied one to `StartTestAsync`; no runner adapter supplies one yet, so runner-driven setup runs until the provider's own connect timeout (Npgsql's default, or `Connect Timeout` in the connection string) ends it.
 - **The test owns the schema.** There is no automatic migration or database creation: the factory returns the connection and the test (or its fixture) sets the schema up.
 
 ## Links

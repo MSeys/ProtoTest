@@ -63,12 +63,13 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
     /// </summary>
     private static string? RowName(ITestMethod testMethod)
         => testMethod.Arguments is { Length: > 0 } arguments
-            ? $"{ProtoTestName.FromMethod(testMethod.MethodInfo)}[{string.Join(", ", arguments.Select(argument => argument?.ToString() ?? "null"))}]"
+            ? ProtoTestName.ForRow(testMethod.MethodInfo, arguments)
             : null;
 
     /// <summary>
     /// Maps the one result MSTest produced for this invocation. MSTest calls the attribute once per
-    /// data row, so there is no multi-row aggregation to do.
+    /// data row, so there is no multi-row aggregation to do. A failure with an exception goes through
+    /// the shared classifier, so a cancelled body maps the same way here as in every other adapter.
     /// </summary>
     internal static ProtoTestResult ToProtoTestResult(TestResult? result)
     {
@@ -79,10 +80,8 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
             UnitTestOutcome.Ignored or UnitTestOutcome.Inconclusive => ProtoTestResult.Skipped,
             // MSTest reports a test it cannot run as skipped by default; match the runner.
             UnitTestOutcome.NotRunnable => ProtoTestResult.Skipped,
-            UnitTestOutcome.Failed or UnitTestOutcome.Error when result.TestFailureException is OperationCanceledException =>
-                ProtoTestResult.Cancelled(result.TestFailureException),
             UnitTestOutcome.Failed or UnitTestOutcome.Error when result.TestFailureException is not null =>
-                ProtoTestResult.Failed(result.TestFailureException),
+                ProtoTestResult.FromException(result.TestFailureException),
             UnitTestOutcome.Failed or UnitTestOutcome.Error => ProtoTestResult.Failed(
                 FrameworkName, result.Outcome.ToString(), $"{FrameworkName} completed with outcome {result.Outcome}."),
             // A timeout or abort means the test never finished; recording it as cancelled keeps it

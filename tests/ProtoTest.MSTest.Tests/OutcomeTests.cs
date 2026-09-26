@@ -2,6 +2,7 @@ namespace ProtoTest.MSTest.Tests;
 
 using System.Reflection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 
 [TestClass]
@@ -121,7 +122,7 @@ public sealed class OutcomeTests
         public void Inconclusive() => Assert.Inconclusive("deliberate inconclusive");
 
         [ProtoTest]
-        [RequiresCapability("not-composed", Reason = "the adapter proves the skip path")]
+        [RequiresCapability(AdapterProbes.SkipCapability, Reason = AdapterProbes.SkipReason)]
         public void RequiresCapability() => throw new InvalidOperationException("A skipped test must not run its body.");
     }
 #pragma warning restore MSTEST0030, MSTEST0032

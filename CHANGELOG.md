@@ -173,9 +173,19 @@ All ProtoTest packages share one version; breaking API changes are called out be
   `PlaywrightWebOptions.MaxTraceBytes` (32 MiB, 0 off), `WebSocketDeviceOptions.MaxMessageBytes`
   (4 MiB, 0 off) with `DeviceFrameTooLargeException`, and `IWebBackend.PollInterval` bound the reads
   and the session timing.
+- `AddLoopbackApplication(applicationName, createApp)` (`ProtoTest.AspNetCore`) hosts a hand-built
+  `WebApplication` on its own loopback listener for browser journeys: it starts the factory on
+  `http://127.0.0.1:0`, publishes the bound address as `ProtoTest:Applications:{app}:BaseUrl` (a
+  configured key skips the listener), forwards the suite's configuration with the started settings
+  available at its registration position as command-line arguments, and releases the application
+  with the run. The published instance is separate from `AddAspNetCoreServer`, with no
+  `ServerFactory` or `[RequiresInProcess]`.
 
 ### Fixed
 
+- A browser download is named binary content: `WebDownload` implements `IProtoBinaryContent`, so a
+  downloaded file feeds anything consuming named bytes (for example `ProtoSheets.Open`) in one line
+  instead of through a stream.
 - The in-process HTTP client is owned by its test alone: ProtoTest builds it over the `TestServer`'s
   handler instead of `WebApplicationFactory.CreateDefaultClient`, so the parallel tests of a run no
   longer mutate the shared per-run factory's client ledger. A torn ledger entry crashed run teardown
@@ -423,6 +433,13 @@ All ProtoTest packages share one version; breaking API changes are called out be
   `PT0001` reports a method that carries both a ProtoTest test attribute and the runner's own plain
   test attribute, and `PT0002` reports a test registered by a plain runner attribute that reads
   `Proto.Context`. Warnings only; consumers opt in by referencing the package.
+- `AddLoopbackApplication(applicationName, createApp)` (`ProtoTest.AspNetCore`) starts the given
+  `WebApplication` factory on `http://127.0.0.1:0` as run infrastructure, publishes the bound address
+  as `ProtoTest:Applications:{application}:BaseUrl`, and forwards the suite's configuration with the
+  started settings at its registration position as command-line arguments, so a browser session, a
+  REST client and a readiness probe resolve one running application. A configured address skips the
+  listener like any address provider; the listener is a separate instance with no `ServerFactory` or
+  `[RequiresInProcess]`.
 - A readiness timeout names the probed URL and the last error; a rejected GraphQL subscription names
   the server's errors; an oversized WebSocket frame fails naming the address and limit; a stuck
   Selenium pump is reported (`web.selenium.executor_abandoned`) instead of abandoned silently; a

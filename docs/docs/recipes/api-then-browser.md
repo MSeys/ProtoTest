@@ -33,53 +33,17 @@ public static class App
 }
 ```
 
-Declare the listener as run-scoped [infrastructure](../foundation/infrastructure.md) that publishes the address it bound. Registering it with the key it fills keeps the suite portable: a run that configures `ProtoTest:Applications:Api:BaseUrl` skips the listener and points at that environment instead. The full piece and its browser proof live in [tests/ProtoTest.AspNetCore.Web.Tests](../../../tests/ProtoTest.AspNetCore.Web.Tests/LoopbackApplication.cs); it needs `Microsoft.AspNetCore.Builder`, `Microsoft.AspNetCore.Hosting.Server[.Features]`, `Microsoft.Extensions.DependencyInjection` and `ProtoTest.Core`.
+Declare the listener with `AddLoopbackApplication(applicationName, createApp)` from `ProtoTest.AspNetCore`: it starts the factory on `http://127.0.0.1:0`, publishes the address the listener bound as the application's `BaseUrl`, forwards the suite's configuration with the values the infrastructure started before it published as command-line arguments, and releases the application with the run. Registering it with the key it fills keeps the suite portable: a run that configures `ProtoTest:Applications:Api:BaseUrl` skips the listener and points at that environment instead. The composition and its browser proof live in [Setup.cs](../../../tests/ProtoTest.AspNetCore.Web.Tests/Setup.cs); the piece itself in [ProtoHostBuilderExtensions.cs](../../../src/ProtoTest.AspNetCore/ProtoHostBuilderExtensions.cs).
 
-```csharp
-internal sealed class LoopbackApplication(string applicationName, Func<string[], WebApplication> create)
-    : IProtoSettingsInfrastructure
-{
-    private WebApplication? _application;
-    private string _baseUrl = string.Empty;
-
-    public string Id => $"application:loopback:{applicationName}";
-    public string Kind => "application";
-    public string Description => $"{applicationName} on a loopback listener";
-    public ProtoResourceScope Scope => ProtoResourceScope.Run;
-    public string BaseUrlKey => $"{ProtoApplication.SectionPath}:{applicationName}:BaseUrl";
-
-    public IReadOnlyDictionary<string, string> Settings =>
-        new Dictionary<string, string> { [BaseUrlKey] = _baseUrl };
-
-    public async ValueTask StartAsync(CancellationToken cancellationToken = default)
-    {
-        // Port 0 picks a free port; the bound address is read back from the listener, never guessed.
-        var application = create(["--urls", "http://127.0.0.1:0"]);
-        await application.StartAsync(cancellationToken);
-        _application = application;
-        _baseUrl = application.Services.GetRequiredService<IServer>()
-            .Features.Get<IServerAddressesFeature>()!.Addresses.First();
-    }
-
-    public async ValueTask ReleaseAsync(ProtoResourceReleaseContext context)
-    {
-        if (_application is { } application)
-        {
-            _application = null;
-            await application.DisposeAsync();
-        }
-    }
-}
-```
+Pass the factory's arguments to `WebApplication.CreateBuilder`: they carry the run's collected configuration, so the hand-built application reads the same addresses the tests do. Arguments the factory ignores never reach the application.
 
 The composition then stays the recipe's shape, with the listener added:
 
 ```csharp
 protected override void Configure(IProtoHostBuilder builder)
 {
-    var loopback = new LoopbackApplication("Api", App.Create);
     builder
-        .AddInfrastructure(loopback, loopback.BaseUrlKey)
+        .AddLoopbackApplication("Api", App.Create)
         .AddApplication("Api", app => app
             .AddRest(rest => rest.AddClient("Api")))
         .AddData(data => data.AddDefaultsFromAssembly(typeof(Setup).Assembly))

@@ -99,6 +99,12 @@ and fills each declared key with `IProtoConnectionInfrastructure.ConnectionStrin
   publishes its mapped address as the declared `ProtoTest:Applications:{application}:BaseUrl` and defaults
   readiness to the mapped port; add `AddHttpReadiness` after it (canonical:
   `tests/ProtoTest.AspNetCore.Web.Tests/Setup.cs`).
+- A hand-built `WebApplication` under test can be a piece too: `AddLoopbackApplication(application,
+  createApp)` (`ProtoTest.AspNetCore`) starts the factory on `http://127.0.0.1:0`, publishes the bound
+  address as the declared `ProtoTest:Applications:{application}:BaseUrl`, forwards the suite's
+  configuration with the started settings at its registration position as command-line arguments, and
+  releases the application with the run; add `AddHttpReadiness` after it (canonical:
+  `tests/ProtoTest.AspNetCore.Web.Tests/Setup.cs`).
 
 ## Recipe: a product under test that resolves its addresses at use time
 

@@ -1,5 +1,6 @@
 namespace ProtoTest.AspNetCore.Web.Tests;
 
+using ProtoTest.AspNetCore;
 using ProtoTest.Core;
 using ProtoTest.NUnit;
 using ProtoTest.Rest;
@@ -33,12 +34,11 @@ public sealed class Setup : ProtoTestAssembly
 
     protected override void Configure(IProtoHostBuilder builder)
     {
-        var loopback = new LoopbackApplication(LoopbackApplicationName, SampleApi.Program.CreateApp);
         builder
-            .AddInfrastructure(loopback, loopback.BaseUrlKey)
-            .AddHttpReadiness(loopback.ApplicationName, "/welcome")
-            .AddApplication(loopback.ApplicationName, app => app
-                .AddRest(rest => rest.AddClient(loopback.ApplicationName))
+            .AddLoopbackApplication(LoopbackApplicationName, SampleApi.Program.CreateApp)
+            .AddHttpReadiness(LoopbackApplicationName, "/welcome")
+            .AddApplication(LoopbackApplicationName, app => app
+                .AddRest(rest => rest.AddClient(LoopbackApplicationName))
                 .AddWeb(options => options.Headless = true));
 
         // The container is started before the host so a machine without a container runtime can decide

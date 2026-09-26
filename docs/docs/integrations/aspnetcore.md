@@ -220,13 +220,14 @@ A browser can only open a real address, and the in-memory test host has none. Tw
 Host the listener in-process:
 
 ```csharp
-var loopback = new LoopbackApplication("Api", App.Create);
 builder
-    .AddInfrastructure(loopback, loopback.BaseUrlKey)   // starts Api on http://127.0.0.1:0 and publishes the bound address
+    .AddLoopbackApplication("Api", App.Create)   // starts Api on http://127.0.0.1:0 and publishes the bound address
     .AddApplication("Api", app => app
         .AddRest(rest => rest.AddClient("Api"))
         .AddWeb());
 ```
+
+The listener forwards the suite's configuration with the values the infrastructure started before it published as command-line arguments, so a factory that builds from its arguments reads the same addresses the tests do.
 
 Or start the application's image as a container with `ApplicationContainer` from `ProtoTest.Testcontainers`:
 

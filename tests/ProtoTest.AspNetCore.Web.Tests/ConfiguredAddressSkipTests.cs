@@ -20,11 +20,10 @@ public sealed class ConfiguredAddressSkipTests
     [Test]
     public async Task LoopbackApplication_WhenTheAddressIsConfigured_ShouldNotStartTheListener()
     {
-        var loopback = new LoopbackApplication(Setup.LoopbackApplicationName, _ =>
-            throw new InvalidOperationException("The listener must not start when the address is configured."));
-
-        var builder = BuilderWithConfigured(loopback.BaseUrlKey);
-        builder.AddInfrastructure(loopback, loopback.BaseUrlKey);
+        var builder = BuilderWithConfigured(BaseUrlKey(Setup.LoopbackApplicationName));
+        builder.AddLoopbackApplication(
+            Setup.LoopbackApplicationName,
+            _ => throw new InvalidOperationException("The listener must not start when the address is configured."));
         await using var host = builder.Build();
         await host.StartAsync();
         await host.StopAsync();
@@ -57,4 +56,7 @@ public sealed class ConfiguredAddressSkipTests
             keys.ToDictionary(key => key, _ => (string?)PublishedAddress)));
         return builder;
     }
+
+    private static string BaseUrlKey(string applicationName)
+        => $"{ProtoApplication.SectionPath}:{applicationName}:BaseUrl";
 }

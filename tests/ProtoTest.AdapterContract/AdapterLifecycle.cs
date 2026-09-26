@@ -1,5 +1,6 @@
 namespace ProtoTest.AdapterContract;
 
+using System.Collections.Concurrent;
 using System.Reflection;
 using ProtoTest.Core;
 
@@ -62,7 +63,7 @@ public static class AdapterLifecycle
         }
 
         var unknown = tests
-            .Where(test => test.Outcome == ProtoTraceOutcome.Unknown)
+            .Where(test => test.Outcome == ProtoTraceOutcome.Unknown && !ExpectedUnknownTraces.ContainsKey(test.Name))
             .Select(test => test.Name)
             .ToArray();
         Ensure(
@@ -81,6 +82,20 @@ public static class AdapterLifecycle
     }
 
     private const string ComplianceTestName = "Adapter_ShouldSatisfySharedLifecycleContract";
+
+    private static readonly ConcurrentDictionary<string, byte> ExpectedUnknownTraces = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Marks a trace a driver deliberately completes as Unknown, because the driver probes the
+    /// adapter's completion boundary itself (an inner-runner throw leaves no result to map). Every
+    /// other Unknown trace still fails <see cref="VerifyCompletedRun"/>; only the probing driver
+    /// registers its subject, so the contract stays loud for a silently incomplete scope.
+    /// </summary>
+    public static void ExpectUnknownTrace(string testName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(testName);
+        ExpectedUnknownTraces.TryAdd(testName, 0);
+    }
 
     /// <summary>
     /// Verifies the before lifecycle, the test's identity and the attachment surface, then marks the

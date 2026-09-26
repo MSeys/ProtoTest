@@ -222,10 +222,15 @@ public sealed partial class GraphQLRequestBuilder
         TimeSpan duration,
         Exception exception,
         CancellationToken cancellationToken)
-        => ProtoObservationCapture.TryRecord(Context, () =>
+        => ProtoObservationCapture.TryRecord(Context, ProtoGraphQLBuilder.Protocol, () =>
         {
             var attachmentOptions = Context.ResolveAttachmentOptions(ProtoGraphQLBuilder.ProtocolName);
-            var diagnostics = ProtoHttpFailureDiagnostics.From(requestUri, exception, cancellationToken, attachmentOptions);
+            var diagnostics = ProtoFailureDiagnostics.From(
+                requestUri,
+                exception,
+                cancellationToken,
+                attachmentOptions,
+                attachmentOptions?.SensitiveQueryParameters);
             return new ProtoObservation(
                 TargetName,
                 ProtoGraphQLBuilder.FailureObservationKind,

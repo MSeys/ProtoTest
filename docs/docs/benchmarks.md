@@ -21,7 +21,7 @@ The comparison an evaluator actually cares about: one short test - POST an order
 bodies - written twice against the same in-process application and measured a whole test at a time. The raw
 side uses `WebApplicationFactory` with `System.Net.Http.Json`, creates a client per test and deserializes with
 `JsonSerializer`; the ProtoTest side runs the full lifecycle and asserts with
-`Should.HaveHttpStatus(...).ShouldMatchShape(...)`. Same requests, same assertions, 32 warmups and 256
+`Should.HaveHttpStatus(...).Should.MatchShape(...)`. Same requests, same assertions, 32 warmups and 256
 measured, medians:
 
 | Mode | Per test | p95 | Start | Call | Complete | Allocated |

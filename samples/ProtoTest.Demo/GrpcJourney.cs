@@ -54,9 +54,9 @@ public sealed class GrpcJourney
             new ListProjectsRequest { Limit = 10 });
 
         // Assert: same identity, same state, from the other protocol.
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
-            reply.ShouldMatchShape(new
+            ProtoGrpcAssertions.For(reply).Should.MatchShape(new
             {
                 id = project.Id,
                 name = "grpc-atlas",
@@ -64,6 +64,6 @@ public sealed class GrpcJourney
             });
             Assert.That(listed.Any(item => item.Id == project.Id), Is.True,
                 "The project created over REST is visible on the gRPC stream.");
-        });
+        }
     }
 }

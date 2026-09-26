@@ -20,7 +20,10 @@ public interface IProtoMessageConsumer : IAsyncDisposable
     /// <summary>
     /// Waits for the first message on <paramref name="destination"/> matching <paramref name="predicate"/>
     /// within <paramref name="timeout"/>. Only messages that reach this consumer count, so another test's
-    /// traffic on a shared broker can never satisfy the await.
+    /// traffic on a shared broker can never satisfy the await. Awaits on one consumer are serialized in
+    /// call order, and a delivery that matches no active predicate is not consumed: it stays available to
+    /// a later await on the same consumer, so concurrent awaits neither lose nor steal each other's
+    /// messages and every matched message is consumed exactly once.
     /// </summary>
     ValueTask<ProtoMessage> AwaitAsync(
         string destination,

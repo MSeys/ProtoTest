@@ -3,6 +3,13 @@ namespace ProtoTest.Devices.WebSocket;
 using ProtoTest.Devices;
 
 /// <summary>
+/// The frame a device sent exceeded <see cref="WebSocketDeviceOptions.MaxMessageBytes"/>. The message
+/// names the address and the limit, so an oversized frame fails as a device assertion instead of an
+/// out-of-memory crash.
+/// </summary>
+public sealed class DeviceFrameTooLargeException(string message) : InvalidOperationException(message);
+
+/// <summary>
 /// Talks to devices over WebSocket - the simulator or gateway in CI, the device's own endpoint in a
 /// lab. Text frames stay text, binary frames stay binary; the address comes from the client's resolver.
 /// </summary>
@@ -107,6 +114,15 @@ public sealed class WebSocketDeviceConnection : IProtoDeviceConnection
 
             type = result.MessageType;
             message.Write(buffer, 0, result.Count);
+            // Counted per fragment, so an oversized message fails before the whole payload is buffered.
+            if (_options.MaxMessageBytes > 0 && message.Length > _options.MaxMessageBytes)
+            {
+                throw new DeviceFrameTooLargeException(
+                    $"The device at '{RemoteAddress ?? "unknown address"}' sent a frame larger than the " +
+                    $"configured {_options.MaxMessageBytes} bytes; set " +
+                    $"'{WebSocketDeviceOptions.ConfigurationSectionName}:MaxMessageBytes' to allow it.");
+            }
+
             if (result.EndOfMessage)
             {
                 break;

@@ -35,7 +35,7 @@ public sealed class GraphQLFluentAndProtocolTests
                 .Variables(new { input = new { product = "notebook", quantity = 2 } })
                 .ExecuteAsync();
 
-            response.ShouldHaveNoErrors();
+            response.Should.HaveNoErrors();
             Assert.That(document, Does.Contain("mutation PlaceOrder($input: OrderInput!)"));
             Assert.That(document, Does.Contain("placed: createOrder(input: $input)"));
         }
@@ -120,8 +120,34 @@ public sealed class GraphQLFluentAndProtocolTests
                 .ExecuteAsync();
 
             var exception = Assert.Throws<GraphQLAssertionException>(() =>
-                response.ShouldMatchShape(new { value = 1 }));
+                response.Should.MatchShape(new { value = 1 }));
             Assert.That(exception!.Message, Does.Contain("Expected GraphQL data"));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task MatchShape_ShouldNameTheOperationOnMismatch()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"value":1}}"""));
+        await host.StartTestAsync("shape-subject", "14", TestMethods.Placeholder);
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            var exception = Assert.Throws<GraphQLAssertionException>(() =>
+                response.Should.MatchShape(new { value = 2 }));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exception!.Message, Does.StartWith(
+                    "query <anonymous> — Shape mismatch failed with 1 error(s):"));
+                Assert.That(exception.Message, Does.Contain("$.value"));
+                Assert.That(exception.InnerException, Is.TypeOf<ProtoTest.Json.JsonShapeMismatchException>(),
+                    "the shared mismatch data stays reachable");
+            }
         }
         finally { await host.CompleteTestAsync(); }
     }
@@ -136,7 +162,7 @@ public sealed class GraphQLFluentAndProtocolTests
             .ExecuteAsync();
 
         var exception = Assert.Throws<GraphQLAssertionException>(() =>
-            response.ShouldMatchShape(new { value = 1 }));
+            response.Should.MatchShape(new { value = 1 }));
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
         var operation = host.Trace.Snapshot().Tests.Single().Entries
@@ -164,7 +190,7 @@ public sealed class GraphQLFluentAndProtocolTests
             using var response = await Proto.Context.GraphQL()
                 .Query(null, query => query.Field("value"))
                 .ExecuteAsync();
-            response.Should.HaveHttpStatus(HttpStatusCode.Accepted).ShouldHaveNoErrors();
+            response.Should.HaveHttpStatus(HttpStatusCode.Accepted).Should.HaveNoErrors();
             Assert.Multiple(() =>
             {
                 Assert.That(response.HasData, Is.True);
@@ -295,7 +321,7 @@ public sealed class GraphQLFluentAndProtocolTests
                 .SubscribeAsync();
 
             using var message = await subscription.NextAsync();
-            message!.ShouldHaveNoErrors().ShouldMatchShape(new { id = 42, status = "pending" });
+            message!.Should.HaveNoErrors().Should.MatchShape(new { id = 42, status = "pending" });
             Assert.That(await subscription.NextAsync(), Is.Null);
 
             Assert.Multiple(() =>
@@ -368,8 +394,300 @@ public sealed class GraphQLFluentAndProtocolTests
                 .SubscribeAsync();
             using var message = await subscription.NextAsync();
 
-            message!.ShouldHaveErrors().ShouldHaveError("FORBIDDEN");
+            message!.Should.HaveErrors().Should.HaveError("FORBIDDEN");
             Assert.That(subscription.IsCompleted, Is.True);
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task Should_ErrorAssertions_ShouldChainWithStatusAndShape()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"value":1}}"""));
+        await host.StartTestAsync("error chain", "20", TestMethods.Placeholder);
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            var returned = response.Should.HaveHttpStatus(HttpStatusCode.OK)
+                .Should.HaveNoErrors()
+                .Should.MatchShape(new { value = 1 });
+
+            Assert.That(returned, Is.SameAs(response));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task Should_ErrorAssertions_ShouldKeepTheExistingMessagesAndEvidence()
+    {
+        await using var host = CreateHost(_ => Json("""{"errors":[{"message":"boom","extensions":{"code":"FORBIDDEN"}}]}"""));
+        await host.StartTestAsync("error facade", "21", TestMethods.Placeholder);
+        using var response = await Proto.Context.GraphQL()
+            .Query(null, query => query.Field("value"))
+            .ExecuteAsync();
+
+        var noErrors = Assert.Throws<GraphQLAssertionException>(() => response.Should.HaveNoErrors());
+        Assert.That(response.Should.HaveErrors(), Is.SameAs(response));
+        Assert.That(response.Should.HaveError("forbidden"), Is.SameAs(response));
+        var wrongCode = Assert.Throws<GraphQLAssertionException>(() => response.Should.HaveError("OTHER"));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(noErrors!));
+        var entries = host.Trace.Snapshot().Tests.Single().Entries;
+        var operation = entries.Single(entry => entry.Kind == "assert.graphql.no_errors");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(noErrors!.Message, Is.EqualTo("Expected no GraphQL errors, but received 1: boom"));
+            Assert.That(wrongCode!.Message, Is.EqualTo("Expected a GraphQL error with code 'OTHER', but found: FORBIDDEN."));
+            Assert.That(operation.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(operation.Attributes["actual.error_count"], Is.EqualTo("1"));
+            Assert.That(operation.Attributes.ContainsKey("assertion.negated"), Is.False,
+                "the positive path keeps the existing evidence");
+            Assert.That(operation.Name, Is.EqualTo("Assert no GraphQL errors"),
+                "the positive operation names are unchanged");
+            Assert.That(entries.Single(entry => entry.Kind == "assert.graphql.has_errors").Name,
+                Is.EqualTo("Assert GraphQL has errors"));
+            Assert.That(
+                entries.Single(entry => entry.Kind == "assert.graphql.error_code"
+                    && entry.Outcome == ProtoTraceOutcome.Succeeded).Name,
+                Is.EqualTo("Assert GraphQL error · forbidden"));
+        }
+    }
+
+    [Test]
+    public async Task ShouldNot_ErrorAssertions_ShouldAskForTheOpposite()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"value":1}}"""));
+        await host.StartTestAsync("negated errors", "22", TestMethods.Placeholder);
+        using var response = await Proto.Context.GraphQL()
+            .Query(null, query => query.Field("value"))
+            .ExecuteAsync();
+
+        response.ShouldNot.HaveErrors();
+        response.ShouldNot.HaveError("FORBIDDEN");
+
+        var thrown = Assert.Throws<GraphQLAssertionException>(() => response.ShouldNot.HaveNoErrors());
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(thrown!));
+        var entries = host.Trace.Snapshot().Tests.Single().Entries;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(thrown!.Message, Is.EqualTo("Expected GraphQL errors, but the response contained none."));
+            Assert.That(entries.Single(entry => entry.Kind == "assert.graphql.has_errors").Name,
+                Is.EqualTo("Assert GraphQL has no errors"));
+            Assert.That(entries.Single(entry => entry.Kind == "assert.graphql.error_code").Name,
+                Is.EqualTo("Assert GraphQL does not have an error with code 'FORBIDDEN'"));
+            Assert.That(entries.Single(entry => entry.Kind == "assert.graphql.no_errors").Name,
+                Is.EqualTo("Assert GraphQL has errors"));
+        }
+    }
+
+    [Test]
+    public async Task Obsolete_ErrorAssertions_ShouldStillDelegateToTheFacade()
+    {
+        await using var host = CreateHost(_ => Json("""{"errors":[{"message":"boom","extensions":{"code":"FORBIDDEN"}}]}"""));
+        await host.StartTestAsync("obsolete errors", "23", TestMethods.Placeholder);
+        using var response = await Proto.Context.GraphQL()
+            .Query(null, query => query.Field("value"))
+            .ExecuteAsync();
+
+        // Intentional: pins the obsolete shims while they delegate to the facade; CS0618 is expected.
+#pragma warning disable CS0618
+        Assert.That(response.ShouldHaveErrors().ShouldHaveError("FORBIDDEN"), Is.SameAs(response));
+        var thrown = Assert.Throws<GraphQLAssertionException>(() => response.ShouldHaveNoErrors());
+#pragma warning restore CS0618
+
+        Assert.That(thrown!.Message, Is.EqualTo("Expected no GraphQL errors, but received 1: boom"));
+        await host.CompleteTestAsync();
+    }
+
+    [Test]
+    public async Task ReadDataAs_WithPath_ShouldReadSingleValuesAndIndices()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"value":42,"order":{"total":19.95},"items":[1,2,3]}}"""));
+        await host.StartTestAsync("path read", "30", TestMethods.Placeholder);
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(response.ReadDataAs<int>("$.value"), Is.EqualTo(42));
+                Assert.That(response.ReadDataAs<decimal>("order.total"), Is.EqualTo(19.95m));
+                Assert.That(response.ReadDataAs<int>("$.items[2]"), Is.EqualTo(3));
+            }
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task ReadDataAs_WithPath_ShouldNameTheOperationAndPathWhenMissing()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"value":42}}"""));
+        await host.StartTestAsync("path missing", "31", TestMethods.Placeholder);
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            var exception = Assert.Throws<GraphQLAssertionException>(() => response.ReadDataAs<int>("$.missing"));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exception!.Message, Does.StartWith(
+                    "query <anonymous> — The JSON path '$.missing' did not match: the member 'missing' was not found."));
+                Assert.That(exception.InnerException, Is.TypeOf<ProtoTest.Json.JsonPathException>());
+            }
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task ReadDataAs_WithPath_ShouldThrowOnWrongTypeAndReturnNullForJsonNull()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"value":42,"text":"hello","note":null}}"""));
+        await host.StartTestAsync("path types", "32", TestMethods.Placeholder);
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.Throws<JsonException>(() => response.ReadDataAs<int>("$.text"));
+                Assert.That(
+                    Assert.Throws<GraphQLAssertionException>(() => response.ReadDataAs<int>("$.value.x"))!.Message,
+                    Does.Contain("cannot be read from a JSON number"));
+                Assert.That(response.ReadDataAs<string?>("$.note"), Is.Null);
+            }
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task ReadRequired_ShouldReturnTheValueAndThrowWhenNothingIsThere()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"value":42}}"""));
+        await host.StartTestAsync("required read", "33", TestMethods.Placeholder);
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            Assert.That(response.ReadRequired<ValueData>(), Is.Not.Null);
+            Assert.That(response.ReadRequired<int>("$.value"), Is.EqualTo(42));
+            Assert.That(
+                Assert.Throws<GraphQLAssertionException>(() => response.ReadRequired<int>("$.missing"))!.Message,
+                Does.Contain("$.missing"));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task ReadRequired_ShouldThrowNamingTheOperationWhenThereIsNoData()
+    {
+        await using var host = CreateHost(_ => Json("""{"errors":[{"message":"boom"}]}"""));
+        await host.StartTestAsync("required no data", "36", TestMethods.Placeholder);
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            var exception = Assert.Throws<GraphQLAssertionException>(() => response.ReadRequired<int>());
+
+            Assert.That(exception!.Message, Is.EqualTo(
+                "query <anonymous> — ReadRequired<Int32> failed: the response did not contain data."));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task ReadRequired_WithPath_ShouldThrowWhenThePathIsJsonNull()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"note":null}}"""));
+        await host.StartTestAsync("required null", "34", TestMethods.Placeholder);
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("note"))
+                .ExecuteAsync();
+
+            var exception = Assert.Throws<GraphQLAssertionException>(() => response.ReadRequired<string>("$.note"));
+
+            Assert.That(exception!.Message, Is.EqualTo(
+                "query <anonymous> — ReadRequired<String>('$.note') failed: the value at '$.note' was JSON null."));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task ReadRequired_WithPath_ShouldFailTheDeserializeOperationOnAJsonNullValueType()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"note":null}}"""));
+        await host.StartTestAsync("required null value type", "37", TestMethods.Placeholder);
+        using var response = await Proto.Context.GraphQL()
+            .Query(null, query => query.Field("note"))
+            .ExecuteAsync();
+
+        var exception = Assert.Throws<GraphQLAssertionException>(() => response.ReadRequired<int>("$.note"));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        var operation = host.Trace.Snapshot().Tests.Single().Entries
+            .Single(entry => entry.Kind == "graphql.response.deserialize");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.Message, Is.EqualTo(
+                "query <anonymous> — ReadRequired<Int32>('$.note') failed: the value at '$.note' was JSON null."));
+            Assert.That(operation.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(operation.Attributes["target.type"], Is.EqualTo(typeof(int).FullName));
+            Assert.That(operation.Attributes["graphql.path"], Is.EqualTo("$.note"));
+            Assert.That(operation.Error!.Type, Is.EqualTo(typeof(GraphQLAssertionException).FullName));
+        }
+    }
+
+    [Test]
+    public async Task ReadRequired_ShouldThrowOnJsonNullDataForAValueType()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":null}"""));
+        await host.StartTestAsync("required null data value type", "38", TestMethods.Placeholder);
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            var exception = Assert.Throws<GraphQLAssertionException>(() => response.ReadRequired<int>());
+
+            Assert.That(exception!.Message, Is.EqualTo(
+                "query <anonymous> — ReadRequired<Int32> failed: the response did not contain data."));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task ReadRequired_ShouldChainWithShapeAssertions()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"value":42}}"""));
+        await host.StartTestAsync("required chain", "35", TestMethods.Placeholder);
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            var value = response.Should.HaveNoErrors()
+                .Should.MatchShape(new { value = 42 })
+                .ReadRequired<int>("$.value");
+
+            Assert.That(value, Is.EqualTo(42));
         }
         finally { await host.CompleteTestAsync(); }
     }

@@ -1,21 +1,28 @@
 namespace ProtoTest.NUnit.Tests;
 
-using ProtoTest.Core;
+using global::NUnit.Framework.Internal;
+using ProtoTest.AdapterContract;
 
 [TestFixture]
 public sealed class AttachmentPublishTests
 {
     [Test]
-    public async Task Publisher_ShouldMaterializeAndAttachTheFileToTheTest()
+    public async Task Publisher_ShouldAttachTheFileToTheNUnitResult()
     {
-        var attachment = ProtoTestAttachment.FromText(
-            "adapter-attachment",
-            "payload",
-            description: "Shared adapter artifact");
+        // The runner-side half of the publisher contract: NUnit's own result must receive the
+        // attachment. Asserting only that the file exists would stay green for a publisher no-op.
+        var attachment = AdapterProbes.CreateAttachment();
         var path = await attachment.MaterializeFileAsync();
 
         await NUnitAttachmentPublisher.Instance.PublishAsync(attachment);
 
-        Assert.That(File.Exists(path), Is.True, "the published attachment must exist on disk");
+        var attached = TestExecutionContext.CurrentContext.CurrentResult.TestAttachments
+            .SingleOrDefault(candidate => candidate.FilePath == path);
+        Assert.That(attached, Is.Not.Null, "the published attachment must reach the NUnit result");
+        Assert.Multiple(() =>
+        {
+            Assert.That(attached!.Description, Is.EqualTo(AdapterProbes.AttachmentDescription));
+            Assert.That(File.Exists(path), Is.True, "the published attachment must exist on disk");
+        });
     }
 }

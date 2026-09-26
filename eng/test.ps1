@@ -31,21 +31,27 @@ Invoke-DotNet build $solution --configuration $Configuration --no-restore
 # project. TUnit and xUnit.net v3 are Microsoft Testing Platform executables and run explicitly below;
 # xUnit.net v2 still uses VSTest, so the repository intentionally runs both models.
 $testsRoot = Join-Path $repository "tests"
+# Each MTP project declares the run-test minimum its suite must meet, so a collapse (discovery
+# predicate drift, engine change) fails instead of passing a one-test suite. The bases differ: TUnit's
+# --minimum-expected-tests counts tests that actually ran, so the deliberate adapter skip is excluded
+# (14 of 15 discovered), while the JUnit total xUnit.net v3 writes includes skipped tests (17).
+# Raising a minimum with added tests is free; lowering one is a deliberate edit that names the removals.
 $mtpProjects = @(
-    (Join-Path $testsRoot "ProtoTest.TUnit.Tests/ProtoTest.TUnit.Tests.csproj"),
-    (Join-Path $testsRoot "ProtoTest.Xunit3.Tests/ProtoTest.Xunit3.Tests.csproj")
+    @{ Project = (Join-Path $testsRoot "ProtoTest.TUnit.Tests/ProtoTest.TUnit.Tests.csproj"); MinimumTests = 14 },
+    @{ Project = (Join-Path $testsRoot "ProtoTest.Xunit3.Tests/ProtoTest.Xunit3.Tests.csproj"); MinimumTests = 17 }
 )
 foreach ($mtpProject in $mtpProjects) {
-    if (-not (Test-Path -LiteralPath $mtpProject)) {
-        throw "The Microsoft Testing Platform project '$mtpProject' does not exist."
+    if (-not (Test-Path -LiteralPath $mtpProject.Project)) {
+        throw "The Microsoft Testing Platform project '$($mtpProject.Project)' does not exist."
     }
 }
 
+$mtpProjectPaths = @($mtpProjects | ForEach-Object { $_.Project })
 $vstestProjects = Get-ChildItem -Path $testsRoot -Recurse -Filter *.csproj |
     Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' } |
     Where-Object { Select-String -Path $_.FullName -Pattern 'IsTestProject>true|Microsoft\.NET\.Test\.Sdk|MSTest\.TestAdapter|MSTest\.Sdk|Include="MSTest"|NUnit3TestAdapter|xunit\.runner\.visualstudio|TUnit' -Quiet } |
     ForEach-Object { $_.FullName } |
-    Where-Object { $_ -notin $mtpProjects } |
+    Where-Object { $_ -notin $mtpProjectPaths } |
     Sort-Object
 
 # Test projects follow the *.Tests naming convention, so the directories under tests/ are the expected
@@ -56,7 +62,7 @@ $expectedProjects = @(Get-ChildItem -Path $testsRoot -Directory |
     Where-Object { $_.Name.EndsWith(".Tests", [StringComparison]::Ordinal) } |
     ForEach-Object { $_.Name } |
     Sort-Object)
-$discoveredProjects = @($vstestProjects + $mtpProjects) |
+$discoveredProjects = @($vstestProjects + $mtpProjectPaths) |
     ForEach-Object { Split-Path -Leaf (Split-Path -Parent $_) } |
     Sort-Object -Unique
 $missingProjects = @($expectedProjects | Where-Object { $_ -notin $discoveredProjects })
@@ -84,25 +90,40 @@ foreach ($project in $vstestProjects) {
 foreach ($mtpProject in $mtpProjects) {
     # The MTP executables have no "No test is available" text to match, so each run carries its own
     # zero-test guard. The separator travels as an array element: a literal -- is swallowed by the
-    # PowerShell parser. TUnit's platform exposes --minimum-expected-tests; xUnit.net v3's in-process
-    # runner does not, so its execution summary is inspected instead.
+    # PowerShell parser. TUnit's platform enforces --minimum-expected-tests itself; xUnit.net v3's
+    # in-process runner exits 0 on a zero-test run, so its structured JUnit result is parsed and
+    # compared with the same minimum. eng/test-gates.ps1 proves both guards fail on a zero-test filter.
+    $projectPath = $mtpProject.Project
+    $minimumTests = [int]$mtpProject.MinimumTests
     $mtpArguments = @(
-        "run", "--project", $mtpProject,
+        "run", "--project", $projectPath,
         "--configuration", $Configuration, "--no-build", "--no-restore",
         "--"
     )
-    if ((Split-Path -Leaf (Split-Path -Parent $mtpProject)) -eq "ProtoTest.TUnit.Tests") {
-        $mtpArguments += @("--minimum-expected-tests", "1")
+    if ((Split-Path -Leaf (Split-Path -Parent $projectPath)) -eq "ProtoTest.TUnit.Tests") {
+        $mtpArguments += @("--minimum-expected-tests", [string]$minimumTests)
         Invoke-DotNet @mtpArguments
         continue
     }
 
-    $output = & dotnet @mtpArguments 2>&1
-    $output | ForEach-Object { Write-Host $_ }
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet run $mtpProject failed with exit code $LASTEXITCODE."
+    $resultPath = Join-Path ([IO.Path]::GetTempPath()) ("prototest-mtp-" + [Guid]::NewGuid().ToString("N") + ".xml")
+    try {
+        $mtpArguments += @("-result-junit", $resultPath)
+        $output = & dotnet @mtpArguments 2>&1
+        $output | ForEach-Object { Write-Host $_ }
+        if ($LASTEXITCODE -ne 0) {
+            throw "dotnet run $projectPath failed with exit code $LASTEXITCODE."
+        }
+        if (-not (Test-Path -LiteralPath $resultPath)) {
+            throw "The Microsoft Testing Platform project '$projectPath' wrote no structured result to '$resultPath'."
+        }
+        [xml]$result = Get-Content -Raw -LiteralPath $resultPath
+        $tests = [int]$result.testsuites.tests
+        if ($tests -lt $minimumTests) {
+            throw "The Microsoft Testing Platform project '$projectPath' ran $tests test(s); the declared minimum is $minimumTests."
+        }
     }
-    if (($output -join [Environment]::NewLine) -match 'Total:\s*0\b') {
-        throw "The Microsoft Testing Platform project '$mtpProject' ran zero tests."
+    finally {
+        Remove-Item -LiteralPath $resultPath -Force -ErrorAction SilentlyContinue
     }
 }

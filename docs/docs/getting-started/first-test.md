@@ -74,7 +74,7 @@ namespace Orders.Tests;
 public sealed class OrderTests
 {
     [ProtoTest]
-    public async Task Creating_an_order_returns_it()
+    public async Task CreatingAnOrderReturnsIt()
     {
         using var response = await Proto.Context.Rest()
             .Body(new { product = "notebook", quantity = 2 })
@@ -100,7 +100,7 @@ using ProtoTest.Json;
 
 response
     .Should.HaveHttpStatus(HttpStatusCode.Created)
-    .ShouldMatchShape(new
+    .Should.MatchShape(new
     {
         id = JsonValue.GreaterThan(0),
         product = "notebook",
@@ -164,7 +164,7 @@ Now compose them:
 public sealed class OrderTests
 {
     [ProtoTest]
-    public async Task Creating_an_order_returns_it()
+    public async Task CreatingAnOrderReturnsIt()
     {
         // Every request is now authenticated as a fresh customer.
     }
@@ -200,7 +200,7 @@ Tracing is on even without `ConfigureTracing`; that call only chooses where the 
 
 ## Rules, options and limits
 
-- **One context per async flow.** Starting a second test before completing the active one throws. `Proto.Context` outside a test throws *"No active ProtoExecutionContext available on this thread."*
+- **One context per async flow.** Starting a second test before completing the active one throws. `Proto.Context` outside a test throws *"No active ProtoExecutionContext is available on this flow. …"* and names the alternatives (`ProtoHost.FindTraceWriter(Activity?)` for off-flow telemetry, `ProtoHost.CurrentHost` for run scope).
 - **A skip starts nothing.** A test stopped by a [skip condition](../foundation/skip-conditions.md) has no context, no trace record and no teardown.
 - **Ids are configurable.** `ConfigureTestIds(ids => ids.RunPrefix = 42)` fixes the run prefix (random six digits by default); `SequenceDigits` defaults to `6` and accepts 1–9. Ids are at most 18 digits.
 - **Tracing is configurable.** `ProtoTraceOptions` also has `Enabled`, `ActivitySources`, `CaptureSourceLocations` and `EmbedSources`; `EmbedSources` only applies when `CaptureSourceLocations` is on. See [Configuration](./configuration.md).

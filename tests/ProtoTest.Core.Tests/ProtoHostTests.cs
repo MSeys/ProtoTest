@@ -46,7 +46,16 @@ public class ProtoHostTests
     public void Current_ShouldThrowInvalidOperationException_WhenAccessedOutsideOfTestScope()
     {
         // Act & Assert
-        Assert.Throws<InvalidOperationException>(() => _ = ProtoHost.CurrentContext);
+        var exception = Assert.Throws<InvalidOperationException>(() => _ = ProtoHost.CurrentContext);
+        Assert.That(exception!.Message, Does.Contain("FindTraceWriter"));
+    }
+
+    [Test]
+    public void CurrentHost_ShouldNameTheFix_WhenNoHostIsActive()
+    {
+        // This fixture is non-parallel, so no other test's host is active here.
+        var exception = Assert.Throws<InvalidOperationException>(() => _ = ProtoHost.CurrentHost);
+        Assert.That(exception!.Message, Does.Contain("ProtoTestAssembly"));
     }
 
     [Test]

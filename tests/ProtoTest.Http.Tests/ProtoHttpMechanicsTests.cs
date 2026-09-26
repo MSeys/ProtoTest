@@ -1,6 +1,6 @@
 namespace ProtoTest.Http.Tests;
 
-using ProtoTest.Http;
+using ProtoTest.Json;
 
 [TestFixture]
 public sealed class ProtoHttpMechanicsTests
@@ -34,11 +34,12 @@ public sealed class ProtoHttpMechanicsTests
     [Test]
     public void FailureDiagnostics_ShouldSanitizeTheAddressAndMessage()
     {
-        var diagnostics = ProtoHttpFailureDiagnostics.From(
+        var diagnostics = ProtoFailureDiagnostics.From(
             new Uri("https://user:secret@example.test/orders?access_token=xyz"),
             new InvalidOperationException("""{"token":"hunter2","note":"failed"}"""),
             CancellationToken.None,
-            new ProtoHttpAttachmentOptions());
+            new ProtoHttpAttachmentOptions(),
+            new ProtoHttpAttachmentOptions().SensitiveQueryParameters);
 
         Assert.Multiple(() =>
         {
@@ -59,10 +60,10 @@ public sealed class ProtoHttpMechanicsTests
         Assert.Multiple(() =>
         {
             Assert.That(
-                ProtoHttpFailureDiagnostics.From(null, new InvalidOperationException(), cancellation.Token, null).IsCanceled,
+                ProtoFailureDiagnostics.From(null, new InvalidOperationException(), cancellation.Token, null).IsCanceled,
                 Is.True);
             Assert.That(
-                ProtoHttpFailureDiagnostics.From(
+                ProtoFailureDiagnostics.From(
                     null,
                     new OperationCanceledException(),
                     CancellationToken.None,

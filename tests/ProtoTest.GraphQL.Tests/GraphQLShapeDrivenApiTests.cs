@@ -66,7 +66,7 @@ public sealed class GraphQLShapeDrivenApiTests
         try
         {
             using var response = await Proto.Context.GraphQL().Query("ping").ExpectAsync("pong");
-            response.ShouldHaveNoErrors();
+            response.Should.HaveNoErrors();
         }
         finally { await host.CompleteTestAsync(); }
     }
@@ -169,7 +169,7 @@ public sealed class GraphQLShapeDrivenApiTests
                 })
                 .ExecuteAsync();
 
-            response.ShouldHaveNoErrors();
+            response.Should.HaveNoErrors();
             Assert.Multiple(() =>
             {
                 Assert.That(body, Does.Contain("variables.input.files.0"));
@@ -199,7 +199,7 @@ public sealed class GraphQLShapeDrivenApiTests
                 .ExecuteAsync();
 
             var data = response.ReadDataAs<OrdersSelection>();
-            response.ShouldMatchShape(new OrdersSelection([], new PageInfoSelection(false)));
+            response.Should.MatchShape(new OrdersSelection([], new PageInfoSelection(false)));
 
             Assert.Multiple(() =>
             {
@@ -230,7 +230,7 @@ public sealed class GraphQLShapeDrivenApiTests
                 .Query("viewer")
                 .Select(new { displayName = Gql.Field })
                 .ExecuteAsync();
-            response.ShouldHaveNoErrors();
+            response.Should.HaveNoErrors();
             Assert.That(document, Does.Contain("displayName"));
 
             using var typed = await Proto.Context.GraphQL()
@@ -271,7 +271,7 @@ public sealed class GraphQLShapeDrivenApiTests
                 .Query("orders")
                 .Select(new { nodes = Array.Empty<MarkerRow>() })
                 .ExecuteAsync();
-            response.ShouldHaveNoErrors();
+            response.Should.HaveNoErrors();
             Assert.Multiple(() =>
             {
                 Assert.That(document, Does.Contain("nodes {"));
@@ -300,7 +300,7 @@ public sealed class GraphQLShapeDrivenApiTests
                 .Variables(new { other = "explicit" })
                 .Select(new { displayName = Gql.Field })
                 .ExecuteAsync();
-            response.ShouldHaveNoErrors();
+            response.Should.HaveNoErrors();
 
             using var envelope = JsonDocument.Parse(requestBody!);
             Assert.Multiple(() =>
@@ -330,7 +330,7 @@ public sealed class GraphQLShapeDrivenApiTests
                 .Variables(new { other = "explicit", first = 99 })
                 .Select(new { nodes = Gql.Field })
                 .ExecuteAsync();
-            response.ShouldHaveNoErrors();
+            response.Should.HaveNoErrors();
 
             using var envelope = JsonDocument.Parse(requestBody!);
             Assert.Multiple(() =>
@@ -360,7 +360,7 @@ public sealed class GraphQLShapeDrivenApiTests
                 .Query("orders")
                 .Select(new Dictionary<string, object?> { ["nodes"] = Gql.Field })
                 .ExecuteAsync();
-            response.ShouldHaveNoErrors();
+            response.Should.HaveNoErrors();
 
             Assert.Multiple(() =>
             {

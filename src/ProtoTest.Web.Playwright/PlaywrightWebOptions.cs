@@ -86,6 +86,13 @@ public sealed class PlaywrightWebOptions : IProtoConfigurableOptions
     public bool CapturePageErrors { get; set; } = true;
     public bool CaptureRequestFailures { get; set; } = true;
 
+    /// <summary>
+    /// The largest native trace attached to the test, in bytes. Defaults to 32 MiB; a bigger trace is
+    /// not attached and the trace records <c>web.playwright.trace_too_large</c> with its size, so a
+    /// failing run cannot spike memory buffering the whole zip. Set to zero to read without a cap.
+    /// </summary>
+    public long MaxTraceBytes { get; set; } = 32 * 1024 * 1024;
+
     /// <summary>The native context options this configuration describes, escape hatch applied last.</summary>
     internal BrowserNewContextOptions BuildContextOptions()
     {
@@ -106,5 +113,6 @@ public sealed class PlaywrightWebOptions : IProtoConfigurableOptions
     internal static void Validate(PlaywrightWebOptions options)
     {
         if (options.ActionTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(ActionTimeout));
+        if (options.MaxTraceBytes < 0) throw new ArgumentOutOfRangeException(nameof(MaxTraceBytes));
     }
 }

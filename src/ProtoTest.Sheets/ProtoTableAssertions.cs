@@ -26,8 +26,8 @@ public sealed class ProtoTableAssertions
         _negated = negated;
     }
 
-    /// <summary>Asserts a row exists where the key column holds the value.</summary>
-    public void ContainRow(string keyColumn, string value)
+    /// <summary>Asserts a row exists where the key column holds the value. Returns the table.</summary>
+    public ProtoTable ContainRow(string keyColumn, string value)
     {
         ArgumentNullException.ThrowIfNull(keyColumn);
         ArgumentNullException.ThrowIfNull(value);
@@ -45,5 +45,6 @@ public sealed class ProtoTableAssertions
                     $"the table on '{_sheetName}'",
                     $"contain a row where '{keyColumn}' is '{value}'", _negated)} " +
                 $"but it {(_negated ? "does" : "does not")}."));
+        return _table;
     }
 }

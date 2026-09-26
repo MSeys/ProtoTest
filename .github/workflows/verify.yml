@@ -74,6 +74,19 @@ jobs:
         shell: pwsh
         run: ./eng/test.ps1 -Configuration Release
 
+      # The viewer's recipe traces are regenerated from the demo this job just built and tested, so a
+      # recipe filter that matches no test (or a generator break) fails CI. The committed snapshots
+      # carry wall-clock timestamps and per-run ids, so this proves generation, not byte equality
+      # (eng/facts/gotchas.md, "Versioning, feeds and gates").
+      - name: Regenerate the viewer recipe traces
+        shell: pwsh
+        run: ./eng/generate-recipe-traces.ps1 -NoBuild
+
+      # The gate fixtures, now with the Release test binaries the MTP zero-test guards need.
+      - name: Test the gate scripts
+        shell: pwsh
+        run: ./eng/test-gates.ps1
+
       - name: Verify formatting and analyzers
         shell: pwsh
         run: ./eng/lint.ps1 -NoRestore
@@ -220,11 +233,21 @@ jobs:
             docs/package-lock.json
             viewer/package-lock.json
 
-      # The content checks run before the builds: they catch removed symbols, drifted configuration
-      # keys and dead sample links without depending on a Docusaurus build.
+      # The content checks run before the builds: they catch removed symbols, docs configuration keys
+      # with no source section constant, dead sample links and a stale generated changelog without
+      # depending on a Docusaurus build. CI runs the public key list
+      # (docs/configuration-keys.json); the private fact sheets add the fact-to-docs direction on a
+      # machine that has the records checkout.
       - name: Check the documentation content
         shell: pwsh
         run: ./eng/check-docs.ps1
+
+      # The gate scripts are themselves gated: the fixtures run verify.ps1, check-docs.ps1, lint.ps1
+      # and release.ps1 in throwaway repositories. The MTP runner guards skip here (no built test
+      # binaries) and run in the build-and-test job below, after the suites are built.
+      - name: Test the gate scripts
+        shell: pwsh
+        run: ./eng/test-gates.ps1
 
       # Both builds run stylelint, type checks and link checks; they are not part of the dotnet build,
       # so without this job a broken page or type error would only surface after merge.

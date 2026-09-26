@@ -19,6 +19,7 @@ internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IAsyncDisposa
     private readonly SemaphoreSlim _gate = new(1, 1);
     private IConnection? _connection;
     private IChannel? _publishChannel;
+    private bool _disposed;
 
     public RabbitMqMessageBroker(RabbitMqOptions options)
     {
@@ -39,6 +40,9 @@ internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IAsyncDisposa
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            // A released broker stays released: without this, the reopen in ConnectionAsync would
+            // revive the run's connection for a late publisher and leak it.
+            ObjectDisposedException.ThrowIf(_disposed, this);
             var channel = await PublishChannelAsync(cancellationToken).ConfigureAwait(false);
             var properties = new BasicProperties
             {
@@ -78,6 +82,12 @@ internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IAsyncDisposa
         await _gate.WaitAsync().ConfigureAwait(false);
         try
         {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
             if (_publishChannel is not null)
             {
                 await _publishChannel.DisposeAsync().ConfigureAwait(false);
@@ -102,6 +112,7 @@ internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IAsyncDisposa
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             var connection = await ConnectionAsync(cancellationToken).ConfigureAwait(false);
             return await connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         }

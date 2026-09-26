@@ -24,20 +24,14 @@ protected override void Configure(IProtoHostBuilder builder) =>
             .AddAspNetCoreServer<Program>()
             .AddRest(rest => rest.AddClient("Api")))
         // Last, so the application has declared its exchanges before the test's taps bind to them.
-        .AddMessaging(messaging => messaging.UseRabbitMq());
+        .AddMessaging(messaging => messaging
+            // Pre-bind every destination the act publishes to; a tap declared at the first await
+            // misses anything published before it.
+            .Tap("invoice.paid")
+            .UseRabbitMq());
 ```
 
-Declare the destinations the suite awaits, so the adapter binds its tap before the test acts:
-
-```json
-{
-  "ProtoTest": {
-    "Messaging": {
-      "Destinations": [ "invoice.paid" ]
-    }
-  }
-}
-```
+`Tap` declares the destination in code, where the test's intent lives. The `ProtoTest:Messaging:Destinations` configuration key still applies over it, so an environment can add its own destinations.
 
 ## The test
 

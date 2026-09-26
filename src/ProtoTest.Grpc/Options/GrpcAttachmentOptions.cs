@@ -10,11 +10,18 @@ using ProtoTest.Json;
 /// </summary>
 public sealed class GrpcAttachmentOptions : ProtoDiagnosticCaptureOptions
 {
-    /// <summary>The configuration section this type binds from.</summary>
-    public const string ConfigurationSection = "ProtoTest:Grpc:Attachments";
+    /// <summary>
+    /// The section this type binds from. It is not named <c>ConfigurationSectionName</c> because the
+    /// inherited instance property already carries that name; the instance property returns this value.
+    /// </summary>
+    public const string SectionName = "ProtoTest:Grpc:Attachments";
+
+    /// <summary>The pre-1.1 name of <see cref="SectionName"/>.</summary>
+    [Obsolete("Use the inherited ConfigurationSectionName instance property, or SectionName.")]
+    public const string ConfigurationSection = SectionName;
 
     public GrpcAttachmentOptions()
-        : base(ConfigurationSection)
+        : base(SectionName)
     {
     }
 }

@@ -1,8 +1,10 @@
 namespace ProtoTest.Core;
 
+using ProtoTest.Core.Internal;
+
 internal sealed class ProtoTraceExportHook(
     ProtoTraceSession traceSession,
-    ProtoTraceOptions options) : IProtoRunHook
+    ProtoTraceOptions options) : IProtoRunHook, IProtoRunEvidenceHook
 {
     // AfterRun executes in descending order. Trace export runs last so generated sink artifacts can be bundled.
     public int Order => ProtoHookOrder.First;

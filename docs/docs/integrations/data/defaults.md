@@ -54,8 +54,8 @@ For each member, the first of these that applies wins:
 2. A **member default** — `data.For<T>().Default(x => x.Member, …)`, resolved by walking the target type and its base types.
 3. A **type provider** — `data.Values.Use<TValue>(…)`, matched on the exact type only.
 4. A **custom resolver** — `IProtoDataValueResolver`, in registration order; a throwing resolver is wrapped in `ProtoDataException`.
-5. A **safe built-in**: `null` for a nullable member or a nullable-annotated reference, a generated string for `string`, a generated `Guid`, and an empty array or list for array, `IEnumerable<T>`, `IReadOnlyCollection<T>`, `IReadOnlyList<T>`, `ICollection<T>`, `IList<T>` and `List<T>`.
-6. The constructor parameter's **default value**, on the constructor route only.
+5. The constructor parameter's **default value**, on the constructor route only. The declaration's default is the value the author asked for, so a generation never replaces it — including `null` for a nullable parameter.
+6. A **safe built-in**, for a member with no constructor default: `null` for a nullable member or a nullable-annotated reference, a generated string for `string`, a generated `Guid`, and an empty array or list for array, `IEnumerable<T>`, `IReadOnlyCollection<T>`, `IReadOnlyList<T>`, `ICollection<T>`, `IList<T>` and `List<T>`.
 
 If none apply, `ProtoDataException` names the member. Numbers, enums, booleans, dates and your own value objects are deliberately *not* on the built-in list — provide them explicitly or through a default.
 
@@ -92,7 +92,7 @@ Both kinds of provider, and every member default, receive a `ProtoDataValueConte
 | `NextString()` | a deterministic string like `Invoice.Reference-0001-00` |
 | `Ref<T>(identity)` | a value provisioned earlier in this test, from the [identity map](./provisioners.md#refs-and-the-identity-map) |
 
-`NextGuid()` is the first 16 bytes of a SHA-256 over `"{TestId}|{ObjectSequence}|{TargetType.FullName}|{MemberName}|{counter}"`, and `NextString()` is `"{TargetType.Name}.{MemberName}-{ObjectSequence:D4}-{counter:D2}"`. Each member resolution gets a fresh context, so the counter starts at 0 per member: the same test produces the same values on every run, while different tests never collide.
+`NextGuid()` is the first 16 bytes of a SHA-256 over `"{TestId}|{ObjectSequence}|{TargetType.FullName}|{MemberName}|{counter}"`, and `NextString()` is `"{TargetType.Name}.{MemberName}-{ObjectSequence:D4}-{counter:D2}"`. Each member resolution gets a fresh context, so the counter starts at 0 per member: the same test produces the same values on every run, while different tests never collide. For a name outside a member default — a tenant, an operator — use `Proto.Context.UniqueName("tenant")`, which derives `tenant-{TestId}` from the same test id.
 
 ## Domain factories
 

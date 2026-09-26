@@ -27,7 +27,7 @@ public async Task An_overstaying_car_is_charged_an_idle_fee()
     Proto.Context.Clock.Advance(TimeSpan.FromHours(5));
 
     using var invoice = await Proto.Context.Rest().GetAsync($"/api/invoices/{session.InvoiceId}");
-    invoice.ShouldMatchShape(new { idleFee = JsonValue.GreaterThan(0) });
+    invoice.Should.MatchShape(new { idleFee = JsonValue.GreaterThan(0) });
 }
 ```
 

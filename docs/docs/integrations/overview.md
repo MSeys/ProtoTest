@@ -33,7 +33,7 @@ public sealed class ApiTests
             .PostAsync("/api/orders");
 
         response.Should.HaveHttpStatus(HttpStatusCode.Created)
-            .ShouldMatchShape(new { id = JsonValue.GreaterThan(0), product = "notebook" });
+            .Should.MatchShape(new { id = JsonValue.GreaterThan(0), product = "notebook" });
     }
 }
 ```
@@ -60,8 +60,8 @@ public async Task TheMonthlyReport_ShouldMatchItsModel()
     response.Should.HaveHttpStatus(HttpStatusCode.OK);
     var report = Proto.Context.Sheets().Open(response).Model<ProjectReportRow>();
 
-    report.Verify();
-    report.Column(row => row.Environments).ShouldAll(count => count >= 0);
+    report.Should.MatchModel();
+    report.Column(row => row.Environments).Should.All(count => count >= 0);
 }
 ```
 

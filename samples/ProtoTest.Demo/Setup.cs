@@ -132,6 +132,15 @@ public sealed class Setup : ProtoTestAssembly
             .ConfigureAppConfiguration(configuration => ConfigureTests(configuration, environment))
             .AddSheets()
             .AddWeb()
+            // The reasons the gated journeys would otherwise repeat: the broker gate and the
+            // "Northstar standalone" server gate read these; a per-test Reason still overrides.
+            .AddCapabilityReason(
+                ProtoCapabilityKinds.Broker,
+                "No broker is configured; set ProtoTest:Messaging:RabbitMq:ConnectionString.")
+            .AddCapabilityReason(
+                ProtoCapabilityKinds.Server,
+                "The standalone application is only started when the suite owns the store.",
+                "Northstar standalone")
             .AddNorthstarTestSupport(support =>
                 support.UseInProcessGraphQLWebSockets = environment.UsesLocalApplications)
             .AddNorthstarData(data =>

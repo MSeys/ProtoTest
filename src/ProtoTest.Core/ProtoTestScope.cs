@@ -52,15 +52,34 @@ public sealed class ProtoTestScope : IAsyncDisposable
     }
 
     /// <summary>
-    /// Completes the lifecycle once. A teardown failure is recorded by the lifecycle as a finding and
-    /// on the failing teardown operation; it is swallowed here so cleanup can never replace the
-    /// test's own outcome.
+    /// Completes the lifecycle once. The scope owns its started test: completion must run on the async
+    /// flow that started it and while that test is the active one, because completion reads the ambient
+    /// context. Disposing off-flow, or under another test, would complete nothing (or someone else's
+    /// test), so the scope records that as a finding on its own test and reports it instead of
+    /// silently no-oping. A teardown failure is already recorded by the lifecycle as a finding and on
+    /// the failing teardown operation; it is swallowed here so cleanup can never replace the test's own
+    /// outcome.
     /// </summary>
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _completed, 1) != 0)
         {
             return;
+        }
+
+        var active = ProtoHost.CurrentContextOrNull;
+        if (!ReferenceEquals(active, Context))
+        {
+            var message = active is null
+                ? $"The ProtoTestScope for '{Context.TestName}' was disposed on an async flow that did not start it, so its test cannot complete. Dispose the scope on the flow that started it."
+                : $"The ProtoTestScope for '{Context.TestName}' was disposed while another test is active on this flow, so it cannot complete its own test. Dispose the scope on its own flow, outside any other test.";
+            Context.AddFinding(
+                message,
+                ProtoReportStatus.Error,
+                category: "Lifecycle",
+                targetName: Context.TestName,
+                tags: [nameof(ProtoTestScope)]);
+            throw new InvalidOperationException(message);
         }
 
         try

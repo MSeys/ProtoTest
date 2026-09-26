@@ -26,10 +26,7 @@ using ProtoTest.Web;
 [Auth<NorthstarAuthenticator>]
 [WebSession("Default", DiscoverRoutes = true)]
 [LoginAs<NorthstarConsoleLogin>("owner")]
-[RequiresCapability(
-    ProtoCapabilityKinds.Server,
-    CapabilityName = "Northstar standalone",
-    Reason = "The standalone application is only started when the suite owns the store.")]
+[RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "Northstar standalone")]
 [RequiresConsoleBuild]
 public sealed class WebJourney
 {
@@ -128,7 +125,7 @@ public sealed class WebJourney
 
         await reports.Status.Should.HaveTextAsync("monthly.xlsx downloaded.", NorthstarConsole.Wait);
         var reportModel = report.Model<SheetsJourney.ProjectReportRow>();
-        reportModel.Verify();
+        reportModel.Should.MatchModel();
         var reportRow = reportModel.Row(candidate => candidate.Name == ProjectName);
         using (Assert.EnterMultipleScope())
         {

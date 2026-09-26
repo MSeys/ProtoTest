@@ -20,7 +20,7 @@ public sealed class TargetedGraphQLProbeTests
                 .ExecuteAsync();
 
             var exception = Assert.Throws<GraphQLAssertionException>(() =>
-                response.ShouldMatchShape(new { value = 1 }));
+                response.Should.MatchShape(new { value = 1 }));
             Assert.That(exception!.Message, Does.Contain("Expected GraphQL data"));
         }
         finally { await host.CompleteTestAsync(); }

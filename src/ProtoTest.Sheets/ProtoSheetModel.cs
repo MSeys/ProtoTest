@@ -3,29 +3,41 @@ namespace ProtoTest.Sheets;
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using ProtoTest.Core;
 using ProtoTest.Sheets.Internal;
 
 /// <summary>
 /// A sheet modelled as a record: <c>[Sheet]</c> and <c>[Column]</c> declare the layout once, the model
-/// verifies it, and tests read typed rows and columns without repeating header paths. The record is the
-/// model; <see cref="ProtoSheetModel{TRow}"/> remains the escape hatch for shapes a record cannot hold.
+/// verifies it, and tests read typed rows and columns without repeating header paths. Rows are
+/// constructed through the record's primary constructor, so its guards run; <see cref="ProtoSheetModel{TRow}"/>
+/// remains the escape hatch for shapes a record cannot hold.
 /// </summary>
 public sealed class ProtoSheetModel<TRow> where TRow : notnull
 {
     private readonly ProtoTable _table;
     private readonly ProtoExecutionContext? _context;
     private readonly IReadOnlyList<SheetColumnBinding> _columns;
+    private readonly ConstructorInfo? _constructor;
+    private readonly IReadOnlyList<ConstructorArgument> _constructorArguments;
+    private readonly IReadOnlyList<SheetColumnBinding> _propertyBindings;
 
     private ProtoSheetModel(
         ProtoSheet sheet,
         ProtoTable table,
         IReadOnlyList<SheetColumnBinding> columns,
+        ConstructorInfo? constructor,
+        IReadOnlyList<ConstructorArgument> constructorArguments,
         ProtoExecutionContext? context)
     {
         Sheet = sheet;
         _table = table;
         _columns = columns;
+        _constructor = constructor;
+        _constructorArguments = constructorArguments;
+        _propertyBindings = constructorArguments.Count == 0
+            ? columns
+            : [.. columns.Where(column => constructorArguments.All(argument => argument.Binding != column))];
         _context = context;
     }
 
@@ -73,8 +85,15 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
         return new ProtoModelColumn<TValue>(Sheet.Name, binding.Name, values, _table.DataStartRow, _context);
     }
 
+    /// <summary>The assertions of this model, for example <c>Should.MatchModel()</c>.</summary>
+    public ProtoSheetModelAssertions<TRow> Should => new(this);
+
     /// <summary>Checks every declared column against the record's shape; all violations are reported.</summary>
-    public void Verify()
+    /// <remarks>Obsolete: use <c>Should.MatchModel()</c>.</remarks>
+    [Obsolete("Use Should.MatchModel() instead.")]
+    public void Verify() => AssertModel();
+
+    internal ProtoSheetModel<TRow> AssertModel()
     {
         _table.RecordRead(_table.DataRange);
         var failures = new List<string>();
@@ -152,7 +171,7 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
         if (failures.Count == 0)
         {
             operation?.Succeed();
-            return;
+            return this;
         }
 
         var shown = failures.Take(10).ToArray();
@@ -196,15 +215,74 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
                 $"{typeof(TRow).Name} declares no [Column] properties.");
         }
 
-        return new ProtoSheetModel<TRow>(sheet, table, columns, context);
+        var constructor = ResolveConstructor(columns, out var constructorArguments);
+        return new ProtoSheetModel<TRow>(sheet, table, columns, constructor, constructorArguments, context);
+    }
+
+    /// <summary>
+    /// Resolves the route a row is constructed through. A parameterless constructor is used as-is; a
+    /// record's primary constructor is used when every parameter maps to a <c>[Column]</c>, so its
+    /// guards and normalization run. A constructor parameter no column maps fails the model by name
+    /// instead of constructing the record uninitialized with a fabricated default for that parameter.
+    /// </summary>
+    private static ConstructorInfo? ResolveConstructor(
+        IReadOnlyList<SheetColumnBinding> columns,
+        out IReadOnlyList<ConstructorArgument> arguments)
+    {
+        arguments = [];
+        var type = typeof(TRow);
+        if (type.IsValueType)
+        {
+            return null;
+        }
+
+        var constructors = type.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
+        if (constructors.Length == 0)
+        {
+            throw new SpreadsheetAssertionException(
+                $"'{type.Name}' has no public constructor, so a row cannot be constructed for it.");
+        }
+
+        if (constructors.Any(constructor => constructor.GetParameters().Length == 0))
+        {
+            return null;
+        }
+
+        foreach (var constructor in constructors)
+        {
+            var mapped = new List<ConstructorArgument>();
+            foreach (var parameter in constructor.GetParameters())
+            {
+                var binding = columns.FirstOrDefault(column =>
+                    string.Equals(column.Name, parameter.Name, StringComparison.OrdinalIgnoreCase));
+                if (binding is null)
+                {
+                    mapped.Clear();
+                    break;
+                }
+
+                mapped.Add(new ConstructorArgument(binding, parameter.ParameterType));
+            }
+
+            if (mapped.Count == constructor.GetParameters().Length)
+            {
+                arguments = mapped;
+                return constructor;
+            }
+        }
+
+        var candidate = constructors[0];
+        var unmapped = candidate.GetParameters().First(parameter =>
+            columns.All(column => !string.Equals(column.Name, parameter.Name, StringComparison.OrdinalIgnoreCase)));
+        throw new SpreadsheetAssertionException(
+            $"'{type.Name}' has a constructor parameter '{unmapped.Name}' that no [Column] maps, so a row " +
+            "cannot be constructed through it. Mark it with [Column(\"...\")] or add a parameterless constructor.");
     }
 
     private TRow Project(int row)
     {
-        // Records only expose their primary constructor, so the instance is created uninitialized and
-        // every declared property is set from its column.
-        var instance = (TRow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(TRow));
-        foreach (var binding in _columns)
+        var instance = _constructor is null ? Activator.CreateInstance<TRow>() : InvokeConstructor(row);
+        foreach (var binding in _propertyBindings)
         {
             var cell = _table.Cell(row, binding.Number);
             // The projection must fail the same way Column does; the converter returns null for an
@@ -215,6 +293,33 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
 
         return instance;
     }
+
+    private TRow InvokeConstructor(int row)
+    {
+        var arguments = new object?[_constructorArguments.Count];
+        for (var index = 0; index < arguments.Length; index++)
+        {
+            var argument = _constructorArguments[index];
+            var cell = _table.Cell(row, argument.Binding.Number);
+            GuardEmpty(argument.Binding, cell);
+            arguments[index] = SheetCellValue.Convert(argument.ParameterType, cell);
+        }
+
+        try
+        {
+            return (TRow)_constructor!.Invoke(arguments);
+        }
+        catch (TargetInvocationException exception) when (exception.InnerException is not null)
+        {
+            // A guard the model's constructor declares is the failure: the caller sees its type and
+            // message instead of a reflection wrapper.
+            ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
+            throw;
+        }
+    }
+
+    /// <summary>One constructor parameter and the column its value comes from.</summary>
+    private sealed record ConstructorArgument(SheetColumnBinding Binding, Type ParameterType);
 
     private void GuardEmpty(SheetColumnBinding binding, ProtoCell cell)
     {

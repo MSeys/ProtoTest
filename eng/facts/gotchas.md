@@ -90,7 +90,8 @@ audit plan.
   `ProtoInfrastructureContext.Readiness`; a container started outside a host keeps its own
   `ReadinessTimeout`/`ReadinessInterval`. `ProtoReadiness.WaitAsync` itself rides
   `ProtoPolling.PollAsync`, so readiness shares the one interval/deadline loop with every other wait
-  (VOC-4 fixed); exceptions still mean "not ready yet" and the timeout message carries the last error.
+  (VOC-4 fixed); exceptions still mean "not ready yet" and the timeout message names the probed URL and the
+last error.
 - **The consumer rule is adopted by `AddAspNetCoreServer`, the in-process device transport,
   `UseRabbitMq`, `AddSql` (with `SqlOptions.AddressKeys`) and `AddEntityFrameworkCore` (same keys).**
   A missing address means "inert +
@@ -110,27 +111,43 @@ audit plan.
 
 ## Messaging
 
-- **A tap misses messages published before its destination is prepared.** `UseRabbitMq` declares the
-  destinations listed in `ProtoTest:Messaging:Destinations:<n>` during test setup; any other destination
-  is declared at the first `AwaitAsync`, so an act-then-await flow loses a message the act published.
-  Pre-bind every destination the act publishes to. (Canonical:
-  `tests/ProtoTest.Messaging.RabbitMq.Tests/RabbitMqTests.cs`; used by OpenCSMS `Setup.cs`.)
+- **A tap misses messages published before its destination is prepared.** The adapter declares the
+  destinations registered during test setup: `ProtoMessagingBuilder.Tap(...)` in code, plus the
+  `ProtoTest:Messaging:Destinations:<n>` configuration entries (configuration binds after code and the
+  prepared set is deduped). Any other destination is declared at the first `AwaitAsync`, so an
+  act-then-await flow loses a message the act published. Pre-bind every destination the act publishes
+  to. (Canonical: `tests/ProtoTest.Messaging.RabbitMq.Tests/RabbitMqTests.cs`, the
+  `Tap_ShouldPreBind...` round trip and `tests/ProtoTest.Messaging.Tests/MessagingTapTests.cs`.)
+- **Awaits on one consumer serialize, and an unmatched delivery is kept.** The shared concurrency
+  contract: concurrent awaits on one consumer run in call order, and a delivery matching no awaited
+  predicate stays buffered for a later await, so nothing is lost or stolen. Both adapters follow it
+  (canonical: `tests/ProtoTest.TestSupport/MessagingConcurrencyContract.cs`, called by the in-memory
+  and RabbitMQ suites).
 - **`UseRabbitMq` declares the `Broker` capability conditionally on
   `ProtoTest:Messaging:RabbitMq:ConnectionString`.** A run with a configured key or a broker container
   that declares it keeps the capability; with neither it is absent and gated tests skip instead of
   failing setup/first publish. A callback that sets `RabbitMqOptions.ConnectionString` in code provides
   the address without a key and keeps the capability unconditional. An adapter registered with the
   key-less `UseBroker(factory)` overload keeps the unconditional declaration too.
-- **A pre-bound destination still connects at test setup when the capability is present.** The
-  pre-bind failure mode is unchanged; the address rule only decides whether the run gets that far.
+- **A pre-bound destination still connects at test setup when the capability is present.** A destination
+  whose exchange cannot be declared fails only the tests that await it, with the named error — not the
+  whole class at setup — because each tap owns its channel.
 - **`ProtoMessage` carries the exchange as `Destination` and drops the routing key.** Taps bind
   destinations as exchanges, so a queue (a dead-letter queue) or an `(exchange, routingKey)` pair cannot
   be awaited through the framework. Use a raw `RabbitMQ.Client` helper until the recorded REF-5 addition
   ships (canonical: OpenCSMS `tests/OpenCsms.Suite/Support/RabbitMqRawClient.cs`).
 - **Messaging observations are evidence, not coverage.** The package ships no collector and the
-  protocol descriptor carries no coverage category (A5 VOC-1 decision): `messaging.publish`,
-  `messaging.receive` and `messaging.contract.shape` reach a report only through a collector a suite
-  registers, and destinations are never aggregated by ProtoTest itself.
+  protocol descriptor carries no coverage category (A5 VOC-1 decision): the `messaging.published`,
+  `messaging.receive` and `messaging.contract.shape` observations reach a report only through a collector
+  a suite registers, and destinations are never aggregated by ProtoTest itself. (`messaging.publish`
+  remains the operation name.)
+- **Message reads are typed but JSON-only.** `message.ReadAsJson<T>()` reuses
+  `ProtoJsonDefaults.Reader` and stays nullable; `ReadRequired<T>()`/`ReadRequired<T>(path)` throw
+  `MessagingAssertionException` naming the destination for an empty payload, JSON `null` or a missing
+  path, and a wrong type still throws the deserializer's `JsonException`. `Payload` stays for raw
+  inspection, and the UTF-8-string limit is unchanged. Unlike REST/GraphQL required reads, a messaging
+  read records no deserialize trace event (no new messaging vocabulary; the await already traces the
+  payload section).
 
 ## Clock and time
 
@@ -169,6 +186,14 @@ audit plan.
   `device.connected = false` and emits `device.disconnect`, so a test that never disconnects still ends
   with a final disconnected state; an explicit `DisconnectAsync` then a send reconnects and records
   both connects.
+- **Selenium actions verify the resulting state.** `Check`/`SelectOption` fail with
+  `WebActionabilityException` when the click did not take, matching Playwright; a stub-driver test is
+  the proof where no real driver is installed.
+- **Sheet integer reads are strict.** A fractional, out-of-range or NaN numeric cell fails naming the
+  cell instead of rounding or saturating; whole in-range values convert.
+- **Sheet record models construct through the constructor their columns map**, and a throwing
+  constructor guard propagates with its original stack; an unmapped constructor parameter fails naming
+  it. In `ProtoTest.Data`, a declared optional constructor-parameter default wins over a generated value.
 
 ## Tests and parallelism
 
@@ -181,12 +206,21 @@ audit plan.
 - Registration-shape and report-markup tests are labelled `[Category("Characterization")]`; keep the
   label, they are deliberate refactoring brakes.
 - Shared doubles and helpers live in `tests/ProtoTest.TestSupport` (`TemporaryTrace`,
-  `TestNetworking.FreePort`, `SingleConnectionListener`). `eng/lint.ps1` fails a local `FreePort`,
-  `ServeOnceAsync`, `TemporaryTrace` or `SingleConnectionListener` definition outside that project, so
-  the copies cannot drift back (audit TST-2).
-- **Parallel safety rests on per-test ownership, not on the runner policy.** Provisioning names from
-  `context.TestId` (the `[CsmsOperator]` pattern) and predicates on test-owned ids are what make
-  `ParallelScope.All` safe; the default id generator's random six-digit run prefix also keeps reruns
+  `TestNetworking.FreePort`, `SingleConnectionListener`). `eng/lint.ps1` fails a local identifier whose
+  name contains the known roots (`FreePort`, `ServeOnceAsync`, `TemporaryTrace`,
+  `SingleConnectionListener`) outside that project, so `GetFreePort` or `LazyTemporaryTrace` cannot
+  drift back either (audit TST-2/A5-64). The rule is a deny list, not a shape scan: a helper renamed
+  completely away from those roots (say `AcquirePort`) is not detected.
+- The MTP runs carry per-project run-test minimums in `eng/test.ps1`: TUnit 14 (its
+  `--minimum-expected-tests` counts tests that actually ran, so the deliberate adapter skips are
+  excluded from the 15 discovered) and xUnit.net v3 17 (the JUnit total it writes includes the skip).
+  xUnit.net v3's in-process runner exits 0 on a zero-test run, so its structured JUnit result is
+  parsed and compared with the same minimum. Lowering a minimum is a deliberate edit that names the
+  removed tests. `eng/test-gates.ps1` proves both guards fail on a filter that matches zero tests.
+- **Parallel safety rests on per-test ownership, not on the runner policy.** Provisioning names come
+  from `context.UniqueName(kind, sequence)` (the `[CsmsOperator]` pattern; `kind-{TestId}[-sequence]`,
+  deterministic and persistent-store-safe) and predicates use test-owned ids; that is what makes
+  `ParallelScope.All` safe. The default id generator's random six-digit run prefix also keeps reruns
   against a persistent database collision-free. A shared fixture or a fixed identifier reintroduces the
   repeatability bug (REF-1).
 
@@ -197,10 +231,15 @@ audit plan.
   (`4bafa6d`). The old collision (a locally-packed `prototest.* 1.0.1` in the global cache made package
   validation compare the package against itself) is the reason: local consumers use package-source
   mapping and clear `~/.nuget/packages/prototest.*` after a repack.
-- **The branch meets CI.** `ci.yml` includes `version/**` and a manual dispatch, and every locally run
-  stage records its evidence through `eng/verify.ps1 -Stage <name>`; the gate auto-scopes to the change
-  (docs-only stages skip lint/tests, code stages format only the projects they touched) and takes
-  `-Pack` when public surface/packaging changed, `-Full` for the CI shape.
+- **The branch meets CI, and the gate record is honest.** `ci.yml` includes `version/**` and a manual
+  dispatch, and every locally run stage records its evidence through `eng/verify.ps1 -Stage <name>`.
+  The gate scopes to the working-tree change, or to the HEAD commit when the tree is clean; it formats
+  only the projects the change touched, records `docs-only` for a docs change, and records `tooling`
+  and runs `eng/test-gates.ps1` for a gate-script or workflow change. A stage that changed code but
+  skipped lint/tests (it is already committed without `-Full`, or `-SkipLint`/`-SkipTests` was passed)
+  records `incomplete` and exits 1; only `-AllowSkippedCodeGates` turns that record green, and the
+  record then names the skipped gates and the approval. `-Pack` when public surface/packaging changed,
+  `-Full` for the CI shape.
 - `eng/pack.ps1` is the per-stage pack gate; it verifies the packable set, READMEs, dependency edges,
   PDB/DLL pairs and that a project disabling package validation carries a
   `<PackageValidationOptOutReason>`. Run it whenever packaging changes, then re-pack for consumers
@@ -215,8 +254,23 @@ audit plan.
   stay green. The removed-symbol deny list is derived from `src/**/CompatibilitySuppressions.xml`:
   CP0001 type removals by short name, CP0002 member removals as `DeclaringType.Member` while no
   member of that name is left on the declaring type (a changed overload keeps the name), and CP0006 is
-  excluded because it means a member was added to an interface. The config-key cross-check still
-  depends on the gitignored `assets/internal/docs-facts` and skips itself in CI.
+  excluded because it means a member was added to an interface. The configuration-key cross-check runs
+  everywhere against the tracked `docs/configuration-keys.json`: its `sections` are the
+  `ConfigurationSectionName`/`SectionName`/`SectionPath` constants scanned from `src/**/*.cs` and
+  verified against the file on every run, and its `allowedKeys` are the documented non-section keys,
+  each with a reason and required to stay mentioned in a page. A docs key with no source section
+  fails in CI; the private `assets/internal/records/docs-facts` sheets add the fact-to-docs direction
+  where the records checkout exists.
+- **Publishing is tag-gated.** `.github/workflows/release.yml` logs in to NuGet and publishes only
+  from `github.ref_type == 'tag'`; a dispatch from a branch with `dry_run: false` hits the guard and
+  fails instead of pushing. `eng/release.ps1` refuses a real push from any non-tag ref - or from a
+  local run with no CI ref - unless `-AllowBranch` is passed, and a tag ref must still be
+  `v<version>`; `-DryRun` is always allowed so the workflow can validate a plan on a branch.
+- **The viewer's recipe traces are snapshots; CI proves generation, not byte equality.**
+  `eng/generate-recipe-traces.ps1` runs in the build-test-pack job after the suites, so a recipe filter
+  that matches no test or a generator break fails CI. The committed
+  `viewer/public/demos/recipes/*.prototrace` files embed wall-clock timestamps and per-run ids, so
+  `git diff` cannot be the check: regeneration is exercised, byte staleness is not detected.
 - **The changelog is cut before tagging.** `eng/cut-release.ps1` rolls `[Unreleased]` into
   `## [<version>] - <date>` from `Directory.Build.props` and fails on an empty section;
   `.github/workflows/release.yml` refuses to create a GitHub Release without that section instead of

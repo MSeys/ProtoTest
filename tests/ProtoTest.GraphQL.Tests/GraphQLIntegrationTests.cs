@@ -40,7 +40,7 @@ public sealed class GraphQLIntegrationTests
                         .PageInfo("hasNextPage", "endCursor")))
                 .ExecuteAsync();
 
-            response.ShouldHaveNoErrors().ShouldMatchShape(new
+            response.Should.HaveNoErrors().Should.MatchShape(new
             {
                 products = new
                 {
@@ -169,7 +169,7 @@ public sealed class GraphQLIntegrationTests
             using var response = await Proto.Context.GraphQL()
                 .Query("Product", query => query.Field("product", field => field.Fields("id", "name")))
                 .ExecuteAsync();
-            response.ShouldHaveNoErrors();
+            response.Should.HaveNoErrors();
 
             // Assert
             var collector = Proto.Context.Services.GetServices<IProtoCollector>()
@@ -205,7 +205,7 @@ public sealed class GraphQLIntegrationTests
                     .Field("product", field => field.Argument("id", Gql.Var("id"))))
                 .Variables(new { id = "missing" })
                 .ExecuteAsync();
-            response.ShouldHaveErrors().ShouldHaveError("NOT_FOUND");
+            response.Should.HaveErrors().Should.HaveError("NOT_FOUND");
             Assert.That(response.Errors.Single().Path, Is.EqualTo(new object[] { "product" }));
         }
         finally { await host.CompleteTestAsync(); }
@@ -365,7 +365,7 @@ public sealed class GraphQLIntegrationTests
                     .Fields("token")))
                 .Variables(new { password = "client-secret" })
                 .ExecuteAsync();
-            response.ShouldMatchShape(new { login = new { token = "server-secret" } });
+            response.Should.MatchShape(new { login = new { token = "server-secret" } });
 
             Assert.That(Proto.Context.Attachments.Select(item => item.Name.Split('-', 2)[1]), Is.EquivalentTo(new[]
             {
@@ -487,7 +487,7 @@ public sealed class GraphQLIntegrationTests
                 .Header("x-trace", "second")
                 .Query(null, query => query.Field("ping"))
                 .ExecuteAsync();
-            response.ShouldHaveNoErrors();
+            response.Should.HaveNoErrors();
 
             var snapshot = host.Trace.Snapshot();
             var entries = snapshot.Tests.Single().Entries;
@@ -595,7 +595,7 @@ public sealed class GraphQLIntegrationTests
                 .Query(null, query => query.Field("value"))
                 .ExecuteAsync();
 
-            response.ShouldHaveErrors();
+            response.Should.HaveErrors();
             Assert.Multiple(() =>
             {
                 Assert.That(response.Errors, Has.Count.EqualTo(3));

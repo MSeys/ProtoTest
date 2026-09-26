@@ -14,6 +14,8 @@ public static class ProtoMessagingBuilderExtensions
     /// Uses RabbitMQ as the broker: publish to exchanges named like the destination, await on a tap
     /// prepared for the destination before the act. The connection comes from
     /// <c>ProtoTest:Messaging:RabbitMq:ConnectionString</c>, so a deployed run only changes configuration.
+    /// The <paramref name="configure"/> callback runs exactly once, when this call registers; the
+    /// instance it configured is the one the run resolves.
     /// </summary>
     /// <remarks>
     /// The <c>Broker</c> capability is declared conditionally on that key: a run whose address comes
@@ -27,10 +29,19 @@ public static class ProtoMessagingBuilderExtensions
         Action<RabbitMqOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(messaging);
+
+        // The callback runs exactly once, here: the options it configured are what the run resolves, so
+        // a code-provided address is visible both to the capability decision and to the adapter, and a
+        // callback with side effects cannot run twice.
+        var options = new RabbitMqOptions();
+        configure?.Invoke(options);
+        var providedInCode = !string.IsNullOrWhiteSpace(options.ConnectionString)
+            && !string.Equals(options.ConnectionString, DefaultConnectionString, StringComparison.Ordinal);
+
         // The first RabbitMQ registration wins, like every other option; a repeated call cannot replace it.
         messaging.Services.TryAddSingleton(serviceProvider =>
         {
-            var options = ProtoOptionsRegistration.Resolve<RabbitMqOptions>(serviceProvider, configure);
+            var resolved = ProtoOptionsRegistration.Resolve(serviceProvider, () => options);
 
             // Precedence: an explicitly configured connection string wins, then a started broker
             // container, then whatever the registration or the defaults chose.
@@ -38,38 +49,22 @@ public static class ProtoMessagingBuilderExtensions
             var configured = configuration[RabbitMqOptions.ConnectionStringSetting];
             if (!string.IsNullOrWhiteSpace(configured))
             {
-                options.ConnectionString = configured;
+                resolved.ConnectionString = configured;
             }
             else if (serviceProvider.GetService<ProtoInfrastructureSettings>() is { } settings
                 && settings.Values.TryGetValue(RabbitMqOptions.ConnectionStringSetting, out var provided))
             {
-                options.ConnectionString = provided;
+                resolved.ConnectionString = provided;
             }
 
-            return options;
+            // Re-validate the final value: the settings a started broker container publishes are applied
+            // after ProtoOptionsRegistration already validated, and a malformed one must fail here naming
+            // the key rather than at connect time.
+            resolved.Validate();
+            return resolved;
         });
         return messaging.UseBroker(
             serviceProvider => new RabbitMqMessageBroker(serviceProvider.GetRequiredService<RabbitMqOptions>()),
-            AddressKeys(configure));
-    }
-
-    /// <summary>
-    /// The connection-string key the adapter reads, unless the callback itself provides a connection
-    /// string: a code-provided address cannot be withdrawn by configuration, so the capability stays
-    /// unconditional. The callback runs once here to see what it provides and again when the options
-    /// resolve.
-    /// </summary>
-    private static string[] AddressKeys(Action<RabbitMqOptions>? configure)
-    {
-        if (configure is null)
-        {
-            return [RabbitMqOptions.ConnectionStringSetting];
-        }
-
-        var probe = new RabbitMqOptions();
-        configure(probe);
-        var providedInCode = !string.IsNullOrWhiteSpace(probe.ConnectionString)
-            && !string.Equals(probe.ConnectionString, DefaultConnectionString, StringComparison.Ordinal);
-        return providedInCode ? [] : [RabbitMqOptions.ConnectionStringSetting];
+            providedInCode ? [] : [RabbitMqOptions.ConnectionStringSetting]);
     }
 }

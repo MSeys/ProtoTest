@@ -73,11 +73,33 @@ public sealed partial class SeleniumWebBackend : IWebBackend, IWebBackendJavaScr
     {
         if (Interlocked.Exchange(ref _disposeStarted, 1) != 0) return;
         Exception? failure = null;
-        try { await _executor.RunAsync(() => Driver.Quit(), CancellationToken.None); }
-        catch (Exception exception) { failure = exception; }
-        try { await _executor.RunAsync(() => Driver.Dispose(), CancellationToken.None); }
-        catch (Exception exception) { failure ??= exception; }
-        await _executor.DisposeAsync();
+        var quit = _executor.RunAsync(() => Driver.Quit(), CancellationToken.None).AsTask();
+        var dispose = _executor.RunAsync(() => Driver.Dispose(), CancellationToken.None).AsTask();
+        var abandoned = await _executor.StopAsync();
+        if (abandoned is null)
+        {
+            try { await quit; }
+            catch (Exception exception) { failure = exception; }
+            try { await dispose; }
+            catch (Exception exception) { failure ??= exception; }
+        }
+        else
+        {
+            // Release cannot wait forever on a pump stuck in a driver call: report the abandoned work
+            // so a hung suite has a trace line naming it, instead of failing disposal for no reason.
+            _context.Trace.WriteEvent(
+                "web.selenium.executor_abandoned",
+                "Selenium driver pump abandoned at release",
+                TraceSource,
+                ProtoTracePhase.Teardown,
+                ProtoTraceOutcome.Failed,
+                attributes: new Dictionary<string, string?>
+                {
+                    ["web.executor"] = nameof(SeleniumDriverExecutor),
+                    ["web.executor.work"] = abandoned
+                });
+        }
+
         if (failure is not null) throw failure;
     }
 

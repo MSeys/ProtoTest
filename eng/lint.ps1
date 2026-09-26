@@ -20,15 +20,17 @@ if (-not $NoRestore) {
     }
 }
 
-# One home for the shared test helpers (audit TST-2). A local definition of a helper that lives in
-# tests/ProtoTest.TestSupport fails here with the file and line, so the copies cannot drift back.
-# The rule is deliberately narrow: only the known helper names, not a general duplicate-code scan.
+# One home for the shared test helpers (audit TST-2). A local definition of a helper whose name
+# contains one of the known roots (FreePort, ServeOnceAsync, TemporaryTrace, SingleConnectionListener)
+# fails here with the file and line, so GetFreePort or LazyTemporaryTrace cannot drift back either.
+# The rule is deliberately a deny list of the known copies, not a shape scan: a helper renamed to an
+# unrelated name (say AcquirePort) is not detected, and that limit is stated in eng/facts/gotchas.md.
 $supportRoot = [IO.Path]::GetFullPath((Join-Path $repository "tests/ProtoTest.TestSupport"))
 $duplicationRules = @(
-    @{ Name = "FreePort"; Pattern = '\bstatic\b[^\r\n;{}=]*\bFreePort\s*\(' },
-    @{ Name = "ServeOnceAsync"; Pattern = '\bstatic\b[^\r\n;{}=]*\bServeOnceAsync\s*\(' },
-    @{ Name = "TemporaryTrace"; Pattern = '\bclass\s+TemporaryTrace\b' },
-    @{ Name = "SingleConnectionListener"; Pattern = '\bclass\s+SingleConnectionListener\b' }
+    @{ Name = "FreePort"; Pattern = '\bstatic\b[^\r\n;{}=]*\b(\w*FreePort\w*)\s*\(' },
+    @{ Name = "ServeOnceAsync"; Pattern = '\bstatic\b[^\r\n;{}=]*\b(\w*ServeOnceAsync\w*)\s*\(' },
+    @{ Name = "TemporaryTrace"; Pattern = '\bclass\s+(\w*TemporaryTrace\w*)\b' },
+    @{ Name = "SingleConnectionListener"; Pattern = '\bclass\s+(\w*SingleConnectionListener\w*)\b' }
 )
 
 $duplicates = New-Object System.Collections.Generic.List[string]
@@ -41,8 +43,15 @@ $testFiles = Get-ChildItem -LiteralPath (Join-Path $repository "tests") -Recurse
 foreach ($file in $testFiles) {
     foreach ($rule in $duplicationRules) {
         foreach ($match in Select-String -LiteralPath $file.FullName -Pattern $rule.Pattern) {
+            $helper = if ($match.Matches.Count -gt 0 -and $match.Matches[0].Groups.Count -gt 1) {
+                $match.Matches[0].Groups[1].Value
+            }
+            else {
+                $rule.Name
+            }
+
             $relative = $file.FullName.Substring($repository.Length + 1).Replace('\', '/')
-            $duplicates.Add(("{0}:{1}: a local {2} belongs in tests/ProtoTest.TestSupport" -f $relative, $match.LineNumber, $rule.Name))
+            $duplicates.Add(("{0}:{1}: a local {2} belongs in tests/ProtoTest.TestSupport" -f $relative, $match.LineNumber, $helper))
         }
     }
 }

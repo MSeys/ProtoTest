@@ -1,7 +1,6 @@
 namespace ProtoTest.Sheets;
 
 using ProtoTest.Core;
-using ProtoTest.Sheets.Internal;
 
 /// <summary>A typed model column with property-style assertions over its values.</summary>
 public sealed class ProtoModelColumn<TValue>
@@ -37,37 +36,9 @@ public sealed class ProtoModelColumn<TValue>
         => new(this, _sheetName, _dataStartRow, _context, negated: true);
 
     /// <summary>Checks every value against a property, for example every amount above zero.</summary>
-    public void ShouldAll(Func<TValue?, bool> predicate)
-    {
-        ArgumentNullException.ThrowIfNull(predicate);
-        string? actual = null;
-        SheetAssertion.Run(
-            _context,
-            Title,
-            ColumnAttributes,
-            negated: false,
-            () =>
-            {
-                for (var index = 0; index < Values.Count; index++)
-                {
-                    if (!predicate(Values[index]))
-                    {
-                        actual = $"row {_dataStartRow + index} was {Display(Values[index])}";
-                        return false;
-                    }
-                }
-
-                return true;
-            },
-            () => new SheetAssertionFailure(
-                $"{SheetAssertion.Describe($"column '{_sheetName}.{Header}'", "hold only matching values", false)} " +
-                $"but {actual}.",
-                new Dictionary<string, string?>
-                {
-                    ["sheets.expected"] = "hold only matching values",
-                    ["sheets.actual"] = actual
-                }));
-    }
+    /// <remarks>Obsolete: use <c>Should.All(predicate)</c>.</remarks>
+    [Obsolete("Use Should.All(predicate) instead.")]
+    public void ShouldAll(Func<TValue?, bool> predicate) => Should.All(predicate);
 
     internal string Title => $"Sheets · {_sheetName}.{Header}";
 

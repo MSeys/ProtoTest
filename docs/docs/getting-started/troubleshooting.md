@@ -21,10 +21,9 @@ The problems below are the ones a new suite meets first. Each starts with the me
 
 ## The host is not there
 
-> **ProtoHost is not initialized.**
-> **No active ProtoHost is available.**
+> **No active ProtoHost is available. The runner setup creates it: derive the suite's [SetUpFixture] from ProtoTestAssembly …**
 
-The runner never ran your setup class, so no host was built — the second sentence of the message is the adapter's own hint (`Ensure your setup class inherits from ProtoTestAssembly.`, `Register your fixture with [assembly: AssemblyFixture(...)]`, …). Check the one that applies to your runner:
+The runner never ran your setup class, so no host was built — the rest of the message points at the fix, and the adapter's own hint (`Ensure your setup class inherits from ProtoTestAssembly.`, `Register your fixture with [assembly: AssemblyFixture(...)]`, …) tells you which one. Check the one that applies to your runner:
 
 - **NUnit** — the `[SetUpFixture]` only covers its own namespace and the namespaces below it. A test in `Orders.Tests.Api` is covered by a setup in `Orders.Tests`, not by one in `Orders.Tests.Web`. Move the setup up, or out of any namespace to cover the whole assembly.
 - **xUnit v3** — `[assembly: AssemblyFixture(typeof(Setup))]` is missing.
@@ -35,9 +34,9 @@ Each runner's page under [Test runners](../runners/overview.md) shows the comple
 
 ## There is no test context
 
-> **No active ProtoExecutionContext available on this thread.**
+> **No active ProtoExecutionContext is available on this flow. Proto.Context only works inside a test body … Off-flow telemetry uses ProtoHost.FindTraceWriter(Activity?) …**
 
-`Proto.Context` was read outside a ProtoTest test. Usually the test uses the runner's own attribute — `[Test]`, `[Fact]`, `[TestMethod]` — instead of the ProtoTest attribute that opens the context (`[ProtoTest]`, or `[ProtoTestFact]` / `[ProtoTestTheory]` for xUnit). It also happens in code that runs outside the test's async flow, such as a static initializer or a thread started by hand; pass the `ProtoExecutionContext` along instead.
+`Proto.Context` was read outside a ProtoTest test. Usually the test uses the runner's own attribute — `[Test]`, `[Fact]`, `[TestMethod]` — instead of the ProtoTest attribute that opens the context (`[ProtoTest]`, or `[ProtoTestFact]` / `[ProtoTestTheory]` for xUnit). It also happens in code that runs outside the test's async flow, such as a static initializer or a thread started by hand: pass the `ProtoExecutionContext` along, or — for telemetry that cannot — reach the owning test's trace with `ProtoHost.FindTraceWriter(Activity?)`.
 
 ## A client cannot be resolved
 
@@ -74,7 +73,13 @@ Playwright reports that the browser executable does not exist when it was never 
 
 Parallel tests share the application and its data. When two tests create the same customer, order number or email address, one of them fails — but only when they happen to run at the same time.
 
-Make every value a test creates unique to that test, for example with `context.TestId`:
+Make every value a test creates unique to that test. `Proto.Context.UniqueName("customer")` derives a deterministic, persistent-store-safe name from the test id, so a rerun against a database that outlives the process never collides; fix `RunPrefix` if the same record should be reused:
+
+```csharp
+new { name = Proto.Context.UniqueName("customer") }   // "customer-0042317"
+```
+
+For a one-off value that does not need to survive the run, `context.TestId` interpolated into the value works too:
 
 ```csharp
 new { email = $"customer-{context.TestId}@example.test" }

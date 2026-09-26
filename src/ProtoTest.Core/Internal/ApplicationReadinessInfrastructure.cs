@@ -69,12 +69,16 @@ internal sealed class ApplicationReadinessInfrastructure : IProtoConfiguredInfra
 
         var url = new Uri(baseUri, _path);
         var timeout = _timeoutOverride ?? _options.Timeout;
+        string? lastFailure = null;
         var result = await ProtoReadiness.WaitAsync(
-            $"{_applicationName} address",
-            ProtoReadiness.Http(url, _ready),
+            $"{_applicationName} address at {url}",
+            ProtoReadiness.Http(url, _ready, onFailure: reason => lastFailure = reason),
             timeout,
             _options.Interval,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            describeLastError: () => lastFailure is null
+                ? "the endpoint answered, but the readiness check rejected every response"
+                : lastFailure).ConfigureAwait(false);
 
         _evidence = new Dictionary<string, string?>(StringComparer.Ordinal)
         {

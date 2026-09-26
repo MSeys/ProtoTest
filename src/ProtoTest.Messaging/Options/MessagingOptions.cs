@@ -14,7 +14,10 @@ public sealed class MessagingOptions : IProtoConfigurableOptions
 
     /// <summary>
     /// Destinations this suite awaits, configured for the run; an adapter declares the test's per-test
-    /// taps from it before the system under test publishes. Optional for brokers that keep history.
+    /// taps from it before the system under test publishes. Declare them in code with
+    /// <c>ProtoMessagingBuilder.Tap</c> or under <c>ProtoTest:Messaging:Destinations</c>; configuration
+    /// binds after code and can add values. Pre-bind every destination the act publishes to - a tap
+    /// declared at the first await misses earlier messages. Optional for brokers that keep history.
     /// </summary>
     public IList<string> Destinations { get; set; } = new List<string>();
 

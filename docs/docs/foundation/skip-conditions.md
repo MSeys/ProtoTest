@@ -26,11 +26,12 @@ public class RequiresCapabilityAttribute : ProtoAttribute, IProtoSkipCondition
 
     public string Kind { get; }
     public string? CapabilityName { get; init; }
+    public string? CapabilityInstance { get; init; }
     public string? Reason { get; init; }
 }
 ```
 
-The test runs when `ProtoHost.HasCapability(kind, CapabilityName)` is true. Otherwise it skips with `Reason`, or with *"This test requires the '…' capability, which this host is not composed with."* when no reason is given:
+The test runs when `ProtoHost.HasCapability(kind, CapabilityName, CapabilityInstance)` is true. `CapabilityName` matches the descriptor name; `CapabilityInstance` matches the instance a capability describes (an `AddAspNetCoreServer` name) — every non-null filter must match. Otherwise the test skips with `Reason`, or with *"This test requires the '…' capability, which this host is not composed with."* when no reason is given:
 
 ```csharp
 [RequiresCapability(
@@ -51,9 +52,47 @@ The pair of conditional registration kinds answers the address question in both 
 - `AddCapabilityUnlessConfigured(capability, keys…)` drops when **every** key is configured — the environment provides what the integration would serve (`AddAspNetCoreServer`, the in-process device transport).
 - `AddCapabilityWhenProvided(capability, keys…)` drops when **none** of the keys is provided, where *provided* means a configured value or a key a registered infrastructure piece declares — including a piece the run skips because configuration already fills its keys. It is the kind for an integration that cannot serve without an address: `UseRabbitMq` declares `broker` over `ProtoTest:Messaging:RabbitMq:ConnectionString`, so a run with neither a configured key nor a broker container skips instead of failing at setup or first publish; `AddSql` declares `store` over `SqlOptions.AddressKeys`, and `AddEntityFrameworkCore` follows the same keys for its `Entity Framework Core` capability.
 
-A dropped declaration is recorded as a `capability.skipped` event naming the deciding keys (`capability.keys`) and the reason (`capability.reason`: `already configured`, or `no key provided`). The SQL integration goes one step further when its address keys are declared and none is provided: the connection is never opened during setup, the enlistment hook leaves the context alone, and `Proto.Context.SqlSession()`, `SqlConnection()`, `SqlTransaction()` and `Sql<TContext>()` throw naming the missing keys and the `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate, so an ungated test fails with the fix in its message.
+A dropped declaration is recorded as a `capability.skipped` event naming the deciding keys (`capability.keys`) and the reason (`capability.reason`: `already configured`, or `no key provided`). The SQL integration goes one step further when its address keys are declared and none is provided: the connection is never opened during setup, the enlistment hook leaves the context alone, and `Proto.Context.Sql()`, `SqlConnection()`, `SqlTransaction()` and `Sql<TContext>()` throw naming the missing keys and the `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate, so an ungated test fails with the fix in its message.
 
 Class-level and method-level conditions accumulate like any other attribute; the first one that applies supplies the reason.
+
+## Typed conditions for the host composition
+
+Three shipped conditions remove the stringly-typed gates for the most common cases; each sets its capability from a type or a name and reports a reason naming the registration call:
+
+```csharp
+[RequiresWorker<BillingWorker>]        // the worker AddWorkerHost<BillingWorker>() starts
+[RequiresServer("Api")]                // the named AddAspNetCoreServer<Program>(name: "Api") instance
+[RequiresApplication("Api")]           // the application AddApplication("Api", ...) declares
+public async Task ...() { ... }
+```
+
+- `[RequiresWorker<TProgram>]` checks the `worker` capability by the program assembly's name — the identity `AddWorkerHost<TProgram>()` registers — so a typo cannot turn a missing worker into a plausible skip. Its default reason names `AddWorkerHost<TProgram>()`.
+- `[RequiresServer(name)]` checks the `server` capability's instance (the server name), not the descriptor name `ASP.NET Core`, so configuring one named server's `BaseUrl` drops only that server. Its default reason names `AddAspNetCoreServer<TProgram>(name: "…")`.
+- `[RequiresApplication(name)]` checks that the suite declared the application with `AddApplication`, regardless of which protocols it registered. Its default reason names `AddApplication("…", app => ...)`.
+
+Each accepts `Reason` like `[RequiresCapability]`, and `[RequiresCapability(kind)]` stays for open kinds and integration-specific names.
+
+## One reason for the suite
+
+A reason that would be the same on every gated test is declared once on the builder:
+
+```csharp
+builder.AddCapabilityReason(
+    ProtoCapabilityKinds.Broker,
+    "No broker is configured; set ProtoTest:Messaging:RabbitMq:ConnectionString.");
+```
+
+`[RequiresCapability(kind)]` and the typed gates read it before their built-in default. A per-test `Reason` still wins, and a `name` narrows the reason to one capability name or the instance a capability describes (a named server):
+
+```csharp
+builder.AddCapabilityReason(
+    ProtoCapabilityKinds.Server,
+    "The standalone console is only started when the suite owns the store.",
+    "Northstar standalone");
+```
+
+A gate whose `(kind, name)` has no declared reason falls back to its default message, so a suite can state the common reasons and leave the rest. `[RequiresApplication]` checks that an application was declared rather than a capability, so it keeps its own `Reason`/default.
 
 ## In-process only
 
@@ -142,7 +181,7 @@ Because nothing starts, a skipped test has no context, no trace record and no re
 
 - **A condition only sees registered capabilities.** If an integration isn't configured, its capability is absent and tests that require it skip — which is the point. Configure the integration (or provide the connection string it reads) to make them run.
 - **`[RequiresInProcess]` doesn't inspect `BaseUrl`.** With no in-process server registered it skips, regardless of what the host can reach over the network.
-- **The reason is fixed at compile time.** Attribute arguments are constants; build messages from a name or a configuration key, as the examples do.
+- **An attribute's `Reason` is fixed at compile time.** Attribute arguments are constants; a suite-level reason (`AddCapabilityReason`) is declared on the builder instead, and both can name a configuration key, as the examples do.
 - **Conditions are selected in resolution order, not `Order`.** `ProtoTestSkip.GetReason` returns the first non-null `GetSkipReason` in the order the adapter resolved the attributes — for NUnit, class-level before method-level in reflection order — because ordering by `Order` only happens inside `StartTestAsync`, which a skipped test never reaches.
 
 ## In the sample suite
@@ -152,5 +191,7 @@ The demo gates each environment-dependent journey with a condition:
 - `DomainAccessJourney` requires `ProtoCapabilityKinds.Store`, because composing the test-side domain needs a store the suite can connect to;
 - the console journeys — `WebJourney`, `ApiThenBrowserJourney` and `BrowserThenApiJourney` — require the named `"Northstar standalone"` server, because only the standalone instance gives browser tests an address, and the demo's `RequiresConsoleBuild` skips them when the Vue SPA has not been built;
 - `MessagingJourney` requires `ProtoCapabilityKinds.Broker`, and the broker capability only exists when a real broker adapter is configured.
+
+The broker reason and the `"Northstar standalone"` server reason are each declared once in the demo's `Setup` with `AddCapabilityReason`; the console messaging journey keeps its own `Reason` for the server gate, which is the per-test override.
 
 `[RequiresInProcess]` itself is exercised by the repository's own NUnit tests (`tests/ProtoTest.NUnit.Tests/SkipConditionTests.cs`).

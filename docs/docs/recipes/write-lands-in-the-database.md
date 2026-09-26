@@ -47,7 +47,7 @@ protected override void Configure(IProtoHostBuilder builder) =>
 public sealed class OrderPersistenceTests
 {
     [ProtoTest]
-    public async Task A_created_order_is_stored_as_pending()
+    public async Task ACreatedOrderIsStoredAsPending()
     {
         var reference = $"ORD-{Proto.Context.TestId}";
 
@@ -60,11 +60,11 @@ public sealed class OrderPersistenceTests
             .AsNoTracking()
             .SingleAsync(order => order.Reference == reference);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(stored.Status, Is.EqualTo(OrderStatus.Pending));
             Assert.That(stored.Quantity, Is.EqualTo(2));
-        });
+        }
     }
 }
 ```

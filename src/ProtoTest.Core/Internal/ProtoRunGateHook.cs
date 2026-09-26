@@ -4,7 +4,7 @@ internal sealed class ProtoRunGateHook(
     IEnumerable<IProtoRunGate> gates,
     IEnumerable<IProtoCollector> collectors,
     IEnumerable<IProtoReportSource> reportSources,
-    ProtoTraceSession trace) : IProtoRunHook
+    ProtoTraceSession trace) : IProtoRunHook, IProtoRunEvidenceHook
 {
     // AfterRun executes in descending order. Gates run first so their verdicts reach the sinks, the
     // run-scoped resources are still alive, and the trace archive picks everything up.
@@ -25,6 +25,9 @@ internal sealed class ProtoRunGateHook(
 
         foreach (var gate in gateList)
         {
+            // A gate that throws is a failed verdict with the exception kept as evidence: the trace
+            // error and the report metadata carry its type, message and stack instead of a string only.
+            Exception? gateException = null;
             ProtoRunGateResult result;
             try
             {
@@ -33,6 +36,7 @@ internal sealed class ProtoRunGateHook(
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
+                gateException = exception;
                 result = ProtoRunGateResult.Failed(
                     $"The gate threw {exception.GetType().Name}: {exception.Message}");
             }
@@ -45,7 +49,15 @@ internal sealed class ProtoRunGateHook(
                 Status: StatusOf(result.Outcome),
                 Count: 1,
                 Message: result.Message,
-                Tags: result.Details));
+                Tags: result.Details,
+                Metadata: gateException is null
+                    ? null
+                    : new Dictionary<string, object>(StringComparer.Ordinal)
+                    {
+                        ["gate.error.type"] = gateException.GetType().FullName ?? gateException.GetType().Name,
+                        ["gate.error.message"] = gateException.Message,
+                        ["gate.error.stack_trace"] = gateException.StackTrace ?? string.Empty
+                    }));
 
             // A gate judges the run, so it belongs to the run's trace, not to any test's.
             trace.RunWriter.WriteEvent(
@@ -60,7 +72,8 @@ internal sealed class ProtoRunGateHook(
                     ["gate.status"] = result.Outcome.ToString(),
                     ["gate.message"] = result.Message,
                     ["gate.details"] = result.Details is null ? null : string.Join(", ", result.Details)
-                });
+                },
+                exception: gateException);
 
             if (result.Outcome == ProtoRunGateOutcome.Failed)
             {

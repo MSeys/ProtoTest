@@ -162,6 +162,10 @@ public sealed class ProtoHost : IAsyncDisposable
         IEnumerable<ProtoAttribute>? attributes = null, IProtoTestAttachmentPublisher? attachmentPublisher = null);
     Task<ProtoExecutionContext> StartTestAsync(string testName, string testId, MethodInfo testMethod,
         IEnumerable<ProtoAttribute>? attributes = null, IProtoTestAttachmentPublisher? attachmentPublisher = null);
+    Task<ProtoExecutionContext> StartTestAsync(string testName, MethodInfo testMethod,
+        CancellationToken cancellationToken);
+    Task<ProtoExecutionContext> StartTestAsync(string testName, string testId, MethodInfo testMethod,
+        CancellationToken cancellationToken);
 
     Task CompleteTestAsync();                          // outcome Unknown
     Task CompleteTestAsync(ProtoTestResult result);

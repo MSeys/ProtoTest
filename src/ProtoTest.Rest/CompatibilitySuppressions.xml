@@ -22,4 +22,25 @@
     <Right>lib/net9.0/ProtoTest.Rest.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:ProtoTest.Rest.RestResponse.get_Should</Target>
+    <Left>lib/net10.0/ProtoTest.Rest.dll</Left>
+    <Right>lib/net10.0/ProtoTest.Rest.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:ProtoTest.Rest.RestResponse.get_Should</Target>
+    <Left>lib/net8.0/ProtoTest.Rest.dll</Left>
+    <Right>lib/net8.0/ProtoTest.Rest.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:ProtoTest.Rest.RestResponse.get_Should</Target>
+    <Left>lib/net9.0/ProtoTest.Rest.dll</Left>
+    <Right>lib/net9.0/ProtoTest.Rest.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
 </Suppressions>

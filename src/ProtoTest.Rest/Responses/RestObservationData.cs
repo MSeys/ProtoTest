@@ -30,4 +30,18 @@ public sealed record RestShapeMatchData(
     IReadOnlyList<string> MatchedProperties,
     Type TargetType,
     int? StatusCode = null
-);
+)
+{
+    /// <summary>
+    /// The HTTP method the shape was matched on, for example <c>GET</c>, when the producer knows it.
+    /// Structured routing data: consumers must not recover the method from
+    /// <see cref="RequestIdentifier"/>, which is the display form.
+    /// </summary>
+    public string? Method { get; init; }
+
+    /// <summary>
+    /// The route template the shape was matched on, for example <c>/orders/{id}</c>, when the producer
+    /// knows it. Structured routing data; see <see cref="Method"/>.
+    /// </summary>
+    public string? RouteTemplate { get; init; }
+}

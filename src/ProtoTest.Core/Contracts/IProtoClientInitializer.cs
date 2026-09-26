@@ -31,9 +31,11 @@ public interface IProtoClientInitializer
     /// Returns <see langword="false"/> without changing the context when this initializer
     /// cannot provide the client for the current configuration.
     /// <para>
-    /// Setup is not cancellable: no runner adapter supplies a cancellation token for the test
-    /// lifecycle, so an initializer that needs one takes it from the operation it performs, not
-    /// from this call. A run-scoped hook is the cancellable extension point.
+    /// No runner adapter supplies a cancellation token for the test lifecycle. A caller that starts a
+    /// test explicitly can pass one to <c>StartTestAsync</c>, and an initializer reads it from
+    /// <see cref="ProtoExecutionContext.CancellationToken"/>; a runner-driven test gets
+    /// <see cref="CancellationToken.None"/>. An initializer that performs its own I/O should pass the
+    /// token it finds there to that operation; a run-scoped hook is the cancellable extension point.
     /// </para>
     /// </summary>
     Task<bool> TryInitializeAsync(ProtoExecutionContext context);

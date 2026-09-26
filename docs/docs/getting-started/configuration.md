@@ -133,4 +133,8 @@ The one exception is a base address: a URL passed directly to `AddClient("Api", 
 | `ProtoTest:Web:*` | [Web](../integrations/web/index.md) |
 | `ProtoTest:Reporting:*` | [Reporting](../observability/reporting.md) |
 
+An integration's own options bind from one section named `ProtoTest:<Integration>`, with an optional second segment for the area the options type covers: `ProtoTest:Rest:Responses`, `ProtoTest:GraphQL:Attachments`, `ProtoTest:Grpc:Client`, `ProtoTest:Devices:WebSocket`, `ProtoTest:Messaging:RabbitMq`. The area names the role (`Responses`, `Attachments`, `Client`, `WebSocket`, `RabbitMq`), so an integration with one options set has no second segment (`ProtoTest:Sql`, `ProtoTest:Sheets`). Application-targeted keys stay under `ProtoTest:Applications:{name}` because the application, not the integration, owns the address.
+
+A renamed section keeps its old key working as a deprecated fallback for one release: `ProtoTest:Grpc:Client` binds over the legacy `ProtoTest:Grpc`, and a value under the current section wins. The next major removes the fallback.
+
 Configured only in code: tracing (`ConfigureTracing`), test ids (`ConfigureTestIds`) and data defaults (`AddData`). Those callbacks run while the host is being built, before configuration exists, so they can't read `IConfiguration`. If a value needs to vary per environment, read it yourself — for example `trace.OutputPath = Environment.GetEnvironmentVariable("TRACE_PATH") ?? "TestResults/run.prototrace";`. Inside tests, hooks and attributes, `context.Configuration` has everything.

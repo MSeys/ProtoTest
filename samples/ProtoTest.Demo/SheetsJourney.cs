@@ -43,13 +43,13 @@ public sealed class SheetsJourney
         var report = Proto.Context.Sheets().Open(response).Model<ProjectReportRow>();
 
         // Assert: the model checks the layout, and the exact values are ordinary assertions.
-        report.Verify();
-        report.Column(row => row.Environments).ShouldAll(count => count >= 0);
+        report.Should.MatchModel();
+        report.Column(row => row.Environments).Should.All(count => count >= 0);
         var row = report.Row(candidate => candidate.Name == "report-atlas");
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(row.Status, Is.EqualTo(project.Status));
             Assert.That(row.Environments, Is.EqualTo(0));
-        });
+        }
     }
 }

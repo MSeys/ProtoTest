@@ -106,13 +106,13 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
 
     private void RecordShapeMatchHit(RestShapeMatchData hit)
     {
-        var parts = hit.RequestIdentifier.Split(' ', 2);
-        if (parts.Length < 2 || hit.StatusCode is null)
+        // The structured method and route are the contract; the display identifier is not parsed.
+        if (hit.Method is null || hit.RouteTemplate is null || hit.StatusCode is null)
         {
             return;
         }
 
-        if (!TryResolve(parts[0], parts[1], out var method, out var route, out var operation)
+        if (!TryResolve(hit.Method, hit.RouteTemplate, out var method, out var route, out var operation)
             || OpenApiRouteMatcher.FindResponseKey(operation, hit.StatusCode.Value) is not { } responseKey)
         {
             return;

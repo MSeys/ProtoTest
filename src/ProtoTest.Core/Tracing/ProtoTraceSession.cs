@@ -20,6 +20,7 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
     private ActivityListener? _activityListener;
     private int _listening;
     private int _runArtifactSequence;
+    private int _captureFailureReported;
 
     public ProtoTraceSession(ProtoTraceOptions? options = null)
     {
@@ -98,9 +99,33 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
             var operationId = writer.CaptureActivity(activity);
             _converter.Observe(writer, activity, operationId);
         }
-        catch
+        catch (Exception exception)
         {
-            // Capturing telemetry must never break the application.
+            // Capturing telemetry must never break the application, but a broken capture must not be
+            // invisible either: the first failure is recorded once as a run event with its exception
+            // type and stack, and every later failure coalesces into that one event.
+            if (Interlocked.Exchange(ref _captureFailureReported, 1) == 0)
+            {
+                try
+                {
+                    _runWriter.WriteEvent(
+                        "telemetry.capture_failed",
+                        "Telemetry capture failed",
+                        "ProtoTest.Core",
+                        ProtoTracePhase.Run,
+                        ProtoTraceOutcome.Failed,
+                        new Dictionary<string, string?>
+                        {
+                            ["telemetry.source"] = activity.Source.Name,
+                            ["telemetry.activity"] = activity.DisplayName
+                        },
+                        exception);
+                }
+                catch (Exception)
+                {
+                    // Recording the failure is best-effort: even that must not break the application.
+                }
+            }
         }
     }
 

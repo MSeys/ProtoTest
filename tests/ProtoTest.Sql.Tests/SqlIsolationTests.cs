@@ -249,12 +249,14 @@ public sealed class SqlIsolationTests
 
         // Act
         var session = Proto.Context.SqlSession();
+        var primary = Proto.Context.Sql();
         var connection = Proto.Context.SqlConnection();
         var transaction = Proto.Context.SqlTransaction();
 
         // Assert
         Assert.Multiple(() =>
         {
+            Assert.That(primary, Is.SameAs(session));
             Assert.That(session.Connection, Is.SameAs(connection));
             Assert.That(transaction, Is.Not.Null);
             Assert.That(session.Transaction, Is.SameAs(transaction));

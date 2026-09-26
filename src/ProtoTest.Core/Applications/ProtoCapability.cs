@@ -18,7 +18,7 @@ public sealed record ProtoCapabilityDescriptor(string Name, string Kind, string 
     /// are two capabilities: dropping one does not drop the other. <see langword="null"/> for a
     /// capability that describes the host as a whole, where two equal descriptors are one capability.
     /// <see cref="ProtoHost.HasCapability(string, string?)"/> still matches <see cref="Name"/>, not the
-    /// instance.
+    /// instance; <see cref="ProtoHost.HasCapability(string, string?, string?)"/> can narrow by both.
     /// </summary>
     public string? Instance { get; init; }
 }
@@ -135,6 +135,14 @@ internal sealed record ProtoSkippedCapability(ProtoCapabilityDescriptor Capabili
 /// <summary>The capabilities the run dropped because no declaration for them is needed.</summary>
 internal sealed record ProtoSkippedCapabilities(IReadOnlyList<ProtoSkippedCapability> Capabilities);
 
+/// <summary>
+/// A suite-level reason a capability gate reports when it skips and the attribute carries no per-test
+/// reason, declared through <c>AddCapabilityReason</c>. <paramref name="Name"/> narrows it to one
+/// capability name (or the instance a capability describes, such as a named server); a null name is the
+/// reason for the kind as a whole.
+/// </summary>
+internal sealed record ProtoCapabilityReason(string Kind, string? Name, string Reason);
+
 /// <summary>Registers capability descriptors from the host builder or from an application builder.</summary>
 public static class ProtoCapabilityExtensions
 {
@@ -242,6 +250,32 @@ public static class ProtoCapabilityExtensions
                 "AddCapabilityWhenProvided requires at least one configuration key; with no key, nothing can provide the capability.",
                 nameof(keys));
         }
+    }
+
+    /// <summary>
+    /// Declares the reason the suite's capability gates of <paramref name="kind"/> report when they
+    /// skip, so one sentence covers every gated test instead of repeating on each attribute. Omit
+    /// <paramref name="name"/> for the kind as a whole, or set it to narrow the reason to one capability
+    /// name (or the instance a capability describes, such as a named server). A gate's own
+    /// <c>Reason</c> still overrides it, and a gate whose kind has no declared reason falls back to the
+    /// attribute's default message.
+    /// </summary>
+    /// <remarks>
+    /// The reason is resolved when the adapter evaluates the skip, through
+    /// <see cref="ProtoHost.FindCapabilityReason(string, string?)"/>. Declare the reason on the host
+    /// builder before <see cref="IProtoHostBuilder.Build"/>, like every other composition entry.
+    /// </remarks>
+    public static IProtoHostBuilder AddCapabilityReason(
+        this IProtoHostBuilder builder,
+        string kind,
+        string reason,
+        string? name = null)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        return builder.ConfigureServices(
+            services => services.AddSingleton(new ProtoCapabilityReason(kind, name, reason)));
     }
 
     // Descriptors are metadata by value: registering the same one twice - a helper called twice, two

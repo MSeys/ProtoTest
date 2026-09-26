@@ -155,7 +155,7 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
         attributes["web.expectation"] = describedExpectation;
         attributes["web.assert.negated"] = negated ? "true" : "false";
         attributes["web.assert.timeout"] = assertionTimeout.ToString();
-        await operations.ExecuteVoidAsync(
+        await operations.ExecuteAsync<string?>(
             "assert.web",
             $"Assert · {element.Name} should {describedExpectation}",
             WebOperationKind.Assert,
@@ -175,15 +175,16 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
                         $"Element '{element.ComponentPath}.{element.Name}' should {describedExpectation} within {assertionTimeout}. " +
                         $"Last observed: {result.Value.Observation}.");
                 }
-            },
-            cancellationToken);
 
-        // A passing assertion is what makes a page covered; the address is the page it was checked on.
-        var backend = await session.GetOrCreateBackendAsync(cancellationToken);
-        session.RecordPageObservation(
-            WebPageInventory.VerifiedObservationKind,
-            session.PagePathFrom(await WebSession.TryCurrentAddressAsync(backend, cancellationToken)),
-            "assert");
+                // The verified address is read inside the assertion operation, so coverage comes from
+                // the same traced pipeline the assertion used instead of a second untraced backend call.
+                return await WebSession.TryCurrentAddressAsync(backend, ct);
+            },
+            cancellationToken,
+            afterCapture: (address, _) => session.RecordPageObservation(
+                WebPageInventory.VerifiedObservationKind,
+                session.PagePathFrom(address),
+                "assert"));
     }
 
     private static string Shorten(string value)

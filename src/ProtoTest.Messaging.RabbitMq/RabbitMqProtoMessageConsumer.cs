@@ -8,19 +8,23 @@ using global::RabbitMQ.Client.Exceptions;
 using ProtoTest.Messaging;
 
 /// <summary>
-/// One test's RabbitMQ consumer: its own channel on the run's shared connection, an exclusive,
-/// auto-delete tap queue per destination, and an asynchronous consumer per queue feeding an unbounded
-/// channel, so an await reacts to a delivery instead of polling. Prepared queues are declared before
-/// the act; a destination that was never prepared is declared just in time at the first await, which
-/// only sees messages published after the await begins. All queues are deleted when the consumer is
-/// disposed with the test, and an exclusive queue never competes with the application's own consumers.
+/// One test's RabbitMQ consumer: an exclusive, auto-delete tap queue per destination, each on its own
+/// channel on the run's shared connection, and an asynchronous consumer per queue feeding an unbounded
+/// channel, so an await reacts to a delivery instead of polling. A channel per tap keeps one destination
+/// that cannot be declared - a missing exchange closes its channel - from poisoning the taps that were
+/// already prepared. Prepared queues are declared before the act; a destination that was never prepared
+/// is declared just in time at the first await, which only sees messages published after the await
+/// begins. Awaits on one consumer serialize in call order, and a delivery that matches no awaited
+/// predicate is buffered and offered to a later await instead of being discarded, so concurrent awaits
+/// neither lose nor steal each other's messages. All queues are deleted when the consumer is disposed
+/// with the test, and an exclusive queue never competes with the application's own consumers.
 /// </summary>
 internal sealed class RabbitMqProtoMessageConsumer : IProtoMessageConsumer
 {
     private readonly RabbitMqMessageBroker _broker;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly SemaphoreSlim _awaitGate = new(1, 1);
     private readonly Dictionary<string, Tap> _taps = new(StringComparer.Ordinal);
-    private IChannel? _channel;
     private bool _disposed;
 
     public RabbitMqProtoMessageConsumer(RabbitMqMessageBroker broker)
@@ -74,41 +78,70 @@ internal sealed class RabbitMqProtoMessageConsumer : IProtoMessageConsumer
             _gate.Release();
         }
 
-        var deadline = DateTime.UtcNow + timeout;
-        while (true)
+        // Awaits serialize on _awaitGate: the active one inspects the deliveries no earlier await
+        // matched first, then reads new ones. A delivery that does not match stays in the tap's
+        // buffer instead of being discarded, so the waiter it belongs to still finds it.
+        await _awaitGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            var remaining = deadline - DateTime.UtcNow;
-            if (remaining <= TimeSpan.Zero)
+            var deadline = DateTime.UtcNow + timeout;
+            var scanned = 0;
+            while (true)
             {
-                throw Timeout(destination, timeout);
-            }
+                while (scanned < tap.Buffered.Count)
+                {
+                    var candidate = tap.Buffered[scanned];
+                    if (predicate(candidate))
+                    {
+                        tap.Buffered.RemoveAt(scanned);
+                        return candidate;
+                    }
 
-            ProtoMessage message;
-            using var expiry = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            expiry.CancelAfter(remaining);
-            try
-            {
-                message = await tap.Deliveries.ReadAsync(expiry.Token).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                throw Timeout(destination, timeout);
-            }
+                    scanned++;
+                }
 
-            if (predicate(message))
-            {
-                return message;
-            }
+                var remaining = deadline - DateTime.UtcNow;
+                if (remaining <= TimeSpan.Zero)
+                {
+                    throw Timeout(destination, timeout);
+                }
 
-            // A non-matching delivery is discarded, like the auto-acking poll this replaced. The
-            // deadline is re-checked before the next read, so a stream of non-matching traffic cannot
-            // keep an await running past its timeout.
+                ProtoMessage message;
+                using var expiry = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                expiry.CancelAfter(remaining);
+                try
+                {
+                    message = await tap.Deliveries.ReadAsync(expiry.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    // A delivery assigned at the same instant the deadline passes must win, never be
+                    // dropped: inspect one already-consumed delivery before giving up on the timeout.
+                    if (tap.Deliveries.TryRead(out var late))
+                    {
+                        if (predicate(late))
+                        {
+                            return late;
+                        }
+
+                        tap.Buffered.Add(late);
+                    }
+
+                    throw Timeout(destination, timeout);
+                }
+
+                tap.Buffered.Add(message);
+            }
+        }
+        finally
+        {
+            _awaitGate.Release();
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        IChannel? channel;
+        Tap[] taps;
         await _gate.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -118,74 +151,58 @@ internal sealed class RabbitMqProtoMessageConsumer : IProtoMessageConsumer
             }
 
             _disposed = true;
-            channel = _channel;
-            _channel = null;
+            taps = [.. _taps.Values];
+            _taps.Clear();
         }
         finally
         {
             _gate.Release();
         }
 
-        if (channel is null)
+        foreach (var tap in taps)
         {
-            return;
-        }
-
-        try
-        {
-            if (channel.IsOpen)
+            try
             {
-                foreach (var tap in _taps.Values)
+                if (tap.Channel.IsOpen)
                 {
-                    try
-                    {
-                        await channel.QueueDeleteAsync(tap.Queue, ifUnused: false, ifEmpty: false).ConfigureAwait(false);
-                    }
-                    catch (Exception)
-                    {
-                        // Cleanup only: a queue that is already gone must not fail the test's teardown.
-                    }
+                    await tap.Channel.QueueDeleteAsync(tap.Queue, ifUnused: false, ifEmpty: false).ConfigureAwait(false);
                 }
             }
-        }
-        finally
-        {
-            await channel.DisposeAsync().ConfigureAwait(false);
+            catch (Exception)
+            {
+                // Cleanup only: a queue that is already gone must not fail the test's teardown.
+            }
+
+            try
+            {
+                await tap.Channel.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // Cleanup only: a channel the broker already closed must not fail the test's teardown.
+            }
         }
     }
 
     private static TimeoutException Timeout(string destination, TimeSpan timeout)
         => new($"No message matching the predicate arrived on '{destination}' within {timeout.TotalSeconds:0.###}s.");
 
-    private async Task<IChannel> RabbitChannelAsync(CancellationToken cancellationToken)
-    {
-        if (_channel is { IsOpen: true })
-        {
-            return _channel;
-        }
-
-        if (_channel is not null)
-        {
-            await _channel.DisposeAsync().ConfigureAwait(false);
-            _channel = null;
-        }
-
-        _channel = await _broker.CreateChannelAsync(cancellationToken).ConfigureAwait(false);
-        return _channel;
-    }
-
     private async Task<Tap> DeclareAsync(string destination, CancellationToken cancellationToken)
     {
-        var channel = await RabbitChannelAsync(cancellationToken).ConfigureAwait(false);
-        var queue = (await channel.QueueDeclareAsync(
-            queue: $"prototest-{Guid.NewGuid():N}",
-            durable: false,
-            exclusive: true,
-            autoDelete: true,
-            arguments: null,
-            cancellationToken: cancellationToken).ConfigureAwait(false)).QueueName;
+        // One channel per tap: a destination whose exchange is missing closes its own channel on the
+        // 404, so the taps already prepared for other destinations keep receiving.
+        var channel = await _broker.CreateChannelAsync(cancellationToken).ConfigureAwait(false);
+        string queue;
         try
         {
+            queue = (await channel.QueueDeclareAsync(
+                queue: $"prototest-{Guid.NewGuid():N}",
+                durable: false,
+                exclusive: true,
+                autoDelete: true,
+                arguments: null,
+                cancellationToken: cancellationToken).ConfigureAwait(false)).QueueName;
+
             // Direct exchanges match the destination routing key; "#" keeps topic exchanges catch-all;
             // fanout and headers exchanges ignore the routing key and match these argument-less bindings.
             // RabbitMQ still delivers one copy per message even when both bindings match this queue.
@@ -194,16 +211,24 @@ internal sealed class RabbitMqProtoMessageConsumer : IProtoMessageConsumer
         }
         catch (OperationInterruptedException exception) when (exception.ShutdownReason is { ReplyCode: 404 })
         {
-            // The broker closes the channel on this error, so the caller must not keep using it.
+            await DisposeQuietlyAsync(channel).ConfigureAwait(false);
             throw new InvalidOperationException(
                 $"Cannot await messages on '{destination}': the exchange '{destination}' does not exist on the broker. " +
                 "Declare the exchange before the test awaits it.",
                 exception);
         }
+        catch (Exception)
+        {
+            await DisposeQuietlyAsync(channel).ConfigureAwait(false);
+            throw;
+        }
 
         var deliveries = Channel.CreateUnbounded<ProtoMessage>(new UnboundedChannelOptions
         {
-            SingleReader = true,
+            // Awaits serialize on _awaitGate, but the channel stays honest without it: a second reader
+            // must be possible, because a silent SingleReader violation is what let a racing await
+            // consume the delivery another await owned.
+            SingleReader = false,
             SingleWriter = false
         });
         var consumer = new AsyncEventingBasicConsumer(channel);
@@ -214,18 +239,39 @@ internal sealed class RabbitMqProtoMessageConsumer : IProtoMessageConsumer
             deliveries.Writer.TryWrite(Convert(delivery));
             return Task.CompletedTask;
         };
-        await channel.BasicConsumeAsync(
-            queue,
-            autoAck: true,
-            consumerTag: string.Empty,
-            noLocal: false,
-            exclusive: false,
-            arguments: null,
-            consumer: consumer,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
-        var tap = new Tap(queue, deliveries.Reader);
+        try
+        {
+            await channel.BasicConsumeAsync(
+                queue,
+                autoAck: true,
+                consumerTag: string.Empty,
+                noLocal: false,
+                exclusive: false,
+                arguments: null,
+                consumer: consumer,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            await DisposeQuietlyAsync(channel).ConfigureAwait(false);
+            throw;
+        }
+
+        var tap = new Tap(queue, deliveries.Reader, channel);
         _taps[destination] = tap;
         return tap;
+    }
+
+    private static async ValueTask DisposeQuietlyAsync(IChannel channel)
+    {
+        try
+        {
+            await channel.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Cleanup only: the broker may already have closed the channel on the error path.
+        }
     }
 
     private static ProtoMessage Convert(BasicDeliverEventArgs delivery)
@@ -251,5 +297,12 @@ internal sealed class RabbitMqProtoMessageConsumer : IProtoMessageConsumer
             properties.ContentType);
     }
 
-    private sealed record Tap(string Queue, ChannelReader<ProtoMessage> Deliveries);
+    private sealed record Tap(string Queue, ChannelReader<ProtoMessage> Deliveries, IChannel Channel)
+    {
+        /// <summary>
+        /// Deliveries read by an await whose predicate did not match. They are not consumed and a later
+        /// await on the same consumer still inspects them, so a racing await cannot steal them.
+        /// </summary>
+        public List<ProtoMessage> Buffered { get; } = [];
+    }
 }

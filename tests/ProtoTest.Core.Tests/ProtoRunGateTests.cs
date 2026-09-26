@@ -182,6 +182,41 @@ public class ProtoRunGateTests
     }
 
     [Test]
+    public async Task GateThatThrows_ShouldKeepTheExceptionTypeAndStackInTraceAndReport()
+    {
+        // A5.3 (Audit 5, A5-23): the thrown exception is the evidence; a string-only verdict drops it.
+        var sink = new CapturingSink();
+        var builder = new ProtoHostBuilder();
+        builder.AddSink(sink);
+        builder.AddRunGate("broken", _ => throw new InvalidOperationException("gate exploded"));
+        await using var host = builder.Build();
+
+        // Act
+        await host.StartAsync();
+        Assert.ThrowsAsync<ProtoRunGateException>(() => host.StopAsync());
+
+        // Assert
+        var entry = host.Trace.Snapshot().Entries!.Single(item => item.Kind == "gate.evaluate");
+        var verdict = sink.Items.Single(item => item.Kind == ProtoReportItemKinds.Gate);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(entry.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(entry.Error, Is.Not.Null);
+            Assert.That(entry.Error!.Type, Is.EqualTo(typeof(InvalidOperationException).FullName));
+            Assert.That(entry.Error!.Message, Is.EqualTo("gate exploded"));
+            Assert.That(entry.Error!.StackTrace, Is.Not.Null.And.Not.Empty, "the trace error keeps the stack");
+
+            Assert.That(verdict.Metadata, Is.Not.Null);
+            Assert.That(verdict.Metadata!["gate.error.type"], Is.EqualTo(typeof(InvalidOperationException).FullName));
+            Assert.That(verdict.Metadata["gate.error.message"], Is.EqualTo("gate exploded"));
+            Assert.That(
+                verdict.Metadata["gate.error.stack_trace"],
+                Is.Not.Null.And.Not.Empty,
+                "the report metadata keeps the stack");
+        }
+    }
+
+    [Test]
     public void Context_ShouldAggregateCoveragePerTargetAndCategory()
     {
         // Arrange

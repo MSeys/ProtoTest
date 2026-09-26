@@ -46,7 +46,7 @@ xUnit v2, MSTest and TUnit run this lifecycle asynchronously. NUnit and xUnit v3
 
 | Runner | Outcomes ProtoTest records | Why |
 | --- | --- | --- |
-| xUnit v2 | Passed, Failed, Cancelled | xUnit's aggregator decides pass/fail; cancellation is read from the runner's `CancellationTokenSource`; a failure keeps the exception. |
+| xUnit v2 | Passed, Failed, Cancelled | xUnit's aggregator decides pass/fail; cancellation is a body `OperationCanceledException` or the runner's signalled `CancellationTokenSource`; a failure keeps the exception. |
 | xUnit v3 | Passed, Failed, Skipped, Cancelled, Unknown | Skipped covers xUnit's `Skipped` and `NotRun`; a cancelled exception type maps to Cancelled; Unknown is the fallback for an unmapped state. |
 | NUnit | Passed, Failed, Skipped, Partial, Unknown | Inconclusive maps to Skipped; Warning maps to Partial because the test passed with warnings attached. NUnit exposes no exception type, so a cancelled test reads as Failed. |
 | MSTest | Passed, Failed, Skipped, Cancelled, Unknown | Ignored, Inconclusive and NotRunnable map to Skipped; a cancelled exception, timeout or abort maps to Cancelled. |
@@ -86,7 +86,7 @@ Artifacts ProtoTest captures (request/response bodies, screenshots, Playwright t
 
 ## Test names
 
-Every adapter except xUnit v2 records `ProtoTestName.FromMethod`, which produces `DeclaringType.FullName.MethodName`. xUnit v2 records xUnit's display name instead, so theory rows stay distinguishable (`…Invoices_filter_by_state(state: "open")`).
+Every adapter except xUnit v2 starts from `ProtoTestName.FromMethod`, which produces `DeclaringType.FullName.MethodName`. Parameterized rows append their arguments — MSTest and TUnit record `…MethodName[1, admin]`, NUnit and xUnit v3 use the runner's own display name — while xUnit v2 records xUnit's display name (`…Invoices_filter_by_state(state: "open")`). A plain method keeps the fully qualified name.
 
 ## Custom attributes work everywhere
 

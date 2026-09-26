@@ -16,7 +16,7 @@ var context = Proto.Context;
 
 `Proto.Context` works anywhere on the test's async flow — in the test method, in helpers it awaits, in page objects, in authenticators. Hooks and attributes receive the context as a parameter instead.
 
-Outside a test, `Proto.Context` throws *"No active ProtoExecutionContext available on this thread."* The usual cause is work started with `Task.Run` or a timer callback that escaped the test's flow, or using it from a static initializer.
+Outside a test, `Proto.Context` throws *"No active ProtoExecutionContext is available on this flow. …"* and names the alternatives: off-flow telemetry uses `ProtoHost.FindTraceWriter(Activity?)` to reach the owning test's trace, and run-level code uses `ProtoHost.CurrentHost` or the host reference a hook receives. The usual cause is work started with `Task.Run` or a timer callback that escaped the test's flow, or using it from a static initializer.
 
 :::tip[Parallel tests are isolated]
 The context is stored in an `AsyncLocal`, so parallel tests each see their own. You don't need to pass it around, and one test can't accidentally read another's state.
@@ -31,6 +31,33 @@ The context is stored in an `AsyncLocal`, so parallel tests each see their own. 
 | `Id` | a `ProtoTestId` — see [test ids](./lifecycle.md#test-ids) |
 | `TestId` | the id as a zero-padded string |
 | `TestNumber` | the id as a `long` |
+
+## Cancellation
+
+`CancellationToken` is the token the caller supplied when the test was started:
+
+```csharp
+await using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+var context = await host.StartTestAsync("Checkout", method, cancellation.Token);
+context.CancellationToken;   // the same token in hooks, attributes and setup I/O
+```
+
+No runner adapter supplies one yet, so a runner-driven test sees `CancellationToken.None` and setup runs to the integration's own timeout. `ProtoTest.Sql` passes the token to the connection open and transaction begin; the run-scoped [`IProtoRunHook`](./hooks.md#run-hooks) keeps taking its token as a parameter.
+
+## Unique names
+
+A record that outlives the test process — a tenant, an operator, a customer — needs a name that is unique per test and stable across reruns. `UniqueName` derives one from the test id:
+
+```csharp
+var tenant = Proto.Context.UniqueName("tenant");        // "tenant-0042317"
+var second = Proto.Context.UniqueName("member", 2);     // "member-0042317-2"
+```
+
+```csharp
+string UniqueName(string name, int sequence = 0);
+```
+
+The name is `{name}-{TestId}`, or `{name}-{TestId}-{sequence}` when the optional sequence is given for a second object of the same kind. Because the id carries the run prefix, parallel tests never collide and a rerun against a persistent database or a configured environment never collides either; the same record is reused only when the suite fixes `RunPrefix` (`ConfigureTestIds`), since the default prefix is random per run. `ProtoTest.Data`'s generated member defaults are deterministic per test in the same spirit.
 
 ## Typed state
 
@@ -58,7 +85,7 @@ T? TryResolve<T>() where T : class, IProtoContext;
 
 - `IProtoContext` is an empty marker interface.
 - State is keyed by the **exact type** you pass. Setting the same type again replaces it, and you must read it back with the same type — not a base class or interface.
-- A missing `Resolve<T>()` throws *"No context of type 'X' registered."* Use `TryResolve` in teardown code, where setup may not have got that far.
+- A missing *"No context of type 'X' is registered for this test. Register it before the test body reads it - an attribute or hook calls context.SetContext(...) in setup - or use `TryResolve<T>()` when the state is optional."* Use `TryResolve` in teardown code, where setup may not have got that far.
 - `SetContext` records the value as traced state for the context entity. `TryResolve` never traces, and `Resolve` writes a `context.resolve` event only when it fails — so the trace tells you which lookups were missing, not every read.
 
 ## Services
@@ -80,7 +107,8 @@ Register services with `builder.ConfigureServices(...)`. Scoped services are per
 Integrations with a system to talk to register their clients on the context; you normally use their extension methods (`Rest()`, `GraphQL()`, `Web()`). The underlying API:
 
 ```csharp
-void RegisterClient<TClient>(TClient client, string name = "Default", bool disposeWithContext = true) where TClient : class;
+void RegisterClient<TClient>(TClient client, string name = "Default",
+    ProtoClientOwnership ownership = ProtoClientOwnership.Context) where TClient : class;
 TClient Client<TClient>(string name = "Default") where TClient : class;
 TClient? TryClient<TClient>(string name = "Default") where TClient : class;
 ```

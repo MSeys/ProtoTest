@@ -3,6 +3,10 @@ param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release",
     [switch]$DryRun,
+
+    # Publishing is tag-gated (audit A5-07): a real push requires the v<version> tag, and only a
+    # deliberate local push passes -AllowBranch, which logs the exception.
+    [switch]$AllowBranch,
     [string]$Source = "https://api.nuget.org/v3/index.json",
     [string]$ApiKey = $env:NUGET_API_KEY
 )
@@ -10,6 +14,20 @@ param(
 $ErrorActionPreference = "Stop"
 $repository = Split-Path -Parent $PSScriptRoot
 $packagesPath = Join-Path $repository "artifacts/packages"
+
+# Publishing is tag-gated: the release workflow only publishes a v* tag, and this script refuses a
+# push from any other ref - or from no CI ref at all, a local run - unless the caller passes
+# -AllowBranch deliberately. Dry runs are always allowed so the workflow can validate a plan on a
+# branch. The tag itself must match the packed version, checked below where the version is known.
+$refType = $env:GITHUB_REF_TYPE
+$isTagRef = $refType -eq 'tag'
+if (-not $DryRun -and -not $isTagRef -and -not $AllowBranch) {
+    $ref = if ($refType) { "$refType '$($env:GITHUB_REF_NAME)'" } else { 'no CI ref (a local run)' }
+    throw "Refusing to publish from ${ref}: releases publish from the v<version> tag (GITHUB_REF_TYPE=tag, GITHUB_REF_NAME=v<version>). Push the tag, run with -DryRun, or pass -AllowBranch for a deliberate local push."
+}
+if ($AllowBranch -and -not $isTagRef -and -not $DryRun) {
+    Write-Warning "Publishing from a non-tag ref because -AllowBranch was passed; NuGet versions are immutable."
+}
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
@@ -106,7 +124,7 @@ if ($versions.Count -ne 1) {
     throw "The release folder contains multiple package versions: $($versions -join ', ')."
 }
 $releaseVersion = $versions[0]
-if ($env:GITHUB_REF_TYPE -eq 'tag') {
+if ($isTagRef) {
     $expectedTag = "v$releaseVersion"
     if ($env:GITHUB_REF_NAME -ne $expectedTag) {
         throw "Release tag '$($env:GITHUB_REF_NAME)' does not match package version '$releaseVersion'. Expected '$expectedTag'."

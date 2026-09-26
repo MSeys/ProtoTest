@@ -14,7 +14,9 @@ using var response = await Proto.Context.GraphQL()
         nodes = new[] { new { id = JsonValue.NotNull(), name = "Notebook" } }
     });
 
-response.ShouldHaveNoErrors();
+response.Should.HaveNoErrors();
+
+var total = response.ReadRequired<decimal>("$.order.total");
 ```
 
 The package also supports raw documents, file uploads and subscriptions over WebSocket or SSE. Schema coverage is available when an SDL source is configured.

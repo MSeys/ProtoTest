@@ -11,7 +11,9 @@ using var response = await Proto.Context.Rest()
     .GetAsync("/orders/{id}", new { id = 42 });
 
 response.Should.HaveHttpStatus(HttpStatusCode.OK)
-    .ShouldMatchShape(new { id = 42, status = "active" });
+    .Should.MatchShape(new { id = 42, status = "active" });
+
+var id = response.ReadRequired<int>("$.id");  // throws naming the route and path when missing
 ```
 
 ## What does it add?

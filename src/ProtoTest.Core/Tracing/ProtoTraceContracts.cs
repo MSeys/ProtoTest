@@ -240,6 +240,34 @@ public sealed record ProtoTestResult(
     public static ProtoTestResult Cancelled(Exception? exception = null) => new(ProtoTraceOutcome.Cancelled, exception);
 
     /// <summary>
+    /// Classifies the exception a runner reported for a test body, so every adapter applies the same
+    /// cancellation rule instead of its own: an <see cref="OperationCanceledException"/> - and the
+    /// <see cref="TaskCanceledException"/> subclass - is cancellation, anything else is a failure.
+    /// The rule is shared with runners that report only a type name through
+    /// <see cref="IsCancellation(string)"/>; NUnit cannot use either because its result carries no
+    /// exception, so its adapter classifies from NUnit's own result state instead.
+    /// </summary>
+    public static ProtoTestResult FromException(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        return exception is OperationCanceledException
+            ? Cancelled(exception)
+            : Failed(exception);
+    }
+
+    /// <summary>
+    /// Whether a runner-reported exception type name is the shared cancellation signal - the name
+    /// half of the one <see cref="FromException(Exception)"/> rule, for runners (xUnit v3) whose
+    /// result state carries the type as a string.
+    /// </summary>
+    public static bool IsCancellation(string? exceptionTypeName)
+        => exceptionTypeName is not null
+           && (exceptionTypeName == typeof(OperationCanceledException).FullName
+               || exceptionTypeName == typeof(TaskCanceledException).FullName
+               || exceptionTypeName == typeof(OperationCanceledException).Name
+               || exceptionTypeName == typeof(TaskCanceledException).Name);
+
+    /// <summary>
     /// A failure a runner reported without an exception. The framework and its own state join into the
     /// error type - "NUnit.Failed", "MSTest.Error" - so runner-reported failures read alike in a trace.
     /// </summary>

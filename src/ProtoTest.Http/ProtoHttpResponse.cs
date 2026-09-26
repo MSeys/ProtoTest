@@ -31,6 +31,8 @@ public abstract class ProtoHttpResponse : IDisposable
         AttachmentOptions = context?.AttachmentOptions;
         AttachmentPrefix = context?.AttachmentPrefix;
         RequestTraceId = context?.RequestTraceId;
+        RequestMethod = context?.Method;
+        RouteTemplate = context?.RouteTemplate;
     }
 
     /// <summary>The response message this instance owns and disposes.</summary>
@@ -62,6 +64,12 @@ public abstract class ProtoHttpResponse : IDisposable
     /// <summary>The trace operation that made the call, used as the parent of assertions.</summary>
     protected string? RequestTraceId { get; }
 
+    /// <summary>The HTTP method the call was made with, when the protocol knows it.</summary>
+    protected string? RequestMethod { get; }
+
+    /// <summary>The route template the call was made against, when the protocol knows it.</summary>
+    protected string? RouteTemplate { get; }
+
     /// <summary>
     /// The name for the next expected-shape attachment, or null when the protocol did not opt in or the
     /// response was made without a context (an untraced assertion). The name carries a per-response
@@ -77,6 +85,35 @@ public abstract class ProtoHttpResponse : IDisposable
         var assertionNumber = Interlocked.Increment(ref _shapeAssertionSequence);
         var assertionSuffix = assertionNumber == 1 ? string.Empty : $"-{assertionNumber:00}";
         return $"{AttachmentPrefix}-expected-shape{assertionSuffix}";
+    }
+
+    /// <summary>
+    /// The redaction options a status failure body uses: the protocol's configured response limit
+    /// bounds it even when the protocol never opted into attachment capture, and attachment options,
+    /// when present, keep their own redaction rules and may tighten the limit further. One helper for
+    /// REST and GraphQL, so the clamp cannot drift between them.
+    /// </summary>
+    protected ProtoHttpAttachmentOptions ResolveStatusDiagnosticOptions(string protocolName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(protocolName);
+        var responseLimit = Context?.ResolveResponseOptions(protocolName).MaxDiagnosticBodyLength
+            ?? new ProtoHttpResponseOptions().MaxDiagnosticBodyLength;
+        if (AttachmentOptions is null)
+        {
+            return new ProtoHttpAttachmentOptions { MaxDiagnosticBodyLength = responseLimit };
+        }
+
+        if (responseLimit >= AttachmentOptions.MaxDiagnosticBodyLength)
+        {
+            return AttachmentOptions;
+        }
+
+        return new ProtoHttpAttachmentOptions
+        {
+            RedactSensitiveData = AttachmentOptions.RedactSensitiveData,
+            SensitiveJsonProperties = [.. AttachmentOptions.SensitiveJsonProperties],
+            MaxDiagnosticBodyLength = responseLimit
+        };
     }
 
     /// <summary>

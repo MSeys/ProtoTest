@@ -15,17 +15,17 @@ GraphQL servers usually answer `200 OK` even when an operation fails, so the int
 All of them return the response, so they chain.
 
 ```csharp
-public GraphQLAssertions Should { get; }
+public GraphQLShouldAssertions Should { get; }
 public GraphQLAssertions ShouldNot { get; }
 
 public GraphQLResponse HaveHttpStatus(HttpStatusCode expected);                 // on GraphQLAssertions
-public GraphQLResponse ShouldHaveNoErrors();
-public GraphQLResponse ShouldHaveErrors();
-public GraphQLResponse ShouldHaveError(string code);                            // matches extensions.code, case-insensitive
-public GraphQLResponse ShouldMatchShape(object expectedShape, JsonSerializerOptions? options = null);
+public GraphQLResponse HaveNoErrors();                                          // on GraphQLAssertions
+public GraphQLResponse HaveErrors();
+public GraphQLResponse HaveError(string code);                                  // matches extensions.code, case-insensitive
+public GraphQLResponse MatchShape(object expectedShape, JsonSerializerOptions? options = null);  // on GraphQLShouldAssertions
 ```
 
-`ShouldNot.HaveHttpStatus(expected)` asserts the HTTP status is **anything but** `expected`. The error and shape assertions are positive-only, so there is no negated form for them.
+`ShouldNot.HaveHttpStatus(expected)` asserts the HTTP status is **anything but** `expected`. The error assertions honor the same polarity, so `ShouldNot.HaveErrors()` is the same check as `Should.HaveNoErrors()`. Shape is positive-only, so `MatchShape` lives on the `Should` facade and `ShouldNot` has no shape form.
 
 ```csharp
 using var response = await Proto.Context.GraphQL()
@@ -34,32 +34,51 @@ using var response = await Proto.Context.GraphQL()
     .Select(new { id = Gql.Field })
     .ExecuteAsync();
 
-response.ShouldHaveErrors().ShouldHaveError("UNAUTHORIZED");
+response.Should.HaveErrors().Should.HaveError("UNAUTHORIZED");
 ```
 
 ### Error assertions
 
-- `ShouldHaveNoErrors()` fails if `Errors.Count > 0`.
-- `ShouldHaveErrors()` fails if the response has no errors.
-- `ShouldHaveError(code)` matches `GraphQLError.Code`, parsed from `extensions.code`, case-insensitively.
+- `Should.HaveNoErrors()` fails if `Errors.Count > 0`.
+- `Should.HaveErrors()` fails if the response has no errors.
+- `Should.HaveError(code)` matches `GraphQLError.Code`, parsed from `extensions.code`, case-insensitively.
 
-Each records its own operation — `assert.graphql.no_errors`, `assert.graphql.has_errors`, `assert.graphql.error_code` (with `expected.error_code` and `actual.error_codes`) — parented to the request, with an error count attribute. Failures throw `GraphQLAssertionException`.
+Each records its own operation — `assert.graphql.no_errors`, `assert.graphql.has_errors`, `assert.graphql.error_code` (with `expected.error_code` and `actual.error_codes`) — parented to the request, with an error count attribute. Failures throw `GraphQLAssertionException`. The old `ShouldHaveNoErrors()`/`ShouldHaveErrors()`/`ShouldHaveError(code)` response methods remain as obsolete shims.
 
 ### Shape assertions
 
-`ShouldMatchShape` uses the same rules as REST's — partial objects, exact arrays, `JsonValue` constraints — see [Shape matching](../../foundation/shape-matching.md). For shape-driven operations it compares against the **root field's value**; for fluent and raw operations, against the whole `data` object.
+`Should.MatchShape` uses the same rules as REST's — partial objects, exact arrays, `JsonValue` constraints — see [Shape matching](../../foundation/shape-matching.md). For shape-driven operations it compares against the **root field's value**; for fluent and raw operations, against the whole `data` object.
 
-The assertion records an `assert.json.shape` operation with the expected type and the operation identifier (`graphql.operation`), and on success records a `graphql.contract.shape` observation carrying the request identifier and the matched property paths. A shape mismatch throws `JsonShapeMismatchException` with every mismatch listed.
+The assertion records an `assert.json.shape` operation with the expected type and the operation identifier (`graphql.operation`), and on success records a `graphql.contract.shape` observation carrying the request identifier and the matched property paths.
+
+A mismatch throws `GraphQLAssertionException` whose message starts with the operation identifier, keeping the shared `JsonShapeMismatchException` — and so the whole mismatch list — as `InnerException`:
+
+```
+query Orders — Shape mismatch failed with 1 error(s):
+  • [$.value]: Values did not match. (Expected: '1', Actual: '2')
+```
 
 A response with no data — `data` missing or `null`, typically errors-only — records a failed `assert.json.shape` (`shape.result = mismatched`) and throws `GraphQLAssertionException("Expected GraphQL data, but the response did not contain data.")` rather than a shape mismatch.
 
 ## Reading
 
 ```csharp
-T? ReadDataAs<T>(JsonSerializerOptions? options = null);   // case-insensitive by default
+T? ReadDataAs<T>(JsonSerializerOptions? options = null);
+T? ReadDataAs<T>(string jsonPath, JsonSerializerOptions? options = null);
+T  ReadRequired<T>(JsonSerializerOptions? options = null);
+T  ReadRequired<T>(string jsonPath, JsonSerializerOptions? options = null);
 ```
 
-`ReadDataAs` reads the same element `ShouldMatchShape` compares against. It records a `graphql.response.deserialize` operation with `target.type` and rethrows a failure.
+`ReadDataAs` reads the same element `Should.MatchShape` compares against and is case-insensitive by default. It records a `graphql.response.deserialize` operation with `target.type` — plus `graphql.path` for a path read — and fails it with the exception it rethrows; a required path read fails the operation when the path holds JSON `null`.
+
+`ReadDataAs<T>(jsonPath)` reads one value from the selected data instead of a wrapper record:
+
+```csharp
+var total = response.ReadDataAs<decimal>("$.order.total");
+var first = response.ReadRequired<string>("items[0].sku");
+```
+
+The path subset is `$`, dot members and zero-based array indices; a leading member without `$` is accepted. Members match case-sensitively, and filters, wildcards, quoted names and slices are not part of the subset. A path that does not resolve throws `GraphQLAssertionException` whose message starts with the operation identifier and names the path, keeping the shared `JsonPathException` as `InnerException`. `ReadRequired<T>` throws `GraphQLAssertionException` naming the operation when the response has no data and `ReadRequired<T>(jsonPath)` when the path holds JSON `null` — the null check runs before the deserializer, so a value type reports the assertion exception too.
 
 ## Members
 

@@ -57,6 +57,12 @@ internal sealed class FailingDbConnection : DbConnection
 
     public bool FailRollback { get; init; }
 
+    /// <summary>An open that only ends when cancellation arrives, modelling a wrong address or a starting database.</summary>
+    public bool StallOpen { get; init; }
+
+    /// <summary>A transaction begin that only ends when cancellation arrives.</summary>
+    public bool StallBegin { get; init; }
+
     public bool IsDisposed { get; private set; }
 
     public FailingDbTransaction? Transaction { get; private set; }
@@ -80,15 +86,19 @@ internal sealed class FailingDbConnection : DbConnection
 
     public override void Open() => _state = ConnectionState.Open;
 
-    public override Task OpenAsync(CancellationToken cancellationToken)
+    public override async Task OpenAsync(CancellationToken cancellationToken)
     {
         if (FailOpen)
         {
             throw new InvalidOperationException("open failed");
         }
 
+        if (StallOpen)
+        {
+            await StallUntilCancelledAsync("open", cancellationToken);
+        }
+
         _state = ConnectionState.Open;
-        return Task.CompletedTask;
     }
 
     protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel)
@@ -100,6 +110,34 @@ internal sealed class FailingDbConnection : DbConnection
 
         Transaction = new FailingDbTransaction(this, isolationLevel, FailRollback);
         return Transaction;
+    }
+
+    protected override async ValueTask<DbTransaction> BeginDbTransactionAsync(
+        IsolationLevel isolationLevel,
+        CancellationToken cancellationToken)
+    {
+        if (FailBegin)
+        {
+            throw new InvalidOperationException("begin failed");
+        }
+
+        if (StallBegin)
+        {
+            await StallUntilCancelledAsync("begin", cancellationToken);
+        }
+
+        Transaction = new FailingDbTransaction(this, isolationLevel, FailRollback);
+        return Transaction;
+    }
+
+    /// <summary>
+    /// The provider's operation only ends when cancellation arrives. The five-second bound keeps a
+    /// broken token path from hanging the suite: it fails the test with a message that names it.
+    /// </summary>
+    private static async Task StallUntilCancelledAsync(string operation, CancellationToken cancellationToken)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken).ConfigureAwait(false);
+        throw new InvalidOperationException($"the {operation} was never cancelled");
     }
 
     protected override DbCommand CreateDbCommand() => throw new NotSupportedException();

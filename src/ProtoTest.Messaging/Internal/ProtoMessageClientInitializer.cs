@@ -18,6 +18,7 @@ internal sealed class ProtoMessageClientInitializer(string name) : IProtoClientI
         var options = context.Service<MessagingOptions>();
         // Test setup is not cancellable: no adapter supplies a token for it.
         var consumer = await broker.CreateConsumerAsync(CancellationToken.None);
+        var prepareFailures = new Dictionary<string, Exception>(StringComparer.Ordinal);
 
         // Register before preparing: a failed PrepareAsync must not leak the consumer's channel or queues.
         context.RegisterResource(
@@ -28,10 +29,30 @@ internal sealed class ProtoMessageClientInitializer(string name) : IProtoClientI
         if (options.Destinations.Count > 0)
         {
             // Bind the test's taps before it acts: a message published after this point is never missed.
-            await consumer.PrepareAsync([.. options.Destinations], CancellationToken.None);
+            // Tap callbacks and the configuration section can both name a destination, so the set is
+            // filtered and deduped here, the one place every adapter reads it. Each destination is
+            // prepared on its own: one that cannot be declared (a missing exchange) must fail only the
+            // tests that await it, with the adapter's named error, instead of every test in the class
+            // during setup. The client rethrows the recorded failure from AwaitAsync for that
+            // destination.
+            var destinations = options.Destinations
+                .Where(destination => !string.IsNullOrWhiteSpace(destination))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            foreach (var destination in destinations)
+            {
+                try
+                {
+                    await consumer.PrepareAsync([destination], CancellationToken.None);
+                }
+                catch (Exception exception)
+                {
+                    prepareFailures[destination] = exception;
+                }
+            }
         }
 
-        context.RegisterClient(new ProtoMessageClient(context, broker, consumer, options), Name);
+        context.RegisterClient(new ProtoMessageClient(context, broker, consumer, options, prepareFailures), Name);
         return true;
     }
 }

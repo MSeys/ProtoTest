@@ -33,9 +33,9 @@ public sealed class AccessJourney
 
         // Assert
         developerAttempt.Should.HaveHttpStatus(HttpStatusCode.Forbidden)
-            .ShouldMatchShape(new { code = ProblemCodes.Forbidden });
+            .Should.MatchShape(new { code = ProblemCodes.Forbidden });
         billingAttempt.Should.HaveHttpStatus(HttpStatusCode.Forbidden)
-            .ShouldMatchShape(new { code = ProblemCodes.Forbidden });
+            .Should.MatchShape(new { code = ProblemCodes.Forbidden });
     }
 
     [ProtoTest]
@@ -51,7 +51,7 @@ public sealed class AccessJourney
 
         // Assert
         project.Should.HaveHttpStatus(HttpStatusCode.Created)
-            .ShouldMatchShape(new { name = "owner-project", status = ProjectStatuses.Active });
+            .Should.MatchShape(new { name = "owner-project", status = ProjectStatuses.Active });
     }
 
     [ProtoTest]
@@ -77,9 +77,9 @@ public sealed class AccessJourney
 
         // Assert
         previewDeploy.Should.HaveHttpStatus(HttpStatusCode.Created)
-            .ShouldMatchShape(new { status = DeploymentStatuses.Succeeded });
+            .Should.MatchShape(new { status = DeploymentStatuses.Succeeded });
         productionAttempt.Should.HaveHttpStatus(HttpStatusCode.Forbidden)
-            .ShouldMatchShape(new { code = ProblemCodes.Forbidden });
+            .Should.MatchShape(new { code = ProblemCodes.Forbidden });
         productionDeploy.Should.HaveHttpStatus(HttpStatusCode.Created);
     }
 
@@ -94,7 +94,7 @@ public sealed class AccessJourney
 
         // Assert
         audit.Should.HaveHttpStatus(HttpStatusCode.Forbidden)
-            .ShouldMatchShape(new { code = ProblemCodes.Forbidden });
+            .Should.MatchShape(new { code = ProblemCodes.Forbidden });
     }
 
     [ProtoTest]
@@ -130,7 +130,7 @@ public sealed class AccessJourney
 
         // Assert
         deployment.Should.HaveHttpStatus(HttpStatusCode.Forbidden)
-            .ShouldMatchShape(new { code = ProblemCodes.Forbidden });
+            .Should.MatchShape(new { code = ProblemCodes.Forbidden });
     }
 
     [ProtoTest]
@@ -140,7 +140,7 @@ public sealed class AccessJourney
         var owner = await Proto.Context.Data().CreateMemberTokenAsync(MemberRoles.Owner);
         var intruder = await Proto.Context.Data()
             .For<ProvisionTenantRequest>()
-            .With(request => request.Name, $"northstar-intruder-{Proto.Context.TestId}")
+            .With(request => request.Name, Proto.Context.UniqueName("northstar-intruder"))
             .With(request => request.PlanId, PlanIds.Free)
             .CreateAsync<TenantResponse>();
         using var secret = await Proto.Context.Demo().As(intruder.OwnerToken)
@@ -155,7 +155,7 @@ public sealed class AccessJourney
 
         // Assert
         attempt.Should.HaveHttpStatus(HttpStatusCode.NotFound)
-            .ShouldMatchShape(new { code = ProblemCodes.NotFound });
+            .Should.MatchShape(new { code = ProblemCodes.NotFound });
     }
 
     [ProtoTest]
@@ -174,6 +174,6 @@ public sealed class AccessJourney
 
         // Assert
         limited.Should.HaveHttpStatus(HttpStatusCode.TooManyRequests)
-            .ShouldMatchShape(new { code = ProblemCodes.RateLimited });
+            .Should.MatchShape(new { code = ProblemCodes.RateLimited });
     }
 }

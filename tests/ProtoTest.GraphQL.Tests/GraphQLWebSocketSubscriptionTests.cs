@@ -36,7 +36,7 @@ public sealed class GraphQLWebSocketSubscriptionTests
                 .SubscribeAsync();
 
             using var message = await subscription.ExpectNextAsync(new { id = 42, status = "pending" });
-            message.ShouldHaveNoErrors();
+            message.Should.HaveNoErrors();
             Assert.That(await subscription.NextAsync(), Is.Null);
 
             Assert.Multiple(() =>
@@ -160,6 +160,39 @@ public sealed class GraphQLWebSocketSubscriptionTests
             var exception = Assert.ThrowsAsync<GraphQLProtocolException>(() => subscription.NextAsync());
 
             Assert.That(exception!.Message, Does.Contain("exceeded the configured limit"));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task Subscription_WhenTheServerRejectsTheOperation_ShouldNameTheServerError()
+    {
+        // Audit 5 A5.9 (A5-69): a rejected subscription arrives as an errors-only response; the shape
+        // assertion names the server's message instead of only "the response did not contain data".
+        var socket = new StubWebSocket(
+            """{"type":"connection_ack"}""",
+            """{"id":"1","type":"error","payload":[{"message":"The field `orderCreated` does not exist on the type `Subscription`."}]}""");
+        var builder = new ProtoHostBuilder();
+        builder.AddGraphQL(graphQL => graphQL.AddClient("Default", "https://example.test/graphql"));
+        builder.ConfigureServices(services => services.AddSingleton<IGraphQLWebSocketFactory>(
+            new StubWebSocketFactory(socket)));
+        await using var host = builder.Build();
+        await host.StartTestAsync("websocket-error-frame", "5", TestMethods.Placeholder);
+        try
+        {
+            await using var subscription = await Proto.Context.GraphQL()
+                .Subscription("orderCreated")
+                .Select(new { id = Gql.Field })
+                .SubscribeAsync();
+
+            var exception = Assert.ThrowsAsync<GraphQLAssertionException>(() =>
+                subscription.ExpectNextAsync(new { id = 42 }));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exception!.Message, Does.Contain("The field `orderCreated` does not exist"));
+                Assert.That(exception.Message, Does.Contain("Server errors:"));
+            });
         }
         finally { await host.CompleteTestAsync(); }
     }

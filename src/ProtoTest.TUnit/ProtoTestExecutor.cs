@@ -1,5 +1,6 @@
 namespace ProtoTest.TUnit;
 
+using System.Reflection;
 using global::TUnit.Core.Extensions;
 using global::TUnit.Core.Interfaces;
 using ProtoTest.Core;
@@ -26,7 +27,7 @@ public class ProtoTestExecutor : ITestExecutor
             return;
         }
 
-        var preparation = ProtoTestAdapter.Prepare(methodInfo, ProtoTestAssembly.Host);
+        var preparation = ProtoTestAdapter.Prepare(methodInfo, ProtoTestAssembly.Host, RowName(methodInfo, context));
         if (!preparation.CanRun)
         {
             global::TUnit.Core.Skip.Test(preparation.SkipReason!);
@@ -47,14 +48,11 @@ public class ProtoTestExecutor : ITestExecutor
             result = ProtoTestResult.Skipped;
             failure = exception;
         }
-        catch (OperationCanceledException exception)
-        {
-            result = ProtoTestResult.Cancelled(exception);
-            failure = exception;
-        }
         catch (Exception exception)
         {
-            result = ProtoTestResult.Failed(exception);
+            // The shared classifier decides cancelled vs failed, so TUnit agrees with the other
+            // adapters on a body that cancels.
+            result = ProtoTestResult.FromException(exception);
             failure = exception;
         }
         finally
@@ -69,4 +67,16 @@ public class ProtoTestExecutor : ITestExecutor
         }
     }
 
+    /// <summary>
+    /// The row's trace name: TUnit's display name is the method name alone, so a parameterized test
+    /// gets the shared row form - the stable method name with the row's arguments appended, the same
+    /// shape MSTest records. A plain test keeps the stable fully qualified name.
+    /// </summary>
+    private static string? RowName(MethodInfo methodInfo, TestContext context)
+    {
+        var arguments = context.Metadata.TestDetails.TestMethodArguments;
+        return arguments is { Length: > 0 }
+            ? ProtoTestName.ForRow(methodInfo, arguments)
+            : null;
+    }
 }

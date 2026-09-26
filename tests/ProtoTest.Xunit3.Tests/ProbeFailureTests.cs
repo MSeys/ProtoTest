@@ -32,7 +32,8 @@ public sealed class ProbeFailureTests
         Assert.Equal(AdapterFailureProbe.SetupMessage, exception!.Message);
         Assert.Equal(ProtoTraceOutcome.Failed, trace.Outcome);
         Assert.Contains(AdapterFailureProbe.SetupMessage, trace.Error?.Message);
-        Assert.Throws<InvalidOperationException>(() => _ = Proto.Context);
+        var contextFailure = Assert.Throws<InvalidOperationException>(() => _ = Proto.Context);
+        Assert.Contains("FindTraceWriter", contextFailure.Message);
     }
 
     [Fact]

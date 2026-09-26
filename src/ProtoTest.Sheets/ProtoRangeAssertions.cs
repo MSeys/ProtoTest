@@ -26,8 +26,8 @@ public sealed class ProtoRangeAssertions
         _negated = negated;
     }
 
-    /// <summary>Asserts the range has exactly this many rows and columns.</summary>
-    public void HaveDimensions(int rows, int columns)
+    /// <summary>Asserts the range has exactly this many rows and columns. Returns the range.</summary>
+    public ProtoRange HaveDimensions(int rows, int columns)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(rows);
         ArgumentOutOfRangeException.ThrowIfNegative(columns);
@@ -46,10 +46,11 @@ public sealed class ProtoRangeAssertions
             () => new SheetAssertionFailure(
                 $"{SheetAssertion.Describe(reference, $"have dimensions {rows}x{columns}", _negated)} " +
                 $"but it was {_range.RowCount}x{_range.ColumnCount}."));
+        return _range;
     }
 
-    /// <summary>Compares the range's text values to an expected table, row by row.</summary>
-    public void Match(IReadOnlyList<IReadOnlyList<string?>> expected)
+    /// <summary>Compares the range's text values to an expected table, row by row. Returns the range.</summary>
+    public ProtoRange Match(IReadOnlyList<IReadOnlyList<string?>> expected)
     {
         ArgumentNullException.ThrowIfNull(expected);
         var expectedRows = expected.Count;
@@ -94,6 +95,7 @@ public sealed class ProtoRangeAssertions
             },
             () => new SheetAssertionFailure(
                 DescribeFailure(expectedShape, mismatchedCell, expectedValue)));
+        return _range;
     }
 
     private string DescribeFailure(string expectedShape, ProtoCell? mismatchedCell, string? expectedValue)

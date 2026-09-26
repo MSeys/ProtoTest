@@ -25,7 +25,7 @@ public sealed class OnboardingJourney
         using var audit = await Proto.Context.Rest().GetAsync("/api/v1/audit");
 
         // Assert
-        organization.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        organization.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new
         {
             planId = PlanIds.Free,
             planName = "Free",
@@ -36,7 +36,7 @@ public sealed class OnboardingJourney
             projectLimit = 1,
             cancelAtPeriodEnd = false
         });
-        audit.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        audit.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new
         {
             items = new[]
             {
@@ -62,7 +62,7 @@ public sealed class OnboardingJourney
 
         // Assert
         invitation.Should.HaveHttpStatus(HttpStatusCode.PaymentRequired)
-            .ShouldMatchShape(new { code = ProblemCodes.PlanLimitExceeded });
+            .Should.MatchShape(new { code = ProblemCodes.PlanLimitExceeded });
     }
 
     [ProtoTest]
@@ -85,7 +85,7 @@ public sealed class OnboardingJourney
             .PostAsync("/api/v1/members");
 
         // Assert
-        invitation.Should.HaveHttpStatus(HttpStatusCode.Created).ShouldMatchShape(new
+        invitation.Should.HaveHttpStatus(HttpStatusCode.Created).Should.MatchShape(new
         {
             email = "overflow@example.test",
             role = MemberRoles.Viewer,
@@ -109,7 +109,7 @@ public sealed class OnboardingJourney
             .PostAsync("/api/v1/projects");
 
         // Assert
-        second.Should.HaveHttpStatus(HttpStatusCode.PaymentRequired).ShouldMatchShape(new
+        second.Should.HaveHttpStatus(HttpStatusCode.PaymentRequired).Should.MatchShape(new
         {
             code = ProblemCodes.PlanLimitExceeded,
             details = new { limit = "1", active = "1" }
@@ -133,7 +133,7 @@ public sealed class OnboardingJourney
             .PostAsync("/api/v1/projects");
 
         // Assert
-        second.Should.HaveHttpStatus(HttpStatusCode.Created).ShouldMatchShape(new
+        second.Should.HaveHttpStatus(HttpStatusCode.Created).Should.MatchShape(new
         {
             name = "beacon",
             status = ProjectStatuses.Active,

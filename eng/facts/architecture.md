@@ -46,8 +46,8 @@ or `Sheets` type names.
    no plain declaration promises it; the decision names the deciding keys and the reason in the trace.
 4. Selects the run clock (a `ProtoClock` registered by `ConfigureClock`, else one starting now) and
    registers the `TimeProvider` bridge.
-5. Registers the internal hooks (client initializer and completion, trace export, run gates, run
-   resources) and report sources.
+5. Registers the internal hooks (client initializer and completion, trace export, sink export, run gates,
+   run resources) and report sources.
 6. Builds the provider and **constructs every `IProtoCollector`** so a bad OpenAPI/GQL schema fails
    construction, not the first test.
 7. Second `Build()` throws; every public registration entry that would mutate composition throws
@@ -66,8 +66,10 @@ or `Sheets` type names.
    worker receives the merged overlay (options over settings over configuration) as `--{key}={value}`
    arguments, so the worker's `Program.Main` sees final-precedence values, and the `HostBuilding`
    in-memory overlay stays as the fallback for an entry point that ignores args.
-4. Starts the trace listener. A start failure rolls back completed run hooks in reverse, clears
-   infrastructure settings, and returns the host to Created for a retry.
+4. Starts the trace listener. A start failure rolls back the completed run hooks that own state, in
+   reverse, so a suite-setup hook's state is released; the evidence hooks (gates, sink export, the
+   archive) stay silent for a run that never started. It clears infrastructure settings and returns the
+   host to Created for a retry.
 
 `StopAsync()` (first stop wins; second returns or rethrows the remembered failure):
 
@@ -87,7 +89,9 @@ provider, stops listening, unregisters. Start/stop/dispose racing is rejected, n
    host's `ProtoClockRegistry` (a failed start removes it; context disposal removes it), sorts
    attributes by `Order`, sets the ambient context, then runs hooks ascending (the built-in client
    initializer has `Order = int.MinValue`) and attributes ascending. It opens `test.execution` and
-   makes it the parent.
+   makes it the parent. The caller's token becomes `ProtoExecutionContext.CancellationToken`, which
+   hooks and attributes read and `ProtoTest.Sql` passes to the connection open and transaction begin;
+   no runner adapter supplies one yet.
 3. A setup failure records the test `Failed`, rolls back only the completed components (attributes and
    hooks in reverse), and rethrows.
 4. Teardown runs attributes reverse, hooks reverse, publishes attachments, disposes the context
@@ -95,7 +99,8 @@ provider, stops listening, unregisters. Start/stop/dispose racing is rejected, n
    completes the recorder. Every step is attempted; teardown failures become findings and never replace
    the adapter's result; a single exception is rethrown as-is, several aggregate.
 5. `CompleteTestAsync` refuses a missing or foreign test; the context disposes once; resources release
-   at most once.
+   at most once. A scope disposed off the async flow that started it, or while another test is active,
+   records a `Lifecycle` finding on its test and throws rather than completing silently.
 
 ## Ownership and lifetimes
 
@@ -141,7 +146,11 @@ duplicate that is actually a different program, server, backend or device type i
   whole. Built-in kinds live in `ProtoCapabilityKinds`
   (`server`, `worker`, `device`, `protocol`, `browser`, `store`, `broker`, `data`, `document`).
 - `[RequiresCapability(kind, CapabilityName = ...)]` is evaluated by the adapter before the test starts;
-  a skip has no lifecycle. `[RequiresInProcess]` is `[RequiresCapability(server)]`.
+  a skip has no lifecycle. `[RequiresInProcess]` is `[RequiresCapability(server)]`. A suite states a
+  gate's reason once with `AddCapabilityReason(kind, reason, name?)` (the typed gates included); the
+  attribute reads the reason for `(kind, CapabilityName ?? CapabilityInstance)` then `(kind, null)`
+  before its default, and a per-test `Reason` still wins. `RequiresApplication` checks a declaration,
+  not a capability, and keeps its own reason/default.
 - Honesty rule: a capability may only be declared by an integration that can serve it.
   `AddCapabilityUnlessConfigured` decides **per declaration**: a descriptor drops only when every
   conditional declaration for it drops and no plain declaration promises it, so one satisfied
@@ -160,7 +169,12 @@ duplicate that is actually a different program, server, backend or device type i
 - Multi-instance capabilities carry their instance: two named servers are two descriptors, two
   capabilities and two run entities (`server:ASP.NET Core:A`), so configuring A's address drops only
   A's. `HasCapability(kind)` matches any instance; `HasCapability(kind, name)` matches the descriptor
-  `Name`, not the instance. The Web pair leaves exactly the winning backend's browser capability.
+  `Name`, not the instance; `HasCapability(kind, name, instance)` narrows by both (every non-null filter
+  must match), and `[RequiresServer(name)]` uses it to address one named `AddAspNetCoreServer`
+  instance. `[RequiresWorker<TProgram>]` checks the worker capability by the program assembly name,
+  `[RequiresApplication(name)]` checks `ProtoHost.HasApplication(name)` (the `AddApplication`
+  declaration), and `RequiresCapabilityAttribute.CapabilityInstance` exposes the instance filter to
+  open kinds. The Web pair leaves exactly the winning backend's browser capability.
 
 ## Address resolution (one authority per application)
 
@@ -197,10 +211,19 @@ source. A first-reader-wins divergence is a bug (audit ADDR-2, fixed).
 
 ## Options
 
-`IProtoConfigurableOptions` (`ConfigurationSectionName`, `BindFromConfiguration`, `Validate`) is the
+`IProtoConfigurableOptions` (`ConfigurationSectionName`, `FallbackConfigurationSectionName`,
+`BindFromConfiguration`, `Validate`) is the
 shared shape. `ProtoOptionsRegistration.Configure<T>` composes code callbacks in order, binds the
 section over them (configuration wins), and resolves one instance per consumer. Validation runs where
-options resolve; a bad value fails there, not the first test.
+options resolve; a bad value fails there, not the first test. Sections follow
+`ProtoTest:<Integration>[:<Area>]`, where the area names the options type's role (`Responses`,
+`Attachments`, `Client`, `WebSocket`, `RabbitMq`); an integration with one options set has no area
+segment. A renamed section returns its old name from `FallbackConfigurationSectionName`: the fallback
+binds first and the current section binds over it, so the old key keeps working (documented as
+deprecated) and the current key wins. `GrpcClientOptions` is the example — `ProtoTest:Grpc:Client` over
+the legacy `ProtoTest:Grpc` — and it is registered **per named client**: the keyed registration
+composes each client's callbacks in order, the shared section binds over each client's callback, and
+the unkeyed instance is the run-wide default a transport-backed fallback client reads.
 
 Known outliers (sanctioned or audit-owed): Web backends validate through static delegates instead of
 the interface method; the sink path binds but does not validate; OpenAPI/GraphQL schema sources are
@@ -230,6 +253,21 @@ same key set when it is called after `AddSql`.
 - Trace format compatibility: readers support the current major and the previous one; a breaking
   change bumps the major with a migration note (`docs/docs/observability/prototrace.md`).
 
+## Assertion surface
+
+- Every ProtoTest-owned assertable subject exposes `Should` (and `ShouldNot` where a negated form is
+  meaningful); each member returns the subject, so assertions chain. The pre-facade spellings are
+  `[Obsolete]` delegating shims (DX-01/DX-02), never a second implementation.
+- Shape is positive-only and lives on the positive facade or a factory because C# has no extension
+  properties: `response.Should.MatchShape(shape)` (REST/GraphQL), `ProtoGrpcAssertions.For(reply)`,
+  `message.Should.MatchShape(shape)`, `row.Should.MatchShape(shape)` (table rows). A model row is a
+  user type, so `row.ShouldMatchShape(shape)` stays the documented generic-subject extension.
+- A shape producer wraps the shared matcher failure after `ProtoShapeAssertion.Assert` has recorded and
+  failed the operation, so trace attributes/sections/observations stay byte-identical: the protocol's
+  assertion exception starts with the subject (`request.identifier`, `graphql.operation`, the message
+  type, `messaging.destination`, or the row's `Sheet!Range`) and keeps the matcher exception - with
+  `Mismatches` - as `InnerException`. The GraphQL data-less path keeps its own message and section.
+
 ## Context rules (Audit 3 CTX-1)
 
 `Proto.Context` is for code that runs **inside a test on the test's flow**: test bodies and
@@ -237,7 +275,10 @@ test-author entries (`context.Data().For<T>()`, `row.ShouldMatchShape(...)`, ass
 plumbing they call. Prefer explicit passing when it keeps a callee constructible in a unit test.
 Run scope uses the host (`ProtoHost.CurrentHost`, or the reference a hook receives). Off-flow telemetry
 uses `ProtoHost.FindTraceWriter(Activity?)` and correlates by trace id. An object whose lifetime spans
-tests resolves per call and never holds a context.
+tests resolves per call and never holds a context. `context.UniqueName(name, sequence)` derives a
+deterministic test-scoped name (`name-{TestId}`, `name-{TestId}-{sequence}`) for records that outlive
+the process; `ProtoTest.Data`'s per-member generated defaults are deterministic per test in the same
+spirit (see `ProtoDataValueContext`).
 
 ## Vocabulary ownership
 
@@ -250,9 +291,10 @@ tests resolves per call and never holds a context.
   builder type of its own).
 - `sheets.workbook` is record-only evidence: opening a workbook is not an assertion, so
   `SheetsCoverageCollector` consumes only `sheets.range` (decided in A5; not changed).
-- Messaging records `messaging.publish`, `messaging.receive` and `messaging.contract.shape` as trace
-  evidence and ships no collector; destinations are deliberately not a coverage category (A5 VOC-1
-  decision: the promise was deleted, not shipped).
+- Messaging records the `messaging.publish` operation and the `messaging.published`, `messaging.receive`,
+  `messaging.failure` and `messaging.contract.shape` observations as trace evidence and ships no collector;
+  destinations are deliberately not a coverage category (A5 VOC-1 decision: the promise was deleted, not
+  shipped).
 - Entity ids: `client:{type}:{name}`, `context:{type}`, `capability:{kind}:{name}` (with `:{instance}`
   when the descriptor carries one), `device:{client}:{deviceType}:{id}`, infrastructure `Id`, resources
   `Id`, value items `{type}:{identity}`.
@@ -264,7 +306,12 @@ Each adapter owns its lifecycle boundary and maps the runner's result to the tra
 re-implements lifecycle. Consolidated facts (Audit 3 Stage 4): NUnit uses an `IWrapSetUpTearDown`
 command wrapper (skip precedes `[SetUp]`, lifecycle spans setup/teardown); MSTest is one lifecycle per
 data row; xUnit v3 traces theory rows by display name and always completes the scope; TUnit runs
-reflection-less tests unwrapped; xUnit v2 names rows. `AdapterContract` is the shared compliance
+reflection-less tests unwrapped; xUnit v2 names rows. Classification is shared:
+`ProtoTestResult.FromException` (with `IsCancellation(string)` for xUnit v3's result state) records a
+runner-reported cancellation as `Cancelled` and anything else as `Failed`; NUnit is the documented
+exception (its result carries no exception, so a cancelled test reads `Failed`). xUnit v2 completes the
+scope in a `finally`; TUnit appends row arguments through `ProtoTestName.ForRow`, the same form MSTest
+records. `AdapterContract` is the shared compliance
 suite; extend it, do not fork it.
 
 ## Inventory — the one of everything
@@ -286,10 +333,11 @@ suite; extend it, do not fork it.
 | Flow | `ProtoFlow`, `ProtoStepDescriptor` | `src/ProtoTest.Core/` |
 | Tracing | `ProtoTraceRecorder`, `ProtoTraceSession`, `ProtoTraceWire`, `ProtoTraceContracts` | `src/ProtoTest.Core/Tracing/` |
 | Redaction | `ProtoMetadataRedaction`, `ProtoUriSanitizer`, `JsonDiagnosticSanitizer` | Core / ProtoTest.Json |
+| JSON value read | `JsonPathResolver`, `JsonPathException` | `src/ProtoTest.Json/` |
 | Reporting | `IProtoSink`, `IProtoReportSource`, `IProtoCollector`, `ProtoReportItem`, run gates | `src/ProtoTest.Core/Reporting/` |
 | Clock | `ProtoClock`, `ProtoTestTimeProvider`, `ProtoRequestClock`, `ProtoClockRegistry` | `src/ProtoTest.Core/Time/` |
 | Readiness | `ProtoReadiness`, `ProtoReadinessOptions` | `src/ProtoTest.Core/Readiness/` |
-| Skip | `RequiresCapabilityAttribute`, `RequiresInProcessAttribute`, `ProtoTestSkip` | `src/ProtoTest.Core/Applications/` |
+| Skip | `RequiresCapabilityAttribute`, `RequiresInProcessAttribute`, `RequiresWorkerAttribute<TProgram>`, `RequiresServerAttribute`, `RequiresApplicationAttribute`, `ProtoTestSkip` | `src/ProtoTest.Core/Applications/` |
 | Adapters | five runner packages + `tests/ProtoTest.AdapterContract` | `src/`, `tests/` |
 
 ## Invariants to protect

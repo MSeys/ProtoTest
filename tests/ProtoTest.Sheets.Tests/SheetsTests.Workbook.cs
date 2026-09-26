@@ -207,6 +207,39 @@ public sealed partial class SheetsTests
             new Row(Number("A3", 200), Text("B3", "second")));
         keysPart.Worksheet.Save();
 
+        // Layered headers whose leaves collide: a table row shape cannot name them apart.
+        var groupsPart = workbookPart.AddNewPart<WorksheetPart>();
+        var groupsData = new SheetData();
+        groupsPart.Worksheet = new Worksheet(groupsData);
+        sheets.Append(new Sheet
+        {
+            Id = workbookPart.GetIdOfPart(groupsPart),
+            SheetId = 13,
+            Name = "Groups"
+        });
+        groupsData.Append(
+            new Row(Text("A1", "FY26"), Text("B1", "FY25")),
+            new Row(Text("A2", "Amount"), Text("B2", "Amount")),
+            new Row(Number("A3", 1200), Number("B3", 900)));
+        groupsPart.Worksheet.Save();
+
+        // Layered headers whose leaves differ only by case: the case-insensitive shape lookup cannot
+        // tell them apart either.
+        var caseGroupsPart = workbookPart.AddNewPart<WorksheetPart>();
+        var caseGroupsData = new SheetData();
+        caseGroupsPart.Worksheet = new Worksheet(caseGroupsData);
+        sheets.Append(new Sheet
+        {
+            Id = workbookPart.GetIdOfPart(caseGroupsPart),
+            SheetId = 14,
+            Name = "CaseGroups"
+        });
+        caseGroupsData.Append(
+            new Row(Text("A1", "FY26"), Text("B1", "FY25")),
+            new Row(Text("A2", "Amount"), Text("B2", "amount")),
+            new Row(Number("A3", 1200), Number("B3", 900)));
+        caseGroupsPart.Worksheet.Save();
+
         // Dates for Min/Max constraints, and text-vs-number values for uniqueness.
         var datedPart = workbookPart.AddNewPart<WorksheetPart>();
         var datedData = new SheetData();

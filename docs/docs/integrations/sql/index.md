@@ -49,7 +49,7 @@ builder.AddSql(
     sql => sql.AddressKeys.Add("ConnectionStrings:Orders"));
 ```
 
-With at least one key declared, `AddSql` declares the `SQL` store capability only while one of them can provide a connection — a configured value, or a key a registered container declares and fills. When none can, the integration is inert: the connection is not opened during setup, and `Proto.Context.SqlSession()`, `SqlConnection()` and `SqlTransaction()` throw naming the missing keys and the `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate. `AddressKeys` is a code API — a `SqlAddressKeys` set that only `Add` (or a `SqlOptions` instance registered before `AddSql`) fills. No configuration section binds it, because the capability decision is made when the host is built and a key that only configuration knows could not have promised the connection the decision was made against. It is empty by default, which keeps the capability unconditional and the factory owning the address.
+With at least one key declared, `AddSql` declares the `SQL` store capability only while one of them can provide a connection — a configured value, or a key a registered container declares and fills. When none can, the integration is inert: the connection is not opened during setup, and `Proto.Context.Sql()`, `SqlConnection()` and `SqlTransaction()` throw naming the missing keys and the `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate. `AddressKeys` is a code API — a `SqlAddressKeys` set that only `Add` (or a `SqlOptions` instance registered before `AddSql`) fills. No configuration section binds it, because the capability decision is made when the host is built and a key that only configuration knows could not have promised the connection the decision was made against. It is empty by default, which keeps the capability unconditional and the factory owning the address.
 
 ## Isolation
 
@@ -85,7 +85,7 @@ An undeclared application fails the run at start with an explanation telling you
 
 ```csharp
 DbConnection connection = Proto.Context.SqlConnection();
-ProtoSqlSession session = Proto.Context.SqlSession();
+ProtoSqlSession session = Proto.Context.Sql();          // SqlSession() is the historical alias
 DbTransaction? transaction = Proto.Context.SqlTransaction();   // null with SqlIsolation.None
 ```
 

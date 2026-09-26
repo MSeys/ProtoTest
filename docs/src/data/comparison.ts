@@ -164,7 +164,7 @@ public sealed class BillingTests
             .Body(new CreateOrderRequest("observability-seat", 12, 19.95m))
             .PostAsync("/api/orders");
 
-        created.Should.HaveHttpStatus(HttpStatusCode.Created).ShouldMatchShape(new
+        created.Should.HaveHttpStatus(HttpStatusCode.Created).Should.MatchShape(new
         {
             product = "observability-seat",
             quantity = 12,
@@ -175,7 +175,7 @@ public sealed class BillingTests
         using var invoices = await Proto.Context.Rest()
             .GetAsync("/api/billing/invoices", new { state = "open" });
 
-        invoices.Should.HaveHttpStatus(HttpStatusCode.OK).ShouldMatchShape(new
+        invoices.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new
         {
             state = "open",
             invoices = new[]

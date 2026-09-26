@@ -84,6 +84,9 @@ public sealed class ProtoTable
 
     internal ProtoExecutionContext? Context => _context;
 
+    /// <summary>The sheet this table was read from, for a failure that names its subject.</summary>
+    internal string SheetName => _sheet.Name;
+
     /// <summary>Whether any data row holds <paramref name="value"/> under the key column, recording the read.</summary>
     internal bool ContainsRow(string keyColumn, string value)
     {

@@ -1,11 +1,11 @@
+namespace Starter.Tests;
+
 using NUnit.Framework;
 using ProtoTest.AspNetCore;
 using ProtoTest.Core;
 using ProtoTest.NUnit;
 using ProtoTest.Reporting;
 using ProtoTest.Rest;
-
-namespace Starter.Tests;
 
 /// <summary>
 /// Composes the suite once for the whole run: the API hosted in-process, a REST client for it, coverage of

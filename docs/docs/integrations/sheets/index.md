@@ -118,7 +118,7 @@ var emea = table.RowWhere("Region", "EMEA");          // throws when no row matc
 string amount = emea["FY26", "Amount"].Text;          // row indexer by header path
 ```
 
-A column is found by its full header path; a single segment may match by suffix when it is unambiguous. Zero matches and more than one full or suffix match throw `SpreadsheetAssertionException` naming the candidate paths, so ambiguity fails instead of guessing. Header matching is ordinal (case-sensitive), and a single-segment path has no case folding. `ContainRow` compares rendered values, so a numeric or date key cell matches its printed form.
+A column is found by its full header path; a single segment may match by suffix when it is unambiguous. Zero matches and more than one full or suffix match throw `SpreadsheetAssertionException` naming the candidate paths, so ambiguity fails instead of guessing. Header matching is ordinal (case-sensitive), and a single-segment path has no case folding. `ContainRow` compares rendered values, so a numeric or date key cell matches its printed form. A row can also be matched against a shape keyed by leaf header names, for example `table.Rows[0].Should.MatchShape(new { Region = "EMEA", Amount = "1200" })`.
 
 ### Typed models
 
@@ -133,10 +133,10 @@ public sealed record SalesRow(
 
 var sales = Proto.Context.Sheets().Open(response).Model<SalesRow>();
 
-sales.Verify();                                                    // every rule, every row
+sales.Should.MatchModel();                                                    // every rule, every row
 sales.Column(row => row.Amount).Should.Be([1200m, 900m]);
 sales.Column(row => row.Amount).Should.BeSortedBy(ProtoSortDirection.Descending);
-sales.Column(row => row.Amount).ShouldAll(amount => amount > 0);
+sales.Column(row => row.Amount).Should.All(amount => amount > 0);
 sales.Row(row => row.Region == "EMEA")
     .ShouldMatchShape(new { Amount = 1200m, Count = 12 });
 ```
@@ -144,9 +144,9 @@ sales.Row(row => row.Region == "EMEA")
 `[Sheet(name)]` names the worksheet and its `HeaderRows` (default `[1]`). `[Column(path)]` binds a property to a header path and can carry `Optional`, `Min`, `Max`, `Pattern`, `OneOf` and `Unique`. `Model<TRow>()` requires `[Sheet]`, rejects a model with no `[Column]` properties, and rejects `Optional` on a non-nullable property; a missing header fails immediately with the names the sheet has.
 
 - `Rows` returns the projected records; `Row(predicate)` fails when nothing matches; `Column(row => row.Amount)` reads a typed column.
-- Typed columns support `string`, `decimal`, `double`, `int`, `long`, `bool`, `DateTime` and their nullables. `Should.Be` uses `EqualityComparer<TValue?>.Default`, `Should.BeSortedBy` uses `Comparer<TValue?>.Default`, and `ShouldAll(predicate)` is positive-only and reports the first failing row.
-- `Verify()` checks every declared column and reports **all** violations in one failure — emptiness and non-nullability, conversion, `Min`/`Max` (numbers and date serial values), `Pattern`, `OneOf`, and `Unique` with kind-aware keys. The message shows up to ten, then `+N more`.
-- A row is matched with the same [shapes](../../foundation/shape-matching.md) as a JSON response, through `row.ShouldMatchShape(shape)`. The assertion is a traced `assert.json.shape` operation on the ambient test context with the same expected/actual evidence as a response assertion, and its failure keeps the mismatch details as the inner exception.
+- Typed columns support `string`, `decimal`, `double`, `int`, `long`, `bool`, `DateTime` and their nullables. `Should.Be` uses `EqualityComparer<TValue?>.Default`, `Should.BeSortedBy` uses `Comparer<TValue?>.Default`, and `Should.All(predicate)` reports the first failing row (`ShouldNot.All` passes when at least one value does not match).
+- `Should.MatchModel()` checks every declared column and reports **all** violations in one failure — emptiness and non-nullability, conversion, `Min`/`Max` (numbers and date serial values), `Pattern`, `OneOf`, and `Unique` with kind-aware keys. The message shows up to ten, then `+N more`.
+- A row is matched with the same [shapes](../../foundation/shape-matching.md) as a JSON response: `table.Rows[0].Should.MatchShape(shape)` for a table row and `row.ShouldMatchShape(shape)` for a model row (a record is a user type, so C# cannot give it a `Should` extension property). A model row serializes with its record property names; a table row is keyed by each column's leaf header name with the cell's rendered value (a table whose leaves collide fails instead of guessing). The assertion is a traced `assert.json.shape` operation on the ambient test context with the same expected/actual evidence as a response assertion, and its failure names the row's `Sheet!Range` (or the record type) and keeps the mismatch details as the inner exception.
 - Records are populated without running their constructors; an optional empty cell binds as `null`.
 
 ### Hidden sheets
@@ -161,7 +161,7 @@ Hidden sheets are skipped unless `ProtoTest:Sheets:IncludeHiddenSheets` (or the 
 - Reading a cell or range records a `sheets.range` observation (`"{Sheet}!{reference}"`); `SheetsCoverageCollector` (category `Sheets`) aggregates those reads.
 - Opening a workbook records a `sheets.workbook` observation with a `sheets.count` metadata value. It is evidence, not coverage: opening a workbook is not an assertion and covers nothing, so only `sheets.range` marks a range covered.
 
-Reads are recorded by cell and range reads, `Table.Column`, `RowWhere`, `Rows`, the `ProtoTableRow` indexer, and model `Rows`, `Column` and `Verify`. Building a table view records nothing, and a malformed reference throws before any read is recorded. Coverage therefore means **"verified"**, not "present in the file":
+Reads are recorded by cell and range reads, `Table.Column`, `RowWhere`, `Rows`, the `ProtoTableRow` indexer, table-row shape assertions, and model `Rows`, `Column` and `Should.MatchModel()`. Building a table view records nothing, and a malformed reference throws before any read is recorded. Coverage therefore means **"verified"**, not "present in the file":
 
 ```csharp
 var coverage = Proto.Context.Services.GetServices<IProtoCollector>()
@@ -187,13 +187,13 @@ The capability is name `"Sheets"`, kind `document` (`ProtoCapabilityKinds.Docume
 - **One million cells per range.** Reading a bigger area, or a reversed rectangle, throws; merge propagation is skipped above 1,000,000 cells in a merge.
 - **Dates are a heuristic.** A numeric cell counts as a date when its style or number format says so; the rule is not a schema.
 - **Cached formula values only.** ProtoTest never recalculates; the formula text and the cached result are what the file holds.
-- **`ShouldAll` has no negated counterpart**, and typed columns read the whole declared range whether or not the test looks at every value.
+- **`ShouldNot.All` passes when at least one value does not match**, and typed columns read the whole declared range whether or not the test looks at every value.
 - **Coverage is read-based.** A column present in the file but never read is uncovered; hidden sheets are excluded by default. Opening a workbook records `sheets.workbook` evidence but covers nothing.
 - **Header paths are ordinal.** Matching is case-sensitive, and a suffix match is only allowed when exactly one column matches.
 
 ## Links
 
 - [Integrations overview](../overview.md) — where the document package sits.
-- [Shape matching](../../foundation/shape-matching.md) — the rules behind `ShouldMatchShape` on model rows.
+- [Shape matching](../../foundation/shape-matching.md) — the rules behind `Should.MatchShape` on table rows and the model-row extension.
 - [Coverage](../../observability/coverage.md) — how collectors and report items work.
 - The demo's report journey: [`samples/ProtoTest.Demo/SheetsJourney.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/SheetsJourney.cs).

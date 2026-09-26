@@ -289,18 +289,61 @@ The register turns the reference suite's friction and a cross-integration API re
 (P1 = 5, P2 = 7, P3 = 6), with the deliberate idioms listed so they are not "fixed". The P1s are part of
 the 1.1 experience bar; P2/P3 land by demand, each as its own stage with the worker-cycle review.
 
-- [ ] **DX-01 — one assertion surface.** Every assertable subject exposes `Should`/`ShouldNot` and
-  chainable members; `ShouldX` extensions remain only where C# forbids a facade (gRPC messages and
-  exceptions, generic model rows). Add facade members to Sheets/Web and the GraphQL error assertions;
-  deprecate the old names first.
-- [ ] **DX-02 — shape failures name their subject.** The protocol producer prefixes the identifier
-  (route/destination/operation) to the mismatch message; trace attributes unchanged.
-- [ ] **DX-03 — a code API for a messaging tap.** `UseRabbitMq().Tap("invoice.issued")` (or
-  `Destinations(...)`) so the reliability declaration lives in the test, with the config key staying as
-  the environment override.
-- [ ] **DX-05 — required reads.** `ReadRequired<T>()` (and `ReadRequired<T>(path)` composing with A1)
-  throws a protocol exception naming the identifier when the body is missing; the nullable reads stay.
+- [x] **DX-01 — one assertion surface.** Done in this stage; independently reviewed
+  (`assets/internal/review-dx1.md`; its should-fixes fixed before commit). GraphQL error assertions
+  moved onto `Should`/`ShouldNot` (old names obsolete shims, polarity-aware); gRPC gained
+  `ProtoGrpcAssertions.For(exception).Should.HaveStatus(...)` with the old extensions as obsolete
+  shims; Sheets gained `Should.MatchModel()`/`Should.All(...)`, chaining returns everywhere and
+  `ProtoTableRow.ShouldMatchShape` (case-insensitive leaf keys); gRPC/Sheets return types are
+  source-compatible but binary-breaking, recorded in the generated suppressions. Docs:
+  `docs/docs/foundation/assertions.md`; register row updated. Gate: `verify DX1 1.1.0-alpha.1: lint
+  PASS · docs PASS · test PASS · pack PASS`.
+- [x] **DX-02 — shape failures name their subject.** Done with the `Should.MatchShape` migration;
+  independently reviewed (`assets/internal/review-dx2.md`, no blockers; its should-fixes fixed before
+  commit: the OpenCSMS migration committed, `ProtoMessage.Should` is `[JsonIgnore]`d, the docs site
+  built). Every producer prefixes the subject the framework knows (REST route/identifier, GraphQL
+  operation, gRPC method, messaging destination, Sheets subject) while the trace attributes,
+  sections and observations stay identical and the mismatch data remains reachable. Shape is now
+  `response.Should.MatchShape(shape)` (REST/GraphQL), `message.Should.MatchShape(shape)`,
+  `ProtoGrpcAssertions.For(reply).Should.MatchShape(shape)`, `row.Should.MatchShape(shape)`; each
+  returns its subject and the old `ShouldMatchShape` extensions are obsolete shims. OpenCSMS migrated
+  and 6/6 in both modes. Gate: `verify DX2 1.1.0-alpha.1: lint PASS · docs PASS · test PASS · pack
+  PASS`.
+- [x] **DX-03 — a code API for a messaging tap.** Done with DX-05's batch; independently reviewed
+  (`assets/internal/review-dx3.md`; should-fixes fixed before commit). `AddMessaging(m =>
+  m.CaptureAttachments().UseRabbitMq().Tap("csms.events"))` declares the pre-bound destinations;
+  repeated calls compose and dedupe, configuration adds over the code values (a Limit: it cannot
+  withdraw a code-declared destination), and the initializer is the single normalization point. The
+  OpenCSMS suite migrated off the indexed config key and stayed 6/6 both modes.
+- [x] **DX-05 — required reads.** Done; `ReadRequired<T>()`/`ReadRequired<T>(path)` on REST and
+  GraphQL return `T` and throw the protocol assertion naming the subject and path for an empty body,
+  JSON null (value and reference types alike) or a missing path; the nullable reads stay. A1's
+  path-based read (`ReadAsJson<T>("$.id")`/`ReadDataAs<T>("$.id")`) landed with it through the shared
+  `JsonPathResolver` subset (`$`, dot members, `[n]`), tested for missing path, wrong type, JSON null
+  and decimal precision; REST records the failed read through `http.response.deserialize` with
+  `json.path`. Gate: `verify DX3 1.1.0-alpha.1: lint PASS · docs PASS · test PASS · pack PASS`.
 - [ ] **DX-04** is already a plan-5 decision (routing key); promote it when DX-03/DX-10 need it.
+
+- [x] **P2 batch (DX-06..DX-10) — done.** Independently reviewed (`assets/internal/review-dxp2.md`;
+  its blocker DXP2R-01 — an unbackticked `TryResolve<T>()` broke the docs build — and the UniqueName
+  "reuses the record" wording were fixed before commit; the docs build was re-run). Landed:
+  `context.UniqueName(name, sequence)`; `context.Sql()` primary with `SqlSession()` a documented alias
+  and `Messaging(name = null)`; `[RequiresWorker<T>]`, `[RequiresServer(name)]`,
+  `[RequiresApplication(name)]` with the additive `ProtoHost.HasCapability(kind, name, instance)` and
+  `HasApplication`; the three ambient errors now name the fix; `ProtoMessage.ReadAsJson/ReadRequired`
+  (path-composing). OpenCSMS migrated (UniqueName, worker gates, message reads) and stayed 6/6 both
+  modes. Gate: `verify DXP2 1.1.0-alpha.1: lint PASS · docs PASS · test PASS · pack PASS`.
+
+- [x] **P3 batch (DX-13/14/15/16/18) — done.** Independently reviewed (`assets/internal/review-dxp3.md`;
+  its blocker DXP3R-01 — a gRPC attachments const hiding the inherited `ConfigurationSectionName`
+  property — and the fallback/collection wording were fixed before commit). `RabbitMqOptions.Validate()`;
+  the `ProtoTest:<Integration>[:<Area>]` section rule with `ProtoTest:Grpc:Client` and the legacy
+  `ProtoTest:Grpc` fallback; `Assert.EnterMultipleScope` for samples and new tests; PascalCase template
+  test names; template usings inside the namespace; `AddCapabilityReason` with the demo migrated. The
+  docs site and the template smoke (`dotnet new` → build → 4/4) are green. Gate: `verify DXP3
+  1.1.0-alpha.1: lint PASS · docs PASS · test PASS · pack PASS`.
+  - **Phase 3b complete:** the DX register is fully dispositioned (DX-04 recorded; DX-11/12/17 landed
+    earlier). New DX items go to the register, not this plan.
 
 P2/P3: the register is the order; each becomes a stage when scheduled, and its "Deliberate idioms —
 do not change" section is binding.
@@ -334,7 +377,7 @@ Order is plan-4's demand order; each item is its own stage with the feature-plan
 | 1b — R1a review follow-ups | Complete | OpenCSMS `e3cf209` + `92a6d0d`; logs under `artifacts/gates/` | All seven should-fixes done: redelivery test, dead-channel reset, observable clock, at-most-once recorded, API-only migrations, evidence runner, suite polish; R1a-14 anecdotal |
 | 2 — Audit correctness A1–A4 | Complete | A1 · A2a · A2b · A3 · A4, all independently reviewed; pack green on A2b/A3/A4; OpenCSMS 6/6 both modes | Phase 3 (A5–A7 hygiene) next |
 | 3 — Hygiene A5–A7 | Complete | A5 (`review-a5`) · A6 · A7 (gate + `release.ps1 -DryRun`) | Audit 4 closed at `8382789`; Phase 3b (DX P1s) next |
-| 3b — DX and API consistency | Pending | `eng/dx-review.md`: 5 P1, 7 P2, 6 P3 | DX-01/02/03/05 accepted (DX-04 recorded); P2/P3 by demand; deliberate idioms binding |
+| 3b — DX and API consistency | Complete | DX-01 (review-dx1) · DX-02 (review-dx2) · DX-03/05+A1 (review-dx3) · P2 (review-dxp2) · P3 (review-dxp3); gates + pack green | Register fully dispositioned; Phase 4 (plan-4 resume) next |
 | 4 — Plan-4 resume | Pending | — | R2–R5, P5–P8, X1/X2 |
 
 ## How this plan keeps sessions from drifting

@@ -36,7 +36,7 @@ public sealed class GraphQLWebSocketSubscriptionTests
                 .SubscribeAsync();
 
             using var message = await subscription.ExpectNextAsync(new { id = 42, status = "pending" });
-            message.ShouldHaveNoErrors();
+            message.Should.HaveNoErrors();
             Assert.That(await subscription.NextAsync(), Is.Null);
 
             Assert.Multiple(() =>

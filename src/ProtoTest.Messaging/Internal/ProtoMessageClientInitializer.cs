@@ -28,7 +28,16 @@ internal sealed class ProtoMessageClientInitializer(string name) : IProtoClientI
         if (options.Destinations.Count > 0)
         {
             // Bind the test's taps before it acts: a message published after this point is never missed.
-            await consumer.PrepareAsync([.. options.Destinations], CancellationToken.None);
+            // Tap callbacks and the configuration section can both name a destination, so the set is
+            // filtered and deduped here, the one place every adapter reads it.
+            var destinations = options.Destinations
+                .Where(destination => !string.IsNullOrWhiteSpace(destination))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            if (destinations.Length > 0)
+            {
+                await consumer.PrepareAsync(destinations, CancellationToken.None);
+            }
         }
 
         context.RegisterClient(new ProtoMessageClient(context, broker, consumer, options), Name);

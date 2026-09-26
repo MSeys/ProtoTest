@@ -16,11 +16,11 @@ public sealed partial class SheetsTests
     {
         var (host, context) = Start("sheets model");
         var model = context.Sheets().Open(_path).Model<SalesRow>();
-        model.Verify();
+        model.Should.MatchModel();
 
         var emea = model.Row(row => row.Region == "EMEA");
         model.Column(row => row.Amount).Should.Be([1200m, 900m]);
-        model.Column(row => row.Amount).ShouldAll(value => value > 0);
+        model.Column(row => row.Amount).Should.All(value => value > 0);
         model.Column(row => row.Amount).Should.BeSortedBy(ProtoSortDirection.Descending);
         Assert.Multiple(() =>
         {
@@ -59,7 +59,9 @@ public sealed partial class SheetsTests
         await host.CompleteTestAsync(ProtoTestResult.Failed(mismatch!));
         Assert.Multiple(() =>
         {
-            Assert.That(mismatch!.Message, Does.Contain("Region"));
+            Assert.That(mismatch!.Message, Does.StartWith("SalesRow — Shape mismatch failed with 1 error(s):"),
+                "the model-row exception names the record type as its subject");
+            Assert.That(mismatch.Message, Does.Contain("Region"));
             Assert.That(mismatch.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
                 "the shared mismatch details stay inspectable");
             Assert.That(host.Trace.Snapshot().Tests.Single().Entries,
@@ -75,10 +77,178 @@ public sealed partial class SheetsTests
         var (host, context) = Start("sheets constraints");
         var model = context.Sheets().Open(_path).Model<StrictSalesRow>();
 
-        var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Verify());
+        var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Should.MatchModel());
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
         Assert.That(exception!.Message, Does.Contain("900"));
+    }
+
+    [Test]
+    public async Task Should_Assertions_ShouldChainBackToTheirSubject()
+    {
+        var (host, context) = Start("sheets chaining");
+        var workbook = context.Sheets().Open(_path);
+        var summary = workbook.Sheet("Summary");
+        var table = workbook.Sheet("Sales").Table(1, 2);
+        var model = workbook.Model<SalesRow>();
+
+        var cell = summary.Cell("A1");
+        var range = summary.Range("A4:B5");
+        var column = model.Column(row => row.Amount);
+
+        var returnedCell = cell.Should.Be("Total").Should.BeText();
+        var returnedRange = range.Should.HaveDimensions(2, 2)
+            .Should.Match([["Region", "Amount"], ["EMEA", "1200"]]);
+        var returnedTable = table.Should.ContainRow("Region", "EMEA").ShouldNot.ContainRow("Region", "NOPE");
+        var returnedColumn = column.Should.Be([1200m, 900m]).Should.All(value => value > 0);
+        var returnedModel = model.Should.MatchModel();
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(returnedCell, Is.SameAs(cell));
+            Assert.That(returnedRange, Is.SameAs(range));
+            Assert.That(returnedTable, Is.SameAs(table));
+            Assert.That(returnedColumn, Is.SameAs(column));
+            Assert.That(returnedModel, Is.SameAs(model));
+        }
+    }
+
+    [Test]
+    public async Task ShouldNot_All_ShouldPassWhenAValueDoesNotMatch()
+    {
+        var (host, context) = Start("sheets negated all");
+        var amount = context.Sheets().Open(_path).Model<SalesRow>().Column(row => row.Amount);
+
+        var returned = amount.ShouldNot.All(value => value > 1000);
+        var exception = Assert.Throws<SpreadsheetAssertionException>(
+            () => amount.ShouldNot.All(value => value >= 0));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(returned, Is.SameAs(amount));
+            Assert.That(exception!.Message, Does.Contain("not to hold only matching values"));
+        }
+    }
+
+    [Test]
+    public async Task Obsolete_VerifyAndShouldAll_ShouldStillDelegateToTheFacade()
+    {
+        var (host, context) = Start("sheets obsolete shims");
+        var workbook = context.Sheets().Open(_path);
+        var model = workbook.Model<SalesRow>();
+        var strict = workbook.Model<StrictSalesRow>();
+
+        // Intentional: pins the obsolete shims while they delegate to the facade; CS0618 is expected.
+#pragma warning disable CS0618
+        model.Verify();
+        model.Column(row => row.Amount).ShouldAll(value => value > 0);
+        var exception = Assert.Throws<SpreadsheetAssertionException>(() => strict.Verify());
+#pragma warning restore CS0618
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        Assert.That(exception!.Message, Does.Contain("900"),
+            "the obsolete Verify reports the same constraint violation as Should.MatchModel");
+    }
+
+    [Test]
+    public async Task TableRow_ShouldMatchShapeAgainstLeafHeaderNames()
+    {
+        var (host, context) = Start("sheets table row shape");
+        var table = context.Sheets().Open(_path).Sheet("Keys").Table(1);
+        var row = table.RowWhere("Id", "100");
+
+        var returned = row.Should.MatchShape(new { Id = "100", Name = "first" });
+        var mismatch = Assert.Throws<SpreadsheetAssertionException>(
+            () => row.Should.MatchShape(new { Name = "nope" }));
+        var coverage = Coverage(context).Select(item => item.Identifier).ToArray();
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(mismatch!));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(returned, Is.SameAs(row));
+            Assert.That(mismatch!.Message, Does.StartWith("Keys!A2:B2 — Shape mismatch failed with 1 error(s):"),
+                "the failure names the row it was made against");
+            Assert.That(mismatch.Message, Does.Contain("Name"));
+            Assert.That(mismatch.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
+                "the shared mismatch details stay inspectable");
+            Assert.That(coverage, Is.EquivalentTo(new[] { "Keys!A2:B3", "Keys!A2:B2" }),
+                "the RowWhere data range and the shape's own row read both count as coverage");
+            Assert.That(host.Trace.Snapshot().Tests.Single().Entries,
+                Has.Some.Matches<ProtoTraceEntry>(entry =>
+                    entry.Kind == "assert.json.shape" && entry.Outcome == ProtoTraceOutcome.Failed),
+                "a table row shape mismatch leaves the same traced evidence as a model row");
+        }
+    }
+
+    [Test]
+    public async Task TableRow_ShouldMatchShape_ShouldMapAnEmptyCellToNull()
+    {
+        var (host, context) = Start("sheets table row empty shape");
+        var table = context.Sheets().Open(_path).Sheet("Ledger").Table(1);
+        var row = table.Rows[2];
+
+        var returned = row.Should.MatchShape(new { Amount = (string?)null, Note = "missing amount" });
+        var amount = row["Amount"];
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(returned, Is.SameAs(row));
+            Assert.That(amount.IsEmpty, Is.True, "the shape was compared against the empty cell");
+        }
+    }
+
+    [Test]
+    public async Task TableRow_ShouldMatchShape_ShouldFailOnDuplicateLeafHeaders()
+    {
+        var (host, context) = Start("sheets ambiguous row shape");
+        var table = context.Sheets().Open(_path).Sheet("Groups").Table(1, 2);
+        var row = table.Rows[0];
+
+        var exception = Assert.Throws<SpreadsheetAssertionException>(
+            () => row.Should.MatchShape(new { Amount = "1200" }));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        Assert.That(exception!.Message, Does.Contain("more than one column"));
+    }
+
+    [Test]
+    public async Task TableRow_ShouldMatchShape_ShouldFailOnCaseVariantLeafHeaders()
+    {
+        var (host, context) = Start("sheets case-ambiguous row shape");
+        var table = context.Sheets().Open(_path).Sheet("CaseGroups").Table(1, 2);
+        var row = table.Rows[0];
+
+        var exception = Assert.Throws<SpreadsheetAssertionException>(
+            () => row.Should.MatchShape(new { Amount = "1200" }));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        Assert.That(exception!.Message, Does.Contain("more than one column"),
+            "the shape lookup is case-insensitive, so case variants collide too");
+    }
+
+    [Test]
+    public async Task Obsolete_TableRowShouldMatchShape_ShouldStillDelegateToTheFacade()
+    {
+        var (host, context) = Start("sheets obsolete row shape");
+        var table = context.Sheets().Open(_path).Sheet("Keys").Table(1);
+        var row = table.RowWhere("Id", "100");
+
+        // Intentional: pins the obsolete shim while it delegates to the facade; CS0618 is expected.
+#pragma warning disable CS0618
+        var returned = row.ShouldMatchShape(new { Id = "100", Name = "first" });
+        var mismatch = Assert.Throws<SpreadsheetAssertionException>(
+            () => row.ShouldMatchShape(new { Name = "nope" }));
+#pragma warning restore CS0618
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(mismatch!));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(returned, Is.SameAs(row));
+            Assert.That(mismatch!.Message, Does.StartWith("Keys!A2:B2 — Shape mismatch"));
+        }
     }
 
     [Test]
@@ -117,7 +287,7 @@ public sealed partial class SheetsTests
         var (host, context) = Start("sheets unique kinds");
         var model = context.Sheets().Open(_path).Model<MixedCodeRow>();
 
-        model.Verify();
+        model.Should.MatchModel();
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
     }
@@ -128,7 +298,7 @@ public sealed partial class SheetsTests
         var (host, context) = Start("sheets unique text duplicates");
         var model = context.Sheets().Open(_path).Model<DuplicateCodeRow>();
 
-        var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Verify());
+        var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Should.MatchModel());
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
         Assert.That(exception!.Message, Does.Contain("repeats '1200'"));
@@ -156,8 +326,8 @@ public sealed partial class SheetsTests
         var (host, context) = Start("sheets date constraints");
         var workbook = context.Sheets().Open(_path);
 
-        var minException = Assert.Throws<SpreadsheetAssertionException>(() => workbook.Model<MinDateRow>().Verify());
-        var maxException = Assert.Throws<SpreadsheetAssertionException>(() => workbook.Model<MaxDateRow>().Verify());
+        var minException = Assert.Throws<SpreadsheetAssertionException>(() => workbook.Model<MinDateRow>().Should.MatchModel());
+        var maxException = Assert.Throws<SpreadsheetAssertionException>(() => workbook.Model<MaxDateRow>().Should.MatchModel());
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(minException!));
         Assert.Multiple(() =>
@@ -175,7 +345,7 @@ public sealed partial class SheetsTests
         var (host, context) = Start("sheets numeric constraints");
         var model = context.Sheets().Open(_path).Model<NumericConstraintRow>();
 
-        var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Verify());
+        var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Should.MatchModel());
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
         Assert.Multiple(() =>

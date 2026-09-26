@@ -73,8 +73,15 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
         return new ProtoModelColumn<TValue>(Sheet.Name, binding.Name, values, _table.DataStartRow, _context);
     }
 
+    /// <summary>The assertions of this model, for example <c>Should.MatchModel()</c>.</summary>
+    public ProtoSheetModelAssertions<TRow> Should => new(this);
+
     /// <summary>Checks every declared column against the record's shape; all violations are reported.</summary>
-    public void Verify()
+    /// <remarks>Obsolete: use <c>Should.MatchModel()</c>.</remarks>
+    [Obsolete("Use Should.MatchModel() instead.")]
+    public void Verify() => AssertModel();
+
+    internal ProtoSheetModel<TRow> AssertModel()
     {
         _table.RecordRead(_table.DataRange);
         var failures = new List<string>();
@@ -152,7 +159,7 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
         if (failures.Count == 0)
         {
             operation?.Succeed();
-            return;
+            return this;
         }
 
         var shown = failures.Take(10).ToArray();

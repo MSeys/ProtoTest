@@ -153,7 +153,7 @@ public class RestRequestBuilderTests
         // Assert - Response Verification & Shape Hit Recording
         response
             .Should.HaveHttpStatus(HttpStatusCode.Created)
-            .ShouldMatchShape(new { id = JsonValue.GreaterThan(0), created = true });
+            .Should.MatchShape(new { id = JsonValue.GreaterThan(0), created = true });
 
         var shapeHit = _context.RecordedObservations.FirstOrDefault(h => h.Data is RestShapeMatchData);
         Assert.That(shapeHit, Is.Not.Null);

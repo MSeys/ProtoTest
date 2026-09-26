@@ -99,6 +99,42 @@ public sealed class RabbitMqTests
     }
 
     [Test]
+    public async Task Tap_ShouldPreBindTheDestinationSoAnEarlierPublishIsReceived()
+    {
+        var connectionString = RequireBroker();
+
+        var exchange = $"prototest.tests.{Guid.NewGuid():N}";
+        await DeclareExchangeAsync(connectionString, exchange, ExchangeType.Fanout);
+
+        try
+        {
+            // The tap is declared in code, so the consumer prepares it during test setup: the message
+            // published before the test's first await is still delivered to this test's queue.
+            var builder = new ProtoHostBuilder();
+            builder.AddMessaging(messaging => messaging
+                .UseRabbitMq(options => options.ConnectionString = connectionString)
+                .Tap(exchange));
+            await using var host = builder.Build();
+            await host.StartAsync();
+            var context = await host.StartTestAsync("rabbit tap prebind", TestMethods.Placeholder);
+            var messages = context.Messaging();
+
+            await messages.PublishAsync(exchange, "{\"id\":1}", contentType: "application/json");
+            var received = await messages.AwaitAsync(
+                exchange,
+                message => message.Payload == "{\"id\":1}",
+                TimeSpan.FromSeconds(15));
+
+            await host.CompleteTestAsync(ProtoTestResult.Passed);
+            Assert.That(received.ContentType, Is.EqualTo("application/json"));
+        }
+        finally
+        {
+            await DeleteExchangeAsync(connectionString, exchange);
+        }
+    }
+
+    [Test]
     public async Task PublishAndAwait_ShouldRoundTripOnADirectExchange()
     {
         var connectionString = RequireBroker();

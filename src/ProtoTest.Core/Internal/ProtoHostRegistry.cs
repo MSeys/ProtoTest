@@ -35,7 +35,10 @@ internal static class ProtoHostRegistry
             return ActiveHosts.Count switch
             {
                 1 => ActiveHosts.Single(),
-                0 => throw new InvalidOperationException("No active ProtoHost is available."),
+                0 => throw new InvalidOperationException(
+                    "No active ProtoHost is available. The runner setup creates it: derive the suite's " +
+                    "[SetUpFixture] from ProtoTestAssembly (or register the runner's equivalent), or build " +
+                    "one with new ProtoHostBuilder().Build()."),
                 _ => throw new InvalidOperationException(
                     "Multiple ProtoHost instances are active. Proto.Host is only available inside a test context.")
             };

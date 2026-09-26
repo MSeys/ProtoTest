@@ -93,6 +93,7 @@ Register the probe **after** the infrastructure that publishes the address; a pr
 - The journeys and their `[ProtoTest]` tests, attributes, authenticators and provisioners.
 - The runner attribute and assembly setup: one host per process, same lifecycle.
 - The trace and the HTML/JSON reports — every run produces the same artifacts wherever it ran.
+- Records that outlive the process keep their identity: `Proto.Context.UniqueName("tenant")` derives a deterministic name from the test id, so a rerun against the same configured database or broker never collides; fix `RunPrefix` (`ConfigureTestIds`) when a rerun should reuse the same records.
 - [Skip conditions](../foundation/skip-conditions.md): a test that needs something the host doesn't have skips, so an environment-specific journey is an environment-specific *skip*, not a failure.
 
 ## Only an in-process application can do this

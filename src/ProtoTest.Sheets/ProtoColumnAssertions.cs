@@ -19,8 +19,10 @@ public sealed class ProtoColumnAssertions
         _negated = negated;
     }
 
-    /// <summary>Compares the column's values against the expected sequence, top to bottom.</summary>
-    public void Be(IReadOnlyList<string?> expected)
+    /// <summary>
+    /// Compares the column's values against the expected sequence, top to bottom, and returns the column.
+    /// </summary>
+    public ProtoColumn Be(IReadOnlyList<string?> expected)
     {
         ArgumentNullException.ThrowIfNull(expected);
         var header = string.Join(" / ", _column.Header);
@@ -37,6 +39,7 @@ public sealed class ProtoColumnAssertions
             () => (mismatch = SheetColumnAssertion.FindMismatch(
                 _column.Values, expected, StringComparer.Ordinal, static value => value)) is null,
             () => new SheetAssertionFailure(DescribeFailure(header, expected, mismatch)));
+        return _column;
     }
 
     private string DescribeFailure(string header, IReadOnlyList<string?> expected, SheetColumnMismatch? mismatch)

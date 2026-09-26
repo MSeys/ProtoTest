@@ -92,7 +92,7 @@ Both kinds of provider, and every member default, receive a `ProtoDataValueConte
 | `NextString()` | a deterministic string like `Invoice.Reference-0001-00` |
 | `Ref<T>(identity)` | a value provisioned earlier in this test, from the [identity map](./provisioners.md#refs-and-the-identity-map) |
 
-`NextGuid()` is the first 16 bytes of a SHA-256 over `"{TestId}|{ObjectSequence}|{TargetType.FullName}|{MemberName}|{counter}"`, and `NextString()` is `"{TargetType.Name}.{MemberName}-{ObjectSequence:D4}-{counter:D2}"`. Each member resolution gets a fresh context, so the counter starts at 0 per member: the same test produces the same values on every run, while different tests never collide.
+`NextGuid()` is the first 16 bytes of a SHA-256 over `"{TestId}|{ObjectSequence}|{TargetType.FullName}|{MemberName}|{counter}"`, and `NextString()` is `"{TargetType.Name}.{MemberName}-{ObjectSequence:D4}-{counter:D2}"`. Each member resolution gets a fresh context, so the counter starts at 0 per member: the same test produces the same values on every run, while different tests never collide. For a name outside a member default — a tenant, an operator — use `Proto.Context.UniqueName("tenant")`, which derives `tenant-{TestId}` from the same test id.
 
 ## Domain factories
 

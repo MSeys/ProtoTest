@@ -110,11 +110,13 @@ audit plan.
 
 ## Messaging
 
-- **A tap misses messages published before its destination is prepared.** `UseRabbitMq` declares the
-  destinations listed in `ProtoTest:Messaging:Destinations:<n>` during test setup; any other destination
-  is declared at the first `AwaitAsync`, so an act-then-await flow loses a message the act published.
-  Pre-bind every destination the act publishes to. (Canonical:
-  `tests/ProtoTest.Messaging.RabbitMq.Tests/RabbitMqTests.cs`; used by OpenCSMS `Setup.cs`.)
+- **A tap misses messages published before its destination is prepared.** The adapter declares the
+  destinations registered during test setup: `ProtoMessagingBuilder.Tap(...)` in code, plus the
+  `ProtoTest:Messaging:Destinations:<n>` configuration entries (configuration binds after code and the
+  prepared set is deduped). Any other destination is declared at the first `AwaitAsync`, so an
+  act-then-await flow loses a message the act published. Pre-bind every destination the act publishes
+  to. (Canonical: `tests/ProtoTest.Messaging.RabbitMq.Tests/RabbitMqTests.cs`, the
+  `Tap_ShouldPreBind...` round trip and `tests/ProtoTest.Messaging.Tests/MessagingTapTests.cs`.)
 - **`UseRabbitMq` declares the `Broker` capability conditionally on
   `ProtoTest:Messaging:RabbitMq:ConnectionString`.** A run with a configured key or a broker container
   that declares it keeps the capability; with neither it is absent and gated tests skip instead of
@@ -131,6 +133,13 @@ audit plan.
   protocol descriptor carries no coverage category (A5 VOC-1 decision): `messaging.publish`,
   `messaging.receive` and `messaging.contract.shape` reach a report only through a collector a suite
   registers, and destinations are never aggregated by ProtoTest itself.
+- **Message reads are typed but JSON-only.** `message.ReadAsJson<T>()` reuses
+  `ProtoJsonDefaults.Reader` and stays nullable; `ReadRequired<T>()`/`ReadRequired<T>(path)` throw
+  `MessagingAssertionException` naming the destination for an empty payload, JSON `null` or a missing
+  path, and a wrong type still throws the deserializer's `JsonException`. `Payload` stays for raw
+  inspection, and the UTF-8-string limit is unchanged. Unlike REST/GraphQL required reads, a messaging
+  read records no deserialize trace event (no new messaging vocabulary; the await already traces the
+  payload section).
 
 ## Clock and time
 
@@ -184,9 +193,10 @@ audit plan.
   `TestNetworking.FreePort`, `SingleConnectionListener`). `eng/lint.ps1` fails a local `FreePort`,
   `ServeOnceAsync`, `TemporaryTrace` or `SingleConnectionListener` definition outside that project, so
   the copies cannot drift back (audit TST-2).
-- **Parallel safety rests on per-test ownership, not on the runner policy.** Provisioning names from
-  `context.TestId` (the `[CsmsOperator]` pattern) and predicates on test-owned ids are what make
-  `ParallelScope.All` safe; the default id generator's random six-digit run prefix also keeps reruns
+- **Parallel safety rests on per-test ownership, not on the runner policy.** Provisioning names come
+  from `context.UniqueName(kind, sequence)` (the `[CsmsOperator]` pattern; `kind-{TestId}[-sequence]`,
+  deterministic and persistent-store-safe) and predicates use test-owned ids; that is what makes
+  `ParallelScope.All` safe. The default id generator's random six-digit run prefix also keeps reruns
   against a persistent database collision-free. A shared fixture or a fixed identifier reintroduces the
   repeatability bug (REF-1).
 

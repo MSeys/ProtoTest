@@ -90,9 +90,82 @@ All ProtoTest packages share one version; breaking API changes are called out be
 - `WebPageInventory.VisitedObservationKind` and `WebPageInventory.VerifiedObservationKind` name the
   `web.page.visited`/`web.page.verified` observation kinds beside the existing
   `AvailableObservationKind`, so producers and collectors reference one constant each.
+- One assertion surface across the integrations. GraphQL responses expose `Should.HaveNoErrors()`,
+  `Should.HaveErrors()` and `Should.HaveError(code)`; a failed gRPC call exposes
+  `ProtoGrpcAssertions.For(exception).Should.HaveStatus(...)` (or `.ShouldNot`); a Sheets model exposes
+  `Should.MatchModel()` and a typed column `Should.All(predicate)`, and every Sheets assertion member
+  now returns its subject so assertions chain. `ShouldMatchShape` returns its subject on gRPC replies
+  and model rows, and an untyped table row gained a shape assertion by leaf header names and rendered
+  cell values (spelled `row.Should.MatchShape(shape)` since DX-02). The foundation docs gained an
+  [Assertions](https://prototest.dev/docs/foundation/assertions) page.
+- Shape matching is a facade member: `response.Should.MatchShape(shape)` on REST and GraphQL
+  responses, `message.Should.MatchShape(shape)` on a consumed message (the `Should` property is
+  `[JsonIgnore]`d, so the message's JSON is unchanged),
+  `ProtoGrpcAssertions.For(reply).Should.MatchShape(shape)` on a gRPC reply, and
+  `row.Should.MatchShape(shape)` on a Sheets table row. Each returns its subject, so
+  `response.Should.HaveHttpStatus(Ok).Should.MatchShape(shape)` reads as one chain. Shape stays
+  positive-only: there is no `ShouldNot.MatchShape`. A model row is a user type, so it keeps the
+  `row.ShouldMatchShape(shape)` extension (C# has no extension properties).
+- Messaging taps gain a code API: `AddMessaging(messaging => messaging.Tap("invoice.issued").UseRabbitMq())`
+  declares the destinations an adapter pre-binds during test setup, so a message published before the
+  test's first await is still received. Repeated calls compose and dedupe, and
+  `ProtoTest:Messaging:Destinations` configuration still binds over the code values.
+- REST and GraphQL read a single value by JSON path: `RestResponse.ReadAsJson<T>("$.id")` and
+  `GraphQLResponse.ReadDataAs<T>("$.order.total")`, over the documented subset (`$`, dot members,
+  `[n]` indices; a leading member without `$` is accepted). A path that does not resolve throws the
+  protocol's assertion exception naming the subject and the path and records the protocol's failed
+  deserialize evidence (`http.response.deserialize` event / `graphql.response.deserialize` operation)
+  with the path; `ProtoTest.Json.JsonPathResolver` is the shared resolver.
+- Required reads return `T`: `RestResponse.ReadRequired<T>()` / `ReadRequired<T>(jsonPath)` and
+  `GraphQLResponse.ReadRequired<T>()` / `ReadRequired<T>(jsonPath)` throw the protocol's assertion
+  exception naming the subject (and the path) when the body is empty, JSON `null`, or the path is
+  missing. JSON `null` is checked before deserializing, so a value type reports the protocol exception
+  too; REST records a required-read failure, and GraphQL a required path failure, through the same
+  deserialize evidence. The nullable reads are unchanged.
+- `Proto.Context.UniqueName("tenant")` is the first-class name for records that outlive the process:
+  it derives a deterministic, persistent-store-safe name from the test id (`tenant-{TestId}`, or
+  `tenant-{TestId}-{sequence}` with the optional sequence for a second object of the same kind), so
+  parallel tests never collide and a rerun against a database that outlives the process never
+  collides; the record is reused only when the suite fixes `RunPrefix` (`ConfigureTestIds`), because
+  the default run prefix is random per run. `ProtoTest.Data`'s generated member defaults are
+  deterministic per test in the same spirit.
+- Accessor symmetry: `Proto.Context.Sql()` is the primary SQL accessor (`SqlSession()` stays a
+  documented alias; `SqlConnection()`/`SqlTransaction()` delegate to it), and
+  `Proto.Context.Messaging(name = null)` accepts an optional client name - the run's broker client is
+  `Default` - failing with a message naming `AddMessaging` for an unknown name. The added parameter is
+  source-compatible but binary-breaking for compiled consumers; the per-TFM
+  `ProtoTest.Messaging/CompatibilitySuppressions.xml` records it.
+- Typed skip conditions for the host composition: `[RequiresWorker<TProgram>]` checks the `worker`
+  capability by the program assembly name with a default reason naming `AddWorkerHost<TProgram>()`;
+  `[RequiresServer(name)]` checks the named `AddAspNetCoreServer` instance through the new
+  `ProtoHost.HasCapability(kind, name, instance)` overload; `[RequiresApplication(name)]` checks that
+  the suite declared the application with `AddApplication` through the new `ProtoHost.HasApplication`.
+  `RequiresCapabilityAttribute.CapabilityInstance` exposes the instance filter to open kinds.
+- `ProtoMessage` reads are typed: `message.ReadAsJson<T>(options)` reuses `ProtoJsonDefaults.Reader`
+  (case-insensitive property names) and `message.ReadRequired<T>()` / `ReadRequired<T>(jsonPath)`
+  return `T`, throwing `MessagingAssertionException` naming the destination when the payload is empty,
+  JSON `null`, or the path is missing (the shared `JsonPathResolver` subset). `Payload` stays for raw
+  inspection.
+- Suite-level skip reasons: `builder.AddCapabilityReason(kind, reason, name?)` states a capability
+  gate's reason once, so a suite with many gated tests does not repeat one sentence. A gate's own
+  `Reason` still wins, then the suite reason for its name, then the suite reason for its kind, then the
+  attribute's default; `ProtoHost.FindCapabilityReason(kind, name?)` exposes the lookup to custom
+  conditions. `[RequiresWorker<T>]`, `[RequiresServer(name)]`, `[RequiresDevice<T>]` and
+  `[RequiresInProcess]` inherit the behavior through `[RequiresCapability]`.
+- `IProtoConfigurableOptions.FallbackConfigurationSectionName` lets a renamed options section keep its
+  old key working: the fallback binds first and the current section binds over it, so a scalar in the
+  current section wins; list-valued options accumulate the fallback and current entries (the legacy
+  list is appended, not replaced). `GrpcClientOptions` uses it for the legacy gRPC section.
 
 ### Fixed
 
+- The RabbitMQ broker connection string is validated where the options resolve: a missing, non-absolute
+  or non-`amqp`/`amqps` value fails naming `ProtoTest:Messaging:RabbitMq:ConnectionString` instead of
+  failing later at connect time, including a value a started broker container publishes.
+- The ambient-context failures name the fix: `Proto.Context` outside a test points at
+  `ProtoHost.FindTraceWriter(Activity?)` for off-flow telemetry and `ProtoHost.CurrentHost` for run
+  scope, a missing `Resolve<T>()` names `SetContext` (and the keyed form), and no active host names the
+  runner setup (`ProtoTestAssembly`).
 - `UseRabbitMq` declares the `Broker` capability conditionally on
   `ProtoTest:Messaging:RabbitMq:ConnectionString`: a run with a configured key or a broker container
   that declares it keeps the capability, while a run with neither drops it and
@@ -191,6 +264,37 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ### Changed
 
+- gRPC client options bind from `ProtoTest:Grpc:Client` (the section rule `ProtoTest:<Integration>
+  [:<Area>]`); the legacy `ProtoTest:Grpc` section still binds as a deprecated fallback, so an existing
+  suite keeps working, and a value under `ProtoTest:Grpc:Client` wins (list-valued options accumulate
+  both sections). `GrpcAttachmentOptions` keeps the inherited `ConfigurationSectionName` instance
+  property and names its constant `SectionName` — a `ConfigurationSectionName` constant would hide the
+  inherited property and break `new GrpcAttachmentOptions().ConfigurationSectionName`. The old
+  `ConfigurationSection` constant stays as an `[Obsolete]` alias.
+- The pre-facade assertion spellings remain as `[Obsolete]` shims that delegate to the facade, so
+  existing tests keep compiling: GraphQL's `ShouldHaveNoErrors()`/`ShouldHaveErrors()`/
+  `ShouldHaveError(code)`, gRPC's `ShouldHaveStatus`/`ShouldNotHaveStatus` extension methods, and
+  Sheets' `Verify()` and `ShouldAll(predicate)`. New tests use `Should.*`; the sheets docs and READMEs
+  now teach `Should.MatchModel()` and `Should.All(predicate)`. The `void` → subject return changes
+  behind the chaining are source-compatible but binary-breaking for compiled consumers; the affected
+  packages' `CompatibilitySuppressions.xml` record them.
+- Shape failures now name their subject and use the protocol's assertion exception. A REST mismatch
+  throws `RestAssertionException` starting with the request identifier (`GET /orders/42 — Shape
+  mismatch failed with 1 error(s): …`), GraphQL throws `GraphQLAssertionException` starting with the
+  operation, gRPC throws `GrpcAssertionException` starting with the message type, messaging throws
+  `MessagingAssertionException` starting with the destination, and a Sheets row throws
+  `SpreadsheetAssertionException` starting with the row's `Sheet!Range` (a model row names the record
+  type). The shared `JsonShapeMismatchException` — with the full mismatch list — stays reachable as
+  the failure's `InnerException`, and the trace attributes, sections and observations are unchanged.
+  This is a behavioral change: code that caught `JsonShapeMismatchException` from a protocol assertion
+  now catches the protocol exception (or `ProtoAssertionException`).
+- The shape spellings are obsolete shims: `RestResponse.ShouldMatchShape`,
+  `GraphQLResponse.ShouldMatchShape`, `ProtoMessagingAssertions.ShouldMatchShape`,
+  `ProtoGrpcAssertions.ShouldMatchShape` and `SheetModelAssertions.ShouldMatchShape(ProtoTableRow, …)`
+  delegate to `Should.MatchShape`; new tests use the facade. `RestResponse.Should` and
+  `GraphQLResponse.Should` now return the positive facade type (`RestShouldAssertions`,
+  `GraphQLShouldAssertions`), which is source-compatible but binary-breaking for compiled consumers;
+  the affected packages' `CompatibilitySuppressions.xml` record it.
 - `IProtoInProcessDeviceTransport.CanConnect` takes the requested application
   (`CanConnect(context, applicationName)`) instead of a `DeviceEndpoint` it ignored, so a transport
   answers for the identity it serves. The device transport interface is unreleased 1.1 plumbing; a

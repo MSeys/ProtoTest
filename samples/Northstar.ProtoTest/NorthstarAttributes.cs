@@ -25,7 +25,7 @@ public sealed class NorthstarTenantAttribute : ProtoAttribute
     {
         var tenant = await context.Data()
             .For<ProvisionTenantRequest>()
-            .With(request => request.Name, $"northstar-{context.TestId}")
+            .With(request => request.Name, context.UniqueName("northstar"))
             .With(request => request.PlanId, PlanId)
             .CreateAsync<TenantResponse>();
         context.SetContext(new NorthstarOrganizationContext(

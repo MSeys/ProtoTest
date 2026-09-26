@@ -279,6 +279,30 @@ public sealed class MessagingTests
         Assert.That(adapter.Disposed, Is.True, "The broker is owned by the run and released with it.");
     }
 
+    [Test]
+    public async Task MessagingAccessor_ShouldResolveTheDefaultClientAndNameAnUnknownOne()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("messaging accessor", TestMethods.Placeholder);
+
+        var byDefault = context.Messaging();
+        var byName = context.Messaging("Default");
+        var exception = Assert.Throws<InvalidOperationException>(() => context.Messaging("nope"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(byName, Is.SameAs(byDefault));
+            Assert.That(exception!.Message, Does.Contain("nope"));
+            Assert.That(exception.Message, Does.Contain("AddMessaging"));
+        }
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
+
     private sealed class FakeBroker : IProtoMessageBroker, IDisposable
     {
         public string Name => "Fake";

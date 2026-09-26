@@ -84,7 +84,7 @@ None. The collector is attached to a REST target and needs no execution-context 
 ```csharp
 var response = await Proto.Context.Rest("Api").GetAsync("/api/orders/42");
 response.Should.HaveHttpStatus(HttpStatusCode.OK);
-response.ShouldMatchShape(new
+response.Should.MatchShape(new
 {
     id = 42,
     lines = new[] { new { total = 10m } }
@@ -109,7 +109,7 @@ The exact status code is looked up first, then a case-insensitive wildcard like 
 
 ### How a property matches
 
-- Only shape assertions count. A property is covered when a `ShouldMatchShape` assertion actually matched it; receiving a field in a response body is not coverage.
+- Only shape assertions count. A property is covered when a `Should.MatchShape` assertion actually matched it; receiving a field in a response body is not coverage.
 - Array indices are normalized before comparison: `[\d+]` becomes `[]`, and matching is case-insensitive, so `$.lines[0].total` and `$.lines[3].total` both count toward `$.lines[].total`.
 - Schema extraction walks the whole document: every media type with a schema adds a `$` baseline row for the body itself; `allOf`, `oneOf` and `anyOf` are traversed at the same path; each property adds `{path}.{name}`; each array item adds `{path}[]`; `$ref`s resolve through the document's components. Recursion and diamond revisits are cut.
 

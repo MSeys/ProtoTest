@@ -46,6 +46,10 @@ public static class ProtoMessagingBuilderExtensions
                 options.ConnectionString = provided;
             }
 
+            // Re-validate the final value: the settings a started broker container publishes are applied
+            // after ProtoOptionsRegistration already validated, and a malformed one must fail here naming
+            // the key rather than at connect time.
+            options.Validate();
             return options;
         });
         return messaging.UseBroker(

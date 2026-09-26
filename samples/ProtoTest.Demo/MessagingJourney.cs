@@ -23,9 +23,7 @@ using ProtoTest.Web;
 [NorthstarTenant(PlanIds.Growth)]
 [Auth<NorthstarAuthenticator>]
 [WebSession("Default", DiscoverRoutes = true)]
-[RequiresCapability(
-    ProtoCapabilityKinds.Broker,
-    Reason = "No broker is configured; set ProtoTest:Messaging:RabbitMq:ConnectionString.")]
+[RequiresCapability(ProtoCapabilityKinds.Broker)]
 public sealed class MessagingJourney
 {
     [ProtoTest]
@@ -50,11 +48,11 @@ public sealed class MessagingJourney
                     StringComparison.Ordinal),
             TimeSpan.FromSeconds(15));
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(message.ContentType, Is.EqualTo("application/json"));
             Assert.That(message.Payload, Does.Contain($"\"status\":\"{InvoiceStatuses.Paid}\""));
-        });
+        }
     }
 }
 
@@ -66,9 +64,7 @@ public sealed class MessagingJourney
 [NorthstarTenant(PlanIds.Growth)]
 [Auth<NorthstarAuthenticator>]
 [WebSession("Default", DiscoverRoutes = true)]
-[RequiresCapability(
-    ProtoCapabilityKinds.Broker,
-    Reason = "No broker is configured; set ProtoTest:Messaging:RabbitMq:ConnectionString.")]
+[RequiresCapability(ProtoCapabilityKinds.Broker)]
 [RequiresCapability(
     ProtoCapabilityKinds.Server,
     CapabilityName = "Northstar standalone",
@@ -101,10 +97,10 @@ public sealed class ConsoleMessagingJourney
                     StringComparison.Ordinal),
             TimeSpan.FromSeconds(15));
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(message.ContentType, Is.EqualTo("application/json"));
             Assert.That(message.Payload, Does.Contain($"\"status\":\"{InvoiceStatuses.Paid}\""));
-        });
+        }
     }
 }

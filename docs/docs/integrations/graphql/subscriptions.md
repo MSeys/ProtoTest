@@ -35,11 +35,11 @@ public async Task SubscriptionStreamsShapeMatchedEvents()
         })
         .Select(new { id = Gql.Field })
         .ExecuteAsync();
-    created.ShouldHaveNoErrors();
+    created.Should.HaveNoErrors();
 
     using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
     using var notification = await subscription.ExpectNextAsync(expected, timeout.Token);
-    notification.ShouldHaveNoErrors();
+    notification.Should.HaveNoErrors();
 }
 ```
 
@@ -71,7 +71,7 @@ await foreach (var message in subscription.WithCancellation(timeout.Token))
 {
     using (message)
     {
-        message.ShouldHaveNoErrors();
+        message.Should.HaveNoErrors();
         if (++received == 3) break;
     }
 }

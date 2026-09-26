@@ -189,7 +189,7 @@ public sealed partial class SheetsTests
         var (host, context) = Start("sheets model coverage");
         var model = context.Sheets().Open(_path).Model<SalesRow>();
 
-        model.Verify();
+        model.Should.MatchModel();
         Assert.That(Coverage(context).Select(item => item.Identifier),
             Is.EqualTo(new[] { "Sales!A3:C4" }), "Verifying reads the whole data range.");
 
@@ -239,7 +239,7 @@ public sealed partial class SheetsTests
         var (host, context) = Start("sheets unique numbers");
         var model = context.Sheets().Open(_path).Model<LedgerRow>();
 
-        var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Verify());
+        var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Should.MatchModel());
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
         Assert.That(exception!.Message, Does.Contain("repeats '1200'"));

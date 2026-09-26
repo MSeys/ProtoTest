@@ -33,7 +33,11 @@ internal sealed class ProtoTestLifecycle
     }
 
     public static ProtoExecutionContext CurrentContext => Current.Value?.Context
-        ?? throw new InvalidOperationException("No active ProtoExecutionContext available on this thread.");
+        ?? throw new InvalidOperationException(
+            "No active ProtoExecutionContext is available on this flow. Proto.Context only works inside a " +
+            "test body, in the test-author code it calls, and in the attributes and hooks that run around " +
+            "it. Off-flow telemetry uses ProtoHost.FindTraceWriter(Activity?) to reach the owning test's " +
+            "trace, and run-level code uses ProtoHost.CurrentHost or the host reference a hook receives.");
 
     /// <summary>Gets the current test context, or <see langword="null"/> when none is active on this flow.</summary>
     public static ProtoExecutionContext? TryGetCurrentContext => Current.Value?.Context;

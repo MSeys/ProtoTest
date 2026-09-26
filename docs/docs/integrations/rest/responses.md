@@ -19,7 +19,7 @@ using var response = await Proto.Context.Rest()
 
 response
     .Should.HaveHttpStatus(HttpStatusCode.Created)
-    .ShouldMatchShape(new
+    .Should.MatchShape(new
     {
         product = "observability-seat",
         quantity = 12,
@@ -31,20 +31,20 @@ response.ShouldNot.HaveHttpStatus(HttpStatusCode.InternalServerError);
 ```
 
 ```csharp
-public RestAssertions Should { get; }
+public RestShouldAssertions Should { get; }
 public RestAssertions ShouldNot { get; }
 
 public RestResponse HaveHttpStatus(HttpStatusCode expected);            // on RestAssertions
-public RestResponse ShouldMatchShape(object expectedShape, JsonSerializerOptions? options = null);
+public RestResponse MatchShape(object expectedShape, JsonSerializerOptions? options = null);  // on RestShouldAssertions
 ```
 
-`ShouldNot.HaveHttpStatus(expected)` asserts the status is **anything but** `expected`; shape assertions are positive-only and live on the response.
+`ShouldNot.HaveHttpStatus(expected)` asserts the status is **anything but** `expected`. Shape is positive-only — a negated shape match has no meaning — so `MatchShape` lives on the `Should` facade and `ShouldNot` has no shape form.
 
 ### Status assertions
 
 A status assertion records an `assert.http.status` operation (source `ProtoTest.Rest`, parented to the request) with the expected and actual status codes, the client identity and `assertion.negated` when it is the `ShouldNot` side. `RestStatusAssertionException` carries `ExpectedStatusCode`, `ActualStatusCode`, `ResponseBody` and `Negated`, and appends the sanitized response body to its message — bounded by the smaller of `ProtoTest:Rest:Responses:MaxDiagnosticBodyLength` and the attachment options' cap — so a failing `400` tells you *why* without re-running anything.
 
-### `ShouldMatchShape`
+### `MatchShape`
 
 Describe the JSON you expect as an anonymous object. The short version of the rules:
 
@@ -54,11 +54,15 @@ Describe the JSON you expect as an anonymous object. The short version of the ru
 - **Values can be constraints**, not just literals — `JsonValue.GreaterThan(0)`, `JsonValue.NotNull()`, `JsonValue.Regex(...)` and more.
 - **Every mismatch is reported at once**, each with its JSON path.
 
+A failure names the request it was made against — the identifier the trace already carries:
+
 ```
-Shape mismatch failed with 2 error(s):
+POST /api/orders — Shape mismatch failed with 2 error(s):
   • [$.total]: Expected greater than 200, but found '19.95'. (Expected: "greater than 200", Actual: '19.95')
   • [$.status]: Values did not match. (Expected: "pending", Actual: "cancelled")
 ```
+
+The failure is a `RestAssertionException` whose `InnerException` is the shared `JsonShapeMismatchException` (`Mismatches`, `MatchedProperties`), so the mismatch list stays inspectable.
 
 The assertion records an `assert.json.shape` operation with the expected type, the actual media type, the expected and actual shapes, and the matched properties or every mismatch (`matched.property_count`, `shape.mismatches`, `shape.mismatch_count`, `shape.result`). On success it records an `http.contract.shape` observation carrying the request identifier, matched property paths, target type and status code — the input [OpenAPI coverage](../openapi.md) uses. When `CaptureExpectedShapes` is on, the expected shape is attached as `rest-{n:00}-expected-shape` (`-02`, `-03` … for repeated assertions on one response).
 
@@ -68,7 +72,7 @@ The full rules and every available matcher are on the [Shape matching](../../fou
 Because arrays are positional, a list assertion is precise:
 
 ```csharp
-audit.ShouldMatchShape(new[]
+audit.Should.MatchShape(new[]
 {
     new { action = "workspace.created", resource = JsonValue.NotNull() },
     new { action = "release.deployed", resource = JsonValue.NotNull() }
@@ -80,25 +84,42 @@ audit.ShouldMatchShape(new[]
 
 ```csharp
 T? ReadAsJson<T>(JsonSerializerOptions? options = null);
+T? ReadAsJson<T>(string jsonPath, JsonSerializerOptions? options = null);
+T  ReadRequired<T>(JsonSerializerOptions? options = null);
+T  ReadRequired<T>(string jsonPath, JsonSerializerOptions? options = null);
 T? ReadAsAnonymous<T>(T anonymousTypeDefinition, JsonSerializerOptions? options = null);
 dynamic? ReadAsDynamic();
 byte[] ReadAsBytes();
 ```
 
-`ReadAsJson<T>` is case-insensitive by default and returns `default` for an empty body. A deserialization failure records an `http.response.deserialize` event with `target.type` and `content.length`, then rethrows. `ReadAsAnonymous` exists purely for type inference — the argument's values are ignored:
+`ReadAsJson<T>` is case-insensitive by default and returns `default` for an empty body. A deserialization failure records an `http.response.deserialize` event with `target.type` and `content.length` — plus `json.path` for a path read — then rethrows; the required reads record the same failed event for an empty body or JSON `null`. `ReadAsAnonymous` exists purely for type inference — the argument's values are ignored:
 
 ```csharp
 var created = response.ReadAsAnonymous(new { id = 0, status = "" })!;
 Console.WriteLine(created.id);
 ```
 
-A common pattern is assert-then-read, so the test fails with a useful message before you dereference anything:
+A common pattern is assert-then-read, so the test fails with a useful message before you dereference anything. `ReadRequired<T>` does both: it throws `RestAssertionException` naming the request identifier when the body is empty or JSON `null`, instead of making you write `!`:
 
 ```csharp
 var workspace = response
     .Should.HaveHttpStatus(HttpStatusCode.Created)
-    .ReadAsJson<WorkspaceResponse>()!;
+    .ReadRequired<WorkspaceResponse>();
 ```
+
+### Reading one value by path
+
+`ReadAsJson<T>(jsonPath)` reads a single value instead of a wrapper record:
+
+```csharp
+var id = response.ReadAsJson<int>("$.id");
+var total = response.ReadRequired<decimal>("$.order.total");
+var first = response.ReadAsJson<string>("items[0].sku");
+```
+
+The path subset is `$` for the root, dot members (`$.customer.id`) and zero-based array indices (`$.items[0].sku`); a leading member without `$` is accepted as `$.member`. Members match case-sensitively. The subset deliberately excludes filters, wildcards, quoted names and slices.
+
+A path that does not resolve throws `RestAssertionException` whose message starts with the request identifier and names the path, for example `GET /orders/42 — The JSON path '$.missing' did not match: the member 'missing' was not found.`; the shared `JsonPathException` stays reachable as `InnerException`. A value of the wrong type throws `JsonException`. `ReadRequired<T>(jsonPath)` additionally throws when the body is empty or the path holds JSON `null` — for every `T`, including value types, because the null check runs before the deserializer — and the nullable `ReadAsJson<T>(jsonPath)` returns `default` for an empty body.
 
 ## Raw access
 

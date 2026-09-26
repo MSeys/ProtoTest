@@ -29,8 +29,10 @@ public sealed class ProtoModelColumnAssertions<TValue>
         _negated = negated;
     }
 
-    /// <summary>Compares the column's values against the expected sequence, top to bottom.</summary>
-    public void Be(IReadOnlyList<TValue?> expected)
+    /// <summary>
+    /// Compares the column's values against the expected sequence, top to bottom, and returns the column.
+    /// </summary>
+    public ProtoModelColumn<TValue> Be(IReadOnlyList<TValue?> expected)
     {
         ArgumentNullException.ThrowIfNull(expected);
         SheetColumnMismatch? mismatch = null;
@@ -45,10 +47,50 @@ public sealed class ProtoModelColumnAssertions<TValue>
                 EqualityComparer<TValue?>.Default,
                 ProtoModelColumn<TValue>.Display)) is null,
             () => new SheetAssertionFailure(DescribeFailure(expected, mismatch)));
+        return _column;
     }
 
-    /// <summary>Checks the values are ordered in the requested direction.</summary>
-    public void BeSortedBy(ProtoSortDirection direction = ProtoSortDirection.Ascending)
+    /// <summary>
+    /// Checks every value against a property, for example every amount above zero, and returns the
+    /// column. A negated assertion passes when at least one value does not match.
+    /// </summary>
+    public ProtoModelColumn<TValue> All(Func<TValue?, bool> predicate)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        string? actual = null;
+        SheetAssertion.Run(
+            _context,
+            _column.Title,
+            _column.ColumnAttributes,
+            _negated,
+            () =>
+            {
+                for (var index = 0; index < _column.Values.Count; index++)
+                {
+                    if (!predicate(_column.Values[index]))
+                    {
+                        actual = $"row {_dataStartRow + index} was {ProtoModelColumn<TValue>.Display(_column.Values[index])}";
+                        return false;
+                    }
+                }
+
+                return true;
+            },
+            () => _negated
+                ? new SheetAssertionFailure(
+                    $"{SheetAssertion.Describe(Subject, "hold only matching values", true)} but it did.")
+                : new SheetAssertionFailure(
+                    $"{SheetAssertion.Describe(Subject, "hold only matching values", false)} but {actual}.",
+                    new Dictionary<string, string?>
+                    {
+                        ["sheets.expected"] = "hold only matching values",
+                        ["sheets.actual"] = actual
+                    }));
+        return _column;
+    }
+
+    /// <summary>Checks the values are ordered in the requested direction. Returns the column.</summary>
+    public ProtoModelColumn<TValue> BeSortedBy(ProtoSortDirection direction = ProtoSortDirection.Ascending)
     {
         string? actual = null;
         SheetAssertion.Run(
@@ -83,6 +125,7 @@ public sealed class ProtoModelColumnAssertions<TValue>
                         ["sheets.actual"] = detail
                     });
             });
+        return _column;
     }
 
     private static string Describe(ProtoSortDirection direction)

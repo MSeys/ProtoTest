@@ -43,7 +43,7 @@ No, it is a different metric. Code coverage tells you which lines ran. ProtoTest
 
 ## Why are my property hits zero?
 
-Because receiving a field is not covering it. Property coverage comes only from the paths a shape assertion matched: a test that checks the status code covers the endpoint and the status, but none of the fields. Add the field to a `ShouldMatchShape` call and it starts counting. See [reading the coverage report](./observability/coverage.md#reading-the-report) and the [shape rules](./foundation/shape-matching.md#constraints). This is deliberate - a field nobody asserts is a field that can break silently.
+Because receiving a field is not covering it. Property coverage comes only from the paths a shape assertion matched: a test that checks the status code covers the endpoint and the status, but none of the fields. Add the field to a `Should.MatchShape` call and it starts counting. See [reading the coverage report](./observability/coverage.md#reading-the-report) and the [shape rules](./foundation/shape-matching.md#constraints). This is deliberate - a field nobody asserts is a field that can break silently.
 
 ## What happens if the maintainer stops?
 

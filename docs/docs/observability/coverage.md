@@ -55,12 +55,12 @@ Three different gaps, three different fixes:
 
 - **An endpoint was never called** — there's a feature with no test at all.
 - **A response status was never reached** — the error path is untested. `403` and `404` are the usual suspects.
-- **A property was never asserted** — the test calls the endpoint but doesn't check that field. Add it to a `ShouldMatchShape`.
+- **A property was never asserted** — the test calls the endpoint but doesn't check that field. Add it to a `Should.MatchShape`.
 
 The summary at the top of each report gives the total, covered and uncovered counts and a coverage percentage.
 
 :::tip[Coverage rewards shape assertions]
-Property coverage comes from the paths `ShouldMatchShape` matched. A test that only checks the status code covers the endpoint and the status, but none of the fields. That's deliberate — a field nobody asserts is a field that can break silently.
+Property coverage comes from the paths `Should.MatchShape` matched. A test that only checks the status code covers the endpoint and the status, but none of the fields. That's deliberate — a field nobody asserts is a field that can break silently.
 :::
 
 ## How it works

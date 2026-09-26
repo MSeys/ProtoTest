@@ -8,7 +8,7 @@ using ProtoTest.Json;
 public sealed class ProtoMessagingAssertionsTests
 {
     [Test]
-    public async Task ShouldMatchShape_ShouldRecordTheAssertionAndTheObservation()
+    public async Task MatchShape_ShouldRecordTheAssertionAndTheObservation()
     {
         var builder = new ProtoHostBuilder();
         builder.AddMessaging();
@@ -17,8 +17,9 @@ public sealed class ProtoMessagingAssertionsTests
         var context = await host.StartTestAsync("messaging shape", TestMethods.Placeholder);
         var message = new ProtoMessage("invoice.paid", """{"id":42,"status":"paid"}""", ContentType: "application/json");
 
-        message.ShouldMatchShape(new { id = 42, status = "paid" });
+        var returned = message.Should.MatchShape(new { id = 42, status = "paid" });
 
+        Assert.That(returned, Is.SameAs(message), "Should.MatchShape returns the message, so assertions chain");
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         var operation = host.Trace.Snapshot().Tests.Single().Entries
             .Single(entry => entry.Kind == "assert.json.shape");
@@ -37,23 +38,27 @@ public sealed class ProtoMessagingAssertionsTests
     }
 
     [Test]
-    public async Task ShouldMatchShape_ShouldFailTheOperationAndRethrowOnMismatch()
+    public async Task MatchShape_ShouldNameTheDestinationOnMismatch()
     {
         var builder = new ProtoHostBuilder();
         builder.AddMessaging();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging shape mismatch", TestMethods.Placeholder);
+        await host.StartTestAsync("messaging shape mismatch", TestMethods.Placeholder);
         var message = new ProtoMessage("invoice.paid", """{"id":42}""");
 
-        var exception = Assert.Throws<JsonShapeMismatchException>(
-            () => message.ShouldMatchShape(new { id = 7 }));
+        var exception = Assert.Throws<MessagingAssertionException>(
+            () => message.Should.MatchShape(new { id = 7 }));
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
         var operation = host.Trace.Snapshot().Tests.Single().Entries
             .Single(entry => entry.Kind == "assert.json.shape");
         Assert.Multiple(() =>
         {
+            Assert.That(exception!.Message, Does.StartWith(
+                "invoice.paid — Shape mismatch failed with 1 error(s):"));
+            Assert.That(exception.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
+                "the shared mismatch data stays reachable");
             Assert.That(operation.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
             Assert.That(operation.Attributes["shape.result"], Is.EqualTo("mismatched"));
             Assert.That(operation.Attributes["shape.mismatch_count"], Is.EqualTo("1"));
@@ -63,31 +68,56 @@ public sealed class ProtoMessagingAssertionsTests
     }
 
     [Test]
-    public async Task ShouldMatchShape_ShouldNameTheDestinationForEmptyOrNonJsonPayloads()
+    public async Task MatchShape_ShouldNameTheDestinationForEmptyOrNonJsonPayloads()
     {
         var builder = new ProtoHostBuilder();
         builder.AddMessaging();
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("messaging payload", TestMethods.Placeholder);
+        await host.StartTestAsync("messaging payload", TestMethods.Placeholder);
 
-        var empty = Assert.Throws<JsonDocumentAssertionException>(
-            () => new ProtoMessage("invoice.paid", null).ShouldMatchShape(new { id = 42 }));
-        var text = Assert.Throws<JsonDocumentAssertionException>(
-            () => new ProtoMessage("invoice.paid", "not json").ShouldMatchShape(new { id = 42 }));
+        var empty = Assert.Throws<MessagingAssertionException>(
+            () => new ProtoMessage("invoice.paid", null).Should.MatchShape(new { id = 42 }));
+        var text = Assert.Throws<MessagingAssertionException>(
+            () => new ProtoMessage("invoice.paid", "not json").Should.MatchShape(new { id = 42 }));
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(text!));
         Assert.Multiple(() =>
         {
-            Assert.That(empty!.Message, Does.Contain("invoice.paid"));
-            Assert.That(empty.Message, Does.Contain("not valid Json"));
-            Assert.That(text!.Message, Does.Contain("invoice.paid"));
-            Assert.That(text.Message, Does.Contain("not valid Json"));
+            Assert.That(empty!.Message, Does.StartWith("invoice.paid — "));
+            Assert.That(empty.Message, Does.Contain("Expected JSON"));
+            Assert.That(empty.InnerException, Is.TypeOf<JsonDocumentAssertionException>());
+            Assert.That(text!.Message, Does.StartWith("invoice.paid — "));
+            Assert.That(text.Message, Does.Contain("Expected valid JSON"));
             Assert.That(host.Trace.Snapshot().Tests.Single().Entries
                 .Count(entry => entry.Kind == "assert.json.shape"), Is.EqualTo(2));
         });
         await host.StopAsync();
     }
 
+    [Test]
+    public async Task Obsolete_ShouldMatchShape_ShouldStillDelegateToTheFacade()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("messaging obsolete shape", TestMethods.Placeholder);
+        var message = new ProtoMessage("invoice.paid", """{"id":42,"status":"paid"}""");
 
+        // Intentional: pins the obsolete shim while it delegates to the facade; CS0618 is expected.
+#pragma warning disable CS0618
+        var returned = message.ShouldMatchShape(new { id = 42 });
+        var exception = Assert.Throws<MessagingAssertionException>(
+            () => message.ShouldMatchShape(new { id = 7 }));
+#pragma warning restore CS0618
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(returned, Is.SameAs(message));
+            Assert.That(exception!.Message, Does.StartWith("invoice.paid — "));
+        }
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
 }

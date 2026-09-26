@@ -141,7 +141,11 @@ duplicate that is actually a different program, server, backend or device type i
   whole. Built-in kinds live in `ProtoCapabilityKinds`
   (`server`, `worker`, `device`, `protocol`, `browser`, `store`, `broker`, `data`, `document`).
 - `[RequiresCapability(kind, CapabilityName = ...)]` is evaluated by the adapter before the test starts;
-  a skip has no lifecycle. `[RequiresInProcess]` is `[RequiresCapability(server)]`.
+  a skip has no lifecycle. `[RequiresInProcess]` is `[RequiresCapability(server)]`. A suite states a
+  gate's reason once with `AddCapabilityReason(kind, reason, name?)` (the typed gates included); the
+  attribute reads the reason for `(kind, CapabilityName ?? CapabilityInstance)` then `(kind, null)`
+  before its default, and a per-test `Reason` still wins. `RequiresApplication` checks a declaration,
+  not a capability, and keeps its own reason/default.
 - Honesty rule: a capability may only be declared by an integration that can serve it.
   `AddCapabilityUnlessConfigured` decides **per declaration**: a descriptor drops only when every
   conditional declaration for it drops and no plain declaration promises it, so one satisfied
@@ -160,7 +164,12 @@ duplicate that is actually a different program, server, backend or device type i
 - Multi-instance capabilities carry their instance: two named servers are two descriptors, two
   capabilities and two run entities (`server:ASP.NET Core:A`), so configuring A's address drops only
   A's. `HasCapability(kind)` matches any instance; `HasCapability(kind, name)` matches the descriptor
-  `Name`, not the instance. The Web pair leaves exactly the winning backend's browser capability.
+  `Name`, not the instance; `HasCapability(kind, name, instance)` narrows by both (every non-null filter
+  must match), and `[RequiresServer(name)]` uses it to address one named `AddAspNetCoreServer`
+  instance. `[RequiresWorker<TProgram>]` checks the worker capability by the program assembly name,
+  `[RequiresApplication(name)]` checks `ProtoHost.HasApplication(name)` (the `AddApplication`
+  declaration), and `RequiresCapabilityAttribute.CapabilityInstance` exposes the instance filter to
+  open kinds. The Web pair leaves exactly the winning backend's browser capability.
 
 ## Address resolution (one authority per application)
 
@@ -197,10 +206,17 @@ source. A first-reader-wins divergence is a bug (audit ADDR-2, fixed).
 
 ## Options
 
-`IProtoConfigurableOptions` (`ConfigurationSectionName`, `BindFromConfiguration`, `Validate`) is the
+`IProtoConfigurableOptions` (`ConfigurationSectionName`, `FallbackConfigurationSectionName`,
+`BindFromConfiguration`, `Validate`) is the
 shared shape. `ProtoOptionsRegistration.Configure<T>` composes code callbacks in order, binds the
 section over them (configuration wins), and resolves one instance per consumer. Validation runs where
-options resolve; a bad value fails there, not the first test.
+options resolve; a bad value fails there, not the first test. Sections follow
+`ProtoTest:<Integration>[:<Area>]`, where the area names the options type's role (`Responses`,
+`Attachments`, `Client`, `WebSocket`, `RabbitMq`); an integration with one options set has no area
+segment. A renamed section returns its old name from `FallbackConfigurationSectionName`: the fallback
+binds first and the current section binds over it, so the old key keeps working (documented as
+deprecated) and the current key wins. `GrpcClientOptions` is the example — `ProtoTest:Grpc:Client` over
+the legacy `ProtoTest:Grpc`.
 
 Known outliers (sanctioned or audit-owed): Web backends validate through static delegates instead of
 the interface method; the sink path binds but does not validate; OpenAPI/GraphQL schema sources are
@@ -230,6 +246,21 @@ same key set when it is called after `AddSql`.
 - Trace format compatibility: readers support the current major and the previous one; a breaking
   change bumps the major with a migration note (`docs/docs/observability/prototrace.md`).
 
+## Assertion surface
+
+- Every ProtoTest-owned assertable subject exposes `Should` (and `ShouldNot` where a negated form is
+  meaningful); each member returns the subject, so assertions chain. The pre-facade spellings are
+  `[Obsolete]` delegating shims (DX-01/DX-02), never a second implementation.
+- Shape is positive-only and lives on the positive facade or a factory because C# has no extension
+  properties: `response.Should.MatchShape(shape)` (REST/GraphQL), `ProtoGrpcAssertions.For(reply)`,
+  `message.Should.MatchShape(shape)`, `row.Should.MatchShape(shape)` (table rows). A model row is a
+  user type, so `row.ShouldMatchShape(shape)` stays the documented generic-subject extension.
+- A shape producer wraps the shared matcher failure after `ProtoShapeAssertion.Assert` has recorded and
+  failed the operation, so trace attributes/sections/observations stay byte-identical: the protocol's
+  assertion exception starts with the subject (`request.identifier`, `graphql.operation`, the message
+  type, `messaging.destination`, or the row's `Sheet!Range`) and keeps the matcher exception - with
+  `Mismatches` - as `InnerException`. The GraphQL data-less path keeps its own message and section.
+
 ## Context rules (Audit 3 CTX-1)
 
 `Proto.Context` is for code that runs **inside a test on the test's flow**: test bodies and
@@ -237,7 +268,10 @@ test-author entries (`context.Data().For<T>()`, `row.ShouldMatchShape(...)`, ass
 plumbing they call. Prefer explicit passing when it keeps a callee constructible in a unit test.
 Run scope uses the host (`ProtoHost.CurrentHost`, or the reference a hook receives). Off-flow telemetry
 uses `ProtoHost.FindTraceWriter(Activity?)` and correlates by trace id. An object whose lifetime spans
-tests resolves per call and never holds a context.
+tests resolves per call and never holds a context. `context.UniqueName(name, sequence)` derives a
+deterministic test-scoped name (`name-{TestId}`, `name-{TestId}-{sequence}`) for records that outlive
+the process; `ProtoTest.Data`'s per-member generated defaults are deterministic per test in the same
+spirit (see `ProtoDataValueContext`).
 
 ## Vocabulary ownership
 
@@ -286,10 +320,11 @@ suite; extend it, do not fork it.
 | Flow | `ProtoFlow`, `ProtoStepDescriptor` | `src/ProtoTest.Core/` |
 | Tracing | `ProtoTraceRecorder`, `ProtoTraceSession`, `ProtoTraceWire`, `ProtoTraceContracts` | `src/ProtoTest.Core/Tracing/` |
 | Redaction | `ProtoMetadataRedaction`, `ProtoUriSanitizer`, `JsonDiagnosticSanitizer` | Core / ProtoTest.Json |
+| JSON value read | `JsonPathResolver`, `JsonPathException` | `src/ProtoTest.Json/` |
 | Reporting | `IProtoSink`, `IProtoReportSource`, `IProtoCollector`, `ProtoReportItem`, run gates | `src/ProtoTest.Core/Reporting/` |
 | Clock | `ProtoClock`, `ProtoTestTimeProvider`, `ProtoRequestClock`, `ProtoClockRegistry` | `src/ProtoTest.Core/Time/` |
 | Readiness | `ProtoReadiness`, `ProtoReadinessOptions` | `src/ProtoTest.Core/Readiness/` |
-| Skip | `RequiresCapabilityAttribute`, `RequiresInProcessAttribute`, `ProtoTestSkip` | `src/ProtoTest.Core/Applications/` |
+| Skip | `RequiresCapabilityAttribute`, `RequiresInProcessAttribute`, `RequiresWorkerAttribute<TProgram>`, `RequiresServerAttribute`, `RequiresApplicationAttribute`, `ProtoTestSkip` | `src/ProtoTest.Core/Applications/` |
 | Adapters | five runner packages + `tests/ProtoTest.AdapterContract` | `src/`, `tests/` |
 
 ## Invariants to protect

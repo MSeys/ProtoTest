@@ -14,9 +14,9 @@ ProtoTest has three scopes, and each has exactly one way to reach it:
 
 - **Inside a test, on the test's flow** — use `Proto.Context`. This covers test bodies,
   test-author entries (`context.Data().For<T>()`, `row.ShouldMatchShape(...)`,
-  `exception.ShouldHaveStatus(...)`) and the plumbing they call. Prefer passing the context down
-  from an entry when the callee is easy to construct directly in a test; do not thread it through
-  purely for style.
+  `ProtoGrpcAssertions.For(exception).Should.HaveStatus(...)`) and the plumbing they call. Prefer
+  passing the context down from an entry when the callee is easy to construct directly in a test; do
+  not thread it through purely for style.
 - **Run scope** — use the host: the reference a hook receives at registration, or
   `ProtoHost.CurrentHost`. There is no ambient run context: run hooks and report building run
   outside any test.
@@ -30,14 +30,28 @@ their trace writer from `ProtoResourceReleaseContext`.
 
 ## Test conventions
 
-A test's name states the behavior it pins: `Subject_ShouldOutcome`, with `_WhenCondition` when the
-condition is the point (for example `RollbackFailure_ShouldStillDisposeTheTransactionAndConnection`).
-Use the plain present tense and name the subject as the reader knows it, not the type under test.
+A test's name states the behavior it pins. Two forms, by kind:
+
+- **Pure unit fixtures** use `Subject_ShouldOutcome`, with `_WhenCondition` when the condition is the
+  point (for example `RollbackFailure_ShouldStillDisposeTheTransactionAndConnection`). Name the subject
+  as the reader knows it, not the type under test.
+- **Integration journeys, samples and the `dotnet new` template** use a PascalCase sentence that reads
+  as the behavior, matching the demo and the reference suite (`CreatingAnOrderReturnsIt`,
+  `AChargingSessionBecomesAnInvoice`).
+
+Group related assertions with NUnit 4's scoped block, `using (Assert.EnterMultipleScope()) { … }`, so a
+failure reports every assertion in the scope. New tests, the samples and the template use the scoped
+form; `Assert.Multiple` remains in older tests and is not churned for style.
 
 Keep the phases visible with `// Arrange`, `// Act` and `// Assert` comments whenever the test is long
 enough that the phases are not obvious from the code; a short test needs none. One behavior per test,
 one act per test. Fixture data names its intent (`OverdueInvoice`, not `Invoice1`), and a helper used
 by more than one suite lives in `ProtoTest.TestSupport`.
+
+`using` directives go inside the file-scoped namespace, as every sample and test does. The exception is
+an assembly-attribute file whose attributes must precede the namespace (the TUnit and xUnit v3
+`Setup.cs` files); keep its usings above the namespace.
+
 ## Build and test
 
 ProtoTest requires the .NET 8, 9 and 10 SDKs. Node.js 20 or newer is needed for the documentation and trace viewer.

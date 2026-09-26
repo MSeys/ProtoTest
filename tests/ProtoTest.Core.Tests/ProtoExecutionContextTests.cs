@@ -61,7 +61,57 @@ public class ProtoExecutionContextTests
 
         // Act & Assert
         var exception = Assert.Throws<InvalidOperationException>(() => context.Resolve<SampleContext>());
-        Assert.That(exception!.Message, Does.Contain(nameof(SampleContext)));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.Message, Does.Contain(nameof(SampleContext)));
+            Assert.That(exception.Message, Does.Contain("SetContext"));
+        }
+    }
+
+    [Test]
+    public void UniqueName_ShouldDeriveADeterministicNameFromTheTestId()
+    {
+        var first = new ProtoExecutionContext("TestMethod", _scope, "0042317", TestMethods.Placeholder);
+        var again = new ProtoExecutionContext("TestMethod", _scope, "0042317", TestMethods.Placeholder);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.UniqueName("tenant"), Is.EqualTo("tenant-0042317"));
+            Assert.That(again.UniqueName("tenant"), Is.EqualTo(first.UniqueName("tenant")));
+        }
+    }
+
+    [Test]
+    public void UniqueName_ShouldDifferAcrossTests()
+    {
+        var first = new ProtoExecutionContext("TestMethod", _scope, "0042317", TestMethods.Placeholder);
+        var second = new ProtoExecutionContext("TestMethod", _scope, "0042318", TestMethods.Placeholder);
+
+        Assert.That(first.UniqueName("tenant"), Is.Not.EqualTo(second.UniqueName("tenant")));
+    }
+
+    [Test]
+    public void UniqueName_ShouldCarryTheSequenceForASecondObject()
+    {
+        var context = new ProtoExecutionContext("TestMethod", _scope, "0042317", TestMethods.Placeholder);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(context.UniqueName("member"), Is.EqualTo("member-0042317"));
+            Assert.That(context.UniqueName("member", sequence: 2), Is.EqualTo("member-0042317-2"));
+        }
+    }
+
+    [Test]
+    public void UniqueName_ShouldRejectAnEmptyNameAndANegativeSequence()
+    {
+        var context = new ProtoExecutionContext("TestMethod", _scope, "0042317", TestMethods.Placeholder);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<ArgumentException>(() => context.UniqueName(" "));
+            Assert.Throws<ArgumentOutOfRangeException>(() => context.UniqueName("member", sequence: -1));
+        }
     }
 
     [Test]

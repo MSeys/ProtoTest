@@ -51,9 +51,9 @@ A repeated `AddGrpc` is not a no-op: its `configure` callback always runs, so mo
 
 | Key | Option | Type | Default |
 | --- | --- | --- | --- |
-| `ProtoTest:Grpc:Metadata` | `GrpcClientOptions.Metadata` | `IDictionary<string, string>` | empty |
-| `ProtoTest:Grpc:DefaultDeadline` | `GrpcClientOptions.DefaultDeadline` | `TimeSpan?` | `null` |
-| `ProtoTest:Grpc:SensitiveMetadataKeys` | `GrpcClientOptions.SensitiveMetadataKeys` | `List<string>` | `authorization`, `cookie`, `set-cookie`, `x-api-key`, `api-key`, `token`, `x-auth-token` |
+| `ProtoTest:Grpc:Client:Metadata` | `GrpcClientOptions.Metadata` | `IDictionary<string, string>` | empty |
+| `ProtoTest:Grpc:Client:DefaultDeadline` | `GrpcClientOptions.DefaultDeadline` | `TimeSpan?` | `null` |
+| `ProtoTest:Grpc:Client:SensitiveMetadataKeys` | `GrpcClientOptions.SensitiveMetadataKeys` | `List<string>` | `authorization`, `cookie`, `set-cookie`, `x-api-key`, `api-key`, `token`, `x-auth-token` |
 | `ProtoTest:Grpc:Attachments:CaptureRequestBodies` | `ProtoHttpAttachmentOptions.CaptureRequestBodies` | `bool` | `true` |
 | `ProtoTest:Grpc:Attachments:CaptureResponses` | `ProtoHttpAttachmentOptions.CaptureResponses` | `bool` | `true` |
 | `ProtoTest:Grpc:Attachments:CaptureExpectedShapes` | `ProtoHttpAttachmentOptions.CaptureExpectedShapes` | `bool` | `true` |
@@ -63,7 +63,7 @@ A repeated `AddGrpc` is not a no-op: its `configure` callback always runs, so mo
 | `ProtoTest:Grpc:Attachments:MaxDiagnosticBodyLength` | `JsonDiagnosticOptions.MaxDiagnosticBodyLength` | `int` | 65536 (64 KiB) |
 | `ProtoTest:Grpc:Attachments:SensitiveJsonProperties` | `JsonDiagnosticOptions.SensitiveJsonProperties` | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret` |
 
-One `ProtoTest:Grpc` section serves every named client; each registration binds it over its code callback. `GrpcAttachmentOptions` derives from the shared HTTP attachment options and binds `ProtoTest:Grpc:Attachments`, so there is one global attachment section per registration, not one per client. `GrpcClientOptions.ConfigureMetadata` is a delegate and is not bindable.
+One `ProtoTest:Grpc:Client` section serves every named client; each registration binds it over its code callback. The pre-1.1 `ProtoTest:Grpc` section still binds as a deprecated fallback, so a suite on the old key keeps working; a value under `ProtoTest:Grpc:Client` wins. `GrpcAttachmentOptions` derives from the shared HTTP attachment options and binds `ProtoTest:Grpc:Attachments`, so there is one global attachment section per registration, not one per client. `GrpcClientOptions.ConfigureMetadata` is a delegate and is not bindable.
 
 ## API
 
@@ -110,20 +110,23 @@ Task<AsyncDuplexStreamingCall<TRequest, TResponse>> OpenDuplexStreamingAsync<TRe
 
 ### Assertions
 
-A reply is a protobuf message, and `ShouldMatchShape` matches it with the same [shapes](../../foundation/shape-matching.md) as REST and GraphQL:
+A reply is a protobuf message, and `Should.MatchShape` matches it with the same [shapes](../../foundation/shape-matching.md) as REST and GraphQL. C# has no extension properties, so a message reaches its facade through the factory; `MatchShape` returns the reply:
 
 ```csharp
-public static void ShouldMatchShape<TResponse>(this TResponse response, object expectedShape,
-    JsonSerializerOptions? options = null) where TResponse : IMessage;
+public static ProtoGrpcMessageAssertions<TResponse> For<TResponse>(TResponse response)
+    where TResponse : IMessage;
+// ProtoGrpcMessageAssertions<TResponse>: Should -> ProtoGrpcMessageAssertions<TResponse>
+//                                       MatchShape(object expectedShape, JsonSerializerOptions? options = null) -> TResponse
 ```
 
-The reply is compared through its JSON form: field names are camelCase, enums are their names, and fields left at their default value are still present, so `quantity = 0` can be asserted. Every mismatch is reported at once. The assertion records an `assert.json.shape` operation with a `grpc.contract.shape` observation on the ambient test context, like the other integrations' data-object assertions.
+The reply is compared through its JSON form: field names are camelCase, enums are their names, and fields left at their default value are still present, so `quantity = 0` can be asserted. Every mismatch is reported at once. The assertion records an `assert.json.shape` operation with a `grpc.contract.shape` observation on the ambient test context, like the other integrations' data-object assertions. A mismatch throws `GrpcAssertionException` whose message starts with the message type, keeping the shared `JsonShapeMismatchException` as `InnerException`. The old `ShouldMatchShape` extension remains as an obsolete shim.
 
-A failed call throws `RpcException`, and both polarities of the status assertion exist:
+A failed call throws `RpcException`; `ProtoGrpcAssertions.For(exception)` returns its assertion facade:
 
 ```csharp
-public static RpcException ShouldHaveStatus(this RpcException exception, StatusCode expected);
-public static RpcException ShouldNotHaveStatus(this RpcException exception, StatusCode unexpected);
+public static ProtoGrpcExceptionAssertions For(RpcException exception);
+// ProtoGrpcExceptionAssertions: Should / ShouldNot -> ProtoGrpcExceptionAssertions
+//                               HaveStatus(StatusCode expected) -> RpcException
 ```
 
 ```csharp
@@ -134,12 +137,12 @@ try
 }
 catch (RpcException exception)
 {
-    exception.ShouldHaveStatus(StatusCode.NotFound);
-    exception.ShouldNotHaveStatus(StatusCode.Internal);
+    ProtoGrpcAssertions.For(exception).Should.HaveStatus(StatusCode.NotFound);
+    ProtoGrpcAssertions.For(exception).ShouldNot.HaveStatus(StatusCode.Internal);
 }
 ```
 
-The assertion records an `assert.grpc.status` operation on the ambient test context with expected and actual `rpc.grpc.status_code`/`rpc.grpc.status` and a `Result` Checks section; a mismatch throws `GrpcAssertionException`. gRPC deliberately exposes these as methods rather than REST's `Should`/`ShouldNot` facade, because C# has no extension properties.
+The assertion records an `assert.grpc.status` operation on the ambient test context with expected and actual `rpc.grpc.status_code`/`rpc.grpc.status` and a `Result` Checks section; a mismatch throws `GrpcAssertionException`. gRPC deliberately exposes the facade through `For(...)` rather than a `Should` property, because C# has no extension properties; the old `ShouldHaveStatus`/`ShouldNotHaveStatus` extension methods remain as obsolete shims.
 
 ## Quick start
 
@@ -154,7 +157,7 @@ public sealed class OrderTests
             Orders.GetOrder,
             new GetOrderRequest { Id = 42 });
 
-        reply.ShouldMatchShape(new { id = 42, status = "PENDING" });
+        ProtoGrpcAssertions.For(reply).Should.MatchShape(new { id = 42, status = "PENDING" });
     }
 }
 ```
@@ -174,7 +177,7 @@ public sealed class OrderTests
 }
 ```
 
-Authenticators write HTTP headers as usual; the gRPC applier translates them to lowercase metadata keys. Metadata is layered client `Metadata` first, then `ConfigureMetadata`, then per-call `metadata`, with authenticators last so they can override. Sensitive metadata values are redacted in the trace; `SensitiveMetadataKeys` starts with the defaults above and entries under `ProtoTest:Grpc:SensitiveMetadataKeys` extend them. Matching is case-insensitive and by substring, so `authorization` also covers `proxy-authorization`.
+Authenticators write HTTP headers as usual; the gRPC applier translates them to lowercase metadata keys. Metadata is layered client `Metadata` first, then `ConfigureMetadata`, then per-call `metadata`, with authenticators last so they can override. Sensitive metadata values are redacted in the trace; `SensitiveMetadataKeys` starts with the defaults above and entries under `ProtoTest:Grpc:Client:SensitiveMetadataKeys` extend them. Matching is case-insensitive and by substring, so `authorization` also covers `proxy-authorization`.
 
 ### Attachments
 

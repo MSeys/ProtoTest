@@ -65,7 +65,7 @@ public sealed class GrpcIntegrationTests
             EchoMethods.Say,
             new EchoRequest { Message = "hello" },
             metadata => metadata.Add("authorization", "Bearer secret"));
-        reply.ShouldMatchShape(new { message = "hello" });
+        ProtoGrpcAssertions.For(reply).Should.MatchShape(new { message = "hello" });
 
         // Resolve coverage before the test completes: the test scope is disposed with the result.
         var coverage = context.Services.GetServices<IProtoCollector>()

@@ -37,7 +37,7 @@ public sealed class PlatformJourney
             });
 
         // Assert
-        projects.ShouldHaveNoErrors();
+        projects.Should.HaveNoErrors();
     }
 
     [ProtoTest]
@@ -79,8 +79,8 @@ public sealed class PlatformJourney
         // Assert
         using var notification = await pending
             ?? throw new GraphQLAssertionException("Expected a deployment status event, but the stream completed.");
-        notification.ShouldMatchShape(expected);
-        notification.ShouldHaveNoErrors();
+        notification.Should.MatchShape(expected);
+        notification.Should.HaveNoErrors();
     }
 
     [ProtoTest]
@@ -109,7 +109,7 @@ public sealed class PlatformJourney
             });
 
         // Assert
-        page.ShouldHaveNoErrors();
+        page.Should.HaveNoErrors();
     }
 
     [ProtoTest]
@@ -123,7 +123,7 @@ public sealed class PlatformJourney
             .ExecuteAsync();
 
         // Assert
-        response.ShouldHaveErrors().ShouldHaveError(ProblemCodes.Unauthorized);
+        response.Should.HaveErrors().Should.HaveError(ProblemCodes.Unauthorized);
     }
 
     [ProtoTest]

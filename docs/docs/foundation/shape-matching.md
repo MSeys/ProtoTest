@@ -6,10 +6,21 @@ description: "Describe the JSON you expect with an anonymous object: partial, ne
 
 # Shape matching
 
-REST's `ShouldMatchShape`, GraphQL's `ShouldMatchShape` / `ExpectAsync` / `ExpectNextAsync`, gRPC's `ShouldMatchShape` and messaging's `ShouldMatchShape` all use the same matcher from `ProtoTest.Json`. You describe the JSON you expect with an anonymous object, and the matcher compares.
+REST and GraphQL responses, gRPC replies, consumed messages and sheet rows all use the same matcher from `ProtoTest.Json`; only the spelling that reaches it differs:
+
+| Subject | Call |
+| --- | --- |
+| REST response | `response.Should.MatchShape(shape)` |
+| GraphQL response | `response.Should.MatchShape(shape)`; `ExpectAsync`/`ExpectNextAsync` assert for you |
+| gRPC reply | `ProtoGrpcAssertions.For(reply).Should.MatchShape(shape)` |
+| Consumed message | `message.Should.MatchShape(shape)` |
+| Sheets table row | `row.Should.MatchShape(shape)` |
+| Sheets model row | `row.ShouldMatchShape(shape)` — a record is a user type, so C# cannot give it a `Should` extension property |
+
+You describe the JSON you expect with an anonymous object, and the matcher compares.
 
 ```csharp
-response.ShouldMatchShape(new
+response.Should.MatchShape(new
 {
     id = JsonValue.GreaterThan(0),
     status = "pending",
@@ -92,7 +103,16 @@ public sealed class JsonShapeMismatchException : ProtoAssertionException
 }
 ```
 
-Empty or invalid JSON throws `JsonDocumentAssertionException` instead, with the content in its `Content` property.
+Each protocol producer rethrows the matcher failure as its own assertion exception (`RestAssertionException`, `GraphQLAssertionException`, `GrpcAssertionException`, `MessagingAssertionException`, `SpreadsheetAssertionException`) whose message **starts with the subject it was asserted against** and keeps the matcher exception — and so the mismatch list — as `InnerException`:
+
+```
+GET /api/orders/42 — Shape mismatch failed with 1 error(s):
+  • [$.status]: Values did not match. (Expected: "pending", Actual: "cancelled")
+```
+
+The subject is the REST request identifier, the GraphQL operation, the gRPC message type, the messaging destination, or the sheet row's `Sheet!Range` (a model row names the record type).
+
+Empty or invalid JSON throws `JsonDocumentAssertionException` instead, with the content in its `Content` property; the producer wraps it the same way.
 
 ## Constraints
 
@@ -162,7 +182,7 @@ public sealed record IsoCurrency : IJsonValueMatcher
 ```
 
 ```csharp
-response.ShouldMatchShape(new { total = new { currency = new IsoCurrency() } });
+response.Should.MatchShape(new { total = new { currency = new IsoCurrency() } });
 ```
 
 In GraphQL shapes, any `IJsonValueMatcher` is also treated as a leaf field when building the selection set.
@@ -174,7 +194,7 @@ IReadOnlyList<string> matched = JsonShapeMatcher.AssertMatch(json, expectedShape
 IReadOnlyList<string> matched = JsonShapeMatcher.AssertMatch(jsonElement, expectedShape, options);
 ```
 
-It returns the JSON paths that matched and throws the same exceptions the protocol assertions do.
+It returns the JSON paths that matched and throws the matcher exceptions (`JsonShapeMismatchException`, `JsonDocumentAssertionException`); the protocol assertions wrap those with the subject they were made against.
 
 ## Evidence in the trace
 

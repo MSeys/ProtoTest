@@ -44,9 +44,11 @@ checkboxes below stay the source of truth for scope, and `eng/plan-4.md` is the 
 
 ## Track A — 1.1 polish and trust (small, user-visible)
 
-- [ ] **A1 Path-based single-value read** — `ReadAsJson<int>("$.id")` on responses, so one value does not
+- [x] **A1 Path-based single-value read** — `ReadAsJson<int>("$.id")` on responses, so one value does not
   need a wrapper record. Add to `ProtoTest.Http`/`Rest`/`GraphQL` where the response type already reads
-  JSON. Tests: missing path, wrong type, JSON null, numeric precision. Effort: days.
+  JSON. Tests: missing path, wrong type, JSON null, numeric precision. Effort: days. **Done in plan-5
+  Phase 3b DX-05** (REST `ReadAsJson<T>(path)`, GraphQL `ReadDataAs<T>(path)`, shared `JsonPathResolver`
+  subset `$`/dots/`[n]`; `ReadRequired<T>(path)` composes with it).
 - [x] **A2 Clock sweep** (brief item): resolved by plan-4 P3 - no `IClock` or `TimeProvider` reference
   existed in the samples to migrate, and the framework now provides a test clock for the code that
   needs one.

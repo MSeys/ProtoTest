@@ -35,6 +35,8 @@ flowchart TB
 
 **[Clients](./clients.md)** are what integrations give you: `Rest()`, `GraphQL()`, `Web()`. Under the hood each is created per test by a client initializer, which you can write yourself.
 
+**[Assertions](./assertions.md)** are the surface every integration exposes: `Should`/`ShouldNot`, chainable assertion members and `Should.MatchShape`.
+
 **[Attachments](./attachments.md)** are files a test produces — response bodies, screenshots — handed to your runner and bundled into the trace.
 
 **[Skip conditions](./skip-conditions.md)** stop a test before its lifecycle starts when the host cannot run it, so an environment-specific test reads as skipped.

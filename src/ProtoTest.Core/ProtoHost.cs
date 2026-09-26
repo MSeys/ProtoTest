@@ -129,11 +129,57 @@ public sealed class ProtoHost : IAsyncDisposable
     /// can actually do rather than what it was asked to do.
     /// </summary>
     public bool HasCapability(string kind, string? name = null)
+        => HasCapability(kind, name, instance: null);
+
+    /// <summary>
+    /// Returns whether the host is composed with a capability of the given kind narrowed by the
+    /// descriptor <paramref name="name"/> and/or the <paramref name="instance"/> it describes (an
+    /// <c>AddAspNetCoreServer</c> name, an application an in-process device transport belongs to). A
+    /// <see langword="null"/> filter matches anything; every non-null filter must match. The two-argument
+    /// form matches the descriptor name only - use this overload to address an instance such as a named
+    /// server.
+    /// </summary>
+    public bool HasCapability(string kind, string? name, string? instance)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(kind);
         return _rootServiceProvider.GetServices<ProtoCapabilityDescriptor>().Any(capability =>
             string.Equals(capability.Kind, kind, StringComparison.Ordinal)
-            && (name is null || string.Equals(capability.Name, name, StringComparison.Ordinal)));
+            && (name is null || string.Equals(capability.Name, name, StringComparison.Ordinal))
+            && (instance is null || string.Equals(capability.Instance, instance, StringComparison.Ordinal)));
+    }
+
+    /// <summary>
+    /// Returns whether the host declares an application of this name through <c>AddApplication</c>, so a
+    /// skip condition can answer whether the suite composed the application under test rather than
+    /// whether an address happens to be configured.
+    /// </summary>
+    public bool HasApplication(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return _rootServiceProvider.GetServices<ProtoApplicationClients>()
+            .Any(application => string.Equals(application.ApplicationName, name, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Finds the suite-level reason a capability gate reports when it skips, declared through
+    /// <c>AddCapabilityReason</c>. A reason declared for the exact <paramref name="name"/> wins over one
+    /// declared for <paramref name="kind"/> as a whole; <see langword="null"/> when the suite declared no
+    /// reason (the gate then uses its own default).
+    /// </summary>
+    public string? FindCapabilityReason(string kind, string? name = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
+        var reasons = _rootServiceProvider.GetServices<ProtoCapabilityReason>().ToArray();
+        return reasons
+                .FirstOrDefault(reason => string.Equals(reason.Kind, kind, StringComparison.Ordinal)
+                    && string.Equals(reason.Name, name, StringComparison.Ordinal))
+                ?.Reason
+            ?? (name is null
+                ? null
+                : reasons
+                    .FirstOrDefault(reason => string.Equals(reason.Kind, kind, StringComparison.Ordinal)
+                        && reason.Name is null)
+                    ?.Reason);
     }
 
     // A capability that describes one instance carries it in the entity id, so two live instances of

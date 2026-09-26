@@ -101,6 +101,28 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     public string TestId => Id.Value;
     public long TestNumber => Id.Number;
 
+    /// <summary>
+    /// Creates a readable name that is unique to this test and deterministic across runs, for a record
+    /// that must survive the test process: a tenant, an operator, an account, a customer. The name
+    /// derives from <see cref="TestId"/>, so parallel tests never collide and a rerun against a
+    /// persistent store or a configured environment reuses the same record instead of guessing a new
+    /// one. Use <paramref name="sequence"/> when one test creates several objects of the same kind; the
+    /// default (<c>0</c>) omits it. This is the test-scoped companion of ProtoTest.Data's
+    /// <c>ProtoDataValueContext.NextString()</c>, which derives generated member defaults the same way.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// var tenant = context.UniqueName("tenant");        // "tenant-0042317"
+    /// var second = context.UniqueName("member", 2);     // "member-0042317-2"
+    /// </code>
+    /// </example>
+    public string UniqueName(string name, int sequence = 0)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentOutOfRangeException.ThrowIfNegative(sequence);
+        return sequence == 0 ? $"{name}-{TestId}" : $"{name}-{TestId}-{sequence}";
+    }
+
     /// <summary>Records automatic execution diagnostics for ProtoTest integrations.</summary>
     public IProtoTraceWriter Trace { get; }
 

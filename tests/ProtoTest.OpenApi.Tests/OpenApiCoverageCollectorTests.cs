@@ -312,7 +312,7 @@ public class OpenApiCoverageCollectorTests
             // Act
             using var response = await Proto.Context.Rest().GetAsync("/users/{id}", new { id = 42 });
             response.Should.HaveHttpStatus(System.Net.HttpStatusCode.OK)
-                .ShouldMatchShape(new { id = "42", name = "Ada" });
+                .Should.MatchShape(new { id = "42", name = "Ada" });
 
             // Assert
             var collectors = Proto.Context.Services.GetServices<IProtoCollector>().ToArray();

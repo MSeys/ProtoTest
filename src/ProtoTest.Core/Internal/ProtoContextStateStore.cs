@@ -18,6 +18,10 @@ internal sealed class ProtoContextStateStore
     public T Get<T>(string? key) where T : class, IProtoContext
         => TryGet<T>(key)
            ?? throw new InvalidOperationException(key is null
-               ? $"No context of type '{typeof(T).Name}' registered."
-               : $"No context of type '{typeof(T).Name}' registered under key '{key}'.");
+               ? $"No context of type '{typeof(T).Name}' is registered for this test. Register it before " +
+                 "the test body reads it - an attribute or hook calls context.SetContext(...) in setup - " +
+                 "or use TryResolve<T>() when the state is optional."
+               : $"No context of type '{typeof(T).Name}' is registered under key '{key}' for this test. " +
+                 "Register it before the test body reads it - an attribute or hook calls " +
+                 "context.SetContext(key, ...) in setup - or use TryResolve<T>(key) when the state is optional.");
 }

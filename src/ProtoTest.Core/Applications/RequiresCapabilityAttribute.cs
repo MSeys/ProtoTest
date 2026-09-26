@@ -46,17 +46,33 @@ public class RequiresCapabilityAttribute : ProtoAttribute, IProtoSkipCondition
     /// <summary>The capability name within the kind, when a specific one is required.</summary>
     public string? CapabilityName { get; init; }
 
+    /// <summary>
+    /// The instance within the capability when a specific one is required - the name of an
+    /// <c>AddAspNetCoreServer</c> server, an application an in-process device transport belongs to
+    /// (<see cref="ProtoCapabilityDescriptor.Instance"/>). <see cref="CapabilityName"/> and this filter
+    /// compose: every non-null filter must match.
+    /// </summary>
+    public string? CapabilityInstance { get; init; }
+
     /// <summary>The reason reported when the capability is missing.</summary>
     public string? Reason { get; init; }
 
     public string? GetSkipReason(ProtoHost host)
     {
         ArgumentNullException.ThrowIfNull(host);
-        return host.HasCapability(Kind, CapabilityName) ? null : Reason ?? DefaultReason;
+        if (host.HasCapability(Kind, CapabilityName, CapabilityInstance))
+        {
+            return null;
+        }
+
+        // A per-test reason wins over the suite-level one, which wins over this attribute's default.
+        return Reason
+            ?? host.FindCapabilityReason(Kind, CapabilityName ?? CapabilityInstance)
+            ?? DefaultReason;
     }
 
     protected virtual string DefaultReason
-        => $"This test requires the '{CapabilityName ?? Kind}' capability, which this host is not composed with.";
+        => $"This test requires the '{CapabilityInstance ?? CapabilityName ?? Kind}' capability, which this host is not composed with.";
 }
 
 /// <summary>

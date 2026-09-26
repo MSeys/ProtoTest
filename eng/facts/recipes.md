@@ -60,6 +60,11 @@ and the device client (`ProtoDeviceClient` + registration store). The shared rul
   otherwise the configured address. The transport is selected by the client's application identity,
   never by path or first match. Do not branch on environment in user code.
 
+Accessor shape: `context.<Protocol>()` returns a **client** for the protocols that address named clients
+(Rest, GraphQL, gRPC, Devices, Web) and the **capability interface** for the integrations that own one
+thing per run (Data, Sql, Sheets); a named client accessor fails naming the `Add*` call when the name is
+unknown.
+
 ## Recipe: infrastructure (a run-owned piece)
 
 `AddInfrastructure(piece, keys)` owns and releases it, starts it with the run in registration order,
@@ -117,12 +122,18 @@ examples).
 ## Recipe: configurable options
 
 1. Class with a `ConfigurationSectionName` constant and defaults; implement
-   `IProtoConfigurableOptions`.
+   `IProtoConfigurableOptions`. The section follows `ProtoTest:<Integration>[:<Area>]`, where the area
+   names the options type's role (`Responses`, `Attachments`, `Client`, `WebSocket`, `RabbitMq`); an
+   integration with one options set has no area segment.
 2. Register with `ProtoOptionsRegistration.Configure<T>(services, () => new T(), configure)` so code
    callbacks compose in order and the section binds over them (configuration wins).
 3. Validate real invariants in `Validate()`; it runs where options resolve. If a value must fail host
    construction, construct the consumer at `Build()` (the collector precedent).
-4. Test: code value, configuration override, and the validation failure.
+4. A renamed section keeps its old key working for one release by returning the old name from
+   `FallbackConfigurationSectionName`, documented as deprecated; the current section binds over the
+   fallback, so its value wins. Remove the fallback at the next major.
+5. Test: code value, configuration override, the validation failure, and (for a fallback) both sections
+   binding with the current one winning.
 
 ## Recipe: an observation and its coverage
 
@@ -149,10 +160,11 @@ examples).
 
 ## Recipe: a skip condition
 
-Prefer the shipped ones: `[RequiresCapability(kind, CapabilityName = ...)]`, `[RequiresInProcess]`,
-`[RequiresDevice<T>]`. A new condition implements `IProtoSkipCondition` and is evaluated by adapters
-before `StartTestAsync` (no lifecycle, no context). The reason must name what is missing and how to
-provide it.
+Prefer the shipped ones: `[RequiresCapability(kind, CapabilityName = ...)]` (or
+`CapabilityInstance = ...`), `[RequiresInProcess]`, `[RequiresDevice<T>]`,
+`[RequiresWorker<TProgram>]`, `[RequiresServer(name)]`, `[RequiresApplication(name)]`. A new condition
+implements `IProtoSkipCondition` and is evaluated by adapters before `StartTestAsync` (no lifecycle, no
+context). The reason must name what is missing and how to provide it.
 
 ## Recipe: a runner adapter
 
@@ -168,6 +180,18 @@ tests that call hooks directly create false confidence (Audit 3 class 7).
 Put shared doubles in `tests/ProtoTest.TestSupport` (`StubHttpHandler`, `StubTransportInitializer`,
 `StaticConfigurationSource`, temp-trace helpers, `FreePort`). Copy nothing twice; the lint gate greps
 for known duplicates (audit TST-2).
+
+## Test style (samples, the template and new tests)
+
+- Group assertions with `using (Assert.EnterMultipleScope()) { … }` (NUnit 4), not
+  `Assert.Multiple(() => …)`; older tests are not churned for style.
+- Integration journeys, samples and the template use a PascalCase sentence
+  (`CreatingAnOrderReturnsIt`); pure unit fixtures keep `Subject_ShouldOutcome`.
+- `using` directives go inside the file-scoped namespace; only an assembly-attribute file (the TUnit
+  and xUnit v3 `Setup.cs` files) puts them before the namespace.
+- A suite states a capability gate's skip reason once with
+  `AddCapabilityReason(kind, reason, name?)`; a gate's own `Reason` still overrides it, and an
+  unregistered `(kind, name)` falls back to the attribute's default message.
 
 ## Anti-patterns (audit-backed)
 

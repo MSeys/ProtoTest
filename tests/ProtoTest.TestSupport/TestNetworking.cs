@@ -3,7 +3,7 @@ namespace ProtoTest.TestSupport;
 using System.Net;
 using System.Net.Sockets;
 
-/// <summary>The network helpers suites share instead of copying (audit TST-2).</summary>
+/// <summary>The network helpers suites share instead of copying.</summary>
 public static class TestNetworking
 {
     /// <summary>

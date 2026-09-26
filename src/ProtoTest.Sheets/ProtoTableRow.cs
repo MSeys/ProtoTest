@@ -59,7 +59,8 @@ public sealed class ProtoTableRow
 
     /// <summary>
     /// The shape assertion behind <see cref="ProtoTableRowAssertions.MatchShape"/> and the obsolete
-    /// extension shim. The subject is the row's <c>Sheet!Range</c> reference.
+    /// extension shim. The subject is the row's <c>Sheet!Range</c> reference, traced on the owning
+    /// table's context, so the assertion lands under the test that read the row whatever flow runs it.
     /// </summary>
     internal ProtoTableRow AssertShape(object expectedShape, JsonSerializerOptions? options = null)
     {
@@ -69,7 +70,8 @@ public sealed class ProtoTableRow
             nameof(ProtoTableRow),
             _table.RowRange(RowNumber),
             expectedShape,
-            options);
+            options,
+            _table.Context);
         return this;
     }
 }

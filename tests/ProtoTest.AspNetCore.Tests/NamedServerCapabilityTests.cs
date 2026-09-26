@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 
 /// <summary>
-/// Pins the per-instance server capability (audit REG-1/REG-2): each named registration declares its
+/// Pins the per-instance server capability: each named registration declares its
 /// own capability, so one configured address drops only that server's capability and the shared query
 /// still answers for the live in-process server.
 /// </summary>

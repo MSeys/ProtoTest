@@ -7,7 +7,7 @@ using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 
 /// <summary>
-/// Stage 0 characterization for the TUnit setup and teardown failure paths (Audit 3, findings E5/F1).
+/// Characterization for the TUnit setup and teardown failure paths.
 /// The executor surfaces a setup failure with its original exception and records one failed trace; a
 /// teardown failure keeps the reported result and lands as a Partial trace with a finding.
 /// </summary>

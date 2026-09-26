@@ -184,7 +184,7 @@ public class ProtoRunGateTests
     [Test]
     public async Task GateThatThrows_ShouldKeepTheExceptionTypeAndStackInTraceAndReport()
     {
-        // A5.3 (Audit 5, A5-23): the thrown exception is the evidence; a string-only verdict drops it.
+        // The thrown exception is the evidence; a string-only verdict drops it.
         var sink = new CapturingSink();
         var builder = new ProtoHostBuilder();
         builder.AddSink(sink);

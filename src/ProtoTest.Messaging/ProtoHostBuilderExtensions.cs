@@ -97,6 +97,53 @@ public sealed class ProtoMessagingBuilder
         });
         return this;
     }
+
+    /// <summary>
+    /// Declares the destinations this suite owns, in code, so the adapter creates them on the broker
+    /// during test setup - before any tap binds and before the act publishes. A suite that owns the
+    /// broker and publishes its own events uses <c>Declare</c> for the destinations nothing else
+    /// declares; a destination the application declares stays the application's. Repeated calls
+    /// compose and skip a value already declared; configuration under
+    /// <c>ProtoTest:Messaging:DeclaredDestinations</c> still applies over these values. Declaration is
+    /// idempotent: an adapter leaves an existing destination as it is, a destination is declared once
+    /// per run, and a repeated declaration is a no-op.
+    /// </summary>
+    /// <remarks>
+    /// The declaration is configuration, not a runtime call: the builder is consumed when
+    /// <c>AddMessaging</c> runs, so a destination cannot be declared after a test has prepared. An
+    /// adapter whose broker has no topology - the in-memory broker, where every destination already
+    /// exists - treats <c>Declare</c> as a no-op.
+    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="destinations"/> is empty, or contains a null, empty or whitespace destination.
+    /// </exception>
+    public ProtoMessagingBuilder Declare(params string[] destinations)
+    {
+        ArgumentNullException.ThrowIfNull(destinations);
+        if (destinations.Length == 0)
+        {
+            throw new ArgumentException("Provide at least one destination.", nameof(destinations));
+        }
+
+        foreach (var destination in destinations)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(destination);
+        }
+
+        // The same options callback shape as Tap: repeated calls compose in order and the configuration
+        // section binds over the result, so the environment can add declarations.
+        ProtoOptionsRegistration.Configure(Services, () => new MessagingOptions(), options =>
+        {
+            foreach (var destination in destinations)
+            {
+                if (!options.DeclaredDestinations.Contains(destination, StringComparer.Ordinal))
+                {
+                    options.DeclaredDestinations.Add(destination);
+                }
+            }
+        });
+        return this;
+    }
 }
 
 public static class ProtoHostBuilderExtensions

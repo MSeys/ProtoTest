@@ -31,7 +31,7 @@ public class OpenApiCoverageCollectorTests
     [Test]
     public void MissingSpecification_ShouldFailWhenTheHostIsBuilt()
     {
-        // Stage 5 (Audit 3, finding D5): collectors are constructed at Build, so a missing specification
+        // Collectors are constructed at Build, so a missing specification
         // fails configuration instead of the first test that happens to record an observation.
         var builder = new ProtoHostBuilder();
         builder.AddRest(rest => rest

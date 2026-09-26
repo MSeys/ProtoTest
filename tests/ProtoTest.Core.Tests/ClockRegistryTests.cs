@@ -1,7 +1,7 @@
 namespace ProtoTest.Core.Tests;
 
 /// <summary>
-/// Pins the host-scoped clock lookup (audit CFG-3): one <see cref="ProtoClockRegistry"/> belongs to
+/// Pins the host-scoped clock lookup: one <see cref="ProtoClockRegistry"/> belongs to
 /// each host, so two hosts that share a test id resolve their own clocks, a failed test start leaves
 /// no entry, and host disposal clears the registry.
 /// </summary>

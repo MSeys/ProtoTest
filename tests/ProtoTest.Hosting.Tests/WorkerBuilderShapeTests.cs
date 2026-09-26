@@ -8,7 +8,7 @@ using ProtoTest.Hosting.Internal;
 using ProtoTest.Hosting.TestWorker;
 
 /// <summary>
-/// Pins the worker builder-shape boundary (audit DEV-6 and A3R-01): the HostBuilding overlay is the
+/// Pins the worker builder-shape boundary: the HostBuilding overlay is the
 /// documented fallback when the entry point ignores its arguments, the application-builder shape is
 /// matched through <see cref="IHostApplicationBuilder"/> (which <c>WebApplicationBuilder</c> also
 /// implements), and an unrecognised builder fails loudly instead of silently losing the configuration

@@ -9,7 +9,7 @@ public sealed class ParameterizedRowTests
     [Arguments(2)]
     public async Task Rows_ShouldRecordTheirOwnTraceNames(int row)
     {
-        // Audit 5 A5.6 (D-05): TUnit names every row by the method alone, so parallel rows were
+        // TUnit names every row by the method alone, so parallel rows would be
         // indistinguishable in the trace. The adapter now composes the same row form MSTest records;
         // the rows run in parallel, and each asserts its own name and its own trace record.
         var method = typeof(ParameterizedRowTests).GetMethod(nameof(Rows_ShouldRecordTheirOwnTraceNames))!;

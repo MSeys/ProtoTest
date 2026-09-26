@@ -101,7 +101,7 @@ The composer above gives a suite its direct starting packages. This reference in
 | `ProtoTest.Json` | `dotnet add package ProtoTest.Json` | partial JSON shape matching and `JsonValue` constraints; normally transitive | `JsonShapeMatcher.AssertMatch`, `JsonValue` |
 | `ProtoTest.Testcontainers` | `dotnet add package ProtoTest.Testcontainers` | `ProtoContainerResource<TContainer>` base for run-scoped containers: start-once, release-once, `TryStart` | `builder.AddInfrastructure(…)` |
 | `ProtoTest.Reporting` | `dotnet add package ProtoTest.Reporting` | JSON and HTML report sinks | `builder.AddSink<JsonReportSink>()`, `AddSink<HtmlReportSink>()` |
-| `ProtoTest.OpenTelemetry` | `dotnet add package ProtoTest.OpenTelemetry` | export ProtoTest operations as OpenTelemetry spans | `tracerBuilder.AddProtoTestInstrumentation()` |
+ProtoTest's operations are also `Activity`s on the `ProtoTest` source; subscribe OpenTelemetry with `AddSource("ProtoTest")` — see [OpenTelemetry](../observability/opentelemetry.md). No bridge package is needed.
 
 ### Runners and templates
 

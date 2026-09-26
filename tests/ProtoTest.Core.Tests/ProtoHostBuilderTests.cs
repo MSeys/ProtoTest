@@ -1,7 +1,7 @@
 namespace ProtoTest.Core.Tests;
 
 /// <summary>
-/// Stage 2 (Audit 3, finding B8): after the host is built, adding a resource or configuring tracing
+/// After the host is built, adding a resource or configuring tracing
 /// would mutate the live host instead of composing it, so both are rejected like a second build.
 /// </summary>
 [TestFixture]

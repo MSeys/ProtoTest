@@ -23,7 +23,7 @@ public sealed class GrpcIntegrationTests
     [Test]
     public async Task CancelledCall_ShouldRecordACancelledOperation()
     {
-        // Stage 3 (Audit 3, finding D3): one cancellation rule; gRPC reports both an OCE and a status
+        // One cancellation rule; gRPC reports both an OCE and a status
         // code for a cancelled call, and both are recorded as cancelled.
         var builder = new ProtoHostBuilder();
         builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
@@ -55,7 +55,7 @@ public sealed class GrpcIntegrationTests
     [Test]
     public async Task NonRpcFailure_ShouldRecordTheSharedFailureObservation()
     {
-        // Audit 5 A5.9 (B06): every failure - not only an RpcException - records the shared
+        // Every failure - not only an RpcException - records the shared
         // failure-diagnostics record through the guard, with the call duration.
         var builder = new ProtoHostBuilder();
         builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
@@ -220,7 +220,7 @@ public sealed class GrpcIntegrationTests
     [NonParallelizable]
     public async Task Auth_ShouldResolveAFreshAuthenticatorForEveryCall()
     {
-        // Audit 5, A5-35: the decided contract is a fresh authenticator per call (Audit 3 D11), for the
+        // The decided contract is a fresh authenticator per call, for the
         // traced helpers and the raw helpers alike; nothing caches an authenticator across calls.
         Interlocked.Exchange(ref CountingAuthenticator.Created, 0);
         var builder = new ProtoHostBuilder();
@@ -636,7 +636,7 @@ public sealed class GrpcIntegrationTests
         builder.AddApplication("Echo", app => app.AddGrpc(grpc => grpc.AddClient("Default")));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc transport", ApplicationTransportTestMethod());
+        var context = await host.StartTestAsync("grpc transport", ApplicationTransportTestMethod(), [new ApplicationAttribute("Echo")]);
         var client = context.Grpc();
 
         var reply = await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "transport" });
@@ -654,10 +654,10 @@ public sealed class GrpcIntegrationTests
     [Test]
     public async Task ApplicationTransportFallback_ShouldApplyTheRunWideConfiguredOptions()
     {
-        // A named client's code callback is its own (Audit 5, A5-03); the transport fallback an
+        // A named client's code callback is its own; the transport fallback an
         // unregistered target resolves to reads the run-wide default, which binds the shared
-        // ProtoTest:Grpc:Client section. That keeps Audit 3's D2 fix - the fallback must not start from
-        // hardcoded defaults - without letting one client's callback leak into another target.
+        // ProtoTest:Grpc:Client section instead of starting from hardcoded defaults, without
+        // letting one client's callback leak into another target.
         var builder = new ProtoHostBuilder();
         builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>
@@ -676,7 +676,7 @@ public sealed class GrpcIntegrationTests
         builder.AddApplication("Echo", _ => { });
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc fallback options", ApplicationTransportTestMethod());
+        var context = await host.StartTestAsync("grpc fallback options", ApplicationTransportTestMethod(), [new ApplicationAttribute("Echo")]);
         var client = context.Grpc("Unregistered");
 
         var reply = await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "options" });
@@ -700,7 +700,7 @@ public sealed class GrpcIntegrationTests
     [Test]
     public async Task ApplicationTransport_WithoutABaseAddress_ShouldNameTheAddressSources()
     {
-        // Audit 5, A5-31: a transport with no base address must fail with the message that names the
+        // A transport with no base address must fail with the message that names the
         // address sources instead of silently dialing http://localhost.
         var builder = new ProtoHostBuilder();
         builder.ConfigureServices(services =>
@@ -711,7 +711,7 @@ public sealed class GrpcIntegrationTests
         builder.AddApplication("Echo", app => app.AddGrpc());
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc transport without address", ApplicationTransportTestMethod());
+        var context = await host.StartTestAsync("grpc transport without address", ApplicationTransportTestMethod(), [new ApplicationAttribute("Echo")]);
         var client = context.Grpc();
 
         var exception = Assert.ThrowsAsync<InvalidOperationException>(
@@ -739,7 +739,7 @@ public sealed class GrpcIntegrationTests
         builder.AddApplication("Echo", app => app.AddGrpc(grpc => grpc.AddClient("Default")));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc published address", ApplicationTransportTestMethod());
+        var context = await host.StartTestAsync("grpc published address", ApplicationTransportTestMethod(), [new ApplicationAttribute("Echo")]);
         var client = context.Grpc();
 
         var reply = await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "published" });
@@ -759,7 +759,7 @@ public sealed class GrpcIntegrationTests
         builder.AddApplication("Echo", app => app.AddGrpc(grpc => grpc.AddClient("Default")));
         await using var host = builder.Build();
         await host.StartAsync();
-        var context = await host.StartTestAsync("grpc missing address", ApplicationTransportTestMethod());
+        var context = await host.StartTestAsync("grpc missing address", ApplicationTransportTestMethod(), [new ApplicationAttribute("Echo")]);
         var client = context.Grpc();
 
         var exception = Assert.ThrowsAsync<InvalidOperationException>(

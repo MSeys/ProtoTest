@@ -12,6 +12,17 @@ Register it with `UseRabbitMq()`. Messages are published to exchanges and each t
 builder.AddMessaging(messaging => messaging.Tap("invoice-paid").UseRabbitMq());
 ```
 
+A destination the suite owns and nothing else declares is created with `Declare`, once per run during setup and before any tap binds: a fanout, durable, non-auto-delete exchange. A suite that owns the broker and publishes its own events needs no raw broker client:
+
+```csharp
+builder.AddMessaging(messaging => messaging
+    .Declare("invoice-paid")
+    .Tap("invoice-paid")
+    .UseRabbitMq());
+```
+
+A destination that already exists with that shape, or a repeated declaration, is a no-op.
+
 The RabbitMQ connection is shared for the run, while awaited messages remain isolated per test.
 
 ## Learn more

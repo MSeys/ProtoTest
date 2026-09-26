@@ -23,8 +23,8 @@ public sealed class WebSessionAttribute : ProtoAttribute
         Name = string.IsNullOrWhiteSpace(name)
             ? throw new ArgumentException("A web session name is required.", nameof(name))
             : name;
-        // Declarations run before logins (default Order 0), so a session is open before it is logged in.
-        Order = -10;
+        // A session is declared before a login runs, so the login finds an open session.
+        Order = ProtoAttributeOrder.SessionDeclaration;
     }
 
     /// <summary>Gets the session name, matching <c>Proto.Context.Web(name)</c> and <c>LoginAs(Session = ...)</c>.</summary>

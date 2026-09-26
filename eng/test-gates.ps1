@@ -114,7 +114,7 @@ Write-Host ""
 
 try {
     # A stage that genuinely changed no code runs only the docs check and records docs-only, never
-    # code-green (audit A5-05).
+    # code-green.
     Invoke-Fixture "verify-docs-only" {
         $root = New-FixtureRepository "verify-docs-only"
         Add-FixtureFile -Root $root -RelativePath "notes.md" -Content "# stage notes" | Out-Null
@@ -131,7 +131,7 @@ try {
         Assert-Fixture (@($record.skippedCodeGates).Count -eq 0) "a docs-only stage skipped no applicable code gate"
     }
 
-    # One changed project runs the tests and scopes format to that project (audit A5-05).
+    # One changed project runs the tests and scopes format to that project.
     Invoke-Fixture "verify-one-project" {
         $root = New-FixtureRepository "verify-one-project"
         Add-FixtureFile -Root $root -RelativePath "src/Foo/Foo.csproj" -Content "<Project />" | Out-Null
@@ -149,7 +149,7 @@ try {
     }
 
     # A committed code stage on a clean tree can no longer skip the code gates silently: the record is
-    # incomplete and non-green until -Full covers it (audit A5-05).
+    # incomplete and non-green until -Full covers it.
     Invoke-Fixture "verify-committed-code-incomplete" {
         $root = New-FixtureRepository "verify-committed-code"
         Add-FixtureFile -Root $root -RelativePath "src/Foo/Foo.csproj" -Content "<Project />" | Out-Null
@@ -234,7 +234,7 @@ try {
         Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "test") -ne "") "the tests still ran"
     }
 
-    # The lint duplication rule catches an obvious rename of a shared helper (audit A5-64).
+    # The lint duplication rule catches an obvious rename of a shared helper.
     Invoke-Fixture "lint-renamed-helpers" {
         $root = New-FixtureRepository "lint-renamed-helpers"
         New-Item -ItemType Directory -Path (Join-Path $root "tests/ProtoTest.TestSupport") -Force | Out-Null
@@ -260,7 +260,7 @@ internal sealed class LazyTemporaryTrace
     }
 
     # The docs key cross-check runs without the private facts checkout, against the tracked public key
-    # list (audit A5-06).
+    # list.
     Invoke-Fixture "check-docs-public-keys" {
         if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return "skip" }
 
@@ -301,7 +301,7 @@ internal sealed class LazyTemporaryTrace
         Assert-Fixture ($drift.Text.Contains("stale")) "the drift failure must say so: $($drift.Text)"
     }
 
-    # Publishing from a branch ref fails before any push; dry runs stay allowed (audit A5-07).
+    # Publishing from a branch ref fails before any push; dry runs stay allowed.
     Invoke-Fixture "release-branch-ref" {
         $root = New-FixtureRepository "release-branch-ref"
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot "release.ps1") -Destination (Join-Path $root "eng/release.ps1")
@@ -325,7 +325,7 @@ internal sealed class LazyTemporaryTrace
         }
     }
 
-    # The release workflow keeps the publish path tag-gated (audit A5-07).
+    # The release workflow keeps the publish path tag-gated.
     Invoke-Fixture "release-workflow-tag-guard" {
         $workflow = Get-Content -Raw -LiteralPath (Join-Path $repository ".github/workflows/release.yml")
         Assert-Fixture ($workflow -match "(?s)id: login.*?if: [^\n]*github\.ref_type == 'tag'") "the NuGet login step must be gated on a tag"
@@ -333,7 +333,7 @@ internal sealed class LazyTemporaryTrace
         Assert-Fixture ($workflow -match "(?s)Create or update GitHub Release\s*\n\s*if: github\.ref_type == 'tag'") "the GitHub release step stays tag-gated"
     }
 
-    # Both MTP zero-test guards fail on a filter that matches no test (audit A5-65). The xUnit v3
+    # Both MTP zero-test guards fail on a filter that matches no test. The xUnit v3
     # runner exits 0 on a zero-test run, so the structured JUnit result is what the gate compares with
     # its minimum; TUnit enforces --minimum-expected-tests itself. Needs the Release test binaries.
     Invoke-Fixture "mtp-zero-test-guards" {

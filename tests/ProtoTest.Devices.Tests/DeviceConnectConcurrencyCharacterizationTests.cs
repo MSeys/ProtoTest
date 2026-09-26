@@ -3,7 +3,7 @@ namespace ProtoTest.Devices.Tests;
 using ProtoTest.Core;
 
 /// <summary>
-/// Pins the device session's concurrency contract (audit DEV-3): connect is single-flight, sends are
+/// Pins the device session's concurrency contract: connect is single-flight, sends are
 /// serialized, one receive is in flight at a time, and a disconnect that races a send fails with a
 /// device error naming the device instead of a disposed-socket exception.
 /// </summary>

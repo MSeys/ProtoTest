@@ -5,7 +5,7 @@ using ProtoTest.Core;
 using ProtoTest.Messaging;
 
 /// <summary>
-/// Pins the Broker capability's address rule (audit ADDR-1): <c>UseRabbitMq</c> declares it only while
+/// Pins the Broker capability's address rule: <c>UseRabbitMq</c> declares it only while
 /// the connection-string key can be provided - configured, or declared by a registered broker
 /// container - so a run with neither skips instead of failing at setup or first publish.
 /// </summary>
@@ -95,6 +95,20 @@ public sealed class ProvidedAddressCapabilityTests
             host.HasCapability(ProtoCapabilityKinds.Broker),
             Is.True,
             "a code-provided address cannot be withdrawn by configuration");
+    }
+
+    [Test]
+    public async Task UseRabbitMq_WhenDeclarationsExistButNoAddressIsProvided_ShouldStillDropTheBrokerCapability()
+    {
+        var builder = BuilderWith();
+        builder.AddMessaging(messaging => messaging.Declare("suite.owned").UseRabbitMq());
+
+        await using var host = builder.Build();
+
+        Assert.That(
+            host.HasCapability(ProtoCapabilityKinds.Broker),
+            Is.False,
+            "a declaration changes no address rule: without a configured key or a container there is no broker to declare on");
     }
 
     [Test]

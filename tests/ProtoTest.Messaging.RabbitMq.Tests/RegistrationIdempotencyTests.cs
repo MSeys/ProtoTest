@@ -50,5 +50,31 @@ public sealed class RegistrationIdempotencyTests
         await host.StopAsync();
     }
 
+    [Test]
+    public async Task AddMessaging_WhenTheRabbitMqConfigureCallbackThrows_ShouldLeaveNoRegistrationBehind()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
 
+        Assert.Throws<InvalidOperationException>(
+            () => builder.AddMessaging(messaging => messaging.UseRabbitMq(
+                _ => throw new InvalidOperationException("bad options"))));
+
+        // The throwing call ran the callback before registering anything, so a later call composes
+        // from scratch instead of finding a half-applied registration.
+        builder.AddMessaging(messaging => messaging.UseRabbitMq(
+            options => options.ConnectionString = "amqp://127.0.0.1:1/"));
+        await using var host = builder.Build();
+
+        Assert.That(host.HasCapability(ProtoCapabilityKinds.Broker), Is.True);
+
+        await host.StartAsync();
+        var context = await host.StartTestAsync("rabbitmq throw path", TestMethods.Placeholder);
+        Assert.That(
+            context.Service<RabbitMqOptions>().ConnectionString,
+            Is.EqualTo("amqp://127.0.0.1:1/"),
+            "the later call's options are the ones the run resolves");
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
 }

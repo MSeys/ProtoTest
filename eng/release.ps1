@@ -4,7 +4,7 @@ param(
     [string]$Configuration = "Release",
     [switch]$DryRun,
 
-    # Publishing is tag-gated (audit A5-07): a real push requires the v<version> tag, and only a
+    # Publishing is tag-gated: a real push requires the v<version> tag, and only a
     # deliberate local push passes -AllowBranch, which logs the exception.
     [switch]$AllowBranch,
     [string]$Source = "https://api.nuget.org/v3/index.json",

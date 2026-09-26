@@ -14,13 +14,12 @@ using ProtoTest.Core.Internal;
 public sealed class ProtoHost : IAsyncDisposable
 {
     private readonly IServiceProvider _rootServiceProvider;
-    private readonly ProtoRunHooks _runHooks;
+    private readonly ProtoRunLifecycle _runLifecycle;
     private readonly ProtoTestLifecycle _testLifecycle;
     private readonly ProtoTraceSession _trace;
     private readonly ProtoClock _clock;
     private readonly ProtoClockRegistry _clockRegistry;
     private readonly ProtoRunStateMachine _runState = new();
-    private readonly List<IProtoRunHook> _startedHooks = [];
 
     // The builder is the only composition path: it registers the stores, gates and hooks the host's
     // reporting depends on, so a provider assembled by hand cannot produce a host that silently
@@ -40,7 +39,7 @@ public sealed class ProtoHost : IAsyncDisposable
         // assembled by hand gets a host-local one, cleared when the host is disposed.
         _clockRegistry = _rootServiceProvider.GetService<ProtoClockRegistry>() ?? new ProtoClockRegistry();
 
-        _runHooks = new ProtoRunHooks(runHooks);
+        _runLifecycle = new ProtoRunLifecycle(_rootServiceProvider, runHooks, _trace, _clock);
         _testLifecycle = new ProtoTestLifecycle(
             this, _rootServiceProvider, testHooks, testIdGenerator, _trace, _clock, _clockRegistry);
         _clock.Advanced += OnRunClockAdvanced;
@@ -103,7 +102,7 @@ public sealed class ProtoHost : IAsyncDisposable
     /// <summary>
     /// Gets the host owning the current test, or the sole active host outside a test.
     /// </summary>
-    public static ProtoHost CurrentHost => ProtoHostRegistry.GetCurrent(ProtoTestLifecycle.CurrentHost);
+    public static ProtoHost CurrentHost => ProtoHostRegistry.GetCurrent();
 
     /// <summary>
     /// Finds the trace writer of the test an application span belongs to, matched by its W3C trace id.
@@ -182,40 +181,15 @@ public sealed class ProtoHost : IAsyncDisposable
                     ?.Reason);
     }
 
-    // A capability that describes one instance carries it in the entity id, so two live instances of
-    // the same named capability stay two run entities instead of overwriting each other.
-    private static string CapabilityId(ProtoCapabilityDescriptor capability)
-        => capability.Instance is { Length: > 0 } instance
-            ? $"{capability.Kind}:{capability.Name}:{instance}"
-            : $"{capability.Kind}:{capability.Name}";
-
     public IConfiguration Configuration => _rootServiceProvider.GetRequiredService<IConfiguration>();
-
-    // A disposed provider throws on lookup, and disposal is exactly when the settings must be cleared:
-    // the host's own teardown paths treat "already gone" as "nothing left to clear".
-    private ProtoInfrastructureSettings? InfrastructureSettings
-    {
-        get
-        {
-            try
-            {
-                return _rootServiceProvider.GetService<ProtoInfrastructureSettings>();
-            }
-            catch (ObjectDisposedException)
-            {
-                return null;
-            }
-        }
-    }
 
     /// <summary>Gets immutable snapshots of the current run trace.</summary>
     public IProtoTraceSource Trace => _trace;
 
     /// <summary>
-    /// Executes all suite-level BeforeRun hooks in ascending order, then records the capabilities the
-    /// host is composed of as run entities. The whole start path runs once: a repeat call after a
-    /// successful start is a no-op, and a call while a start is in flight is rejected rather than
-    /// recording or starting anything twice.
+    /// Runs the run lifecycle's start path once: hooks, capability records, skipped declarations and
+    /// the run's infrastructure, then the trace listener. A repeat call after a successful start is a
+    /// no-op, and a call while a start is in flight is rejected rather than starting anything twice.
     /// </summary>
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
@@ -226,188 +200,17 @@ public sealed class ProtoHost : IAsyncDisposable
 
         try
         {
-            await _runHooks.RunBeforeAsync(_startedHooks, cancellationToken);
-
-            // A retry after a failed start re-owns the run-scoped resources the rollback released.
-            var runResources = _rootServiceProvider.GetService<ProtoRunResourceStore>();
-            runResources?.ResetForRestart();
-
-            foreach (var capability in _rootServiceProvider.GetServices<ProtoCapabilityDescriptor>())
-            {
-                _trace.RunWriter.SetEntityState(
-                    ProtoTraceEntityKinds.Capability,
-                    CapabilityId(capability),
-                    capability.Name,
-                    new Dictionary<string, string?>
-                    {
-                        ["capability.name"] = capability.Name,
-                        ["capability.kind"] = capability.Kind,
-                        ["capability.source"] = capability.Source,
-                        ["capability.instance"] = capability.Instance
-                    },
-                    scope: "run",
-                    change: "activated");
-            }
-
-            if (_rootServiceProvider.GetService<ProtoSkippedCapabilities>() is { Capabilities.Count: > 0 } skippedCapabilities)
-            {
-                // The capability is absent from the run overview: the environment either already
-                // provides what the dropped integration would serve, or cannot provide the address it
-                // needs. The event keeps the decision visible in the trace, names the deciding keys
-                // and says which condition decided it.
-                foreach (var skipped in skippedCapabilities.Capabilities)
-                {
-                    var capability = skipped.Capability;
-                    _trace.RunWriter.WriteEvent(
-                        "capability.skipped",
-                        $"Skipped · {capability.Name}",
-                        capability.Source,
-                        phase: ProtoTracePhase.Run,
-                        outcome: ProtoTraceOutcome.Skipped,
-                        attributes: new Dictionary<string, string?>
-                        {
-                            ["capability.name"] = capability.Name,
-                            ["capability.kind"] = capability.Kind,
-                            ["capability.instance"] = capability.Instance,
-                            ["capability.keys"] = string.Join(", ", skipped.Keys),
-                            ["capability.reason"] = skipped.Reason
-                        });
-                }
-            }
-
-            // Infrastructure starts before any test: the run owns it, records it, and lets an in-process
-            // application receive the connection strings as host settings. Hosts built without the builder
-            // (tests, embedded use) simply have none.
-            var settings = _rootServiceProvider.GetService<ProtoInfrastructureSettings>() ?? new ProtoInfrastructureSettings();
-            var configuration = _rootServiceProvider.GetService<IConfiguration>() ?? new ConfigurationBuilder().Build();
-            var timeProvider = _rootServiceProvider.GetService<TimeProvider>() ?? new ProtoTestTimeProvider(_clock);
-            var readinessOptions = _rootServiceProvider.GetService<ProtoReadinessOptions>();
-            var skippedInfrastructure = _rootServiceProvider.GetService<ProtoSkippedInfrastructure>()?.Ids;
-            var registrations = _rootServiceProvider.GetServices<ProtoInfrastructureRegistration>().ToArray();
-            var inProcessServers = _rootServiceProvider.GetServices<ProtoCapabilityDescriptor>()
-                .Where(capability => string.Equals(capability.Kind, ProtoCapabilityKinds.Server, StringComparison.Ordinal)
-                    && !string.IsNullOrWhiteSpace(capability.Instance))
-                .Select(capability => capability.Instance!)
-                .ToHashSet(StringComparer.Ordinal);
-            for (var index = 0; index < registrations.Length; index++)
-            {
-                var registration = registrations[index];
-                var infrastructure = registration.Infrastructure;
-
-                if (skippedInfrastructure is not null && skippedInfrastructure.Contains(infrastructure.Id))
-                {
-                    // Every address this piece would fill is already configured; starting it would
-                    // shadow the environment's values, so the run records it as skipped, not owned.
-                    _trace.RunWriter.SetEntityState(
-                        infrastructure.Kind,
-                        infrastructure.Id,
-                        infrastructure.Description,
-                        new Dictionary<string, string?>
-                        {
-                            ["infrastructure.kind"] = infrastructure.Kind,
-                            ["infrastructure.settings"] = string.Join(", ", registration.Settings),
-                            ["infrastructure.state"] = "skipped",
-                            ["infrastructure.reason"] = "already configured"
-                        },
-                        scope: "run",
-                        change: "skipped");
-                    continue;
-                }
-
-                // What a piece starting here cannot see yet: the settings keys infrastructure
-                // registered after it declares, and the applications an in-process server backs. The
-                // application readiness probe uses them to name an ordering mistake honestly.
-                var pendingSettings = new HashSet<string>(StringComparer.Ordinal);
-                for (var later = index + 1; later < registrations.Length; later++)
-                {
-                    if (skippedInfrastructure is not null
-                        && skippedInfrastructure.Contains(registrations[later].Infrastructure.Id))
-                    {
-                        continue;
-                    }
-
-                    pendingSettings.UnionWith(registrations[later].Settings);
-                }
-
-                var infrastructureContext = new ProtoInfrastructureContext(settings, configuration, timeProvider)
-                {
-                    Readiness = readinessOptions,
-                    PendingSettings = pendingSettings,
-                    InProcessServerApplications = inProcessServers
-                };
-
-                // Starting it again makes this a new ownership period: its release must run again.
-                runResources?.Rearm(infrastructure);
-                if (infrastructure is IProtoConfiguredInfrastructure configured)
-                {
-                    // Pieces that need the run's collected state (a worker reading a broker a container
-                    // just started, a readiness probe reading a published address) receive it here.
-                    await configured.StartAsync(infrastructureContext, cancellationToken);
-                }
-                else
-                {
-                    await infrastructure.StartAsync(cancellationToken);
-                }
-                var state = new Dictionary<string, string?>
-                {
-                    ["infrastructure.kind"] = infrastructure.Kind,
-                    ["infrastructure.settings"] = string.Join(", ", registration.Settings)
-                };
-                if (infrastructure is IProtoStartupEvidence evidence)
-                {
-                    foreach (var (key, value) in evidence.StartupEvidence)
-                    {
-                        state[key] = value;
-                    }
-                }
-                if (infrastructure is IProtoConnectionInfrastructure connection)
-                {
-                    foreach (var key in registration.Settings)
-                    {
-                        settings.Set(key, connection.ConnectionString);
-                    }
-                }
-
-                if (infrastructure is IProtoSettingsInfrastructure sourced)
-                {
-                    foreach (var (key, value) in sourced.Settings)
-                    {
-                        settings.Set(key, value);
-                    }
-                }
-
-                _trace.RunWriter.SetEntityState(
-                    infrastructure.Kind,
-                    infrastructure.Id,
-                    infrastructure.Description,
-                    state,
-                    scope: "run",
-                    change: "started");
-            }
-
-            _trace.StartListening();
+            await _runLifecycle.StartAsync(cancellationToken);
             _runState.CompleteStart();
         }
         catch (Exception exception)
         {
-            // Nothing that owns state may leak: every completed hook unwinds in reverse, so a user
-            // hook's BeforeRun setup is undone. Hooks whose AfterRun writes run evidence (gates,
-            // reports, the archive) are not unwound: a run that never finished starting produces no
-            // evidence, and the state returns to Created so a retry is possible.
-            var failures = new List<Exception> { exception };
-            IReadOnlyList<IProtoRunHook> rollbackHooks =
-                [.. _startedHooks.Where(hook => hook is not IProtoRunEvidenceHook)];
-            await _runHooks.RunAfterAsync(rollbackHooks, failures, cancellationToken);
-            _startedHooks.Clear();
+            // Nothing that owns state may leak: the run lifecycle unwinds every completed hook in
+            // reverse, while hooks whose AfterRun writes run evidence (gates, reports, the archive) stay
+            // silent for a run that never finished starting. The state returns to Created so a retry is
+            // possible.
+            var failures = await _runLifecycle.RollbackAsync(exception, cancellationToken);
             _runState.RollbackStart();
-
-            // The released infrastructure's connection strings must not survive into a retry or outlive
-            // the run: clear the keys they filled while they were alive.
-            if (InfrastructureSettings is { } settings)
-            {
-                settings.Clear();
-            }
-
             LifecycleExceptionHelper.ThrowIfAny(
                 "ProtoHost startup failed and the run's started resources were released.", failures);
         }
@@ -424,20 +227,15 @@ public sealed class ProtoHost : IAsyncDisposable
         var exceptions = new List<Exception>();
         try
         {
-            await _runHooks.RunAfterAsync(_startedHooks, exceptions, cancellationToken);
+            await _runLifecycle.StopAsync(exceptions, cancellationToken);
         }
         finally
         {
-            _startedHooks.Clear();
             _runState.CompleteStop(exceptions);
 
             // The run is over: the released infrastructure's connection strings must not stay readable,
             // and the trace is complete even when a hook failed to shut down.
-            if (InfrastructureSettings is { } settings)
-            {
-                settings.Clear();
-            }
-
+            _runLifecycle.ClearInfrastructureSettings();
             _trace.CompleteRun();
         }
 
@@ -589,10 +387,7 @@ public sealed class ProtoHost : IAsyncDisposable
 
         // Whichever path ran the teardown, the infrastructure is gone by now: its connection strings
         // must not remain readable through the settings object.
-        if (InfrastructureSettings is { } infrastructureSettings)
-        {
-            infrastructureSettings.Clear();
-        }
+        _runLifecycle.ClearInfrastructureSettings();
 
         try
         {

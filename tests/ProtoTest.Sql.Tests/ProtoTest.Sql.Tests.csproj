@@ -13,11 +13,13 @@
     </PackageReference>
     <PackageReference Include="NUnit3TestAdapter" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ProtoTest.Sql\ProtoTest.Sql.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Sql.EntityFrameworkCore\ProtoTest.Sql.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Sql.Testcontainers\ProtoTest.Sql.Testcontainers.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Pins the one post-<c>Build()</c> rule (audit REG-3): every public composition entry - on the host
+/// Pins the one post-<c>Build()</c> rule: every public composition entry - on the host
 /// builder and on an application builder - throws the same single message instead of silently
 /// mutating a collection the built host no longer reads.
 /// </summary>
@@ -42,7 +42,9 @@ public sealed class PostBuildRegistrationTests
             Assert.Throws<InvalidOperationException>(() => builder.AddInfrastructure(new LateInfrastructure())),
             Assert.Throws<InvalidOperationException>(() => builder.AddResource(new ProtoResource(
                 "late-resource", "probe", "Late resource", _ => ValueTask.CompletedTask, ProtoResourceScope.Run))),
-            Assert.Throws<InvalidOperationException>(() => application!.AddCapability(capability))
+            Assert.Throws<InvalidOperationException>(() => builder.AddApplication("Late", _ => { })),
+            Assert.Throws<InvalidOperationException>(() => application!.AddCapability(capability)),
+            Assert.Throws<InvalidOperationException>(() => application!.RegisterClient("Rest", "Late"))
         };
 
         Assert.Multiple(() =>
@@ -64,10 +66,15 @@ public sealed class PostBuildRegistrationTests
     {
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
+        IProtoApplicationBuilder? application = null;
+        builder.AddApplication("Api", app => application = app);
         await using var host = builder.Build();
 
         Assert.Throws<InvalidOperationException>(
             () => builder.ConfigureServices(services => services.AddSingleton<LateService>()));
+        // A captured application builder still hands out its service collection; a late mutation is
+        // invisible to the built host instead of reaching it after composition.
+        application!.Services.AddSingleton<LateService>();
 
         await host.StartAsync();
         await host.StartTestAsync("late registration", "00001", TestMethods.Placeholder);

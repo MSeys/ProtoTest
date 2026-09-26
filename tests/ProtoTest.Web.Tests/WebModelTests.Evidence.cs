@@ -14,7 +14,7 @@ public sealed partial class WebModelTests
     [Test]
     public async Task Assertion_ShouldReadTheVerifiedAddressInsideTheAssertionOperation()
     {
-        // Audit 5 A5.9 (C07): coverage comes from the address the assertion operation itself read, not
+        // Coverage comes from the address the assertion operation itself read, not
         // from a second untraced backend call after the operation completed.
         var factory = new FakeBackendFactory();
         factory.Backend.CurrentAddress = "https://example.test/login";
@@ -45,7 +45,7 @@ public sealed partial class WebModelTests
     [Test]
     public async Task SeleniumPollInterval_ShouldReachTheSessionAssertions()
     {
-        // Audit 5 A5.12 (C11): the session assertion poller reads the backend's interval, so Selenium's
+        // The session assertion poller reads the backend's interval, so Selenium's
         // PollInterval retimes element assertions as well as the backend's own action retries.
         var driver = new StubWebDriver();
         var host = new ProtoHostBuilder()
@@ -67,7 +67,7 @@ public sealed partial class WebModelTests
     [Test]
     public async Task SeleniumRelease_ShouldTraceWorkAbandonedOnThePump()
     {
-        // Audit 5 A5.9 (C05): a pump stuck in a driver call no longer makes release silent - the bound
+        // A pump stuck in a driver call no longer makes release silent - the bound
         // expires, the in-flight work is named, and release does not hang.
         using var entered = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();

@@ -71,6 +71,10 @@ public class IntegrationTests
             Assert.That(pages, Does.Not.Contain("/ping"), "a JSON minimal API endpoint is not a page");
             Assert.That(pages, Does.Not.Contain("/any-method"), "an endpoint without explicit GET metadata is not a page");
             Assert.That(pages, Does.Not.Contain("/api/orders"), "API-shaped routes are excluded");
+            Assert.That(pages, Does.Not.Contain("/_framework/page"),
+                "the /_… framework pseudo-segment is excluded even when the endpoint produces HTML");
+            Assert.That(pages, Does.Not.Contain("/.well-known/probe"),
+                "the /.well-known pseudo-segment is excluded even when the endpoint produces HTML");
             Assert.That(pages, Does.Not.Contain("/orders/{id}"), "parameterized routes are not inventoried");
         });
     }

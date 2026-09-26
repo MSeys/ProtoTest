@@ -6,19 +6,17 @@ description: "Export ProtoTest operations to OpenTelemetry, so test runs land in
 
 # OpenTelemetry
 
-Every ProtoTrace operation is also a .NET `Activity` on the `ActivitySource` named **`ProtoTest`**. `ProtoTest.OpenTelemetry` is a one-line bridge that subscribes an OpenTelemetry tracer to it, so test runs can land in the same backend as your application's telemetry.
+Every ProtoTrace operation is also a .NET `Activity` on the `ActivitySource` named **`ProtoTest`**. Subscribe an OpenTelemetry tracer to it with `AddSource("ProtoTest")`, so test runs land in the same backend as your application's telemetry.
 
 ```bash
-dotnet add package ProtoTest.OpenTelemetry
 dotnet add package OpenTelemetry.Exporter.OpenTelemetryProtocol
 ```
 
-The package targets .NET 8, 9 and 10 (the project template defaults to `net10.0`; pass `-f net8.0` or `net9.0` for an older runtime). It is a bridge, not an exporter: install the exporter you want separately.
+Install the exporter you want separately; ProtoTest only emits the source.
 
 ```csharp
 using OpenTelemetry;
 using OpenTelemetry.Trace;
-using ProtoTest.OpenTelemetry;
 
 public sealed class OpenTelemetryHook : IProtoRunHook
 {
@@ -27,7 +25,7 @@ public sealed class OpenTelemetryHook : IProtoRunHook
     public Task BeforeRunAsync(CancellationToken cancellationToken = default)
     {
         _provider = Sdk.CreateTracerProviderBuilder()
-            .AddProtoTestInstrumentation()
+            .AddSource("ProtoTest")
             .AddOtlpExporter()
             .Build();
         return Task.CompletedTask;
@@ -45,7 +43,7 @@ public sealed class OpenTelemetryHook : IProtoRunHook
 builder.AddRunHook<OpenTelemetryHook>();
 ```
 
-The package adds exactly one method — `AddProtoTestInstrumentation()`, which is `AddSource("ProtoTest")`. Exporters, sampling and resource attributes are ordinary OpenTelemetry configuration.
+`AddSource("ProtoTest")` is the whole subscription — ProtoTest always emits its operations on that source. Exporters, sampling and resource attributes are ordinary OpenTelemetry configuration.
 
 ## What's exported
 
@@ -80,7 +78,7 @@ Because operations are real `Activity` instances, `HttpClient`'s standard W3C tr
 
 ## Limits
 
-- **No exporter included.** The package only subscribes the `ProtoTest` source; install the exporter you want, as above.
+- **No exporter included.** Subscribing is one `AddSource` call; install the exporter you want, as above.
 - **Large values stay out of spans.** Values longer than 2,048 characters and the structured keys `context.value`, `observation.data`, `observation.metadata`, `shape.expected`, `shape.actual`, `shape.matches` and `shape.mismatches` exist only in `.prototrace`. The same cap applies to spans captured from your application.
 - **The `.prototrace` archive is unaffected.** Tracing stays on by default and remains the complete record; OpenTelemetry is a second consumer of the same operations.
 - **Propagation into the application is expected, not proven.** The end-to-end W3C path is not covered by the repository's tests.

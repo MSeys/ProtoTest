@@ -4,9 +4,9 @@ using ProtoTest.Core;
 using Xunit;
 
 /// <summary>
-/// Stage 0 characterization for the xUnit v3 class lifecycle (Audit 3, finding E3). The scope starts in
+/// Characterization for the xUnit v3 class lifecycle. The scope starts in
 /// the before-attribute, which xUnit v3 runs after class construction and <c>IAsyncLifetime.InitializeAsync</c>
-/// and before <c>DisposeAsync</c>. Stage 4 documents or widens this boundary and flips these assertions.
+/// and before <c>DisposeAsync</c>; these tests pin that boundary.
 /// </summary>
 public sealed class ClassLifecycleBoundaryTests : IAsyncLifetime
 {

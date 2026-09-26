@@ -8,7 +8,7 @@ public sealed class ProtoTestResultTests
     [Test]
     public void FromException_ShouldClassifyCancellationAndFailureWithOneRule()
     {
-        // The one classifier the runner adapters share (Audit 5 A5.6, D-04): OCE and its
+        // The one classifier the runner adapters share: OCE and its
         // TaskCanceledException subclass are cancellation, anything else is a failure.
         Assert.Multiple(() =>
         {

@@ -3,10 +3,9 @@ namespace ProtoTest.Core.Tests;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Stage 0 characterization for <see cref="ProtoTestHostLifetime"/> (Audit 3, finding B3). These tests
-/// pin the current behavior — including the check-then-act window — before Stage 2 changes it. They
-/// observe per-host behavior instead of the process-wide host registry, because the suite runs fixtures
-/// in parallel and the registry is shared.
+/// Characterization for <see cref="ProtoTestHostLifetime"/>. These tests pin its observable behavior —
+/// including the check-then-act window — and observe per-host behavior instead of the process-wide
+/// host registry, because the suite runs fixtures in parallel and the registry is shared.
 /// </summary>
 [TestFixture]
 [NonParallelizable]
@@ -66,7 +65,7 @@ public sealed class ProtoTestHostLifetimeTests
     [Test]
     public async Task StartAsync_ConcurrentCalls_ShouldStartOneHostAndRejectTheOther()
     {
-        // Stage 2 (Audit 3, finding B3): the start is single-flight. A concurrent second call is rejected
+        // The start is single-flight. A concurrent second call is rejected
         // while the first is in flight; the first's failure leaves the lifetime retryable.
         var lifetime = new ProtoTestHostLifetime();
         var firstHook = new ThrowingRunHook();

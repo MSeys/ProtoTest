@@ -20,7 +20,7 @@ if (-not $NoRestore) {
     }
 }
 
-# One home for the shared test helpers (audit TST-2). A local definition of a helper whose name
+# One home for the shared test helpers. A local definition of a helper whose name
 # contains one of the known roots (FreePort, ServeOnceAsync, TemporaryTrace, SingleConnectionListener)
 # fails here with the file and line, so GetFreePort or LazyTemporaryTrace cannot drift back either.
 # The rule is deliberately a deny list of the known copies, not a shape scan: a helper renamed to an
@@ -57,7 +57,7 @@ foreach ($file in $testFiles) {
 }
 
 if ($duplicates.Count -gt 0) {
-    Write-Host "Test-support duplication found (audit TST-2):"
+    Write-Host "Test-support duplication found:"
     foreach ($duplicate in $duplicates) { Write-Host "  $duplicate" }
     throw "use the shared helpers in tests/ProtoTest.TestSupport instead of copying them."
 }

@@ -32,7 +32,13 @@ public sealed class ScopedProbe : IScopedProbe, IDisposable
 
 public sealed class Program
 {
-    public static void Main(string[] args)
+    public static void Main(string[] args) => CreateApp(args).Run();
+
+    /// <summary>
+    /// Builds the application without running it, so a suite can host it on its own loopback listener
+    /// for a browser journey (<c>Program.CreateApp(["--urls", "http://127.0.0.1:0"])</c>).
+    /// </summary>
+    public static WebApplication CreateApp(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
         builder.Services.AddSingleton<ITestMessageService, TestMessageService>();
@@ -63,7 +69,15 @@ public sealed class Program
                     if (result.MessageType == System.Net.WebSockets.WebSocketMessageType.Text)
                     {
                         var text = System.Text.Encoding.UTF8.GetString(payload);
-                        var response = text == "BOOT" ? "BOOT_ACK" : $"{text}_ACK";
+                        var response = text switch
+                        {
+                            "BOOT" => "BOOT_ACK",
+                            // Serves the application's TimeProvider, so a suite can prove which clock
+                            // the request flow sees while it is holding the socket.
+                            "NOW" => context.RequestServices.GetRequiredService<TimeProvider>()
+                                .GetUtcNow().ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+                            _ => $"{text}_ACK"
+                        };
                         await socket.SendAsync(
                             System.Text.Encoding.UTF8.GetBytes(response),
                             System.Net.WebSockets.WebSocketMessageType.Text,
@@ -88,6 +102,10 @@ public sealed class Program
         app.MapGet("/portal/home", () => Results.Content("<h1>Portal</h1>", "text/html"))
             .WithMetadata(new ProducesResponseTypeMetadata(StatusCodes.Status200OK, typeof(string), ["text/html"]));
         app.MapGet("/portal/legacy/old", () => Results.Content("<h1>Old</h1>", "text/html"))
+            .WithMetadata(new ProducesResponseTypeMetadata(StatusCodes.Status200OK, typeof(string), ["text/html"]));
+        app.MapGet("/_framework/page", () => Results.Content("<h1>Framework</h1>", "text/html"))
+            .WithMetadata(new ProducesResponseTypeMetadata(StatusCodes.Status200OK, typeof(string), ["text/html"]));
+        app.MapGet("/.well-known/probe", () => Results.Content("<h1>Well known</h1>", "text/html"))
             .WithMetadata(new ProducesResponseTypeMetadata(StatusCodes.Status200OK, typeof(string), ["text/html"]));
         app.Map("/any-method", async context =>
             {
@@ -124,7 +142,7 @@ public sealed class Program
                     ["text/html"]));
         }
 
-        app.Run();
+        return app;
     }
 }
 

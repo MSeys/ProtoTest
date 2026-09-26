@@ -4,8 +4,8 @@ using ProtoTest.Core;
 using ProtoTest.Json;
 
 /// <summary>
-/// Stage 5 (Audit 3, finding D6): a diagnostic capture failure is traced evidence instead of being
-/// swallowed silently, matching the gRPC, messaging and web diagnostic paths. Audit 5 A5.9 (B12): the
+/// A diagnostic capture failure is traced evidence instead of being
+/// swallowed silently, matching the gRPC, messaging and web diagnostic paths. The
 /// guard takes the protocol's identity, so the event names the protocol that failed, not HTTP.
 /// </summary>
 [TestFixture]

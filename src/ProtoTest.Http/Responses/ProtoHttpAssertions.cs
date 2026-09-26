@@ -7,9 +7,8 @@ using System.Net;
 /// protocol's assertion with the facade's polarity, so <c>Should</c> and <c>ShouldNot</c> read the
 /// same in every protocol.
 /// </summary>
-public abstract class ProtoHttpAssertions<TResponse, TAssertions>
+public abstract class ProtoHttpAssertions<TResponse>
     where TResponse : ProtoHttpResponse
-    where TAssertions : ProtoHttpAssertions<TResponse, TAssertions>
 {
     protected ProtoHttpAssertions(TResponse response, bool negated)
     {

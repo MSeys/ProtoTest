@@ -1,5 +1,7 @@
 # ProtoTest engineering facts — recipes
 
+Current at branch `version/1.1`, HEAD `7d1a484`.
+
 How to add things the ProtoTest way. Every recipe names the canonical example to copy; if no example
 fits, that is a design question for the plan, not a reason to invent a second mechanism. Read
 `architecture.md` first, and `gotchas.md` before touching lifecycle, addresses, capabilities or the
@@ -88,6 +90,21 @@ and fills each declared key with `IProtoConnectionInfrastructure.ConnectionStrin
 - Long waits go through readiness (`AddReadinessProbe` or `ProtoContainerResource.ReadyOn`), never a
   `Task.Delay` in setup.
 - Add a conditional path test (keys configured → not started, never owned) and an error-path test.
+- A run-scoped action that is not a piece — create a schema, seed a catalogue — registers with
+  `AddRunSetup(name, delegate)`: it starts at its registration position like a piece, reads the
+  settings the pieces before it published, and owns nothing to release. Use it over a run hook when the
+  step needs infrastructure's addresses, and over a test hook when its work must survive the per-test
+  transaction.
+- An application under test can be a piece too: `ApplicationContainer.Container(application, image, port)`
+  publishes its mapped address as the declared `ProtoTest:Applications:{application}:BaseUrl` and defaults
+  readiness to the mapped port; add `AddHttpReadiness` after it (canonical:
+  `tests/ProtoTest.AspNetCore.Web.Tests/Setup.cs`).
+- A hand-built `WebApplication` under test can be a piece too: `AddLoopbackApplication(application,
+  createApp)` (`ProtoTest.AspNetCore`) starts the factory on `http://127.0.0.1:0`, publishes the bound
+  address as the declared `ProtoTest:Applications:{application}:BaseUrl`, forwards the suite's
+  configuration with the started settings at its registration position as command-line arguments, and
+  releases the application with the run; add `AddHttpReadiness` after it (canonical:
+  `tests/ProtoTest.AspNetCore.Web.Tests/Setup.cs`).
 
 ## Recipe: a product under test that resolves its addresses at use time
 
@@ -180,6 +197,16 @@ re-implements lifecycle), maps the runner's outcome to `ProtoTestResult`, and pu
 through the runner's API. Add the real-run lifecycle boundary tests (skip-before-setup, setup failure,
 teardown failure, outcome capture, cancellation) and run `dotnet test` through the adapter — unit
 tests that call hooks directly create false confidence (Audit 3 class 7).
+
+## Recipe: an analyzer package
+
+`ProtoTest.Analyzers` (`src/ProtoTest.Analyzers/`) is `netstandard2.0` with `Microsoft.CodeAnalysis.CSharp`
+(`PrivateAssets=all`), packs its DLL under `analyzers/dotnet/cs`, and disables dependencies and symbols in
+the package (an analyzer has no `lib/`). It is never referenced as an analyzer by this repository's own
+projects, so the build stays inert; consumers opt in through the package. Rules match framework vocabulary
+by metadata name (`ProtoTestVocabulary`), never by package reference, and ship only with a false-positive
+analysis that is impossible or trivially suppressible; registration inference (`[RequiresCapability]`,
+application/client selection) is a recorded non-goal because compositions can live in referenced assemblies.
 
 ## Recipe: a test double
 

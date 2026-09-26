@@ -86,9 +86,13 @@ public sealed class ProtoDeviceBuilder
                 $"Device client '{name}' needs an address resolver or a path.", nameof(resolveAddress));
         }
 
-        if (_store.Clients.ContainsKey(name))
+        if (_store.Clients.TryGetValue(name, out var existing))
         {
-            throw new InvalidOperationException($"A device client named '{name}' is already registered.");
+            throw new InvalidOperationException(
+                string.Equals(existing.ApplicationName, ApplicationName, StringComparison.Ordinal)
+                    ? $"A device client named '{name}' is already registered."
+                    : $"Device client '{name}' is already registered for {DescribeScope(existing.ApplicationName)}; " +
+                      $"{DescribeScope(ApplicationName)} cannot reuse the name. Give each application its own client name.");
         }
 
         var registration = new DeviceClientRegistration(name)
@@ -102,6 +106,10 @@ public sealed class ProtoDeviceBuilder
         _store.DefaultClientName ??= name;
         return new ProtoDeviceClientBuilder(registration);
     }
+
+    /// <summary>Names one side of a client-name collision in the error, host level or an application.</summary>
+    private static string DescribeScope(string? applicationName) =>
+        applicationName is null ? "the host" : $"application '{applicationName}'";
 }
 
 /// <summary>The typed devices and protocol catalogs of one device client.</summary>

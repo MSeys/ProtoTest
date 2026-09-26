@@ -1,7 +1,6 @@
 namespace ProtoTest.Core;
 
 using System.Net.Http;
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>Resolves which client a protocol accessor should use for the current application.</summary>
@@ -77,20 +76,15 @@ public static class ProtoApplicationResolution
     }
 
     /// <summary>
-    /// Returns the application state set by the <c>[Application]</c> attribute, falling back to reading
-    /// the attribute directly from the test method or class when the lifecycle pipeline did not run it.
+    /// Returns the application state the <c>[Application]</c> attribute set for the test, or
+    /// <see langword="null"/> when the test selected no application. The attribute's
+    /// <see cref="ApplicationAttribute.BeforeTestAsync"/> is the one writer: a context without state
+    /// did not run an <c>[Application]</c> attribute, so the missing selection is reported rather than
+    /// replaced by a second reading of the attribute.
     /// </summary>
     public static ProtoApplicationState? ResolveState(ProtoExecutionContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var state = context.TryResolve<ProtoApplicationState>();
-        if (state is not null)
-        {
-            return state;
-        }
-
-        var attribute = context.TestMethod.GetCustomAttribute<ApplicationAttribute>(inherit: true)
-            ?? context.TestMethod.DeclaringType?.GetCustomAttribute<ApplicationAttribute>(inherit: true);
-        return attribute is null ? null : new ProtoApplicationState(attribute.Name, attribute.Bindings);
+        return context.TryResolve<ProtoApplicationState>();
     }
 }

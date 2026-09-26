@@ -112,7 +112,7 @@ public class ProtoResourceTests
     [Test]
     public async Task ReleaseResourceAsync_WhileTheReleaseIsInFlight_ShouldReportReleasing()
     {
-        // A5.3 (Audit 5, A5-21): the release state is one enum, so a snapshot mid-release says so.
+        // The release state is one enum, so a snapshot mid-release says so.
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var context = CreateContext();

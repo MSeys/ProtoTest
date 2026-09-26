@@ -127,7 +127,7 @@ public sealed class ProtoHostStartStopTests
     [Test]
     public async Task StartAsync_WhenRollbackReleaseFails_ShouldReleaseTheRetriedOwnershipPeriod()
     {
-        // Stage 2 (Audit 3, finding B1): a failed release is re-armed when the host starts the resource
+        // A failed release is re-armed when the host starts the resource
         // again, so the retried ownership period is released too.
         var failing = new TrackingInfrastructure("failing", failuresBeforeStart: 1, failuresBeforeRelease: 1);
         var builder = new ProtoHostBuilder();
@@ -154,7 +154,7 @@ public sealed class ProtoHostStartStopTests
     [Test]
     public async Task StartAsync_WhenInfrastructureFails_ShouldNotExportReportsOrTrace()
     {
-        // Stage 2 (Audit 3, finding B4): a run that never finished starting exports nothing. Only the
+        // A run that never finished starting exports nothing. Only the
         // run-resource rollback runs, so no sink is asked to export and no archive is written.
         var output = Path.Combine(Path.GetTempPath(), $"prototest-start-failure-{Guid.NewGuid():N}.prototrace");
         try
@@ -193,8 +193,8 @@ public sealed class ProtoHostStartStopTests
     [Test]
     public async Task StartAsync_WhenInfrastructureFails_ShouldUnwindCompletedUserHooks()
     {
-        // A5.2 (Audit 5, A5-02): every completed hook that owns state unwinds on a failed start, while
-        // gates, sinks and the archive stay silent for a run that never started (Audit 3 B4).
+        // Every completed hook that owns state unwinds on a failed start, while
+        // gates, sinks and the archive stay silent for a run that never started.
         var events = new List<string>();
         var first = new TrackingRunHook("First", events);
         var second = new TrackingRunHook("Second", events);

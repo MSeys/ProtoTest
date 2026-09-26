@@ -9,7 +9,7 @@ using ProtoTest.Http;
 /// <see cref="GraphQLResponse.ShouldNot"/>; the shared facade owns the polarity, so a negated error
 /// assertion asks for the opposite of its positive spelling.
 /// </summary>
-public class GraphQLAssertions : ProtoHttpAssertions<GraphQLResponse, GraphQLAssertions>
+public class GraphQLAssertions : ProtoHttpAssertions<GraphQLResponse>
 {
     internal GraphQLAssertions(GraphQLResponse response, bool negated)
         : base(response, negated)

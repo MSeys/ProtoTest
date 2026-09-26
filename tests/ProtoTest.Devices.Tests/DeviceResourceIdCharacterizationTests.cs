@@ -3,7 +3,7 @@ namespace ProtoTest.Devices.Tests;
 using ProtoTest.Core;
 
 /// <summary>
-/// Pins the device resource and entity id shape (audit DEV-4): the device type is part of both, so two
+/// Pins the device resource and entity id shape: the device type is part of both, so two
 /// device types with the same id on one client coexist, each with its own resource and entity, instead
 /// of colliding in the resource registry.
 /// </summary>

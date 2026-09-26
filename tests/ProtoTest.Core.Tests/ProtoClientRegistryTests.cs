@@ -3,7 +3,7 @@ namespace ProtoTest.Core.Tests;
 using ProtoTest.Core.Internal;
 
 /// <summary>
-/// Stage 2 (Audit 3, finding B7): a client alias is a lookup, not an ownership registration, so it must
+/// A client alias is a lookup, not an ownership registration, so it must
 /// obey the same seal as a client registration once the context starts releasing resources.
 /// </summary>
 [TestFixture]

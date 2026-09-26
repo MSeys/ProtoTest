@@ -136,6 +136,35 @@ var connectionString = provider.GetService<ProtoInfrastructureSettings>() is { }
 
 An application hosted in process receives the same keys as host settings automatically (see [ASP.NET Core](../aspnetcore.md)), so the application and the tests can point at one database without environment variables. The default image is `postgres:16-alpine`, configurable through the builder passed to `Container`. `Container()` does not start anything now: the host starts it with the run — before any test-level skip condition — so a missing Docker runtime fails the run's start. `TryStart` reports the reason instead of throwing: call it in the suite fixture before `AddInfrastructure` to fall back or skip the suite, and `Start` starts now or throws.
 
+## Run-owned schema
+
+A container database starts empty, and the schema must exist before the first test — but a test body and a test hook run inside the per-test transaction, so `EnsureCreated`/`Migrate` or raw DDL there is rolled back with the test. Create it once for the run with [run-scoped setup](../../foundation/infrastructure.md#run-scoped-setup), registered **after** the container so it reads the connection string the container published:
+
+```csharp
+builder
+    .AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Orders")
+    .AddSql(
+        provider => new NpgsqlConnection(ResolveDatabase(provider, "ConnectionStrings:Orders")),
+        sql => sql.AddressKeys.Add("ConnectionStrings:Orders"))
+    .AddEntityFrameworkCore<OrdersDbContext>((services, options) =>
+        options.UseNpgsql(services.GetRequiredService<DbConnection>()))
+    .AddRunSetup("database schema", async setup =>
+    {
+        var connectionString = setup.Settings.Values.TryGetValue("ConnectionStrings:Orders", out var published)
+            ? published
+            : setup.Configuration["ConnectionStrings:Orders"]
+              ?? throw new InvalidOperationException(
+                  "Register the PostgreSQL container or configure 'ConnectionStrings:Orders'.");
+        var options = new DbContextOptionsBuilder<OrdersDbContext>().UseNpgsql(connectionString).Options;
+        await using var context = new OrdersDbContext(options);
+        await context.Database.EnsureCreatedAsync(setup.CancellationToken);
+    });
+```
+
+The context here is built over its own connection on purpose: the step runs outside every test, before the per-test transactions begin. `EnsureCreatedAsync` creates the schema of a model without migrations; a suite that ships migrations calls `MigrateAsync` instead. `ResolveDatabase` is the demo's published-first, configured-second read ([below](#the-demos-wiring)). `Npgsql.EntityFrameworkCore.PostgreSQL` is the application's provider package, pinned to the Entity Framework Core version `ProtoTest.Sql.EntityFrameworkCore` brings.
+
+The schema then survives the rollback; the rows do not. Every test sees the tables and writes through `Proto.Context.Sql<TContext>()`, and its transaction carries the writes away when it ends.
+
 ## Tracing
 
 - Operations follow the connection's lifecycle, all with source `ProtoTest.Sql`: `sql.connection.open` (Setup, with `sql.connection.type`), `sql.transaction.begin` (Setup, child of the open, with `sql.isolation`), `sql.transaction.rollback` (release phase, inside the connection resource's release), and `sql.enlist` (Setup, when a `DbContext` joins the transaction, with `db.context`, source `ProtoTest.Sql.EntityFrameworkCore`).
@@ -188,7 +217,7 @@ With `AddressKeys` declared and none of them provided, the `SQL` capability is a
 - **`AddSql` is once per host.** A second call is a no-op rather than layering a second connection: the first registration's factory and options win, matching [repeated registration](../../getting-started/configuration.md#repeated-registration).
 - **A rollback failure still disposes everything.** The transaction and the connection are disposed in their own `finally` blocks even when rollback throws; the release failure is aggregated like any other teardown failure.
 - **The connect timeout is provider-owned.** The connection open and transaction begin observe `ProtoExecutionContext.CancellationToken` when the caller supplied one to `StartTestAsync`; no runner adapter supplies one yet, so runner-driven setup runs until the provider's own connect timeout (Npgsql's default, or `Connect Timeout` in the connection string) ends it.
-- **The test owns the schema.** There is no automatic migration or database creation: the factory returns the connection and the test (or its fixture) sets the schema up.
+- **No automatic migration or database creation.** ProtoTest never creates or migrates a schema by itself. When the run owns the database, create the schema once with [`AddRunSetup`](#run-owned-schema): a test body or hook runs inside the rolled-back transaction, so `EnsureCreated`/`Migrate` there disappears with the test. A deployed environment keeps its own schema.
 
 ## Links
 

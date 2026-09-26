@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Stage 5 (Audit 3, findings C1, C2, C4, D5 and D12): the cross-cutting consistency rules - collectors
+/// The cross-cutting consistency rules: collectors
 /// are isolated, options validate once at resolve, a completed recorder never observes again, and two
 /// hosts do not capture the same test span.
 /// </summary>

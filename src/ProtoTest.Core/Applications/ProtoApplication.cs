@@ -41,13 +41,17 @@ public static class ProtoApplication
     /// <summary>
     /// The one application-setting precedence: an address a started piece published through
     /// <see cref="ProtoInfrastructureSettings"/> wins over static configuration. Readiness, the HTTP
-    /// and gRPC client initializers, browser sessions and device clients all resolve through here.
+    /// and gRPC client initializers, browser sessions and device clients all resolve through here, and
+    /// a suite that reads an application setting itself (a connection string a container published, for
+    /// example) uses the same rule instead of re-implementing it.
     /// </summary>
-    internal static string? ResolveSetting(
+    public static string? ResolveSetting(
         IConfiguration configuration,
         ProtoInfrastructureSettings? settings,
         string key)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
         if (settings is not null
             && settings.Values.TryGetValue(key, out var published)
             && !string.IsNullOrWhiteSpace(published))

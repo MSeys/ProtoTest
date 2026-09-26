@@ -33,6 +33,9 @@ public static class ProtoReportItemKinds
     public const string Gate = "gate";
     public const string Metric = "metric";
     public const string Resource = "resource";
+
+    /// <summary>The environment facts the run recorded about itself, one item per configured key.</summary>
+    public const string RunMetadata = "run_metadata";
 }
 
 public enum ProtoReportStatus

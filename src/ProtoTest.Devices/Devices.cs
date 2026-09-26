@@ -25,6 +25,19 @@ public interface IProtoDeviceTransport
 
     /// <summary>Connects to a device endpoint; the connection is opened lazily on first use.</summary>
     ValueTask<IProtoDeviceConnection> ConnectAsync(DeviceEndpoint endpoint, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Connects to a device endpoint for a specific test context. The default forwards to
+    /// <see cref="ConnectAsync(DeviceEndpoint, CancellationToken)"/>; a transport that routes on the
+    /// test's own state - the in-process TestServer transport - overrides this instead of re-reading
+    /// ambient host state at connect time, so a connection started on another flow still reaches the
+    /// application the routing decision was made for.
+    /// </summary>
+    ValueTask<IProtoDeviceConnection> ConnectAsync(
+        ProtoExecutionContext context,
+        DeviceEndpoint endpoint,
+        CancellationToken cancellationToken = default)
+        => ConnectAsync(endpoint, cancellationToken);
 }
 
 /// <summary>One open connection to a device; frames in, frames out.</summary>

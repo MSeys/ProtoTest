@@ -3,7 +3,7 @@ namespace ProtoTest.NUnit.Tests;
 using ProtoTest.Core;
 
 /// <summary>
-/// Stage 4 (Audit 3, finding E1): the lifecycle is a command wrapper outside NUnit's setup and teardown,
+/// The lifecycle is a command wrapper outside NUnit's setup and teardown,
 /// so the skip decision precedes <c>[SetUp]</c> and <c>[TearDown]</c> runs inside the lifecycle.
 /// </summary>
 [TestFixture]

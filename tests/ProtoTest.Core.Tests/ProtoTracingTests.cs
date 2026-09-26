@@ -498,7 +498,7 @@ public sealed class ProtoTracingTests
     [Test]
     public async Task TelemetryCaptureFailure_ShouldCoalesceIntoOneRunEvent()
     {
-        // A5.3 (Audit 5, A5-22): a broken capture must never break the application, but it must be
+        // A broken capture must never break the application, but it must be
         // visible: the first failure is one run event, later failures coalesce into it.
         var sourceName = $"ProtoTest.Core.Tests.CaptureFailure.{Guid.NewGuid():N}";
         var builder = new ProtoHostBuilder();

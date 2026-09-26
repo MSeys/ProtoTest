@@ -84,6 +84,7 @@ public sealed class ProtoMessageClient
         catch (Exception exception)
         {
             operation.Fail(exception);
+            RecordFailure(destination, exception, cancellationToken);
             throw;
         }
     }
@@ -151,9 +152,29 @@ public sealed class ProtoMessageClient
         catch (Exception exception)
         {
             operation.Fail(exception);
+            RecordFailure(destination, exception, cancellationToken);
             throw;
         }
     }
+
+    // A failed publish or await is evidence too: the shared failure record plus the shared guard, with
+    // the messaging protocol's own observation kind.
+    private void RecordFailure(string destination, Exception exception, CancellationToken cancellationToken)
+        => ProtoObservationCapture.TryRecord(_context, ProtoMessagingProtocol.Protocol, () =>
+            new ProtoObservation(
+                _broker.Name,
+                ProtoMessagingProtocol.FailureObservationKind,
+                destination,
+                Data: ProtoFailureDiagnostics.From(
+                    requestUri: null,
+                    exception,
+                    cancellationToken,
+                    _context.TryService<MessagingAttachmentOptions>()),
+                Metadata: new Dictionary<string, object>
+                {
+                    ["messaging.system"] = _broker.Name,
+                    ["messaging.destination"] = destination
+                }));
 
     /// <summary>
     /// Attaches one sanitized payload. The name carries a per-client sequence so repeated captures on the

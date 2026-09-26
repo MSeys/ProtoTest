@@ -92,27 +92,8 @@ public sealed class GraphQLResponse : ProtoHttpResponse
                     expected,
                     StatusCode,
                     negated,
-                    ProtoHttpDiagnosticSanitizer.SanitizeBody(Content, ResolveStatusDiagnosticOptions()))));
+                    ProtoHttpDiagnosticSanitizer.SanitizeBody(Content, ResolveStatusDiagnosticOptions(ProtoGraphQLBuilder.ProtocolName)))));
         return this;
-    }
-
-    private ProtoHttpAttachmentOptions ResolveStatusDiagnosticOptions()
-    {
-        // The resolved ProtoTest:GraphQL:Responses section bounds the failure body even when the protocol
-        // never opted into attachment capture; attachment options, when present, keep their own
-        // redaction rules and may tighten the limit further.
-        var responseLimit = Context!.ResolveResponseOptions(ProtoGraphQLBuilder.ProtocolName).MaxDiagnosticBodyLength;
-        if (AttachmentOptions is null)
-            return new ProtoHttpAttachmentOptions { MaxDiagnosticBodyLength = responseLimit };
-        if (responseLimit >= AttachmentOptions.MaxDiagnosticBodyLength)
-            return AttachmentOptions;
-
-        return new ProtoHttpAttachmentOptions
-        {
-            RedactSensitiveData = AttachmentOptions.RedactSensitiveData,
-            SensitiveJsonProperties = [.. AttachmentOptions.SensitiveJsonProperties],
-            MaxDiagnosticBodyLength = responseLimit
-        };
     }
 
     /// <summary>Asserts the response carries no GraphQL errors.</summary>
@@ -203,8 +184,7 @@ public sealed class GraphQLResponse : ProtoHttpResponse
                     ParentOperationId: RequestTraceId,
                     ExtraAttributes: new Dictionary<string, string?> { ["graphql.operation"] = Identifier! }),
                 expectedShape,
-                () => new GraphQLAssertionException(
-                    "Expected GraphQL data, but the response did not contain data."));
+                () => new GraphQLAssertionException(DescribeMissingData()));
         }
 
         try
@@ -239,13 +219,15 @@ public sealed class GraphQLResponse : ProtoHttpResponse
     private string PrefixIdentifier(string message)
         => string.IsNullOrEmpty(Identifier) ? message : $"{Identifier} — {message}";
 
+    // An errors-only response has nothing to match, and the server's own message is what the author
+    // needs to see: a rejected subscription or a failed operation must not read as "no data".
+    private string DescribeMissingData()
+        => HasErrors
+            ? $"Expected GraphQL data, but the response did not contain data. Server errors: {ErrorMessages()}."
+            : "Expected GraphQL data, but the response did not contain data.";
+
     private GraphQLAssertionException RequiredFailure<T>(string? jsonPath, string reason)
-    {
-        var read = string.IsNullOrWhiteSpace(jsonPath)
-            ? $"ReadRequired<{typeof(T).Name}>"
-            : $"ReadRequired<{typeof(T).Name}>('{jsonPath}')";
-        return new GraphQLAssertionException(PrefixIdentifier($"{read} failed: {reason}."));
-    }
+        => new(PrefixIdentifier($"{ProtoJsonRead.DescribeRequired<T>(jsonPath)} failed: {reason}."));
 
     /// <summary>
     /// Deserializes the selected data as <typeparamref name="T"/>, or returns <c>default</c> when the
@@ -253,26 +235,7 @@ public sealed class GraphQLResponse : ProtoHttpResponse
     /// rethrows.
     /// </summary>
     public T? ReadDataAs<T>(JsonSerializerOptions? options = null)
-    {
-        using var operation = Context!.Trace
-            .Operation("graphql.response.deserialize", $"Deserialize GraphQL data · {typeof(T).Name}", ProtoGraphQLBuilder.Protocol.TraceSource)
-            .With("target.type", typeof(T).FullName)
-            .Parent(RequestTraceId)
-            .Begin();
-        try
-        {
-            var result = SelectedData.HasValue
-                ? SelectedData.Value.Deserialize<T>(options ?? ProtoJsonDefaults.Reader)
-                : default;
-            operation.Succeed();
-            return result;
-        }
-        catch (Exception exception)
-        {
-            operation.Fail(exception);
-            throw;
-        }
-    }
+        => ReadDataAsCore<T>(jsonPath: null, required: false, options);
 
     /// <summary>
     /// Reads a single value from the selected data at <paramref name="jsonPath"/> and deserializes it
@@ -285,52 +248,7 @@ public sealed class GraphQLResponse : ProtoHttpResponse
     public T? ReadDataAs<T>(string jsonPath, JsonSerializerOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(jsonPath);
-        return ReadAtPath<T>(jsonPath, options, required: false);
-    }
-
-    // Resolves the path under the deserialize operation's trace and deserializes the element. A
-    // required read checks JSON null before the deserializer sees it, so a value-type T reports the
-    // protocol failure; the operation records the failure the caller throws.
-    private T? ReadAtPath<T>(string jsonPath, JsonSerializerOptions? options, bool required)
-    {
-        using var operation = Context!.Trace
-            .Operation("graphql.response.deserialize", $"Deserialize GraphQL data · {typeof(T).Name}", ProtoGraphQLBuilder.Protocol.TraceSource)
-            .With("target.type", typeof(T).FullName)
-            .With("graphql.path", jsonPath)
-            .Parent(RequestTraceId)
-            .Begin();
-        try
-        {
-            T? result = default;
-            if (SelectedData is { } root && root.ValueKind != JsonValueKind.Null)
-            {
-                var element = JsonPathResolver.Resolve(root, jsonPath);
-                if (required && element.ValueKind == JsonValueKind.Null)
-                {
-                    throw RequiredFailure<T>(jsonPath, $"the value at '{jsonPath}' was JSON null");
-                }
-
-                result = element.Deserialize<T>(options ?? ProtoJsonDefaults.Reader);
-                if (required && result is null)
-                {
-                    throw RequiredFailure<T>(jsonPath, $"the value at '{jsonPath}' was JSON null");
-                }
-            }
-
-            operation.Succeed();
-            return result;
-        }
-        catch (JsonPathException exception)
-        {
-            var failure = new GraphQLAssertionException(PrefixIdentifier(exception.Message), exception);
-            operation.Fail(failure);
-            throw failure;
-        }
-        catch (Exception exception)
-        {
-            operation.Fail(exception);
-            throw;
-        }
+        return ReadDataAsCore<T>(jsonPath, required: false, options);
     }
 
     /// <summary>
@@ -342,15 +260,8 @@ public sealed class GraphQLResponse : ProtoHttpResponse
     /// </summary>
     public T ReadRequired<T>(JsonSerializerOptions? options = null)
     {
-        if (SelectedData is not { } data || data.ValueKind == JsonValueKind.Null)
-        {
-            throw RequiredFailure<T>(jsonPath: null, "the response did not contain data");
-        }
-
-        var value = ReadDataAs<T>(options);
-        return value is null
-            ? throw RequiredFailure<T>(jsonPath: null, "the response data was JSON null")
-            : value;
+        EnsureDataIsNotNull<T>(jsonPath: null);
+        return ReadDataAsCore<T>(jsonPath: null, required: true, options)!;
     }
 
     /// <summary>
@@ -363,12 +274,48 @@ public sealed class GraphQLResponse : ProtoHttpResponse
     public T ReadRequired<T>(string jsonPath, JsonSerializerOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(jsonPath);
+        EnsureDataIsNotNull<T>(jsonPath);
+        return ReadDataAsCore<T>(jsonPath, required: true, options)!;
+    }
+
+    // GraphQL's half of the shared read: its exception type and its graphql.response.deserialize
+    // operation. The sink fails the operation for every failure the read detects, once.
+    private T? ReadDataAsCore<T>(string? jsonPath, bool required, JsonSerializerOptions? options)
+    {
+        var scope = Context!.Trace
+            .Operation("graphql.response.deserialize", $"Deserialize GraphQL data · {typeof(T).Name}", ProtoGraphQLBuilder.Protocol.TraceSource)
+            .With("target.type", typeof(T).FullName)
+            .Parent(RequestTraceId);
+        if (jsonPath is not null)
+        {
+            scope = scope.With("graphql.path", jsonPath);
+        }
+
+        using var operation = scope.Begin();
+        var value = ProtoJsonRead.Read<T>(
+            SelectedData?.GetRawText(),
+            jsonPath,
+            required,
+            new ProtoJsonReadSemantics(
+                RequiredFailure: message => new GraphQLAssertionException(PrefixIdentifier(message)),
+                PathMissFailure: (message, inner) => new GraphQLAssertionException(PrefixIdentifier(message), inner),
+                EmptyBodyReason: "the response did not contain data",
+                NullBodyReason: "the response data was JSON null",
+                TraceFailure: (exception, _) => operation.Fail(exception),
+                NullRootReturnsDefault: true),
+            options);
+        operation.Succeed();
+        return value;
+    }
+
+    // A required read without data fails before the read: there is nothing to resolve, and the message
+    // names the missing data rather than a path that could never have resolved.
+    private void EnsureDataIsNotNull<T>(string? jsonPath)
+    {
         if (SelectedData is not { } data || data.ValueKind == JsonValueKind.Null)
         {
             throw RequiredFailure<T>(jsonPath, "the response did not contain data");
         }
-
-        return ReadAtPath<T>(jsonPath, options, required: true)!;
     }
 
     /// <summary>Disposes the parsed document and then the underlying HTTP response.</summary>

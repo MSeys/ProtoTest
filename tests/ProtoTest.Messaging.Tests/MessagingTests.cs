@@ -144,6 +144,33 @@ public sealed class MessagingTests
     }
 
     [Test]
+    public async Task FailedAwait_ShouldRecordTheSharedFailureObservation()
+    {
+        // Audit 5 A5.9 (B06): a messaging failure records the shared failure-diagnostics record, so a
+        // failed await is evidence instead of leaving no observation at all.
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging(messaging => messaging.UseBroker(_ => new FailingConsumerBroker()));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("messaging failure evidence", TestMethods.Placeholder);
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await context.Messaging().AwaitAsync("invoices", _ => true, TimeSpan.FromMilliseconds(50)));
+
+        var failure = context.RecordedObservations.Single(item => item.Kind == "messaging.failure");
+        var diagnostics = failure.Data as ProtoTest.Json.ProtoFailureDiagnostics;
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        await host.StopAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(diagnostics, Is.Not.Null, "the shared failure record is the observation data");
+            Assert.That(diagnostics!.ExceptionType, Does.Contain(nameof(InvalidOperationException)));
+            Assert.That(diagnostics.Message, Does.Contain("The broker is down"));
+            Assert.That(failure.Identifier, Is.EqualTo("invoices"));
+        });
+    }
+
+    [Test]
     public async Task ThrowingPredicate_ShouldNotHangOrLoseOtherWaiters()
     {
         var builder = new ProtoHostBuilder();
@@ -355,6 +382,35 @@ public sealed class MessagingTests
                 TimeSpan timeout,
                 CancellationToken cancellationToken = default)
                 => throw new TimeoutException("The fake broker never has messages.");
+
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
+
+    // A broker whose await fails for a reason other than a timeout: the failure-evidence test.
+    private sealed class FailingConsumerBroker : IProtoMessageBroker
+    {
+        public string Name => "Failing";
+
+        public ValueTask PublishAsync(ProtoMessage message, CancellationToken cancellationToken = default)
+            => ValueTask.CompletedTask;
+
+        public ValueTask<IProtoMessageConsumer> CreateConsumerAsync(CancellationToken cancellationToken = default)
+            => new(new FailingConsumer());
+
+        private sealed class FailingConsumer : IProtoMessageConsumer
+        {
+            public ValueTask PrepareAsync(
+                IReadOnlyCollection<string> destinations,
+                CancellationToken cancellationToken = default)
+                => ValueTask.CompletedTask;
+
+            public ValueTask<ProtoMessage> AwaitAsync(
+                string destination,
+                Func<ProtoMessage, bool> predicate,
+                TimeSpan timeout,
+                CancellationToken cancellationToken = default)
+                => throw new InvalidOperationException("The broker is down.");
 
             public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         }

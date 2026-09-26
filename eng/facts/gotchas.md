@@ -90,7 +90,8 @@ audit plan.
   `ProtoInfrastructureContext.Readiness`; a container started outside a host keeps its own
   `ReadinessTimeout`/`ReadinessInterval`. `ProtoReadiness.WaitAsync` itself rides
   `ProtoPolling.PollAsync`, so readiness shares the one interval/deadline loop with every other wait
-  (VOC-4 fixed); exceptions still mean "not ready yet" and the timeout message carries the last error.
+  (VOC-4 fixed); exceptions still mean "not ready yet" and the timeout message names the probed URL and the
+last error.
 - **The consumer rule is adopted by `AddAspNetCoreServer`, the in-process device transport,
   `UseRabbitMq`, `AddSql` (with `SqlOptions.AddressKeys`) and `AddEntityFrameworkCore` (same keys).**
   A missing address means "inert +
@@ -210,9 +211,9 @@ audit plan.
   `SingleConnectionListener`) outside that project, so `GetFreePort` or `LazyTemporaryTrace` cannot
   drift back either (audit TST-2/A5-64). The rule is a deny list, not a shape scan: a helper renamed
   completely away from those roots (say `AcquirePort`) is not detected.
-- The MTP runs carry per-project run-test minimums in `eng/test.ps1`: TUnit 11 (its
-  `--minimum-expected-tests` counts tests that actually ran, so the one deliberate adapter skip is
-  excluded from the 12 discovered) and xUnit.net v3 16 (the JUnit total it writes includes the skip).
+- The MTP runs carry per-project run-test minimums in `eng/test.ps1`: TUnit 14 (its
+  `--minimum-expected-tests` counts tests that actually ran, so the deliberate adapter skips are
+  excluded from the 15 discovered) and xUnit.net v3 17 (the JUnit total it writes includes the skip).
   xUnit.net v3's in-process runner exits 0 on a zero-test run, so its structured JUnit result is
   parsed and compared with the same minimum. Lowering a minimum is a deliberate edit that names the
   removed tests. `eng/test-gates.ps1` proves both guards fail on a filter that matches zero tests.

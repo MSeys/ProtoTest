@@ -217,6 +217,11 @@ Without an address, the application's HTTP clients fall back to its transport au
 
 ## Limits
 
+- **A startup throw is a setup failure with the application's own exception.** A pipeline build that
+  throws - a startup filter or middleware factory - fails the test that starts the server: the
+  exception reaches the test unwrapped, the failed start is rolled back (the test's ambient context is
+  cleared and no server or client survives it), and the next test starts the application again - the
+  fault is retried, not cached. Nothing of the half-started server keeps running.
 - `PerRun` shares application state across tests; isolate at the data level (the sample uses a tenant per test id). `PerTest` pays the startup cost per test.
 - With `BaseUrl` configured there is no in-process server, container, page inventory or `configureWebHost` callback in play — `configureWebHost` customizes a server that never starts. Tests that need them skip through `[RequiresInProcess]` or a capability condition.
 - The host overload allows one registration per server name per builder; the application overload has no whole-call guard, and repeated calls can register several initializers, with the first successful one winning.

@@ -293,15 +293,43 @@ internal sealed class ProtoXunitTestRunner : XunitTestRunner
             return 0m;
         }
 
-        var executionTime = await base.InvokeTestMethodAsync(aggregator);
+        return await InvokeAndCompleteAsync(
+            scope,
+            aggregator,
+            CancellationTokenSource,
+            () => base.InvokeTestMethodAsync(aggregator));
+    }
 
-        var failure = aggregator.ToException();
-        scope.Result = CancellationTokenSource.IsCancellationRequested
-            ? ProtoTestResult.Cancelled(failure)
-            : failure is null ? ProtoTestResult.Passed : ProtoTestResult.Failed(failure);
-        await scope.DisposeAsync();
+    /// <summary>
+    /// Invokes the inner runner and completes the scope in a <c>finally</c>: however the invocation
+    /// and the mapping end, the started test completes once. The invocation is a delegate so that
+    /// path is provable - xUnit aggregates every throw a body or lifecycle attribute produces, so a
+    /// test body cannot leave this method without a result, but the runner itself throwing is
+    /// exactly what the <c>finally</c> protects against (ScopeCompletionTests drives it).
+    /// </summary>
+    internal static async Task<decimal> InvokeAndCompleteAsync(
+        ProtoTestScope scope,
+        ExceptionAggregator aggregator,
+        CancellationTokenSource cancellationTokenSource,
+        Func<Task<decimal>> invocation)
+    {
+        try
+        {
+            var executionTime = await invocation();
 
-        return executionTime;
+            var failure = aggregator.ToException();
+            // The runner's own cancellation source keeps xUnit's CTS semantics; a body that threw an
+            // OperationCanceledException is classified by the shared rule.
+            scope.Result = cancellationTokenSource.IsCancellationRequested
+                ? ProtoTestResult.Cancelled(failure)
+                : failure is null ? ProtoTestResult.Passed : ProtoTestResult.FromException(failure);
+
+            return executionTime;
+        }
+        finally
+        {
+            await scope.DisposeAsync();
+        }
     }
 }
 

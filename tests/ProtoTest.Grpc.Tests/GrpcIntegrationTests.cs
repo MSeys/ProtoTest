@@ -53,6 +53,36 @@ public sealed class GrpcIntegrationTests
     }
 
     [Test]
+    public async Task NonRpcFailure_ShouldRecordTheSharedFailureObservation()
+    {
+        // Audit 5 A5.9 (B06): every failure - not only an RpcException - records the shared
+        // failure-diagnostics record through the guard, with the call duration.
+        var builder = new ProtoHostBuilder();
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("grpc failure evidence", TestMethods.Placeholder);
+        var client = context.Grpc("Echo");
+        client.Dispose();
+
+        var exception = Assert.CatchAsync(async () =>
+            await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "hello" }));
+
+        var failure = context.RecordedObservations.Single(item => item.Kind == "grpc.failure");
+        var diagnostics = failure.Data as ProtoTest.Json.ProtoFailureDiagnostics;
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception, Is.InstanceOf<ObjectDisposedException>());
+            Assert.That(diagnostics, Is.Not.Null, "the shared failure record is the observation data");
+            Assert.That(diagnostics!.ExceptionType, Does.Contain(nameof(ObjectDisposedException)));
+            Assert.That(diagnostics.Message, Does.Contain("ProtoGrpcClient"));
+            Assert.That(diagnostics.IsCanceled, Is.False);
+            Assert.That(diagnostics.Duration, Is.Not.Null, "the failure carries how long the call ran");
+        });
+    }
+
+    [Test]
     public async Task UnaryCall_ShouldTraceReportAndCarryMetadata()
     {
         var builder = new ProtoHostBuilder();

@@ -34,11 +34,11 @@ $testsRoot = Join-Path $repository "tests"
 # Each MTP project declares the run-test minimum its suite must meet, so a collapse (discovery
 # predicate drift, engine change) fails instead of passing a one-test suite. The bases differ: TUnit's
 # --minimum-expected-tests counts tests that actually ran, so the deliberate adapter skip is excluded
-# (11 of 12 discovered), while the JUnit total xUnit.net v3 writes includes skipped tests (16).
+# (14 of 15 discovered), while the JUnit total xUnit.net v3 writes includes skipped tests (17).
 # Raising a minimum with added tests is free; lowering one is a deliberate edit that names the removals.
 $mtpProjects = @(
-    @{ Project = (Join-Path $testsRoot "ProtoTest.TUnit.Tests/ProtoTest.TUnit.Tests.csproj"); MinimumTests = 11 },
-    @{ Project = (Join-Path $testsRoot "ProtoTest.Xunit3.Tests/ProtoTest.Xunit3.Tests.csproj"); MinimumTests = 16 }
+    @{ Project = (Join-Path $testsRoot "ProtoTest.TUnit.Tests/ProtoTest.TUnit.Tests.csproj"); MinimumTests = 14 },
+    @{ Project = (Join-Path $testsRoot "ProtoTest.Xunit3.Tests/ProtoTest.Xunit3.Tests.csproj"); MinimumTests = 17 }
 )
 foreach ($mtpProject in $mtpProjects) {
     if (-not (Test-Path -LiteralPath $mtpProject.Project)) {

@@ -43,7 +43,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
             Name,
             TraceSource,
             cancellationToken => new ValueTask<IWebBackend>(GetOrCreateBackendAsync(cancellationToken)));
-        _assertions = new WebAssertionPoller(this, _operations, new WebProbeLoop(WebTiming.DefaultPollInterval));
+        _assertions = new WebAssertionPoller(this, _operations, new WebProbeLoop(BackendPollInterval));
         _downloads = new WebDownloadCapture(context, Name, TraceSource, _operations);
         _routeDiscovery = new WebRouteDiscovery(context, Name, TraceSource, discoverRoutes);
     }
@@ -74,6 +74,13 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
 
     /// <summary>The polling engine behind element assertions and <c>WaitUntilAsync</c>.</summary>
     internal WebAssertionPoller Assertions => _assertions;
+
+    // The session's one wait timing: the backend's configured interval when it has one, the shared
+    // default otherwise. Resolved per poll, because the backend is created lazily on first use.
+    private TimeSpan BackendPollInterval()
+        => _backendTask is { IsCompletedSuccessfully: true }
+            ? _backendTask.Result.PollInterval
+            : WebTiming.DefaultPollInterval;
 
     /// <summary>Returns the page for this session, creating it on first use and reusing it afterwards.</summary>
     public TPage Page<TPage>() where TPage : WebPage, new()
@@ -452,7 +459,9 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
             .Begin();
         try
         {
-            await backend.CompleteAsync();
+            // The test's token: teardown I/O (Playwright's trace read, Selenium's final driver call)
+            // observes the same cancellation the test lifecycle does.
+            await backend.CompleteAsync(_context.CancellationToken);
             operation.Succeed();
         }
         catch (Exception exception)

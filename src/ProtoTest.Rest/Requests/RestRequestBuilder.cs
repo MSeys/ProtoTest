@@ -345,7 +345,9 @@ public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, R
                     Identifier: routeIdentifier,
                     AttachmentOptions: attachmentOptions,
                     AttachmentPrefix: attachmentPrefix,
-                    RequestTraceId: traceOperation.Id),
+                    RequestTraceId: traceOperation.Id,
+                    Method: method.Method.ToUpperInvariant(),
+                    RouteTemplate: routeTemplate),
                 bodyBytes);
             responseMessage = null; // The response owns the message from here on.
             return response;
@@ -425,9 +427,14 @@ public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, R
         Exception exception,
         CancellationToken cancellationToken,
         ProtoHttpAttachmentOptions? attachmentOptions)
-        => ProtoObservationCapture.TryRecord(Context, () =>
+        => ProtoObservationCapture.TryRecord(Context, ProtoRestBuilder.Protocol, () =>
         {
-            var diagnostics = ProtoHttpFailureDiagnostics.From(requestUri, exception, cancellationToken, attachmentOptions);
+            var diagnostics = ProtoFailureDiagnostics.From(
+                requestUri,
+                exception,
+                cancellationToken,
+                attachmentOptions,
+                attachmentOptions?.SensitiveQueryParameters);
             return new ProtoObservation(
                 TargetName: TargetName,
                 Kind: ProtoRestBuilder.FailureObservationKind,

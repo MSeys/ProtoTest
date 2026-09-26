@@ -83,7 +83,11 @@ public class OpenApiCoverageCollectorTests
             "Lines",
             "http.contract.shape",
             "GET /lines",
-            new RestShapeMatchData("GET /lines", ["$.lines[0]", "$.lines[0].sku"], typeof(DummyPayload), StatusCode: 200)));
+            new RestShapeMatchData("GET /lines", ["$.lines[0]", "$.lines[0].sku"], typeof(DummyPayload), StatusCode: 200)
+            {
+                Method = "GET",
+                RouteTemplate = "/lines"
+            }));
 
         var properties = collector.GetReportItems().Single().Children!
             .Single(child => child.Identifier == "200").Children!;
@@ -158,6 +162,10 @@ public class OpenApiCoverageCollectorTests
                 TargetType: typeof(DummyPayload),
                 StatusCode: 200
             )
+            {
+                Method = "GET",
+                RouteTemplate = "/users/{id}"
+            }
         ));
 
         var items = collector.GetReportItems().ToList();
@@ -219,7 +227,11 @@ public class OpenApiCoverageCollectorTests
                 "GET /users/{id}",
                 ["$.id"],
                 typeof(DummyPayload),
-                StatusCode: 404)));
+                StatusCode: 404)
+            {
+                Method = "GET",
+                RouteTemplate = "/users/{id}"
+            }));
 
         var successResponse = collector.GetReportItems().Single().Children!
             .Single(child => child.Identifier == "200");
@@ -398,7 +410,11 @@ public class OpenApiCoverageCollectorTests
             "Health",
             "http.contract.shape",
             "GET /health",
-            new RestShapeMatchData("GET /health", ["$"], typeof(DummyPayload), StatusCode: 200)));
+            new RestShapeMatchData("GET /health", ["$"], typeof(DummyPayload), StatusCode: 200)
+            {
+                Method = "GET",
+                RouteTemplate = "/health"
+            }));
 
         var root = collector.GetReportItems().Single().Children!
             .Single(child => child.Identifier == "200").Children!
@@ -424,13 +440,65 @@ public class OpenApiCoverageCollectorTests
                 "GET /users/{id}",
                 ["$.ID"],
                 typeof(DummyPayload),
-                StatusCode: 200)));
+                StatusCode: 200)
+            {
+                Method = "GET",
+                RouteTemplate = "/users/{id}"
+            }));
 
         var id = collector.GetReportItems().Single().Children!
             .Single(child => child.Identifier == "200").Children!
             .Single(child => child.Identifier == "$.id");
         Assert.That(id.IsCovered, Is.True,
             "Schema extraction is ignore-case, so a hit reported as $.ID must land on $.id.");
+    }
+
+    [Test]
+    public void Collect_ShouldUseTheStructuredMethodAndRouteInsteadOfTheDisplayIdentifier()
+    {
+        var collector = new OpenApiCoverageCollector("TestApi", OpenApiTestHelper.SampleJsonSpec);
+
+        collector.Collect(new ProtoObservation(
+            "TestApi",
+            "http.contract.shape",
+            "a display identifier the collector must not parse",
+            new RestShapeMatchData(
+                "a display identifier the collector must not parse",
+                ["$.id"],
+                typeof(DummyPayload),
+                StatusCode: 200)
+            {
+                Method = "GET",
+                RouteTemplate = "/users/{id}"
+            }));
+
+        var id = collector.GetReportItems().Single().Children!
+            .Single(child => child.Identifier == "200").Children!
+            .Single(child => child.Identifier == "$.id");
+        Assert.That(id.IsCovered, Is.True,
+            "The structured method and route resolve the hit; the display identifier is not parsed.");
+    }
+
+    [Test]
+    public void Collect_ShouldNotParseTheDisplayIdentifierWhenTheStructuredFieldsAreMissing()
+    {
+        var collector = new OpenApiCoverageCollector("TestApi", OpenApiTestHelper.SampleJsonSpec);
+
+        collector.Collect(new ProtoObservation(
+            "TestApi",
+            "http.contract.shape",
+            "GET /users/{id}",
+            new RestShapeMatchData(
+                "GET /users/{id}",
+                ["$.id"],
+                typeof(DummyPayload),
+                StatusCode: 200)));
+
+        var id = collector.GetReportItems().Single().Children!
+            .Single(child => child.Identifier == "200").Children!
+            .Single(child => child.Identifier == "$.id");
+        Assert.That(id.IsCovered, Is.False,
+            "Without the structured fields a shape hit cannot be attributed; the old display-string parse is gone.");
     }
 
     [Test]

@@ -13,4 +13,6 @@ public sealed record ProtoHttpResponseContext(
     string? Identifier = null,
     ProtoHttpAttachmentOptions? AttachmentOptions = null,
     string? AttachmentPrefix = null,
-    string? RequestTraceId = null);
+    string? RequestTraceId = null,
+    string? Method = null,
+    string? RouteTemplate = null);

@@ -25,12 +25,23 @@ public static class ProtoHttpEndpoint
             ? await resolver(context, cancellationToken)
             : client.BaseAddress
               ?? throw new InvalidOperationException($"{protocolName} client '{targetName}' has no endpoint.");
-        if (!endpoint.IsAbsoluteUri || !ProtoHttpUri.IsHttpUri(endpoint))
+        return RequireHttpAddress(endpoint, $"A per-test {protocolName} endpoint");
+    }
+
+    /// <summary>
+    /// Validates that an address is an absolute HTTP or HTTPS URI and returns it, so every HTTP-based
+    /// protocol enforces the same rule with the same wording. <paramref name="description"/> names what
+    /// was validated, for example <c>A REST base address</c>.
+    /// </summary>
+    public static Uri RequireHttpAddress(Uri address, string description)
+    {
+        ArgumentNullException.ThrowIfNull(address);
+        ArgumentException.ThrowIfNullOrWhiteSpace(description);
+        if (!address.IsAbsoluteUri || !ProtoHttpUri.IsHttpUri(address))
         {
-            throw new InvalidOperationException(
-                $"A per-test {protocolName} endpoint must be an absolute HTTP or HTTPS URI.");
+            throw new InvalidOperationException($"{description} must be an absolute HTTP or HTTPS URI.");
         }
 
-        return endpoint;
+        return address;
     }
 }

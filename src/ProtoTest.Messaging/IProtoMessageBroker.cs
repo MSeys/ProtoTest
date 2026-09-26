@@ -26,9 +26,7 @@ public sealed record ProtoMessage(
     /// payload must exist.
     /// </summary>
     public T? ReadAsJson<T>(JsonSerializerOptions? options = null)
-        => string.IsNullOrWhiteSpace(Payload)
-            ? default
-            : JsonSerializer.Deserialize<T>(Payload, options ?? ProtoJsonDefaults.Reader);
+        => ProtoJsonRead.Read<T>(Payload, jsonPath: null, required: false, ReadSemantics<T>(), options);
 
     /// <summary>
     /// Deserializes the payload as <typeparamref name="T"/> and fails when there is nothing to return:
@@ -37,23 +35,7 @@ public sealed record ProtoMessage(
     /// assertion rather than a raw <see cref="JsonException"/>.
     /// </summary>
     public T ReadRequired<T>(JsonSerializerOptions? options = null)
-    {
-        if (string.IsNullOrWhiteSpace(Payload))
-        {
-            throw RequiredFailure<T>(jsonPath: null, "the payload was empty");
-        }
-
-        using var document = JsonDocument.Parse(Payload);
-        if (document.RootElement.ValueKind == JsonValueKind.Null)
-        {
-            throw RequiredFailure<T>(jsonPath: null, "the payload was JSON null");
-        }
-
-        var value = document.RootElement.Deserialize<T>(options ?? ProtoJsonDefaults.Reader);
-        return value is null
-            ? throw RequiredFailure<T>(jsonPath: null, "the payload was JSON null")
-            : value;
-    }
+        => ProtoJsonRead.Read<T>(Payload, jsonPath: null, required: true, ReadSemantics<T>(), options)!;
 
     /// <summary>
     /// Reads the value at <paramref name="jsonPath"/> as <typeparamref name="T"/> and fails when the
@@ -64,40 +46,16 @@ public sealed record ProtoMessage(
     public T ReadRequired<T>(string jsonPath, JsonSerializerOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(jsonPath);
-        if (string.IsNullOrWhiteSpace(Payload))
-        {
-            throw RequiredFailure<T>(jsonPath, "the payload was empty");
-        }
-
-        JsonElement element;
-        try
-        {
-            using var document = JsonDocument.Parse(Payload);
-            element = JsonPathResolver.Resolve(document.RootElement, jsonPath).Clone();
-        }
-        catch (JsonPathException exception)
-        {
-            throw new MessagingAssertionException($"{Destination} — {exception.Message}", exception);
-        }
-
-        if (element.ValueKind == JsonValueKind.Null)
-        {
-            throw RequiredFailure<T>(jsonPath, $"the value at '{jsonPath}' was JSON null");
-        }
-
-        var value = element.Deserialize<T>(options ?? ProtoJsonDefaults.Reader);
-        return value is null
-            ? throw RequiredFailure<T>(jsonPath, $"the value at '{jsonPath}' was JSON null")
-            : value;
+        return ProtoJsonRead.Read<T>(Payload, jsonPath, required: true, ReadSemantics<T>(), options)!;
     }
 
-    private MessagingAssertionException RequiredFailure<T>(string? jsonPath, string reason)
-    {
-        var read = string.IsNullOrWhiteSpace(jsonPath)
-            ? $"ReadRequired<{typeof(T).Name}>"
-            : $"ReadRequired<{typeof(T).Name}>('{jsonPath}')";
-        return new MessagingAssertionException($"{Destination} — {read} failed: {reason}.");
-    }
+    // Messaging's half of the shared read: its exception type and destination subject. Messaging records
+    // no deserialize trace event (the assertion exception is the evidence), so the sink stays null.
+    private ProtoJsonReadSemantics ReadSemantics<T>() => new(
+        RequiredFailure: message => new MessagingAssertionException($"{Destination} — {message}"),
+        PathMissFailure: (message, inner) => new MessagingAssertionException($"{Destination} — {message}", inner),
+        EmptyBodyReason: "the payload was empty",
+        NullBodyReason: "the payload was JSON null");
 }
 
 /// <summary>

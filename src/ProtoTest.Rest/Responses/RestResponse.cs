@@ -56,19 +56,7 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
     /// body. A failure records an <c>http.response.deserialize</c> event and rethrows.
     /// </summary>
     public T? ReadAsJson<T>(JsonSerializerOptions? options = null)
-    {
-        try
-        {
-            return string.IsNullOrWhiteSpace(Content)
-                ? default
-                : JsonSerializer.Deserialize<T>(Content, options ?? ProtoJsonDefaults.Reader);
-        }
-        catch (Exception exception)
-        {
-            TraceDeserializeFailure<T>(exception);
-            throw;
-        }
-    }
+        => ProtoJsonRead.Read<T>(Content, jsonPath: null, required: false, SemanticsFor<T>(), options);
 
     /// <summary>
     /// Reads a single value from the body at <paramref name="jsonPath"/> and deserializes it as
@@ -82,9 +70,7 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
     public T? ReadAsJson<T>(string jsonPath, JsonSerializerOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(jsonPath);
-        return string.IsNullOrWhiteSpace(Content)
-            ? default
-            : ReadAtPath<T>(jsonPath, options, required: false);
+        return ProtoJsonRead.Read<T>(Content, jsonPath, required: false, SemanticsFor<T>(), options);
     }
 
     /// <summary>
@@ -94,13 +80,7 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
     /// <see cref="ReadAsJson{T}(JsonSerializerOptions?)"/> stays nullable.
     /// </summary>
     public T ReadRequired<T>(JsonSerializerOptions? options = null)
-    {
-        EnsureBodyIsNotNull<T>(jsonPath: null);
-        var value = ReadAsJson<T>(options);
-        return value is null
-            ? throw TraceRequiredFailure<T>(jsonPath: null, "the response body was JSON null")
-            : value;
-    }
+        => ProtoJsonRead.Read<T>(Content, jsonPath: null, required: true, SemanticsFor<T>(), options)!;
 
     /// <summary>
     /// Reads the value at <paramref name="jsonPath"/> as <typeparamref name="T"/> and fails when the
@@ -112,8 +92,7 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
     public T ReadRequired<T>(string jsonPath, JsonSerializerOptions? options = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(jsonPath);
-        EnsureBodyIsNotNull<T>(jsonPath);
-        return ReadAtPath<T>(jsonPath, options, required: true)!;
+        return ProtoJsonRead.Read<T>(Content, jsonPath, required: true, SemanticsFor<T>(), options)!;
     }
 
     /// <summary>
@@ -144,35 +123,14 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
             ProtoRestBuilder.Protocol.TraceSource,
             expectedStatusCode,
             negated,
-            // The failure message must not exceed either limit: the response section applies even
-            // when the protocol never opted into attachment capture, and the attachment options
-            // keep their own redaction rules when capture is on.
+            // The failure message must not exceed either limit: the shared base helper keeps the
+            // protocol's response section bound and the attachment redaction rules.
             () => new RestStatusAssertionException(
                 expectedStatusCode,
                 StatusCode,
-                ProtoHttpDiagnosticSanitizer.SanitizeBody(Content, ResolveStatusDiagnosticOptions()),
+                ProtoHttpDiagnosticSanitizer.SanitizeBody(Content, ResolveStatusDiagnosticOptions(ProtoRestBuilder.ProtocolName)),
                 negated));
         return this;
-    }
-
-    private ProtoHttpAttachmentOptions ResolveStatusDiagnosticOptions()
-    {
-        // The resolved ProtoTest:Rest:Responses section bounds the failure body even when the protocol
-        // never opted into attachment capture; attachment options, when present, keep their own
-        // redaction rules and may tighten the limit further.
-        var responseLimit = Context?.ResolveResponseOptions(ProtoRestBuilder.ProtocolName).MaxDiagnosticBodyLength
-            ?? new ProtoHttpResponseOptions().MaxDiagnosticBodyLength;
-        if (AttachmentOptions is null)
-            return new ProtoHttpAttachmentOptions { MaxDiagnosticBodyLength = responseLimit };
-        if (responseLimit >= AttachmentOptions.MaxDiagnosticBodyLength)
-            return AttachmentOptions;
-
-        return new ProtoHttpAttachmentOptions
-        {
-            RedactSensitiveData = AttachmentOptions.RedactSensitiveData,
-            SensitiveJsonProperties = [.. AttachmentOptions.SensitiveJsonProperties],
-            MaxDiagnosticBodyLength = responseLimit
-        };
     }
 
     /// <summary>
@@ -215,7 +173,11 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
                             RequestIdentifier: Identifier,
                             MatchedProperties: matched,
                             TargetType: expectedShape.GetType(),
-                            StatusCode: (int)StatusCode))
+                            StatusCode: (int)StatusCode)
+                        {
+                            Method = RequestMethod,
+                            RouteTemplate = RouteTemplate
+                        })
                     : null);
         }
         catch (JsonShapeMismatchException exception)
@@ -235,79 +197,14 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
     private string PrefixIdentifier(string message)
         => string.IsNullOrEmpty(Identifier) ? message : $"{Identifier} — {message}";
 
-    private RestAssertionException RequiredFailure<T>(string? jsonPath, string reason)
-    {
-        var read = string.IsNullOrWhiteSpace(jsonPath)
-            ? $"ReadRequired<{typeof(T).Name}>"
-            : $"ReadRequired<{typeof(T).Name}>('{jsonPath}')";
-        return new RestAssertionException(PrefixIdentifier($"{read} failed: {reason}."));
-    }
-
-    // A required read resolves the element before deserializing, so JSON null - which would otherwise
-    // reach a value-type T as the deserializer's JsonException - fails as the protocol assertion. Every
-    // failure, a path miss included, records the deserialize event with the path.
-    private T? ReadAtPath<T>(string jsonPath, JsonSerializerOptions? options, bool required)
-    {
-        try
-        {
-            using var document = JsonDocument.Parse(Content);
-            var element = JsonPathResolver.Resolve(document.RootElement, jsonPath);
-            if (required && element.ValueKind == JsonValueKind.Null)
-            {
-                throw RequiredFailure<T>(jsonPath, $"the value at '{jsonPath}' was JSON null");
-            }
-
-            var value = element.Deserialize<T>(options ?? ProtoJsonDefaults.Reader);
-            if (required && value is null)
-            {
-                throw RequiredFailure<T>(jsonPath, $"the value at '{jsonPath}' was JSON null");
-            }
-
-            return value;
-        }
-        catch (JsonPathException exception)
-        {
-            var failure = new RestAssertionException(PrefixIdentifier(exception.Message), exception);
-            TraceDeserializeFailure<T>(failure, jsonPath);
-            throw failure;
-        }
-        catch (Exception exception)
-        {
-            TraceDeserializeFailure<T>(exception, jsonPath);
-            throw;
-        }
-    }
-
-    // The required reads check the body before deserializing for the same reason, and an empty or
-    // JSON-null body records the same deserialize event as any other read failure.
-    private void EnsureBodyIsNotNull<T>(string? jsonPath)
-    {
-        if (string.IsNullOrWhiteSpace(Content))
-        {
-            throw TraceRequiredFailure<T>(jsonPath, "the response body was empty");
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(Content);
-            if (document.RootElement.ValueKind == JsonValueKind.Null)
-            {
-                throw TraceRequiredFailure<T>(jsonPath, "the response body was JSON null");
-            }
-        }
-        catch (JsonException exception)
-        {
-            TraceDeserializeFailure<T>(exception, jsonPath);
-            throw;
-        }
-    }
-
-    private RestAssertionException TraceRequiredFailure<T>(string? jsonPath, string reason)
-    {
-        var failure = RequiredFailure<T>(jsonPath, reason);
-        TraceDeserializeFailure<T>(failure, jsonPath);
-        return failure;
-    }
+    // REST's half of the shared read: its exception type and its http.response.deserialize vocabulary.
+    // Every failure the read detects is recorded once through TraceDeserializeFailure.
+    private ProtoJsonReadSemantics SemanticsFor<T>() => new(
+        RequiredFailure: message => new RestAssertionException(PrefixIdentifier(message)),
+        PathMissFailure: (message, inner) => new RestAssertionException(PrefixIdentifier(message), inner),
+        EmptyBodyReason: "the response body was empty",
+        NullBodyReason: "the response body was JSON null",
+        TraceFailure: (exception, jsonPath) => TraceDeserializeFailure<T>(exception, jsonPath));
 
     private void TraceDeserializeFailure<T>(Exception exception, string? jsonPath = null)
     {

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ProtoTest.Core;
@@ -120,6 +121,48 @@ public sealed class WebSocketDeviceTests
         await host.StopAsync();
 
         Assert.That(exception!.Message, Does.Contain("closed the connection"));
+    }
+
+    [Test]
+    public async Task WebSocketClient_WhenTheDeviceSendsAnOversizedMessage_ShouldFailNamed()
+    {
+        await using var server = await EchoServer.StartAsync(async socket =>
+        {
+            var buffer = new byte[4096];
+            var received = await socket.ReceiveAsync(buffer, CancellationToken.None);
+            _ = received;
+            await socket.SendAsync(
+                System.Text.Encoding.UTF8.GetBytes(new string('x', 8192)),
+                WebSocketMessageType.Text,
+                endOfMessage: true,
+                CancellationToken.None);
+            await Task.Delay(TimeSpan.FromSeconds(5));
+        });
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Devices:WebSocket:MaxMessageBytes"] = "1024"
+            }));
+        builder.AddDevices(devices => devices
+            .AddWebSocketClient("Chargers", address: server.Address, path: "/ws/{deviceId}")
+                .AddDevice<EchoDevice>());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("oversized frame", "00001", TestMethods.Placeholder);
+
+        var device = Proto.Context.Devices("Chargers").For<EchoDevice>("CP-005");
+        var exception = Assert.ThrowsAsync<DeviceFrameTooLargeException>(async () => await device.BootAsync());
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        await host.StopAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("larger than the configured 1024 bytes"));
+            Assert.That(exception.Message, Does.Contain($"{server.Address}/ws/CP-005"));
+        });
     }
 
     private static async Task RespondAsync(WebSocket socket)

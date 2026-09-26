@@ -162,6 +162,17 @@ All ProtoTest packages share one version; breaking API changes are called out be
   `ProtoExecutionContext.CancellationToken` and `ProtoTest.Sql` passes it to the connection open and
   transaction begin. No runner adapter supplies one yet; a caller that starts a test explicitly can
   pass one.
+- `ProtoTestResult.FromException(Exception)` and `ProtoTestResult.IsCancellation(string)` are the
+  shared outcome classifier the runner adapters use; `ProtoTestName.ForRow` composes the row name MSTest
+  and TUnit record (`…MethodName[1, admin]`).
+- `ProtoTest.Json` hosts the shared mechanics: `ProtoFailureDiagnostics` (sanitized
+  address/type/message/cancellation/duration), `ProtoJsonRead`/`ProtoJsonReadSemantics` (one JSON read)
+  and `ProtoObservationCapture`; `ProtoTest.Http.ProtoHttpFailureDiagnostics` and its capture moved
+  there. `ProtoHttpEndpoint.RequireHttpAddress` is the shared absolute-HTTP(S) rule.
+  `RestShapeMatchData.Method`/`RouteTemplate` structure a shape hit for OpenAPI coverage.
+  `PlaywrightWebOptions.MaxTraceBytes` (32 MiB, 0 off), `WebSocketDeviceOptions.MaxMessageBytes`
+  (4 MiB, 0 off) with `DeviceFrameTooLargeException`, and `IWebBackend.PollInterval` bound the reads
+  and the session timing.
 
 ### Fixed
 
@@ -356,6 +367,22 @@ All ProtoTest packages share one version; breaking API changes are called out be
   propagates with its original stack.
 - Optional constructor-parameter defaults win over generated values in `ProtoTest.Data`, so a declared
   default (including `null`) is honored.
+- A readiness timeout names the probed URL and the last error; a rejected GraphQL subscription names
+  the server's errors; an oversized WebSocket frame fails naming the address and limit; a stuck
+  Selenium pump is reported (`web.selenium.executor_abandoned`) instead of abandoned silently; a
+  Playwright trace over the cap records `web.playwright.trace_too_large`; coverage reads the address
+  inside the assertion operation.
+- A body `OperationCanceledException` records `Cancelled` under xUnit v2 as it already did under
+  MSTest, TUnit and xUnit v3; NUnit still records `Failed` because its result carries no exception.
+  xUnit v2 completes the test scope in a `finally` even when its own pipeline throws.
+- TUnit parameterized rows record their arguments in the trace name (`…MethodName[1]`) instead of the
+  method name alone, so parallel rows stay distinguishable.
+- Failure evidence is one record: gRPC and messaging record `ProtoFailureDiagnostics` through the
+  protocol-identified guard (`{protocol}.diagnostics.failed`), so a non-`RpcException` and a failed
+  publish/await are observations.
+- One wait timing per session: assertions poll at `IWebBackend.PollInterval` (Selenium's `PollInterval`,
+  the shared default otherwise), and REST request-URI validation uses the shared wording
+  (`REST request URI '…' must be an absolute HTTP or HTTPS URI`).
 
 ### Removed
 

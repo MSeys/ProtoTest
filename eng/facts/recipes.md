@@ -62,6 +62,9 @@ and the device client (`ProtoDeviceClient` + registration store). The shared rul
 - Client options are **per named client**: register them keyed by the scoped client name and let one
   name's callbacks compose in order; the unkeyed instance stays the run-wide default for a
   transport-backed fallback client, and the shared section binds over each client's callback.
+- Response reads go through the shared mechanics: `ProtoJsonRead.Read` with the protocol's
+  `ProtoJsonReadSemantics` for JSON-at-path reads, and `ProtoHttpResponse.ResolveStatusDiagnosticOptions`
+  for status-body clamping; do not hand-roll a second reader.
 
 Accessor shape: `context.<Protocol>()` returns a **client** for the protocols that address named clients
 (Rest, GraphQL, gRPC, Devices, Web) and the **capability interface** for the integrations that own one

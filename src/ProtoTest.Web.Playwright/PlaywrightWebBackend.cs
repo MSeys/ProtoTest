@@ -367,12 +367,31 @@ public sealed partial class PlaywrightWebBackend : IWebBackend, IWebBackendJavaS
                     try
                     {
                         await _browserContext.Tracing.StopAsync(new TracingStopOptions { Path = path });
-                        var bytes = await File.ReadAllBytesAsync(path);
-                        _context.AddAttachment(ProtoTestAttachment.FromBytes(
-                            $"playwright-{WebNames.SafeName(_sessionName)}-trace.zip",
-                            bytes,
-                            "application/vnd.microsoft.playwright.trace+zip",
-                            $"Native Playwright trace for Web session '{_sessionName}'."));
+                        var bytes = await PlaywrightTraceFile.ReadAsync(path, _options.MaxTraceBytes, cancellationToken);
+                        if (bytes is null)
+                        {
+                            // The cap is a deliberate artifact policy, not a capture failure: the trace
+                            // stays on disk for manual inspection and the trace says why it was skipped.
+                            _context.Trace.WriteEvent(
+                                "web.playwright.trace_too_large",
+                                "Playwright native trace exceeded the configured cap",
+                                TraceSource,
+                                ProtoTracePhase.Teardown,
+                                ProtoTraceOutcome.Failed,
+                                attributes: new Dictionary<string, string?>
+                                {
+                                    ["web.trace.limit_bytes"] = _options.MaxTraceBytes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                                    ["web.trace.bytes"] = new FileInfo(path).Length.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                                });
+                        }
+                        else
+                        {
+                            _context.AddAttachment(ProtoTestAttachment.FromBytes(
+                                $"playwright-{WebNames.SafeName(_sessionName)}-trace.zip",
+                                bytes,
+                                "application/vnd.microsoft.playwright.trace+zip",
+                                $"Native Playwright trace for Web session '{_sessionName}'."));
+                        }
                     }
                     finally
                     {

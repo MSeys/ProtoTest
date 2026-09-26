@@ -140,6 +140,17 @@ public sealed class ProtoTestFactOutcomeTests
     }
 
     [Fact]
+    public async Task CancelledBody_ShouldRecordCancelledOutcome()
+    {
+        // Deliberate change (Audit 5 A5.6, D-04; user decision 2026-09-26): a body
+        // OperationCanceledException maps to Cancelled in xUnit v2 as it already did in MSTest,
+        // TUnit and xUnit v3. The characterization test pinned the previous Failed outcome first.
+        var run = await RunFactAsync(nameof(Subjects.Cancelled));
+
+        Assert.Equal(ProtoTraceOutcome.Cancelled, run.Trace.Outcome);
+    }
+
+    [Fact]
     public async Task TheoryRows_ShouldEachRecordTheirOwnOutcome()
     {
         var method = TestMethod(nameof(Subjects.EvenOnly));
@@ -222,7 +233,7 @@ public sealed class ProtoTestFactOutcomeTests
         }
 
         [ProtoTestFact]
-        [RequiresCapability("not-composed", Reason = "the adapter proves the skip path")]
+        [RequiresCapability(AdapterProbes.SkipCapability, Reason = AdapterProbes.SkipReason)]
         public void RequiresCapability()
             => throw new InvalidOperationException("A skipped test must not run its body.");
 

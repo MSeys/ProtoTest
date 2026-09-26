@@ -113,7 +113,14 @@ public sealed partial class WebModelTests
         public string? CurrentAddress { get; set; }
 
         public ValueTask<string?> GetCurrentAddressAsync(CancellationToken cancellationToken = default)
-            => ValueTask.FromResult(CurrentAddress);
+        {
+            CallOrder.Add("address");
+            return ValueTask.FromResult(CurrentAddress);
+        }
+
+        /// <summary>The order backend calls happened in; the coverage test proves the address read is
+        /// inside the assertion operation.</summary>
+        public List<string> CallOrder { get; } = [];
 
         public ValueTask NavigateAsync(Uri address, CancellationToken cancellationToken = default)
         {
@@ -127,6 +134,17 @@ public sealed partial class WebModelTests
             CancellationToken cancellationToken = default)
         {
             BegunOperations.Add(operation);
+            CallOrder.Add("begin");
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask EndOperationAsync(
+            WebBackendOperationContext operation,
+            ProtoTraceOutcome outcome,
+            Exception? exception = null,
+            CancellationToken cancellationToken = default)
+        {
+            CallOrder.Add("end");
             return ValueTask.CompletedTask;
         }
 

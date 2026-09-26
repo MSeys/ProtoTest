@@ -291,9 +291,10 @@ spirit (see `ProtoDataValueContext`).
   builder type of its own).
 - `sheets.workbook` is record-only evidence: opening a workbook is not an assertion, so
   `SheetsCoverageCollector` consumes only `sheets.range` (decided in A5; not changed).
-- Messaging records the `messaging.publish` operation and the `messaging.published`, `messaging.receive`
-  and `messaging.contract.shape` observations as trace evidence and ships no collector; destinations are
-  deliberately not a coverage category (A5 VOC-1 decision: the promise was deleted, not shipped).
+- Messaging records the `messaging.publish` operation and the `messaging.published`, `messaging.receive`,
+  `messaging.failure` and `messaging.contract.shape` observations as trace evidence and ships no collector;
+  destinations are deliberately not a coverage category (A5 VOC-1 decision: the promise was deleted, not
+  shipped).
 - Entity ids: `client:{type}:{name}`, `context:{type}`, `capability:{kind}:{name}` (with `:{instance}`
   when the descriptor carries one), `device:{client}:{deviceType}:{id}`, infrastructure `Id`, resources
   `Id`, value items `{type}:{identity}`.
@@ -305,7 +306,12 @@ Each adapter owns its lifecycle boundary and maps the runner's result to the tra
 re-implements lifecycle. Consolidated facts (Audit 3 Stage 4): NUnit uses an `IWrapSetUpTearDown`
 command wrapper (skip precedes `[SetUp]`, lifecycle spans setup/teardown); MSTest is one lifecycle per
 data row; xUnit v3 traces theory rows by display name and always completes the scope; TUnit runs
-reflection-less tests unwrapped; xUnit v2 names rows. `AdapterContract` is the shared compliance
+reflection-less tests unwrapped; xUnit v2 names rows. Classification is shared:
+`ProtoTestResult.FromException` (with `IsCancellation(string)` for xUnit v3's result state) records a
+runner-reported cancellation as `Cancelled` and anything else as `Failed`; NUnit is the documented
+exception (its result carries no exception, so a cancelled test reads `Failed`). xUnit v2 completes the
+scope in a `finally`; TUnit appends row arguments through `ProtoTestName.ForRow`, the same form MSTest
+records. `AdapterContract` is the shared compliance
 suite; extend it, do not fork it.
 
 ## Inventory — the one of everything

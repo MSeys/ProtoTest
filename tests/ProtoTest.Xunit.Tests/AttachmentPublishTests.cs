@@ -1,6 +1,7 @@
 namespace ProtoTest.Xunit.Tests;
 
 using global::Xunit;
+using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 
 [Collection(ProtoTestCollection.Name)]
@@ -9,10 +10,7 @@ public sealed class AttachmentPublishTests
     [Fact]
     public async Task Publisher_ShouldWriteTheMaterializedPathToTestOutput()
     {
-        var attachment = ProtoTestAttachment.FromText(
-            "adapter-attachment",
-            "payload",
-            description: "Shared adapter artifact");
+        var attachment = AdapterProbes.CreateAttachment();
         var path = await attachment.MaterializeFileAsync();
 
         var original = Console.Out;

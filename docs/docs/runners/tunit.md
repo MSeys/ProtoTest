@@ -65,7 +65,7 @@ public class OrderTests
 
 ## Per-test lifecycle
 
-`ProtoTestExecutor.ExecuteTest` resolves the test's `MethodInfo` and attributes, starts the context with the fully qualified name from `ProtoTestName.FromMethod`, awaits the test action, then completes the context; the live `TestContext` is what the attachment publisher writes to. It runs asynchronously, like xUnit v2 and MSTest.
+`ProtoTestExecutor.ExecuteTest` resolves the test's `MethodInfo` and attributes, starts the context with the stable fully qualified name from `ProtoTestName.FromMethod` (a parameterized row appends its arguments, `…MethodName[1]`), awaits the test action, then completes the context; the live `TestContext` is what the attachment publisher writes to. It runs asynchronously, like xUnit v2 and MSTest.
 
 If the body throws, the executor records the outcome, completes the context, and rethrows with `ExceptionDispatchInfo` so TUnit still sees the exception. Teardown never replaces the original failure.
 

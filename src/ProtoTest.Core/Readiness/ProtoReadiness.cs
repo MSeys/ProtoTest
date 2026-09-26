@@ -34,12 +34,15 @@ public static class ProtoReadiness
 
     /// <summary>
     /// Ready when an HTTP GET answers. By default any response - including a 404 - proves the address is
-    /// serving; pass <paramref name="ready"/> to demand a health endpoint or a status.
+    /// serving; pass <paramref name="ready"/> to demand a health endpoint or a status. Pass
+    /// <paramref name="onFailure"/> to observe why an attempt failed (the last reason feeds the timeout
+    /// failure <see cref="WaitAsync"/> builds).
     /// </summary>
     public static Func<CancellationToken, ValueTask<bool>> Http(
         Uri url,
         Func<HttpResponseMessage, bool>? ready = null,
-        TimeSpan? requestTimeout = null)
+        TimeSpan? requestTimeout = null,
+        Action<string>? onFailure = null)
     {
         ArgumentNullException.ThrowIfNull(url);
         var timeout = requestTimeout ?? TimeSpan.FromSeconds(10);
@@ -53,13 +56,15 @@ public static class ProtoReadiness
                 using var response = await SharedHttpClient.GetAsync(url, requestCancellation.Token).ConfigureAwait(false);
                 return ready?.Invoke(response) ?? true;
             }
-            catch (HttpRequestException)
+            catch (HttpRequestException exception)
             {
+                onFailure?.Invoke($"{exception.GetType().Name}: {exception.Message}");
                 return false;
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 // The request's own timeout, not the caller's cancellation: still not ready.
+                onFailure?.Invoke($"the request did not answer within {timeout.TotalSeconds:0.#}s");
                 return false;
             }
         };
@@ -68,7 +73,8 @@ public static class ProtoReadiness
     /// <summary>
     /// Polls a check until it returns <see langword="true"/> or the timeout expires. Exceptions count as
     /// "not ready yet" and are remembered as the last error, so a refused connection while a container
-    /// boots is normal; a timeout throws with the name, the attempts and the last error. The wait rides
+    /// boots is normal; a timeout throws with the name, the attempts and the last error (from an
+    /// exception the check threw or from <paramref name="describeLastError"/>). The wait rides
     /// <see cref="ProtoPolling.PollAsync{T}"/>, so readiness shares one interval and deadline rule with
     /// every other wait in the framework.
     /// </summary>
@@ -77,7 +83,8 @@ public static class ProtoReadiness
         Func<CancellationToken, ValueTask<bool>> check,
         TimeSpan timeout,
         TimeSpan interval,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Func<string?>? describeLastError = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(check);
@@ -118,9 +125,10 @@ public static class ProtoReadiness
         if (!result.Satisfied)
         {
             var message = $"Readiness probe '{name}' was not satisfied within {timeout.TotalSeconds:0.#}s after {attempts} attempt(s).";
-            if (lastError is not null)
+            var observed = lastError ?? describeLastError?.Invoke();
+            if (observed is not null)
             {
-                message += $" Last error: {lastError}";
+                message += $" Last error: {observed}";
             }
 
             throw new InvalidOperationException(message);

@@ -1,6 +1,7 @@
 namespace ProtoTest.MSTest.Tests;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 
 [TestClass]
@@ -24,10 +25,7 @@ public sealed class AttachmentPublishTests
     {
         [ProtoTest]
         public void AttachesAResult()
-            => Proto.Context.AddAttachment(ProtoTestAttachment.FromText(
-                "adapter-attachment",
-                "payload",
-                description: "Shared adapter artifact"));
+            => Proto.Context.AddAttachment(AdapterProbes.CreateAttachment());
     }
 #pragma warning restore MSTEST0030, MSTEST0032
 }

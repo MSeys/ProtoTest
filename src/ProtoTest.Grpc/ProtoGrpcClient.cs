@@ -80,6 +80,7 @@ public sealed partial class ProtoGrpcClient : IDisposable
         ArgumentNullException.ThrowIfNull(method);
         var callNumber = Interlocked.Increment(ref _callSequence);
         using var operation = BeginCallTrace(method, deadline);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var callMetadata = await PrepareMetadataAsync(metadata, operation, cancellationToken);
         var attachmentOptions = _context.TryService<GrpcAttachmentOptions>();
         if (attachmentOptions?.CaptureRequestBodies == true)
@@ -113,14 +114,9 @@ public sealed partial class ProtoGrpcClient : IDisposable
                 op => op.AddSection(ResponseSection(response)));
             return response;
         }
-        catch (RpcException exception)
-        {
-            Fail(operation, method.ServiceName, method.Name, exception);
-            throw;
-        }
         catch (Exception exception)
         {
-            operation.Fail(exception);
+            Fail(operation, method, exception, stopwatch, cancellationToken);
             throw;
         }
     }
@@ -139,6 +135,7 @@ public sealed partial class ProtoGrpcClient : IDisposable
         ArgumentNullException.ThrowIfNull(requests);
         var callNumber = Interlocked.Increment(ref _callSequence);
         using var operation = BeginCallTrace(method, deadline);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var callMetadata = await PrepareMetadataAsync(metadata, operation, cancellationToken);
         var requestList = requests as IReadOnlyCollection<TRequest> ?? [.. requests];
         operation.SetAttribute("grpc.request.count", requestList.Count.ToString(CultureInfo.InvariantCulture));
@@ -180,14 +177,9 @@ public sealed partial class ProtoGrpcClient : IDisposable
                 op => op.AddSection(ResponseSection(response)));
             return response;
         }
-        catch (RpcException exception)
-        {
-            Fail(operation, method.ServiceName, method.Name, exception);
-            throw;
-        }
         catch (Exception exception)
         {
-            operation.Fail(exception);
+            Fail(operation, method, exception, stopwatch, cancellationToken);
             throw;
         }
     }
@@ -205,6 +197,7 @@ public sealed partial class ProtoGrpcClient : IDisposable
         ArgumentNullException.ThrowIfNull(method);
         var callNumber = Interlocked.Increment(ref _callSequence);
         using var operation = BeginCallTrace(method, deadline);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var callMetadata = await PrepareMetadataAsync(metadata, operation, cancellationToken);
         var attachmentOptions = _context.TryService<GrpcAttachmentOptions>();
         if (attachmentOptions?.CaptureRequestBodies == true)
@@ -243,14 +236,9 @@ public sealed partial class ProtoGrpcClient : IDisposable
                 op => op.AddSection(ResponseSection(responses)));
             return responses;
         }
-        catch (RpcException exception)
-        {
-            Fail(operation, method.ServiceName, method.Name, exception);
-            throw;
-        }
         catch (Exception exception)
         {
-            operation.Fail(exception);
+            Fail(operation, method, exception, stopwatch, cancellationToken);
             throw;
         }
     }
@@ -388,35 +376,84 @@ public sealed partial class ProtoGrpcClient : IDisposable
                 : null),
             cancellationToken: cancellationToken);
 
-    private void Fail(ProtoTraceOperation operation, string service, string name, RpcException exception)
+    private void Fail(
+        ProtoTraceOperation operation,
+        IMethod method,
+        Exception exception,
+        System.Diagnostics.Stopwatch stopwatch,
+        CancellationToken cancellationToken)
     {
-        operation.SetAttribute("rpc.grpc.status_code", ((int)exception.StatusCode).ToString(CultureInfo.InvariantCulture));
-        operation.SetAttribute("rpc.grpc.status", exception.StatusCode.ToString());
-        operation.AddSection(new ProtoTraceSection(
-            "Status",
-            ProtoTraceSectionKind.Fields,
-            Items:
-            [
-                new ProtoTraceSectionItem("code", exception.StatusCode.ToString()),
-                new ProtoTraceSectionItem("detail", exception.Status.Detail)
-            ]));
-        // A call the caller cancelled is not a product failure, even when gRPC reports it as a status
-        // code rather than an OperationCanceledException.
-        if (exception.StatusCode == StatusCode.Cancelled)
+        string status;
+        if (exception is RpcException rpc)
         {
-            operation.Cancel(exception);
+            status = rpc.StatusCode.ToString();
+            operation.SetAttribute("rpc.grpc.status_code", ((int)rpc.StatusCode).ToString(CultureInfo.InvariantCulture));
+            operation.SetAttribute("rpc.grpc.status", status);
+            operation.AddSection(new ProtoTraceSection(
+                "Status",
+                ProtoTraceSectionKind.Fields,
+                Items:
+                [
+                    new ProtoTraceSectionItem("code", rpc.StatusCode.ToString()),
+                    new ProtoTraceSectionItem("detail", rpc.Status.Detail)
+                ]));
+            // A call the caller cancelled is not a product failure, even when gRPC reports it as a status
+            // code rather than an OperationCanceledException.
+            if (rpc.StatusCode == StatusCode.Cancelled)
+            {
+                operation.Cancel(rpc);
+            }
+            else
+            {
+                operation.Fail(rpc);
+            }
         }
         else
         {
+            status = exception.GetType().Name;
             operation.Fail(exception);
         }
 
-        _context.RecordObservation(Observation(
-            service,
-            name,
-            exception.StatusCode.ToString(),
-            ProtoGrpcBuilder.FailureObservationKind));
+        RecordFailure(method, exception, status, stopwatch.Elapsed, cancellationToken);
     }
+
+    // Every failure - an RpcException or not - records the shared failure record through the guard, so a
+    // transport or cancellation fault is evidence a collector can see. The channel target, when the
+    // channel exists, is the sanitized address the call was sent to.
+    private void RecordFailure(
+        IMethod method,
+        Exception exception,
+        string status,
+        TimeSpan elapsed,
+        CancellationToken cancellationToken)
+        => ProtoObservationCapture.TryRecord(_context, ProtoGrpcBuilder.Protocol, () =>
+        {
+            var diagnostics = ProtoFailureDiagnostics.From(
+                FailureAddress(),
+                exception,
+                cancellationToken,
+                _context.TryService<GrpcAttachmentOptions>()) with
+            {
+                Duration = elapsed
+            };
+            return new ProtoObservation(
+                _targetName,
+                ProtoGrpcBuilder.FailureObservationKind,
+                $"{method.ServiceName}/{method.Name}",
+                Data: diagnostics,
+                Metadata: new Dictionary<string, object>
+                {
+                    ["rpc.system"] = "grpc",
+                    ["rpc.service"] = method.ServiceName,
+                    ["rpc.method"] = method.Name,
+                    ["rpc.grpc.status"] = status
+                });
+        });
+
+    private Uri? FailureAddress()
+        => _channel?.Target is { Length: > 0 } target && Uri.TryCreate(target, UriKind.Absolute, out var uri)
+            ? uri
+            : null;
 
     private ProtoObservation Observation(string service, string name, string status, string kind)
         => new(

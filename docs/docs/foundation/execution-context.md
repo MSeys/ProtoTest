@@ -32,6 +32,18 @@ The context is stored in an `AsyncLocal`, so parallel tests each see their own. 
 | `TestId` | the id as a zero-padded string |
 | `TestNumber` | the id as a `long` |
 
+## Cancellation
+
+`CancellationToken` is the token the caller supplied when the test was started:
+
+```csharp
+await using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+var context = await host.StartTestAsync("Checkout", method, cancellation.Token);
+context.CancellationToken;   // the same token in hooks, attributes and setup I/O
+```
+
+No runner adapter supplies one yet, so a runner-driven test sees `CancellationToken.None` and setup runs to the integration's own timeout. `ProtoTest.Sql` passes the token to the connection open and transaction begin; the run-scoped [`IProtoRunHook`](./hooks.md#run-hooks) keeps taking its token as a parameter.
+
 ## Unique names
 
 A record that outlives the test process — a tenant, an operator, a customer — needs a name that is unique per test and stable across reruns. `UniqueName` derives one from the test id:
@@ -95,7 +107,8 @@ Register services with `builder.ConfigureServices(...)`. Scoped services are per
 Integrations with a system to talk to register their clients on the context; you normally use their extension methods (`Rest()`, `GraphQL()`, `Web()`). The underlying API:
 
 ```csharp
-void RegisterClient<TClient>(TClient client, string name = "Default", bool disposeWithContext = true) where TClient : class;
+void RegisterClient<TClient>(TClient client, string name = "Default",
+    ProtoClientOwnership ownership = ProtoClientOwnership.Context) where TClient : class;
 TClient Client<TClient>(string name = "Default") where TClient : class;
 TClient? TryClient<TClient>(string name = "Default") where TClient : class;
 ```

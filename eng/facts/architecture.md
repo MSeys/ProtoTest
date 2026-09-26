@@ -46,8 +46,8 @@ or `Sheets` type names.
    no plain declaration promises it; the decision names the deciding keys and the reason in the trace.
 4. Selects the run clock (a `ProtoClock` registered by `ConfigureClock`, else one starting now) and
    registers the `TimeProvider` bridge.
-5. Registers the internal hooks (client initializer and completion, trace export, run gates, run
-   resources) and report sources.
+5. Registers the internal hooks (client initializer and completion, trace export, sink export, run gates,
+   run resources) and report sources.
 6. Builds the provider and **constructs every `IProtoCollector`** so a bad OpenAPI/GQL schema fails
    construction, not the first test.
 7. Second `Build()` throws; every public registration entry that would mutate composition throws
@@ -66,8 +66,10 @@ or `Sheets` type names.
    worker receives the merged overlay (options over settings over configuration) as `--{key}={value}`
    arguments, so the worker's `Program.Main` sees final-precedence values, and the `HostBuilding`
    in-memory overlay stays as the fallback for an entry point that ignores args.
-4. Starts the trace listener. A start failure rolls back completed run hooks in reverse, clears
-   infrastructure settings, and returns the host to Created for a retry.
+4. Starts the trace listener. A start failure rolls back the completed run hooks that own state, in
+   reverse, so a suite-setup hook's state is released; the evidence hooks (gates, sink export, the
+   archive) stay silent for a run that never started. It clears infrastructure settings and returns the
+   host to Created for a retry.
 
 `StopAsync()` (first stop wins; second returns or rethrows the remembered failure):
 
@@ -87,7 +89,9 @@ provider, stops listening, unregisters. Start/stop/dispose racing is rejected, n
    host's `ProtoClockRegistry` (a failed start removes it; context disposal removes it), sorts
    attributes by `Order`, sets the ambient context, then runs hooks ascending (the built-in client
    initializer has `Order = int.MinValue`) and attributes ascending. It opens `test.execution` and
-   makes it the parent.
+   makes it the parent. The caller's token becomes `ProtoExecutionContext.CancellationToken`, which
+   hooks and attributes read and `ProtoTest.Sql` passes to the connection open and transaction begin;
+   no runner adapter supplies one yet.
 3. A setup failure records the test `Failed`, rolls back only the completed components (attributes and
    hooks in reverse), and rethrows.
 4. Teardown runs attributes reverse, hooks reverse, publishes attachments, disposes the context
@@ -95,7 +99,8 @@ provider, stops listening, unregisters. Start/stop/dispose racing is rejected, n
    completes the recorder. Every step is attempted; teardown failures become findings and never replace
    the adapter's result; a single exception is rethrown as-is, several aggregate.
 5. `CompleteTestAsync` refuses a missing or foreign test; the context disposes once; resources release
-   at most once.
+   at most once. A scope disposed off the async flow that started it, or while another test is active,
+   records a `Lifecycle` finding on its test and throws rather than completing silently.
 
 ## Ownership and lifetimes
 
@@ -216,7 +221,9 @@ options resolve; a bad value fails there, not the first test. Sections follow
 segment. A renamed section returns its old name from `FallbackConfigurationSectionName`: the fallback
 binds first and the current section binds over it, so the old key keeps working (documented as
 deprecated) and the current key wins. `GrpcClientOptions` is the example — `ProtoTest:Grpc:Client` over
-the legacy `ProtoTest:Grpc`.
+the legacy `ProtoTest:Grpc` — and it is registered **per named client**: the keyed registration
+composes each client's callbacks in order, the shared section binds over each client's callback, and
+the unkeyed instance is the run-wide default a transport-backed fallback client reads.
 
 Known outliers (sanctioned or audit-owed): Web backends validate through static delegates instead of
 the interface method; the sink path binds but does not validate; OpenAPI/GraphQL schema sources are
@@ -284,9 +291,9 @@ spirit (see `ProtoDataValueContext`).
   builder type of its own).
 - `sheets.workbook` is record-only evidence: opening a workbook is not an assertion, so
   `SheetsCoverageCollector` consumes only `sheets.range` (decided in A5; not changed).
-- Messaging records `messaging.publish`, `messaging.receive` and `messaging.contract.shape` as trace
-  evidence and ships no collector; destinations are deliberately not a coverage category (A5 VOC-1
-  decision: the promise was deleted, not shipped).
+- Messaging records the `messaging.publish` operation and the `messaging.published`, `messaging.receive`
+  and `messaging.contract.shape` observations as trace evidence and ships no collector; destinations are
+  deliberately not a coverage category (A5 VOC-1 decision: the promise was deleted, not shipped).
 - Entity ids: `client:{type}:{name}`, `context:{type}`, `capability:{kind}:{name}` (with `:{instance}`
   when the descriptor carries one), `device:{client}:{deviceType}:{id}`, infrastructure `Id`, resources
   `Id`, value items `{type}:{identity}`.

@@ -35,6 +35,31 @@ public sealed class MessagingTests
     }
 
     [Test]
+    public async Task Publish_ShouldRecordAnEventShapedObservationKindDistinctFromTheOperation()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("messaging publish observation", TestMethods.Placeholder);
+
+        await context.Messaging().PublishAsync("invoices", "{\"id\":1}");
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        var operationKinds = host.Trace.Snapshot().Tests.Single().Entries.Select(entry => entry.Kind).ToArray();
+        var observationKinds = context.RecordedObservations.Select(observation => observation.Kind).ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(operationKinds, Does.Contain("messaging.publish"),
+                "the operation keeps the action verb");
+            Assert.That(observationKinds, Does.Contain("messaging.published"),
+                "the published-message event has an event-shaped observation kind");
+            Assert.That(observationKinds, Does.Not.Contain("messaging.publish"),
+                "the observation kind must not double as the operation name");
+        });
+    }
+
+    [Test]
     public async Task Await_ShouldTimeOutWhenNothingMatches()
     {
         var builder = new ProtoHostBuilder();

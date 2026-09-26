@@ -4,7 +4,7 @@ internal sealed class ProtoSinkExportHook(
     IEnumerable<IProtoCollector> collectors,
     IEnumerable<IProtoReportSource> reportSources,
     IEnumerable<IProtoSink> sinks,
-    ProtoTraceSession traceSession) : IProtoRunHook
+    ProtoTraceSession traceSession) : IProtoRunHook, IProtoRunEvidenceHook
 {
     // AfterRun executes in descending order. Reports are generated after the gates and before the
     // run-scoped resources are released and the trace archive is written.
@@ -12,10 +12,17 @@ internal sealed class ProtoSinkExportHook(
 
     public async Task AfterRunAsync(CancellationToken cancellationToken = default)
     {
+        var sinkList = sinks.ToArray();
+        if (sinkList.Length == 0)
+        {
+            // Nothing to export to: collecting would only re-run every report source.
+            return;
+        }
+
         var items = ProtoReportItems.Collect(collectors, reportSources);
         var exceptions = new List<Exception>();
 
-        foreach (var sink in sinks)
+        foreach (var sink in sinkList)
         {
             try
             {

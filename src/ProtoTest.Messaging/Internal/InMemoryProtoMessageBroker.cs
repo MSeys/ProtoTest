@@ -3,9 +3,10 @@ namespace ProtoTest.Messaging.Internal;
 /// <summary>
 /// The default broker: messages live for the run, ordered by a publish position, and every consumer
 /// snapshots the current position at creation, so it only ever matches messages published after its own
-/// test started. A match advances that consumer's position, so repeated awaits consume the stream like
-/// RabbitMQ does instead of re-delivering the first match. One lock guards the history and the signal;
-/// predicates always run in the awaiting flow, so a slow or throwing predicate cannot stall publishers.
+/// test started. A matched message is consumed and never matched again; a delivery that matched no
+/// awaited predicate stays in the history for a later await, so concurrent awaits on one consumer
+/// neither lose nor steal each other's messages. One lock guards the history and the signal; predicates
+/// always run in the awaiting flow, so a slow or throwing predicate cannot stall publishers.
 /// It makes the API and the demo independent of infrastructure; a real adapter replaces it with the
 /// broker the system under test actually uses.
 /// </summary>
@@ -50,7 +51,8 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
     private MatchedMessage? Find(
         string destination,
         Func<ProtoMessage, bool> predicate,
-        long position)
+        long position,
+        HashSet<long> consumed)
     {
         Entry[] candidates;
         lock (_gate)
@@ -60,6 +62,11 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
 
         foreach (var entry in candidates)
         {
+            if (consumed.Contains(entry.Position))
+            {
+                continue;
+            }
+
             if (!string.Equals(entry.Message.Destination, destination, StringComparison.Ordinal))
             {
                 continue;
@@ -84,11 +91,13 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
     private sealed class InMemoryProtoMessageConsumer(InMemoryProtoMessageBroker broker, long afterPosition)
         : IProtoMessageConsumer
     {
-        // One consumer delivers each message once: concurrent awaits serialize, so the later one never
-        // snapshots the position the earlier one is about to consume past. Without the gate both waiters
-        // match the same publish and the second message stays unread.
+        // One consumer serves one await at a time, in call order, and a matched message is consumed
+        // exactly once. A delivery that matched no awaited predicate stays in the history, so a later
+        // await on this consumer can still match it and two concurrent awaits cannot steal each
+        // other's messages. Both fields are only touched while _awaitGate is held.
         private readonly SemaphoreSlim _awaitGate = new(1, 1);
-        private long _position = afterPosition;
+        private readonly HashSet<long> _consumed = [];
+        private readonly long _position = afterPosition;
 
         public ValueTask PrepareAsync(
             IReadOnlyCollection<string> destinations,
@@ -111,11 +120,11 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
                     destination,
                     predicate,
                     timeout,
-                    Volatile.Read(ref _position),
+                    _position,
                     cancellationToken);
-                // A match is consumed: advance past it so a later await sees the next message, exactly
+                // A match is consumed: a later await on this consumer never matches it again, exactly
                 // like an auto-acking RabbitMQ tap.
-                Volatile.Write(ref _position, matched.Position);
+                _consumed.Add(matched.Position);
                 return matched.Message;
             }
             finally
@@ -143,7 +152,7 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
                     signal = broker._published.Task;
                 }
 
-                if (broker.Find(destination, predicate, position) is { } matched)
+                if (broker.Find(destination, predicate, position, _consumed) is { } matched)
                 {
                     return matched;
                 }
@@ -152,7 +161,7 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
                 if (remaining <= TimeSpan.Zero)
                 {
                     // A match assigned at the same instant the deadline passes must win, never time out.
-                    if (broker.Find(destination, predicate, position) is { } lateMatch)
+                    if (broker.Find(destination, predicate, position, _consumed) is { } lateMatch)
                     {
                         return lateMatch;
                     }

@@ -98,6 +98,18 @@ internal static class ConformanceMarkup
         </body></html>
         """;
 
+    /// <summary>
+    /// Controls a page never lets change state: Playwright's auto-waiting actions wait for the state and
+    /// time out, which is the failure the Selenium backend verifies for itself after its click.
+    /// </summary>
+    public const string DisabledInteractionsHtml = """
+        <!doctype html>
+        <html><body>
+          <input type="checkbox" data-field="blocked" aria-label="Blocked" disabled>
+          <select data-field="frozen" aria-label="Frozen" disabled><option value="en">English</option></select>
+        </body></html>
+        """;
+
     /// <summary>A page whose export link downloads a small generated CSV, with no server involved.</summary>
     public const string DownloadHtml = """
         <!doctype html>

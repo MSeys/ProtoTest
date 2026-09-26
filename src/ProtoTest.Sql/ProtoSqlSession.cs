@@ -41,14 +41,17 @@ public sealed class ProtoSqlSession
             .Begin();
         try
         {
-            await Connection.OpenAsync();
+            // The token is the test's own: a caller that passed one to StartTestAsync cancels a
+            // connection the provider would otherwise hold to its own connect timeout. No runner
+            // adapter supplies one yet, so a runner-driven setup passes CancellationToken.None.
+            await Connection.OpenAsync(context.CancellationToken);
             if (_options.Isolation == SqlIsolation.Transaction)
             {
                 await context.Trace
                     .Operation("sql.transaction.begin", "SQL · begin transaction", TraceSource)
                     .During(ProtoTracePhase.Setup)
                     .With("sql.isolation", _options.Isolation.ToString())
-                    .RunAsync(async () => Transaction = await Connection.BeginTransactionAsync());
+                    .RunAsync(async () => Transaction = await Connection.BeginTransactionAsync(context.CancellationToken));
             }
 
             open.Succeed();

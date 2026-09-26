@@ -353,5 +353,35 @@ public sealed partial class SheetsTests
                 new MergeCell { Reference = "A1:XFD1048576" },
                 new MergeCell { Reference = "B2:A1" }));
         corruptPart.Worksheet.Save();
+
+        // Numeric cells an integer read must refuse: a whole number that still converts, a fraction, an
+        // out-of-range double and NaN. Each target lives on its own sheet so one failing read cannot
+        // hide another.
+        Cell Single(string reference, double value) => new()
+        {
+            CellReference = reference,
+            CellValue = new CellValue(value.ToString(CultureInfo.InvariantCulture))
+        };
+
+        void SingleValueSheet(string name, uint sheetId, Cell value)
+        {
+            var part = workbookPart.AddNewPart<WorksheetPart>();
+            var data = new SheetData();
+            part.Worksheet = new Worksheet(data);
+            sheets.Append(new Sheet
+            {
+                Id = workbookPart.GetIdOfPart(part),
+                SheetId = sheetId,
+                Name = name
+            });
+            data.Append(new Row(Text("A1", "Value")), new Row(value));
+            part.Worksheet.Save();
+        }
+
+        SingleValueSheet("StrictWhole", 15, Single("A2", 1200));
+        SingleValueSheet("StrictFraction", 16, Single("A2", 1200.75));
+        SingleValueSheet("StrictHuge", 17, Single("A2", 1e20));
+        SingleValueSheet("StrictNan", 18, Single("A2", double.NaN));
+        SingleValueSheet("Guarded", 19, Single("A2", -1));
     }
 }

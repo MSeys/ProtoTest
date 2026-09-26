@@ -63,7 +63,7 @@ A repeated `AddGrpc` is not a no-op: its `configure` callback always runs, so mo
 | `ProtoTest:Grpc:Attachments:MaxDiagnosticBodyLength` | `JsonDiagnosticOptions.MaxDiagnosticBodyLength` | `int` | 65536 (64 KiB) |
 | `ProtoTest:Grpc:Attachments:SensitiveJsonProperties` | `JsonDiagnosticOptions.SensitiveJsonProperties` | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret` |
 
-One `ProtoTest:Grpc:Client` section serves every named client; each registration binds it over its code callback. The pre-1.1 `ProtoTest:Grpc` section still binds as a deprecated fallback, so a suite on the old key keeps working; a value under `ProtoTest:Grpc:Client` wins. `GrpcAttachmentOptions` derives from the shared HTTP attachment options and binds `ProtoTest:Grpc:Attachments`, so there is one global attachment section per registration, not one per client. `GrpcClientOptions.ConfigureMetadata` is a delegate and is not bindable.
+One `ProtoTest:Grpc:Client` section serves every named client; each registration binds it over its code callback. A client's `configure` callback applies to that client only - metadata, deadline and sensitive keys never reach another client - while the transport-backed fallback client reads the shared section without any named client's callback. The pre-1.1 `ProtoTest:Grpc` section still binds as a deprecated fallback, so a suite on the old key keeps working; a value under `ProtoTest:Grpc:Client` wins. `GrpcAttachmentOptions` derives from the shared HTTP attachment options and binds `ProtoTest:Grpc:Attachments`, so there is one global attachment section per registration, not one per client. `GrpcClientOptions.ConfigureMetadata` is a delegate and is not bindable.
 
 ## API
 
@@ -177,7 +177,7 @@ public sealed class OrderTests
 }
 ```
 
-Authenticators write HTTP headers as usual; the gRPC applier translates them to lowercase metadata keys. Metadata is layered client `Metadata` first, then `ConfigureMetadata`, then per-call `metadata`, with authenticators last so they can override. Sensitive metadata values are redacted in the trace; `SensitiveMetadataKeys` starts with the defaults above and entries under `ProtoTest:Grpc:Client:SensitiveMetadataKeys` extend them. Matching is case-insensitive and by substring, so `authorization` also covers `proxy-authorization`.
+Authenticators write HTTP headers as usual; the gRPC applier translates them to lowercase metadata keys. Metadata is layered client `Metadata` first, then `ConfigureMetadata`, then per-call `metadata`, with authenticators last so they can override. Each call resolves its authenticator from the test's factory, so a stateful authenticator is created per call and never shared between calls. Sensitive metadata values are redacted in the trace; `SensitiveMetadataKeys` starts with the defaults above and entries under `ProtoTest:Grpc:Client:SensitiveMetadataKeys` extend them. Matching is case-insensitive and by substring, so `authorization` also covers `proxy-authorization`.
 
 ### Attachments
 
@@ -229,7 +229,8 @@ The client is state, not history: it appears once with `client.name`, `client.pr
 ## Limits
 
 - **Streaming capture is capped.** Only the first 10 messages of a client- or server-streaming call are attached; the cap is a private constant and not configurable.
-- **Raw helpers are untraced and uncaptured.** `ServerStreaming`, `DuplexStreaming`, `OpenServerStreamingAsync` and `OpenDuplexStreamingAsync` return the call for you to drive; only `[Auth]` metadata is applied. Because a raw call has no traced operation to cache an authenticator on, each raw call resolves a fresh one - keep raw calls to cases the traced helpers cannot express.
+- **Raw helpers are untraced and uncaptured.** `ServerStreaming`, `DuplexStreaming`, `OpenServerStreamingAsync` and `OpenDuplexStreamingAsync` return the call for you to drive; only `[Auth]` metadata is applied. Every call - traced or raw - resolves a fresh authenticator from the test's factory, so a stateful authenticator is never shared between calls; keep raw calls to cases the traced helpers cannot express.
+- **Address-dependent authenticators stay HTTP-only.** An authenticator that needs the request URI - `ApiKeyAuthenticator` with `ApiKeyLocation.Query` - fails when a gRPC call applies it, because metadata has no URI; use a header-location key or `GrpcClientOptions.ConfigureMetadata` for gRPC.
 - **Two serializations.** Trace request/response sections use protobuf text format, while attachments and shape matching use JSON.
 - **One attachments section.** `GrpcAttachmentOptions` binds one global section per registration; there is no per-client section.
 - **No retries.** There is no exponential backoff and no client interceptor beyond metadata.

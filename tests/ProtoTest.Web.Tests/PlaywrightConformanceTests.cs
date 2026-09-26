@@ -84,6 +84,39 @@ public sealed class PlaywrightConformanceTests
     }
 
     [Test]
+    public async Task DisabledControls_ShouldFailWithTheSharedActionabilityFailure()
+    {
+        var host = new ProtoHostBuilder()
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Off;
+                options.ActionTimeout = TimeSpan.FromMilliseconds(300);
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("playwright disabled controls", TestMethods.Placeholder);
+        var web = context.Web();
+        var backend = await OpenBrowserAsync(web);
+        await backend.Page.SetContentAsync(ConformanceMarkup.DisabledInteractionsHtml);
+        var page = web.Page<DisabledInteractionsPage>();
+
+        var check = Assert.ThrowsAsync<WebActionabilityException>(async () =>
+            await page.Blocked.CheckAsync());
+        var select = Assert.ThrowsAsync<WebActionabilityException>(async () =>
+            await page.Frozen.SelectOptionAsync("en"));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(check!));
+        Assert.Multiple(() =>
+        {
+            Assert.That(check!.Message, Does.Contain("did not become actionable"));
+            Assert.That(select!.Message, Does.Contain("did not become actionable"));
+        });
+    }
+
+    [Test]
     public async Task EscapeHatchLocatorsFlowsAndConfiguredContext_ShouldRunAgainstARealBrowser()
     {
         var host = new ProtoHostBuilder()
@@ -733,6 +766,12 @@ public sealed class PlaywrightConformanceTests
     public sealed class DownloadPage : WebPage
     {
         public WebElement Export => Element(By.Css("#export"));
+    }
+
+    public sealed class DisabledInteractionsPage : WebPage
+    {
+        public WebElement Blocked => Element(By.Attribute("data-field", "blocked"));
+        public WebElement Frozen => Element(By.Attribute("data-field", "frozen"));
     }
 
 }

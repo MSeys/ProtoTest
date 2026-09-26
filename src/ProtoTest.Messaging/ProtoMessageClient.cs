@@ -19,18 +19,21 @@ public sealed class ProtoMessageClient
     private readonly IProtoMessageBroker _broker;
     private readonly IProtoMessageConsumer _consumer;
     private readonly MessagingOptions _options;
+    private readonly IReadOnlyDictionary<string, Exception> _prepareFailures;
     private int _captureSequence;
 
     internal ProtoMessageClient(
         ProtoExecutionContext context,
         IProtoMessageBroker broker,
         IProtoMessageConsumer consumer,
-        MessagingOptions options)
+        MessagingOptions options,
+        IReadOnlyDictionary<string, Exception> prepareFailures)
     {
         _context = context;
         _broker = broker;
         _consumer = consumer;
         _options = options;
+        _prepareFailures = prepareFailures;
     }
 
     /// <summary>Publishes one message, optionally with headers and a content type.</summary>
@@ -74,7 +77,7 @@ public sealed class ProtoMessageClient
             operation.Succeed();
             _context.RecordObservation(new ProtoObservation(
                 _broker.Name,
-                ProtoMessagingProtocol.Publish,
+                ProtoMessagingProtocol.PublishObservationKind,
                 destination,
                 Metadata: new Dictionary<string, object> { ["messaging.system"] = _broker.Name }));
         }
@@ -88,7 +91,8 @@ public sealed class ProtoMessageClient
     /// <summary>
     /// Waits for the first message on <paramref name="destination"/> matching <paramref name="predicate"/>
     /// within the timeout (the configured default when none is given). Failing to arrive is a test
-    /// failure, not a sleep.
+    /// failure, not a sleep. A destination whose tap could not be declared during setup fails the await
+    /// with the adapter's named error instead of timing out.
     /// </summary>
     public async Task<ProtoMessage> AwaitAsync(
         string destination,
@@ -108,6 +112,13 @@ public sealed class ProtoMessageClient
         var attachmentOptions = _context.TryService<MessagingAttachmentOptions>();
         try
         {
+            // A destination the setup hook could not prepare (a missing exchange) fails its own tests
+            // with the adapter's error; tests that never await it stay unaffected.
+            if (_prepareFailures.TryGetValue(destination, out var prepareFailure))
+            {
+                throw prepareFailure;
+            }
+
             var message = await _consumer.AwaitAsync(destination, predicate, effective, cancellationToken);
             operation
                 .SetAttribute("messaging.destination", message.Destination)

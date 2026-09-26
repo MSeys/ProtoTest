@@ -46,7 +46,9 @@ public sealed class MessagingTapTests
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         Assert.That(broker.Prepared, Is.EqualTo(new[] { "shared", "own" }),
-            "the prepared set is deduped and blank entries are dropped");
+            "each declared destination is prepared exactly once, deduped and without blanks; " +
+            "the setup hook prepares them one at a time so a destination that cannot be declared " +
+            "does not fail the whole class");
     }
 
     [Test]
@@ -80,7 +82,9 @@ public sealed class MessagingTapTests
                 IReadOnlyCollection<string> destinations,
                 CancellationToken cancellationToken = default)
             {
-                owner.Prepared = [.. destinations];
+                // Accumulate: the setup hook prepares one destination per call so a failure can be
+                // attributed, and this records the full declaration order either way.
+                owner.Prepared = [.. owner.Prepared, .. destinations];
                 return ValueTask.CompletedTask;
             }
 

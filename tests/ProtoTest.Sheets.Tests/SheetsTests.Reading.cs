@@ -180,8 +180,34 @@ public sealed partial class SheetsTests
 
     [Sheet("Sales", HeaderRows = [1, 2])]
     public sealed record UnmappedPropertyRow(
-        [property: Column("Region")] string Region,
+        [property: Column("Region")] string Region)
+    {
+        /// <summary>Deliberately not a column, so a <c>Column(...)</c> read has to refuse it by name.</summary>
+        public string NotAColumn { get; init; } = string.Empty;
+    }
+
+    [Sheet("StrictWhole")]
+    public sealed record UnmappedConstructorRow(
+        [property: Column("Value")] int Value,
         string NotAColumn);
+
+    [Sheet("Guarded")]
+    public sealed class GuardedRow
+    {
+        public GuardedRow(int value)
+        {
+            if (value <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value), $"Value must be positive, but was {value}.");
+            }
+
+            Value = value;
+        }
+
+        [Column("Value")]
+        public int Value { get; }
+    }
 
     [Test]
     public async Task Model_ShouldRecordTheRangesItRead()
@@ -271,5 +297,77 @@ public sealed partial class SheetsTests
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
     }
+
+    [Test]
+    public async Task Model_ShouldConvertAWholeNumberToAnInteger()
+    {
+        var (host, context) = Start("sheets whole integer");
+        var model = context.Sheets().Open(_path).Model<StrictWholeRow>();
+
+        var value = model.Rows[0].Value;
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.That(value, Is.EqualTo(1200));
+    }
+
+    [Test]
+    public async Task Model_ShouldRejectAFractionalIntegerInsteadOfRounding()
+    {
+        var (host, context) = Start("sheets fractional integer");
+        var model = context.Sheets().Open(_path).Model<StrictFractionRow>();
+
+        var exception = Assert.Throws<FormatException>(() => _ = model.Rows);
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("A2"), "the failure names the cell");
+            Assert.That(exception.Message, Does.Contain("cannot be converted to Int32"));
+        });
+    }
+
+    [Test]
+    public async Task Model_ShouldRejectAnOutOfRangeLongInsteadOfSaturating()
+    {
+        var (host, context) = Start("sheets huge long");
+        var model = context.Sheets().Open(_path).Model<StrictHugeRow>();
+
+        var exception = Assert.Throws<FormatException>(() => _ = model.Rows);
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("A2"), "the failure names the cell");
+            Assert.That(exception.Message, Does.Contain("cannot be converted to Int64"));
+        });
+    }
+
+    [Test]
+    public async Task Model_ShouldRejectNaNForAnIntegerInsteadOfProjectingASaturatedValue()
+    {
+        var (host, context) = Start("sheets nan integer");
+        var model = context.Sheets().Open(_path).Model<StrictNanRow>();
+
+        var exception = Assert.Throws<FormatException>(() => _ = model.Rows);
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("NaN"));
+            Assert.That(exception.Message, Does.Contain("Int32"));
+        });
+    }
+
+    [Sheet("StrictWhole")]
+    public sealed record StrictWholeRow([property: Column("Value")] int Value);
+
+    [Sheet("StrictFraction")]
+    public sealed record StrictFractionRow([property: Column("Value")] int Value);
+
+    [Sheet("StrictHuge")]
+    public sealed record StrictHugeRow([property: Column("Value")] long Value);
+
+    [Sheet("StrictNan")]
+    public sealed record StrictNanRow([property: Column("Value")] int Value);
 
 }

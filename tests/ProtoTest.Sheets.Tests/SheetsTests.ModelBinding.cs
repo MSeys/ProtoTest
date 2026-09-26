@@ -379,4 +379,32 @@ public sealed partial class SheetsTests
         Assert.That(exception!.Message, Does.Contain("[Column"));
     }
 
+    [Test]
+    public async Task Model_ShouldRunTheRecordsConstructorGuardWhenProjecting()
+    {
+        var (host, context) = Start("sheets constructor guard");
+        var model = context.Sheets().Open(_path).Model<GuardedRow>();
+
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => _ = model.Rows);
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        Assert.That(exception!.Message, Does.Contain("Value must be positive"),
+            "the projection failed with the guard's own message, not a reflection wrapper");
+    }
+
+    [Test]
+    public async Task Model_ShouldRejectAConstructorParameterThatNoColumnMaps()
+    {
+        var (host, context) = Start("sheets unmapped constructor parameter");
+        var exception = Assert.Throws<SpreadsheetAssertionException>(() =>
+            _ = context.Sheets().Open(_path).Model<UnmappedConstructorRow>());
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("NotAColumn"), "the failure names the parameter");
+            Assert.That(exception.Message, Does.Contain("[Column"));
+        });
+    }
+
 }

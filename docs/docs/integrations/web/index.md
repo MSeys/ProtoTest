@@ -457,7 +457,7 @@ React has no generic runtime route table to read, and ProtoTest deliberately doe
 - **Vue discovery** latches after the first non-null route table, so a router that later adds routes in the same session is not re-read.
 - **Page origin:** an external redirect contributes no visited or verified coverage, and a backend that cannot report an address still passes the test.
 - **Playwright:** the browser pool is scoped to one test — identical launch options share a process only inside that test. Reads and actions use Playwright's own auto-waiting, bounded by `ActionTimeout` (5 s by default); a timeout becomes the same resolution or actionability exception Selenium raises. `InstallBrowsers` does nothing when `Channel` is set, trace groups are serialized by a semaphore and skipped when `TraceRetention = Off`, console/page-error/request-failure text is truncated at 4096 characters, and the skip probe starts the Playwright driver.
-- **Selenium:** one driver per session, no pooling, so sessions do not share cookies or storage; native failures surface as `WebActionabilityException` after `ActionTimeout`; `SelectOptionAsync` requires exactly one option carrying the requested `value`.
+- **Selenium:** one driver per session, no pooling, so sessions do not share cookies or storage; native failures surface as `WebActionabilityException` after `ActionTimeout`; `CheckAsync` and `SelectOptionAsync` verify the selected state after the click, so a click the page ignored fails like Playwright's auto-wait instead of passing silently; `SelectOptionAsync` requires exactly one option carrying the requested `value`.
 
 ## Next
 

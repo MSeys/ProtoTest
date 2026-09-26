@@ -5,7 +5,10 @@ public enum ProtoResourceState
 {
     Registered,
     Released,
-    ReleaseFailed
+    ReleaseFailed,
+
+    /// <summary>The resource's release callback is running; a snapshot in between reports this state.</summary>
+    Releasing
 }
 
 /// <summary>An immutable view of one resource owned by a test.</summary>

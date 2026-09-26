@@ -19,6 +19,14 @@ internal static class ProtoMessagingProtocol
     /// <summary>The operation a published message is traced under.</summary>
     public const string Publish = "messaging.publish";
 
+    /// <summary>
+    /// The observation kind a successful publish records. It is deliberately event-shaped and distinct
+    /// from the <see cref="Publish"/> operation verb: the trace shows what the test did, the observation
+    /// what it saw, and a collector can filter the published-message event without colliding with the
+    /// operation vocabulary.
+    /// </summary>
+    public const string PublishObservationKind = "messaging.published";
+
     /// <summary>The operation an awaited message is traced under.</summary>
     public const string Await = "messaging.await";
 

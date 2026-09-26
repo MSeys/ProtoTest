@@ -74,13 +74,13 @@ flowchart LR
     Sinks --> Archive[".prototrace"]
 ```
 
-1. Integrations record **observations** as tests run. REST records `http.response` for every response and `http.contract.shape` for every successful shape assertion; GraphQL records `graphql.response` and `graphql.contract.shape`; gRPC records `grpc.response` per call and `grpc.contract.shape`; messaging records `messaging.publish` and `messaging.receive`, plus `messaging.contract.shape` from a message shape assertion.
+1. Integrations record **observations** as tests run. REST records `http.response` for every response and `http.contract.shape` for every successful shape assertion; GraphQL records `graphql.response` and `graphql.contract.shape`; gRPC records `grpc.response` per call and `grpc.contract.shape`; messaging records `messaging.published` and `messaging.receive`, plus `messaging.contract.shape` from a message shape assertion.
 2. Each observation is offered to every registered **collector** whose `CanCollect` accepts it. Collectors live for the whole run, so they aggregate across all tests.
 3. When the run stops, every collector's **report items** are gathered, sorted by target, category and identifier, and passed to every **sink**.
 4. Files the sinks wrote are added to the `.prototrace` archive.
 
 :::warning[Messaging ships no collector, by decision]
-`ProtoTest.Messaging` records `messaging.publish`, `messaging.receive` and `messaging.contract.shape` observations as trace evidence, but destinations are deliberately not a built-in coverage category and the package ships no collector, so they never appear in a report unassisted. Register a collector of your own with the broker's target name (`RabbitMQ`, or `InMemory` for the default broker) if you want destinations aggregated. The same is true of `ProtoTest.Messaging.RabbitMq`.
+`ProtoTest.Messaging` records `messaging.published`, `messaging.receive` and `messaging.contract.shape` observations as trace evidence, but destinations are deliberately not a built-in coverage category and the package ships no collector, so they never appear in a report unassisted. Register a collector of your own with the broker's target name (`RabbitMQ`, or `InMemory` for the default broker) if you want destinations aggregated. The same is true of `ProtoTest.Messaging.RabbitMq`.
 :::
 
 ## Observations

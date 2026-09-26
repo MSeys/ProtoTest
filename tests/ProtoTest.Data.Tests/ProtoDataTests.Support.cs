@@ -35,6 +35,17 @@ public sealed partial class ProtoDataTests
     public sealed record CreateInvoice(InvoiceId Id, decimal Total, string Reference);
     public sealed record SemanticState(InvoiceStatus Status);
     public sealed record RequiresNumber(decimal Amount);
+
+    /// <summary>
+    /// Optional parameters whose declared defaults must survive the pipeline: the compiler-expressible
+    /// shapes for a string, an int, a collection and a struct.
+    /// </summary>
+    public sealed record OptionalDefaults(
+        string Currency = "EUR",
+        int Retries = 3,
+        IReadOnlyList<string>? Tags = null,
+        Guid Version = default);
+
     public enum InvoiceStatus { Draft, Overdue }
 
     public sealed class DomainInvoice

@@ -58,6 +58,37 @@ public sealed class RabbitMqTests
     }
 
     [Test]
+    public async Task UseRabbitMq_ShouldRunTheConfigureCallbackOncePerRegistration()
+    {
+        var calls = 0;
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging(messaging => messaging.UseRabbitMq(options =>
+        {
+            calls++;
+            options.ConnectionString = "amqp://127.0.0.1:1/";
+        }));
+
+        await using var host = builder.Build();
+        Assert.Multiple(() =>
+        {
+            Assert.That(calls, Is.EqualTo(1), "the capability decision must not invoke the callback a second time");
+            Assert.That(host.HasCapability(ProtoCapabilityKinds.Broker), Is.True,
+                "a code-provided address keeps the capability unconditional");
+        });
+
+        await host.StartAsync();
+        var context = await host.StartTestAsync("rabbit callback count", TestMethods.Placeholder);
+        var options = context.Service<RabbitMqOptions>();
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(calls, Is.EqualTo(1), "resolving the options must not run the callback again");
+            Assert.That(options.ConnectionString, Is.EqualTo("amqp://127.0.0.1:1/"));
+        });
+    }
+
+    [Test]
     public async Task PublishAndAwait_ShouldRoundTripAgainstARealBroker()
     {
         // A configured broker wins; otherwise the test owns a container. A machine with neither skips
@@ -305,6 +336,87 @@ public sealed class RabbitMqTests
     }
 
     [Test]
+    public async Task Tap_WhenADestinationCannotBeDeclared_ShouldFailOnlyTheTestsThatAwaitIt()
+    {
+        var connectionString = RequireBroker();
+
+        var declared = $"prototest.tests.{Guid.NewGuid():N}";
+        var missing = $"prototest.tests.{Guid.NewGuid():N}";
+        await DeclareExchangeAsync(connectionString, declared, ExchangeType.Fanout);
+
+        try
+        {
+            var builder = new ProtoHostBuilder();
+            builder.AddMessaging(messaging => messaging
+                .UseRabbitMq(options => options.ConnectionString = connectionString)
+                .Tap(declared, missing));
+            await using var host = builder.Build();
+            await host.StartAsync();
+
+            // The declared destination's tap binds; the missing one fails during setup of every test,
+            // but only the test that awaits it may fail. A class-wide setup failure would break here.
+            var first = await host.StartTestAsync("rabbit declared tap", TestMethods.Placeholder);
+            await first.Messaging().PublishAsync(declared, "{\"id\":1}");
+            var received = await first.Messaging().AwaitAsync(
+                declared,
+                message => message.Payload == "{\"id\":1}",
+                TimeSpan.FromSeconds(15));
+            await host.CompleteTestAsync(ProtoTestResult.Passed);
+            Assert.That(received.Payload, Is.EqualTo("{\"id\":1}"));
+
+            // The test that awaits the destination whose exchange is missing fails naming it, with the
+            // adapter's declaration error rather than a bare timeout.
+            var second = await host.StartTestAsync("rabbit missing tap", TestMethods.Placeholder);
+            var failure = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await second.Messaging().AwaitAsync(missing, _ => true, TimeSpan.FromSeconds(1)));
+
+            await host.CompleteTestAsync(ProtoTestResult.Failed(failure!));
+            Assert.Multiple(() =>
+            {
+                Assert.That(failure!.Message, Does.Contain(missing));
+                Assert.That(failure.Message, Does.Contain("does not exist"));
+            });
+        }
+        finally
+        {
+            await DeleteExchangeAsync(connectionString, declared);
+        }
+    }
+
+    [Test]
+    public async Task ConcurrentAwaitsOnOneDestination_ShouldNotLoseOrStealMessages()
+    {
+        var connectionString = RequireBroker();
+
+        var exchange = $"prototest.tests.{Guid.NewGuid():N}";
+        await DeclareExchangeAsync(connectionString, exchange, ExchangeType.Fanout);
+
+        try
+        {
+            var builder = new ProtoHostBuilder();
+            builder.AddMessaging(messaging => messaging.UseRabbitMq(options =>
+                options.ConnectionString = connectionString));
+            await using var host = builder.Build();
+            await host.StartAsync();
+            var context = await host.StartTestAsync("rabbit concurrent awaits", TestMethods.Placeholder);
+            var broker = context.Service<IProtoMessageBroker>();
+
+            // The same body the in-memory suite runs: the strict waiter starts first and the delivery
+            // only the lenient waiter accepts is published first. A discard-on-mismatch adapter loses
+            // it here; a serialized, buffering one hands each waiter its own message.
+            await MessagingConcurrencyContract.ConcurrentAwaitsOnOneDestination_ShouldNotLoseOrStealMessages(
+                broker,
+                exchange);
+
+            await host.CompleteTestAsync(ProtoTestResult.Passed);
+        }
+        finally
+        {
+            await DeleteExchangeAsync(connectionString, exchange);
+        }
+    }
+
+    [Test]
     public async Task Await_ShouldTimeOutWhileNonMatchingMessagesKeepArriving()
     {
         var connectionString = RequireBroker();
@@ -363,6 +475,31 @@ public sealed class RabbitMqTests
         {
             await DeleteExchangeAsync(connectionString, exchange);
         }
+    }
+
+    [Test]
+    public async Task Publish_AfterBrokerDispose_ShouldThrowObjectDisposedException()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Messaging:RabbitMq:ConnectionString"] = "amqp://127.0.0.1:1/"
+            }));
+        builder.AddMessaging(messaging => messaging.UseRabbitMq());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("rabbit disposed broker", TestMethods.Placeholder);
+        var broker = context.Service<IProtoMessageBroker>();
+        await ((IAsyncDisposable)broker).DisposeAsync();
+
+        // The release must stick: without a disposed guard the publish silently reopens the run's
+        // connection and fails on the unreachable address instead of naming the released broker.
+        var exception = Assert.ThrowsAsync<ObjectDisposedException>(async () =>
+            await context.Messaging().PublishAsync("invoices", "{}"));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        Assert.That(exception!.ObjectName, Does.Contain("RabbitMqMessageBroker"));
     }
 
     [Test]

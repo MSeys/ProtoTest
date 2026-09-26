@@ -46,19 +46,34 @@ public sealed partial class SeleniumWebBackend : IWebBackend, IWebBackendJavaScr
         => _executor.RunAsync(() => Driver.Navigate().GoToUrl(address), cancellationToken);
 
     public ValueTask ClickAsync(WebElementReference element, CancellationToken cancellationToken = default)
-        => ExecuteActionableAsync(element, WebOperationKind.Click, resolved => resolved.Click(), cancellationToken);
+        => ExecuteActionableAsync(element, WebOperationKind.Click, resolved =>
+        {
+            resolved.Click();
+            return null;
+        }, cancellationToken);
 
     public ValueTask FillAsync(WebElementReference element, string value, CancellationToken cancellationToken = default)
         => ExecuteActionableAsync(element, WebOperationKind.Fill, resolved =>
         {
             resolved.Clear();
             resolved.SendKeys(value);
+            return null;
         }, cancellationToken);
 
     public ValueTask CheckAsync(WebElementReference element, bool isChecked, CancellationToken cancellationToken = default)
         => ExecuteActionableAsync(element, WebOperationKind.Check, resolved =>
         {
-            if (resolved.Selected != isChecked) resolved.Click();
+            if (resolved.Selected != isChecked)
+            {
+                resolved.Click();
+                if (resolved.Selected != isChecked)
+                {
+                    return $"checked={resolved.Selected.ToString().ToLowerInvariant()} after the click, " +
+                           $"expected checked={isChecked.ToString().ToLowerInvariant()}";
+                }
+            }
+
+            return null;
         }, cancellationToken);
 
     public ValueTask SelectOptionAsync(WebElementReference element, string value, CancellationToken cancellationToken = default)
@@ -71,10 +86,17 @@ public sealed partial class SeleniumWebBackend : IWebBackend, IWebBackendJavaScr
                 throw new WebElementResolutionException(
                     $"Expected one option with the requested value in '{element.ComponentPath}.{element.Name}', but found {matches.Length}.");
             matches[0].Click();
+            return matches[0].Selected
+                ? null
+                : $"option with value '{value}' is not selected after the click";
         }, cancellationToken);
 
     public ValueTask PressAsync(WebElementReference element, WebKey key, CancellationToken cancellationToken = default)
-        => ExecuteActionableAsync(element, WebOperationKind.Press, resolved => resolved.SendKeys(MapKey(key)), cancellationToken);
+        => ExecuteActionableAsync(element, WebOperationKind.Press, resolved =>
+        {
+            resolved.SendKeys(MapKey(key));
+            return null;
+        }, cancellationToken);
 
     public ValueTask<int> CountAsync(WebElementReference elements, CancellationToken cancellationToken = default)
         => _executor.RunAsync(

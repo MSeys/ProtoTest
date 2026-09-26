@@ -156,6 +156,12 @@ All ProtoTest packages share one version; breaking API changes are called out be
   old key working: the fallback binds first and the current section binds over it, so a scalar in the
   current section wins; list-valued options accumulate the fallback and current entries (the legacy
   list is appended, not replaced). `GrpcClientOptions` uses it for the legacy gRPC section.
+- `ProtoResourceState.Releasing` reports a resource whose release callback is running, so a snapshot
+  taken during a blocked release no longer reads as `Registered`.
+- `StartTestAsync` accepts a `CancellationToken`; it is carried as
+  `ProtoExecutionContext.CancellationToken` and `ProtoTest.Sql` passes it to the connection open and
+  transaction begin. No runner adapter supplies one yet; a caller that starts a test explicitly can
+  pass one.
 
 ### Fixed
 
@@ -261,6 +267,33 @@ All ProtoTest packages share one version; breaking API changes are called out be
   implementation, so one rule owns every poll interval and deadline (audit VOC-4). Observable behavior
   is unchanged: exceptions mean "not ready yet", and a timeout still names the probe, the attempts and
   the last error.
+- A sink registered directly in the service collection is exported at run end like one added with
+  `AddSink`; the export hook is registered once by the host build, so mixing both paths still exports
+  once.
+- A failed run start unwinds every completed run hook that owns state, in reverse, so a suite-setup
+  hook's `BeforeRunAsync` state is released by its `AfterRunAsync`; gates, reports and the trace
+  archive stay silent for a run that never started.
+- A `ProtoTestScope` disposed off the async flow that started it, or while another test is active,
+  records a `Lifecycle` finding on its test and throws instead of completing nothing silently.
+- A throwing run gate keeps its exception type, message and stack in the run trace and in the gate
+  verdict's report metadata.
+- A telemetry capture failure records one coalesced `telemetry.capture_failed` run event with the
+  exception; later failures collapse into it and capturing still never breaks the application.
+- `UseRabbitMq` runs its options callback exactly once per registration: the capability decision reads
+  the instance the callback configured instead of probing it with a second invocation.
+- A publish to a released RabbitMQ broker throws `ObjectDisposedException` naming it instead of
+  silently reopening the connection, and a repeated release is a no-op.
+- A `Tap` destination whose exchange is missing no longer fails every test in the class at setup: the
+  failure is scoped to the tests that await it, which fail there with the named error, and each tap
+  owns its channel.
+- The gRPC client's options are per named client: each `AddClient` configure callback applies to that
+  client only, so metadata, `DefaultDeadline` and `SensitiveMetadataKeys` never leak into another
+  client; a repeated registration for the same name still composes, the shared `ProtoTest:Grpc:Client`
+  section still binds over each client's callback, and a transport-backed fallback client reads the
+  run-wide configuration default.
+- A gRPC client whose in-process transport has no base address fails naming `AddClient`, the
+  application's `Grpc:Address`/`BaseUrl` keys and `AddAspNetCoreServer` instead of silently dialing
+  `http://localhost`.
 
 ### Changed
 
@@ -309,6 +342,20 @@ All ProtoTest packages share one version; breaking API changes are called out be
 - `ProtoProtocol.CoverageCategory` is optional and `null` for a protocol that ships no collector; a
   collector with no category falls back to the protocol name, and the shipped REST/GraphQL/gRPC/OpenAPI
   collectors keep their categories.
+- Messaging adapters share one concurrency contract: awaits serialize and a delivery matching no
+  awaited predicate is kept for a later await, so concurrent awaits neither lose nor steal; RabbitMQ
+  previously discarded the racing delivery and the in-memory adapter advanced past it.
+- A successful publish records the `messaging.published` observation instead of `messaging.publish`
+  (which stays the operation name); update a collector that filtered the old observation kind.
+- Selenium `Check`/`SelectOption` verify the resulting state (`Selected`) and fail with
+  `WebActionabilityException` within the action timeout instead of reporting a click that did not take.
+- Sheet reads of `int`/`long` accept only finite, integral, in-range values; a fraction, an out-of-range
+  number or NaN fails naming the cell instead of rounding or saturating.
+- Sheet record models construct through the constructor their columns map (the record primary
+  constructor); an unmapped constructor parameter fails naming it, and a throwing constructor guard
+  propagates with its original stack.
+- Optional constructor-parameter defaults win over generated values in `ProtoTest.Data`, so a declared
+  default (including `null`) is honored.
 
 ### Removed
 
@@ -331,8 +378,10 @@ All ProtoTest packages share one version; breaking API changes are called out be
   which registers the stores, gates and hooks the host's reporting depends on.
 - `ProtoFlow` steps now declare the trace operation they record (`ProtoStepDescriptor`); the unused
   `ProtoStepOptions` retry and timeout surface was removed.
-- `IProtoClientInitializer.TryInitializeAsync` no longer takes a cancellation token. Test setup is
-  not cancellable by any runner adapter; a run-scoped hook is the cancellable extension point.
+- `IProtoClientInitializer.TryInitializeAsync` no longer takes a cancellation token. No runner adapter
+  supplies a test cancellation token; a caller that starts a test explicitly can pass one to
+  `StartTestAsync`, visible as `ProtoExecutionContext.CancellationToken`, and a run-scoped hook remains
+  the cancellable extension point for runner-driven suites.
 - `ProtoTest.AspNetCore` now depends on the new `ProtoTest.Web.Pages` package (page identity and
   inventory) instead of the full `ProtoTest.Web`, for the one concept the in-process server and the
   browser sessions share. `ProtoTest.Web` depends on it too.

@@ -48,10 +48,17 @@ internal sealed class ProtoTestLifecycle
         string testName,
         MethodInfo testMethod,
         IEnumerable<ProtoAttribute>? attributes,
-        IProtoTestAttachmentPublisher? attachmentPublisher)
+        IProtoTestAttachmentPublisher? attachmentPublisher,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(testMethod);
-        return StartAsync(testName, _testIdGenerator.Next(testMethod), testMethod, attributes, attachmentPublisher);
+        return StartAsync(
+            testName,
+            _testIdGenerator.Next(testMethod),
+            testMethod,
+            attributes,
+            attachmentPublisher,
+            cancellationToken);
     }
 
     public Task<ProtoExecutionContext> StartAsync(
@@ -59,7 +66,8 @@ internal sealed class ProtoTestLifecycle
         ProtoTestId testId,
         MethodInfo testMethod,
         IEnumerable<ProtoAttribute>? attributes,
-        IProtoTestAttachmentPublisher? attachmentPublisher)
+        IProtoTestAttachmentPublisher? attachmentPublisher,
+        CancellationToken cancellationToken = default)
     {
         if (Current.Value?.Context is not null)
         {
@@ -80,7 +88,8 @@ internal sealed class ProtoTestLifecycle
             // Each test gets its own clock, seeded from the run's: advancing time inside a test stays
             // inside that test, and parallel tests never share a timeline.
             var clock = new ProtoClock(_clock.GetUtcNow());
-            var context = new ProtoExecutionContext(testName, scope, testId, testMethod, testTrace, clock, _clockRegistry);
+            var context = new ProtoExecutionContext(
+                testName, scope, testId, testMethod, testTrace, clock, _clockRegistry, cancellationToken);
             // The registration happens inside the same guard as the rest of the start: a start that
             // fails below removes its own clock instead of leaking an entry no context will dispose.
             _clockRegistry.Add(testId.Value, clock);

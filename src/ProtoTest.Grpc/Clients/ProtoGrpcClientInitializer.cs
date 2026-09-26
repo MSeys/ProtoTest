@@ -85,23 +85,13 @@ public sealed class ProtoGrpcClientInitializer(
             ?? transport?.BaseAddress;
         if (address is null)
         {
-            var applicationName = application ?? clientName;
-            var scope = application is null
-                ? $"client '{clientName}'"
-                : $"client '{clientName}' in application '{application}'";
-            throw new InvalidOperationException(
-                $"No gRPC address is available for {scope}. Pass one to AddClient, set " +
-                $"'{ProtoApplication.SectionPath}:{applicationName}:Grpc:Address' or 'BaseUrl', or back " +
-                "the application with AddAspNetCoreServer.");
+            throw Internal.ProtoGrpcChannelFactory.MissingAddress(clientName, application);
         }
 
         // An address that came from the application's in-process transport runs over the test server.
         return configured is null && addressResolver is null && transport is not null
-            ? GrpcChannel.ForAddress(address, new GrpcChannelOptions
-            {
-                HttpHandler = new Internal.GrpcChannelForwardingHandler(transport)
-            })
-            : GrpcChannel.ForAddress(address);
+            ? Internal.ProtoGrpcChannelFactory.ForTransport(transport, clientName, application)
+            : Internal.ProtoGrpcChannelFactory.ForAddress(address);
     }
 
     /// <summary>

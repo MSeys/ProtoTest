@@ -55,14 +55,16 @@ public sealed partial class ProtoGrpcClient : IDisposable
         string name,
         HttpClient transport,
         GrpcClientOptions options,
-        string entityName)
+        string entityName,
+        string? application = null)
         => new(
             context,
             name,
             options,
-            (_, _) => ValueTask.FromResult(GrpcChannel.ForAddress(
-                transport.BaseAddress ?? new Uri("http://localhost"),
-                new GrpcChannelOptions { HttpHandler = new Internal.GrpcChannelForwardingHandler(transport) })),
+            (_, _) => ValueTask.FromResult(Internal.ProtoGrpcChannelFactory.ForTransport(
+                transport,
+                name,
+                application)),
             entityName);
 
     /// <summary>Calls a unary method and waits for its response.</summary>

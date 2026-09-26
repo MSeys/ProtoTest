@@ -59,6 +59,9 @@ and the device client (`ProtoDeviceClient` + registration store). The shared rul
 - An in-process application transport is preferred when the application it belongs to is hosted;
   otherwise the configured address. The transport is selected by the client's application identity,
   never by path or first match. Do not branch on environment in user code.
+- Client options are **per named client**: register them keyed by the scoped client name and let one
+  name's callbacks compose in order; the unkeyed instance stays the run-wide default for a
+  transport-backed fallback client, and the shared section binds over each client's callback.
 
 Accessor shape: `context.<Protocol>()` returns a **client** for the protocols that address named clients
 (Rest, GraphQL, gRPC, Devices, Web) and the **capability interface** for the integrations that own one

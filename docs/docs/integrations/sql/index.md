@@ -187,6 +187,7 @@ With `AddressKeys` declared and none of them provided, the `SQL` capability is a
 - **The guard only sees registered applications.** An application hosted without `AddApplication` cannot be detected, so nothing fails the run if it writes outside the transaction.
 - **`AddSql` is once per host.** A second call is a no-op rather than layering a second connection: the first registration's factory and options win, matching [repeated registration](../../getting-started/configuration.md#repeated-registration).
 - **A rollback failure still disposes everything.** The transaction and the connection are disposed in their own `finally` blocks even when rollback throws; the release failure is aggregated like any other teardown failure.
+- **The connect timeout is provider-owned.** The connection open and transaction begin observe `ProtoExecutionContext.CancellationToken` when the caller supplied one to `StartTestAsync`; no runner adapter supplies one yet, so runner-driven setup runs until the provider's own connect timeout (Npgsql's default, or `Connect Timeout` in the connection string) ends it.
 - **The test owns the schema.** There is no automatic migration or database creation: the factory returns the connection and the test (or its fixture) sets the schema up.
 
 ## Links

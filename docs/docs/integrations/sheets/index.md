@@ -147,7 +147,7 @@ sales.Row(row => row.Region == "EMEA")
 - Typed columns support `string`, `decimal`, `double`, `int`, `long`, `bool`, `DateTime` and their nullables. `Should.Be` uses `EqualityComparer<TValue?>.Default`, `Should.BeSortedBy` uses `Comparer<TValue?>.Default`, and `Should.All(predicate)` reports the first failing row (`ShouldNot.All` passes when at least one value does not match).
 - `Should.MatchModel()` checks every declared column and reports **all** violations in one failure — emptiness and non-nullability, conversion, `Min`/`Max` (numbers and date serial values), `Pattern`, `OneOf`, and `Unique` with kind-aware keys. The message shows up to ten, then `+N more`.
 - A row is matched with the same [shapes](../../foundation/shape-matching.md) as a JSON response: `table.Rows[0].Should.MatchShape(shape)` for a table row and `row.ShouldMatchShape(shape)` for a model row (a record is a user type, so C# cannot give it a `Should` extension property). A model row serializes with its record property names; a table row is keyed by each column's leaf header name with the cell's rendered value (a table whose leaves collide fails instead of guessing). The assertion is a traced `assert.json.shape` operation on the ambient test context with the same expected/actual evidence as a response assertion, and its failure names the row's `Sheet!Range` (or the record type) and keeps the mismatch details as the inner exception.
-- Records are populated without running their constructors; an optional empty cell binds as `null`.
+- Records are constructed through their primary constructor, so its guards and normalization run; every constructor parameter must map to a `[Column]`, or the model fails naming the parameter. A class with a parameterless constructor is constructed and its declared `[Column]` properties are set, and a class with only a mapped parameterized constructor is constructed through it. An optional empty cell binds as `null`.
 
 ### Hidden sheets
 
@@ -189,6 +189,7 @@ The capability is name `"Sheets"`, kind `document` (`ProtoCapabilityKinds.Docume
 - **Cached formula values only.** ProtoTest never recalculates; the formula text and the cached result are what the file holds.
 - **`ShouldNot.All` passes when at least one value does not match**, and typed columns read the whole declared range whether or not the test looks at every value.
 - **Coverage is read-based.** A column present in the file but never read is uncovered; hidden sheets are excluded by default. Opening a workbook records `sheets.workbook` evidence but covers nothing.
+- **Integer reads are strict.** A cell read as `int` or `long` must be finite, integral and in range: `1200.75` does not round to `1201`, and `1e20` or a `NaN` cell fails the read with a cell-naming `FormatException` instead of saturating. Read a `double` or `decimal` when a fractional value is data.
 - **Header paths are ordinal.** Matching is case-sensitive, and a suffix match is only allowed when exactly one column matches.
 
 ## Links

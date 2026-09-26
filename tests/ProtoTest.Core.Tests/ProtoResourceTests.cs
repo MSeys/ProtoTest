@@ -110,6 +110,38 @@ public class ProtoResourceTests
     }
 
     [Test]
+    public async Task ReleaseResourceAsync_WhileTheReleaseIsInFlight_ShouldReportReleasing()
+    {
+        // A5.3 (Audit 5, A5-21): the release state is one enum, so a snapshot mid-release says so.
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var context = CreateContext();
+        context.RegisterResource(new ProtoResource(
+            "blocking",
+            "test",
+            "Blocks while releasing",
+            async _ =>
+            {
+                entered.TrySetResult();
+                await release.Task;
+            }));
+
+        // Act
+        var pending = context.ReleaseResourceAsync("blocking").AsTask();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Assert
+        Assert.That(
+            context.Resources.Single().State,
+            Is.EqualTo(ProtoResourceState.Releasing),
+            "a snapshot between begin and end reports the release as in flight");
+
+        release.SetResult();
+        await pending;
+        Assert.That(context.Resources.Single().State, Is.EqualTo(ProtoResourceState.Released));
+    }
+
+    [Test]
     public async Task ReleaseAll_ShouldContinueAfterAFailedReleaseAndReportIt()
     {
         // Arrange

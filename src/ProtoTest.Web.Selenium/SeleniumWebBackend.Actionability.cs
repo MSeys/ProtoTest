@@ -6,10 +6,17 @@ using ProtoTest.Web.Internal;
 
 public sealed partial class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics
 {
+    /// <summary>
+    /// Runs one action against the resolved element until it is actionable <em>and</em> its resulting
+    /// state is the requested one. The action answers <see langword="null"/> when it took effect and an
+    /// observation naming the unchanged state when it did not, so a click the page ignored is a wait
+    /// that ends in <see cref="WebBackendErrors.NotActionable"/> instead of a silent success - the
+    /// strictness Playwright's auto-waiting actions already give.
+    /// </summary>
     private async ValueTask ExecuteActionableAsync(
         WebElementReference reference,
         WebOperationKind operation,
-        Action<IWebElement> action,
+        Func<IWebElement, string?> action,
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -59,7 +66,10 @@ public sealed partial class SeleniumWebBackend : IWebBackend, IWebBackendJavaScr
                     return Waiting("another element covers the click point");
                 }
 
-                action(element);
+                var observation = action(element);
+                if (observation is not null)
+                    return Waiting(observation);
+
                 Record(operation, reference, attempt, "succeeded", "action completed", stopwatch.Elapsed);
                 return new WebProbe(true, "action completed");
             }

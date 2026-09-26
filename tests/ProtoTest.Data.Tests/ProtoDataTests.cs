@@ -130,6 +130,50 @@ public sealed partial class ProtoDataTests
     }
 
     [Test]
+    public async Task Build_ShouldKeepOptionalConstructorParameterDefaults()
+    {
+        await using var host = CreateHost();
+        await host.StartAsync();
+        await host.StartTestAsync("constructor defaults", TestMethods.Placeholder);
+
+        var builder = Proto.Context.Data().For<OptionalDefaults>();
+        var explanation = builder.Explain();
+        var defaults = builder.Build();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(defaults.Currency, Is.EqualTo("EUR"),
+                "the declared string default wins over the generated string");
+            Assert.That(defaults.Retries, Is.EqualTo(3));
+            Assert.That(defaults.Tags, Is.Null, "the declared collection default wins over the generated empty list");
+            Assert.That(defaults.Version, Is.EqualTo(Guid.Empty), "the declared struct default wins over the generated Guid");
+            Assert.That(explanation.Values.Single(value => value.MemberName == "Currency").SourceKind,
+                Is.EqualTo("ConstructorDefault"));
+            Assert.That(explanation.Values.Single(value => value.MemberName == "Retries").SourceKind,
+                Is.EqualTo("ConstructorDefault"));
+        });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
+
+    [Test]
+    public async Task Build_ShouldGenerateOnlyForParametersWithoutADefault()
+    {
+        await using var host = CreateHost();
+        await host.StartAsync();
+        await host.StartTestAsync("constructor no default", TestMethods.Placeholder);
+
+        var command = Proto.Context.Data().For<CreateInvoice>().With(x => x.Total, 1m).Build();
+
+        Assert.That(command.Reference, Does.StartWith("CreateInvoice.Reference-"),
+            "a parameter without a default is still generated");
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
+
+    [Test]
     public async Task Explain_ShouldExposeProvenanceAndReuseResolvedValues()
     {
         await using var host = CreateHost();

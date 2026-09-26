@@ -10,6 +10,7 @@ using Google.Protobuf.WellKnownTypes;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Grpc.Tests.Echo;
@@ -183,6 +184,61 @@ public sealed class GrpcIntegrationTests
                 host.Trace.Snapshot().Tests.Single().Entries.Any(entry => entry.Kind == "grpc.call"),
                 Is.False);
         });
+    }
+
+    [Test]
+    [NonParallelizable]
+    public async Task Auth_ShouldResolveAFreshAuthenticatorForEveryCall()
+    {
+        // Audit 5, A5-35: the decided contract is a fresh authenticator per call (Audit 3 D11), for the
+        // traced helpers and the raw helpers alike; nothing caches an authenticator across calls.
+        Interlocked.Exchange(ref CountingAuthenticator.Created, 0);
+        var builder = new ProtoHostBuilder();
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("grpc fresh auth", CountingAuthenticatedTestMethod());
+        var client = context.Grpc("Echo");
+
+        await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "fresh" });
+        using var raw = await client.OpenServerStreamingAsync(
+            EchoMethods.Stream,
+            new EchoRequest { Message = "fresh-raw" });
+        await foreach (var _ in raw.ResponseStream.ReadAllAsync())
+        {
+        }
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(CountingAuthenticator.Created, Is.EqualTo(2),
+                "the traced helper and the raw helper each resolve their own authenticator");
+            Assert.That(EchoService.LastAuthorization, Is.EqualTo("Bearer counting-token"));
+            Assert.That(EchoService.LastStreamAuthorization, Is.EqualTo("Bearer counting-token"));
+        });
+    }
+
+    [Test]
+    [NonParallelizable]
+    public async Task Auth_WithAQueryLocationApiKey_ShouldFailLoudlyAtCallTime()
+    {
+        // The documented limit: an address-dependent authenticator has no URI to write to when gRPC
+        // translates headers to metadata, so the call fails loudly instead of sending no credential.
+        var builder = new ProtoHostBuilder();
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("grpc query api key", QueryApiKeyAuthenticatedTestMethod());
+        var client = context.Grpc("Echo");
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "query-key" }));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        Assert.That(
+            exception!.Message,
+            Does.Contain("requires the request to have a URI"),
+            "the failure names why the authenticator cannot apply");
     }
 
     [Test]
@@ -566,16 +622,22 @@ public sealed class GrpcIntegrationTests
     }
 
     [Test]
-    public async Task ApplicationTransportFallback_ShouldApplyConfiguredOptions()
+    public async Task ApplicationTransportFallback_ShouldApplyTheRunWideConfiguredOptions()
     {
-        // Stage 3 (Audit 3, finding D2): a client resolved through the application transport keeps the
-        // options configured for the protocol instead of starting from defaults. The call names an
-        // unregistered client, which is the path that falls back to the transport.
+        // A named client's code callback is its own (Audit 5, A5-03); the transport fallback an
+        // unregistered target resolves to reads the run-wide default, which binds the shared
+        // ProtoTest:Grpc:Client section. That keeps Audit 3's D2 fix - the fallback must not start from
+        // hardcoded defaults - without letting one client's callback leak into another target.
         var builder = new ProtoHostBuilder();
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Grpc:Client:Metadata:x-fallback"] = "configured"
+            }));
         builder.AddGrpc(grpc => grpc.AddClient(
             "Configured",
             GrpcTestServer.Address,
-            configure: options => options.Metadata.Add("x-fallback", "configured")));
+            configure: options => options.Metadata["x-client-only"] = "client"));
         builder.ConfigureServices(services =>
         {
             services.AddSingleton(new ProtoApplicationTransport("Echo", "Echo"));
@@ -597,7 +659,43 @@ public sealed class GrpcIntegrationTests
             Assert.That(
                 call.Attributes["rpc.metadata.x-fallback"],
                 Is.EqualTo("configured"),
-                "the fallback client carries the configured metadata");
+                "the fallback client carries the run-wide configured metadata");
+            Assert.That(
+                call.Attributes.ContainsKey("rpc.metadata.x-client-only"),
+                Is.False,
+                "a named client's code callback does not leak into the fallback client");
+        });
+    }
+
+    [Test]
+    public async Task ApplicationTransport_WithoutABaseAddress_ShouldNameTheAddressSources()
+    {
+        // Audit 5, A5-31: a transport with no base address must fail with the message that names the
+        // address sources instead of silently dialing http://localhost.
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureServices(services =>
+        {
+            services.AddSingleton(new ProtoApplicationTransport("Echo", "Echo"));
+            services.AddSingleton<IProtoClientInitializer>(new TransportClientInitializer("Echo", address: null));
+        });
+        builder.AddApplication("Echo", app => app.AddGrpc());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("grpc transport without address", ApplicationTransportTestMethod());
+        var client = context.Grpc();
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await client.UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "nowhere" }));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("No gRPC address is available"));
+            Assert.That(exception.Message, Does.Contain("in application 'Echo'"));
+            Assert.That(exception.Message, Does.Contain("ProtoTest:Applications:Echo:Grpc:Address"));
+            Assert.That(exception.Message, Does.Not.Contain("localhost"),
+                "the failure names the sources instead of inventing an address");
         });
     }
 
@@ -647,13 +745,18 @@ public sealed class GrpcIntegrationTests
         });
     }
 
-    private sealed class TransportClientInitializer(string name, string address) : IProtoClientInitializer<HttpClient>
+    private sealed class TransportClientInitializer(string name, string? address) : IProtoClientInitializer<HttpClient>
     {
         public string Name { get; } = name;
 
         public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
         {
-            var client = new HttpClient { BaseAddress = new Uri(address) };
+            var client = new HttpClient();
+            if (address is not null)
+            {
+                client.BaseAddress = new Uri(address);
+            }
+
             context.RegisterClient(client, Name);
             return Task.FromResult(true);
         }
@@ -753,6 +856,22 @@ public sealed class GrpcIntegrationTests
         }
     }
 
+    /// <summary>Counts its own construction, so a test can prove one authenticator per call.</summary>
+    private sealed class CountingAuthenticator : IProtoHttpAuthenticator
+    {
+        public static int Created;
+
+        public CountingAuthenticator() => Interlocked.Increment(ref Created);
+
+        public ValueTask AuthenticateAsync(
+            ProtoHttpAuthenticationContext context,
+            CancellationToken cancellationToken = default)
+        {
+            context.Request.Headers.TryAddWithoutValidation("authorization", "Bearer counting-token");
+            return ValueTask.CompletedTask;
+        }
+    }
+
     [Auth<BearerTokenAuthenticator>("shared-token")]
     private static void AuthenticatedPlaceholder()
     {
@@ -768,6 +887,22 @@ public sealed class GrpcIntegrationTests
 
     private static MethodInfo AsyncAuthenticatedTestMethod()
         => typeof(GrpcIntegrationTests).GetMethod(nameof(AsyncAuthenticatedPlaceholder), BindingFlags.Static | BindingFlags.NonPublic)!;
+
+    [Auth<CountingAuthenticator>]
+    private static void CountingAuthenticatedPlaceholder()
+    {
+    }
+
+    private static MethodInfo CountingAuthenticatedTestMethod()
+        => typeof(GrpcIntegrationTests).GetMethod(nameof(CountingAuthenticatedPlaceholder), BindingFlags.Static | BindingFlags.NonPublic)!;
+
+    [Auth<ApiKeyAuthenticator>("api_key", "secret", ApiKeyLocation.Query)]
+    private static void QueryApiKeyPlaceholder()
+    {
+    }
+
+    private static MethodInfo QueryApiKeyAuthenticatedTestMethod()
+        => typeof(GrpcIntegrationTests).GetMethod(nameof(QueryApiKeyPlaceholder), BindingFlags.Static | BindingFlags.NonPublic)!;
 
     [Application("Echo")]
     private static void ApplicationTransportPlaceholder()

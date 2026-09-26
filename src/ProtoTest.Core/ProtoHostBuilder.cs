@@ -236,6 +236,9 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
         _services.AddSingleton<IProtoTestHook, ProtoClientInitializerHook>();
         _services.AddSingleton<IProtoTestHook, ProtoClientCompletionHook>();
         _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoRunHook, ProtoTraceExportHook>());
+        // Registered here, not only by AddSink, so a sink registered directly through DI is exported too;
+        // TryAddEnumerable keeps AddSink and Build from registering the export hook twice.
+        _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoRunHook, ProtoSinkExportHook>());
         _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoRunHook, ProtoRunGateHook>());
         _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoRunHook, ProtoRunResourceHook>());
         _services.TryAddEnumerable(ServiceDescriptor.Singleton<IProtoReportSource, ProtoRunGateReportSource>());

@@ -140,9 +140,9 @@ public async Task PayingAnInvoicePublishesAnEvent()
 
 `UseRabbitMq` publishes to the exchange named like the destination, with the destination as the routing key, `ContentType` defaulting to `application/json` and messages marked non-persistent; null headers are dropped.
 
-The broker owns one connection and one publish channel, created lazily on first use and kept for the run. Every test's consumer owns its own channel on that connection — channels are not thread-safe, so each side serializes its own. The consumer declares one exclusive, auto-delete tap queue per destination, named `prototest-{guid}`: during setup for a declared destination, just in time at the first await otherwise. Each queue is bound with the destination as routing key and with `#`, which covers every exchange type — direct exchanges match the routing key, topic exchanges match the `#` catch-all, and fanout and headers exchanges ignore the routing key, so their argument-less bindings match every message. Every queue is deleted when the test's consumer is disposed, and an exclusive queue never competes with the application's own consumers.
+The broker owns one connection and one publish channel, created lazily on first use and kept for the run. Every test's consumer owns one channel per tap queue on that connection — channels are not thread-safe, so each side serializes its own. The consumer declares one exclusive, auto-delete tap queue per destination, named `prototest-{guid}`: during setup for a declared destination, just in time at the first await otherwise. Each queue is bound with the destination as routing key and with `#`, which covers every exchange type — direct exchanges match the routing key, topic exchanges match the `#` catch-all, and fanout and headers exchanges ignore the routing key, so their argument-less bindings match every message. Every queue is deleted when the test's consumer is disposed, and an exclusive queue never competes with the application's own consumers.
 
-The exchange must already exist when a tap binds; the adapter does not declare application exchanges. The demo declares its event topology at application startup and registers `AddMessaging` last on purpose, so the messaging initializer binds after the in-process application's initializer has created the exchanges:
+The exchange must already exist when a tap binds; the adapter does not declare application exchanges. A declared destination whose exchange is missing fails only the tests that await it, not the whole class: preparing that tap cannot bind, and the first `AwaitAsync` on the destination throws the named error while the other tests run normally. The demo declares its event topology at application startup and registers `AddMessaging` last on purpose, so the messaging initializer binds after the in-process application's initializer has created the exchanges:
 
 ```csharp
 builder
@@ -152,7 +152,7 @@ builder
 
 ### Repeats and consumption
 
-Each await consumes the message it matches. On RabbitMQ the tap polls with `BasicGet(autoAck: true)` at `PollInterval` and discards a message whose predicate does not match, so a later await never sees it again. The in-memory broker behaves the same way: messages live for the run and are ordered, each consumer snapshots the broker position when it is created — so only messages published after its test started can match — and a match advances that consumer's position. A predicate that throws fails only the await that owns it. A timeout is a `TimeoutException`; awaiting or declaring on a missing exchange is an `InvalidOperationException` naming the destination; an unreachable broker is an `InvalidOperationException` naming the sanitized address and `ProtoTest:Messaging:RabbitMq:ConnectionString`.
+Each await consumes the message it matches. Awaits on one consumer are serialized in call order, and a delivery that matches no awaited predicate is not consumed: it stays available to a later await on the same consumer, so concurrent awaits on one destination neither lose nor steal each other's messages and every matched message is consumed exactly once. The in-memory broker behaves the same way: messages live for the run and are ordered, each consumer snapshots the broker position when it is created — so only messages published after its test started can match — and each matched message is consumed once. A predicate that throws fails only the await that owns it. A timeout is a `TimeoutException`; awaiting or declaring on a missing exchange is an `InvalidOperationException` naming the destination; an unreachable broker is an `InvalidOperationException` naming the sanitized address and `ProtoTest:Messaging:RabbitMq:ConnectionString`.
 
 ### Owning a broker
 
@@ -212,7 +212,7 @@ From the moment a tap is declared, anything the application publishes is queued 
 Every publish and await is recorded:
 
 - Operations `messaging.publish` and `messaging.await` with `messaging.system` (the broker name), `messaging.destination`, and `messaging.timeout_ms` on the await. The payload is recorded as a redacted `Message` code section.
-- Observations `messaging.publish` for a successful publish and `messaging.receive` for a matched await — target is the broker name (`InMemory` or `RabbitMQ`), identifier is the destination, metadata carries `messaging.system`. `Should.MatchShape` adds a `messaging.contract.shape` observation carrying `MessagingShapeMatchData(Destination, MatchedProperties)`.
+- Observations `messaging.published` for a successful publish and `messaging.receive` for a matched await — target is the broker name (`InMemory` or `RabbitMQ`), identifier is the destination, metadata carries `messaging.system`. `Should.MatchShape` adds a `messaging.contract.shape` observation carrying `MessagingShapeMatchData(Destination, MatchedProperties)`.
 - Resources: the run-scoped `messaging:broker` resource with kind `broker`, and the per-test `messaging:consumer:Default` resource with kind `consumer`. The container adds `broker:rabbitmq`.
 - The event `messaging.attachment.failed` with `attachment.name` when a capture cannot be registered.
 
@@ -234,13 +234,13 @@ The observations are trace evidence, not a coverage promise: `ProtoTest.Messagin
 
 - **The in-memory broker is a test double.** It registers no `Broker` capability and its `PrepareAsync` does nothing.
 - **No history on RabbitMQ.** A tap holds only what arrived after it was declared; a destination declared just in time at the await sees only later messages.
-- **A non-matching message is consumed.** Match on the destination and the start of the payload rather than re-awaiting the same message.
+- **An unmatched delivery stays for a later await.** A delivery that matched no awaited predicate is kept for a later await on the same consumer rather than consumed, so concurrent awaits on one destination cannot steal each other's messages; disposing the consumer drops whatever it never matched. Match on the destination and the start of the payload rather than re-awaiting a message another await already consumed.
 - **UTF-8 strings only.** `ProtoMessage.Payload` is a `string?`; there is no binary payload API.
 - **`Tap` is run-scoped.** It declares destinations for every test in the run; there is no per-test destination declaration on `ProtoMessageClient`.
 - **Configuration adds to `Tap`, it does not replace it.** Because `Destinations` is a list, an environment that exports `ProtoTest__Messaging__Destinations__0` adds a destination; it cannot withdraw a code-declared one.
 - **Capture is opt-in.** Payload attachments exist only after `CaptureAttachments`.
-- **Destinations are evidence, not coverage.** No Messaging collector ships (a decision, not a gap); the `messaging.publish`, `messaging.receive` and `messaging.contract.shape` observations reach a report only through a collector a suite registers.
-- **One run connection, serialized channels.** RabbitMQ uses a single connection and one publish channel, with consumer operations serialized per channel; the exchange must already exist and there is no retry or backoff.
+- **Destinations are evidence, not coverage.** No Messaging collector ships (a decision, not a gap); the `messaging.published`, `messaging.receive` and `messaging.contract.shape` observations reach a report only through a collector a suite registers.
+- **One run connection, serialized consumers.** RabbitMQ uses a single connection and one publish channel; every consumer owns a channel per tap queue and awaits on one consumer serialize in call order. The exchange must already exist and there is no retry or backoff.
 
 ## Links
 

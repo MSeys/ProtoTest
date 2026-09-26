@@ -37,7 +37,8 @@ public static class ProtoExecutionContextExtensions
                 resolvedName,
                 transport,
                 context.TryService<GrpcClientOptions>() ?? new GrpcClientOptions(),
-                ProtoClientResolution.ScopedName("Grpc", resolvedName));
+                ProtoClientResolution.ScopedName("Grpc", resolvedName),
+                application);
             context.RegisterClient(client, ProtoClientResolution.ScopedName("Grpc", resolvedName));
 
             context.Trace.WriteEvent(

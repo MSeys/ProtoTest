@@ -53,13 +53,23 @@ internal static class SheetCellValue
 
         if (target == typeof(int) && cell.Number is { } intNumber)
         {
-            value = (int)Math.Round(intNumber);
+            if (!TryIntegral(intNumber, out var integral) || integral is < int.MinValue or > int.MaxValue)
+            {
+                return false;
+            }
+
+            value = (int)integral;
             return true;
         }
 
         if (target == typeof(long) && cell.Number is { } longNumber)
         {
-            value = (long)Math.Round(longNumber);
+            if (!TryIntegral(longNumber, out var integral))
+            {
+                return false;
+            }
+
+            value = integral;
             return true;
         }
 
@@ -77,4 +87,37 @@ internal static class SheetCellValue
 
         return false;
     }
+
+    /// <summary>
+    /// An integer target accepts only a finite, integral value that fits: <c>1200.75</c> is not
+    /// <c>1200</c>, <c>1e20</c> does not become <c>long.MinValue</c>, and NaN never becomes an integer.
+    /// A float that is integral up to a rounding tolerance (a spreadsheet render of a binary number)
+    /// still converts.
+    /// </summary>
+    private static bool TryIntegral(double number, out long value)
+    {
+        value = 0;
+        if (!double.IsFinite(number))
+        {
+            return false;
+        }
+
+        var rounded = Math.Round(number);
+        if (Math.Abs(number - rounded) > IntegralTolerance)
+        {
+            return false;
+        }
+
+        // 2^63 is representable as a double but outside long; the bound keeps the cast defined.
+        if (rounded < -9223372036854775808.0 || rounded >= 9223372036854775808.0)
+        {
+            return false;
+        }
+
+        value = (long)rounded;
+        return true;
+    }
+
+    /// <summary>The tolerance between a cell's double and an exact integer, in absolute value.</summary>
+    private const double IntegralTolerance = 1e-9;
 }

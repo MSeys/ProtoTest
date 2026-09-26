@@ -178,11 +178,11 @@ public sealed class GraphQLResponse : ProtoHttpResponse
             // GraphQL-specific failure the docs promise.
             ProtoShapeAssertion.AssertMissing(
                 new ProtoShapeAssertionContext(
-                    Context!,
+                    Context,
                     ProtoGraphQLBuilder.Protocol.TraceSource,
                     "Assert GraphQL data shape",
                     ParentOperationId: RequestTraceId,
-                    ExtraAttributes: new Dictionary<string, string?> { ["graphql.operation"] = Identifier! }),
+                    ExtraAttributes: new Dictionary<string, string?> { ["graphql.operation"] = Identifier }),
                 expectedShape,
                 () => new GraphQLAssertionException(DescribeMissingData()));
         }
@@ -195,12 +195,14 @@ public sealed class GraphQLResponse : ProtoHttpResponse
                 SelectedData?.GetRawText(),
                 expectedShape,
                 options,
-                new Dictionary<string, string?> { ["graphql.operation"] = Identifier! },
-                matched => new ProtoObservation(
-                    TargetName!,
-                    ProtoGraphQLBuilder.ShapeObservationKind,
-                    Identifier!,
-                    new GraphQLShapeMatchData(Identifier!, matched)));
+                new Dictionary<string, string?> { ["graphql.operation"] = Identifier },
+                matched => Context is not null && !string.IsNullOrEmpty(TargetName) && !string.IsNullOrEmpty(Identifier)
+                    ? new ProtoObservation(
+                        TargetName!,
+                        ProtoGraphQLBuilder.ShapeObservationKind,
+                        Identifier!,
+                        new GraphQLShapeMatchData(Identifier!, matched))
+                    : null);
         }
         catch (JsonShapeMismatchException exception)
         {
@@ -279,19 +281,20 @@ public sealed class GraphQLResponse : ProtoHttpResponse
     }
 
     // GraphQL's half of the shared read: its exception type and its graphql.response.deserialize
-    // operation. The sink fails the operation for every failure the read detects, once.
+    // operation. The sink fails the operation for every failure the read detects, once. A response
+    // built without an execution context (an untraced assertion) still reads, like REST's.
     private T? ReadDataAsCore<T>(string? jsonPath, bool required, JsonSerializerOptions? options)
     {
-        var scope = Context!.Trace
+        var scope = Context?.Trace
             .Operation("graphql.response.deserialize", $"Deserialize GraphQL data · {typeof(T).Name}", ProtoGraphQLBuilder.Protocol.TraceSource)
             .With("target.type", typeof(T).FullName)
             .Parent(RequestTraceId);
         if (jsonPath is not null)
         {
-            scope = scope.With("graphql.path", jsonPath);
+            scope = scope?.With("graphql.path", jsonPath);
         }
 
-        using var operation = scope.Begin();
+        using var operation = scope?.Begin();
         var value = ProtoJsonRead.Read<T>(
             SelectedData?.GetRawText(),
             jsonPath,
@@ -301,10 +304,10 @@ public sealed class GraphQLResponse : ProtoHttpResponse
                 PathMissFailure: (message, inner) => new GraphQLAssertionException(PrefixIdentifier(message), inner),
                 EmptyBodyReason: "the response did not contain data",
                 NullBodyReason: "the response data was JSON null",
-                TraceFailure: (exception, _) => operation.Fail(exception),
+                TraceFailure: operation is null ? null : (exception, _) => operation.Fail(exception),
                 NullRootReturnsDefault: true),
             options);
-        operation.Succeed();
+        operation?.Succeed();
         return value;
     }
 
@@ -333,17 +336,19 @@ public sealed class GraphQLResponse : ProtoHttpResponse
         Func<bool> holds,
         Func<string> describeFailure)
     {
-        var scope = Context!.Trace
+        // An untraced assertion (a response built without an execution context) still asserts; it just
+        // records no operation. REST's status and shape assertions tolerate the same null context.
+        var scope = Context?.Trace
             .Operation(kind, name, ProtoGraphQLBuilder.Protocol.TraceSource)
             .With(attributes);
         if (negated)
         {
             // The positive evidence is unchanged from the pre-facade assertions; the polarity is only
             // recorded when there is one.
-            scope = scope.With("assertion.negated", "true");
+            scope = scope?.With("assertion.negated", "true");
         }
 
-        using var operation = scope.Parent(RequestTraceId).Begin();
+        using var operation = scope?.Parent(RequestTraceId).Begin();
         try
         {
             if (!ProtoAssertion.IsSatisfied(holds(), negated))
@@ -351,12 +356,12 @@ public sealed class GraphQLResponse : ProtoHttpResponse
                 throw new GraphQLAssertionException(describeFailure());
             }
 
-            operation.Succeed();
+            operation?.Succeed();
             return this;
         }
         catch (Exception exception)
         {
-            operation.Fail(exception);
+            operation?.Fail(exception);
             throw;
         }
     }

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Net.WebSockets;
 using Microsoft.AspNetCore.TestHost;
 using ProtoTest.AspNetCore;
+using ProtoTest.AspNetCore.Internal;
 using ProtoTest.Core;
 using ProtoTest.Devices;
 using ProtoTest.Devices.WebSocket;
@@ -38,19 +39,31 @@ public sealed class InProcessWebSocketDeviceTransport<TProgram>(
     {
         ArgumentNullException.ThrowIfNull(context);
         // Identity decides, never the endpoint: a client for another application must not be routed
-        // through this application's TestServer, even when both expose the same path (audit DEV-1).
+        // through this application's TestServer, even when both expose the same path.
         return string.Equals(applicationName, _applicationName, StringComparison.OrdinalIgnoreCase)
             && context.TryServerFactory<TProgram>(_applicationName) is not null;
     }
 
     /// <inheritdoc />
+    public ValueTask<IProtoDeviceConnection> ConnectAsync(
+        DeviceEndpoint endpoint,
+        CancellationToken cancellationToken = default)
+        => ConnectAsync(
+            ProtoHost.CurrentContextOrNull ?? throw new InvalidOperationException(
+                $"An in-process device connection needs a running test; '{endpoint.DeviceId}' was reached outside one."),
+            endpoint,
+            cancellationToken);
+
+    /// <inheritdoc />
     public async ValueTask<IProtoDeviceConnection> ConnectAsync(
+        ProtoExecutionContext context,
         DeviceEndpoint endpoint,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(endpoint);
-        var context = ProtoHost.CurrentContextOrNull ?? throw new InvalidOperationException(
-            $"An in-process device connection needs a running test; '{endpoint.DeviceId}' was reached outside one.");
+        // The context that decided routing opens the connection: re-reading ambient host state here
+        // would throw on a flow without it after CanConnect already said yes.
         var factory = context.ServerFactory<TProgram>(_applicationName);
         var path = Uri.TryCreate(endpoint.Address, UriKind.Absolute, out var absolute)
             ? absolute.PathAndQuery
@@ -62,7 +75,12 @@ public sealed class InProcessWebSocketDeviceTransport<TProgram>(
         WebSocket socket;
         try
         {
-            socket = await factory.Server.CreateWebSocketClient()
+            var client = factory.Server.CreateWebSocketClient();
+            // The handshake is an HTTP request the application handles without this flow's test
+            // context, so it carries the same identity the in-process HTTP client sends; the
+            // application's clock filter then pushes this test's clock while it serves the socket.
+            client.ConfigureRequest = ProtoTraceContextHandler.ApplyTo;
+            socket = await client
                 .ConnectAsync(uri, attempt.Token)
                 .ConfigureAwait(false);
         }

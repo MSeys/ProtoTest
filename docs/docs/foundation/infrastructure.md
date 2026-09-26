@@ -105,13 +105,22 @@ builder.AddInfrastructure(new StandaloneSampleApp(fallbackDatabase, databaseProv
 
 It starts the sample application as a standalone process and fills `ProtoTest:Applications:{application}:BaseUrl` from its `Settings`, so the [web sessions](../integrations/web/index.md) have an address. A settings-only infrastructure fills its dictionary whether or not keys were passed.
 
+An application image is the container counterpart: `ApplicationContainer` (`ProtoTest.Testcontainers`) starts the image as run infrastructure and fills `ProtoTest:Applications:{application}:BaseUrl` from the mapped address, so the application's clients, browser sessions and readiness probe resolve it:
+
+```csharp
+var api = ApplicationContainer.Container("Api", "my-registry.example.test/orders-api:1.4", port: 8080);
+builder.AddInfrastructure(api, api.BaseUrlKey);
+```
+
+It is registered instead of `AddAspNetCoreServer` for that application - a containerized application has no in-process server. [Hosting a browser journey](../integrations/aspnetcore.md#hosting-a-browser-journey) shows the full composition next to the loopback recipe.
+
 ## When it starts
 
 `ProtoHost.StartAsync` runs in this order:
 
 1. the **run hooks** — `BeforeRunAsync`, ascending `Order`;
 2. the host's **capabilities**, recorded as run entities;
-3. each **infrastructure** registration, in registration order — a piece every declared key of which is already configured is recorded as skipped instead — `StartAsync` on each piece, then its settings;
+3. each **infrastructure** registration, in registration order — a piece every declared key of which is already configured is recorded as skipped instead — `StartAsync` on each piece, then its settings; **run setup steps** (`AddRunSetup`) are infrastructure too, so a step starts after the pieces registered before it;
 4. trace listening begins.
 
 Runner assembly setups call `StartAsync` before any test (see the [runner overview](../runners/overview.md)), so infrastructure is guaranteed to be started and its settings filled before the first test lifecycle begins. Each started piece is recorded in the trace as a run entity with `change: "started"` and its settings keys.
@@ -184,6 +193,52 @@ One application-setting precedence is shared by every address reader: an address
 
 `AddAspNetCoreServer`'s **step-aside** is the one deliberate asymmetry: it reads static configuration, so an application whose address only a started piece published keeps its in-process server (for `ServerFactory`-style access) while the address readers above talk to the published process. Give the published process its own application name when both must coexist; the demo registers its standalone console as its own application for exactly that reason.
 
+## Run-scoped setup
+
+Some run-owned state is an action rather than a piece to own: create the schema of a container database,
+seed a catalogue, warm a cache. `AddRunSetup(name, delegate)` runs it once at the run's start, at its
+registration position in the infrastructure order, so a step registered after a container reads the
+connection string that container published:
+
+```csharp
+builder
+    .AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar")
+    .AddSql(
+        provider => new NpgsqlConnection(ResolveDatabase(provider, "ConnectionStrings:Northstar")),
+        sql => sql.AddressKeys.Add("ConnectionStrings:Northstar"))
+    .AddEntityFrameworkCore<OrdersDbContext>((services, options) =>
+        options.UseNpgsql(services.GetRequiredService<DbConnection>()))
+    .AddRunSetup("database schema", async setup =>
+    {
+        var connectionString = setup.Settings.Values.TryGetValue("ConnectionStrings:Northstar", out var published)
+            ? published
+            : setup.Configuration["ConnectionStrings:Northstar"]
+              ?? throw new InvalidOperationException(
+                  "ConnectionStrings:Northstar is not configured and no container published it.");
+        var options = new DbContextOptionsBuilder<OrdersDbContext>().UseNpgsql(connectionString).Options;
+        await using var context = new OrdersDbContext(options);
+        await context.Database.EnsureCreatedAsync(setup.CancellationToken);
+    });
+```
+
+The step receives a `ProtoRunSetupContext`:
+
+- **`Settings`** — the values the pieces registered before it published, so it reads a container's
+  connection string without a second lookup;
+- **`Configuration`** — the suite's configuration, for an environment that provides the address and
+  makes the container skip;
+- **`CancellationToken`** — the run's start token.
+
+A step owns nothing to release: stop and dispose release the run's resources and do not call the step
+again, and the run records it as an entity like any other piece. A step that throws fails the run's
+start with its own exception, releases what had started and leaves the host retryable, so a retry runs
+the step again — the same loud failure as infrastructure that cannot start.
+
+Use a step instead of a run hook or a test setup when the state belongs to the whole run: a run hook
+runs before infrastructure starts and cannot see a container's address, and a test hook or test body
+runs inside the per-test transaction, where its DDL is rolled back with the test. The SQL page shows
+the [run-owned schema recipe](../integrations/sql/index.md#run-owned-schema).
+
 ## When it is released
 
 Infrastructure is released with the run, after the run stops and the reports are written:
@@ -209,7 +264,7 @@ Use `AddInfrastructure` when the piece must start with the run or publish values
 
 ## Limits
 
-- **Once per run.** Infrastructure starts and stops at run boundaries. Per-test setup is a [hook or attribute](./hooks.md) job.
+- **Once per run.** Infrastructure starts and stops at run boundaries. Per-test setup is a [hook or attribute](./hooks.md) job. `AddRunSetup` is the run-level counterpart of a setup hook: it runs once at run start, owns nothing to release, and stop and dispose do not call it again.
 - **A started container is not watched.** The host waits for readiness once, at run start, and never polls the container again: if a container dies mid-run, the next call through its published connection string fails with the transport's own error in that test, and the run's release disposes what is left. There is no restart, failover or liveness probe, and the published setting keeps the dead address until the run is released.
 - **A configured environment wins.** Declare the keys a piece fills; when all of them are configured the host skips the piece instead of shadowing the environment. `AddInfrastructureAlways` forces a start (see [above](#when-the-environment-already-provides-the-addresses)).
 - **Failures are run failures.** There is no automatic skip for infrastructure that cannot start; use `TryStart` and decide before registering.

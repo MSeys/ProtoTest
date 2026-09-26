@@ -45,6 +45,8 @@ This file is the operating contract for contributors and coding agents working i
    docs Limits sections move with the behavior.
 8. **Stop at the stage boundary.** If a stage grows past its checklist, stop, write the handoff, and
    let the next session pick it up. Do not absorb a second stage into one session.
+9. **Comments explain the code as it stands.** No audit IDs, plan items or record-file references in
+   source comments; the tracked `eng/facts/` files carry the history.
 
 ## Workflow
 

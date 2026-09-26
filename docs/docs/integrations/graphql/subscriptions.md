@@ -64,7 +64,7 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
 
 Every `GraphQLResponse` you receive is yours to dispose. Only one `NextAsync` may be pending at a time — a concurrent call throws `InvalidOperationException`.
 
-Because it's `IAsyncEnumerable`, you can also iterate:
+Because it's `IAsyncEnumerable`, you can also iterate. The enumerator disposes the previous event as it advances, so `await foreach` without a per-element `using` does not leak; the event currently in the loop body — and the last event after the loop — stay yours:
 
 ```csharp
 await foreach (var message in subscription.WithCancellation(timeout.Token))

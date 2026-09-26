@@ -70,53 +70,53 @@ internal sealed class StandaloneSampleApp(
             start.Environment["Messaging__RabbitMq__ConnectionString"] = broker;
         }
 
-        _process = Process.Start(start)!;
+        var process = Process.Start(start)!;
+        _process = process;
         // Redirected pipes fill up and block the child once nobody drains them, so a chatty application
         // would deadlock the run. The handlers keep both streams flowing and remember the tail, so a
         // failure to become healthy can report why instead of a bare timeout.
-        _process.OutputDataReceived += (_, e) => Remember(e.Data);
-        _process.ErrorDataReceived += (_, e) => Remember(e.Data);
-        _process.BeginOutputReadLine();
-        _process.BeginErrorReadLine();
+        process.OutputDataReceived += (_, e) => Remember(e.Data);
+        process.ErrorDataReceived += (_, e) => Remember(e.Data);
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
 
-        using var client = new HttpClient
+        // Readiness rides the framework's one wait loop; a child that exits before answering fails
+        // fast with its exit code instead of waiting out the timeout. The exit subscription is removed
+        // before the cancellation source is disposed, so a later exit (the release kill) cannot fire
+        // into a disposed source.
+        process.EnableRaisingEvents = true;
+        var exited = new CancellationTokenSource();
+        EventHandler onExited = (_, _) => exited.Cancel();
+        process.Exited += onExited;
+        try
         {
-            BaseAddress = new Uri(_baseUrl),
-            Timeout = TimeSpan.FromSeconds(5)
-        };
-        var deadline = DateTime.UtcNow + StartupTimeout;
-        while (DateTime.UtcNow < deadline)
-        {
-            if (_process.HasExited)
-            {
-                throw new InvalidOperationException(
-                    $"The standalone sample application exited with code {_process.ExitCode} before becoming " +
-                    $"healthy at {_baseUrl}.{Environment.NewLine}Last output:{Environment.NewLine}{Tail()}");
-            }
-
+            using var wait = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, exited.Token);
+            var lastError = (string?)null;
             try
             {
-                using var response = await client.GetAsync("/health", cancellationToken);
-                if (response.IsSuccessStatusCode)
-                {
-                    return;
-                }
+                await ProtoReadiness.WaitAsync(
+                    $"the standalone sample application at {_baseUrl}",
+                    ProtoReadiness.Http(
+                        new Uri($"{_baseUrl}/health"),
+                        requestTimeout: TimeSpan.FromSeconds(5),
+                        onFailure: reason => lastError = reason),
+                    StartupTimeout,
+                    TimeSpan.FromMilliseconds(250),
+                    wait.Token,
+                    describeLastError: () => DescribeUnhealthy(lastError));
             }
-            catch (HttpRequestException)
+            catch (OperationCanceledException) when (exited.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
-                // Still starting.
+                throw new InvalidOperationException(
+                    $"The standalone sample application exited with code {process.ExitCode} before becoming " +
+                    $"healthy at {_baseUrl}.{Environment.NewLine}Last output:{Environment.NewLine}{Tail()}");
             }
-            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                // The per-request timeout elapsed; the process may still be starting.
-            }
-
-            await Task.Delay(250, cancellationToken);
         }
-
-        throw new InvalidOperationException(
-            $"The standalone sample application did not become healthy at {_baseUrl} within " +
-            $"{(int)StartupTimeout.TotalSeconds}s.{Environment.NewLine}Last output:{Environment.NewLine}{Tail()}");
+        finally
+        {
+            process.Exited -= onExited;
+            exited.Dispose();
+        }
     }
 
     public ValueTask ReleaseAsync(ProtoResourceReleaseContext context)
@@ -141,6 +141,13 @@ internal sealed class StandaloneSampleApp(
     }
 
     private string Tail() => _output.IsEmpty ? "(no output)" : string.Join(Environment.NewLine, _output);
+
+    // The readiness timeout's last error: a reactor exit is the most useful fact, otherwise the last
+    // HTTP reason plus the child's output tail.
+    private string DescribeUnhealthy(string? lastError)
+        => _process is { HasExited: true } process
+            ? $"the application exited with code {process.ExitCode}. Last output:{Environment.NewLine}{Tail()}"
+            : $"{lastError ?? "the health endpoint did not answer"}. Last output:{Environment.NewLine}{Tail()}";
 
     private static int FreePort()
     {

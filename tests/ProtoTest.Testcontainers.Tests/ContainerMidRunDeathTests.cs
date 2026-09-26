@@ -7,7 +7,7 @@ using ProtoTest.Core;
 using ProtoTest.Testcontainers;
 
 /// <summary>
-/// The failure mode the brief asked about (feature-plan A3): a container that dies mid-run. Nothing in
+/// A container that dies mid-run. Nothing in
 /// the framework watches a started container; the next use of its address must surface the transport's
 /// own error in the affected test, not hang, and not pass.
 /// </summary>

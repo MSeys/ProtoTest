@@ -8,7 +8,7 @@ using ProtoTest.Http;
 /// The status assertions reachable through <see cref="RestResponse.Should"/> and
 /// <see cref="RestResponse.ShouldNot"/>; the shared facade owns the polarity.
 /// </summary>
-public class RestAssertions : ProtoHttpAssertions<RestResponse, RestAssertions>
+public class RestAssertions : ProtoHttpAssertions<RestResponse>
 {
     internal RestAssertions(RestResponse response, bool negated)
         : base(response, negated)

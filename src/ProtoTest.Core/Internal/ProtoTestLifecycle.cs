@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 internal sealed class ProtoTestLifecycle
 {
-    private static readonly AsyncLocal<ContextState?> Current = new();
     private readonly ProtoHost _host;
     private readonly IServiceProvider _rootServiceProvider;
     private readonly IReadOnlyList<IProtoTestHook> _hooks;
@@ -32,7 +31,7 @@ internal sealed class ProtoTestLifecycle
         _clockRegistry = clockRegistry;
     }
 
-    public static ProtoExecutionContext CurrentContext => Current.Value?.Context
+    public static ProtoExecutionContext CurrentContext => ProtoAmbient.Test?.Context
         ?? throw new InvalidOperationException(
             "No active ProtoExecutionContext is available on this flow. Proto.Context only works inside a " +
             "test body, in the test-author code it calls, and in the attributes and hooks that run around " +
@@ -40,9 +39,9 @@ internal sealed class ProtoTestLifecycle
             "trace, and run-level code uses ProtoHost.CurrentHost or the host reference a hook receives.");
 
     /// <summary>Gets the current test context, or <see langword="null"/> when none is active on this flow.</summary>
-    public static ProtoExecutionContext? TryGetCurrentContext => Current.Value?.Context;
+    public static ProtoExecutionContext? TryGetCurrentContext => ProtoAmbient.Test?.Context;
 
-    public static ProtoHost? CurrentHost => Current.Value?.Host;
+    public static ProtoHost? CurrentHost => ProtoAmbient.Host;
 
     public Task<ProtoExecutionContext> StartAsync(
         string testName,
@@ -69,7 +68,7 @@ internal sealed class ProtoTestLifecycle
         IProtoTestAttachmentPublisher? attachmentPublisher,
         CancellationToken cancellationToken = default)
     {
-        if (Current.Value?.Context is not null)
+        if (ProtoAmbient.Test?.Context is not null)
         {
             throw new InvalidOperationException(
                 "A ProtoExecutionContext is already active on this async flow. Complete the active test before starting another one.");
@@ -81,7 +80,7 @@ internal sealed class ProtoTestLifecycle
         // This method stays synchronous so the ambient AsyncLocal context it sets is visible to the
         // caller's execution context; awaiting here would scope the change to this state machine.
         var scope = _rootServiceProvider.CreateScope();
-        ContextState state;
+        ProtoTestLifecycleState state;
         try
         {
             var testTrace = _trace.StartTest(testName, testId, testMethod);
@@ -93,7 +92,7 @@ internal sealed class ProtoTestLifecycle
             // The registration happens inside the same guard as the rest of the start: a start that
             // fails below removes its own clock instead of leaking an entry no context will dispose.
             _clockRegistry.Add(testId.Value, clock);
-            state = new ContextState(
+            state = new ProtoTestLifecycleState(
                 _host,
                 context,
                 attributes?.OrderBy(attribute => attribute.Order).ToArray() ?? [],
@@ -107,13 +106,13 @@ internal sealed class ProtoTestLifecycle
             throw;
         }
 
-        Current.Value = state;
+        ProtoAmbient.SetTest(state);
         return ExecuteBeforeAsync(state);
     }
 
     public async Task CompleteAsync(ProtoTestResult result)
     {
-        var state = Current.Value;
+        var state = ProtoAmbient.Test;
         if (state?.Context is null)
         {
             return;
@@ -130,7 +129,7 @@ internal sealed class ProtoTestLifecycle
             "One or more test lifecycle components failed during teardown.", exceptions);
     }
 
-    private async Task<ProtoExecutionContext> ExecuteBeforeAsync(ContextState state)
+    private async Task<ProtoExecutionContext> ExecuteBeforeAsync(ProtoTestLifecycleState state)
     {
         state.SetupOperation = state.Context!.Trace
             .Operation("test.setup", "Setup", "ProtoTest.Core")
@@ -220,7 +219,7 @@ internal sealed class ProtoTestLifecycle
             });
 
     private static async Task TeardownAsync(
-        ContextState state,
+        ProtoTestLifecycleState state,
         List<Exception> exceptions,
         ProtoTestResult result,
         bool isRollback)
@@ -372,26 +371,10 @@ internal sealed class ProtoTestLifecycle
 
         recorder?.CompleteTest(result);
 
-        if (ReferenceEquals(Current.Value, state))
+        if (ReferenceEquals(ProtoAmbient.Test, state))
         {
             state.Context = null;
-            Current.Value = null;
+            ProtoAmbient.ClearTest(state);
         }
-    }
-
-    private sealed class ContextState(
-        ProtoHost host,
-        ProtoExecutionContext context,
-        IReadOnlyList<ProtoAttribute> attributes,
-        IProtoTestAttachmentPublisher? attachmentPublisher)
-    {
-        public ProtoHost Host { get; } = host;
-        public ProtoExecutionContext? Context { get; set; } = context;
-        public IReadOnlyList<ProtoAttribute> Attributes { get; } = attributes;
-        public IProtoTestAttachmentPublisher? AttachmentPublisher { get; } = attachmentPublisher;
-        public List<IProtoTestHook> CompletedHooks { get; } = [];
-        public List<ProtoAttribute> CompletedAttributes { get; } = [];
-        public ProtoTraceOperation? SetupOperation { get; set; }
-        public ProtoTraceOperation? ExecutionOperation { get; set; }
     }
 }

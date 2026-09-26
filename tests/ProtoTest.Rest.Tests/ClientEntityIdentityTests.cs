@@ -7,9 +7,9 @@ using ProtoTest.Core;
 using ProtoTest.TestSupport;
 
 /// <summary>
-/// Stage 3 (Audit 3, finding D1): the request operation and the client's configuration link to one
-/// entity — the registry key the resolver actually hit. Before Stage 3 the request used the logical name
-/// while the configuration used the protocol-scoped name, so the trace carried two client entities.
+/// The request operation and the client's configuration link to one entity — the registry key the
+/// resolver actually hit — so a REST request's trace carries one client entity, not a logical name and
+/// a protocol-scoped name pointing at separate entities.
 /// </summary>
 [TestFixture]
 public sealed class ClientEntityIdentityTests
@@ -67,7 +67,7 @@ public sealed class ClientEntityIdentityTests
     [Test]
     public async Task ClientConfiguration_ShouldRedactCredentialsAndQueryParametersFromTheBaseAddress()
     {
-        // Stage 1 (Audit 3, finding A3): the client's recorded address cannot carry user info or a
+        // The client's recorded address cannot carry user info or a
         // query parameter the redaction policy does not know.
         var builder = new ProtoHostBuilder();
         builder.AddRest(rest => rest.AddClient("Orders", "https://user:pass@orders.test?access_token=secret"));

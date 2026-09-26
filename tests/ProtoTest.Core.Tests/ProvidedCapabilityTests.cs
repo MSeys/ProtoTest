@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Pins the provided-capability rule (audit ADDR-1): a declaration drops when none of its keys can
+/// Pins the provided-capability rule: a declaration drops when none of its keys can
 /// provide the capability - no configured value and no registered infrastructure piece declares one -
 /// and it composes with the other declaration kinds per declaration, not per descriptor.
 /// </summary>

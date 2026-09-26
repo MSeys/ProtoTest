@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using ProtoTest.Hosting.Internal;
 
 /// <summary>
-/// Pins the entry point's argument composition (audit CFG-1): the run's merged overlay travels as
+/// Pins the entry point's argument composition: the run's merged overlay travels as
 /// command-line pairs, so a worker that builds its host from <c>args</c> reads final-precedence values
 /// inside <c>Main</c>. A parameterless or argument-ignoring entry point is the documented limit: the
 /// arguments are the only channel before <c>Build()</c>, where the <c>HostBuilding</c> overlay applies.
@@ -35,6 +35,35 @@ public sealed class WorkerArgumentsTests
                 Is.False,
                 "a null value has no argument");
         });
+    }
+
+    [Test]
+    public void Compose_ShouldKeepTheGeneratedIdentityArgumentsWhenTheOverlayNamesThem()
+    {
+        var configuration = new Dictionary<string, string?>
+        {
+            ["contentRoot"] = "C:\\suite",
+            ["ContentRoot"] = "C:\\suite-other",
+            ["ApplicationName"] = "Suite",
+            ["Worker:Value"] = "from-suite"
+        };
+
+        var arguments = ProtoWorkerArguments.Compose("C:\\worker", "Worker", configuration);
+
+        // What the entry point's builder reads: the generated pair is the only source for the two
+        // identity switches, so an overlay key cannot replace them by position.
+        var read = new ConfigurationBuilder().AddCommandLine(arguments).Build();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(read["contentRoot"], Is.EqualTo("C:\\worker"), "the generated content root wins");
+            Assert.That(read["applicationName"], Is.EqualTo("Worker"), "the generated application name wins");
+            Assert.That(read["Worker:Value"], Is.EqualTo("from-suite"), "other overlay keys still travel");
+            Assert.That(
+                arguments.Count(argument => argument.StartsWith("--contentRoot", StringComparison.OrdinalIgnoreCase)),
+                Is.EqualTo(1),
+                "one content-root switch, never a duplicate");
+        }
     }
 
     [Test]

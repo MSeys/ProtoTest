@@ -25,7 +25,7 @@ public sealed class RestAttributeIntegrationTests
         await using var host = CreateHost(requests, "Orders", "Inventory");
         var method = GetCaseMethod<RestAttributeCases>(methodName);
 
-        await host.StartTestAsync(methodName, "10001", method);
+        await host.StartTestAsync(methodName, "10001", method, GetApplicationAttributes(method));
 
         try
         {
@@ -61,7 +61,7 @@ public sealed class RestAttributeIntegrationTests
         await using var host = CreateHost(requests, "Default");
         var method = GetCaseMethod<DefaultRestAttributeCases>(nameof(DefaultRestAttributeCases.NoAttributes));
 
-        await host.StartTestAsync(method.Name, "10002", method);
+        await host.StartTestAsync(method.Name, "10002", method, GetApplicationAttributes(method));
 
         try
         {
@@ -87,7 +87,7 @@ public sealed class RestAttributeIntegrationTests
         await using var host = CreateHost(requests, "Orders");
         var method = GetCaseMethod<InheritedRestAttributeCases>(nameof(InheritedRestAttributeCases.Inherited));
 
-        await host.StartTestAsync(method.Name, "10003", method);
+        await host.StartTestAsync(method.Name, "10003", method, GetApplicationAttributes(method));
 
         try
         {
@@ -163,6 +163,14 @@ public sealed class RestAttributeIntegrationTests
 
     private static IReadOnlyList<ProtoAttribute> GetProtoAttributes(MethodInfo method)
         => ProtoAttributeResolver.Resolve(method);
+
+    /// <summary>
+    /// The resolved <c>[Application]</c> attributes, class first then method, matching what an adapter
+    /// passes to the lifecycle; the other ProtoTest attributes stay out so their own before-hooks do not
+    /// add requests this test counts.
+    /// </summary>
+    private static IReadOnlyList<ProtoAttribute> GetApplicationAttributes(MethodInfo method)
+        => [.. ProtoAttributeResolver.Resolve(method).OfType<ApplicationAttribute>()];
 
     [Application("App", "Rest:Orders")]
     [Auth<BearerTokenAuthenticator>("class-token")]

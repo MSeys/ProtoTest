@@ -166,6 +166,129 @@ public sealed class RabbitMqTests
     }
 
     [Test]
+    public async Task Declare_ShouldCreateTheDestinationBeforeTheSuitePublishes()
+    {
+        var connectionString = RequireBroker();
+
+        // The suite itself declares the exchange: no fixture pre-creates it with a raw client, so this
+        // is the documented path for a suite that owns the broker and publishes its own events.
+        var exchange = $"prototest.tests.{Guid.NewGuid():N}";
+
+        try
+        {
+            var builder = new ProtoHostBuilder();
+            builder.AddMessaging(messaging => messaging
+                .UseRabbitMq(options => options.ConnectionString = connectionString)
+                .Declare(exchange)
+                .Tap(exchange));
+            await using var host = builder.Build();
+            await host.StartAsync();
+            var context = await host.StartTestAsync("rabbit declared destination", TestMethods.Placeholder);
+            var messages = context.Messaging();
+
+            // The declaration ran during setup: the exchange exists before the act publishes, and the
+            // tap bound its queue to it.
+            await AssertExchangeExistsAsync(connectionString, exchange);
+
+            await messages.PublishAsync(exchange, "{\"id\":1}", contentType: "application/json");
+            var received = await messages.AwaitAsync(
+                exchange,
+                message => message.Payload == "{\"id\":1}",
+                TimeSpan.FromSeconds(15));
+
+            await host.CompleteTestAsync(ProtoTestResult.Passed);
+            Assert.That(received.ContentType, Is.EqualTo("application/json"));
+        }
+        finally
+        {
+            await DeleteExchangeAsync(connectionString, exchange);
+        }
+    }
+
+    [Test]
+    public async Task Declare_ShouldBeIdempotentWhenRepeatedAndAlreadyOnTheBroker()
+    {
+        var connectionString = RequireBroker();
+
+        var exchange = $"prototest.tests.{Guid.NewGuid():N}";
+        // The application's shape: a fanout, durable exchange a suite may declare again.
+        await DeclareExchangeAsync(connectionString, exchange, ExchangeType.Fanout, durable: true, autoDelete: false);
+
+        try
+        {
+            var builder = new ProtoHostBuilder();
+            builder.AddMessaging(messaging => messaging
+                .UseRabbitMq(options => options.ConnectionString = connectionString)
+                .Declare(exchange, exchange)
+                .Declare(exchange)
+                .Tap(exchange));
+            await using var host = builder.Build();
+            await host.StartAsync();
+
+            // The first test's prepare declares the destination (an existing exchange is left as is);
+            // the second test's prepare repeats the declaration. A repeat is a no-op, not a 406.
+            var first = await host.StartTestAsync("rabbit declare twice", TestMethods.Placeholder);
+            await first.Messaging().PublishAsync(exchange, "{\"id\":1}");
+            var firstReceived = await first.Messaging().AwaitAsync(
+                exchange,
+                message => message.Payload == "{\"id\":1}",
+                TimeSpan.FromSeconds(15));
+            await host.CompleteTestAsync(ProtoTestResult.Passed);
+            Assert.That(firstReceived.Payload, Is.EqualTo("{\"id\":1}"));
+
+            var second = await host.StartTestAsync("rabbit declare repeated", TestMethods.Placeholder);
+            await second.Messaging().PublishAsync(exchange, "{\"id\":2}");
+            var secondReceived = await second.Messaging().AwaitAsync(
+                exchange,
+                message => message.Payload == "{\"id\":2}",
+                TimeSpan.FromSeconds(15));
+            await host.CompleteTestAsync(ProtoTestResult.Passed);
+            Assert.That(secondReceived.Payload, Is.EqualTo("{\"id\":2}"));
+        }
+        finally
+        {
+            await DeleteExchangeAsync(connectionString, exchange);
+        }
+    }
+
+    [Test]
+    public async Task Declare_WhenTheDestinationExistsWithOtherProperties_ShouldFailSetupNamingTheDestination()
+    {
+        var connectionString = RequireBroker();
+
+        var exchange = $"prototest.tests.{Guid.NewGuid():N}";
+        // A direct, non-durable exchange with the declared name: the suite's declaration cannot match it.
+        await DeclareExchangeAsync(connectionString, exchange, ExchangeType.Direct, durable: false, autoDelete: true);
+
+        try
+        {
+            var builder = new ProtoHostBuilder();
+            builder.ConfigureTracing(options => options.Enabled = false);
+            builder.AddMessaging(messaging => messaging
+                .UseRabbitMq(options => options.ConnectionString = connectionString)
+                .Declare(exchange));
+            await using var host = builder.Build();
+            await host.StartAsync();
+
+            // The suite stated the destination exists; the broker refusing the declaration must fail
+            // setup with the destination named instead of letting tests publish into a mismatch.
+            var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await host.StartTestAsync("rabbit declare conflict", TestMethods.Placeholder));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exception!.Message, Does.Contain(exchange));
+                Assert.That(exception.Message, Does.Contain("refused the declaration"));
+            });
+            await host.StopAsync();
+        }
+        finally
+        {
+            await DeleteExchangeAsync(connectionString, exchange);
+        }
+    }
+
+    [Test]
     public async Task PublishAndAwait_ShouldRoundTripOnADirectExchange()
     {
         var connectionString = RequireBroker();
@@ -550,11 +673,25 @@ public sealed class RabbitMqTests
     }
 
     /// <summary>Declares a throwaway exchange for one test, on a connection of its own.</summary>
-    private static async Task DeclareExchangeAsync(string connectionString, string exchange, string type)
+    private static async Task DeclareExchangeAsync(
+        string connectionString,
+        string exchange,
+        string type,
+        bool durable = false,
+        bool autoDelete = true)
     {
         await using var connection = await ConnectAsync(connectionString);
         await using var channel = await connection.CreateChannelAsync();
-        await channel.ExchangeDeclareAsync(exchange, type, durable: false, autoDelete: true);
+        await channel.ExchangeDeclareAsync(exchange, type, durable: durable, autoDelete: autoDelete);
+    }
+
+    /// <summary>Asserts the exchange exists, with a passive declaration that fails the test on a 404.</summary>
+    private static async Task AssertExchangeExistsAsync(string connectionString, string exchange)
+    {
+        await using var connection = await ConnectAsync(connectionString);
+        await using var channel = await connection.CreateChannelAsync();
+        await channel.ExchangeDeclareAsync(
+            exchange, ExchangeType.Fanout, durable: true, autoDelete: false, passive: true);
     }
 
     /// <summary>Deletes the throwaway exchange, so a rerun starts from the same broker state.</summary>

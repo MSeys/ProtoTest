@@ -3,7 +3,7 @@ namespace ProtoTest.Core.Tests;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Audit 5 A5-01: the export hook belongs to the host build, not to <c>AddSink</c> alone, so a sink
+/// The export hook belongs to the host build, not to <c>AddSink</c> alone, so a sink
 /// registered directly through DI exports too - and exactly once when both paths are used.
 /// </summary>
 [TestFixture]

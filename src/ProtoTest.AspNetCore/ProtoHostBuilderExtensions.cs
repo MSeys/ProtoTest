@@ -1,6 +1,7 @@
 namespace ProtoTest.AspNetCore;
 
 using System.Runtime.CompilerServices;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -109,4 +110,41 @@ public static class ProtoHostBuilderExtensions
         => services.TryAddKeyedScoped(
             name,
             (_, key) => ApplicationServicesScope<TProgram>.Create(Proto.Context, (string)key!));
+
+    /// <summary>
+    /// Hosts a hand-built <see cref="WebApplication"/> on its own loopback listener inside the test
+    /// process and publishes the address the listener bound as the application's <c>BaseUrl</c>, so a
+    /// browser session, a REST client and the readiness probe all resolve that one running
+    /// application and the run releases the listener with the run.
+    /// </summary>
+    /// <param name="builder">The <see cref="IProtoHostBuilder"/> instance.</param>
+    /// <param name="applicationName">The application the published address belongs to.</param>
+    /// <param name="createApp">
+    /// Builds the application without running it, from the given command-line arguments. Pass them
+    /// to <c>WebApplication.CreateBuilder</c> (or <c>Host.CreateApplicationBuilder</c>): they carry
+    /// the suite's configuration with the values the infrastructure started before this piece
+    /// published, and the loopback <c>--urls</c> pair. Arguments the factory ignores never reach the
+    /// application.
+    /// </param>
+    /// <returns>The modified <see cref="IProtoHostBuilder"/>.</returns>
+    /// <remarks>
+    /// The piece is registered with the address key it fills
+    /// (<c>ProtoTest:Applications:{applicationName}:BaseUrl</c>), so a run that configures that key
+    /// skips the listener and points at that environment instead. The published instance is a real
+    /// application, not the test host: register it instead of <c>AddAspNetCoreServer</c> for that
+    /// application, because <c>ServerFactory</c>, <c>ApplicationServices</c> and
+    /// <c>[RequiresInProcess]</c> belong to the test host.
+    /// </remarks>
+    public static IProtoHostBuilder AddLoopbackApplication(
+        this IProtoHostBuilder builder,
+        string applicationName,
+        Func<string[], WebApplication> createApp)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(applicationName);
+        ArgumentNullException.ThrowIfNull(createApp);
+
+        var loopback = new LoopbackApplicationInfrastructure(applicationName, createApp);
+        return builder.AddInfrastructure(loopback, loopback.BaseUrlKey);
+    }
 }

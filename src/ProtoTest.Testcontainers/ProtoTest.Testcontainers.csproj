@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <PackageReference Include="Testcontainers" />
   </ItemGroup>
 
 </Project>

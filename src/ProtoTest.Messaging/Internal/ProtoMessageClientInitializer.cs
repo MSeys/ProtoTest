@@ -16,6 +16,20 @@ internal sealed class ProtoMessageClientInitializer(string name) : IProtoClientI
     {
         var broker = context.Service<IProtoMessageBroker>();
         var options = context.Service<MessagingOptions>();
+
+        // Declarations are the run's own topology: create them before any tap binds, so a destination
+        // this suite owns - it publishes to it itself - exists when the test starts. A declaration that
+        // fails fails setup: the suite stated the destination exists, and its tests must not run against
+        // a broker where it does not. The adapter makes repeated declarations no-ops.
+        var declared = options.DeclaredDestinations
+            .Where(destination => !string.IsNullOrWhiteSpace(destination))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (declared.Length > 0)
+        {
+            await broker.DeclareAsync(declared, CancellationToken.None);
+        }
+
         // Test setup is not cancellable: no adapter supplies a token for it.
         var consumer = await broker.CreateConsumerAsync(CancellationToken.None);
         var prepareFailures = new Dictionary<string, Exception>(StringComparer.Ordinal);

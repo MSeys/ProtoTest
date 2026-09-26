@@ -14,7 +14,7 @@ using ProtoTest.Devices.WebSocket;
 public static class InProcessWebSocketDeviceHostBuilderExtensions
 {
     // One registration per (program, application): a second TProgram, or the same program under
-    // another application, is a second transport instead of a silently dropped duplicate (audit DEV-1).
+    // another application, is a second transport instead of a silently dropped duplicate.
     private static readonly ConditionalWeakTable<IServiceCollection, HashSet<(Type Program, string Application)>> Registrations = new();
 
     /// <summary>
@@ -39,8 +39,7 @@ public static class InProcessWebSocketDeviceHostBuilderExtensions
             if (registeredTransport)
             {
                 // The registered options resolve (and validate) when the transport resolves, exactly
-                // like the socket transport, so configured values are the ones the connection uses
-                // (audit DEV-2).
+                // like the socket transport, so configured values are the ones the connection uses.
                 services.AddSingleton<IProtoDeviceTransport>(provider =>
                     new InProcessWebSocketDeviceTransport<TProgram>(
                         applicationName,
@@ -55,7 +54,7 @@ public static class InProcessWebSocketDeviceHostBuilderExtensions
 
         // The transport only serves an application that runs in-process. When the environment publishes
         // the application's address the transport declines and the socket takes over, so the capability
-        // steps aside with it instead of advertising a transport the run will not use (audit REG-5).
+        // steps aside with it instead of advertising a transport the run will not use.
         return builder.AddCapabilityUnlessConfigured(
             new ProtoCapabilityDescriptor(
                 InProcessWebSocketDeviceTransport<TProgram>.TransportName,

@@ -124,6 +124,7 @@ $apiAllowlist = @(
     'AddJsonFile',             # Microsoft.Extensions.Configuration
     'AddMinutes',              # System.DateTimeOffset
     'AddOtlpExporter'          # OpenTelemetry exporter builder
+    'AddSource'                # OpenTelemetry source subscription
 )
 
 $apiNamePattern = [regex]'\b(Add[A-Z][A-Za-z0-9_]*)\b'

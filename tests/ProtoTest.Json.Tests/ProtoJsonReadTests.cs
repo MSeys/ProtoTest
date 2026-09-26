@@ -3,7 +3,7 @@ namespace ProtoTest.Json.Tests;
 using System.Text.Json;
 
 /// <summary>
-/// Audit 5 A5.12 (B01): the shared JSON read. REST, GraphQL and messaging supply their own exception
+/// The shared JSON read. REST, GraphQL and messaging supply their own exception
 /// type and trace vocabulary through <see cref="ProtoJsonReadSemantics"/>; the mechanics - empty body,
 /// path resolution, the required null rules and the deserializer - are one implementation.
 /// </summary>

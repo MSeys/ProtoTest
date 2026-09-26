@@ -59,7 +59,7 @@ public sealed record ProtoMessage(
 }
 
 /// <summary>
-/// The broker capability's state-free adapter contract. The capability owns the broker resource and the
+/// The broker capability's adapter contract. The capability owns the broker resource and the
 /// trace-facing API; an adapter owns the client technology (RabbitMQ today, others later). One broker is
 /// shared by the whole run and may publish concurrently, while every test gets its own
 /// <see cref="IProtoMessageConsumer"/>.
@@ -78,4 +78,22 @@ public interface IProtoMessageBroker
     /// tests on the same destination stay isolated instead of stealing each other's messages.
     /// </summary>
     ValueTask<IProtoMessageConsumer> CreateConsumerAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Declares each destination on the broker, so publishing to it and awaiting it both work even when
+    /// nothing else declares it - a suite that owns the broker and publishes its own events. Called
+    /// during test setup before any tap is prepared. Declaration is idempotent: a destination that
+    /// already exists, declared earlier in the run or by the application with the same shape, is left
+    /// as it is, and a repeated declaration is a no-op. An adapter whose broker has no topology
+    /// implements this as a no-op, because every destination already exists there; the default
+    /// implementation refuses instead of pretending, so an adapter that cannot create the destination
+    /// fails the declaration loudly rather than letting the test publish into nothing.
+    /// </summary>
+    /// <exception cref="NotSupportedException">The adapter does not declare destinations.</exception>
+    ValueTask DeclareAsync(
+        IReadOnlyCollection<string> destinations,
+        CancellationToken cancellationToken = default)
+        => throw new NotSupportedException(
+            $"The broker adapter '{Name}' does not declare destinations. Declare(...) needs an adapter " +
+            "that creates the destination on the broker; remove the declaration or implement DeclareAsync.");
 }

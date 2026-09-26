@@ -142,7 +142,7 @@ public sealed class ProtoTestFactOutcomeTests
     [Fact]
     public async Task CancelledBody_ShouldRecordCancelledOutcome()
     {
-        // Deliberate change (Audit 5 A5.6, D-04; user decision 2026-09-26): a body
+        // Deliberate change: a body
         // OperationCanceledException maps to Cancelled in xUnit v2 as it already did in MSTest,
         // TUnit and xUnit v3. The characterization test pinned the previous Failed outcome first.
         var run = await RunFactAsync(nameof(Subjects.Cancelled));

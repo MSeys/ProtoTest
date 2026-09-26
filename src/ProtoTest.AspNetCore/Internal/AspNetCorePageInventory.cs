@@ -65,8 +65,10 @@ internal static class AspNetCorePageInventory
             var path = WebPagePath.NormalizeRoute(pattern);
             if (path is null) continue;
             if (!IsGet(endpoint)) continue;
-            // An API-shaped route is excluded unless the endpoint is page-like beyond JSON: an
-            // [ApiController] action that renders a view or produces HTML is still a page.
+            // Framework pseudo-segments are never pages, even when they produce HTML (the Blazor
+            // /_framework family); an API-shaped route is excluded unless the endpoint is page-like
+            // beyond JSON: an [ApiController] action that renders a view or produces HTML is a page.
+            if (IsFrameworkRoute(path)) continue;
             if (IsApiShaped(path) && !HasHtmlEvidence(endpoint) && !ReturnsViewResultFor(endpoint)) continue;
             if (!IsPageLike(endpoint)) continue;
             if (include.Count > 0 && !include.Any(glob => GlobMatch(glob, path))) continue;
@@ -181,6 +183,19 @@ internal static class AspNetCorePageInventory
         => ApiRoutePrefixes.Any(prefix =>
             path.Equals(prefix, StringComparison.OrdinalIgnoreCase)
             || path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// A framework pseudo-segment (<c>/_…</c>, <c>/.well-known…</c>) is never a page, whatever it
+    /// returns. The check reads the first path segment, so the whole family matches without the word
+    /// boundary an API prefix needs.
+    /// </summary>
+    private static bool IsFrameworkRoute(string path)
+    {
+        var segment = path.AsSpan().TrimStart('/');
+        var separator = segment.IndexOf('/');
+        var first = separator < 0 ? segment : segment[..separator];
+        return first.Length > 0 && (first[0] == '_' || first[0] == '.');
+    }
 
     /// <summary>Case-insensitive glob match: <c>*</c> is any run of characters, <c>?</c> is exactly one.</summary>
     internal static bool GlobMatch(string pattern, string value)

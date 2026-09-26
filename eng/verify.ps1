@@ -11,7 +11,7 @@ param(
     [switch]$Full,
 
     # A code stage that skipped its code gates may only record green when the caller says so
-    # explicitly; the record then names the approval and the skipped gates (audit A5-05).
+    # explicitly; the record then names the approval and the skipped gates.
     [switch]$AllowSkippedCodeGates
 )
 
@@ -19,11 +19,13 @@ param(
 # machine-readable record to artifacts/gates/<stage>.json so a plan row can quote evidence instead of
 # prose. The scope follows the stage: uncommitted changes while the tree is dirty, the HEAD commit
 # when it is not. A docs-only stage pays only the docs check, a tooling stage runs the gate fixtures,
-# and a code stage runs dotnet format over the projects it touched plus the full test suite. A code
-# change whose code gates were skipped (it is already committed, or -SkipLint/-SkipTests was passed)
-# records `incomplete` and is not green unless -AllowSkippedCodeGates names the exception. -Full
-# forces the CI shape. A failed gate does not stop the remaining gates: the record says what was
-# green and what was not.
+# and a code stage runs dotnet format over the projects it touched plus the test projects those
+# projects reach, falling back to the full solution and suite when the change is wide or unmappable.
+# A code change whose code gates were skipped (it is already committed, or -SkipLint/-SkipTests was
+# passed) records `incomplete` and is not green unless -AllowSkippedCodeGates names the exception.
+# -Full forces the full test suite and the gate fixtures; the full-solution lint runs in CI's own
+# step. A failed gate does not stop the remaining gates: the record says what was green and what was
+# not.
 
 $ErrorActionPreference = "Stop"
 $repository = Split-Path -Parent $PSScriptRoot
@@ -69,6 +71,74 @@ function Get-CommittedPath {
     return $paths
 }
 
+# Maps changed files to the project directories that own them, walking up to the nearest csproj.
+function Get-ChangedProjectDirectories {
+    param([string[]]$Paths)
+
+    $directories = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::OrdinalIgnoreCase)
+    foreach ($path in $Paths) {
+        if ($path -notmatch '\.(cs|csproj)$') { continue }
+        $directory = Split-Path -Parent (Join-Path $repository $path)
+        while ($directory -and $directory.Length -gt $repository.Length) {
+            if (Test-Path -Path (Join-Path $directory '*.csproj')) { break }
+            $directory = Split-Path -Parent $directory
+        }
+
+        if ($directory -and $directory.Length -gt $repository.Length -and (Test-Path -Path (Join-Path $directory '*.csproj'))) {
+            [void]$directories.Add($directory)
+        }
+    }
+
+    return $directories
+}
+
+# The test projects a change can reach: the touched projects plus every project that references them,
+# transitively. A wide or unmappable change returns empty, and the caller runs the full suite.
+function Get-TestProjectInclude {
+    param([System.Collections.Generic.HashSet[string]]$ChangedDirectories)
+
+    if ($ChangedDirectories.Count -eq 0 -or $ChangedDirectories.Count -gt 12) { return "" }
+
+    $references = @{}
+    $roots = @("src", "tests", "samples") | ForEach-Object { Join-Path $repository $_ }
+    $projects = @(Get-ChildItem -Path $roots -Recurse -Filter *.csproj -File |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' })
+    foreach ($project in $projects) {
+        $directory = Split-Path -Parent $project.FullName
+        try { [xml]$xml = Get-Content -LiteralPath $project.FullName } catch { continue }
+        $referenced = New-Object System.Collections.Generic.List[string]
+        foreach ($reference in @($xml.Project.ItemGroup.ProjectReference)) {
+            if ($null -eq $reference -or -not $reference.Include) { continue }
+            $resolved = [IO.Path]::GetFullPath((Join-Path $directory ($reference.Include -replace '\\', '/')))
+            $referenced.Add((Split-Path -Parent $resolved))
+        }
+
+        $references[$directory] = $referenced
+    }
+
+    $affected = New-Object System.Collections.Generic.HashSet[string]($ChangedDirectories, [StringComparer]::OrdinalIgnoreCase)
+    $grew = $true
+    while ($grew) {
+        $grew = $false
+        foreach ($directory in @($references.Keys)) {
+            if ($affected.Contains($directory)) { continue }
+            foreach ($reference in $references[$directory]) {
+                if ($affected.Contains($reference)) {
+                    [void]$affected.Add($directory)
+                    $grew = $true
+                    break
+                }
+            }
+        }
+    }
+
+    $tests = @($affected | Where-Object {
+            $_ -match '[\\/]tests[\\/]' -or $_ -match '[\\/]samples[\\/]ProtoTest\.Demo'
+        })
+    if ($tests.Count -eq 0 -or $tests.Count -gt 12) { return "" }
+    return ($tests -join ';')
+}
+
 $changed = Get-ChangedPath
 $dirty = $changed.Count -gt 0
 $scope = if ($dirty) { "working-tree" } else { "head-commit" }
@@ -88,25 +158,21 @@ $codeSkipReason = if ($codeChanges.Count -gt 0) { "committed code changes; re-ru
 
 # Scope format to the projects the change touched; a wide or unrecognisable change falls back to the
 # full solution (empty include list).
+$changedProjectDirectories = Get-ChangedProjectDirectories -Paths $changed
+
+# Format checking follows the change like the tests do; the full-solution lint runs in CI's own step,
+# so a local -Full does not repeat it. A wide or unmappable change still falls back to the solution.
 $lintInclude = @()
-if (-not $SkipLint -and $canRunCodeGates -and -not $Full) {
-    $directories = New-Object System.Collections.Generic.HashSet[string]
-    foreach ($path in $changed) {
-        if ($path -notmatch '\.(cs|csproj)$') { continue }
-        $directory = Split-Path -Parent (Join-Path $repository $path)
-        while ($directory -and $directory.Length -gt $repository.Length) {
-            if (Test-Path -Path (Join-Path $directory '*.csproj')) { break }
-            $directory = Split-Path -Parent $directory
-        }
+if (-not $SkipLint -and $canRunCodeGates -and
+    $changedProjectDirectories.Count -gt 0 -and $changedProjectDirectories.Count -le 12) {
+    $lintInclude = @($changedProjectDirectories)
+}
 
-        if ($directory -and $directory.Length -gt $repository.Length -and (Test-Path -Path (Join-Path $directory '*.csproj'))) {
-            [void]$directories.Add($directory)
-        }
-    }
-
-    if ($directories.Count -gt 0 -and $directories.Count -le 12) {
-        $lintInclude = @($directories)
-    }
+# The test stage scopes the same way: the touched projects plus everything that references them. A wide
+# or unmappable change falls back to the full suite, and -Full always runs every discovered project.
+$testInclude = ""
+if (-not $SkipTests -and $canRunCodeGates -and -not $Full) {
+    $testInclude = Get-TestProjectInclude -ChangedDirectories $changedProjectDirectories
 }
 
 $gates = New-Object System.Collections.Generic.List[object]
@@ -136,6 +202,54 @@ function Invoke-Gate {
     Write-Host "=== verify: $Name $result in ${seconds}s ==="
 }
 
+# A gate that shares nothing with the .NET build (documentation checks, or real gate fixtures running
+# in throwaway repositories) can run in a child process alongside the next gate. Start returns null
+# when jobs are unavailable or fail to start; the caller then runs the gate directly.
+function Start-GateJob {
+    param(
+        [string]$Name,
+        [string]$Script
+    )
+
+    if (-not (Get-Command Start-Job -ErrorAction SilentlyContinue)) { return $null }
+
+    Write-Host ""
+    Write-Host "=== verify: $Name ($Script, runs alongside the next gate) ==="
+    $started = Get-Date
+    try {
+        $job = Start-Job -ArgumentList (Join-Path $repository $Script) -ScriptBlock {
+            param($ScriptPath)
+
+            $output = & pwsh -NoProfile -File $ScriptPath 2>&1
+            [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = ($output | Out-String) }
+        }
+    }
+    catch {
+        Write-Host "=== verify: $Name could not start in a child process; it will run after the next gate ==="
+        return $null
+    }
+
+    return [pscustomobject]@{ Name = $Name; Script = $Script; Started = $started; Job = $job }
+}
+
+function Complete-GateJob {
+    param([object]$Pending)
+
+    $received = Receive-Job -Wait -Job $Pending.Job
+    Remove-Job -Job $Pending.Job
+    $exitCode = if ($null -eq $received) { 1 } else { [int]$received.ExitCode }
+    if ($exitCode -ne 0 -and $null -ne $received) { Write-Host $received.Output }
+    $seconds = [math]::Round(((Get-Date) - $Pending.Started).TotalSeconds, 1)
+    $gates.Add([pscustomobject]@{
+            name     = $Pending.Name
+            script   = $Pending.Script
+            exitCode = $exitCode
+            seconds  = $seconds
+        })
+    $result = if ($exitCode -eq 0) { "passed" } else { "FAILED ($exitCode)" }
+    Write-Host "=== verify: $($Pending.Name) $result in ${seconds}s ==="
+}
+
 $lintArguments = @()
 $testArguments = @()
 if ($NoRestore) {
@@ -143,11 +257,23 @@ if ($NoRestore) {
     $testArguments += "-NoRestore"
 }
 
+if ($testInclude) {
+    $testArguments += @("-Include", $testInclude)
+}
+
 if ($lintInclude.Count -gt 0) {
     $lintArguments += @("-Include", ($lintInclude -join ";"))
 }
 
-if ($SkipLint -or -not $canRunCodeGates) {
+$runLint = -not ($SkipLint -or -not $canRunCodeGates)
+$runDocs = -not $SkipDocs
+$runTests = -not ($SkipTests -or -not $canRunCodeGates)
+$runScripts = $Full -or $scriptChanges.Count -gt 0
+
+# The documentation check reads files only, so it runs in a child process while lint builds.
+$docsPending = if ($runDocs -and $runLint) { Start-GateJob -Name "docs" -Script "eng/check-docs.ps1" } else { $null }
+
+if (-not $runLint) {
     $reason = if ($SkipLint) { "requested" } else { $codeSkipReason }
     $skipped.Add([pscustomobject]@{ name = "lint"; reason = $reason })
     if ($expectsCodeGates) { $skippedCodeGates.Add([pscustomobject]@{ name = "lint"; reason = $reason }) }
@@ -156,14 +282,19 @@ else {
     Invoke-Gate -Name "lint" -Script "eng/lint.ps1" -ScriptArguments $lintArguments
 }
 
-if ($SkipDocs) {
+if (-not $runDocs) {
     $skipped.Add([pscustomobject]@{ name = "docs"; reason = "requested" })
+}
+elseif ($null -ne $docsPending) {
+    Complete-GateJob -Pending $docsPending
 }
 else {
     Invoke-Gate -Name "docs" -Script "eng/check-docs.ps1"
 }
 
-if ($SkipTests -or -not $canRunCodeGates) {
+# The gate fixtures run the real gate scripts in throwaway repositories with stubbed gates; they
+# execute the repository's own MTP binaries, so they run after the suite, not next to it.
+if (-not $runTests) {
     $reason = if ($SkipTests) { "requested" } else { $codeSkipReason }
     $skipped.Add([pscustomobject]@{ name = "test"; reason = $reason })
     if ($expectsCodeGates) { $skippedCodeGates.Add([pscustomobject]@{ name = "test"; reason = $reason }) }
@@ -173,12 +304,18 @@ else {
 }
 
 # The gate scripts are themselves under test; a stage that touches them (or -Full) proves them.
-if ($Full -or $scriptChanges.Count -gt 0) {
+if ($runScripts) {
+    # The fixtures execute the real MTP test binaries in this repository, so running them next to the
+    # suite races the same projects; this gate stays sequential.
     Invoke-Gate -Name "scripts" -Script "eng/test-gates.ps1"
 }
 
 if ($Pack) {
-    Invoke-Gate -Name "pack" -Script "eng/pack.ps1"
+    # The suite builds the Release tree, so pack packs what the tests just ran; only a skipped suite
+    # needs the build inside the pack gate.
+    $packArguments = @()
+    if ($runTests) { $packArguments += "-NoBuild" }
+    Invoke-Gate -Name "pack" -Script "eng/pack.ps1" -ScriptArguments $packArguments
 }
 
 $incomplete = $skippedCodeGates.Count -gt 0
@@ -199,6 +336,7 @@ $record = [pscustomobject]@{
     changed               = $codeChanges.Count
     codeChanges           = $codeChanges.Count
     scriptChanges         = $scriptChanges.Count
+    scopedTests           = $testInclude
     gates                 = $gates
     skipped               = $skipped
     skippedCodeGates      = $skippedCodeGates
@@ -214,6 +352,12 @@ $summaryParts = @($gates | ForEach-Object {
 $summaryParts += @($skipped | ForEach-Object { "{0}=SKIP({1})" -f $_.name, $_.reason })
 $summary = $summaryParts -join " "
 $flags = @("scope=$scope", "class=$classification")
+if ($lintInclude.Count -gt 0) {
+    $flags += "lint=scoped"
+}
+if ($testInclude) {
+    $flags += "tests=scoped"
+}
 if ($incomplete) {
     $flags += "skipped-code-gates=" + (($skippedCodeGates | ForEach-Object { $_.name }) -join ",")
     if ($AllowSkippedCodeGates) { $flags += "allow-skipped-code-gates" }

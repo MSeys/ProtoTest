@@ -2,7 +2,7 @@ namespace ProtoTest.TestSupport;
 
 /// <summary>
 /// A unique <c>.prototrace</c> file under the temp directory, deleted when disposed - the one home
-/// for the per-test trace files suites used to create and delete by hand (audit TST-2). Dispose runs
+/// for the per-test trace files suites used to create and delete by hand. Dispose runs
 /// whether the test passed or threw, so a failing test cleans up like the old <c>finally</c> did.
 /// </summary>
 public sealed class TemporaryTrace : IDisposable

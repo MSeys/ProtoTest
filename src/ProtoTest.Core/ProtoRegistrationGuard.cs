@@ -4,8 +4,9 @@ using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// One implementation of the "first registration wins, later calls are no-ops" rule every integration
-/// repeats, for both a service collection and a builder that keeps its marker out of DI.
+/// The public façade for the one internal once-only rule (<c>ProtoRegistration</c>): first registration
+/// wins, later calls are no-ops. The guard reads through that helper for both a service collection and a
+/// builder that keeps its marker out of DI, so an integration's idempotency cannot drift from Core's.
 /// </summary>
 public static class ProtoRegistrationGuard
 {
@@ -16,13 +17,7 @@ public static class ProtoRegistrationGuard
     public static bool TryRegisterOnce<TMarker>(IServiceCollection services) where TMarker : class
     {
         ArgumentNullException.ThrowIfNull(services);
-        if (services.Any(descriptor => descriptor.ServiceType == typeof(TMarker)))
-        {
-            return false;
-        }
-
-        services.AddSingleton<TMarker>();
-        return true;
+        return ProtoRegistration.TryRegisterOnce<TMarker>(services);
     }
 
     /// <summary>The same rule for a builder whose marker lives in a weak table instead of the collection.</summary>
@@ -33,8 +28,6 @@ public static class ProtoRegistrationGuard
     {
         ArgumentNullException.ThrowIfNull(registrations);
         ArgumentNullException.ThrowIfNull(builder);
-        return registrations.TryAdd(builder, Marker);
+        return ProtoRegistration.TryAdd(registrations, builder);
     }
-
-    private static readonly object Marker = new();
 }

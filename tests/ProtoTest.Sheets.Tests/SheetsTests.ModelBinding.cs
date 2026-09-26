@@ -46,6 +46,32 @@ public sealed partial class SheetsTests
     }
 
     [Test]
+    public async Task TableRow_MatchShapeOnAFlowWithoutAmbientContext_ShouldUseTheOwningTablesContext()
+    {
+        // The row assertion uses the context its table carries, not the ambient
+        // Proto.Context, so a row asserted from a helper flow still records and does not throw
+        // "no active ProtoExecutionContext" on the flow it happens to run on.
+        var (host, context) = Start("sheets row shape helper flow");
+        var table = context.Sheets().Open(_path).Sheet("Keys").Table(1);
+        var row = table.RowWhere("Id", "100");
+
+        // A fresh execution context carries no ambient Proto.Context; the row's table carries its own.
+        // The task starts with no captured flow, and the suppression is undone on this same thread
+        // because the block never awaits.
+        using (ExecutionContext.SuppressFlow())
+        {
+            Task.Run(() => row.Should.MatchShape(new { Id = "100", Name = "first" }))
+                .GetAwaiter()
+                .GetResult();
+        }
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.That(host.Trace.Snapshot().Tests.Single().Entries,
+            Has.Some.Matches<ProtoTraceEntry>(entry => entry.Kind == "assert.json.shape"),
+            "the row assertion leaves its evidence under the owning test");
+    }
+
+    [Test]
     public async Task Model_ShouldMatchRowShape()
     {
         var (host, context) = Start("sheets shape");

@@ -58,7 +58,6 @@ $packages = @(
     "src/ProtoTest.Devices.WebSocket.AspNetCore/ProtoTest.Devices.WebSocket.AspNetCore.csproj",
     "src/ProtoTest.Hosting/ProtoTest.Hosting.csproj",
     "src/ProtoTest.OpenApi/ProtoTest.OpenApi.csproj",
-    "src/ProtoTest.OpenTelemetry/ProtoTest.OpenTelemetry.csproj",
     "src/ProtoTest.Reporting/ProtoTest.Reporting.csproj",
     "src/ProtoTest.Traces/ProtoTest.Traces.csproj",
     "src/ProtoTest.Web.Pages/ProtoTest.Web.Pages.csproj",
@@ -66,7 +65,8 @@ $packages = @(
     "src/ProtoTest.Web.Playwright/ProtoTest.Web.Playwright.csproj",
     "src/ProtoTest.Web.Selenium/ProtoTest.Web.Selenium.csproj",
     "src/ProtoTest.Templates/ProtoTest.Templates.csproj",
-    "src/ProtoTest.Cli/ProtoTest.Cli.csproj"
+    "src/ProtoTest.Cli/ProtoTest.Cli.csproj",
+    "src/ProtoTest.Analyzers/ProtoTest.Analyzers.csproj"
 )
 
 $packable = Get-ChildItem -Path (Join-Path $repository "src/*/*.csproj") |

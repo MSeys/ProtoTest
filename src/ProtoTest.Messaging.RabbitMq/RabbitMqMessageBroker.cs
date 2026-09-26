@@ -17,6 +17,7 @@ internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IAsyncDisposa
 {
     private readonly RabbitMqOptions _options;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly HashSet<string> _declared = new(StringComparer.Ordinal);
     private IConnection? _connection;
     private IChannel? _publishChannel;
     private bool _disposed;
@@ -32,6 +33,62 @@ internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IAsyncDisposa
     /// <summary>Creates a consumer that owns its own channel on the shared connection.</summary>
     public ValueTask<IProtoMessageConsumer> CreateConsumerAsync(CancellationToken cancellationToken = default)
         => new(new RabbitMqProtoMessageConsumer(this));
+
+    /// <summary>
+    /// Declares each destination as a fanout, durable, non-auto-delete exchange - the shape the
+    /// application declares for its event exchanges - so publishing to it and binding a test's tap
+    /// queue both work. The run remembers what it declared, so a destination is sent to the broker
+    /// once and a repeated declaration is a no-op; an exchange that already exists with this shape,
+    /// declared by the application or an earlier test, is left as it is.
+    /// </summary>
+    public async ValueTask DeclareAsync(
+        IReadOnlyCollection<string> destinations,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(destinations);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            var pending = destinations
+                .Where(destination => !string.IsNullOrWhiteSpace(destination) && !_declared.Contains(destination))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            if (pending.Length == 0)
+            {
+                return;
+            }
+
+            var connection = await ConnectionAsync(cancellationToken).ConfigureAwait(false);
+            await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            foreach (var destination in pending)
+            {
+                try
+                {
+                    await channel.ExchangeDeclareAsync(
+                        destination,
+                        ExchangeType.Fanout,
+                        durable: true,
+                        autoDelete: false,
+                        cancellationToken: cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationInterruptedException exception)
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot declare the destination '{destination}': the broker refused the declaration " +
+                        $"({exception.ShutdownReason?.ReplyText ?? exception.Message}). A destination the application " +
+                        "declares with another type or durability cannot be declared again.",
+                        exception);
+                }
+
+                _declared.Add(destination);
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
 
     public async ValueTask PublishAsync(ProtoMessage message, CancellationToken cancellationToken = default)
     {

@@ -9,6 +9,7 @@ dotnet add package ProtoTest.AspNetCore
 ## Includes
 
 - Registration through `AddAspNetCoreServer<TProgram>()`.
+- `AddLoopbackApplication(applicationName, createApp)` for browser journeys: the hand-built application on its own loopback listener.
 - Access to the application's HTTP client, services and service scopes from the test context.
 - Per-run hosting by default, with per-test hosting available when isolation requires it.
 

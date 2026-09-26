@@ -43,7 +43,7 @@ public sealed class ProtoTestScopeTests
     [Test]
     public async Task DisposeAsync_WhenDisposedOffFlow_ShouldFailLoudly()
     {
-        // A5.3 (Audit 5, A5-12): completion reads the ambient context, so off-flow it would complete
+        // Completion reads the ambient context, so off-flow it would complete
         // nothing. The scope owns its started test and reports the mismatch instead of no-oping.
         await using var host = new ProtoHostBuilder().Build();
         await host.StartAsync();
@@ -84,7 +84,7 @@ public sealed class ProtoTestScopeTests
     [Test]
     public async Task DisposeAsync_WhenAnotherHostsContextIsActive_ShouldRecordAFindingAndFail()
     {
-        // A5.3 (Audit 5, A5-12): a foreign active context would complete the wrong test; the scope
+        // A foreign active context would complete the wrong test; the scope
         // surfaces a finding on its own test and reports the mismatch.
         var sink = new CapturingSink();
         var firstBuilder = new ProtoHostBuilder();

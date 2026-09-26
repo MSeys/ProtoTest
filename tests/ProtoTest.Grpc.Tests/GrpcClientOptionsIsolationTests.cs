@@ -6,7 +6,7 @@ using ProtoTest.Grpc.Tests.Echo;
 
 /// <summary>
 /// Pins the per-client contract of <c>AddClient</c>'s <c>configure</c> callback: the options belong to
-/// the named client, so metadata, deadline and sensitive keys never leak across clients (A5-03), a
+/// the named client, so metadata, deadline and sensitive keys never leak across clients, a
 /// repeated registration for the same name still composes its callbacks in order, and the shared
 /// <c>ProtoTest:Grpc:Client</c> section still binds over each client's code callback.
 /// </summary>

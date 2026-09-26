@@ -120,6 +120,47 @@ public class ProtoClientInitializerTests
         }
     }
 
+    [Test]
+    public async Task UnscopedInitializer_ShouldReuseOnlyTheRegistrationMadeForTheChainName()
+    {
+        // The fallback memo is keyed by (provider, chain name). Two protocol chains
+        // whose names differ only in case share the provider's one invocation, and each chain's lookup
+        // resolves the client registered under that name.
+        var fallbackCalls = 0;
+        var fallback = new TestInitializer<TestClient>("Api", context =>
+        {
+            fallbackCalls++;
+            context.RegisterClient(new TestClient(), "Api");
+            return true;
+        });
+        var builder = new ProtoHostBuilder()
+            .ConfigureServices(services =>
+            {
+                services.AddSingleton<IProtoClientInitializer>(
+                    new TestInitializer<TestClient>("api", _ => false, protocol: "Rest"));
+                services.AddSingleton<IProtoClientInitializer>(
+                    new TestInitializer<TestClient>("API", _ => false, protocol: "GraphQL"));
+                services.AddSingleton<IProtoClientInitializer>(fallback);
+            });
+
+        await using var host = builder.Build();
+        await host.StartTestAsync("SharedFallbackNames", "00004", TestMethods.Placeholder);
+
+        try
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(fallbackCalls, Is.EqualTo(1), "one invocation serves every chain that names the provider");
+                Assert.That(Proto.Context.Client<TestClient>("api"), Is.Not.Null);
+                Assert.That(Proto.Context.Client<TestClient>("API"), Is.Not.Null);
+            }
+        }
+        finally
+        {
+            await host.CompleteTestAsync();
+        }
+    }
+
     private sealed class TestInitializer<TClient>(
         string name,
         Func<ProtoExecutionContext, bool> initialize,

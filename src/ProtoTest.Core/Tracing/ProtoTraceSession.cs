@@ -17,14 +17,16 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
     private readonly string _runId = Guid.NewGuid().ToString("N");
     private DateTimeOffset? _completedAtUtc;
     private readonly ProtoTraceOptions _options;
+    private readonly ProtoRunMetadata _runMetadata;
     private ActivityListener? _activityListener;
     private int _listening;
     private int _runArtifactSequence;
     private int _captureFailureReported;
 
-    public ProtoTraceSession(ProtoTraceOptions? options = null)
+    public ProtoTraceSession(ProtoTraceOptions? options = null, ProtoRunMetadata? runMetadata = null)
     {
         _options = options ?? new ProtoTraceOptions();
+        _runMetadata = runMetadata ?? ProtoRunMetadata.Capture(_options);
     }
 
     /// <summary>
@@ -172,6 +174,20 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
         var entities = _runWriter.SnapshotEntities();
         var values = _runWriter.SnapshotValues();
 
+        // The built-in environment facts, extended with the metadata the suite configured. A collision
+        // is rejected when the metadata is captured, so the wire still has exactly one key per fact.
+        var environment = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["runtime"] = RuntimeInformation.FrameworkDescription,
+            ["os"] = RuntimeInformation.OSDescription,
+            ["processArchitecture"] = RuntimeInformation.ProcessArchitecture.ToString(),
+            ["osArchitecture"] = RuntimeInformation.OSArchitecture.ToString()
+        };
+        foreach (var (key, value) in _runMetadata.Values)
+        {
+            environment[key] = value;
+        }
+
         return new ProtoTraceRun(
             // The run snapshot has no separate version of its own: it is serialized as the span
             // document, so its version is the span format's.
@@ -180,13 +196,7 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
             _startedAtUtc,
             _completedAtUtc,
             tests,
-            new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["runtime"] = RuntimeInformation.FrameworkDescription,
-                ["os"] = RuntimeInformation.OSDescription,
-                ["processArchitecture"] = RuntimeInformation.ProcessArchitecture.ToString(),
-                ["osArchitecture"] = RuntimeInformation.OSArchitecture.ToString()
-            },
+            environment,
             _runArtifacts.Select(source => source.Artifact).ToArray(),
             _runWriter.Snapshot(),
             entities,

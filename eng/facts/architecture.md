@@ -1,7 +1,7 @@
 # ProtoTest engineering facts — architecture
 
-Current at the A4 stage tree (branch `version/1.1`; audit A1–A4 landed). Source wins over this
-document: when it disagrees, the code is right and this file is the bug to fix in the same commit.
+Current at branch `version/1.1`, HEAD `7d1a484` (the A5 consolidation stages landed). Source wins over
+this document: when it disagrees, the code is right and this file is the bug to fix in the same commit.
 
 ## The model in one paragraph
 
@@ -53,6 +53,10 @@ or `Sheets` type names.
 7. Second `Build()` throws; every public registration entry that would mutate composition throws
    after `Build()` (a repeated same-name registration of the *same* program/type stays a no-op).
 
+Both conditional decisions read one evaluator, `ProtoEnvironment.IsSatisfied`: the infrastructure skip
+asks the all-configured verdict and the capability drop the per-declaration verdict over configured
+values plus the keys a registered piece declares.
+
 `StartAsync()`:
 
 1. Run hooks in ascending `Order` — trace export (`int.MinValue`), run resources (`int.MinValue + 1`),
@@ -65,7 +69,13 @@ or `Sheets` type names.
    mode lie); workers are infrastructure and start after everything registered before them; each
    worker receives the merged overlay (options over settings over configuration) as `--{key}={value}`
    arguments, so the worker's `Program.Main` sees final-precedence values, and the `HostBuilding`
-   in-memory overlay stays as the fallback for an entry point that ignores args.
+   in-memory overlay stays as the fallback for an entry point that ignores args. The generated
+   `--contentRoot`/`--applicationName` pair is reserved: an overlay key of that name produces no
+   argument.
+   A run setup step (`AddRunSetup`) is infrastructure too: it starts at its registration position —
+   after the pieces registered before it, so it reads their published settings — owns nothing released
+   at stop, and a throwing step fails the start like failing infrastructure (a retried start runs it
+   again).
 4. Starts the trace listener. A start failure rolls back the completed run hooks that own state, in
    reverse, so a suite-setup hook's state is released; the evidence hooks (gates, sink export, the
    archive) stay silent for a run that never started. It clears infrastructure settings and returns the
@@ -91,7 +101,11 @@ provider, stops listening, unregisters. Start/stop/dispose racing is rejected, n
    initializer has `Order = int.MinValue`) and attributes ascending. It opens `test.execution` and
    makes it the parent. The caller's token becomes `ProtoExecutionContext.CancellationToken`, which
    hooks and attributes read and `ProtoTest.Sql` passes to the connection open and transaction begin;
-   no runner adapter supplies one yet.
+   no runner adapter supplies one yet. The `[Application]` selection runs at
+   `ProtoAttributeOrder.Application` (`int.MinValue`), before a session declaration
+   (`ProtoAttributeOrder.SessionDeclaration`) and logins (`ProtoAttributeOrder.Default`): a session
+   created before the selection would target its own name instead of the application. `ProtoHookOrder`
+   names the hook bands the same way.
 3. A setup failure records the test `Failed`, rolls back only the completed components (attributes and
    hooks in reverse), and rethrows.
 4. Teardown runs attributes reverse, hooks reverse, publishes attachments, disposes the context
@@ -106,11 +120,11 @@ provider, stops listening, unregisters. Start/stop/dispose racing is rejected, n
 
 | Thing | Owner | Scope | Released by |
 | --- | --- | --- | --- |
-| Clients registered on the context | `ProtoExecutionContext` | test | context disposal (`disposeWithContext: false` opts out, then the caller owns it) |
+| Clients registered on the context | `ProtoExecutionContext` | test | context disposal (`ProtoClientOwnership.Caller` opts out, then the caller owns it); an in-process HTTP client is built over the server's `TestServer` handler, never through the shared factory's client ledger |
 | Test resources (`RegisterResource`) | `ProtoExecutionContext` | test | context disposal, reverse registration order |
 | Clients/resources registered via `AddResource` | `ProtoHost` | run | run resource hook after gates and sinks |
 | Infrastructure (`AddInfrastructure`) | `ProtoHost` | run | same; skipped pieces are never owned |
-| Containers (`ProtoContainerResource`) | the run | run | base `DisposeAsync` during release |
+| Containers (`ProtoContainerResource`, `ApplicationContainer`) | the run | run | base `DisposeAsync` during release |
 | Provisioned data cleanups | `ProtoTest.Data` | test | registered as resources; `data.cleanup` operations |
 | External objects (user drivers, user brokers) | the user | — | ProtoTest documents that it disposes them; no ownership flag (**decided, not changed**) |
 
@@ -129,6 +143,7 @@ starts again after a failed rollback is re-armed and released once per ownership
 | `AddCapabilityWhenProvided` | conditional declaration; drops when none of its keys is provided (configured value, or a key a registered infrastructure piece declares); composes with the other declaration kinds per declaration | throws |
 | `AddSink<TSink>` | first per sink type wins; a repeated generic call appends its configure callback; direct DI registrations are wrapped once | throws |
 | `AddInfrastructure` | same instance merges keys; different instance with the same id throws; skipped when every declared key is configured, unless `AddInfrastructureAlways` | throws |
+| `AddRunSetup` | a step is infrastructure under id `setup:{name}`; a second step under the same name throws (resource-id conflict) | throws |
 | `AddApplication` | named; first client per protocol is the default | throws (application entries too) |
 | Integration `AddClient` | first registration that initializes wins (keyed factory + resolver first match) | throws |
 | `AddWorkerHost` / `AddAspNetCoreServer(name)` | `AddWorkerHost`: first per name wins and a repeated name with a **different program throws**; `AddAspNetCoreServer(name)` is still first-name-wins (A1R-01 residual, different `TProgram` under one name is a no-op) | a new registration throws; a repeated name is a no-op |
@@ -182,15 +197,19 @@ An application-scoped setting resolves through one named precedence, `ProtoAppli
 (a started piece's published settings → static configuration), exposed as
 `ProtoApplication.BaseUrl(context, app)` and `ProtoApplication.GrpcAddress(context, app)`. Every
 address reader uses it; the in-process transport is the client resolver's fallback, never a competing
-source. A first-reader-wins divergence is a bug (audit ADDR-2, fixed).
+source. A first-reader-wins divergence is a bug (audit ADDR-2, fixed). The raw lookup,
+`ResolveSetting(configuration, settings, key)`, is public for a suite that reads one application
+setting outside a client (a blank published value is ignored).
 
 | Integration | Rule |
 | --- | --- |
 | REST / GraphQL / gRPC | settings-published address first, then configuration (gRPC: `Grpc:Address`, then `BaseUrl`); the in-process transport serves only when neither resolves. A missing address fails at first use with the resolver message; the protocol capability stays (A2b decision: one capability covers every client of the protocol, and an application-scoped client is legitimately in-process with no address) |
 | Readiness (`AddHttpReadiness`) | same precedence at its registration position; a probe before the publisher records `readiness.skipped` naming the ordering requirement, and claims "in-process" only when a server capability backs the application |
 | ASP.NET Core server | step-aside reads static configuration only (decided asymmetry); a settings-published address leaves the server in place while every address reader follows the published process |
+| Application container (`ApplicationContainer`) | the mapped port is published as `ProtoTest:Applications:{app}:BaseUrl` through `ProtoInfrastructureSettings`; default readiness waits for the mapped port and `AddHttpReadiness` follows the published address. A configured key skips the piece like any address provider; no `server` capability is declared, so the application is not in-process |
+| Loopback application (`AddLoopbackApplication`) | starts the factory on `http://127.0.0.1:0`, publishes the bound address as `ProtoTest:Applications:{app}:BaseUrl` through `ProtoInfrastructureSettings`, and forwards suite configuration plus earlier settings as command-line arguments. A configured key skips the piece like any address provider; no `server` capability is declared, so the application is not in-process |
 | Web sessions | same precedence; absolute-URL sessions stay addressless |
-| Devices | same precedence; registration-time throw when neither resolves. A device client carries the application it was registered under, and the in-process transport is selected by that identity: a transport serves one `(TProgram, application)` pair, so a client for B is never routed through A's `TestServer` at the same path. A path-only client (no resolver) with no matching transport fails naming the application |
+| Devices | same precedence; registration-time throw when neither resolves. A device client carries the application it was registered under, and the in-process transport is selected by that identity: a transport serves one `(TProgram, application)` pair, so a client for B is never routed through A's `TestServer` at the same path. A path-only client (no resolver) with no matching transport fails naming the application. A client name reused under a second application fails at registration naming both applications |
 | Sql / Messaging | connection resolved through DI factories/options; the capability is declared with `AddCapabilityWhenProvided` over the keys that can provide the address (`SqlOptions.AddressKeys`, `RabbitMqOptions.ConnectionStringSetting`), so a run with none drops it and skips; the SQL connection hook and the Entity Framework Core enlistment hook (same keys) stay inert (no open, no context), and the accessors name the keys |
 
 ## Device stack (A4, frozen until R2 needs more)
@@ -201,6 +220,9 @@ source. A first-reader-wins divergence is a bug (audit ADDR-2, fixed).
   1.1 plumbing; the endpoint parameter was dropped rather than ignored.
 - Options: the in-process transport resolves the registered `WebSocketDeviceOptions` from DI (validated
   with the transport, like the socket path) and applies `ConnectTimeout` to the in-process connect.
+- Clock: the handshake goes through the same context propagator as the in-process HTTP client, so it
+  carries the test id and the application's clock filter pushes the connecting test's clock while it
+  serves the socket. A handshake with no test on its flow carries no id and keeps the run-clock fallback.
 - Concurrency contract on `ProtoDevice`: connection creation is single-flight, sends are serialized,
   one receive is in flight at a time (a second fails fast naming the device), a send that races a
   disconnect fails with a device error naming the device, and send/receive may run concurrently.
@@ -223,15 +245,21 @@ binds first and the current section binds over it, so the old key keeps working 
 deprecated) and the current key wins. `GrpcClientOptions` is the example — `ProtoTest:Grpc:Client` over
 the legacy `ProtoTest:Grpc` — and it is registered **per named client**: the keyed registration
 composes each client's callbacks in order, the shared section binds over each client's callback, and
-the unkeyed instance is the run-wide default a transport-backed fallback client reads.
+the unkeyed instance is the run-wide default a transport-backed fallback client reads. The HTTP
+response and attachment defaults follow the same shape: `ProtoTest:Http:Responses` and `:Attachments`
+bind through `ProtoOptionsRegistration` when no explicit registration exists, and a resolver returning
+null keeps attachment capture opt-in.
 
 Known outliers (sanctioned or audit-owed): Web backends validate through static delegates instead of
 the interface method; the sink path binds but does not validate; OpenAPI/GraphQL schema sources are
 read directly from configuration (decided in Audit 3 D5). `ProtoReadinessOptions` implements
-`IProtoConfigurableOptions` (section `ProtoTest:Readiness`), is bound at `Build`, and is handed to
-infrastructure through `ProtoInfrastructureContext.Readiness`, so one policy governs host probes and
-the containers the run starts (ADDR-3 fixed); a container started outside a host keeps its own
-`ReadinessTimeout`/`ReadinessInterval`.
+`IProtoConfigurableOptions` (section `ProtoTest:Readiness`) and registers through
+`ProtoOptionsRegistration`; `ConfigureReadiness` sets the code values on the one shared instance and the
+section binds over them, and the host resolves the result - bound and validated - while it builds, so a
+bad `ProtoTest:Readiness` fails the build, not the first probe.
+It is handed to infrastructure through `ProtoInfrastructureContext.Readiness`, so one policy governs
+host probes and the containers the run starts (ADDR-3 fixed); a container started outside a host keeps
+its own `ReadinessTimeout`/`ReadinessInterval`.
 
 `SqlOptions.AddressKeys` is a `SqlAddressKeys` value object, deliberately outside configuration
 binding: the keys are declared in code because the Build-time capability decision cannot see a value
@@ -244,6 +272,11 @@ same key set when it is called after `AddSql`.
 - Findings, observations, attachments and archive entries are serialized and redacted **once**, where
   evidence is created — `ProtoMetadataRedaction`, `ProtoDataRedactionPolicy`, `JsonDiagnosticSanitizer`
   and `ProtoUriSanitizer` are the policies. No exit boundary may serialize a raw `object`.
+- The run resource is the run's identity: `runId`, `runStartedAtUtc`, `runCompletedAtUtc` and its
+  environment as flat `environment.*` attributes. `ProtoTraceOptions.RunMetadata` and
+  `RunMetadataEnvironmentVariables` (A5.15) extend the same namespace with facts captured at Build: one
+  `environment.{key}` attribute and one `run_metadata` report item per key; unset variables contribute
+  nothing and a key that would hide a built-in `environment.*` fact fails the build.
 - The trace records operations/events on a recorder; observations are intentional facts the test
   states and the only input coverage collectors consume; findings are for the report and run gates;
   attachments materialize files and are published in teardown.
@@ -299,6 +332,10 @@ spirit (see `ProtoDataValueContext`).
   when the descriptor carries one), `device:{client}:{deviceType}:{id}`, infrastructure `Id`, resources
   `Id`, value items `{type}:{identity}`.
 - New vocabulary is additive to the wire; the viewer contract is not edited casually.
+- Failure diagnostics events are protocol-identified: `{protocol}.diagnostics.failed` carries the
+  protocol's trace source (the old `http.diagnostics.failed`/`ProtoTest.Http` literal is gone), and
+  REST/GraphQL/gRPC/messaging record through `ProtoTest.Json`'s `ProtoFailureDiagnostics` and
+  `ProtoObservationCapture`.
 
 ## Runner adapters
 
@@ -323,8 +360,15 @@ suite; extend it, do not fork it.
 | Execution context | `ProtoExecutionContext`, `Proto.Context`, `ProtoHost.CurrentHost` | `src/ProtoTest.Core/` |
 | Run state machine | `ProtoRunStateMachine` | `src/ProtoTest.Core/Internal/` |
 | Test lifecycle | `ProtoTestLifecycle` | `src/ProtoTest.Core/Internal/` |
+| Order bands | `ProtoHookOrder`, `ProtoAttributeOrder` | `src/ProtoTest.Core/` |
 | Resource registry | `ProtoResourceRegistry`, `ProtoRunResourceStore` | `src/ProtoTest.Core/Internal/` |
 | Infrastructure registration | `ProtoInfrastructureRegistration`, `ProtoInfrastructureSettings`, `IProtoConfiguredInfrastructure`, `ProtoInfrastructureContext` | `src/ProtoTest.Core/Infrastructure/` |
+| Run lifecycle (start/stop sequencing) | `ProtoRunLifecycle` | `src/ProtoTest.Core/Internal/` |
+| Build composer | `ProtoHostComposer` | `src/ProtoTest.Core/Internal/` |
+| Ambient state | `ProtoAmbient`, `ProtoTestLifecycleState` | `src/ProtoTest.Core/Internal/` |
+| Environment evaluator | `ProtoEnvironment` | `src/ProtoTest.Core/Internal/` |
+| Once-only registration | `ProtoRegistration` (internal), `ProtoRegistrationGuard` (public façade) | `src/ProtoTest.Core/Internal/`, `src/ProtoTest.Core/` |
+| Run setup | `ProtoRunSetupContext`, `AddRunSetup` | `src/ProtoTest.Core/Infrastructure/` |
 | Capability | `ProtoCapabilityDescriptor`, `ProtoCapabilityKinds`, `AddCapabilityUnlessConfigured`, `AddCapabilityWhenProvided` | `src/ProtoTest.Core/Applications/ProtoCapability.cs` |
 | Client resolution | `ProtoClientRegistry`, `ProtoClientInitializerHook`, `ProtoClientResolution` | `src/ProtoTest.Core/Internal/` |
 | Application resolution | `ProtoApplication`, `ProtoApplicationResolution`, `[Application]` | `src/ProtoTest.Core/Applications/` |
@@ -339,6 +383,7 @@ suite; extend it, do not fork it.
 | Readiness | `ProtoReadiness`, `ProtoReadinessOptions` | `src/ProtoTest.Core/Readiness/` |
 | Skip | `RequiresCapabilityAttribute`, `RequiresInProcessAttribute`, `RequiresWorkerAttribute<TProgram>`, `RequiresServerAttribute`, `RequiresApplicationAttribute`, `ProtoTestSkip` | `src/ProtoTest.Core/Applications/` |
 | Adapters | five runner packages + `tests/ProtoTest.AdapterContract` | `src/`, `tests/` |
+| Analyzers | `ProtoTest.Analyzers` (`PT0001`, `PT0002`; opt-in, never referenced as an analyzer by this repository's own projects) | `src/ProtoTest.Analyzers/` |
 
 ## Invariants to protect
 

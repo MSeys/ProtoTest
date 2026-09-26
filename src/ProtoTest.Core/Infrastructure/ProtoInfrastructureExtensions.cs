@@ -1,6 +1,7 @@
 namespace ProtoTest.Core;
 
 using Microsoft.Extensions.DependencyInjection;
+using ProtoTest.Core.Internal;
 
 public static class ProtoInfrastructureExtensions
 {
@@ -29,6 +30,33 @@ public static class ProtoInfrastructureExtensions
         IProtoInfrastructure infrastructure,
         params string[] settings)
         => Register(builder, infrastructure, alwaysStart: true, settings);
+
+    /// <summary>
+    /// Registers a run-scoped setup step: an action the host runs once when the run starts, at this
+    /// registration's position in the infrastructure order. Register it after the pieces whose
+    /// published settings it reads - a container's connection string, a broker's address - so it sees
+    /// their started values; the run's cancellation token arrives through
+    /// <see cref="ProtoRunSetupContext.CancellationToken"/>.
+    /// </summary>
+    /// <remarks>
+    /// A step is an action, not a resource: it owns nothing to release, so the run's stop and dispose
+    /// do not run it again. A step that throws fails the run's start with its own exception, releases
+    /// what the run had started and leaves the host retryable, exactly like failing infrastructure; a
+    /// retry runs the step again. Use it for state the whole run shares - a schema for a container
+    /// database - because a run hook runs before infrastructure starts and cannot see its addresses,
+    /// and a test hook or test body runs inside the per-test transaction, where its DDL is rolled back
+    /// with the test.
+    /// </remarks>
+    public static IProtoHostBuilder AddRunSetup(
+        this IProtoHostBuilder builder,
+        string name,
+        Func<ProtoRunSetupContext, ValueTask> setup)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(setup);
+        return builder.AddInfrastructure(new ProtoRunSetupInfrastructure(name, setup));
+    }
 
     private static IProtoHostBuilder Register(
         IProtoHostBuilder builder,

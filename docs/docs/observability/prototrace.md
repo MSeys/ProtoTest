@@ -25,6 +25,36 @@ With `Enabled = false`, no trace file is written and application spans from the 
 captured. ProtoTest still records tests and run state in memory (run gates and `Trace.Snapshot()` can use
 it), and observations and reports keep working.
 
+## Correlating a trace with the run that produced it
+
+Every trace carries the run's own id, its timing and the environment it executed on. When the run happens
+somewhere you do not control — CI, a shared environment — name the facts that identify it, so a result can
+be attributed to the build that produced it:
+
+```csharp
+builder.ConfigureTracing(trace =>
+{
+    trace.RunMetadataEnvironmentVariables.Add("GITHUB_RUN_ID"); // read from the process environment
+    trace.RunMetadataEnvironmentVariables.Add("GITHUB_SHA");
+    trace.RunMetadata["pipeline"] = "nightly";                 // or set a value in code
+});
+```
+
+Each entry is written as `environment.{key}` on the run's resource group in `spans.json`, next to the
+built-in `environment.runtime` and `environment.os`, and every [report sink](./reporting.md) receives it
+as a run-metadata item. So a downloaded `.prototrace` (and the report it carries) names the build and run
+it came from.
+
+The named variables are read once, when the host is built; a variable that is unset or empty — a local
+run — contributes nothing, and neither the trace nor the report changes. An explicit `RunMetadata` value
+wins over a lifted variable of the same name. ProtoTest does not detect a CI provider by itself: only the
+variables you name are read, and a name that would hide one of the built-in facts (`runtime`, `os`,
+`processArchitecture`, `osArchitecture`) fails the build. Values are recorded exactly as given, so list
+only variables that are safe to carry in a trace.
+
+The viewer's run model reads every `environment.*` entry, but its run header still shows only the runtime
+and OS; read the metadata from `spans.json` or from the JSON/HTML report's Run metadata section.
+
 ## What a trace contains
 
 A run contains tests, and a trace records two things about each of them:
@@ -134,7 +164,7 @@ run.prototrace
     └── run/HtmlReportSink/run-artifact-1/report.html
 ```
 
-- **`spans.json`** holds a resource group per test — its id, name, class, method, outcome and duration — with its operations, their events, and the artifacts the test declared. The run's own group carries its id, start and end, and the environment it ran in (`environment.runtime`, `environment.os`, …); run-level events such as gate verdicts sit on it too.
+- **`spans.json`** holds a resource group per test — its id, name, class, method, outcome and duration — with its operations, their events, and the artifacts the test declared. The run's own group carries its id, start and end, and the environment it ran in (`environment.runtime`, `environment.os`, …) plus any [run metadata you configured](#correlating-a-trace-with-the-run-that-produced-it); run-level events such as gate verdicts sit on it too.
 - **`state.json`** holds the run's tracked items and each test's: kind, id, name, scope, first and last seen, the state at the end and every change, with the operation that caused it.
 - **`sources`** in the manifest maps each recorded `code.file.path` to its embedded copy.
 - Each artifact is declared once, with its media type, size and path in the archive; an attachment event refers to it by id.

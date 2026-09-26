@@ -1,5 +1,7 @@
 namespace ProtoTest.Web;
 
+using ProtoTest.Core;
+
 /// <summary>A file the browser downloaded while a web operation ran.</summary>
 /// <param name="FileName">The suggested file name, or the name the test asked for.</param>
 /// <param name="MediaType">A best-effort media type guessed from the file's extension.</param>
@@ -7,8 +9,12 @@ namespace ProtoTest.Web;
 public sealed record WebDownload(
     string FileName,
     string MediaType,
-    ReadOnlyMemory<byte> Content)
+    ReadOnlyMemory<byte> Content) : IProtoBinaryContent
 {
     /// <summary>The size of the downloaded file in bytes.</summary>
     public long Size => Content.Length;
+
+    string? IProtoBinaryContent.MediaType => MediaType;
+
+    string? IProtoBinaryContent.FileName => FileName;
 }

@@ -7,7 +7,7 @@ using ProtoTest.Devices.WebSocket;
 using SampleApi = ProtoTest.AspNetCore.SampleApi;
 
 /// <summary>
-/// Pins the in-process WebSocket device transport after the audit fixes it (audit DEV-1/DEV-2): the
+/// Pins the in-process WebSocket device transport: the
 /// registration is keyed by (program, application) so a second application keeps its transport,
 /// <c>CanConnect</c> answers for the client's application instead of ignoring it, and the registered
 /// <see cref="WebSocketDeviceOptions"/> are resolved and validated instead of being dead.
@@ -120,6 +120,43 @@ public sealed class InProcessDeviceCharacterizationTests
             Assert.That(exception!.ParamName, Is.EqualTo(nameof(WebSocketDeviceOptions.ConnectTimeout)));
             Assert.That(exception.Message, Does.Contain("must be positive"));
         });
+    }
+
+    [Test]
+    public async Task Connect_FromAFlowWithoutAmbientContext_ShouldReachTheRegisteredApplication()
+    {
+        // Routing was decided from the session's context; the connect must use
+        // that context instead of re-reading the ambient host state of whatever flow runs it.
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder
+            .AddInProcessWebSocketDevices<SampleApi.Program>("Api")
+            .AddApplication("Api", app => app
+                .AddAspNetCoreServer<SampleApi.Program>()
+                .AddDevices(devices => devices
+                    .AddClient(
+                        "Chargers",
+                        InProcessWebSocketDeviceTransport<SampleApi.Program>.TransportName,
+                        path: "/ws/{deviceId}")
+                        .AddDevice<EchoDevice>()));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("in-process device off-flow", "00001", TestMethods.Placeholder);
+
+        var device = Proto.Context.Devices("Chargers").For<EchoDevice>("CP-001");
+        string ack;
+        // The task starts with no captured flow, so the ambient Proto.Context is absent; the session's
+        // own context must open the connection (before the fix this threw "outside one"). The
+        // suppression is undone on this same thread because the block never awaits.
+        using (ExecutionContext.SuppressFlow())
+        {
+            ack = Task.Run(() => device.BootAsync().AsTask()).GetAwaiter().GetResult();
+        }
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        Assert.That(ack, Is.EqualTo("BOOT_ACK"));
     }
 
     [Test]

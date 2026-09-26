@@ -46,7 +46,6 @@ internal sealed class ApplicationReadinessInfrastructure : IProtoConfiguredInfra
     public async ValueTask StartAsync(ProtoInfrastructureContext context, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
-        _options.Validate();
 
         // The application-setting precedence every reader shares: a started instance published by a
         // settings piece wins over static configuration.

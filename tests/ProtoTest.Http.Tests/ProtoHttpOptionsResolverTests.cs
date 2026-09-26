@@ -116,4 +116,49 @@ public sealed class ProtoHttpOptionsResolverTests
 
         Assert.That(options.MaxDiagnosticBodyLength, Is.EqualTo(64));
     }
+
+    [Test]
+    public async Task ResolveResponseOptions_ShouldBindTheSharedDefaultSectionWhenNoRegistrationExists()
+    {
+        // The parameterless type's documented ProtoTest:Http:Responses default really
+        // binds when a protocol registered no keyed options, instead of being an inert section name.
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Http:Responses:MaxDiagnosticBodyLength"] = "17"
+            })
+            .Build();
+        var services = new ServiceCollection()
+            .AddSingleton<IConfiguration>(configuration)
+            .BuildServiceProvider();
+        await using var context = new ProtoExecutionContext(
+            "default response options",
+            services.CreateScope(),
+            "00006",
+            TestMethods.Placeholder);
+
+        var options = context.ResolveResponseOptions("GraphQL");
+
+        Assert.That(options.MaxDiagnosticBodyLength, Is.EqualTo(17));
+    }
+
+    [Test]
+    public void ParameterlessAttachmentOptions_ShouldBindTheSharedDefaultSection()
+    {
+        // Absence of a keyed registration stays the attachment opt-in signal, but the
+        // parameterless type's documented default section binds through the shared registrar.
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:Http:Attachments:CaptureResponses"] = "false"
+            })
+            .Build();
+        using var services = new ServiceCollection()
+            .AddSingleton<IConfiguration>(configuration)
+            .BuildServiceProvider();
+
+        var options = ProtoOptionsRegistration.Resolve<ProtoHttpAttachmentOptions>(services);
+
+        Assert.That(options.CaptureResponses, Is.False);
+    }
 }

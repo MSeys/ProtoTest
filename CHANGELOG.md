@@ -173,9 +173,33 @@ All ProtoTest packages share one version; breaking API changes are called out be
   `PlaywrightWebOptions.MaxTraceBytes` (32 MiB, 0 off), `WebSocketDeviceOptions.MaxMessageBytes`
   (4 MiB, 0 off) with `DeviceFrameTooLargeException`, and `IWebBackend.PollInterval` bound the reads
   and the session timing.
+- `AddLoopbackApplication(applicationName, createApp)` (`ProtoTest.AspNetCore`) hosts a hand-built
+  `WebApplication` on its own loopback listener for browser journeys: it starts the factory on
+  `http://127.0.0.1:0`, publishes the bound address as `ProtoTest:Applications:{app}:BaseUrl` (a
+  configured key skips the listener), forwards the suite's configuration with the started settings
+  available at its registration position as command-line arguments, and releases the application
+  with the run. The published instance is separate from `AddAspNetCoreServer`, with no
+  `ServerFactory` or `[RequiresInProcess]`.
 
 ### Fixed
 
+- A browser download is named binary content: `WebDownload` implements `IProtoBinaryContent`, so a
+  downloaded file feeds anything consuming named bytes (for example `ProtoSheets.Open`) in one line
+  instead of through a stream.
+- The in-process HTTP client is owned by its test alone: ProtoTest builds it over the `TestServer`'s
+  handler instead of `WebApplicationFactory.CreateDefaultClient`, so the parallel tests of a run no
+  longer mutate the shared per-run factory's client ledger. A torn ledger entry crashed run teardown
+  with a `NullReferenceException` from `WebApplicationFactory.DisposeAsync`.
+- An in-process device connect carries the test id on the WebSocket handshake, the same way the
+  in-process HTTP client does: the application under test resolves the connecting test's clock instead
+  of falling back to the run clock, so `Proto.Context.Clock.Advance` reaches session timestamps the
+  application stamps from its `TimeProvider`. A handshake with no test on its flow keeps the run clock.
+- A canceled device connect no longer poisons the session: the cancellation reaches its caller and the
+  canceled attempt is cleared, so the next send starts a fresh connect.
+- A device client name reused under a second application fails naming the client and both applications,
+  instead of the bare "already registered" message.
+- A worker entry point always gets the run's `--contentRoot`/`--applicationName`: an overlay key named
+  `contentRoot` or `applicationName` (any casing) is skipped, so the generated pair cannot be replaced.
 - The RabbitMQ broker connection string is validated where the options resolve: a missing, non-absolute
   or non-`amqp`/`amqps` value fails naming `ProtoTest:Messaging:RabbitMq:ConnectionString` instead of
   failing later at connect time, including a value a started broker container publishes.
@@ -281,6 +305,9 @@ All ProtoTest packages share one version; breaking API changes are called out be
 - A sink registered directly in the service collection is exported at run end like one added with
   `AddSink`; the export hook is registered once by the host build, so mixing both paths still exports
   once.
+- `[Application]` runs at `ProtoAttributeOrder.Application` (`int.MinValue`), before every other setup
+  attribute, so a web session declaration or a login always sees the selected application; a session
+  created before the selection falls back to its own name and cannot resolve an address.
 - A failed run start unwinds every completed run hook that owns state, in reverse, so a suite-setup
   hook's `BeforeRunAsync` state is released by its `AfterRunAsync`; gates, reports and the trace
   archive stay silent for a run that never started.
@@ -367,6 +394,52 @@ All ProtoTest packages share one version; breaking API changes are called out be
   propagates with its original stack.
 - Optional constructor-parameter defaults win over generated values in `ProtoTest.Data`, so a declared
   default (including `null`) is honored.
+- Messaging destinations a suite owns can be declared with `Declare(...)` on the `AddMessaging` chain
+  or under `ProtoTest:Messaging:DeclaredDestinations`: the adapter creates them during test setup,
+  before any tap binds, so a suite that owns the broker and publishes its own events works from the
+  documented path. RabbitMQ creates a fanout, durable, non-auto-delete exchange once per run and
+  leaves an existing one as it is; the in-memory broker treats a declaration as a no-op.
+  `IProtoMessageBroker.DeclareAsync` is the adapter seam and its default implementation refuses,
+  naming the adapter, instead of pretending.
+- `AddRunSetup(name, delegate)` registers a run-scoped setup step: infrastructure that starts at its
+  registration position — after the pieces registered before it, so it reads the connection string a
+  container published — over the existing start/stop machinery. The step receives
+  `ProtoRunSetupContext` (`Settings`, `Configuration`, the run's `CancellationToken`), owns nothing to
+  release (stop and dispose never call it again), and a throwing step fails the run start with its own
+  exception and leaves the host retryable, like failing infrastructure.
+- An application under test runs in its own container image: `ApplicationContainer`
+  (`ProtoTest.Testcontainers`) starts the image as run infrastructure
+  (`AddInfrastructure(api, api.BaseUrlKey)`), maps the port the application listens on, publishes
+  `http://{hostname}:{mapped port}` as `ProtoTest:Applications:{application}:BaseUrl`, and waits for the
+  mapped port with the run's readiness policy. A run that configures the key skips the container;
+  `TryStart` reports why a container could not start so a suite can skip without a runtime; a
+  containerized application advertises no in-process server, so `[RequiresInProcess]` tests skip.
+- `ProtoApplication.ResolveSetting(configuration, settings, key)` is public: one
+  published-settings-over-configuration precedence for suites that read an application setting, with a
+  blank published value ignored.
+- `ProtoAttributeOrder` names the setup order bands (`Application`, `SessionDeclaration`, `Default`), so
+  an attribute sequences itself against the built-ins without raw numbers and the deliberate bands live
+  in one place.
+- A trace can name the CI run that produced it: `ConfigureTracing` gains `RunMetadata` (explicit
+  key/value facts) and `RunMetadataEnvironmentVariables` (names read from the process environment, such
+  as `GITHUB_RUN_ID`), captured once when the host is built. Each fact is recorded as
+  `environment.{key}` on the run resource in `spans.json` and as a `run_metadata` report item
+  (`ProtoReportItemKinds.RunMetadata`); an unset variable contributes nothing, so a local run's trace
+  and report are unchanged, and a key that would hide a built-in `environment.*` fact fails the build.
+- `IProtoDeviceTransport.ConnectAsync(context, endpoint, cancellationToken)` has a default
+  implementation forwarding to the context-free overload; the in-process transport overrides it, so a
+  connect from a flow without ambient context still reaches the registered application.
+- `ProtoTest.Analyzers` ships the intent-dependent checks the framework cannot make at runtime:
+  `PT0001` reports a method that carries both a ProtoTest test attribute and the runner's own plain
+  test attribute, and `PT0002` reports a test registered by a plain runner attribute that reads
+  `Proto.Context`. Warnings only; consumers opt in by referencing the package.
+- `AddLoopbackApplication(applicationName, createApp)` (`ProtoTest.AspNetCore`) starts the given
+  `WebApplication` factory on `http://127.0.0.1:0` as run infrastructure, publishes the bound address
+  as `ProtoTest:Applications:{application}:BaseUrl`, and forwards the suite's configuration with the
+  started settings at its registration position as command-line arguments, so a browser session, a
+  REST client and a readiness probe resolve one running application. A configured address skips the
+  listener like any address provider; the listener is a separate instance with no `ServerFactory` or
+  `[RequiresInProcess]`.
 - A readiness timeout names the probed URL and the last error; a rejected GraphQL subscription names
   the server's errors; an oversized WebSocket frame fails naming the address and limit; a stuck
   Selenium pump is reported (`web.selenium.executor_abandoned`) instead of abandoned silently; a
@@ -378,14 +451,32 @@ All ProtoTest packages share one version; breaking API changes are called out be
 - TUnit parameterized rows record their arguments in the trace name (`…MethodName[1]`) instead of the
   method name alone, so parallel rows stay distinguishable.
 - Failure evidence is one record: gRPC and messaging record `ProtoFailureDiagnostics` through the
-  protocol-identified guard (`{protocol}.diagnostics.failed`), so a non-`RpcException` and a failed
-  publish/await are observations.
+  protocol-identified guard, so a non-`RpcException` and a failed publish/await are observations; the
+  capture-failure event is `{protocol}.diagnostics.failed` with the protocol's trace source (the old
+  `http.diagnostics.failed`/`ProtoTest.Http` literal is gone).
 - One wait timing per session: assertions poll at `IWebBackend.PollInterval` (Selenium's `PollInterval`,
   the shared default otherwise), and REST request-URI validation uses the shared wording
   (`REST request URI '…' must be an absolute HTTP or HTTPS URI`).
+- `ProtoApplicationResolution.ResolveState` returns only the state the `[Application]` attribute set
+  during the test's lifecycle; a context started without the resolved attribute reports "No application
+  is selected" instead of re-reading the method. Adapters pass the resolved attributes, so suite
+  behavior is unchanged.
+- An untraced GraphQL response tolerates a null execution like the REST contract, and enumerating a
+  subscription disposes each event as it advances (the final event stays the caller's).
+- Container and device release are bounded: an in-flight container start is awaited for at most five
+  seconds and recorded as `container.start.abandoned`; a device connect is awaited the same way and
+  recorded as `device.disconnect.abandoned`; normal release with nothing in flight is unchanged.
+- Framework routes (`/_…`, `/.well-known…`) are never page-inventoried, and a table row's shape
+  assertion uses the table's own context instead of the ambient one.
+- The HTTP response and attachment defaults bind `ProtoTest:Http:Responses` through the shared options
+  registration when no explicit registration exists; a resolver that returns null still means capture
+  is opt-in, so attachments stay off unless asked for.
 
 ### Removed
 
+- `ProtoTest.OpenTelemetry` was retired: the `ProtoTest` `ActivitySource` always exists, so subscribing
+  is one `AddSource("ProtoTest")` call as the observability page shows; a 12-line bridge did not earn a
+  package of its own.
 - `IProtoReadinessProbe` and `ProtoReadinessResult.LastError` were removed: probes are registered as
   delegates with `AddReadinessProbe`/`AddHttpReadiness`, the wait result carries attempts and waited
   time only, and the timeout message still carries the last error. Both were unreleased 1.1 plumbing.
@@ -393,6 +484,10 @@ All ProtoTest packages share one version; breaking API changes are called out be
   destination aggregation, and the Messaging protocol descriptor no longer declares a coverage category.
   The `messaging.*` observations remain trace evidence for a collector a suite registers; no
   `ProtoTest.Messaging` collector ships, and destinations are deliberately not a coverage category.
+- `ProtoHttpAssertions<TResponse, TAssertions>` loses the unused `TAssertions` parameter
+  (`ProtoHttpAssertions<TResponse>`); unreleased 1.1 plumbing, a deriver updates one base-type argument.
+- `WebTiming` and `WebNames` are internal (web timing defaults and artifact naming are plumbing, not
+  consumer promises); the web pages teach the public surface.
 
 ### Breaking
 

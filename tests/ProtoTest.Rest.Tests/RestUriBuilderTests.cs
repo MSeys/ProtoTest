@@ -155,7 +155,7 @@ public class RestUriBuilderTests
     [Test]
     public async Task BuildRequestUri_ShouldValidateThroughTheSharedEndpointRule()
     {
-        // Audit 5 A5.12 (B03): REST validates base addresses and absolute request URIs through the same
+        // REST validates base addresses and absolute request URIs through the same
         // ProtoHttpEndpoint rule GraphQL uses, so the wording and the rule cannot drift.
         using (Assert.EnterMultipleScope())
         {

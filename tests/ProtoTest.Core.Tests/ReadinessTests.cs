@@ -2,6 +2,7 @@ namespace ProtoTest.Core.Tests;
 
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -295,6 +296,49 @@ public sealed class ReadinessTests
         });
     }
 
+    [Test]
+    public async Task HttpReadiness_WhenEveryAnswerIsRejected_ShouldSayTheEndpointAnswered()
+    {
+        using var listener = new AnsweringListener();
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Applications:Api:BaseUrl"] = listener.Address
+            }));
+        builder.ConfigureReadiness(options =>
+        {
+            options.Timeout = TimeSpan.FromMilliseconds(300);
+            options.Interval = TimeSpan.FromMilliseconds(50);
+        });
+        builder.AddHttpReadiness("Api", ready: _ => false);
+        await using var host = builder.Build();
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () => await host.StartAsync());
+
+        Assert.That(
+            exception!.Message,
+            Does.Contain("rejected every response"),
+            "an answered-but-rejected probe names that branch instead of claiming an unreachable endpoint");
+    }
+
+    [Test]
+    public void Build_WhenTheReadinessOptionsAreInvalid_ShouldFailConfigurationNotTheFirstProbe()
+    {
+        // The options register through ProtoOptionsRegistration, and the host forces that
+        // resolve at Build, so validation runs once and a bad ProtoTest:Readiness is configuration error.
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Readiness:Timeout"] = "00:00:00"
+            }));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.Build());
+    }
+
     private sealed class OrderingInfrastructure(List<string> order) : IProtoInfrastructure
     {
         public string Id => "piece";
@@ -312,5 +356,76 @@ public sealed class ReadinessTests
         }
 
         public ValueTask ReleaseAsync(ProtoResourceReleaseContext context) => ValueTask.CompletedTask;
+    }
+
+    /// <summary>
+    /// A loopback HTTP listener that answers every request with <c>200 OK</c>, so a readiness check
+    /// that rejects responses is exercised past its first attempt against one address.
+    /// </summary>
+    private sealed class AnsweringListener : IDisposable
+    {
+        private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+        private readonly Task _serve;
+
+        public AnsweringListener()
+        {
+            _listener.Start();
+            Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            _serve = ServeAsync();
+        }
+
+        public int Port { get; }
+
+        public string Address => $"http://127.0.0.1:{Port}";
+
+        public void Dispose()
+        {
+            _listener.Stop();
+            try
+            {
+                _serve.GetAwaiter().GetResult();
+            }
+            catch (Exception)
+            {
+                // The accept loop ends with the listener; teardown has nothing to report.
+            }
+        }
+
+        private async Task ServeAsync()
+        {
+            var response = Encoding.ASCII.GetBytes(
+                "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok");
+            while (true)
+            {
+                TcpClient client;
+                try
+                {
+                    client = await _listener.AcceptTcpClientAsync();
+                }
+                catch (SocketException)
+                {
+                    return;
+                }
+                catch (ObjectDisposedException)
+                {
+                    return;
+                }
+
+                using (client)
+                {
+                    try
+                    {
+                        var request = new byte[4096];
+                        await client.GetStream().ReadAsync(request);
+                        await client.GetStream().WriteAsync(response);
+                        await client.GetStream().FlushAsync();
+                    }
+                    catch (Exception exception) when (exception is IOException or SocketException)
+                    {
+                        return;
+                    }
+                }
+            }
+        }
     }
 }

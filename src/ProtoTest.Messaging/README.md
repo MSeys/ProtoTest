@@ -18,16 +18,17 @@ Without a broker adapter the package uses an in-memory implementation. Add `Prot
 
 A consumed message reads typed: `message.ReadRequired<T>()` (or `ReadAsJson<T>()` for a nullable read) uses the shared JSON defaults, and `ReadRequired<T>("$.id")` reads one path.
 
-Declare the destinations a test awaits in code with `Tap`, so the adapter binds its tap before the act publishes:
+Declare the destinations a test awaits in code with `Tap`, and the destinations the suite owns — the ones it publishes to itself — with `Declare`, so the adapter binds its taps and creates the suite's topology before the act publishes:
 
 ```csharp
 builder.AddMessaging(messaging => messaging
     .CaptureAttachments()
+    .Declare("invoice-paid")
     .Tap("invoice-paid")
     .UseRabbitMq());
 ```
 
-Repeated calls compose; `ProtoTest:Messaging:Destinations` still binds over the code values.
+Repeated calls compose; `ProtoTest:Messaging:Destinations` and `ProtoTest:Messaging:DeclaredDestinations` still bind over the code values. `Declare` is idempotent — the destination is created once per run during setup — and the in-memory broker treats it as a no-op, because every destination already exists there.
 
 Publishing, waiting and matched payloads can be traced and captured as attachments.
 

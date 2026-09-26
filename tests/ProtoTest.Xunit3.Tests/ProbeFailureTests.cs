@@ -6,7 +6,7 @@ using Xunit;
 using Xunit.v3;
 
 /// <summary>
-/// Stage 0 characterization for the xUnit v3 setup and teardown failure paths (Audit 3, findings E3/F1).
+/// Characterization for the xUnit v3 setup and teardown failure paths.
 /// The adapter surfaces a setup failure with its original exception and records one failed trace; a
 /// teardown failure keeps the reported result and lands as a Partial trace with a finding. Driven through
 /// the real lifecycle handler so a deliberate failure cannot make the suite red.

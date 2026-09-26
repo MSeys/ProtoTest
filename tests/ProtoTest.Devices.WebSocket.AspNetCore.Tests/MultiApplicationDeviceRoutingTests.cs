@@ -7,7 +7,7 @@ using SampleApi = ProtoTest.AspNetCore.SampleApi;
 using SecondApi = ProtoTest.AspNetCore.SecondTestApi;
 
 /// <summary>
-/// Pins multi-application device routing (audit DEV-1): two applications host the same path, and each
+/// Pins multi-application device routing: two applications host the same path, and each
 /// device client reaches the application it was registered under instead of the first transport that
 /// happens to be registered.
 /// </summary>

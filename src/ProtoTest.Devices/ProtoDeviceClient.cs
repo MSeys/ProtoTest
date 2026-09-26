@@ -46,7 +46,7 @@ public sealed class ProtoDeviceClient
         // An in-process transport wins when it applies, so the same registration works whether the
         // application runs in the test process or behind an address. The transport must serve the
         // client's own application: a client for application B must never be routed through
-        // application A's TestServer, even when both expose the same path (audit DEV-1).
+        // application A's TestServer, even when both expose the same path.
         var transports = _context.Service<IEnumerable<IProtoDeviceTransport>>().ToArray();
         var endpoint = new DeviceEndpoint(deviceId, string.Empty);
         var inProcess = _registration.Path is null

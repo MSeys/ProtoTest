@@ -58,7 +58,6 @@ $packages = @(
     "src/ProtoTest.Devices.WebSocket.AspNetCore/ProtoTest.Devices.WebSocket.AspNetCore.csproj",
     "src/ProtoTest.Hosting/ProtoTest.Hosting.csproj",
     "src/ProtoTest.OpenApi/ProtoTest.OpenApi.csproj",
-    "src/ProtoTest.OpenTelemetry/ProtoTest.OpenTelemetry.csproj",
     "src/ProtoTest.Reporting/ProtoTest.Reporting.csproj",
     "src/ProtoTest.Traces/ProtoTest.Traces.csproj",
     "src/ProtoTest.Web.Pages/ProtoTest.Web.Pages.csproj",

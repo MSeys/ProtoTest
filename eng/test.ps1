@@ -2,7 +2,11 @@
 param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release",
-    [switch]$NoRestore
+    [switch]$NoRestore,
+
+    # Optional semicolon-separated project directories (relative to the repository or absolute) to run
+    # instead of every discovered test project; verify.ps1 passes the projects a stage can reach.
+    [string]$Include = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,6 +15,12 @@ $env:TESTINGPLATFORM_TELEMETRY_OPTOUT = "1"
 
 $repository = Split-Path -Parent $PSScriptRoot
 $solution = Join-Path $repository "ProtoTest.slnx"
+
+$includeDirectories = @()
+if (-not [string]::IsNullOrWhiteSpace($Include)) {
+    $includeDirectories = @($Include -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        ForEach-Object { [IO.Path]::GetFullPath((Join-Path $repository $_)) })
+}
 
 function Invoke-DotNet {
     param([Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
@@ -25,7 +35,17 @@ if (-not $NoRestore) {
     Invoke-DotNet restore $solution
 }
 
-Invoke-DotNet build $solution --configuration $Configuration --no-restore
+if ($includeDirectories.Count -gt 0) {
+    # A scoped run builds only the projects it will run; each test project builds its own dependency
+    # chain, so nothing the suite needs is missing.
+    foreach ($directory in $includeDirectories) {
+        $scopedProject = Get-ChildItem -LiteralPath $directory -Filter *.csproj -File | Select-Object -First 1
+        Invoke-DotNet build $scopedProject.FullName --configuration $Configuration --no-restore
+    }
+}
+else {
+    Invoke-DotNet build $solution --configuration $Configuration --no-restore
+}
 
 # Test projects are discovered, not listed: a new project is in the suite the moment it is a test
 # project. TUnit and xUnit.net v3 are Microsoft Testing Platform executables and run explicitly below;
@@ -72,7 +92,68 @@ if ($missingProjects.Count -gt 0) {
 
 $vstestProjects += (Join-Path $repository "samples/ProtoTest.Demo/ProtoTest.Demo.csproj")
 
-foreach ($project in $vstestProjects) {
+# A scoped run passes the project directories a stage can reach; the discovery guard above still
+# checked every expected project before this filter runs.
+if ($includeDirectories.Count -gt 0) {
+    $isIncluded = { param($project) $includeDirectories -contains (Split-Path -Parent $project) }
+    $vstestProjects = @($vstestProjects | Where-Object { & $isIncluded $_ })
+    $mtpProjects = @($mtpProjects | Where-Object { & $isIncluded $_.Project })
+}
+
+# The per-project `dotnet test` host startup, not the tests, is most of this stage's wall clock, so the
+# suites that own nothing shared run in a small pool while the container/browser/process suites run one
+# at a time in front of it. The pool is an allow list: a new project is serial unless it is named here,
+# and a name must own no container, browser, port or background process.
+$parallelProjectNames = @(
+    "ProtoTest.Analyzers.Tests",
+    "ProtoTest.AspNetCore.Tests",
+    "ProtoTest.Core.Tests",
+    "ProtoTest.Data.Tests",
+    "ProtoTest.Devices.Tests",
+    "ProtoTest.Devices.WebSocket.AspNetCore.Tests",
+    "ProtoTest.Devices.WebSocket.Tests",
+    "ProtoTest.GraphQL.Tests",
+    "ProtoTest.Grpc.Tests",
+    "ProtoTest.Hosting.Tests",
+    "ProtoTest.Http.Tests",
+    "ProtoTest.Json.Tests",
+    "ProtoTest.Messaging.Tests",
+    "ProtoTest.MSTest.Tests",
+    "ProtoTest.NUnit.Tests",
+    "ProtoTest.OpenApi.Tests",
+    "ProtoTest.Reporting.Tests",
+    "ProtoTest.Rest.Tests",
+    "ProtoTest.SampleApp.Domain.Tests",
+    "ProtoTest.Sheets.Tests",
+    "ProtoTest.Traces.Tests",
+    "ProtoTest.Xunit.Tests"
+)
+
+$projectName = { param($path) Split-Path -Leaf (Split-Path -Parent $path) }
+$parallelProjects = @($vstestProjects | Where-Object { (& $projectName $_) -in $parallelProjectNames })
+$serialProjects = @($vstestProjects | Where-Object { (& $projectName $_) -notin $parallelProjectNames })
+
+$logRoot = Join-Path $repository "artifacts/test-logs"
+New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
+
+$pool = $null
+if ($parallelProjects.Count -gt 0 -and (Get-Command Start-Job -ErrorAction SilentlyContinue)) {
+    $pool = Start-Job -ArgumentList ($parallelProjects -join "`n"), $Configuration -ScriptBlock {
+        param($ProjectList, $Configuration)
+
+        ($ProjectList -split "`n") | ForEach-Object -Parallel {
+            $project = $_
+            $output = & dotnet test $project --configuration $using:Configuration --no-build --no-restore --verbosity minimal 2>&1
+            [pscustomobject]@{
+                Project  = $project
+                ExitCode = $LASTEXITCODE
+                Output   = ($output | Out-String)
+            }
+        } -ThrottleLimit 4
+    }
+}
+
+foreach ($project in $serialProjects) {
     # A discovered project that runs zero tests means the predicate matched a project the runner cannot
     # execute; the exit code alone would not say so.
     $output = & dotnet test $project --configuration $Configuration --no-build --no-restore --verbosity minimal 2>&1
@@ -84,6 +165,27 @@ foreach ($project in $vstestProjects) {
     $text = $output -join [Environment]::NewLine
     if ($text -match 'No test is available in' -or $text -match 'No test matches the given testcase filter') {
         throw "The discovered test project '$project' ran zero tests; fix the discovery predicate or the project."
+    }
+}
+
+if ($null -ne $pool) {
+    $pooled = Receive-Job -Wait -Job $pool
+    Remove-Job -Job $pool
+    foreach ($result in $pooled) {
+        $name = Split-Path -Leaf (Split-Path -Parent $result.Project)
+        $log = Join-Path $logRoot "$name.log"
+        Set-Content -LiteralPath $log -Value $result.Output -Encoding utf8
+        $text = [string]$result.Output
+        if ($result.ExitCode -ne 0) {
+            Write-Host $text
+            throw "dotnet test $($result.Project) failed with exit code $($result.ExitCode). Log: $log"
+        }
+
+        if ($text -match 'No test is available in' -or $text -match 'No test matches the given testcase filter') {
+            throw "The discovered test project '$($result.Project)' ran zero tests; fix the discovery predicate or the project."
+        }
+
+        Write-Host "dotnet test $name passed (full output: $log)."
     }
 }
 

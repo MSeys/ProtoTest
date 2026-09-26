@@ -12,41 +12,30 @@ The order below is the order work happens in. It is effort-ordered, not date-ord
 
 ## Next — committed, in this order
 
-### 1.1 — polish and trust
+### 1.1 — the platform release
 
-The current line, in preparation. Most of the evaluator work is already live: the [comparison page](./compare.md), the [FAQ](./faq.md) and [support and sustainability](./project/sustainability.md) are published. Still to come in this line:
+The current line is in progress. Everything below is committed to 1.1, in this order; the order is the order work happens in, each milestone leaves the gates green before the next starts, and nothing here is dated.
 
-- **Published overhead numbers** versus raw `WebApplicationFactory` on the [benchmarks page](./benchmarks.md), including where ProtoTest is slower.
-- **Versioned documentation** at the 1.1 release, so 1.0 links keep working.
-- **Trace tooling** already in review: the `prototest` CLI's `trace summary`, the documented [format compatibility policy](./observability/prototrace.md#format-compatibility), and a pack-time compatibility gate that fails an unintentional API break.
-- **Polish that the suite asked for**: path-based single-value reads from JSON responses, a test clock over `TimeProvider` for time-dependent rules, run metadata for cross-run correlation in CI, failure-mode tests for startup and mid-run container death, and the narrow [`ProtoTest.Analyzers`](./project/analyzers.md) warnings for the intent-dependent mistakes the framework cannot catch at runtime.
+- **Shape and truth:** the package review — a package exists only when a consumer can reference it directly or it isolates a dependency — and the one tiny package retired into the docs.
+- **Devices on a real product:** the reference demo's OCPP gateway and charge-point simulator, and the WebSocket device backend proven on it.
+- **Product surface:** the demo's dashboard, browser journeys, and the monthly export through Sheets.
+- **More layers testable:** per-test service substitution and fault injection, expected/exhaustive shape assertions, traffic coverage (fields that arrived as *observed but unasserted*), `Should` vocabulary parity, a built-in test user, WireMock and Aspire integrations, and template `--runner` variants.
+- **Topology under test:** container topology, deployed mode, fault injection, and a nightly reference run.
+- **A second device protocol:** MQTT, after OCPP proves the transport model.
+- **Agent and sharing layer:** the `ProtoTest.Mcp` tool over traces and reports, a GitHub Action that posts the failure digest and trace link, the static trace index, and the docs and skills page.
+- **Showcase:** the seeded benchmark republished on the reference demo, the trace showpiece, and the Northstar demo retired once the nightly run covers its journeys.
+- **Docs, then history:** the documentation rewrite — a five-minute path plus an extended path per topic, with interactive pieces — the history restructure, then the 1.1 tag.
 
-### 1.2 — hosting, and the reference demo
+The reference demo is the proof: an independent open-source EV-charging platform (CSMS) in its own repository — REST API, PostgreSQL, a billing worker with retry and dead-letter semantics, browser journeys, device protocols and containers — running suites this framework did not write for itself.
 
-- **Background-worker hosting** - running a generic host or hosted service under the suite with the same lifecycle and trace as the API.
-- **Readiness waiting** - `AwaitReady`-style health checks instead of sleeps in setup.
-- **Per-test service substitution and fault injection** - the deliberate gap named on the [comparison page](./compare.md#alba).
-- **The reference demo, milestone 1**: an independent open-source EV-charging platform (CSMS) in its own repository - REST API, Postgres, a billing worker with retry and dead-letter semantics, and the first end-to-end journey. It exists to prove the framework on requirements that were not written for it.
-
-### 1.x — the platform line
-
-- **An OCPP gateway and a WebSocket device backend** - the demo's charge-point simulator is the demand proof for device testing.
-- **Dashboard and browser journeys** on the demo, including the monthly export through Sheets.
-- **WireMock integration** for external-dependency fakes, and **an Aspire adapter** for closed-box container-topology runs - both validated by the demo's later milestones.
-- **The demo's benchmarks**: a seeded 1,000-journey run that republishes the overhead numbers on a real product.
-
-Each of these is in the internal plan with acceptance criteria; when one ships, it leaves this section and becomes a docs page like everything else.
+Each item is in the internal plan with acceptance criteria; when one ships, it leaves this section and becomes a docs page like everything else.
 
 ## Exploring — genuinely considered, not committed
 
-- **MCP server and coding-agent workflow.** The reader half exists: `ProtoTest.Traces` and the `prototest` CLI. A local MCP server over traces and reports is the natural next step; it will get a docs page only when it is real.
 - **MassTransit bridge** - wrapping `ITestHarness` in the existing messaging client surface, the way other integrations wrap their libraries.
 - **Wolverine.Tracking bridge** - the same shape, only if users ask for it.
-- **Traffic coverage** - marking fields that arrived in a response as *observed but unasserted*, in a separate report section. Never counted as covered; the assertion-level rule stays.
-- **Exhaustive assertion mode** - flagging fields present in a response that no shape mentioned. One implementation, shared with expected-shape-in-the-call.
 - **Allure and ReportPortal sinks** - built on the existing sink contract; community-friendly once the integration template exists.
-- **A static trace index** for sharing a folder of traces without a server.
-- **An MQTT device backend** - after the WebSocket backend has a real protocol and the first device suite exists.
+- **Further device transports** (TCP, serial, Sigfox) and MQTT variants - after the first OCPP suite and the MQTT backend have real users.
 
 ## Not planned — with reasons
 

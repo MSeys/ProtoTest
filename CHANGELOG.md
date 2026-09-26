@@ -449,6 +449,9 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ### Removed
 
+- `ProtoTest.OpenTelemetry` was retired: the `ProtoTest` `ActivitySource` always exists, so subscribing
+  is one `AddSource("ProtoTest")` call as the observability page shows; a 12-line bridge did not earn a
+  package of its own.
 - `IProtoReadinessProbe` and `ProtoReadinessResult.LastError` were removed: probes are registered as
   delegates with `AddReadinessProbe`/`AddHttpReadiness`, the wait result carries attempts and waited
   time only, and the timeout message still carries the last error. Both were unreleased 1.1 plumbing.

@@ -69,7 +69,6 @@ dotnet add package ProtoTest.Testcontainers # base class for run-scoped containe
 
 ```bash
 dotnet add package ProtoTest.Reporting      # JSON and HTML reports
-dotnet add package ProtoTest.OpenTelemetry  # export operations to OpenTelemetry
 ```
 
 ## What comes along

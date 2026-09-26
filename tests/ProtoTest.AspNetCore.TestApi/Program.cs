@@ -69,7 +69,15 @@ public sealed class Program
                     if (result.MessageType == System.Net.WebSockets.WebSocketMessageType.Text)
                     {
                         var text = System.Text.Encoding.UTF8.GetString(payload);
-                        var response = text == "BOOT" ? "BOOT_ACK" : $"{text}_ACK";
+                        var response = text switch
+                        {
+                            "BOOT" => "BOOT_ACK",
+                            // Serves the application's TimeProvider, so a suite can prove which clock
+                            // the request flow sees while it is holding the socket.
+                            "NOW" => context.RequestServices.GetRequiredService<TimeProvider>()
+                                .GetUtcNow().ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+                            _ => $"{text}_ACK"
+                        };
                         await socket.SendAsync(
                             System.Text.Encoding.UTF8.GetBytes(response),
                             System.Net.WebSockets.WebSocketMessageType.Text,

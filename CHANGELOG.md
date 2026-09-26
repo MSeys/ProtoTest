@@ -176,6 +176,14 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ### Fixed
 
+- The in-process HTTP client is owned by its test alone: ProtoTest builds it over the `TestServer`'s
+  handler instead of `WebApplicationFactory.CreateDefaultClient`, so the parallel tests of a run no
+  longer mutate the shared per-run factory's client ledger. A torn ledger entry crashed run teardown
+  with a `NullReferenceException` from `WebApplicationFactory.DisposeAsync`.
+- An in-process device connect carries the test id on the WebSocket handshake, the same way the
+  in-process HTTP client does: the application under test resolves the connecting test's clock instead
+  of falling back to the run clock, so `Proto.Context.Clock.Advance` reaches session timestamps the
+  application stamps from its `TimeProvider`. A handshake with no test on its flow keeps the run clock.
 - A canceled device connect no longer poisons the session: the cancellation reaches its caller and the
   canceled attempt is cleared, so the next send starts a fresh connect.
 - A device client name reused under a second application fails naming the client and both applications,

@@ -158,6 +158,8 @@ foreach ($project in $serialProjects) {
     # execute; the exit code alone would not say so.
     $output = & dotnet test $project --configuration $Configuration --no-build --no-restore --verbosity minimal 2>&1
     $output | ForEach-Object { Write-Host $_ }
+    # Keep every project's output, serial ones included: a flake must be diagnosable after the run.
+    Set-Content -LiteralPath (Join-Path $logRoot "$(Split-Path -Leaf (Split-Path -Parent $project)).log") -Value ($output | Out-String) -Encoding utf8
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet test $project failed with exit code $LASTEXITCODE."
     }

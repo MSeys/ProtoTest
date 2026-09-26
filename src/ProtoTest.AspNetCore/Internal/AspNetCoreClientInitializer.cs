@@ -69,7 +69,10 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
         var handlers = CreateClientHandlers(clientOptions)
             .Append(new ProtoTraceContextHandler())
             .ToArray();
-        var client = server.Factory.CreateDefaultClient(clientOptions.BaseAddress, handlers);
+        // The client is built over the server's transport handler and owned by the test context alone.
+        // The factory's own client ledger is shared by every test of a per-run server and is not safe
+        // to mutate in parallel; factory disposal enumerates it, so a torn entry crashes teardown.
+        var client = CreateClient(server.Server.CreateHandler(), clientOptions.BaseAddress, handlers);
         context.RegisterClient(client, Name);
         var serverState = new AspNetCoreServerState(
             Name,
@@ -125,7 +128,7 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
         var handlers = CreateClientHandlers(clientOptions)
             .Append(new ProtoTraceContextHandler())
             .ToArray();
-        context.RegisterClient(CreateSocketClient(baseAddress, handlers), Name);
+        context.RegisterClient(CreateClient(new HttpClientHandler(), baseAddress, handlers), Name);
         context.Trace.WriteEvent(
             "aspnetcore.server.skipped",
             $"ASP.NET Core server · {Name} runs at {baseAddress}",
@@ -141,11 +144,15 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
             });
     }
 
-    // The socket path mirrors what WebApplicationFactory does for the in-process path: the framework's
-    // redirect and cookie behavior, then the context propagator, over the real transport.
-    private static HttpClient CreateSocketClient(Uri baseAddress, IReadOnlyList<DelegatingHandler> handlers)
+    // The in-process and the socket path chain ProtoTest's handlers over a transport handler the same
+    // way: the framework's redirect and cookie behavior, then the context propagator, innermost. The
+    // transport handler comes from the TestServer or from a real socket.
+    private static HttpClient CreateClient(
+        HttpMessageHandler transport,
+        Uri baseAddress,
+        IReadOnlyList<DelegatingHandler> handlers)
     {
-        HttpMessageHandler handler = new HttpClientHandler();
+        HttpMessageHandler handler = transport;
         for (var index = handlers.Count - 1; index >= 0; index--)
         {
             handlers[index].InnerHandler = handler;
@@ -273,6 +280,9 @@ internal sealed class AspNetCoreServer<TProgram> : IAsyncDisposable where TProgr
     }
 
     public WebApplicationFactory<TProgram> Factory { get; }
+
+    /// <summary>The started test server the client transports run over.</summary>
+    public TestServer Server => Factory.Server;
 
     public static AspNetCoreServer<TProgram> Start(Action<IWebHostBuilder>? configureWebHost)
     {

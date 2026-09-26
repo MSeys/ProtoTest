@@ -248,6 +248,10 @@ last error.
   demo's console journeys skip in a worktree and a green worktree gate does not cover them; run those
   tests in the main checkout (or build the console there) before trusting a gate on setup or attribute
   changes.
+- **The gate fixtures execute the repository's own MTP binaries.** Run the `scripts` gate after the
+  suite, never beside it: two concurrent runs of the same MTP project race its obj caches and produce
+  an intermittent failure (one gate run failed this way on 2026-09-26). `eng/verify.ps1` keeps the two
+  sequential for this reason, and `eng/test.ps1` logs every project to `artifacts/test-logs/`.
 - The MTP runs carry per-project run-test minimums in `eng/test.ps1`: TUnit 14 (its
   `--minimum-expected-tests` counts tests that actually ran, so the deliberate adapter skips are
   excluded from the 15 discovered) and xUnit.net v3 17 (the JUnit total it writes includes the skip).
@@ -260,6 +264,11 @@ last error.
   `ParallelScope.All` safe. The default id generator's random six-digit run prefix also keeps reruns
   against a persistent database collision-free. A shared fixture or a fixed identifier reintroduces the
   repeatability bug (REF-1).
+- **A per-run in-process server is one `WebApplicationFactory` the whole run shares, and the client
+  ledger the framework keeps for clients it creates is not thread-safe.** ProtoTest builds its
+  in-process HTTP client over the `TestServer`'s handler so the test context is its only owner; a
+  suite that calls `CreateClient`/`CreateDefaultClient` on `ServerFactory<T>()` from parallel tests
+  re-opens that ledger, and its teardown enumeration crashes the run.
 - **A test's setup runs inside the per-test transaction.** `ProtoTest.Sql` opens the connection and
   begins the transaction before hooks and attributes run, so DDL in a test hook or body is rolled back
   with the test (the postgres-ef trial: a table created in one test is gone in the next). Run-owned

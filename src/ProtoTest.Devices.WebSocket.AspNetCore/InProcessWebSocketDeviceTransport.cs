@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Net.WebSockets;
 using Microsoft.AspNetCore.TestHost;
 using ProtoTest.AspNetCore;
+using ProtoTest.AspNetCore.Internal;
 using ProtoTest.Core;
 using ProtoTest.Devices;
 using ProtoTest.Devices.WebSocket;
@@ -74,7 +75,12 @@ public sealed class InProcessWebSocketDeviceTransport<TProgram>(
         WebSocket socket;
         try
         {
-            socket = await factory.Server.CreateWebSocketClient()
+            var client = factory.Server.CreateWebSocketClient();
+            // The handshake is an HTTP request the application handles without this flow's test
+            // context, so it carries the same identity the in-process HTTP client sends; the
+            // application's clock filter then pushes this test's clock while it serves the socket.
+            client.ConfigureRequest = ProtoTraceContextHandler.ApplyTo;
+            socket = await client
                 .ConnectAsync(uri, attempt.Token)
                 .ConfigureAwait(false);
         }

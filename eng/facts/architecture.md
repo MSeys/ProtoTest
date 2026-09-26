@@ -120,7 +120,7 @@ provider, stops listening, unregisters. Start/stop/dispose racing is rejected, n
 
 | Thing | Owner | Scope | Released by |
 | --- | --- | --- | --- |
-| Clients registered on the context | `ProtoExecutionContext` | test | context disposal (`ProtoClientOwnership.Caller` opts out, then the caller owns it) |
+| Clients registered on the context | `ProtoExecutionContext` | test | context disposal (`ProtoClientOwnership.Caller` opts out, then the caller owns it); an in-process HTTP client is built over the server's `TestServer` handler, never through the shared factory's client ledger |
 | Test resources (`RegisterResource`) | `ProtoExecutionContext` | test | context disposal, reverse registration order |
 | Clients/resources registered via `AddResource` | `ProtoHost` | run | run resource hook after gates and sinks |
 | Infrastructure (`AddInfrastructure`) | `ProtoHost` | run | same; skipped pieces are never owned |
@@ -219,6 +219,9 @@ setting outside a client (a blank published value is ignored).
   1.1 plumbing; the endpoint parameter was dropped rather than ignored.
 - Options: the in-process transport resolves the registered `WebSocketDeviceOptions` from DI (validated
   with the transport, like the socket path) and applies `ConnectTimeout` to the in-process connect.
+- Clock: the handshake goes through the same context propagator as the in-process HTTP client, so it
+  carries the test id and the application's clock filter pushes the connecting test's clock while it
+  serves the socket. A handshake with no test on its flow carries no id and keeps the run-clock fallback.
 - Concurrency contract on `ProtoDevice`: connection creation is single-flight, sends are serialized,
   one receive is in flight at a time (a second fails fast naming the device), a send that races a
   disconnect fails with a device error naming the device, and send/receive may run concurrently.

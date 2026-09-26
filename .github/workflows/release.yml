@@ -48,7 +48,7 @@ jobs:
 
       - name: NuGet login (OIDC to temporary key)
         id: login
-        # Publishing is tag-gated (audit A5-07): a dry run needs no key, and a real publish only
+        # Publishing is tag-gated: a dry run needs no key, and a real publish only
         # happens from the v* tag the release was cut for.
         if: github.ref_type == 'tag' && inputs.dry_run != true
         uses: NuGet/login@v1

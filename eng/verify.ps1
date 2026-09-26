@@ -11,7 +11,7 @@ param(
     [switch]$Full,
 
     # A code stage that skipped its code gates may only record green when the caller says so
-    # explicitly; the record then names the approval and the skipped gates (audit A5-05).
+    # explicitly; the record then names the approval and the skipped gates.
     [switch]$AllowSkippedCodeGates
 )
 
@@ -292,10 +292,8 @@ else {
     Invoke-Gate -Name "docs" -Script "eng/check-docs.ps1"
 }
 
-# The gate fixtures run the real gate scripts in throwaway repositories with stubbed gates, so they run
-# in a child process while the suite runs.
-$scriptsPending = if ($runScripts -and $runTests) { Start-GateJob -Name "scripts" -Script "eng/test-gates.ps1" } else { $null }
-
+# The gate fixtures run the real gate scripts in throwaway repositories with stubbed gates; they
+# execute the repository's own MTP binaries, so they run after the suite, not next to it.
 if (-not $runTests) {
     $reason = if ($SkipTests) { "requested" } else { $codeSkipReason }
     $skipped.Add([pscustomobject]@{ name = "test"; reason = $reason })
@@ -307,12 +305,9 @@ else {
 
 # The gate scripts are themselves under test; a stage that touches them (or -Full) proves them.
 if ($runScripts) {
-    if ($null -ne $scriptsPending) {
-        Complete-GateJob -Pending $scriptsPending
-    }
-    else {
-        Invoke-Gate -Name "scripts" -Script "eng/test-gates.ps1"
-    }
+    # The fixtures execute the real MTP test binaries in this repository, so running them next to the
+    # suite races the same projects; this gate stays sequential.
+    Invoke-Gate -Name "scripts" -Script "eng/test-gates.ps1"
 }
 
 if ($Pack) {

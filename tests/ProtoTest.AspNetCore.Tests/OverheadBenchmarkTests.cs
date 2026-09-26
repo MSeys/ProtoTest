@@ -11,7 +11,7 @@ using ProtoTest.Core;
 using ProtoTest.Rest;
 
 /// <summary>
-/// Plan 4 W6 / feature-plan A7: the published overhead comparison. The headline is a short but real test -
+/// The published overhead comparison. The headline is a short but real test -
 /// POST an order, read it back, assert both responses - written once with ProtoTest (start, REST calls,
 /// complete, with the trace written at the end of the run) and once with the raw WebApplicationFactory and
 /// System.Net.Http.Json. A micro comparison (single request, lifecycle without a request, tracing on and

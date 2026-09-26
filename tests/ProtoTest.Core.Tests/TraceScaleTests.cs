@@ -3,7 +3,7 @@ namespace ProtoTest.Core.Tests;
 using System.Diagnostics;
 
 /// <summary>
-/// Stage 6 (Audit 3, finding G1): the scale measurement harness. It runs synthetic tests through the
+/// The scale measurement harness. It runs synthetic tests through the
 /// real lifecycle and records trace size, run time, stop/export time and allocation growth, with
 /// generous sanity bounds so a regression that makes the trace explode fails the suite. The measured
 /// numbers feed the benchmarks page.

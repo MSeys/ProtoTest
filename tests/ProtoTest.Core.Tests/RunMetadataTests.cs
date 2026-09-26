@@ -5,7 +5,7 @@ using System.Text.Json;
 using ProtoTest.TestSupport;
 
 /// <summary>
-/// A5.15 (Audit 5, A5-83 / feature-plan A4): the CI run metadata a suite records on the run wire and in
+/// The CI run metadata a suite records on the run wire and in
 /// the report, and the unchanged run when none is configured.
 /// </summary>
 [TestFixture]
@@ -14,7 +14,7 @@ public sealed class RunMetadataTests
     [Test]
     public async Task RunMetadata_ShouldRecordExplicitValuesOnTheRunWireAndInTheReport()
     {
-        // A5.15: an explicit option is the direct way to say which run produced a trace.
+        // An explicit option is the direct way to say which run produced a trace.
         using var trace = new TemporaryTrace("run-metadata-explicit");
         var sink = new CapturingSink();
         var builder = new ProtoHostBuilder();
@@ -60,7 +60,7 @@ public sealed class RunMetadataTests
     [Test]
     public async Task RunMetadata_ShouldLiftNamedEnvironmentVariables()
     {
-        // A5.15: the CI facts usually already exist as environment variables, so the suite names them
+        // The CI facts usually already exist as environment variables, so the suite names them
         // instead of copying their values. The variable name is unique to this test, and no other test
         // reads it, so setting it process-wide stays parallel-safe.
         const string name = "PROTOTEST_A515_RUN_ID";
@@ -104,7 +104,7 @@ public sealed class RunMetadataTests
     [Test]
     public async Task RunMetadata_ShouldIgnoreANamedVariableThatIsNotSet()
     {
-        // A5.15: optional in every environment - a named variable a local machine does not set leaves
+        // Optional in every environment - a named variable a local machine does not set leaves
         // both the wire and the report exactly as they were.
         const string name = "PROTOTEST_A515_NOT_SET";
         Environment.SetEnvironmentVariable(name, null);
@@ -136,7 +136,7 @@ public sealed class RunMetadataTests
     [Test]
     public async Task RunMetadata_ExplicitValueShouldWinOverTheLiftedVariable()
     {
-        // A5.15: the same name may arrive twice - once from the environment, once from the suite - and
+        // The same name may arrive twice - once from the environment, once from the suite - and
         // the explicit value is the more specific fact.
         const string name = "PROTOTEST_A515_RUN_ID_PRECEDENCE";
         Environment.SetEnvironmentVariable(name, "from-environment");

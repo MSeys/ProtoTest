@@ -95,6 +95,57 @@ public sealed class DeviceTests
     }
 
     [Test]
+    public void AddClient_WhenTwoApplicationsReuseAClientName_ShouldNameBothApplications()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddApplication("Api", app => app.AddDevices(devices => devices
+            .AddClient("Chargers", "InProcessWebSocket", path: "/ws/{deviceId}")));
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            builder.AddApplication("Second", app => app.AddDevices(devices => devices
+                .AddClient("Chargers", "InProcessWebSocket", path: "/ws/{deviceId}"))));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.Message, Does.Contain("Chargers"), "the failure names the client");
+            Assert.That(exception.Message, Does.Contain("'Api'"), "the failure names the application that owns the name");
+            Assert.That(exception.Message, Does.Contain("'Second'"), "the failure names the application that cannot reuse it");
+        }
+    }
+
+    [Test]
+    public async Task Connect_WhenTheFirstConnectIsCanceled_ShouldStartAFreshAttempt()
+    {
+        var transport = new CancelOnceTransport();
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddDevices(devices => devices
+            .AddClient("Chargers", transport, resolveAddress: ProtoDeviceAddress.Template("memory://cp-001"))
+                .AddDevice<FakeCharger>());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("canceled connect", "00001", TestMethods.Placeholder);
+
+        var charger = Proto.Context.Devices("Chargers").For<FakeCharger>("CP-001");
+
+        var canceled = Assert.CatchAsync<OperationCanceledException>(
+            async () => await charger.BootAsync(),
+            "the canceled connect surfaces to its caller");
+        var ack = await charger.BootAsync();
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(canceled, Is.Not.Null, "the cancellation is reported once, not swallowed");
+            Assert.That(ack, Is.EqualTo("BOOT_ACK"), "the next send connects fresh instead of reusing the canceled task");
+            Assert.That(transport.Attempts, Is.EqualTo(2), "exactly one new attempt after the canceled one");
+        }
+    }
+
+    [Test]
     public async Task Client_WhenNoInProcessTransportServesItsApplication_ShouldNameTheApplication()
     {
         var builder = new ProtoHostBuilder();
@@ -323,6 +374,29 @@ public sealed class DeviceTests
         await host.StopAsync();
 
         Assert.That(exception!.Message, Does.Contain("No device client is registered"));
+    }
+
+    private sealed class CancelOnceTransport : IProtoDeviceTransport
+    {
+        private readonly InMemoryTransport _connection = new(_ =>
+            new InMemoryConnection(new FakeProtocol(), responds: true, _ => { }));
+        private int _attempts;
+
+        public string Name => "CancelOnce";
+
+        public int Attempts => _attempts;
+
+        public ValueTask<IProtoDeviceConnection> ConnectAsync(
+            DeviceEndpoint endpoint,
+            CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref _attempts) == 1)
+            {
+                throw new OperationCanceledException("the transport canceled its first connect");
+            }
+
+            return _connection.ConnectAsync(endpoint, cancellationToken);
+        }
     }
 
     private sealed class FakeCharger : ProtoDevice

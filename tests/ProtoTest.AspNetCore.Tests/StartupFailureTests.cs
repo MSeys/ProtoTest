@@ -9,7 +9,7 @@ using ProtoTest.Rest;
 using SampleApi = ProtoTest.AspNetCore.SampleApi;
 
 /// <summary>
-/// The failure mode the brief asked about (feature-plan A3): an ASP.NET Core application whose
+/// An ASP.NET Core application whose
 /// startup throws. The application's own exception must reach the test, the failed start must not
 /// leave a half-started server behind, and the run must stay usable afterwards.
 /// </summary>

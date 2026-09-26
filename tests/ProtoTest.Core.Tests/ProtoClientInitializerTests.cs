@@ -123,7 +123,7 @@ public class ProtoClientInitializerTests
     [Test]
     public async Task UnscopedInitializer_ShouldReuseOnlyTheRegistrationMadeForTheChainName()
     {
-        // Audit 5 A5-24: the fallback memo is keyed by (provider, chain name). Two protocol chains
+        // The fallback memo is keyed by (provider, chain name). Two protocol chains
         // whose names differ only in case share the provider's one invocation, and each chain's lookup
         // resolves the client registered under that name.
         var fallbackCalls = 0;
@@ -148,12 +148,12 @@ public class ProtoClientInitializerTests
 
         try
         {
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(fallbackCalls, Is.EqualTo(1), "one invocation serves every chain that names the provider");
                 Assert.That(Proto.Context.Client<TestClient>("api"), Is.Not.Null);
                 Assert.That(Proto.Context.Client<TestClient>("API"), Is.Not.Null);
-            });
+            }
         }
         finally
         {

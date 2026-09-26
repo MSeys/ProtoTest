@@ -5,7 +5,7 @@ using ProtoTest.Core;
 using ProtoTest.Testcontainers;
 
 /// <summary>
-/// Audit 5 A5.7d carries W4-04: a piece registered with the configuration key it fills is skipped by
+/// A piece registered with the configuration key it fills is skipped by
 /// the host when the environment already configures that key, so the run points at the provided
 /// environment instead of starting a local instance. The loopback test's create delegate and the
 /// container test's <see cref="ProtoContainerResource{TContainer}.IsStarted"/> both fail the test if

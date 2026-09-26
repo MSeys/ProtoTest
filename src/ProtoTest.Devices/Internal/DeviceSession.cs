@@ -100,7 +100,7 @@ internal sealed class DeviceSession : IAsyncDisposable
             catch (Exception exception) when (IsDisconnected(connection))
             {
                 // A disconnect won the race: report a device error naming the device instead of the
-                // transport's disposed-socket exception (audit DEV-3).
+                // transport's disposed-socket exception.
                 throw new InvalidOperationException(
                     $"The device '{_endpoint.DeviceId}' was disconnected while sending '{frame}'; connect again before sending.",
                     exception);
@@ -119,7 +119,7 @@ internal sealed class DeviceSession : IAsyncDisposable
         if (!_receiveGate.Wait(0))
         {
             // A second reader would steal frames from the first; the device conversation is
-            // single-reader, so overlapping receives fail fast instead of racing (audit DEV-3).
+            // single-reader, so overlapping receives fail fast instead of racing.
             throw new InvalidOperationException(
                 $"The device '{_endpoint.DeviceId}' already has a receive in flight; a device reads one frame at a time.");
         }
@@ -208,7 +208,7 @@ internal sealed class DeviceSession : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         // The release path is a disconnect: the entity must not stay "connected" after the test, and
-        // the trace must show the disconnect like an explicit one (audit DEV-5).
+        // the trace must show the disconnect like an explicit one.
         await DisconnectCoreAsync().ConfigureAwait(false);
     }
 
@@ -224,9 +224,11 @@ internal sealed class DeviceSession : IAsyncDisposable
         {
             return await task.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception) when (task.IsFaulted)
+        catch (Exception) when (task.IsCompleted && !task.IsCompletedSuccessfully)
         {
-            // A failed connect does not poison the session: the next use starts a fresh attempt.
+            // A faulted or canceled connect does not poison the session: the next use starts a fresh
+            // attempt. A caller that stops waiting rather than the connect failing leaves the shared
+            // task in flight, and it stays cached for the next caller.
             lock (_connectionGate)
             {
                 if (ReferenceEquals(_connectionTask, task))
@@ -301,7 +303,7 @@ internal sealed class DeviceSession : IAsyncDisposable
         catch (TimeoutException)
         {
             // Release must terminate: a transport that never completes its connect is recorded and
-            // left behind instead of hanging the test's teardown (audit A5-62).
+            // left behind instead of hanging the test's teardown.
             _context.Trace.WriteEvent(
                 "device.disconnect.abandoned",
                 $"Device · {_endpoint.DeviceId} · disconnect abandoned after {ConnectReleaseBound.TotalSeconds:0.#}s",

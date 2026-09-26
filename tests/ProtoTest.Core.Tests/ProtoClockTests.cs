@@ -32,7 +32,7 @@ public sealed class ProtoClockTests
     [Category("Characterization")]
     public async Task ProtoRequestClock_Push_ShouldBeCapturedByADetachedTaskNotRevoked()
     {
-        // Documented limit (audit CFG-4): a push is restored on scope disposal, not revoked. A task
+        // Documented limit: a push is restored on scope disposal, not revoked. A task
         // started inside the scope captured the pushed clock in its own execution context, so it keeps
         // the finished test's clock; long-lived background work must read the run clock instead.
         var seed = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);

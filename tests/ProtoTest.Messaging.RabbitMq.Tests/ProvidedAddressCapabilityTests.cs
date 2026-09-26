@@ -5,7 +5,7 @@ using ProtoTest.Core;
 using ProtoTest.Messaging;
 
 /// <summary>
-/// Pins the Broker capability's address rule (audit ADDR-1): <c>UseRabbitMq</c> declares it only while
+/// Pins the Broker capability's address rule: <c>UseRabbitMq</c> declares it only while
 /// the connection-string key can be provided - configured, or declared by a registered broker
 /// container - so a run with neither skips instead of failing at setup or first publish.
 /// </summary>

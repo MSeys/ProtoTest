@@ -57,7 +57,7 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
         // An unscoped provider serves every chain that names it, so it runs once per test and the
         // chains after the first reuse the client it registered. The memo is keyed by the provider
         // *and the chain's own name*, so a reused entry can only ever be the registration made for
-        // that name - a differently named chain can never be served another chain's client (A5-24).
+        // that name - a differently named chain can never be served another chain's client.
         var fallbacks = new Dictionary<(IProtoClientInitializer Initializer, string Name), InitializedClient?>(
             FallbackKeyComparer.Instance);
         foreach (var chain in chains)

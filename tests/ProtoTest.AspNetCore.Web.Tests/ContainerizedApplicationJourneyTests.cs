@@ -8,7 +8,7 @@ using ProtoTest.Web;
 using ProtoTest.Web.Playwright;
 
 /// <summary>
-/// Audit 5 A5.7d: the application under test runs in its own container image, started as run
+/// The application under test runs in its own container image, started as run
 /// infrastructure; the mapped address it serves on is published as the application's <c>BaseUrl</c>,
 /// so the REST client, the browser session and the readiness probe all resolve that one container. A
 /// machine without a container runtime skips with the reason instead of failing; a machine without a
@@ -69,7 +69,7 @@ public sealed class ContainerizedApplicationJourneyTests
 }
 
 /// <summary>
-/// A5.7d: because the application is served from its container rather than the test host, the suite
+/// Because the application is served from its container rather than the test host, the suite
 /// advertises no in-process server, and a <c>[RequiresInProcess]</c> test skips with its reason before
 /// its body runs. The body throws, so a regression that starts advertising in-process services fails
 /// the run instead of passing quietly.

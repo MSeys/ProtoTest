@@ -7,7 +7,7 @@ using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 
 /// <summary>
-/// Pins the SQL integration's address rule (audit ADDR-1): with <see cref="SqlOptions.AddressKeys"/>
+/// Pins the SQL integration's address rule: with <see cref="SqlOptions.AddressKeys"/>
 /// declared and none provided, the Store capability is absent, setup opens nothing, and the accessors
 /// name the missing keys and the capability gate. Without declared keys the behavior is unchanged.
 /// </summary>

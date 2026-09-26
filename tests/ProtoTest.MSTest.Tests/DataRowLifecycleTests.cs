@@ -5,7 +5,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using ProtoTest.Core;
 
 /// <summary>
-/// Stage 0 characterization for MSTest data rows (Audit 3, finding E2). MSTest invokes the test method
+/// Characterization for MSTest data rows. MSTest invokes the test method
 /// attribute once per data row, so every row gets its own ProtoTest lifecycle under the same method-level
 /// name — the multi-row aggregation in <c>ToProtoTestResult</c> is unreachable. This test replaces the
 /// dead multi-row unit tests that used a fake single-result method.

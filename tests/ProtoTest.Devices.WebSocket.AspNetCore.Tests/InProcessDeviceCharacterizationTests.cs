@@ -7,7 +7,7 @@ using ProtoTest.Devices.WebSocket;
 using SampleApi = ProtoTest.AspNetCore.SampleApi;
 
 /// <summary>
-/// Pins the in-process WebSocket device transport after the audit fixes it (audit DEV-1/DEV-2): the
+/// Pins the in-process WebSocket device transport: the
 /// registration is keyed by (program, application) so a second application keeps its transport,
 /// <c>CanConnect</c> answers for the client's application instead of ignoring it, and the registered
 /// <see cref="WebSocketDeviceOptions"/> are resolved and validated instead of being dead.
@@ -125,7 +125,7 @@ public sealed class InProcessDeviceCharacterizationTests
     [Test]
     public async Task Connect_FromAFlowWithoutAmbientContext_ShouldReachTheRegisteredApplication()
     {
-        // Audit 5 A5-63 (D-11): routing was decided from the session's context; the connect must use
+        // Routing was decided from the session's context; the connect must use
         // that context instead of re-reading the ambient host state of whatever flow runs it.
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);

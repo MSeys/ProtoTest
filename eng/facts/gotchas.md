@@ -1,8 +1,9 @@
 # ProtoTest engineering facts — gotchas
 
-Verified traps, each with the action to take. Items marked **→ AUDIT** are open findings in
-`eng/audit-plan-4.md`; once fixed, replace the entry with the new behavior and keep the history in the
-audit plan.
+Current at branch `version/1.1`, HEAD `7d1a484`.
+
+Verified traps, each with the action to take. The entries describe the code as it stands; the plans and
+audits carry the finding history.
 
 ## Configuration timing
 
@@ -14,7 +15,8 @@ audit plan.
   builder cannot see the overlay before `Build()` - an options factory or hosted service still does -
   and it also does not receive `--contentRoot`/`--applicationName`, so it reads its own appsettings
   from the test process's content root. Build the host from `args` when `Main` itself reads
-  configuration.
+  configuration. The two identity switches are reserved: an overlay key named `contentRoot` or
+  `applicationName` (any casing) produces no argument, so the generated pair is never replaced.
 - **`ProtoWorkerOptions.Set(key, null)` is an empty setting, not a dropped key.** `Set` stores an
   empty value, so the worker sees the key as `""` in `Main` (command line) and at `Build` (in-memory
   overlay) and a suite can deliberately clear a value the run provides. Nulls from the run's own
@@ -23,11 +25,11 @@ audit plan.
   and `WebApplication.CreateBuilder` (both `IHostApplicationBuilder`) and `Host.CreateDefaultBuilder`
   (`IHostBuilder`) get the overlay and the run's clock; any other builder throws naming its type
   instead of silently keeping its own configuration and `TimeProvider`.
-- **Eager configuration reads at registration are still wrong for addresses the run can provide
-  later.** A worker's `Main` now sees the run's static overlay (CFG-1 fixed), but a started piece's
-  published settings are resolved at use time, and a process that also runs standalone reads its own
-  environment. Resolve the address at use time (the P4f consumer rule) - this is what made the
-  reference product's publisher inert. **→ AUDIT CFG-2 / REF-2.**
+- **Eager configuration reads at registration are wrong for addresses the run can provide later.** A
+  worker's `Main` sees the run's static overlay, but a started piece's published settings are resolved
+  at use time, and a process that also runs standalone reads its own environment. Resolve the address
+  at use time (the consumer rule): a product that captures it at registration stays inert in container
+  and configured modes.
 - **Static configuration decides `AddAspNetCoreServer`'s step-aside, not settings.** A settings-published
   address does not step the in-process server aside (decided asymmetry); the address readers still
   follow the published address, so give a published process its own application name when both must
@@ -190,11 +192,14 @@ last error.
   has no matching transport fails naming the application instead of trying another transport.
 - **The in-process path uses the registered `WebSocketDeviceOptions`.** They resolve from DI with the
   transport (so `Validate` runs and a bad value fails when the device is created), and `ConnectTimeout`
-  bounds the in-process connect like the socket path. `ReceiveBufferBytes`/`KeepAliveInterval` feed the
-  same `WebSocketDeviceConnection` the socket path uses.
+  bounds the in-process connect like the socket path. `ReceiveBufferBytes` feeds the shared
+  `WebSocketDeviceConnection` both paths use; `KeepAliveInterval` is a client-socket option applied on
+  the socket path only, so the in-process transport does not use it.
 - **`DeviceSession` has one conversation contract.** Connect is single-flight, sends are serialized,
   one receive may be in flight (a second fails fast naming the device), and a send that races a
   disconnect fails with a device error naming the device instead of a disposed-socket exception.
+  A connect that fails or is canceled is cleared, so the next use starts a fresh attempt; only a caller
+  that stops waiting leaves the shared in-flight connect cached.
   Sends and receives may run concurrently; do not fan out readers over one device.
 - **Device resource and entity ids include the device type**: `device:{client}:{type}:{id}`. Two device
   types with one id on one client coexist, each with its own resource and entity.

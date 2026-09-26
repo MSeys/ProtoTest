@@ -38,7 +38,7 @@ public sealed class InProcessWebSocketDeviceTransport<TProgram>(
     {
         ArgumentNullException.ThrowIfNull(context);
         // Identity decides, never the endpoint: a client for another application must not be routed
-        // through this application's TestServer, even when both expose the same path (audit DEV-1).
+        // through this application's TestServer, even when both expose the same path.
         return string.Equals(applicationName, _applicationName, StringComparison.OrdinalIgnoreCase)
             && context.TryServerFactory<TProgram>(_applicationName) is not null;
     }
@@ -62,7 +62,7 @@ public sealed class InProcessWebSocketDeviceTransport<TProgram>(
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(endpoint);
         // The context that decided routing opens the connection: re-reading ambient host state here
-        // would throw on a flow without it after CanConnect already said yes (audit A5-63).
+        // would throw on a flow without it after CanConnect already said yes.
         var factory = context.ServerFactory<TProgram>(_applicationName);
         var path = Uri.TryCreate(endpoint.Address, UriKind.Absolute, out var absolute)
             ? absolute.PathAndQuery

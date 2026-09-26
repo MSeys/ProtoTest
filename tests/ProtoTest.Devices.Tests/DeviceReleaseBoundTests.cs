@@ -4,7 +4,7 @@ using System.Diagnostics;
 using ProtoTest.Core;
 
 /// <summary>
-/// Audit 5 A5-62 (D-10): the test's release must terminate even when a transport's connect never
+/// The test's release must terminate even when a transport's connect never
 /// completes; the abandoned connect is recorded instead of hanging the teardown forever.
 /// </summary>
 [TestFixture]
@@ -32,14 +32,14 @@ public sealed class DeviceReleaseBoundTests
 
         var entry = host.Trace.Snapshot().Tests.Single().Entries
             .Single(candidate => candidate.Kind == "device.disconnect.abandoned");
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(30)),
                 "release completes despite the hung connect");
             Assert.That(pending.IsCompleted, Is.False, "the hung connect is not adopted by the release");
             Assert.That(entry.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
             Assert.That(entry.Attributes["device.id"], Is.EqualTo("CP-001"));
-        });
+        }
     }
 
     private sealed class WaitDevice : ProtoDevice

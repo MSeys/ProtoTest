@@ -4,7 +4,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Stage 1 (Audit 3, findings A4 and G1): the evidence boundary honors the tracing switch and an
+/// The evidence boundary honors the tracing switch and an
 /// artifact size cap. Disabled tracing keeps in-memory recording for gates and tests but installs no
 /// activity listener and captures no sink artifacts; an over-limit attachment is recorded as an error
 /// artifact without its content.
@@ -130,7 +130,7 @@ public sealed class ProtoEvidenceBoundaryTests
     [Test]
     public async Task DisabledArtifactEmbedding_ShouldDeclareWithoutContent()
     {
-        // Stage 6: the artifacts-off lever. The attachment is declared - name, media type, error - but
+        // The artifacts-off lever. The attachment is declared - name, media type, error - but
         // nothing is read or written.
         var output = Path.Combine(Path.GetTempPath(), $"prototest-no-embed-{Guid.NewGuid():N}.prototrace");
         try

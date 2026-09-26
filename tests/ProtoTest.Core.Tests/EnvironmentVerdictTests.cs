@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using ProtoTest.Core.Internal;
 
 /// <summary>
-/// Pins the one environment-satisfaction evaluator (Audit 5 A5-13): the infrastructure-skip decision
+/// Pins the one environment-satisfaction evaluator: the infrastructure-skip decision
 /// and the capability-drop decision answer through the same keys, mode, configuration and
 /// declared-keys rule, so the two semantics cannot drift apart.
 /// </summary>

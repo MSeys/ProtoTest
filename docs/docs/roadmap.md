@@ -19,7 +19,7 @@ The current line, in preparation. Most of the evaluator work is already live: th
 - **Published overhead numbers** versus raw `WebApplicationFactory` on the [benchmarks page](./benchmarks.md), including where ProtoTest is slower.
 - **Versioned documentation** at the 1.1 release, so 1.0 links keep working.
 - **Trace tooling** already in review: the `prototest` CLI's `trace summary`, the documented [format compatibility policy](./observability/prototrace.md#format-compatibility), and a pack-time compatibility gate that fails an unintentional API break.
-- **Polish that the suite asked for**: path-based single-value reads from JSON responses, a test clock over `TimeProvider` for time-dependent rules, run metadata for cross-run correlation in CI, and failure-mode tests for startup and mid-run container death.
+- **Polish that the suite asked for**: path-based single-value reads from JSON responses, a test clock over `TimeProvider` for time-dependent rules, run metadata for cross-run correlation in CI, failure-mode tests for startup and mid-run container death, and the narrow [`ProtoTest.Analyzers`](./project/analyzers.md) warnings for the intent-dependent mistakes the framework cannot catch at runtime.
 
 ### 1.2 — hosting, and the reference demo
 
@@ -42,7 +42,6 @@ Each of these is in the internal plan with acceptance criteria; when one ships, 
 - **MCP server and coding-agent workflow.** The reader half exists: `ProtoTest.Traces` and the `prototest` CLI. A local MCP server over traces and reports is the natural next step; it will get a docs page only when it is real.
 - **MassTransit bridge** - wrapping `ITestHarness` in the existing messaging client surface, the way other integrations wrap their libraries.
 - **Wolverine.Tracking bridge** - the same shape, only if users ask for it.
-- **Analyzers package** - the useful rules are intent-dependent (a `[ProtoTest]` test sitting next to plain `[Test]` methods, a context client used with nothing registered). Design first; a noisy analyzer is worse than none.
 - **Traffic coverage** - marking fields that arrived in a response as *observed but unasserted*, in a separate report section. Never counted as covered; the assertion-level rule stays.
 - **Exhaustive assertion mode** - flagging fields present in a response that no shape mentioned. One implementation, shared with expected-shape-in-the-call.
 - **Allure and ReportPortal sinks** - built on the existing sink contract; community-friendly once the integration template exists.

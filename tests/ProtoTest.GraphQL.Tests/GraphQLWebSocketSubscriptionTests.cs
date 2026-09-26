@@ -167,7 +167,7 @@ public sealed class GraphQLWebSocketSubscriptionTests
     [Test]
     public async Task Subscription_WhenTheServerRejectsTheOperation_ShouldNameTheServerError()
     {
-        // Audit 5 A5.9 (A5-69): a rejected subscription arrives as an errors-only response; the shape
+        // A rejected subscription arrives as an errors-only response; the shape
         // assertion names the server's message instead of only "the response did not contain data".
         var socket = new StubWebSocket(
             """{"type":"connection_ack"}""",
@@ -229,7 +229,7 @@ public sealed class GraphQLWebSocketSubscriptionTests
     [Test]
     public async Task Enumeration_ShouldDisposeEachEventAsItAdvances()
     {
-        // Audit 5 A5-42 (B-17): await foreach without a per-element using must not leak a document
+        // An await foreach without a per-element using must not leak a document
         // and response per event; the enumerator disposes the previous event when the next arrives.
         var socket = new StubWebSocket(
             """{"type":"connection_ack"}""",
@@ -255,7 +255,7 @@ public sealed class GraphQLWebSocketSubscriptionTests
                 events.Add(response);
             }
 
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(events, Has.Count.EqualTo(2));
                 Assert.That(
@@ -265,7 +265,7 @@ public sealed class GraphQLWebSocketSubscriptionTests
                     "the previous event is disposed when the enumerator advances");
                 Assert.That(events[1].ReadDataAs<int>("$.value"), Is.EqualTo(2),
                     "the last event stays with the caller, like an event from NextAsync");
-            });
+            }
             events[1].Dispose();
         }
         finally { await host.CompleteTestAsync(); }

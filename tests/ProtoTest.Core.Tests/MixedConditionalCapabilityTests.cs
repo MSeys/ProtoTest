@@ -3,7 +3,7 @@ namespace ProtoTest.Core.Tests;
 using Microsoft.Extensions.Configuration;
 
 /// <summary>
-/// Pins the per-declaration condition rule (audit REG-1): a descriptor stays while any conditional
+/// Pins the per-declaration condition rule: a descriptor stays while any conditional
 /// declaration for it is unsatisfied, because the integration behind that declaration is still live.
 /// </summary>
 [TestFixture]

@@ -9,11 +9,10 @@ using ProtoTest.Sql.EntityFrameworkCore;
 using ProtoTest.Sql.Testcontainers;
 
 /// <summary>
-/// Audit 5 A5.7b: the run-owned schema recipe. The schema step is registered after the PostgreSQL
+/// The run-owned schema recipe. The schema step is registered after the PostgreSQL
 /// container, reads the connection string the container published, and creates the schema once for the
-/// run. The trial's observed failure (postgres-ef/report.md:72-81) was DDL inside a test transaction
-/// being rolled back with it; the second test lifecycle proves the run-created table survives the
-/// per-test rollback instead.
+/// run. DDL inside a test transaction would be rolled back with it; the second test lifecycle proves
+/// the run-created table survives the per-test rollback instead.
 /// </summary>
 [TestFixture]
 [NonParallelizable]

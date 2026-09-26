@@ -120,7 +120,7 @@ public sealed class ProtoHttpOptionsResolverTests
     [Test]
     public async Task ResolveResponseOptions_ShouldBindTheSharedDefaultSectionWhenNoRegistrationExists()
     {
-        // Audit 5 A5-40: the parameterless type's documented ProtoTest:Http:Responses default really
+        // The parameterless type's documented ProtoTest:Http:Responses default really
         // binds when a protocol registered no keyed options, instead of being an inert section name.
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -145,7 +145,7 @@ public sealed class ProtoHttpOptionsResolverTests
     [Test]
     public void ParameterlessAttachmentOptions_ShouldBindTheSharedDefaultSection()
     {
-        // Audit 5 A5-40: absence of a keyed registration stays the attachment opt-in signal, but the
+        // Absence of a keyed registration stays the attachment opt-in signal, but the
         // parameterless type's documented default section binds through the shared registrar.
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>

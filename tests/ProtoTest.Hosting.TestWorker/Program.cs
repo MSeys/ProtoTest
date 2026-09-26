@@ -24,7 +24,7 @@ public sealed class Program
 /// <summary>
 /// Captures what the worker's <see cref="Program.Main"/> read from its own configuration before the host
 /// was built, keyed by a probe id the starting test sets on its flow. The run hands the merged overlay
-/// to the entry point as command-line arguments (audit CFG-1), so a worker that builds from its args
+/// to the entry point as command-line arguments, so a worker that builds from its args
 /// sees final-precedence values inside <c>Main</c>; this probe is how that is asserted.
 /// </summary>
 public static class WorkerMainCapture
@@ -75,8 +75,8 @@ public static class WorkerMainCapture
 }
 
 /// <summary>
-/// A second entry-point-shaped type in this assembly, for the same-name/different-program guard (audit
-/// DEV-6): <c>AddWorkerHost</c> resolves the host factory from the assembly's entry point, so any class
+/// A second entry-point-shaped type in this assembly, for the same-name/different-program guard:
+/// <c>AddWorkerHost</c> resolves the host factory from the assembly's entry point, so any class
 /// in the assembly can stand in for a different program in a registration-conflict test.
 /// </summary>
 public sealed class OtherWorkerProgram;

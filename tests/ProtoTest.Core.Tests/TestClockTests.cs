@@ -6,7 +6,7 @@ public sealed class TestClockTests
     [Test]
     public async Task AmbientClock_AfterTheTestCompletes_ShouldFallBackToTheRunClock()
     {
-        // Audit 5 A5-16: the ambient owner is the one lookup the TimeProvider bridges to. A task the
+        // The ambient owner is the one lookup the TimeProvider bridges to. A task the
         // test started captured the test's flow; once the test completes, that flow must read the run
         // clock instead of a finished test's.
         var builder = new ProtoHostBuilder();
@@ -32,7 +32,7 @@ public sealed class TestClockTests
         await background;
         await host.StopAsync();
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 observed,
@@ -42,7 +42,7 @@ public sealed class TestClockTests
                 observed,
                 Is.Not.EqualTo(Seed.AddHours(3)),
                 "the finished test's clock is gone from the flow");
-        });
+        }
     }
 
     private static readonly DateTimeOffset Seed = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);

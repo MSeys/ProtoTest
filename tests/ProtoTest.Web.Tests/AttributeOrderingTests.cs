@@ -16,7 +16,7 @@ public sealed class AttributeOrderingTests
     {
         var selection = new ApplicationAttribute("Api").Order;
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(selection, Is.EqualTo(ProtoAttributeOrder.Application));
             Assert.That(
@@ -24,6 +24,6 @@ public sealed class AttributeOrderingTests
                 Is.LessThan(new WebSessionAttribute("Default").Order),
                 "a session declaration creates the session during its own setup step");
             Assert.That(selection, Is.LessThan(ProtoAttributeOrder.Default), "logins use the default order");
-        });
+        }
     }
 }

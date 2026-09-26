@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core.Internal;
 
 /// <summary>
-/// Contract of the build-time composer (Audit 5 A5-15/A5-18): one pass resolves the conditional
+/// Contract of the build-time composer: one pass resolves the conditional
 /// decisions from the collection and registers the run's services, and the readiness options register
 /// through the shared options registrar.
 /// </summary>

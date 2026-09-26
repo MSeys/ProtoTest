@@ -8,9 +8,9 @@ using ProtoTest.Web;
 using SampleApi = ProtoTest.AspNetCore.SampleApi;
 
 /// <summary>
-/// Hosts the sample API twice: on its own loopback listener inside this process (the A5.7c recipe in
+/// Hosts the sample API twice: on its own loopback listener inside this process (the recipe in
 /// docs/docs/recipes/api-then-browser.md) and, when a container runtime is available, from its own
-/// container image (A5.7d) - each published as its application's <c>BaseUrl</c>, so a browser session
+/// container image - each published as its application's <c>BaseUrl</c>, so a browser session
 /// and the REST client resolve one running application per name. Registering each piece with the key
 /// it fills means a run that configures that key skips the piece and points at that environment
 /// instead. A machine without a container runtime records the reason and the container journey skips.

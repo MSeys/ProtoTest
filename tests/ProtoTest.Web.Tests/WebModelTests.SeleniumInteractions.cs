@@ -4,7 +4,7 @@ using ProtoTest.Core;
 using ProtoTest.Web.Selenium;
 
 /// <summary>
-/// The failure path Audit 5 C-01 named: a click or option selection Selenium accepts without the page
+/// A click or option selection Selenium accepts without the page
 /// changing state. The stub driver's element never changes <c>Selected</c> unless a test's click handler
 /// does, so "the click did not take" is a modelled state rather than a timing guess.
 /// </summary>

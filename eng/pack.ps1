@@ -66,7 +66,8 @@ $packages = @(
     "src/ProtoTest.Web.Playwright/ProtoTest.Web.Playwright.csproj",
     "src/ProtoTest.Web.Selenium/ProtoTest.Web.Selenium.csproj",
     "src/ProtoTest.Templates/ProtoTest.Templates.csproj",
-    "src/ProtoTest.Cli/ProtoTest.Cli.csproj"
+    "src/ProtoTest.Cli/ProtoTest.Cli.csproj",
+    "src/ProtoTest.Analyzers/ProtoTest.Analyzers.csproj"
 )
 
 $packable = Get-ChildItem -Path (Join-Path $repository "src/*/*.csproj") |

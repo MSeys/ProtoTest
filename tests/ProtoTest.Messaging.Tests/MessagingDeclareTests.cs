@@ -1,11 +1,10 @@
 namespace ProtoTest.Messaging.Tests;
 
-using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
 
 /// <summary>
-/// Pins the declared-destination contract (Audit 5 A5.7a): <c>Declare</c> composes like <c>Tap</c>,
+/// Pins the declared-destination contract: <c>Declare</c> composes like <c>Tap</c>,
 /// reaches the broker before any tap is prepared, fails loudly on an adapter that cannot declare, and
 /// is an honest no-op on the in-memory broker, where every destination already exists.
 /// </summary>

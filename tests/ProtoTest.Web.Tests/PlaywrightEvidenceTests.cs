@@ -3,7 +3,7 @@ namespace ProtoTest.Web.Tests;
 using ProtoTest.Web.Playwright;
 
 /// <summary>
-/// Audit 5 A5.9 evidence: Playwright operation correlation keeps the parent lineage while an outer
+/// Playwright operation correlation keeps the parent lineage while an outer
 /// operation is still open, and the trace file reader applies the cap and the teardown token.
 /// </summary>
 [TestFixture]

@@ -92,7 +92,7 @@ public sealed class WorkerHostTests
             }));
         builder.AddInfrastructure(new FakeBroker(), "ConnectionStrings:WorkerProbe");
         builder.AddInfrastructure(new FakeSettings());
-        builder.AddWorkerHost<Program>("MainCapture", options => options.Set("Worker:Value", "from-suite"));
+        builder.AddWorkerHost<Program>("MainCapture", options => options.Set("Worker:Value", "a b=c;d"));
         await using var host = builder.Build();
 
         using (WorkerMainCapture.Begin(probeId))
@@ -109,7 +109,8 @@ public sealed class WorkerHostTests
         Assert.Multiple(() =>
         {
             Assert.That(main, Is.Not.Null, "the entry point ran and captured its own view");
-            Assert.That(main!.Value, Is.EqualTo("from-suite"), "the suite's options win inside Main");
+            Assert.That(main!.Value, Is.EqualTo("a b=c;d"),
+                "a value with a space, '=' and ';' survives the command-line overlay inside Main");
             Assert.That(
                 main.RunValue,
                 Is.EqualTo("from-run"),
@@ -117,7 +118,7 @@ public sealed class WorkerHostTests
             Assert.That(main.ConfigValue, Is.EqualTo("config-only"), "the suite's configuration reaches Main");
             Assert.That(main.Probe, Is.EqualTo("from-suite"), "a suite-only key reaches Main");
             Assert.That(main.ConnectionString, Is.EqualTo("amqp://probe"), "the run's settings reach Main");
-            Assert.That(probe.Value, Is.EqualTo("from-suite"), "the hosted service agrees at StartAsync");
+            Assert.That(probe.Value, Is.EqualTo("a b=c;d"), "the hosted service agrees at StartAsync");
         });
     }
 

@@ -93,4 +93,8 @@
     <Project Path="src/ProtoTest.Cli/ProtoTest.Cli.csproj" />
     <Project Path="src/ProtoTest.Traces/ProtoTest.Traces.csproj" />
   </Folder>
+  <Folder Name="/8. Analyzers/">
+    <Project Path="src/ProtoTest.Analyzers/ProtoTest.Analyzers.csproj" />
+    <Project Path="tests/ProtoTest.Analyzers.Tests/ProtoTest.Analyzers.Tests.csproj" />
+  </Folder>
 </Solution>

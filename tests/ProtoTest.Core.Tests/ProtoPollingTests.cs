@@ -3,7 +3,7 @@ namespace ProtoTest.Core.Tests;
 using ProtoTest.Core;
 
 /// <summary>
-/// Pins the one polling engine's interval and deadline behavior (audit VOC-4): readiness, web
+/// Pins the one polling engine's interval and deadline behavior: readiness, web
 /// assertions and every other wait ride <see cref="ProtoPolling"/>, so its guarantees have a test of
 /// their own instead of being assumed through a consumer.
 /// </summary>

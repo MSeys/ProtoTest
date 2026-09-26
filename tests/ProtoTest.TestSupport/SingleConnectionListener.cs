@@ -7,7 +7,7 @@ using System.Text;
 /// <summary>
 /// A loopback HTTP listener on a free port that holds exactly one request until the test answers it.
 /// The <see cref="RequestReceived"/> signal is what a readiness or client test waits on, so it proves
-/// the address was actually reached without a sleep or a fixed timing window (audit TST-2).
+/// the address was actually reached without a sleep or a fixed timing window.
 /// </summary>
 public sealed class SingleConnectionListener : IAsyncDisposable
 {

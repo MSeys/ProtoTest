@@ -80,7 +80,7 @@ public sealed class ProtoApplicationTests
     [Test]
     public async Task Resolution_WhenNoApplicationStateWasSet_ShouldReportTheMissingSelection()
     {
-        // Audit 5 A5-14: the attribute's BeforeTestAsync is the one state factory. A context without
+        // The attribute's BeforeTestAsync is the one state factory. A context without
         // state never ran an [Application] attribute, so the documented error is reported instead of
         // the attribute being read a second time off the method.
         var builder = new ProtoHostBuilder();
@@ -94,7 +94,7 @@ public sealed class ProtoApplicationTests
         var exception = Assert.Throws<InvalidOperationException>(
             () => ProtoApplicationResolution.ResolveClientName(context, "Rest"));
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(exception!.Message, Does.Contain("No application is selected"));
             Assert.That(
@@ -102,7 +102,7 @@ public sealed class ProtoApplicationTests
                 Is.Null,
                 "the attribute on the method is not a second source of state");
             Assert.That(ProtoApplicationResolution.ResolveApplicationName(context), Is.Null);
-        });
+        }
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
     }
@@ -110,7 +110,7 @@ public sealed class ProtoApplicationTests
     [Test]
     public void ResolveSetting_ShouldPreferPublishedSettingsAndFallBackToConfiguration()
     {
-        // Audit 5 A5-25: the sample reads a container-published connection string through the one
+        // The sample reads a container-published connection string through the one
         // precedence helper instead of re-implementing it.
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -121,7 +121,7 @@ public sealed class ProtoApplicationTests
         var settings = new ProtoInfrastructureSettings();
         settings.Set("ConnectionStrings:Northstar", "from-infrastructure");
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 ProtoApplication.ResolveSetting(configuration, settings, "ConnectionStrings:Northstar"),
@@ -135,7 +135,7 @@ public sealed class ProtoApplicationTests
                 ProtoApplication.ResolveSetting(configuration, settings, "Missing"),
                 Is.Null,
                 "neither source has the key");
-        });
+        }
     }
 
     [Test]

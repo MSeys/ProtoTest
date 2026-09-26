@@ -7,7 +7,7 @@ using ProtoTest.AdapterContract;
 using ProtoTest.Core;
 
 /// <summary>
-/// Stage 0/4 characterization for the NUnit setup and teardown failure paths (Audit 3, findings E1/F1).
+/// Characterization for the NUnit setup and teardown failure paths.
 /// The command wrapper surfaces a setup failure with its original exception and records exactly one
 /// failed trace; a teardown failure keeps the reported result and lands as a Partial trace with a
 /// finding. Driven out of band so a deliberate failure cannot make the suite red.

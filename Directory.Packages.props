@@ -14,6 +14,8 @@
     <PackageVersion Include="HotChocolate.AspNetCore" Version="16.6.3" />
     <PackageVersion Include="HotChocolate.Language" Version="16.6.3" />
     <PackageVersion Include="HotChocolate.Subscriptions.InMemory" Version="16.6.3" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.31" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
     <PackageVersion Include="Microsoft.OpenApi" Version="3.10.2" />

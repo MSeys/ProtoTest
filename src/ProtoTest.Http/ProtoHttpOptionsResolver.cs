@@ -14,7 +14,7 @@ internal static class ProtoHttpOptionsResolver
     /// Resolves the response options registered for <paramref name="protocolName"/>, or the shared
     /// <c>ProtoTest:Http:Responses</c> defaults when the protocol registered none. The fallback resolves
     /// through <see cref="ProtoOptionsRegistration.Resolve{TOptions}(IServiceProvider, Func{TOptions}, Action{TOptions}?)"/>
-    /// so the parameterless type's documented default section really binds (audit A5-40).
+    /// so the parameterless type's documented default section really binds.
     /// </summary>
     public static ProtoHttpResponseOptions ResolveResponseOptions(
         this ProtoExecutionContext context,

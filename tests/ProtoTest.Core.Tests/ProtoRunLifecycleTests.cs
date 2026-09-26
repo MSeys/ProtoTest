@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core.Internal;
 
 /// <summary>
-/// Contract of the extracted run starter (Audit 5 A5-15): it owns the start sequence and the unwind of a
+/// Contract of the extracted run starter: it owns the start sequence and the unwind of a
 /// failed start, while the host keeps the run state machine.
 /// </summary>
 [TestFixture]

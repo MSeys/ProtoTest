@@ -3,7 +3,7 @@ namespace ProtoTest.Core.Tests;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// The run setup seam (Audit 5 A5.7b): a step is infrastructure that starts at its registration
+/// The run setup seam: a step is infrastructure that starts at its registration
 /// position, reads the settings the pieces before it published, and fails the run's start loudly
 /// without owning anything stop or dispose must release.
 /// </summary>

@@ -146,7 +146,7 @@ public sealed class MessagingTests
     [Test]
     public async Task FailedAwait_ShouldRecordTheSharedFailureObservation()
     {
-        // Audit 5 A5.9 (B06): a messaging failure records the shared failure-diagnostics record, so a
+        // A messaging failure records the shared failure-diagnostics record, so a
         // failed await is evidence instead of leaving no observation at all.
         var builder = new ProtoHostBuilder();
         builder.AddMessaging(messaging => messaging.UseBroker(_ => new FailingConsumerBroker()));

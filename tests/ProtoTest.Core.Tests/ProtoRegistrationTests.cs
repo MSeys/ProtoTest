@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Contract of the one once-only registration helper (Audit 5 A5-17): the internal match-delegate rule
+/// Contract of the one once-only registration helper: the internal match-delegate rule
 /// is the implementation, and the public guard is its façade - first registration wins, later calls are
 /// no-ops, for both a service collection and a builder whose marker lives in a weak table.
 /// </summary>

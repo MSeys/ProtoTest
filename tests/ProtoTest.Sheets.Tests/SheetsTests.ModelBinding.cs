@@ -48,7 +48,7 @@ public sealed partial class SheetsTests
     [Test]
     public async Task TableRow_MatchShapeOnAFlowWithoutAmbientContext_ShouldUseTheOwningTablesContext()
     {
-        // Audit 5 A5-52 (C-09): the row assertion uses the context its table carries, not the ambient
+        // The row assertion uses the context its table carries, not the ambient
         // Proto.Context, so a row asserted from a helper flow still records and does not throw
         // "no active ProtoExecutionContext" on the flow it happens to run on.
         var (host, context) = Start("sheets row shape helper flow");

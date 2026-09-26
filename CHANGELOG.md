@@ -176,6 +176,12 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ### Fixed
 
+- A canceled device connect no longer poisons the session: the cancellation reaches its caller and the
+  canceled attempt is cleared, so the next send starts a fresh connect.
+- A device client name reused under a second application fails naming the client and both applications,
+  instead of the bare "already registered" message.
+- A worker entry point always gets the run's `--contentRoot`/`--applicationName`: an overlay key named
+  `contentRoot` or `applicationName` (any casing) is skipped, so the generated pair cannot be replaced.
 - The RabbitMQ broker connection string is validated where the options resolve: a missing, non-absolute
   or non-`amqp`/`amqps` value fails naming `ProtoTest:Messaging:RabbitMq:ConnectionString` instead of
   failing later at connect time, including a value a started broker container publishes.
@@ -405,6 +411,10 @@ All ProtoTest packages share one version; breaking API changes are called out be
 - `IProtoDeviceTransport.ConnectAsync(context, endpoint, cancellationToken)` has a default
   implementation forwarding to the context-free overload; the in-process transport overrides it, so a
   connect from a flow without ambient context still reaches the registered application.
+- `ProtoTest.Analyzers` ships the intent-dependent checks the framework cannot make at runtime:
+  `PT0001` reports a method that carries both a ProtoTest test attribute and the runner's own plain
+  test attribute, and `PT0002` reports a test registered by a plain runner attribute that reads
+  `Proto.Context`. Warnings only; consumers opt in by referencing the package.
 - A readiness timeout names the probed URL and the last error; a rejected GraphQL subscription names
   the server's errors; an oversized WebSocket frame fails naming the address and limit; a stuck
   Selenium pump is reported (`web.selenium.executor_abandoned`) instead of abandoned silently; a

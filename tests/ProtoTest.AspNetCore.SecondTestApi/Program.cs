@@ -1,7 +1,7 @@
 namespace ProtoTest.AspNetCore.SecondTestApi;
 
 /// <summary>
-/// A second in-process application for multi-application tests (audit DEV-1): it exposes the same
+/// A second in-process application for multi-application tests: it exposes the same
 /// WebSocket path as <c>ProtoTest.AspNetCore.SampleApi.Program</c> with a distinguishable echo, so a
 /// test can prove which application a device client reached instead of only that a path matched.
 /// </summary>

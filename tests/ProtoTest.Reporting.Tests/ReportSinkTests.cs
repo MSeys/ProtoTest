@@ -169,7 +169,7 @@ public sealed class ReportSinkTests
     [Test]
     public async Task HtmlSink_ShouldRenderRunMetadataAsItsOwnSection()
     {
-        // A5.15 (Audit 5, A5-83): the run metadata a suite records reaches the shipped report, in its
+        // The run metadata a suite records reaches the shipped report, in its
         // own section, one root item per key.
         var directory = CreateTempDirectory();
         var path = Path.Combine(directory, "report.html");

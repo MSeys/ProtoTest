@@ -31,7 +31,7 @@ public interface IProtoDeviceTransport
     /// <see cref="ConnectAsync(DeviceEndpoint, CancellationToken)"/>; a transport that routes on the
     /// test's own state - the in-process TestServer transport - overrides this instead of re-reading
     /// ambient host state at connect time, so a connection started on another flow still reaches the
-    /// application the routing decision was made for (audit A5-63).
+    /// application the routing decision was made for.
     /// </summary>
     ValueTask<IProtoDeviceConnection> ConnectAsync(
         ProtoExecutionContext context,

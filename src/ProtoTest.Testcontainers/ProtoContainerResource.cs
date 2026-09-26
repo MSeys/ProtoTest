@@ -332,7 +332,7 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
         }
 
         // Release must terminate: wait for the racing start under a small bound, then record the start
-        // that outlived its release instead of returning as if nothing were still running (audit A5-55).
+        // that outlived its release instead of returning as if nothing were still running.
         using var bound = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         bound.CancelAfter(AbandonedStartBound);
         try

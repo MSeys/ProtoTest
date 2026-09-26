@@ -51,6 +51,44 @@ public sealed class PlaywrightConformanceTests
     }
 
     [Test]
+    [CancelAfter(60_000)]
+    public async Task TraceLargerThanTheCap_ShouldSkipTheAttachmentAndRecordTheLimit()
+    {
+        var host = new ProtoHostBuilder()
+            .AddWeb(options =>
+            {
+                options.Headless = true;
+                options.InstallBrowsers = true;
+                options.TraceRetention = PlaywrightTraceRetention.Always;
+                options.MaxTraceBytes = 1;
+            })
+            .Build();
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("playwright trace cap", TestMethods.Placeholder);
+        var backend = await OpenBrowserAsync(context.Web());
+        await backend.Page.SetContentAsync("<!doctype html><html><body><div>ready</div></body></html>");
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        var entry = host.Trace.Snapshot().Tests.Single().Entries
+            .Single(candidate => candidate.Kind == "web.playwright.trace_too_large");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(entry.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(entry.Attributes["web.trace.limit_bytes"], Is.EqualTo("1"));
+            Assert.That(
+                long.Parse(entry.Attributes["web.trace.bytes"]!, CultureInfo.InvariantCulture),
+                Is.GreaterThan(1),
+                "the recorded size is the zip that exceeded the cap");
+            Assert.That(
+                context.Attachments.Any(item => item.Name.EndsWith(".zip", StringComparison.Ordinal)),
+                Is.False,
+                "an over-cap trace is skipped instead of attached");
+        }
+    }
+
+    [Test]
     public async Task SelectOption_ShouldMatchTheValueAttributeNotTheLabel()
     {
         var host = new ProtoHostBuilder()

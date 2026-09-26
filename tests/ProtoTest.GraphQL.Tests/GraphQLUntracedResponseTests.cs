@@ -8,7 +8,6 @@ using ProtoTest.Http;
 /// <summary>
 /// A GraphQL response built without an execution context (an untraced assertion) must behave like
 /// REST's: assertions and reads still work and still name the operation, they just record nothing.
-/// Audit 5 A5-38 (B-13).
 /// </summary>
 [TestFixture]
 public sealed class GraphQLUntracedResponseTests
@@ -33,13 +32,13 @@ public sealed class GraphQLUntracedResponseTests
 
         var exception = Assert.Throws<GraphQLAssertionException>(() => response.ReadDataAs<int>("$.missing"));
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(response.ReadDataAs<ValueData>()!.Value, Is.EqualTo(42));
             Assert.That(response.ReadRequired<ValueData>().Value, Is.EqualTo(42));
             Assert.That(exception!.Message, Does.StartWith(
                 "query <anonymous> — The JSON path '$.missing' did not match"));
-        });
+        }
     }
 
     [Test]

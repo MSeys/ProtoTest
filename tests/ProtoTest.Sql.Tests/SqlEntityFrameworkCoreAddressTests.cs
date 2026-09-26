@@ -9,7 +9,7 @@ using ProtoTest.Core;
 using ProtoTest.Sql.EntityFrameworkCore;
 
 /// <summary>
-/// Pins the Entity Framework Core adapter's address rule (audit A2bR-02): it shares
+/// Pins the Entity Framework Core adapter's address rule: it shares
 /// <see cref="SqlOptions.AddressKeys"/> with SQL, so an inert SQL run drops the
 /// <c>Entity Framework Core</c> store capability, the enlistment hook stays out of the context and the
 /// session, and gated tests skip; with the address provided the enlistment and rollback are unchanged.

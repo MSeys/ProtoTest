@@ -135,7 +135,7 @@ public class ProtoFindingTests
     [Test]
     public async Task AddFinding_ShouldRedactSensitiveMetadataInTheTrace()
     {
-        // Stage 1 (Audit 3, finding A1): one redacted copy serves the report item and the trace record.
+        // One redacted copy serves the report item and the trace record.
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
@@ -159,7 +159,7 @@ public class ProtoFindingTests
     [Test]
     public async Task AddFinding_ShouldRedactNewSensitiveNamesInsideSequences()
     {
-        // Stage 1: the shared list covers client_secret and id_token, and a sequence of dictionaries is
+        // The shared list covers client_secret and id_token, and a sequence of dictionaries is
         // walked the same way a top-level dictionary is.
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
@@ -198,7 +198,7 @@ public class ProtoFindingTests
     [Test]
     public async Task TeardownFailure_ShouldReachTheReportAndTheRunGate()
     {
-        // Stage 2 (Audit 3, finding B2): a teardown failure is recorded through AddFinding, so it is
+        // A teardown failure is recorded through AddFinding, so it is
         // visible to sinks and run gates exactly like a failure the test reports itself. The test's own
         // result is still untouched.
         var sink = new CapturingSink();
@@ -245,7 +245,7 @@ public class ProtoFindingTests
     [Test]
     public async Task AddFinding_WithCyclicMetadata_ShouldWriteASafeArchive()
     {
-        // Stage 1 (Audit 3, finding A2): cyclic metadata degrades to a marker instead of failing the
+        // Cyclic metadata degrades to a marker instead of failing the
         // export; the archive is valid and the run stops cleanly.
         var output = Path.Combine(Path.GetTempPath(), $"prototest-cycle-{Guid.NewGuid():N}.prototrace");
         var metadata = new Dictionary<string, object>();

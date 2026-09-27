@@ -175,7 +175,11 @@ duplicate that is actually a different program, server, backend or device type i
   `AddAspNetCoreServer` and `AddInProcessWebSocketDevices` use `AddCapabilityUnlessConfigured`;
   `UseRabbitMq`, `AddSql` and `AddEntityFrameworkCore` (the last sharing `SqlOptions.AddressKeys`)
   use `AddCapabilityWhenProvided`, so a missing address drops the capability and tests skip (ADDR-1,
-  done for these). The HTTP family
+  done for these). The MassTransit bridge (`UseMassTransit<TProgram>`) uses
+  `AddCapabilityUnlessConfigured` over the application's `BaseUrl`: its harness exists only while the
+  application is hosted in-process, so a published application drops the `Broker` capability. The
+  envelope helper (`MassTransitEnvelope`) is the closed-box path beside the bridge: pure conversions
+  between a contract and MassTransit's wire envelope, independent of any adapter's capability. The HTTP family
   (REST/GraphQL/gRPC) keeps the unconditional protocol capability: one capability covers every client
   of the protocol, and an application-scoped client is legitimately served in-process with no address,
   so a per-key drop cannot be expressed without skipping configured clients or hiding the in-process
@@ -211,7 +215,7 @@ setting outside a client (a blank published value is ignored).
 | Aspire AppHost (`AddAspireAppHost`) | starts when any declared resource key is missing; publishes only the keys configuration does not fill, so a configured `ProtoTest:Applications:{app}:BaseUrl` is never masked by a started AppHost; a published endpoint fills its key through `ProtoInfrastructureSettings` |
 | Web sessions | same precedence; absolute-URL sessions stay addressless |
 | Devices | same precedence; registration-time throw when neither resolves. A device client carries the application it was registered under, and the in-process transport is selected by that identity: a transport serves one `(TProgram, application)` pair, so a client for B is never routed through A's `TestServer` at the same path. A path-only client (no resolver) with no matching transport fails naming the application. A client name reused under a second application fails at registration naming both applications |
-| Sql / Messaging | connection resolved through DI factories/options; the capability is declared with `AddCapabilityWhenProvided` over the keys that can provide the address (`SqlOptions.AddressKeys`, `RabbitMqOptions.ConnectionStringSetting`), so a run with none drops it and skips; the SQL connection hook and the Entity Framework Core enlistment hook (same keys) stay inert (no open, no context), and the accessors name the keys |
+| Sql / Messaging | connection resolved through DI factories/options; the capability is declared with `AddCapabilityWhenProvided` over the keys that can provide the address (`SqlOptions.AddressKeys`, `RabbitMqOptions.ConnectionStringSetting`), so a run with none drops it and skips; the SQL connection hook and the Entity Framework Core enlistment hook (same keys) stay inert (no open, no context), and the accessors name the keys. The MassTransit bridge is the in-process direction: `UseMassTransit<TProgram>` declares the `Broker` capability with `AddCapabilityUnlessConfigured` over the application's `BaseUrl`, so a published application (configured address) drops it and skips, and the harness resolves from the application's in-process server per test |
 
 ## Device stack (A4, frozen until R2 needs more)
 
@@ -346,7 +350,8 @@ spirit (see `ProtoDataValueContext`).
 - Messaging records the `messaging.publish` operation and the `messaging.published`, `messaging.receive`,
   `messaging.failure` and `messaging.contract.shape` observations as trace evidence and ships no collector;
   destinations are deliberately not a coverage category (A5 VOC-1 decision: the promise was deleted, not
-  shipped).
+  shipped). The MassTransit bridge records the same vocabulary with `messaging.system` = `MassTransit`
+  and its destination is a message contract type.
 - Entity ids: `client:{type}:{name}`, `context:{type}`, `capability:{kind}:{name}` (with `:{instance}`
   when the descriptor carries one), `device:{client}:{deviceType}:{id}`, the test user `auth:user`,
   infrastructure `Id`, resources `Id`, value items `{type}:{identity}`.
@@ -417,6 +422,8 @@ assembly `[TestExecutor<ProtoTestExecutor>]`. MSTest has no assembly-wide hook (
 | Built-in test user | `[SignedInAs]`, `ProtoTestUser`, `ProtoTestUserHeader`, `context.SignIn`/`SignedInUser`, `TestUserAuthenticator` (`ProtoTest.Http`); app side `webHost.AddTestUserAuthentication()` (`ProtoTest.AspNetCore`) | `src/ProtoTest.Http/Authentication/`, `src/ProtoTest.AspNetCore/TestUserAuthentication.cs` |
 | Fakes | `ProtoTest.WireMock` (`WireMock` coverage collector; `protocol`-kind capability, instance = fake name); a per-run fake keeps its stubs and request log for the run and clears them on release or an explicit `Reset()`; an unmatched request records the `WireMockUnmatchedRequest` marker as the REST failure shape's exception type (no exception produced it) | `src/ProtoTest.WireMock/` |
 | Aspire | `ProtoTest.Aspire` (`net8.0`/`net9.0`/`net10.0` package assets; the suite's AppHost leg is `net10.0`); AppHost as run infrastructure, resources as application targets; configured keys win and the AppHost publishes only the missing ones | `src/ProtoTest.Aspire/` |
+| MassTransit bridge | `ProtoTest.Messaging.MassTransit` (`UseMassTransit<TProgram>(application)` on the messaging seam; the harness resolves from the application's in-process server, destinations are message contract types, `Declare` is a no-op, publishes are observed and consumption is not; `MassTransitEnvelope.Wrap`/`Unwrap` is the pure wire-envelope interop for any adapter, published applications included; no container package - the bus is a library, a RabbitMQ container comes from `ProtoTest.Messaging.RabbitMq.Testcontainers`) | `src/ProtoTest.Messaging.MassTransit/` |
+| Messaging await machinery | `ProtoMessageAwaitQueue` with `IProtoMessageAwaitSource`, `ProtoMessageAwaitEntry` and `ProtoMessageAwaitSnapshot`: the one await gate, position, consumed set and deadline rescan the in-memory, RabbitMQ and MassTransit consumers await through; an adapter contributes a source (snapshot + wait), never its own loop | `src/ProtoTest.Messaging/Internal/` |
 
 ## Invariants to protect
 
@@ -433,3 +440,5 @@ assembly `[TestExecutor<ProtoTestExecutor>]`. MSTest has no assembly-wide hook (
    never silently disables a live integration.
 9. Core stays free of protocol/web/document vocabulary.
 10. No user-facing artifact teaches a symbol that does not exist.
+11. The messaging consumers share `ProtoMessageAwaitQueue`: an adapter contributes an
+    `IProtoMessageAwaitSource`, never a second await gate, position, consumed set or deadline rescan.

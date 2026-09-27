@@ -255,9 +255,37 @@ All ProtoTest packages share one version; breaking API changes are called out be
   so the generated solution restores, builds and runs with the chosen runner; the Microsoft Testing
   Platform variants (`xunit3`, `tunit`) also select the MTP `dotnet test` runner in the generated
   `global.json`.
+- `ProtoTest.Messaging.MassTransit` bridges the messaging surface to an in-process application's MassTransit
+  test harness: `AddMessaging(messaging => messaging.UseMassTransit<Program>())` publishes and awaits
+  over the `ITestHarness` the application composes with `AddMassTransitTestHarness`, so the events the
+  application publishes through its own `IPublishEndpoint` are the ones a test awaits. A destination
+  names a message contract type (its full name, short name or `urn:message:` URN); the payload is JSON
+  for that contract; `Tap` snapshots the harness during setup. `Declare` is a no-op because MassTransit
+  owns message topology, and the `Broker` capability is declared only while the application's `BaseUrl`
+  is not configured, so a published application skips instead of failing. The messaging seam gained
+  `UseBrokerUnlessConfigured` for that in-process direction; the package pins MassTransit 8.5.10
+  (Apache-2.0).
+- `ProtoTest.Messaging.MassTransit` gains the broker-side wire envelope: `MassTransitEnvelope.Wrap(destination,
+  contract)` builds the exact MassTransit JSON envelope as a `ProtoMessage` (`application/vnd.masstransit+json`,
+  the contract's `urn:message:` types, message/correlation/conversation ids, sent time, headers, the
+  host block; a raw JSON payload plus its type works too), and `MassTransitEnvelope.Unwrap(message)` /
+  `Unwrap<T>(message)` read a frame the bus published - typed, or as metadata with the raw payload -
+  failing with `MessagingAssertionException` naming the destination when the frame is not an envelope
+  or does not declare `T`. Both are pure and work with any broker adapter, so a published MassTransit
+  application is testable through `UseRabbitMq` where the in-process harness is unavailable; the
+  envelope needs no `MT-*` transport headers (those belong to MassTransit's raw serializer). Both
+  directions are proved against a real RabbitMQ bus (`MassTransit.RabbitMQ` 8.5.10 is a test
+  dependency only).
 
 ### Changed
 
+- The new-in-1.1 `ProtoTest.MassTransit` package is `ProtoTest.Messaging.MassTransit`, the messaging
+  family's nesting (`ProtoTest.Messaging`, `ProtoTest.Messaging.RabbitMq`). The package was never
+  released, so no compatibility shim ships; the public type names (`MassTransitEnvelope`,
+  `UseMassTransit`) are unchanged. In the same pass the in-memory, RabbitMQ and MassTransit consumers
+  share one await machinery, so "awaits on one consumer serialize in call order", "a delivery that
+  matched no awaited predicate stays for a later await" and "a matched message is consumed once" hold
+  identically across the brokers; no messaging API changed.
 - A per-run WireMock fake keeps its stubs and request log for the whole run: teardown reports the
   test's requests but no longer resets the shared fake, so a stub one test registers still matches in
   the next. `Reset()` clears the shared fake between tests, and release clears it with the run.
@@ -277,6 +305,13 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ### Fixed
 
+- Publishing a null or empty payload to a `ProtoTest.Messaging.MassTransit` contract without a default instance
+  (a positional record) fails naming the contract and the fix - give the contract a parameterless
+  shape or publish an explicit JSON payload - instead of the raw `MissingMethodException`.
+- A `ProtoTest.Messaging.MassTransit` test that substitutes the application after a `Tap` (`Override` or
+  `[ReplaceService]`) awaits the messages its dedicated server's fresh harness publishes: the
+  consumer re-baselines to that harness instead of applying the replaced harness's position and
+  skipping its first messages.
 - A gRPC call made by a signed-in test redacts the built-in test user's metadata: `prototest-user`
   joins the default `GrpcClientOptions.SensitiveMetadataKeys`, so the Base64 identity and its claim
   values never reach the trace (`rpc.metadata.prototest-user` records `(redacted)`) while the

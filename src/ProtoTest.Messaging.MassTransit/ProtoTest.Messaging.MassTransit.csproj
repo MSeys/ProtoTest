@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+
+    <!-- New in 1.1: no released baseline exists yet, so there is nothing to validate against. -->
+    <IsPackable>true</IsPackable>
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <PackageValidationOptOutReason>New in 1.1; no released baseline exists yet. Validate against the 1.1.0 baseline after it publishes (RELEASING.md).</PackageValidationOptOutReason>
+    <PackageId>ProtoTest.Messaging.MassTransit</PackageId>
+    <AssemblyName>ProtoTest.Messaging.MassTransit</AssemblyName>
+    <RootNamespace>ProtoTest.Messaging.MassTransit</RootNamespace>
+    <Description>MassTransit bridge for the ProtoTest messaging capability: publish and await messages over the application's in-process ITestHarness.</Description>
+    <PackageTags>testing;integration-testing;messaging;masstransit;dotnet</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MassTransit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <ProjectReference Include="..\ProtoTest.Messaging\ProtoTest.Messaging.csproj" />
+    <ProjectReference Include="..\ProtoTest.AspNetCore\ProtoTest.AspNetCore.csproj" />
+  </ItemGroup>
+
+</Project>

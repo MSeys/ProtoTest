@@ -80,6 +80,7 @@ The composer above gives a suite its direct starting packages. This reference in
 | `ProtoTest.Grpc` | `dotnet add package ProtoTest.Grpc` | unary and streaming gRPC clients, metadata auth, shape/status assertions, method coverage | `Proto.Context.Grpc()` |
 | `ProtoTest.Messaging` | `dotnet add package ProtoTest.Messaging` | publish and await messages, with an in-memory default broker | `Proto.Context.Messaging()` |
 | `ProtoTest.Messaging.RabbitMq` | `dotnet add package ProtoTest.Messaging.RabbitMq` | RabbitMQ adapter for the messaging client | `messaging.UseRabbitMq()` |
+| `ProtoTest.Messaging.MassTransit` | `dotnet add package ProtoTest.Messaging.MassTransit` | bridge the messaging client to an in-process application's MassTransit test harness | `messaging.UseMassTransit<Program>()` |
 | `ProtoTest.Sheets` | `dotnet add package ProtoTest.Sheets` | `.xlsx` cell, column, range, table and typed-model assertions, range coverage | `Proto.Context.Sheets()` |
 | `ProtoTest.Data` | `dotnet add package ProtoTest.Data` | deterministic data, member defaults, provisioners and the `Ref<T>` identity map | `Proto.Context.Data()` |
 | `ProtoTest.Sql` | `dotnet add package ProtoTest.Sql` | one database connection per test, optional transaction isolation | `Proto.Context.SqlConnection()` |

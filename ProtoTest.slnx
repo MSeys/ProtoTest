@@ -17,6 +17,7 @@
     <Project Path="src/ProtoTest.Messaging/ProtoTest.Messaging.csproj" />
     <Project Path="src/ProtoTest.Messaging.RabbitMq/ProtoTest.Messaging.RabbitMq.csproj" />
     <Project Path="src/ProtoTest.Messaging.RabbitMq.Testcontainers/ProtoTest.Messaging.RabbitMq.Testcontainers.csproj" />
+    <Project Path="src/ProtoTest.Messaging.MassTransit/ProtoTest.Messaging.MassTransit.csproj" />
     <Project Path="src/ProtoTest.OpenApi/ProtoTest.OpenApi.csproj" Id="23cb63d4-b36b-4e43-a2c9-c53533307d85" />
     <Project Path="src/ProtoTest.Reporting/ProtoTest.Reporting.csproj" Id="1ad73a64-19cd-4807-a0d4-283da87581f6" />
     <Project Path="src/ProtoTest.Rest/ProtoTest.Rest.csproj" Id="0161cd20-8be1-40f2-a3c0-76335a74ccd2" />
@@ -46,6 +47,7 @@
     <Project Path="tests/ProtoTest.Json.Tests/ProtoTest.Json.Tests.csproj" />
     <Project Path="tests/ProtoTest.Messaging.Tests/ProtoTest.Messaging.Tests.csproj" />
     <Project Path="tests/ProtoTest.Messaging.RabbitMq.Tests/ProtoTest.Messaging.RabbitMq.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Messaging.MassTransit.Tests/ProtoTest.Messaging.MassTransit.Tests.csproj" />
     <Project Path="tests/ProtoTest.Sheets.Tests/ProtoTest.Sheets.Tests.csproj" />
     <Project Path="tests/ProtoTest.Traces.Tests/ProtoTest.Traces.Tests.csproj" />
   </Folder>
@@ -71,6 +73,7 @@
     <Project Path="tests/ProtoTest.Grpc.Tests/ProtoTest.Grpc.Tests.csproj" />
     <Project Path="tests/ProtoTest.Hosting.TestWorker/ProtoTest.Hosting.TestWorker.csproj" />
     <Project Path="tests/ProtoTest.Hosting.Tests/ProtoTest.Hosting.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Messaging.MassTransit.TestApi/ProtoTest.Messaging.MassTransit.TestApi.csproj" />
     <Project Path="tests/ProtoTest.Aspire.TestService/ProtoTest.Aspire.TestService.csproj" />
     <Project Path="tests/ProtoTest.Aspire.TestAppHost/ProtoTest.Aspire.TestAppHost.csproj" />
     <Project Path="tests/ProtoTest.Aspire.Tests/ProtoTest.Aspire.Tests.csproj" />

@@ -35,14 +35,49 @@ public RestShouldAssertions Should { get; }
 public RestAssertions ShouldNot { get; }
 
 public RestResponse HaveHttpStatus(HttpStatusCode expected);            // on RestAssertions
-public RestResponse MatchShape(object expectedShape, JsonSerializerOptions? options = null);  // on RestShouldAssertions
+public RestResponse HaveContentType(string mediaType);                 // on RestAssertions
+public RestResponse HaveHeader(string name);                           // on RestAssertions
+public RestResponse HaveHeader(string name, string value);             // on RestAssertions
+public RestResponse HaveCookie(string name);                           // on RestAssertions
+public RestResponse HaveCookie(string name, string value);             // on RestAssertions
+public RestResponse HaveRedirectLocation(string location);             // on RestAssertions
+public RestResponse MatchShape(object expectedShape, JsonSerializerOptions? options = null);       // on RestShouldAssertions
+public RestResponse MatchShape(object expectedShape, bool exact, JsonSerializerOptions? options = null);  // on RestShouldAssertions
 ```
 
-`ShouldNot.HaveHttpStatus(expected)` asserts the status is **anything but** `expected`. Shape is positive-only — a negated shape match has no meaning — so `MatchShape` lives on the `Should` facade and `ShouldNot` has no shape form.
+`ShouldNot.HaveHttpStatus(expected)` asserts the status is **anything but** `expected`; the same holds for the content type, header, cookie and redirect assertions. Shape is positive-only — a negated shape match has no meaning — so `MatchShape` lives on the `Should` facade and `ShouldNot` has no shape form.
+
+### Asserting in the call
+
+A pending request can assert its response shape where the call is made. `ExpectAsync` awaits the response and runs the same `Should.MatchShape` the after-the-fact spelling runs, returning the response:
+
+```csharp
+using var response = await Proto.Context.Rest()
+    .Body(new CreateOrderRequest("observability-seat", 12, 19.95m))
+    .PostAsync("/api/orders")
+    .ExpectAsync(new { id = JsonValue.GreaterThan(0), status = "pending" });
+```
+
+On a mismatch the response is disposed and the `RestAssertionException` is rethrown, so a failed call cannot leak a response. `exact: true` switches the shape to [exact mode](../../foundation/shape-matching.md#exact-matching).
 
 ### Status assertions
 
 A status assertion records an `assert.http.status` operation (source `ProtoTest.Rest`, parented to the request) with the expected and actual status codes, the client identity and `assertion.negated` when it is the `ShouldNot` side. `RestStatusAssertionException` carries `ExpectedStatusCode`, `ActualStatusCode`, `ResponseBody` and `Negated`, and appends the sanitized response body to its message — bounded by the smaller of `ProtoTest:Rest:Responses:MaxDiagnosticBodyLength` and the attachment options' cap — so a failing `400` tells you *why* without re-running anything.
+
+### Content type, headers, cookies and redirects
+
+Each of these records its own `assert.http.*` operation (parented to the request, with the Checks section and `assertion.negated` on the `ShouldNot` side), returns the response, and names the request in its failure:
+
+```csharp
+response.Should.HaveContentType("application/json");          // the media type, without parameters, case-insensitive
+response.Should.HaveHeader("X-Correlation");                  // presence; either response or content headers
+response.Should.HaveHeader("X-Correlation", "abc");           // any value of a multi-valued header, ordinal
+response.Should.HaveCookie("session");                        // a Set-Cookie pair; cookie names are case-sensitive
+response.Should.HaveCookie("session", "abc123");              // the value before the first attribute, ordinal
+response.Should.HaveRedirectLocation("/orders/42");           // the Location header as it arrived, relative or absolute
+```
+
+Header and cookie values pass through the shared redaction rules before they reach a failure message or the trace, so a failing assertion on `Authorization` or `Set-Cookie` shows `[REDACTED]` instead of the secret. A failure reads, for example, `GET /orders/42 — Expected header 'X-Correlation' to have value 'abc', but it was def.`
 
 ### `MatchShape`
 
@@ -64,7 +99,9 @@ POST /api/orders — Shape mismatch failed with 2 error(s):
 
 The failure is a `RestAssertionException` whose `InnerException` is the shared `JsonShapeMismatchException` (`Mismatches`, `MatchedProperties`), so the mismatch list stays inspectable.
 
-The assertion records an `assert.json.shape` operation with the expected type, the actual media type, the expected and actual shapes, and the matched properties or every mismatch (`matched.property_count`, `shape.mismatches`, `shape.mismatch_count`, `shape.result`). On success it records an `http.contract.shape` observation carrying the request identifier, matched property paths, target type and status code — the input [OpenAPI coverage](../openapi.md) uses. When `CaptureExpectedShapes` is on, the expected shape is attached as `rest-{n:00}-expected-shape` (`-02`, `-03` … for repeated assertions on one response).
+`MatchShape(shape, exact: true)` is the exhaustive form: a field present in the response that the shape does not mention is a mismatch naming that field. A value constraint mentions its whole subtree. The [shape matching page](../../foundation/shape-matching.md#exact-matching) has the rules.
+
+The assertion records an `assert.json.shape` operation with the expected type, the actual media type, the expected and actual shapes, and the matched properties or every mismatch (`matched.property_count`, `shape.mismatches`, `shape.mismatch_count`, `shape.result`, plus `shape.exact` in exact mode). On success it records an `http.contract.shape` observation carrying the request identifier, matched property paths, target type and status code — the input [OpenAPI coverage](../openapi.md) and [traffic coverage](../../observability/coverage.md#traffic-coverage-observed-but-unasserted) use. When `CaptureExpectedShapes` is on, the expected shape is attached as `rest-{n:00}-expected-shape` (`-02`, `-03` … for repeated assertions on one response).
 
 The full rules and every available matcher are on the [Shape matching](../../foundation/shape-matching.md) page.
 

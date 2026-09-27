@@ -10,7 +10,7 @@ REST and GraphQL responses, gRPC replies, consumed messages and sheet rows all u
 
 | Subject | Call |
 | --- | --- |
-| REST response | `response.Should.MatchShape(shape)` |
+| REST response | `response.Should.MatchShape(shape)`; `PostAsync(…).ExpectAsync(shape)` asserts in the call |
 | GraphQL response | `response.Should.MatchShape(shape)`; `ExpectAsync`/`ExpectNextAsync` assert for you |
 | gRPC reply | `ProtoGrpcAssertions.For(reply).Should.MatchShape(shape)` |
 | Consumed message | `message.Should.MatchShape(shape)` |
@@ -40,6 +40,19 @@ response.Should.MatchShape(new
 Only the properties you list are checked. Everything else in the JSON is ignored — so a shape only states what the test is about, and new fields in the API don't break it.
 
 A listed property that's missing fails with *"Property was missing from the JSON response."* A non-object where you expected one fails with *"Expected an object."*
+
+### Exact matching
+
+`.Should.MatchShape(shape, exact: true)` — or `.ExpectAsync(shape, exact: true)` — demands the other direction too: every field present in the JSON must be mentioned by the shape. A field the shape does not mention fails with its path:
+
+```
+GET /api/orders/42 — Shape mismatch failed with 1 error(s):
+  • [$.extra]: Property was not mentioned in the expected shape. (Expected: "<not mentioned>", Actual: "true")
+```
+
+An unmentioned branch reports its shallowest path once — `$.extra`, not every leaf below it — and the unmentioned fields are collected alongside ordinary mismatches, so one run shows everything. A value constraint mentions its whole subtree, so `customer = JsonValue.Any()` never fails an exact match on the fields inside `customer`.
+
+Exact mode is the Verify-style exhaustive check: partial matching stays the default, and the two share one matcher.
 
 ### Arrays are exact
 
@@ -202,15 +215,17 @@ The protocol assertions and Sheets model rows run through the shared `ProtoShape
 
 - `expected.type`, `shape.expected` and `shape.actual` — the described shape and the sanitized actual JSON;
 - `matched.property_count` and `matched.properties`, or `shape.mismatches` and `shape.mismatch_count` on failure;
-- `shape.matches` (the matched paths) and `shape.result` (`matched` or `mismatched`).
+- `shape.matches` (the matched paths) and `shape.result` (`matched` or `mismatched`);
+- `shape.exact` (`true` only) when the assertion ran in exact mode.
 
 The expected-shape description is capped at depth 16 and 4096 expanded containers; deeper nodes become `<Type at depth limit>`, so a cyclic or pathologically large shape cannot hang the run. On success the protocol records an observation built from the matched paths — `http.contract.shape` for REST, `graphql.contract.shape` for GraphQL — which is what [OpenAPI](../observability/coverage.md) and GraphQL schema coverage consume.
 
 ## Limits
 
-- Partial objects mean extra server fields never fail a shape.
+- Partial objects mean extra server fields never fail a shape — unless the assertion asks for `exact: true`, where a field no property mentioned fails.
 - Arrays are length- and position-sensitive; order matters.
 - Numbers surface as `decimal` or `double`, never `long`; strings are compared ordinally.
+- In exact mode a value constraint mentions its whole subtree; the fields inside a constrained value are not checked.
 
 ## Next
 

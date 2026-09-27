@@ -15,8 +15,11 @@ public sealed class ProtoRestBuilder : ProtoHttpProtocolBuilder<ProtoRestBuilder
     /// <summary>Configuration section backing <see cref="ProtoHttpProtocolBuilder{TBuilder}.CaptureAttachments"/>.</summary>
     public const string AttachmentsConfigurationSectionName = "ProtoTest:Rest:Attachments";
 
+    /// <summary>The observation kind a request records; matched fakes reuse it with a REST payload.</summary>
+    public const string ResponseObservationKind = "http.response";
+
     /// <summary>The observation kind a failed request records; the coverage collector ignores it.</summary>
-    internal const string FailureObservationKind = "http.failure";
+    public const string FailureObservationKind = "http.failure";
 
     /// <summary>The observation kind a successful shape assertion records; OpenAPI coverage consumes it.</summary>
     internal const string ShapeObservationKind = "http.contract.shape";

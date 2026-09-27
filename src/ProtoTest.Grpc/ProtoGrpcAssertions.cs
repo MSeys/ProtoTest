@@ -145,6 +145,14 @@ public sealed class ProtoGrpcMessageAssertions<TResponse>
     /// matcher exception - and its mismatch list - as the inner exception. Returns the message.
     /// </summary>
     public TResponse MatchShape(object expectedShape, JsonSerializerOptions? options = null)
+        => MatchShape(expectedShape, exact: false, options);
+
+    /// <summary>
+    /// Matches the reply against an expected shape exactly through the shared matcher, so a field the
+    /// shape does not mention is a mismatch naming the field; a value constraint mentions its whole
+    /// subtree. Returns the message.
+    /// </summary>
+    public TResponse MatchShape(object expectedShape, bool exact, JsonSerializerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
         var context = Proto.Context;
@@ -157,7 +165,10 @@ public sealed class ProtoGrpcMessageAssertions<TResponse>
                     context,
                     ProtoGrpcBuilder.Protocol.TraceSource,
                     "Assert gRPC response shape",
-                    ExtraAttributes: new Dictionary<string, string?> { ["rpc.message.type"] = messageType.FullName }),
+                    ExtraAttributes: new Dictionary<string, string?> { ["rpc.message.type"] = messageType.FullName })
+                {
+                    Exact = exact
+                },
                 ProtoGrpcAssertions.Formatter.Format(_response),
                 expectedShape,
                 options,

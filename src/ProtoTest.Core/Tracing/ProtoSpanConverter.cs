@@ -26,7 +26,7 @@ internal sealed class ProtoSpanConverter
         "server", "service", "session", "span", "telemetry", "thread", "trace", "url", "user"
     };
 
-    private readonly ConcurrentDictionary<IProtoTraceWriter, ConcurrentDictionary<string, string>> _states = new();
+    private readonly ConcurrentDictionary<IProtoTraceWriter, WriterStates> _states = new();
 
     /// <summary>Gets the number of writers whose observed state is still tracked; used by tests.</summary>
     internal int TrackedWriterCount => _states.Count;
@@ -50,17 +50,15 @@ internal sealed class ProtoSpanConverter
         {
             var state = ReadState(activity, identity.Prefix, identity.Key);
             var itemKey = $"{identity.Prefix}:{identity.Value}";
-            var known = _states.GetOrAdd(
-                writer,
-                static _ => new ConcurrentDictionary<string, string>(StringComparer.Ordinal));
+            var known = _states.GetOrAdd(writer, static _ => new WriterStates());
             string change;
             var serialized = Serialize(state);
-            lock (known)
+            lock (known.Gate)
             {
-                change = !known.TryGetValue(itemKey, out var previous)
+                change = !known.Values.TryGetValue(itemKey, out var previous)
                     ? "created"
                     : string.Equals(previous, serialized, StringComparison.Ordinal) ? "observed" : "changed";
-                known[itemKey] = serialized;
+                known.Values[itemKey] = serialized;
             }
 
             writer.Value(
@@ -125,4 +123,10 @@ internal sealed class ProtoSpanConverter
 
     private static string Title(string prefix)
         => char.ToUpperInvariant(prefix[0]) + prefix[1..];
+
+    private sealed class WriterStates
+    {
+        public readonly ProtoLock Gate = new();
+        public readonly ConcurrentDictionary<string, string> Values = new(StringComparer.Ordinal);
+    }
 }

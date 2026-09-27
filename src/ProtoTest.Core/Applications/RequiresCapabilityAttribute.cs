@@ -11,6 +11,22 @@ public interface IProtoSkipCondition
     string? GetSkipReason(ProtoHost host);
 }
 
+/// <summary>
+/// A skip condition whose answer depends on the application the test selected with
+/// <see cref="ApplicationAttribute"/>. The runner resolves that selection from the same attribute set
+/// it is about to run and passes the application name here, so a condition that targets an application
+/// can skip honestly in a run where another application is live. A condition that ignores the
+/// selection implements <see cref="IProtoSkipCondition"/> only.
+/// </summary>
+public interface IProtoApplicationSkipCondition : IProtoSkipCondition
+{
+    /// <summary>
+    /// Returns the reason to skip for the selected application (or <see langword="null"/> when the
+    /// test selected none), or <see langword="null"/> when the test can run.
+    /// </summary>
+    string? GetSkipReason(ProtoHost host, string? applicationName);
+}
+
 /// <summary>Evaluates the skip conditions of a resolved attribute set.</summary>
 public static class ProtoTestSkip
 {
@@ -19,9 +35,15 @@ public static class ProtoTestSkip
     {
         ArgumentNullException.ThrowIfNull(attributes);
         ArgumentNullException.ThrowIfNull(host);
-        return attributes
+        var resolved = attributes as IReadOnlyList<ProtoAttribute> ?? [.. attributes];
+        // The lifecycle runs a class-level selection before a method-level one, so the last
+        // [Application] in the resolved set is the one the test runs under.
+        var applicationName = resolved.OfType<ApplicationAttribute>().LastOrDefault()?.Name;
+        return resolved
             .OfType<IProtoSkipCondition>()
-            .Select(condition => condition.GetSkipReason(host))
+            .Select(condition => condition is IProtoApplicationSkipCondition applicationCondition
+                ? applicationCondition.GetSkipReason(host, applicationName)
+                : condition.GetSkipReason(host))
             .FirstOrDefault(reason => reason is not null);
     }
 }

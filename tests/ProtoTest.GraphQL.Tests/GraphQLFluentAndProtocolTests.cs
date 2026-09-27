@@ -7,6 +7,7 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Http.Authenticators;
+using ProtoTest.Json;
 
 [TestFixture]
 public sealed class GraphQLFluentAndProtocolTests
@@ -148,6 +149,88 @@ public sealed class GraphQLFluentAndProtocolTests
                 Assert.That(exception.InnerException, Is.TypeOf<ProtoTest.Json.JsonShapeMismatchException>(),
                     "the shared mismatch data stays reachable");
             }
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task MatchShape_Exact_ShouldRejectFieldsTheShapeDoesNotMention()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"value":1,"extra":true}}"""));
+        await host.StartTestAsync("shape exact", "24", TestMethods.Placeholder);
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            response.Should.MatchShape(new { value = 1 });
+
+            var exception = Assert.Throws<GraphQLAssertionException>(() =>
+                response.Should.MatchShape(new { value = 1 }, exact: true));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exception!.Message, Does.StartWith(
+                    "query <anonymous> — Shape mismatch failed with 1 error(s):"));
+                Assert.That(exception.Message, Does.Contain("$.extra"));
+                Assert.That(exception.Message, Does.Contain("Property was not mentioned in the expected shape."));
+                Assert.That(exception.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
+                    "the shared mismatch data stays reachable");
+            }
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task MatchShape_Exact_ShouldPassWhenEveryFieldIsMentioned()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"value":1,"customer":{"email":"ada@example.test"}}}"""));
+        await host.StartTestAsync("shape exact success", "25", TestMethods.Placeholder);
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            var returned = response.Should.MatchShape(
+                new { value = 1, customer = new { email = "ada@example.test" } },
+                exact: true);
+
+            Assert.That(returned, Is.SameAs(response));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task MatchShape_Exact_ShouldTreatAValueConstraintAsMentioningItsSubtree()
+    {
+        await using var host = CreateHost(_ => Json(
+            """{"data":{"value":1,"customer":{"email":"ada@example.test","phone":"555"}}}"""));
+        await host.StartTestAsync("shape exact constraint", "26", TestMethods.Placeholder);
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            response.Should.MatchShape(new { value = 1, customer = JsonValue.NotNull() }, exact: true);
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
+    public async Task MatchShape_Exact_ShouldKeepIgnoringExtraFieldsWithoutExact()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"value":1,"extra":true}}"""));
+        await host.StartTestAsync("shape partial", "27", TestMethods.Placeholder);
+        try
+        {
+            using var response = await Proto.Context.GraphQL()
+                .Query(null, query => query.Field("value"))
+                .ExecuteAsync();
+
+            Assert.DoesNotThrow(() => response.Should.MatchShape(new { value = 1 }));
         }
         finally { await host.CompleteTestAsync(); }
     }

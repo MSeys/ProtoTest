@@ -12,11 +12,11 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ProtoTest.AspNetCore;
 using ProtoTest.Core;
 using ProtoTest.Grpc.Tests.Echo;
 using ProtoTest.Http;
 using ProtoTest.Http.Authenticators;
-
 [TestFixture]
 public sealed class GrpcIntegrationTests
 {
@@ -183,6 +183,70 @@ public sealed class GrpcIntegrationTests
             Assert.That(EchoService.LastAuthorization, Is.EqualTo("Bearer shared-token"));
             Assert.That(call.Attributes["auth.outcome"], Is.EqualTo("applied"));
             Assert.That(call.Attributes["rpc.metadata.authorization"], Is.EqualTo("(redacted)"));
+        });
+    }
+
+    /// <summary>
+    /// The built-in test user rides the same pipeline: the shipped authenticator writes the header and
+    /// the gRPC applier turns it into metadata, so a service sees the identity the test declared.
+    /// </summary>
+    [Test]
+    [NonParallelizable]
+    public async Task SignedInAs_ShouldCarryTheTestUserAsMetadata()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddApplication("Api", app =>
+            app.AddAspNetCoreServer<ProtoTest.AspNetCore.SampleApi.Program>(
+                webHost => webHost.AddTestUserAuthentication()));
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var method = SignedInTestMethod();
+        var context = await host.StartTestAsync("grpc test user", method, ProtoAttributeResolver.Resolve(method));
+
+        var reply = await context.Grpc("Echo").UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "user" });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply.Message, Is.EqualTo("user"));
+            Assert.That(EchoService.LastTestUser, Is.Not.Null, "the identity reached the service as metadata");
+            Assert.That(ProtoTestUserHeader.TryDecode(EchoService.LastTestUser!, out var user), Is.True);
+            Assert.That(user!.Name, Is.EqualTo("frank"));
+            Assert.That(user.Roles, Is.EqualTo(new[] { "operator" }));
+        });
+    }
+
+    /// <summary>
+    /// The test-user metadata carries the identity's claim values in its Base64 payload, so the traced
+    /// call redacts the value while the service still receives it.
+    /// </summary>
+    [Test]
+    [NonParallelizable]
+    public async Task SignedInAs_ShouldRedactTheTestUserMetadataInTheTrace()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddApplication("Api", app =>
+            app.AddAspNetCoreServer<ProtoTest.AspNetCore.SampleApi.Program>(
+                webHost => webHost.AddTestUserAuthentication()));
+        builder.AddGrpc(grpc => grpc.AddClient("Echo", GrpcTestServer.Address));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var method = SignedInTestMethod();
+        var context = await host.StartTestAsync("grpc test user redaction", method, ProtoAttributeResolver.Resolve(method));
+
+        await context.Grpc("Echo").UnaryAsync(EchoMethods.Say, new EchoRequest { Message = "user" });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        var call = host.Trace.Snapshot().Tests.Single().Entries.Single(entry => entry.Kind == "grpc.call");
+        Assert.Multiple(() =>
+        {
+            Assert.That(EchoService.LastTestUser, Is.Not.Null, "the identity really traveled as metadata");
+            Assert.That(call.Attributes["rpc.metadata.prototest-user"], Is.EqualTo("(redacted)"));
+            Assert.That(
+                call.Attributes.Values,
+                Has.None.EqualTo(ProtoTestUserHeader.Encode(new ProtoTestUser("frank", ["operator"]))),
+                "the traced call must not carry the encoded identity");
         });
     }
 
@@ -933,6 +997,15 @@ public sealed class GrpcIntegrationTests
 
     private static MethodInfo QueryApiKeyAuthenticatedTestMethod()
         => typeof(GrpcIntegrationTests).GetMethod(nameof(QueryApiKeyPlaceholder), BindingFlags.Static | BindingFlags.NonPublic)!;
+
+    [Application("Api")]
+    [SignedInAs("frank", "operator")]
+    private static void SignedInPlaceholder()
+    {
+    }
+
+    private static MethodInfo SignedInTestMethod()
+        => typeof(GrpcIntegrationTests).GetMethod(nameof(SignedInPlaceholder), BindingFlags.Static | BindingFlags.NonPublic)!;
 
     [Application("Echo")]
     private static void ApplicationTransportPlaceholder()

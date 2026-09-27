@@ -15,7 +15,9 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\src\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.AspNetCore\ProtoTest.AspNetCore.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Grpc\ProtoTest.Grpc.csproj" />
+    <ProjectReference Include="..\ProtoTest.AspNetCore.TestApi\ProtoTest.AspNetCore.TestApi.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -20,6 +20,12 @@ public sealed record JsonShapeMismatch(string PropertyPath, string Reason, objec
     };
 }
 
+/// <summary>
+/// One field that arrived in the actual JSON but that no mentioned path covers: its JSON path and its
+/// value. An unmentioned branch reports its shallowest path once, not every leaf below it.
+/// </summary>
+public sealed record JsonUnmentionedField(string PropertyPath, object? Value);
+
 public sealed class JsonShapeMismatchException(
     IReadOnlyList<JsonShapeMismatch> mismatches,
     IReadOnlyList<string>? matchedProperties = null)
@@ -41,6 +47,9 @@ public sealed class JsonDocumentAssertionException : ProtoAssertionException
 
 public static class JsonShapeMatcher
 {
+    /// <summary>The Expected side of an unmentioned-field mismatch: the shape carries no value for it.</summary>
+    private const string UnmentionedExpected = "<not mentioned>";
+
     public static IReadOnlyList<string> AssertMatch(string content, object? expected, JsonSerializerOptions? options = null)
     {
         if (string.IsNullOrWhiteSpace(content))
@@ -65,12 +74,143 @@ public static class JsonShapeMatcher
         return matched;
     }
 
-    private static void Match(JsonElement actual, object? expected, string path,
-        List<JsonShapeMismatch> mismatches, List<string> matched, JsonSerializerOptions? options)
+    /// <summary>
+    /// Matches the whole JSON exactly: every field present in the JSON must be mentioned by the
+    /// expected shape, so the response cannot carry a field the shape does not declare. A value
+    /// constraint mentions its whole subtree. Every mismatch - including each unmentioned field - is
+    /// reported at once. Returns the matched property paths.
+    /// </summary>
+    public static IReadOnlyList<string> AssertExactMatch(string content, object? expected, JsonSerializerOptions? options = null)
     {
+        if (string.IsNullOrWhiteSpace(content))
+            throw new JsonDocumentAssertionException("Expected JSON, but the content was empty.", content ?? string.Empty);
+        try
+        {
+            using var document = JsonDocument.Parse(content);
+            return AssertExactMatch(document.RootElement, expected, options);
+        }
+        catch (JsonException exception)
+        {
+            throw new JsonDocumentAssertionException($"Expected valid JSON, but parsing failed: {exception.Message}", content, exception);
+        }
+    }
+
+    /// <summary>
+    /// Matches the whole JSON exactly; see <see cref="AssertExactMatch(string, object?, JsonSerializerOptions?)"/>.
+    /// </summary>
+    public static IReadOnlyList<string> AssertExactMatch(JsonElement actual, object? expected, JsonSerializerOptions? options = null)
+    {
+        var mismatches = new List<JsonShapeMismatch>();
+        var matched = new List<string>();
+        // The mentioned paths and the constraint paths are recorded for every expected path, matched or
+        // not, so an unmentioned field is never confused with a field whose value mismatched.
+        var mentioned = new List<string>();
+        var constraints = new List<string>();
+        Match(actual, expected, "$", mismatches, matched, options, mentioned, constraints);
+        foreach (var field in FindUnmentionedFields(actual, mentioned, options, constraints))
+        {
+            mismatches.Add(new JsonShapeMismatch(
+                field.PropertyPath,
+                "Property was not mentioned in the expected shape.",
+                UnmentionedExpected,
+                field.Value));
+        }
+
+        if (mismatches.Count > 0) throw new JsonShapeMismatchException(mismatches, matched);
+        return matched;
+    }
+
+    /// <summary>
+    /// The fields of <paramref name="content"/> that <paramref name="mentionedPaths"/> does not cover,
+    /// in document order and one shallowest path per unmentioned branch. Property names follow the
+    /// same case rule as matching (<see cref="JsonSerializerOptions.PropertyNameCaseInsensitive"/>,
+    /// case-insensitive by default). Empty content reports nothing; invalid JSON throws
+    /// <see cref="JsonDocumentAssertionException"/> like <see cref="AssertMatch(string, object?, JsonSerializerOptions?)"/>.
+    /// </summary>
+    public static IReadOnlyList<JsonUnmentionedField> FindUnmentionedFields(
+        string content,
+        IReadOnlyCollection<string> mentionedPaths,
+        JsonSerializerOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(mentionedPaths);
+        if (string.IsNullOrWhiteSpace(content)) return [];
+        try
+        {
+            using var document = JsonDocument.Parse(content);
+            return FindUnmentionedFields(document.RootElement, mentionedPaths, options);
+        }
+        catch (JsonException exception)
+        {
+            throw new JsonDocumentAssertionException($"Expected valid JSON, but parsing failed: {exception.Message}", content, exception);
+        }
+    }
+
+    /// <summary>
+    /// The fields of <paramref name="actual"/> that <paramref name="mentionedPaths"/> does not cover;
+    /// see <see cref="FindUnmentionedFields(string, IReadOnlyCollection{string}, JsonSerializerOptions?)"/>.
+    /// </summary>
+    public static IReadOnlyList<JsonUnmentionedField> FindUnmentionedFields(
+        JsonElement actual,
+        IReadOnlyCollection<string> mentionedPaths,
+        JsonSerializerOptions? options = null)
+        => FindUnmentionedFields(actual, mentionedPaths, options, consumedSubtrees: null);
+
+    private static IReadOnlyList<JsonUnmentionedField> FindUnmentionedFields(
+        JsonElement actual,
+        IReadOnlyCollection<string> mentionedPaths,
+        JsonSerializerOptions? options,
+        IReadOnlyCollection<string>? consumedSubtrees)
+    {
+        ArgumentNullException.ThrowIfNull(mentionedPaths);
+        var comparer = options?.PropertyNameCaseInsensitive ?? true
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+        var mentioned = new HashSet<string>(mentionedPaths, comparer);
+        var consumed = consumedSubtrees is null ? null : new HashSet<string>(consumedSubtrees, comparer);
+        var unmentioned = new List<JsonUnmentionedField>();
+        CollectUnmentioned(actual, "$", mentioned, consumed, unmentioned);
+        return unmentioned;
+    }
+
+    // A path a constraint consumed mentions its whole subtree, so its children are not collected. The
+    // root is never reported itself: a document with no mentioned paths reports its fields, not "$".
+    private static void CollectUnmentioned(
+        JsonElement element,
+        string path,
+        HashSet<string> mentioned,
+        HashSet<string>? consumed,
+        List<JsonUnmentionedField> unmentioned)
+    {
+        if (consumed?.Contains(path) == true) return;
+        if (path != "$" && !mentioned.Contains(path))
+        {
+            unmentioned.Add(new JsonUnmentionedField(path, Raw(element)));
+            return;
+        }
+
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                foreach (var property in element.EnumerateObject())
+                    CollectUnmentioned(property.Value, $"{path}.{property.Name}", mentioned, consumed, unmentioned);
+                break;
+            case JsonValueKind.Array:
+                var index = 0;
+                foreach (var item in element.EnumerateArray())
+                    CollectUnmentioned(item, $"{path}[{index++}]", mentioned, consumed, unmentioned);
+                break;
+        }
+    }
+
+    private static void Match(JsonElement actual, object? expected, string path,
+        List<JsonShapeMismatch> mismatches, List<string> matched, JsonSerializerOptions? options,
+        List<string>? mentionedPaths = null, List<string>? constraintPaths = null)
+    {
+        mentionedPaths?.Add(path);
         var mismatchCount = mismatches.Count;
         if (expected is IJsonValueMatcher matcher)
         {
+            constraintPaths?.Add(path);
             var raw = Raw(actual);
             if (!matcher.Matches(raw, out var error)) mismatches.Add(new(path, error ?? "Value constraint failed.", matcher.Description, raw));
             if (mismatches.Count == mismatchCount) matched.Add(path);
@@ -89,7 +229,7 @@ public static class JsonShapeMatcher
             var actualItems = actual.EnumerateArray().ToArray();
             if (expectedItems.Length != actualItems.Length) mismatches.Add(new(path, "Array lengths did not match.", expectedItems.Length, actualItems.Length));
             for (var index = 0; index < Math.Min(expectedItems.Length, actualItems.Length); index++)
-                Match(actualItems[index], expectedItems[index], $"{path}[{index}]", mismatches, matched, options);
+                Match(actualItems[index], expectedItems[index], $"{path}[{index}]", mismatches, matched, options, mentionedPaths, constraintPaths);
             if (mismatches.Count == mismatchCount) matched.Add(path);
             return;
         }
@@ -100,7 +240,7 @@ public static class JsonShapeMatcher
             {
                 var found = TryProperty(actual, name, options?.PropertyNameCaseInsensitive ?? true, out var property);
                 if (!found) mismatches.Add(new($"{path}.{name}", "Property was missing from the JSON response.", value, null));
-                else Match(property, value, $"{path}.{name}", mismatches, matched, options);
+                else Match(property, value, $"{path}.{name}", mismatches, matched, options, mentionedPaths, constraintPaths);
             }
             if (mismatches.Count == mismatchCount) matched.Add(path);
             return;

@@ -8,6 +8,7 @@ This is mostly a transitive package, but could be used in case you are building 
 
 - Shared registration and resolution of named HTTP clients and application targets.
 - The `[Auth<T>]` attribute and built-in authenticators.
+- The built-in test user: `[SignedInAs("alice", "admin")]`, `context.SignIn(...)`/`context.SignedInUser()`, and `TestUserAuthenticator`.
 - Response buffering and sanitization of request and response information before it is recorded.
 
 ## Learn more

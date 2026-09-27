@@ -58,6 +58,35 @@ internal sealed class ProtoClientRegistry
     }
 
     /// <summary>
+    /// Replaces the client registered under <paramref name="name"/> and reports whether the entry
+    /// changed. The registration order is kept, so a snapshot still yields the replacement once.
+    /// Returns <see langword="false"/> when the instance is already registered under the key - a second
+    /// ownership registration would dispose the same instance twice. Throws when nothing is registered
+    /// under the key: a replacement always follows a registration, it never creates one.
+    /// </summary>
+    public bool Replace<TClient>(TClient client, string name) where TClient : class
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        var key = BuildKey(typeof(TClient), name);
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_sealed != 0, this);
+            if (_clients.TryGetValue(key, out var existing))
+            {
+                if (ReferenceEquals(existing, client))
+                {
+                    return false;
+                }
+
+                _clients[key] = client;
+                return true;
+            }
+        }
+
+        throw new InvalidOperationException(DescribeMissing(typeof(TClient), name));
+    }
+
+    /// <summary>
     /// Finds the registration name a client instance is registered under. The registry keys clients by
     /// their scoped name while operations trace entities, so the request path resolves the exact key
     /// here once instead of deriving it again.

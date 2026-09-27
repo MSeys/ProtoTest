@@ -13,7 +13,7 @@ using ProtoTest.Web.Pages;
 /// Initializes an in-process ASP.NET Core test server and a per-test client for it.
 /// </summary>
 /// <typeparam name="TProgram">The entry point class of the ASP.NET Core application under test.</typeparam>
-internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitializer<HttpClient>, IAsyncDisposable
+internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitializer<HttpClient>, IAspNetCoreSubstitutionTarget, IAsyncDisposable
     where TProgram : class
 {
     private readonly Action<IWebHostBuilder>? _configureWebHost;
@@ -39,6 +39,133 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
 
     /// <inheritdoc />
     public string Name { get; }
+
+    string IAspNetCoreSubstitutionTarget.ServerName => Name;
+
+    /// <summary>
+    /// Serves the test from a dedicated server built with its accumulated substitutions. The run's
+    /// shared server is never reconfigured: a substituting test under either lifetime gets its own
+    /// server, built after its substitutions are known and released with the test, so one test's
+    /// override cannot leak into the next and parallel tests that substitute differently never meet.
+    /// </summary>
+    void IAspNetCoreSubstitutionTarget.ApplySubstitution(
+        ProtoExecutionContext context,
+        ServiceSubstitution substitution,
+        ProtoTracePhase phase)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(substitution);
+
+        var address = ProtoApplication.BaseUrl(context.Configuration, Name);
+        if (!string.IsNullOrWhiteSpace(address))
+        {
+            throw new InvalidOperationException(
+                $"Application '{Name}' runs at '{address}', so its services cannot be substituted. " +
+                $"Substitution needs the in-process server: run without a configured " +
+                $"'{ProtoApplication.SectionPath}:{Name}:BaseUrl'.");
+        }
+
+        var union = AspNetCoreSubstitutionLedger.Append(context, substitution);
+        if (union is null)
+        {
+            return;
+        }
+
+        var entityId = $"server:{typeof(TProgram).FullName}:{Name}";
+        using var operation = context.Trace
+            .Operation(
+                substitution.OperationKind,
+                $"{substitution.OperationKind} · {substitution.ServiceType.Name}",
+                "ProtoTest.AspNetCore")
+            .During(phase)
+            .For(ProtoTraceEntityKinds.Server, entityId)
+            .With("service.type", substitution.ServiceType.FullName)
+            .With("service.server", Name)
+            .With("service.replacement", substitution.Replacement)
+            .Begin();
+        try
+        {
+            // The substitution runs after the suite's own web-host callback, so the test's
+            // replacement wins over the registration the suite composed.
+            var server = AspNetCoreServer<TProgram>.Create(CombinedConfigureWithSubstitutions(context, union));
+            try
+            {
+                // The dedicated server is owned before it starts: a registration that throws once the
+                // test is releasing (or a racing override) leaves the server to teardown instead of
+                // leaking a started server. A registration that did not take ownership disposes the
+                // unstarted server here.
+                if (context.TryClient<AspNetCoreServer<TProgram>>(FactoryName(Name)) is null)
+                {
+                    context.RegisterClient(server, FactoryName(Name));
+                }
+                else
+                {
+                    context.ReplaceClient(server, FactoryName(Name));
+                }
+            }
+            catch
+            {
+                server.Dispose();
+                throw;
+            }
+
+            server.Start();
+            context.ReplaceClient(server.Factory, FactoryName(Name), ProtoClientOwnership.Caller);
+            var clientOptions = new WebApplicationFactoryClientOptions();
+            _configureClientOptions?.Invoke(clientOptions);
+            var handlers = CreateClientHandlers(clientOptions)
+                .Append(new ProtoTraceContextHandler())
+                .ToArray();
+            var client = CreateClient(server.Server.CreateHandler(), clientOptions.BaseAddress, handlers);
+            context.ReplaceClient(client, Name);
+            ReportSubstitutedServer(context, union, entityId);
+            AspNetCoreSubstitutionLedger.MarkApplied(context, Name, union);
+            operation.Succeed();
+        }
+        catch (Exception exception)
+        {
+            // The union stays unapplied, so a retry rebuilds instead of skipping a server that never
+            // started.
+            operation.Fail(exception);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Records the dedicated server the same way the shared one is recorded: an initialize event and
+    /// the server entity state, carrying which services the test substituted.
+    /// </summary>
+    private void ReportSubstitutedServer(
+        ProtoExecutionContext context,
+        IReadOnlyList<ServiceSubstitution> union,
+        string entityId)
+    {
+        var serverState = new AspNetCoreServerState(
+            Name,
+            typeof(TProgram).FullName!,
+            typeof(TProgram).Name,
+            _serverLifetime.Kind,
+            Reused: false,
+            WebHostCustomized: true,
+            ClientCustomized: _configureClientOptions is not null,
+            Substitutions: [.. union.Select(record => record.ServiceType.FullName!)]);
+        context.Trace.SetEntityState(
+            ProtoTraceEntityKinds.Server,
+            entityId,
+            serverState.DisplayName,
+            serverState.ToAttributes(),
+            scope: context.TestName,
+            change: "substituted");
+        context.Trace.WriteEvent(
+            "aspnetcore.server.initialize",
+            $"ASP.NET Core server · {Name}",
+            "ProtoTest.AspNetCore",
+            ProtoTracePhase.Setup,
+            ProtoTraceOutcome.Succeeded,
+            serverState.ToAttributes(),
+            entityKind: ProtoTraceEntityKinds.Server,
+            entityId: entityId);
+    }
 
     /// <inheritdoc />
     public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
@@ -201,6 +328,28 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
     public ValueTask DisposeAsync() => _serverLifetime.DisposeAsync();
 
     /// <summary>
+    /// The suite's combined web-host configuration with the test's substitutions appended, so the
+    /// replacement wins over the registration the suite composed.
+    /// </summary>
+    private Action<IWebHostBuilder>? CombinedConfigureWithSubstitutions(
+        ProtoExecutionContext context,
+        IReadOnlyList<ServiceSubstitution> union)
+    {
+        var baseConfigure = CombinedConfigure(context);
+        return webHost =>
+        {
+            baseConfigure?.Invoke(webHost);
+            webHost.ConfigureTestServices(services =>
+            {
+                foreach (var substitution in union)
+                {
+                    substitution.ApplyTo(services);
+                }
+            });
+        };
+    }
+
+    /// <summary>
     /// Started infrastructure provides its connection strings as host settings, so an in-process
     /// application reads the same values the tests do; explicit user configuration still wins because
     /// it is applied afterwards. The application's <see cref="TimeProvider"/> is replaced with the run's
@@ -284,15 +433,16 @@ internal sealed class AspNetCoreServer<TProgram> : IAsyncDisposable where TProgr
     /// <summary>The started test server the client transports run over.</summary>
     public TestServer Server => Factory.Server;
 
-    public static AspNetCoreServer<TProgram> Start(Action<IWebHostBuilder>? configureWebHost)
+    /// <summary>
+    /// Creates the unstarted root and derived factories. The caller owns the returned instance: register
+    /// or otherwise own it before calling <see cref="Start"/>, so a later failure cannot leak it.
+    /// </summary>
+    public static AspNetCoreServer<TProgram> Create(Action<IWebHostBuilder>? configureWebHost)
     {
         var root = new WebApplicationFactory<TProgram>();
         try
         {
             var factory = configureWebHost is null ? root : root.WithWebHostBuilder(configureWebHost);
-
-            // Start the host eagerly so concurrent tests never race WebApplicationFactory's lazy startup.
-            _ = factory.Services;
             return new AspNetCoreServer<TProgram>(root, factory);
         }
         catch
@@ -301,6 +451,30 @@ internal sealed class AspNetCoreServer<TProgram> : IAsyncDisposable where TProgr
             throw;
         }
     }
+
+    /// <summary>Starts the created host eagerly, so concurrent tests never race WebApplicationFactory's lazy startup.</summary>
+    public void Start()
+    {
+        _ = Factory.Services;
+    }
+
+    public static AspNetCoreServer<TProgram> Start(Action<IWebHostBuilder>? configureWebHost)
+    {
+        var server = Create(configureWebHost);
+        try
+        {
+            server.Start();
+            return server;
+        }
+        catch
+        {
+            server.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>Disposes the root factory; safe on an unstarted instance.</summary>
+    public void Dispose() => _root.Dispose();
 
     // Disposing the root factory also disposes factories derived from it with WithWebHostBuilder.
     public ValueTask DisposeAsync() => _root.DisposeAsync();

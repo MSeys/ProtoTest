@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+
+    <!-- New in 1.1: no released baseline exists yet, so there is nothing to validate against. -->
+    <IsPackable>true</IsPackable>
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <PackageValidationOptOutReason>New in 1.1; no released baseline exists yet. Validate against the 1.1.0 baseline after it publishes (RELEASING.md).</PackageValidationOptOutReason>
+    <Description>Run an Aspire AppHost with a ProtoTest suite: the run starts it, its resources become application targets, and the run releases it.</Description>
+    <PackageTags>testing;integration-testing;aspire;distributed-application;dotnet</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <PackageReference Include="Aspire.Hosting.Testing" />
+  </ItemGroup>
+
+</Project>

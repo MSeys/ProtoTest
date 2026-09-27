@@ -100,7 +100,8 @@ jobs:
         run: ./eng/release.ps1 -Configuration Release -DryRun
 
       # The template is packed with every run; this proves the package actually installs, generates a
-      # project against the just-packed packages, and builds and tests it.
+      # project against the just-packed packages for every runner the template offers, and builds and
+      # tests each one.
       - name: Smoke-test the starter template
         shell: pwsh
         run: |
@@ -111,28 +112,41 @@ jobs:
           dotnet new install $package.FullName
           if ($LASTEXITCODE -ne 0) { throw "dotnet new install failed." }
 
-          $starter = Join-Path $env:RUNNER_TEMP "prototest-starter-smoke"
-          if (Test-Path -LiteralPath $starter) { Remove-Item -LiteralPath $starter -Recurse -Force }
-          dotnet new prototest --no-restore -n Starter -o $starter
-          if ($LASTEXITCODE -ne 0) { throw "dotnet new prototest failed." }
-
-          # The starter resolves the packages this run just packed, and falls back to nuget.org for
-          # everything else.
           $packages = (Resolve-Path artifacts/packages).Path
-          @"
-          <?xml version="1.0" encoding="utf-8"?>
-          <configuration>
-            <packageSources>
-              <clear />
-              <add key="local" value="$packages" />
-              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-            </packageSources>
-          </configuration>
-          "@ | Set-Content -Path (Join-Path $starter "NuGet.config")
+          foreach ($runner in @("nunit", "xunit", "xunit3", "tunit", "mstest")) {
+            $starter = Join-Path $env:RUNNER_TEMP "prototest-starter-$runner"
+            if (Test-Path -LiteralPath $starter) { Remove-Item -LiteralPath $starter -Recurse -Force }
+            dotnet new prototest --no-restore -n Starter -o $starter --runner $runner
+            if ($LASTEXITCODE -ne 0) { throw "dotnet new prototest --runner $runner failed." }
 
-          dotnet restore (Join-Path $starter "Starter.slnx")
-          dotnet build (Join-Path $starter "Starter.slnx") --configuration Release --no-restore
-          dotnet test (Join-Path $starter "Starter.Tests/Starter.Tests.csproj") --configuration Release --no-build --no-restore
+            # The starter resolves the packages this run just packed, and falls back to nuget.org for
+            # everything else.
+            @"
+            <?xml version="1.0" encoding="utf-8"?>
+            <configuration>
+              <packageSources>
+                <clear />
+                <add key="local" value="$packages" />
+                <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+              </packageSources>
+            </configuration>
+            "@ | Set-Content -Path (Join-Path $starter "NuGet.config")
+
+            # Run from the starter root: the Microsoft Testing Platform variants select the MTP test
+            # runner in their global.json, which the SDK resolves from the working directory.
+            Push-Location $starter
+            try {
+              dotnet restore Starter.slnx
+              if ($LASTEXITCODE -ne 0) { throw "restore failed for the $runner starter." }
+              dotnet build Starter.slnx --configuration Release --no-restore
+              if ($LASTEXITCODE -ne 0) { throw "build failed for the $runner starter." }
+              dotnet test Starter.Tests/Starter.Tests.csproj --configuration Release --no-build --no-restore
+              if ($LASTEXITCODE -ne 0) { throw "test failed for the $runner starter." }
+            }
+            finally {
+              Pop-Location
+            }
+          }
 
       - name: Keep the validated release packages
         if: inputs.upload_packages

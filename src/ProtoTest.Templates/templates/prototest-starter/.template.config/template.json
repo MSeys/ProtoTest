@@ -5,7 +5,7 @@
   "identity": "ProtoTest.Starter",
   "groupIdentity": "ProtoTest.Starter",
   "name": "ProtoTest starter",
-  "description": "A small ASP.NET Core API and a ProtoTest suite for it: composed, traced and reported, ready for dotnet test.",
+  "description": "A small ASP.NET Core API and a ProtoTest suite for it, written for the runner of your choice: composed, traced and reported, ready for dotnet test.",
   "shortName": "prototest",
   "sourceName": "Starter",
   "preferNameDirectory": true,
@@ -26,6 +26,19 @@
       "defaultValue": "net10.0",
       "replaces": "net10.0"
     },
+    "runner": {
+      "type": "parameter",
+      "description": "The test runner the generated suite uses.",
+      "datatype": "choice",
+      "choices": [
+        { "choice": "nunit", "description": "NUnit (default)" },
+        { "choice": "xunit", "description": "xUnit.net v2" },
+        { "choice": "xunit3", "description": "xUnit.net v3" },
+        { "choice": "tunit", "description": "TUnit" },
+        { "choice": "mstest", "description": "MSTest" }
+      ],
+      "defaultValue": "nunit"
+    },
     "skipRestore": {
       "type": "parameter",
       "datatype": "bool",
@@ -39,6 +52,25 @@
       "replaces": "PROTOTEST_VERSION"
     }
   },
+  "sources": [
+    {
+      "modifiers": [
+        { "condition": "(runner != 'nunit')", "exclude": ["Starter.Tests/Setup.nunit.cs"] },
+        { "condition": "(runner != 'xunit')", "exclude": ["Starter.Tests/Setup.xunit.cs"] },
+        { "condition": "(runner != 'xunit3')", "exclude": ["Starter.Tests/Setup.xunit3.cs"] },
+        { "condition": "(runner != 'tunit')", "exclude": ["Starter.Tests/Setup.tunit.cs"] },
+        { "condition": "(runner != 'mstest')", "exclude": ["Starter.Tests/Setup.mstest.cs"] },
+        { "condition": "(runner == 'nunit')", "exclude": ["global.json"] },
+        { "condition": "(runner == 'xunit')", "exclude": ["global.json"] },
+        { "condition": "(runner == 'mstest')", "exclude": ["global.json"] },
+        { "condition": "(runner == 'nunit')", "rename": { "Starter.Tests/Setup.nunit.cs": "Starter.Tests/Setup.cs" } },
+        { "condition": "(runner == 'xunit')", "rename": { "Starter.Tests/Setup.xunit.cs": "Starter.Tests/Setup.cs" } },
+        { "condition": "(runner == 'xunit3')", "rename": { "Starter.Tests/Setup.xunit3.cs": "Starter.Tests/Setup.cs" } },
+        { "condition": "(runner == 'tunit')", "rename": { "Starter.Tests/Setup.tunit.cs": "Starter.Tests/Setup.cs" } },
+        { "condition": "(runner == 'mstest')", "rename": { "Starter.Tests/Setup.mstest.cs": "Starter.Tests/Setup.cs" } }
+      ]
+    }
+  ],
   "primaryOutputs": [
     { "path": "Starter.slnx" }
   ],

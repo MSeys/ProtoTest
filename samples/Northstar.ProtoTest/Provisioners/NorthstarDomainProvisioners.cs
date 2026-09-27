@@ -28,9 +28,11 @@ internal static class NorthstarDomainAccess
         return execution.Service<NorthstarStore>();
     }
 
-    public static NorthstarPrincipal Principal(NorthstarStore store, ProtoExecutionContext execution)
+    public static async ValueTask<NorthstarPrincipal> PrincipalAsync(
+        NorthstarStore store,
+        ProtoExecutionContext execution)
     {
-        var member = execution.Resolve<NorthstarMemberContext>();
+        var member = await NorthstarMember.EnsureAsync(execution);
         return store.Authenticate(member.Token);
     }
 
@@ -94,15 +96,15 @@ public sealed class NorthstarTenantProvisioner : IProtoDataProvisioner<Provision
 /// <summary>Creates a project through the domain, as the signed-in member.</summary>
 public sealed class NorthstarProjectProvisioner : IProtoDataProvisioner<CreateProjectRequest, ProjectResponse>
 {
-    public ValueTask<ProtoDataProvisioningResult<ProjectResponse>> CreateAsync(
+    public async ValueTask<ProtoDataProvisioningResult<ProjectResponse>> CreateAsync(
         CreateProjectRequest value,
         ProtoDataProvisioningContext context,
         CancellationToken cancellationToken)
     {
         var store = NorthstarDomainAccess.Store(context.Execution);
-        var principal = NorthstarDomainAccess.Principal(store, context.Execution);
+        var principal = await NorthstarDomainAccess.PrincipalAsync(store, context.Execution);
         var project = store.CreateProject(principal, value.Name);
-        return ValueTask.FromResult(new ProtoDataProvisioningResult<ProjectResponse>(project, project.Id));
+        return new ProtoDataProvisioningResult<ProjectResponse>(project, project.Id);
     }
 }
 
@@ -110,17 +112,17 @@ public sealed class NorthstarProjectProvisioner : IProtoDataProvisioner<CreatePr
 public sealed class NorthstarEnvironmentProvisioner
     : IProtoDataProvisioner<ProvisionEnvironmentRequest, EnvironmentResponse>
 {
-    public ValueTask<ProtoDataProvisioningResult<EnvironmentResponse>> CreateAsync(
+    public async ValueTask<ProtoDataProvisioningResult<EnvironmentResponse>> CreateAsync(
         ProvisionEnvironmentRequest value,
         ProtoDataProvisioningContext context,
         CancellationToken cancellationToken)
     {
         var store = NorthstarDomainAccess.Store(context.Execution);
-        var principal = NorthstarDomainAccess.Principal(store, context.Execution);
+        var principal = await NorthstarDomainAccess.PrincipalAsync(store, context.Execution);
         var environment = store.CreateEnvironment(principal, value.ProjectId, value.Name, value.Kind);
-        return ValueTask.FromResult(new ProtoDataProvisioningResult<EnvironmentResponse>(
+        return new ProtoDataProvisioningResult<EnvironmentResponse>(
             environment,
-            environment.Id));
+            environment.Id);
     }
 }
 
@@ -131,17 +133,17 @@ public sealed class NorthstarEnvironmentProvisioner
 public sealed class NorthstarDeploymentProvisioner
     : IProtoDataProvisioner<ProvisionDeploymentRequest, DeploymentResponse>
 {
-    public ValueTask<ProtoDataProvisioningResult<DeploymentResponse>> CreateAsync(
+    public async ValueTask<ProtoDataProvisioningResult<DeploymentResponse>> CreateAsync(
         ProvisionDeploymentRequest value,
         ProtoDataProvisioningContext context,
         CancellationToken cancellationToken)
     {
         var store = NorthstarDomainAccess.Store(context.Execution);
-        var principal = NorthstarDomainAccess.Principal(store, context.Execution);
+        var principal = await NorthstarDomainAccess.PrincipalAsync(store, context.Execution);
         var deployment = store.Deploy(principal, value.EnvironmentId, value.Version, value.CommitSha);
-        return ValueTask.FromResult(new ProtoDataProvisioningResult<DeploymentResponse>(
+        return new ProtoDataProvisioningResult<DeploymentResponse>(
             deployment,
-            deployment.Id));
+            deployment.Id);
     }
 }
 
@@ -151,7 +153,7 @@ public sealed class NorthstarDeploymentProvisioner
 /// </summary>
 public sealed class NorthstarInvoiceProvisioner : IProtoDataProvisioner<IssueInvoiceRequest, InvoiceResponse>
 {
-    public ValueTask<ProtoDataProvisioningResult<InvoiceResponse>> CreateAsync(
+    public async ValueTask<ProtoDataProvisioningResult<InvoiceResponse>> CreateAsync(
         IssueInvoiceRequest value,
         ProtoDataProvisioningContext context,
         CancellationToken cancellationToken)
@@ -159,12 +161,12 @@ public sealed class NorthstarInvoiceProvisioner : IProtoDataProvisioner<IssueInv
         var execution = context.Execution;
         var organization = execution.Resolve<NorthstarOrganizationContext>();
         var store = NorthstarDomainAccess.Store(execution);
-        var principal = NorthstarDomainAccess.Principal(store, execution);
+        var principal = await NorthstarDomainAccess.PrincipalAsync(store, execution);
         store.RecordUsage(principal, value.Metric, value.Quantity);
         store.AdvanceClock(organization.Tenant, TimeSpan.FromDays(value.Days));
         var invoice = store.ListInvoices(principal, InvoiceStatuses.Open, null, 10).Items.FirstOrDefault()
             ?? throw new InvalidOperationException("Closing the billing period produced no open invoice.");
-        return ValueTask.FromResult(new ProtoDataProvisioningResult<InvoiceResponse>(invoice, invoice.Number));
+        return new ProtoDataProvisioningResult<InvoiceResponse>(invoice, invoice.Number);
     }
 }
 

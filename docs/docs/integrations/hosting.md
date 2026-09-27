@@ -65,7 +65,7 @@ Register the worker after the pieces it needs: a [readiness probe](../foundation
 
 ## Limits
 
-- **In-process only.** A suite pointed at a published environment has no worker to start. Guard the tests that need one with `[RequiresWorker<TProgram>]` (the typed form of `[RequiresCapability(ProtoCapabilityKinds.Worker)]`, checked by the program assembly name).
+- **In-process only.** A suite pointed at a published environment has no worker to start. Guard the tests that need one with `[RequiresWorker<TProgram>]` (the typed form of `[RequiresCapability(ProtoCapabilityKinds.Worker)]`, checked by the program assembly name). For an orchestrated topology instead of an in-process worker, see [Aspire](./aspire.md).
 - **One instance per run.** The worker is shared by every test in the run, exactly like the in-process application; tests must not assume a fresh worker per test.
 - **No per-test lifetime.** `AddWorkerHost` has no `PerTest` option; a worker that must restart between tests is not supported.
 - **A parameterless or argument-ignoring `Main` cannot see the overlay before `Build()`.** The run passes the overlay as command-line arguments; an entry point whose `Main()` takes no arguments, or that builds its host without passing `args`, still receives the values when the host is built (the in-memory overlay), so options factories and hosted services read them, but code between creating the builder and calling `Build()` reads only the worker's own sources. A parameterless `Main` also never receives the worker's `--contentRoot`/`--applicationName`, so it reads its own `appsettings.json` from the test process's content root. Build the host from `args` when `Main` itself reads configuration.

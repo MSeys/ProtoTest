@@ -9,6 +9,14 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ### Added
 
+- Low-ceremony mode is opt-in per adapter: `[assembly: ProtoTestAutoWrap]` in `ProtoTest.NUnit` runs
+  every plain `[Test]` through the same lifecycle as `[ProtoTest]`, and the same attribute in
+  `ProtoTest.Xunit3` does it for plain `[Fact]` and `[Theory]` tests. A test that already carries the
+  runner's ProtoTest attribute keeps its own wrapper, so existing tests are untouched.
+- `ProtoTestHost.For<TProgram>(builder)` composes an ASP.NET Core application in one line: the
+  application under test hosted in-process under the default name `Api`, with its protocol
+  registrations (`configure: app => app.AddRest(...)`) on the same call. It is the same composition as
+  `AddApplication("Api", app => app.AddAspNetCoreServer<TProgram>())`.
 - `ProtoTest.Hosting` runs a background worker or generic host in-process with the suite:
   `AddWorkerHost<TProgram>()` starts the worker's own entry point once per run, after the
   infrastructure registered before it, feeds it the suite's configuration, the run's settings
@@ -180,8 +188,105 @@ All ProtoTest packages share one version; breaking API changes are called out be
   available at its registration position as command-line arguments, and releases the application
   with the run. The published instance is separate from `AddAspNetCoreServer`, with no
   `ServerFactory` or `[RequiresInProcess]`.
+- Per-test service substitution (`ProtoTest.AspNetCore`): `context.Override<TService>(...)`,
+  `[ReplaceService<TService>(typeof(TImplementation))]` and `[FailDependency<TService>]` build a
+  dedicated per-test server (both lifetimes) with the replacement applied before the server builds, so
+  a shared per-run server never leaks one test's override into the next. A scope resolved before the
+  override still serves the shared server — apply the override before first resolving application
+  services. Substitutions are traced as
+  `service.substitute`/`service.fail` with `aspnetcore.server.substituted` on the server entity; a
+  `RequiresCapability`-style skip applies when the application is not in-process, and closed-box
+  harnesses cannot be substituted. `ProtoExecutionContext.ReplaceClient` swaps a registered client.
+- `ProtoTest.WireMock` fakes HTTP dependencies per test on WireMock.Net: `AddWireMock(name)` with
+  per-test servers by default and `PerRun()`/`Port(n)` opt-ins, scenario-like `Stub(method,
+  path).RespondJson(...)` stubbing, matched requests traced as `http.response` with the REST response
+  payload (`http.failure` when unmatched, never covered), and an automatic `WireMock` coverage collector
+  where registered stubs are gaps until hit. Matched and unmatched requests reuse the REST response
+  and failure kinds (`ProtoRestBuilder.ResponseObservationKind`/`FailureObservationKind`), so the kinds
+  cannot drift apart; the `aspire` capability kind lives on `ProtoCapabilityKinds`.
+- `ProtoTest.Aspire` runs an Aspire AppHost with the suite (`net8.0`/`net9.0`/`net10.0` package assets; Aspire 13.5.4):
+  `AddAspNetCoreServer` stays for white-box servers; `AddAspireAppHost<TEntryPoint>()` starts the
+  AppHost's own entry point once per run, publishes each resource's endpoint as
+  `ProtoTest:Applications:{resource}:BaseUrl`, and stops it with the run. When only some declared
+  resource keys are configured, the AppHost starts for the rest and publishes only the missing keys,
+  so a configured address is never masked. Closed box: no per-test substitution, no in-process
+  assertions. The test AppHost and suite stay `net10.0`: DCP launches `AddProject` resources with
+  `dotnet run`, which cannot choose a target framework for a multi-targeted project. The
+  `Aspire.AppHost.Sdk` version is pinned once in `global.json` (`msbuild-sdks`).
+- REST responses assert their shape where the call is made: `PostAsync(…).ExpectAsync(new { … })`
+  awaits the response and runs the same `Should.MatchShape` facade assertion (disposing the response
+  on a mismatch), and `Should.MatchShape(shape, exact: true)` adds the exhaustive form — a field
+  present in the response that the shape does not mention fails naming its path, while a value
+  constraint mentions its whole subtree. Exact mode and the traffic collector share the one
+  unmentioned-field walk (`JsonShapeMatcher.AssertExactMatch`/`FindUnmentionedFields`), and the shape
+  assertion records `shape.exact` in the trace.
+- The exhaustive exact shape mode is on every protocol, not just REST: `MatchShape(shape, exact: true)`
+  on GraphQL responses, gRPC replies, consumed messages and Sheets table/model rows, with the obsolete
+  `ShouldMatchShape` shims forwarding the new parameter. Every surface sets the shared
+  `ProtoShapeAssertionContext.Exact` (GraphQL through `ProtoHttpResponse.AssertShape`), so all of them
+  run the one `JsonShapeMatcher.AssertExactMatch` walk REST's exact mode and the traffic collector
+  share — there is no second traversal.
+- REST `Should`/`ShouldNot` assert more of the HTTP response: `HaveContentType`, `HaveHeader`
+  (presence or value), `HaveCookie` (presence or value) and `HaveRedirectLocation`, each traced as its
+  own `assert.http.*` operation, with the request identifier on a failure and header/cookie values
+  redacted by the shared rules.
+- `RestTrafficCoverageCollector` (opt-in: `AddCollector<RestTrafficCoverageCollector>()`) reports the
+  fields that arrived in REST responses but that no shape assertion mentioned, as their own `traffic`
+  report and HTML section. Observed fields never count as covered: the coverage arithmetic and run
+  gates keep counting only asserted paths. It reads the run's `http.response` and
+  `http.contract.shape` observations, keyed by method, route template and status code; a body the
+  diagnostic cap truncated cannot be analyzed and contributes nothing.
+- A built-in test user signs a test in with claims and roles: `[SignedInAs("alice", "Admin",
+  Claims = new[] { "tenant=northstar" })]` (or `context.SignIn(new ProtoTestUser(...))` during the
+  test body) publishes the identity as `context.SignedInUser()` and rides the existing HTTP auth
+  pipeline, so REST, GraphQL and gRPC requests carry it (gRPC as `prototest-user` metadata). The
+  declaration composes with `[Auth<T>]` instead of replacing it, the `Auth` entity names
+  `SignedInAsAttribute` among its authenticators, and the identity itself is traced as an `auth`
+  entity with id `auth:user` (name, roles, claim **types**, application; claim values never reach the
+  trace) plus an `auth.user.sign-in` event. `ProtoTest.AspNetCore` ships the app side:
+  `webHost.AddTestUserAuthentication()` inside `AddAspNetCoreServer` decodes the `ProtoTest-User`
+  header into the application's `ClaimsPrincipal` (name, `ClaimTypes.Role` roles, custom claims) and
+  becomes its default authentication scheme, so plain `[Authorize]`/role checks decide. The identity
+  is per-test state; against a published application the shipped transport stays inert - the request
+  goes out unchanged and the trace marks `auth.transport = inert` with the reason.
+- `ProtoTest.Templates`: `dotnet new prototest --runner nunit|xunit|xunit3|tunit|mstest` writes the
+  starter suite for that test runner (NUnit remains the default). The variant selects the runner's
+  ProtoTest adapter and test packages and the matching lifecycle wiring in `Starter.Tests/Setup.cs`,
+  so the generated solution restores, builds and runs with the chosen runner; the Microsoft Testing
+  Platform variants (`xunit3`, `tunit`) also select the MTP `dotnet test` runner in the generated
+  `global.json`.
+
+### Changed
+
+- A per-run WireMock fake keeps its stubs and request log for the whole run: teardown reports the
+  test's requests but no longer resets the shared fake, so a stub one test registers still matches in
+  the next. `Reset()` clears the shared fake between tests, and release clears it with the run.
+- An unnamed `[ReplaceService<T>]`/`[FailDependency<T>]` gates on the test's selected application
+  (falling back to `Default`), the same target the substitution resolves, instead of any in-process
+  server: a mixed run that publishes the selected application and hosts another in-process now skips
+  that test instead of failing its setup. A named one still gates on its named server.
+- `ProtoExecutionContext.ReplaceClient` with the already-registered instance is a no-op: the instance
+  keeps its existing owner instead of registering a second release that disposed it twice.
+- A substituting test's dedicated server is owned before it starts: a registration that throws once
+  the test started releasing (the sealed client registry, a racing override) disposes the server
+  instead of leaking a started one.
+- `[SignedInAs]` stays out of the method-over-class replacement `[Auth<T>]` uses: a method-level
+  identity now keeps the class-level authenticators and composes with them, so the common "class owns
+  the authenticator, method names the user" shape works. The REST/GraphQL/gRPC auth entity still
+  reports `auth.source` for the `[Auth]` attributes and lists the test user among `auth.types`.
 
 ### Fixed
+
+- A gRPC call made by a signed-in test redacts the built-in test user's metadata: `prototest-user`
+  joins the default `GrpcClientOptions.SensitiveMetadataKeys`, so the Base64 identity and its claim
+  values never reach the trace (`rpc.metadata.prototest-user` records `(redacted)`) while the
+  application still receives the identity.
+- A malformed `ProtoTest-User` header - not Base64, a null role or claim, or an oversized identity -
+  fails the app-side test-user authentication instead of throwing: the request stays anonymous and the
+  application's authorization challenges it as usual, rather than failing with a 500.
+- An Aspire AppHost that starts for a partly configured multi-resource topology no longer masks the
+  configured addresses: it publishes only the keys configuration does not already fill, and its
+  evidence marks `aspire.resource.{resource}.address_source = configuration` for the rest.
 
 - A browser download is named binary content: `WebDownload` implements `IProtoBinaryContent`, so a
   downloaded file feeds anything consuming named bytes (for example `ProtoSheets.Open`) in one line

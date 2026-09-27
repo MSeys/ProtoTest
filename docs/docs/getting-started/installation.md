@@ -10,7 +10,7 @@ ProtoTest targets **.NET 8, 9 and 10**, and every package is a stable release on
 
 ## Quick start: the template
 
-The quickest way in is a solution that already works: a small ASP.NET Core API and a suite for it, composed, traced and reported.
+The quickest way in is a solution that already works: a small ASP.NET Core API and a suite for it, composed, traced and reported. The suite is written for **NUnit** by default; pass `--runner xunit`, `--runner xunit3`, `--runner tunit` or `--runner mstest` to write it for another runner — the setup class and the test project's packages change with it.
 
 ```bash
 dotnet new install ProtoTest.Templates

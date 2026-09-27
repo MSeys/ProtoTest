@@ -9,12 +9,16 @@ public sealed class EchoService : Echo.EchoBase
     public static string? LastAuthorization { get; private set; }
     public static string? LastStreamAuthorization { get; private set; }
 
+    /// <summary>The test-user metadata a call carried, so a test can prove the identity reached gRPC.</summary>
+    public static string? LastTestUser { get; private set; }
+
     /// <summary>The deadline the server saw per request message, so a test can pin a client's default.</summary>
     public static ConcurrentDictionary<string, DateTime> Deadlines { get; } = new(StringComparer.Ordinal);
 
     public override Task<EchoReply> Say(EchoRequest request, ServerCallContext context)
     {
         LastAuthorization = context.RequestHeaders.GetValue("authorization");
+        LastTestUser = context.RequestHeaders.GetValue("prototest-user");
         Deadlines[request.Message] = context.Deadline;
         return Task.FromResult(new EchoReply { Message = request.Message, Password = request.Password });
     }

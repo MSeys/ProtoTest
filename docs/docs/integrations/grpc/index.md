@@ -53,7 +53,7 @@ A repeated `AddGrpc` is not a no-op: its `configure` callback always runs, so mo
 | --- | --- | --- | --- |
 | `ProtoTest:Grpc:Client:Metadata` | `GrpcClientOptions.Metadata` | `IDictionary<string, string>` | empty |
 | `ProtoTest:Grpc:Client:DefaultDeadline` | `GrpcClientOptions.DefaultDeadline` | `TimeSpan?` | `null` |
-| `ProtoTest:Grpc:Client:SensitiveMetadataKeys` | `GrpcClientOptions.SensitiveMetadataKeys` | `List<string>` | `authorization`, `cookie`, `set-cookie`, `x-api-key`, `api-key`, `token`, `x-auth-token` |
+| `ProtoTest:Grpc:Client:SensitiveMetadataKeys` | `GrpcClientOptions.SensitiveMetadataKeys` | `List<string>` | `authorization`, `cookie`, `set-cookie`, `x-api-key`, `api-key`, `token`, `x-auth-token`, `prototest-user` |
 | `ProtoTest:Grpc:Attachments:CaptureRequestBodies` | `ProtoHttpAttachmentOptions.CaptureRequestBodies` | `bool` | `true` |
 | `ProtoTest:Grpc:Attachments:CaptureResponses` | `ProtoHttpAttachmentOptions.CaptureResponses` | `bool` | `true` |
 | `ProtoTest:Grpc:Attachments:CaptureExpectedShapes` | `ProtoHttpAttachmentOptions.CaptureExpectedShapes` | `bool` | `true` |
@@ -117,9 +117,12 @@ public static ProtoGrpcMessageAssertions<TResponse> For<TResponse>(TResponse res
     where TResponse : IMessage;
 // ProtoGrpcMessageAssertions<TResponse>: Should -> ProtoGrpcMessageAssertions<TResponse>
 //                                       MatchShape(object expectedShape, JsonSerializerOptions? options = null) -> TResponse
+//                                       MatchShape(object expectedShape, bool exact, JsonSerializerOptions? options = null) -> TResponse
 ```
 
 The reply is compared through its JSON form: field names are camelCase, enums are their names, and fields left at their default value are still present, so `quantity = 0` can be asserted. Every mismatch is reported at once. The assertion records an `assert.json.shape` operation with a `grpc.contract.shape` observation on the ambient test context, like the other integrations' data-object assertions. A mismatch throws `GrpcAssertionException` whose message starts with the message type, keeping the shared `JsonShapeMismatchException` as `InnerException`. The old `ShouldMatchShape` extension remains as an obsolete shim.
+
+`ProtoGrpcAssertions.For(reply).Should.MatchShape(shape, exact: true)` is the exhaustive form: a field present in the reply that the shape does not mention is a mismatch naming that field. A value constraint mentions its whole subtree. The [shape matching page](../../foundation/shape-matching.md#exact-matching) has the rules.
 
 A failed call throws `RpcException`; `ProtoGrpcAssertions.For(exception)` returns its assertion facade:
 
@@ -166,7 +169,9 @@ public sealed class OrderTests
 
 ### Authentication
 
-gRPC uses the same `[Auth]` attributes as the HTTP protocols:
+gRPC uses the same `[Auth]` attributes as the HTTP protocols - including the
+[built-in test user](../rest/authentication.md#built-in-test-user), whose header arrives as `prototest-user`
+metadata:
 
 ```csharp
 [Application("Api", "Grpc:Api")]

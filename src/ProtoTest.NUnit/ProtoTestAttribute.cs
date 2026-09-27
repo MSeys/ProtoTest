@@ -18,6 +18,17 @@ public class ProtoTestAttribute : TestAttribute, IWrapSetUpTearDown
     public TestCommand Wrap(TestCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
+        return WrapCommand(command);
+    }
+
+    /// <summary>
+    /// The one command wrapper the lifecycle entry points share: the test attribute and the assembly
+    /// auto-wrap both run a test through this, so their lifecycle, skip path and result mapping cannot
+    /// drift apart.
+    /// </summary>
+    internal static TestCommand WrapCommand(TestCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
         return new ProtoTestCommand(command);
     }
 

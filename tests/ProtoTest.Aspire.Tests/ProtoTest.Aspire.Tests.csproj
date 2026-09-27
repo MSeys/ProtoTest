@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+    <!-- The adapter multi-targets net8.0/net9.0/net10.0; the suite and its AppHost stay net10.0
+         because DCP launches the AppHost's project resources with `dotnet run`, which cannot
+         choose a target framework for a multi-targeted project. -->
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="NUnit3TestAdapter" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ProtoTest.Aspire\ProtoTest.Aspire.csproj" />
+    <ProjectReference Include="..\ProtoTest.Aspire.TestAppHost\ProtoTest.Aspire.TestAppHost.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.TestSupport\ProtoTest.TestSupport.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\NUnitParallelization.cs" Link="NUnitParallelization.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+
+</Project>

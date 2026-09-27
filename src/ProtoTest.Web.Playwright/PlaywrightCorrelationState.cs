@@ -12,7 +12,7 @@ using System.Collections.Concurrent;
 /// </summary>
 internal sealed class PlaywrightCorrelationState
 {
-    private readonly object _gate = new();
+    private readonly ProtoLock _gate = new();
     private readonly Dictionary<string, long> _openOperations = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, byte> _openTraceGroups = new(StringComparer.Ordinal);
     private long _sequence;

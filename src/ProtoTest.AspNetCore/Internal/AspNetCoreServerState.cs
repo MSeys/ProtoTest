@@ -11,18 +11,29 @@ internal sealed record AspNetCoreServerState(
     AspNetCoreServerLifetime Lifetime,
     bool Reused,
     bool WebHostCustomized,
-    bool ClientCustomized)
+    bool ClientCustomized,
+    IReadOnlyList<string>? Substitutions = null)
 {
     public string EntityId => $"server:{ProgramType}:{ServerName}";
 
     public string DisplayName => $"Server · {ProgramName}";
 
-    public Dictionary<string, string?> ToAttributes() => new()
+    public Dictionary<string, string?> ToAttributes()
     {
-        ["aspnetcore.application.type"] = ProgramType,
-        ["aspnetcore.server.lifetime"] = Lifetime.ToString(),
-        ["aspnetcore.server.reused"] = Reused ? "true" : "false",
-        ["aspnetcore.web_host.customized"] = WebHostCustomized ? "true" : "false",
-        ["aspnetcore.client.customized"] = ClientCustomized ? "true" : "false"
-    };
+        var attributes = new Dictionary<string, string?>
+        {
+            ["aspnetcore.application.type"] = ProgramType,
+            ["aspnetcore.server.lifetime"] = Lifetime.ToString(),
+            ["aspnetcore.server.reused"] = Reused ? "true" : "false",
+            ["aspnetcore.web_host.customized"] = WebHostCustomized ? "true" : "false",
+            ["aspnetcore.client.customized"] = ClientCustomized ? "true" : "false"
+        };
+        if (Substitutions is { Count: > 0 })
+        {
+            attributes["aspnetcore.server.substituted"] = "true";
+            attributes["aspnetcore.server.substitutions"] = string.Join(",", Substitutions);
+        }
+
+        return attributes;
+    }
 }

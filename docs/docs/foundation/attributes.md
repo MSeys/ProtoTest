@@ -162,6 +162,7 @@ Conditions run before `StartTestAsync`, so a skipped test has no context and no 
 | [`[WebSession]`](../integrations/web/index.md#several-sessions-in-one-test) | `ProtoAttribute` — declares and optionally opens a browser session |
 | [`[LoginAs<TStrategy>]`](../integrations/web/login.md) | `ProtoAttribute` — logs a browser session in |
 | [`[Auth<T>]`](../integrations/rest/authentication.md) | metadata read by the HTTP hooks — one authenticator for REST and GraphQL, narrowed with `Protocols` |
+| [`[SignedInAs]`](../integrations/rest/authentication.md#built-in-test-user) | `ProtoAttribute` + HTTP auth metadata — declares the test user's name, roles and claims for the in-process application |
 | `[Application("Name", "Protocol:Client")]` | `ProtoAttribute` — selects the application under test and, optionally, which client each protocol uses |
 | [`[RequiresCapability(kind)]`](./skip-conditions.md) | `ProtoAttribute` — skips the test unless the host has the capability |
 | [`[RequiresWorker<TProgram>]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute` — skips unless `AddWorkerHost<TProgram>()` hosts the worker |

@@ -441,6 +441,7 @@ public sealed class DeviceTests
 
     private sealed class FakeDeviceServer
     {
+        private readonly ProtoLock _gate = new();
         private readonly List<string> _sent = [];
 
         public FakeProtocol Protocol { get; } = new();
@@ -453,7 +454,7 @@ public sealed class DeviceTests
         {
             get
             {
-                lock (_sent)
+                lock (_gate)
                 {
                     return [.. _sent];
                 }
@@ -468,7 +469,7 @@ public sealed class DeviceTests
         private InMemoryConnection Connect(DeviceEndpoint endpoint)
             => new(Protocol, Responds, frame =>
             {
-                lock (_sent)
+                lock (_gate)
                 {
                     _sent.Add(frame);
                 }

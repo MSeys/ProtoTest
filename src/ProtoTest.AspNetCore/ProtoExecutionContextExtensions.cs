@@ -96,6 +96,91 @@ public static class ProtoExecutionContextExtensions
     }
 
     /// <summary>
+    /// Substitutes a service in the application under test for this test, serving the given instance
+    /// to the application. The test runs against a dedicated server built with the substitution, so
+    /// the run's shared server never sees it and the next test starts clean. The replacement is a
+    /// singleton of the dedicated server: apply the override before the test first resolves
+    /// application services.
+    /// </summary>
+    /// <typeparam name="TService">The service contract the application resolves.</typeparam>
+    /// <param name="context">The active test execution context.</param>
+    /// <param name="instance">The instance the application resolves for the test.</param>
+    /// <param name="name">
+    /// The server to substitute on. When omitted, the test's selected application is used, falling
+    /// back to <c>Default</c> - the same rule the server accessors resolve by.
+    /// </param>
+    public static void Override<TService>(
+        this ProtoExecutionContext context,
+        TService instance,
+        string? name = null)
+        where TService : class
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(instance);
+        var serverName = AspNetCoreSubstitution.ResolveServerName(context, name);
+        var target = AspNetCoreSubstitution.ResolveTarget(context, serverName);
+        target.ApplySubstitution(
+            context,
+            new InstanceSubstitution(typeof(TService), serverName, instance),
+            ProtoTracePhase.Execution);
+    }
+
+    /// <summary>
+    /// Substitutes a service in the application under test for this test, building it with the given
+    /// factory when the application resolves it. The test runs against a dedicated server built with
+    /// the substitution, so the run's shared server never sees it and the next test starts clean.
+    /// </summary>
+    /// <typeparam name="TService">The service contract the application resolves.</typeparam>
+    /// <param name="context">The active test execution context.</param>
+    /// <param name="factory">The factory the application resolves for the test.</param>
+    /// <param name="name">
+    /// The server to substitute on. When omitted, the test's selected application is used, falling
+    /// back to <c>Default</c> - the same rule the server accessors resolve by.
+    /// </param>
+    public static void Override<TService>(
+        this ProtoExecutionContext context,
+        Func<TService> factory,
+        string? name = null)
+        where TService : class
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(factory);
+        var serverName = AspNetCoreSubstitution.ResolveServerName(context, name);
+        var target = AspNetCoreSubstitution.ResolveTarget(context, serverName);
+        target.ApplySubstitution(
+            context,
+            new FactorySubstitution(typeof(TService), serverName, () => factory()!),
+            ProtoTracePhase.Execution);
+    }
+
+    /// <summary>
+    /// Substitutes a service in the application under test for this test, resolving an implementation
+    /// type through the application's container. The test runs against a dedicated server built with
+    /// the substitution, so the run's shared server never sees it and the next test starts clean.
+    /// </summary>
+    /// <typeparam name="TService">The service contract the application resolves.</typeparam>
+    /// <typeparam name="TImplementation">The concrete replacement the container constructs.</typeparam>
+    /// <param name="context">The active test execution context.</param>
+    /// <param name="name">
+    /// The server to substitute on. When omitted, the test's selected application is used, falling
+    /// back to <c>Default</c> - the same rule the server accessors resolve by.
+    /// </param>
+    public static void Override<TService, TImplementation>(
+        this ProtoExecutionContext context,
+        string? name = null)
+        where TService : class
+        where TImplementation : class, TService
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var serverName = AspNetCoreSubstitution.ResolveServerName(context, name);
+        var target = AspNetCoreSubstitution.ResolveTarget(context, serverName);
+        target.ApplySubstitution(
+            context,
+            new TypeSubstitution(typeof(TService), serverName, typeof(TImplementation)),
+            ProtoTracePhase.Execution);
+    }
+
+    /// <summary>
     /// Resolves a required service from the application under test through the test's own scope, so
     /// scoped services work and are disposed with the test.
     /// </summary>

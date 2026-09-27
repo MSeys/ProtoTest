@@ -96,6 +96,86 @@ public sealed class ProtoMessagingAssertionsTests
     }
 
     [Test]
+    public async Task MatchShape_Exact_ShouldRejectFieldsTheShapeDoesNotMention()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("messaging exact shape", TestMethods.Placeholder);
+        var message = new ProtoMessage("invoice.paid", """{"id":42,"extra":true}""");
+
+        message.Should.MatchShape(new { id = 42 });
+
+        var exception = Assert.Throws<MessagingAssertionException>(
+            () => message.Should.MatchShape(new { id = 42 }, exact: true));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.Message, Does.StartWith(
+                "invoice.paid — Shape mismatch failed with 1 error(s):"));
+            Assert.That(exception.Message, Does.Contain("$.extra"));
+            Assert.That(exception.Message, Does.Contain("Property was not mentioned in the expected shape."));
+            Assert.That(exception.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
+                "the shared mismatch data stays reachable");
+        }
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        await host.StopAsync();
+    }
+
+    [Test]
+    public async Task MatchShape_Exact_ShouldPassWhenEveryFieldIsMentioned()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("messaging exact success", TestMethods.Placeholder);
+        var message = new ProtoMessage("invoice.paid", """{"id":42,"status":"paid"}""");
+
+        var returned = message.Should.MatchShape(new { id = 42, status = "paid" }, exact: true);
+
+        Assert.That(returned, Is.SameAs(message), "Should.MatchShape returns the message, so assertions chain");
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
+
+    [Test]
+    public async Task MatchShape_Exact_ShouldTreatAValueConstraintAsMentioningItsSubtree()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("messaging exact constraint", TestMethods.Placeholder);
+        var message = new ProtoMessage(
+            "invoice.paid",
+            """{"id":42,"customer":{"email":"ada@example.test","phone":"555"}}""");
+
+        message.Should.MatchShape(new { id = 42, customer = JsonValue.NotNull() }, exact: true);
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
+
+    [Test]
+    public async Task MatchShape_Exact_ShouldKeepIgnoringExtraFieldsWithoutExact()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("messaging partial shape", TestMethods.Placeholder);
+        var message = new ProtoMessage("invoice.paid", """{"id":42,"extra":true}""");
+
+        Assert.DoesNotThrow(() => message.Should.MatchShape(new { id = 42 }));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
+
+    [Test]
     public async Task Obsolete_ShouldMatchShape_ShouldStillDelegateToTheFacade()
     {
         var builder = new ProtoHostBuilder();
@@ -117,7 +197,7 @@ public sealed class ProtoMessagingAssertionsTests
             Assert.That(returned, Is.SameAs(message));
             Assert.That(exception!.Message, Does.StartWith("invoice.paid — "));
         }
-        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
         await host.StopAsync();
     }
 }

@@ -26,8 +26,12 @@ public static class ProtoExecutionContextExtensions
             var transport = ProtoApplicationResolution.ResolveTransportClient(context, application);
             if (transport is null)
             {
+                var registered = ProtoClientResolution.RegisteredNames<ProtoGrpcClient>(context, "Grpc");
+                var registeredHint = registered.Count == 0
+                    ? string.Empty
+                    : $" Registered for this protocol: {string.Join(", ", registered.Select(name => $"'{name}'"))}.";
                 throw new InvalidOperationException(
-                    $"No gRPC client '{resolvedName}' is registered. Register it under the application, " +
+                    $"No gRPC client '{resolvedName}' is registered.{registeredHint} Register it under the application, " +
                     $"back the application with AddAspNetCoreServer, or set " +
                     $"'ProtoTest:Applications:{application}:Grpc:Address'.");
             }

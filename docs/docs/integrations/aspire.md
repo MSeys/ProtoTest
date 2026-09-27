@@ -37,6 +37,44 @@ public sealed class AppHostAnchor;
 
 `AddAspireAppHost` can be called more than once for different AppHosts; repeating the same entry point with the same composition is one AppHost, while the same entry point with different resources throws instead of silently dropping the second registration. Registering one resource under two AppHosts throws the same way.
 
+## Serving targets through the chain
+
+An AppHost can be one provider among others: register it, then reference its resources from the
+targets they serve. The AppHost serves a target when the integration-owned selection key
+`ProtoTest:Aspire:Enabled` is set (an environment variable in the run script); a configured provider
+earlier in the chain wins over it, and a target it serves needs no plain registration.
+
+```csharp
+builder
+    .AddAspireAppHost<OpenCsmsAppHost>(options => options
+        .MapConnectionString("postgres", "ConnectionStrings:Csms"),
+        "api")
+    .AddApplication("Csms", app => app
+        .UseConfigured()
+        .UseAspireResource<OpenCsmsAppHost>("api")
+        .UseInProcess<CsmsApi>())
+    .AddInfrastructure("CsmsDatabase", piece => piece
+        .UseConfigured()
+        .UseAspireResource<OpenCsmsAppHost>("postgres")
+        .UseContainer(PostgresDatabase.Container()),
+        "ConnectionStrings:Csms");
+```
+
+- `UseAspireResource<OpenCsmsAppHost>("api")` on an application chain publishes the resource's
+  endpoint under the application's derived `BaseUrl`. On an infrastructure chain it publishes the
+  resource's **connection string** under every key the target declares.
+- `ProtoAspireOptions.MapConnectionString` (or `builder.MapConnectionString(resource, key)` after
+  registering the AppHost) fills a key no target declares.
+- The AppHost starts **once** when it wins any target, at its registration position; a losing provider
+  never starts it, and a target whose configured provider wins skips it without starting anything.
+- `ProtoTest:Aspire:Enabled` is the only selection key: `run-suite.ps1 -Mode topology` sets it in the
+  reference suite, and nothing else reads it.
+
+This is the behavior change the package adopts for chains: the old "starts unless every resource key is
+configured" remains the behavior of the plain `AddAspireAppHost` registration (kept for suites that
+register no chain), while a chain's AppHost serves when selected and a configured provider earlier in
+the chain wins.
+
 ## Reaching it from a test
 
 ```csharp
@@ -66,9 +104,10 @@ builder.AddAspireAppHost<TestAppHostAnchor>(
 
 | Key | Type | Default | |
 | --- | --- | --- | --- |
+| `ProtoTest:Aspire:Enabled` | bool | unset → a chain's AppHost providers do not serve | the integration-owned selection key; set it (`ProtoTest__Aspire__Enabled=true`) to resolve the suite's targets through the AppHost |
 | `ProtoTest:Applications:{resource}:BaseUrl` | string | unset → the AppHost publishes it | set it to point the suite at a deployed topology instead of starting the AppHost; a configured key wins over the started AppHost's address for that resource |
 
-`MapResource` publishes the resource under a different application name; `UseEndpoint` reads a non-default endpoint of the resource (the default is `http`); `Set` passes a setting to the AppHost as a command-line argument — the AppHost otherwise reads its own sources. Two resources cannot share one application name.
+`MapResource` publishes the resource under a different application name; `UseEndpoint` reads a non-default endpoint of the resource (the default is `http`); `MapConnectionString` publishes a resource's connection string under a target's key instead of an address; `Set` passes a setting to the AppHost as a command-line argument — the AppHost otherwise reads its own sources. Two resources cannot share one application name.
 
 ## Context API
 
@@ -111,6 +150,8 @@ catch (ProtoAspireUnavailableException exception)
 - **No per-test lifetime.** `AddAspireAppHost` has no `PerTest` option; a topology that must restart between tests is not supported.
 - **Start does not wait for readiness.** `StartAsync` completing means the AppHost accepted the topology, not that every resource answers. Register `AddHttpReadiness` after the AppHost for the HTTP resources tests call.
 - **A configured address wins per resource.** Every declared key configured skips the AppHost entirely; with only some configured it starts and publishes only the missing keys, so `AspireResource` returns the configured value for one resource and the AppHost's address for another.
+- **A chain's AppHost serves only when selected.** `UseAspireResource` providers hold on `ProtoTest:Aspire:Enabled`; a suite that adds the providers but never sets the key resolves every target through its other providers and never starts the AppHost. The plain `AddAspireAppHost` registration keeps the older all-configured rule.
+- **A connection-string resource has no endpoint.** `MapConnectionString` replaces the resource's endpoint publish, and a resource that exposes neither an endpoint nor a connection string fails the AppHost start naming the resource.
 - **The AppHost project restores the Aspire SDK from NuGet.** Offline restores cannot build a suite that composes one.
 
 ## Links

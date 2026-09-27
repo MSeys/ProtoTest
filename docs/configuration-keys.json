@@ -24,6 +24,10 @@
   ],
   "allowedKeys": [
     {
+      "key": "ProtoTest:Aspire:Enabled",
+      "reason": "the integration-owned selection key ProtoTest.Aspire's chain providers read; set by the run script, not an options section"
+    },
+    {
       "key": "ProtoTest:Data",
       "reason": "named in the docs and the fact sheet only to say ProtoTest.Data has no configuration section"
     },

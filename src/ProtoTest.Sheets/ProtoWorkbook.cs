@@ -51,6 +51,14 @@ public sealed class ProtoWorkbook
     public ProtoSheetModel<TRow> Model<TRow>() where TRow : notnull
         => ProtoSheetModel<TRow>.Read(this, _context);
 
+    /// <summary>
+    /// Binds a record with <c>[Sheet("Summary", Kind = ProtoSheetKind.KeyValue)]</c> to a label/value
+    /// sheet: labels in the first column, values in the second, declared once with
+    /// <c>[Column("Label")]</c>.
+    /// </summary>
+    public ProtoKeyValueModel<TModel> KeyValueModel<TModel>() where TModel : notnull
+        => ProtoKeyValueModel<TModel>.Read(this, _context);
+
     /// <summary>Reads a workbook without a test context; used by tests of this package.</summary>
     internal static ProtoWorkbook Read(
         DocumentFormat.OpenXml.Packaging.SpreadsheetDocument document,

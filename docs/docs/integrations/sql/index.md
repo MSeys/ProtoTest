@@ -124,7 +124,10 @@ After the connection hook has opened the connection and begun the transaction, t
 ## PostgreSQL container
 
 ```csharp
-builder.AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar");
+builder.AddInfrastructure(
+    "NorthstarDatabase",
+    chain => chain.UseContainer(PostgresDatabase.Container()),
+    "ConnectionStrings:Northstar");
 ```
 
 [Infrastructure](../../foundation/infrastructure.md) is started by the host before the run and released after it stops; the container's started connection string fills every key you list. Tests read the value from `ProtoInfrastructureSettings`:
@@ -144,7 +147,10 @@ A container database starts empty, and the schema must exist before the first te
 
 ```csharp
 builder
-    .AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Orders")
+    .AddInfrastructure(
+        "OrdersDatabase",
+        chain => chain.UseContainer(PostgresDatabase.Container()),
+        "ConnectionStrings:Orders")
     .AddSql(
         provider => new NpgsqlConnection(ResolveDatabase(provider, "ConnectionStrings:Orders")),
         sql => sql.AddressKeys.Add("ConnectionStrings:Orders"))
@@ -181,7 +187,12 @@ The sample suite composes its own domain over the connection ProtoTest owns, exc
 ```csharp
 if (usePostgres)
 {
-    builder.AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar");
+    builder.AddInfrastructure(
+        "NorthstarDatabase",
+        chain => chain
+            .UseConfigured()
+            .UseContainer(PostgresDatabase.Container()),
+        "ConnectionStrings:Northstar");
 }
 
 builder

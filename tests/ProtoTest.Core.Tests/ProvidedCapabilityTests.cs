@@ -36,7 +36,14 @@ public sealed class ProvidedCapabilityTests
     public async Task AddCapabilityWhenProvided_WhenInfrastructureDeclaresTheKey_ShouldKeepTheCapability()
     {
         var builder = BuilderWith();
-        builder.AddInfrastructure(new DeclaredSettingsInfrastructure("settings:orders", AddressKey, "Host=container"), AddressKey);
+        builder.AddInfrastructure(
+            "OrdersStore",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider(
+                    "settings",
+                    new DeclaredSettingsInfrastructure("settings:orders", AddressKey, "Host=container"))),
+            AddressKey);
         builder.AddCapabilityWhenProvided(Capability, AddressKey);
 
         await using var host = builder.Build();

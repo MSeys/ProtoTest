@@ -72,6 +72,10 @@ public sealed class RegistrationIdempotencyTests
         });
     }
 
+    // Intentional: pins the legacy skip-key registration's merge semantics, which stay the 1.x
+    // compatibility path; the chain replacement is covered by TargetProviderChainTests. CS0618 is
+    // expected in these three tests.
+#pragma warning disable CS0618
     [Test]
     public async Task AddInfrastructure_ShouldStartAndReleaseTheSameResourceOnce()
     {
@@ -155,6 +159,8 @@ public sealed class RegistrationIdempotencyTests
             Assert.That(probe.Values.Keys, Does.Not.Contain("ConnectionStrings:Second"));
         });
     }
+
+#pragma warning restore CS0618
 
     [Test]
     public async Task AddSink_ShouldApplyEveryConfigureCallbackToTheSingleRegistration()

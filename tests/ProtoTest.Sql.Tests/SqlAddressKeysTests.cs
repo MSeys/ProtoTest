@@ -107,7 +107,12 @@ public sealed class SqlAddressKeysTests
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
         builder.AddInfrastructure(
-            new DeclaredSettingsInfrastructure("database:csms", AddressKey, database.ConnectionString),
+            "CsmsDatabase",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider(
+                    "settings",
+                    new DeclaredSettingsInfrastructure("database:csms", AddressKey, database.ConnectionString))),
             AddressKey);
         builder.AddSql(
             _ => new SqliteConnection(database.ConnectionString),

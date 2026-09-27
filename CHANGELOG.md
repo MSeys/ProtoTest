@@ -9,6 +9,50 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ### Added
 
+- Composite attributes group declarations: a `ProtoCompositeAttribute` declares the attributes it
+  composes through `Compose()`, and the framework expands them where attributes are resolved (the
+  lifecycle's attribute resolution and the HTTP auth hook's metadata resolution), recursively, with a
+  cycle throwing the chain. Composed attributes run at their own `Order` (before the composite on a
+  tie, so the composite can read what they publish); an attribute that is both explicit and composed
+  runs once, matched by type and public property values, with the explicit declaration winning; and the
+  trace records the expansion (`attribute.composed` on the composite's step) so a run shows what
+  actually executed. `ProtoAttributeResolver.Expand` exposes the expansion to integrations.
+- Applications, workers, containers and AppHost resources declare their providers as an ordered chain:
+  `AddApplication(name, app => app.UseConfigured().UseInProcess<TProgram>().UseLoopback(createApp))`
+  resolves the application's derived `ProtoTest:Applications:{name}:BaseUrl`, with the in-process server
+  declaring honest `server` and `clock` capabilities and the loopback publishing its bound address.
+  `AddWorkerHost` nests under an application (`UseEnvironment()` leaves the worker to the environment
+  that runs the application, `UseHost()` hosts it and bridges the test clock; `UseContainer` starts a
+  container image), `AddInProcessWebSocketDevices` follows the application's winner, and
+  `UseContainer(PostgresDatabase.Container())` adds a container behind the Docker probe. The new
+  `[RequiresTestClock]` gate skips tests that need the test clock while the application runs in its own
+  process; `ProtoCapabilityKinds.Clock` is its capability. `IProtoTargetProvider` gained
+  `ConfigureServices` (winner-only service contributions) and `ProtoTargetProvider.WinnerServices`;
+  `IProtoProviderChainBuilder` gained `ResolveAfter` and `Services`, and
+  `ProtoProviderConditionContext` exposes the winners resolved before a chain
+  (`Target("Api")`/`ResolvedTargets`). `AddCapabilityWhenInProcess` declares an adapter that exists only
+  behind the in-process test host (the in-process device transport).
+- Aspire resources serve targets through the chain:
+  `UseAspireResource<TAppHost>(resource)` on an application publishes the resource's endpoint under its
+  `BaseUrl` and on an infrastructure chain publishes the resource's connection string under the
+  target's declared keys; `MapConnectionString(resource, key)` (options or builder) fills a key no
+  target declares. The AppHost's chain providers serve when `ProtoTest:Aspire:Enabled` is set and start
+  once when they win any target; a configured provider earlier in the chain wins over it. The plain
+  `AddAspireAppHost` registration keeps the older "starts unless every key is configured" behavior.
+- `ProtoTest.Testcontainers` adds `UseContainer(container)` and `DockerProbe.IsAvailable()`: a container
+  provider holds on the same Docker endpoint Testcontainers uses, so a machine without a runtime skips
+  it with a named reason instead of failing the start.
+- Targets resolve through an ordered provider chain: `AddInfrastructure(name, chain, keys)` registers a
+  target whose providers are walked in priority order while the host is built, and the first provider
+  whose condition holds serves it - its piece starts and releases with the run, its capabilities are
+  declared, and every other provider is recorded skipped with its unmet condition. A target no provider
+  can serve fails the build naming the target and every condition. The Core conditions are
+  `ProtoProviderConditions.Configured`, `.Selected(key)`, `.Available(requirement, probe)` and
+  `.Always`; the keys live on the target, and a provider is written against the public
+  `IProtoTargetProvider` (name, condition, piece, capabilities) or built with `ProtoTargetProvider`.
+  The run trace records `environment.resolved` per target with the winner and the skipped reasons, and
+  `environment.provider.skipped` per loser; a skipped provider's piece is never started, owned or
+  released.
 - Low-ceremony mode is opt-in per adapter: `[assembly: ProtoTestAutoWrap]` in `ProtoTest.NUnit` runs
   every plain `[Test]` through the same lifecycle as `[ProtoTest]`, and the same attribute in
   `ProtoTest.Xunit3` does it for plain `[Fact]` and `[Theory]` tests. A test that already carries the
@@ -315,6 +359,23 @@ All ProtoTest packages share one version; breaking API changes are called out be
   in-repo sample's own assemblies under `samples/` (the one recorded exception; never `src/`).
 - `tests/ProtoTest.Extensibility.Tests` compiles a minimal broker adapter and a minimal web backend
   against the public surface only, so an extension point that regresses to internals fails the build.
+- Sheets models assert the sheet's shape from the declaration alone: `model.Should.MatchHeaders()` (and
+  `ShouldNot.MatchHeaders()`) compares the sheet's header row with the model's `[Column]` paths in
+  declaration order, and a label/value sheet is declared with
+  `[Sheet("Summary", Kind = ProtoSheetKind.KeyValue)]` and read through `workbook.KeyValueModel<T>()`,
+  where `summary.Column(s => s.Total).Should.Be(123.45m)` reads the value under the label and
+  `summary.Should.MatchModel()` checks every declared label. `ProtoSheetKind`, `ShouldNot` on the model
+  facades and the `sheets.label`/`sheets.labels` evidence are additive.
+
+### Deprecated
+
+- The skip-key registration is obsolete: `AddInfrastructure(piece, keys)` keeps its all-configured skip
+  rule for 1.x and `AddInfrastructureAlways` keeps the always-start opt-out, while
+  `AddInfrastructure(name, chain, keys)` with `UseConfigured()` and `Use(provider)`/`UseContainer(...)`
+  providers is the replacement. The samples, tests and docs moved to the chain; the framework's own
+  retained legacy registrations (the top-level worker host, the loopback application and the Aspire
+  AppHost registration) keep the old surface behind a scoped `CS0618` suppression that names the
+  replacement.
 
 ### Changed
 
@@ -345,9 +406,22 @@ All ProtoTest packages share one version; breaking API changes are called out be
   form — targets an assembly that does not end in `.Tests`, and `eng/test-gates.ps1` proves both
   directions in the `lint-friend-edges` fixture. An integration that needs a type it cannot see now
   publishes the contract or moves the code instead of widening the grant.
+- A client name resolves across applications: a bare name the selected application does not register is
+  completed from the host's clients when exactly one client of that protocol has that unqualified name
+  (`Rest("Api")` under a Dashboard-selected test reaches `Csms:Api` from the REST client `AddRest`
+  registered under Csms), a name two applications share fails naming both qualified candidates
+  (`'Csms:Api', 'Dashboard:Api'`), and an explicitly qualified name (`Rest("Csms:Api")`) is exact and
+  never re-qualified with the selected application. The unnamed accessor keeps the selected
+  application's binding, first client and `Default` fallback unchanged, and a client miss now lists the
+  protocol's registered names so the fix is discoverable.
 
 ### Fixed
 
+- An HTTP protocol client (REST, GraphQL, or another integration over `ProtoHttpClientInitializer`)
+  bound to a configured or published address is built over its own primary handler and cookie container
+  for each test: parallel tests of one run no longer share the handler the factory pools per client
+  name, so one test's sign-in cookies cannot reach another. The named client's configured handlers stay
+  in the chain, and the in-process transport path is unchanged.
 - Publishing a null or empty payload to a `ProtoTest.Messaging.MassTransit` contract without a default instance
   (a positional record) fails naming the contract and the fix - give the contract a parameterless
   shape or publish an explicit JSON payload - instead of the raw `MissingMethodException`.

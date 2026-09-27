@@ -1,6 +1,6 @@
 # ProtoTest.Sheets
 
-Open an `.xlsx` file produced by the application and assert on its cells, ranges, tables or typed rows.
+Open an `.xlsx` file produced by the application and assert on its cells, ranges, tables, typed rows or label/value blocks.
 
 ```bash
 dotnet add package ProtoTest.Sheets
@@ -9,8 +9,9 @@ dotnet add package ProtoTest.Sheets
 ```csharp
 var workbook = Proto.Context.Sheets().Open("monthly-report.xlsx");
 
-workbook.Sheet("Summary").Cell("B1").Should.Be(42.0);
-workbook.Sheet("Sales").Model<SalesRow>().Should.MatchModel();
+workbook.Model<SalesRow>().Should.MatchHeaders().Should.MatchModel();
+workbook.KeyValueModel<SummarySheet>().Column(s => s.Total).Should.Be(123.45m);
+workbook.Sheet("Notes").Cell("B1").Should.Be("checked");
 ```
 
 Workbook reads and assertions are recorded in the trace; cell and range reads contribute to Sheets

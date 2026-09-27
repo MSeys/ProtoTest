@@ -97,27 +97,38 @@ public interface IProtoSettingsInfrastructure : IProtoInfrastructure
 /// Registered infrastructure with the configuration keys it provides - a connection string per key, or
 /// the keys a settings-only piece will fill. The host exposes started values through
 /// <see cref="ProtoInfrastructureSettings"/>, and the in-process application receives them as host
-/// settings automatically.
+/// settings automatically. A chain-registered piece is controlled by its target's provider resolution
+/// instead of the all-configured rule.
 /// </summary>
 internal sealed record ProtoInfrastructureRegistration(
     IProtoInfrastructure Infrastructure,
     IReadOnlyList<string> Settings,
-    bool AlwaysStart = false)
+    bool AlwaysStart = false,
+    bool ChainControlled = false)
 {
     /// <summary>
     /// Whether every key this piece declares already has a configured value, so the environment
     /// provides its addresses and the piece must not start and shadow them. Read through the shared
     /// <see cref="ProtoEnvironment"/> evaluator with the capability declarations, so the two skip rules
-    /// cannot drift.
+    /// cannot drift. A piece registered on a target's provider chain is never decided here: its chain
+    /// says whether it is needed.
     /// </summary>
     public bool IsSatisfiedBy(IConfiguration configuration, IReadOnlySet<string> declaredKeys)
         => !AlwaysStart
+           && !ChainControlled
            && ProtoEnvironment.IsSatisfied(
                configuration, Settings, ProtoEnvironmentMode.AllConfigured, declaredKeys);
 }
 
-/// <summary>The infrastructure pieces the environment already satisfies, so the host skips them.</summary>
-internal sealed record ProtoSkippedInfrastructure(IReadOnlySet<string> Ids);
+/// <summary>
+/// The infrastructure pieces the host does not start, each with the reason: the environment already
+/// fills the piece's keys, or an earlier provider serves the target it belongs to.
+/// </summary>
+internal sealed record ProtoSkippedInfrastructure(IReadOnlyDictionary<string, string> Reasons)
+{
+    /// <summary>Gets the ids of the pieces the run does not start.</summary>
+    public IReadOnlyCollection<string> Ids => [.. Reasons.Keys];
+}
 
 /// <summary>The configuration values started infrastructure provided, keyed as the application reads them.</summary>
 public sealed class ProtoInfrastructureSettings

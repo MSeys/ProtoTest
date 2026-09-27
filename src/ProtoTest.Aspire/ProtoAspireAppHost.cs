@@ -4,21 +4,24 @@ using global::Aspire.Hosting;
 using global::Aspire.Hosting.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using ProtoTest.Aspire.Internal;
 using ProtoTest.Core;
 
 /// <summary>
 /// One Aspire AppHost the run owns: the host starts it after the infrastructure registered before
-/// it, each declared resource's endpoint is published as its application's <c>BaseUrl</c> so the
-/// application's clients resolve that one address, and the run stops it after the reports are
-/// written. Register it with <c>AddAspireAppHost</c>, which declares the keys it fills: a run that
-/// configures those keys points at that environment instead of starting the AppHost.
+/// it, each declared publish mapping fills the key it was registered under - an application's
+/// <c>BaseUrl</c> for an endpoint, the target's declared key for a connection string - and the run
+/// stops it after the reports are written. Register it with <c>AddAspireAppHost</c> or reference it
+/// from a target's providers with <c>UseAspireResource</c>; a configured key is never masked, so a
+/// run pointed at an existing environment keeps that environment's values.
 /// </summary>
 /// <typeparam name="TEntryPoint">A public type in the AppHost assembly; the testing host runs the
 /// assembly's entry point in-process.</typeparam>
-public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructure, IProtoConfiguredInfrastructure, IProtoStartupEvidence, IAsyncDisposable
+public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructure, IProtoConfiguredInfrastructure, IProtoStartupEvidence, IProtoAspireAppHost, IAsyncDisposable
     where TEntryPoint : class
 {
     private readonly List<string> _resources;
+    private readonly List<ProtoAspirePublish> _publishes = [];
     private readonly ProtoAspireOptions _options;
     private readonly ProtoLock _gate = new();
     private DistributedApplication? _application;
@@ -29,6 +32,19 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
 
     /// <summary>Creates the resource without starting it; the host starts it with the run.</summary>
     public ProtoAspireAppHost(IEnumerable<string> resources, Action<ProtoAspireOptions>? configure = null)
+        : this(resources, configure, publishEndpoints: true)
+    {
+    }
+
+    /// <summary>
+    /// Creates the resource with or without the default "each resource's endpoint fills its
+    /// application's BaseUrl" publishes. A piece referenced by provider chains declares its publishes
+    /// per target instead, so every key it fills is one the target declared.
+    /// </summary>
+    internal ProtoAspireAppHost(
+        IEnumerable<string> resources,
+        Action<ProtoAspireOptions>? configure,
+        bool publishEndpoints)
     {
         ArgumentNullException.ThrowIfNull(resources);
         _resources = [.. resources.Where(resource => !string.IsNullOrWhiteSpace(resource))];
@@ -47,6 +63,22 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
         _options = new ProtoAspireOptions();
         configure?.Invoke(_options);
         _options.Validate(_resources);
+        if (publishEndpoints)
+        {
+            foreach (var resource in _resources)
+            {
+                // A resource the suite mapped as a connection string has no HTTP endpoint to publish.
+                if (!_options.HasConnectionString(resource))
+                {
+                    _publishes.Add(new ProtoAspirePublish(resource, BaseUrlKey(resource), ProtoAspirePublishKind.Endpoint));
+                }
+            }
+        }
+
+        foreach (var (resource, key) in _options.ConnectionStrings)
+        {
+            _publishes.Add(new ProtoAspirePublish(resource, key, ProtoAspirePublishKind.ConnectionString));
+        }
     }
 
     /// <summary>Gets the Aspire resources this AppHost publishes.</summary>
@@ -70,8 +102,70 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
     public string BaseUrlKey(string resource)
         => $"{ProtoApplication.SectionPath}:{ApplicationFor(resource)}:BaseUrl";
 
-    /// <summary>Gets every key the started AppHost fills, for <c>AddInfrastructure</c>.</summary>
+    /// <summary>Gets the key the started AppHost fills for the resource: its connection string when mapped, its address otherwise.</summary>
+    internal string KeyFor(string resource)
+        => _options.ConnectionStrings.TryGetValue(resource, out var key) ? key : BaseUrlKey(resource);
+
+    /// <summary>Gets every key the started AppHost fills with the resources' addresses, for <c>AddInfrastructure</c>.</summary>
     public IReadOnlyList<string> BaseUrlKeys => _resources.Select(BaseUrlKey).ToArray();
+
+    /// <summary>Gets every key any publish mapping fills, endpoints and connection strings alike.</summary>
+    internal IReadOnlyList<string> PublishKeys
+        => [.. _publishes.Select(publish => publish.Key).Distinct(StringComparer.Ordinal)];
+
+    /// <summary>
+    /// Records that the started AppHost publishes <paramref name="resource"/>'s connection string
+    /// under <paramref name="key"/>, so the run's readers resolve the AppHost's database or broker the
+    /// same way they resolve an application's address. The target's declared registration fills the key
+    /// when the AppHost starts and the environment has no value for it.
+    /// </summary>
+    /// <param name="resource">The AppHost resource, for example <c>postgres</c>.</param>
+    /// <param name="key">The target's declared key, for example <c>ConnectionStrings:Northstar</c>.</param>
+    public ProtoAspireAppHost<TEntryPoint> MapConnectionString(string resource, string key)
+    {
+        AddPublish(resource, key, ProtoAspirePublishKind.ConnectionString, replaceEndpoints: true);
+        return this;
+    }
+
+    /// <summary>
+    /// Records a publish mapping this AppHost fills; the resource must be one it declares. When
+    /// <paramref name="replaceEndpoints"/> is set, an endpoint mapping for the resource is removed: a
+    /// resource serves one target as either an address or a connection string.
+    /// </summary>
+    internal void AddPublish(
+        string resource,
+        string key,
+        ProtoAspirePublishKind kind,
+        bool replaceEndpoints = false)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(resource);
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        if (!_resources.Contains(resource, StringComparer.Ordinal))
+        {
+            throw new ArgumentException(
+                $"'{resource}' is not one of this AppHost's resources ({string.Join(", ", _resources.Select(name => $"'{name}'"))}); " +
+                "declare it with AddAspireAppHost or reference it from a target's providers.",
+                nameof(resource));
+        }
+
+        if (kind == ProtoAspirePublishKind.ConnectionString && replaceEndpoints)
+        {
+            _publishes.RemoveAll(publish =>
+                string.Equals(publish.Resource, resource, StringComparison.Ordinal)
+                && publish.Kind == ProtoAspirePublishKind.Endpoint);
+        }
+
+        if (!_publishes.Any(publish =>
+                string.Equals(publish.Resource, resource, StringComparison.Ordinal)
+                && string.Equals(publish.Key, key, StringComparison.Ordinal)
+                && publish.Kind == kind))
+        {
+            _publishes.Add(new ProtoAspirePublish(resource, key, kind));
+        }
+    }
+
+    /// <summary>Gets every publish mapping the AppHost fills, in declaration order.</summary>
+    internal IReadOnlyList<ProtoAspirePublish> Publishes => _publishes;
 
     /// <summary>Gets the endpoint of the resource the started AppHost reads, defaulting to <c>http</c>.</summary>
     public string EndpointName(string resource)
@@ -89,6 +183,11 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
 
     /// <inheritdoc />
     public string Id => $"aspire:{typeof(TEntryPoint).FullName}";
+
+    IReadOnlyList<string> IProtoAspireAppHost.Resources => Resources;
+
+    void IProtoAspireAppHost.AddPublish(string resource, string key, ProtoAspirePublishKind kind, bool replaceEndpoints)
+        => AddPublish(resource, key, kind, replaceEndpoints);
 
     /// <inheritdoc />
     public string Kind => ProtoCapabilityKinds.Aspire;
@@ -126,7 +225,9 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
     internal bool IsStarted => Volatile.Read(ref _started) != 0;
 
     internal bool SameCompositionAs(ProtoAspireAppHost<TEntryPoint> other)
-        => _resources.SequenceEqual(other._resources, StringComparer.Ordinal) && _options.SameAs(other._options);
+        => _resources.SequenceEqual(other._resources, StringComparer.Ordinal)
+            && _options.SameAs(other._options)
+            && _publishes.SequenceEqual(other._publishes);
 
     internal string Describe()
         => string.Join(", ", _resources.Select(resource =>
@@ -227,7 +328,7 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
         Dictionary<string, string> settings;
         try
         {
-            settings = ResolveEndpoints(application, context.Configuration);
+            settings = await ResolveSettingsAsync(application, context.Configuration, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
@@ -254,40 +355,73 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
     }
 
     /// <summary>
-    /// Resolves the endpoint of every declared resource whose key the environment does not already
-    /// fill: a configured key wins over the AppHost's address (published settings take precedence at
-    /// use time), so publishing it would mask the environment's value. The AppHost still starts for
-    /// the resources that do need an address.
+    /// Resolves every publish mapping whose key the environment does not already fill: a configured key
+    /// wins over the AppHost's value (published settings take precedence at use time), so publishing it
+    /// would mask the environment's value. The AppHost still starts for the mappings that need a value.
     /// </summary>
-    private Dictionary<string, string> ResolveEndpoints(DistributedApplication application, IConfiguration configuration)
+    private async Task<Dictionary<string, string>> ResolveSettingsAsync(
+        DistributedApplication application,
+        IConfiguration configuration,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         var settings = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var resource in _resources)
+        foreach (var publish in _publishes)
         {
-            var key = BaseUrlKey(resource);
-            if (!string.IsNullOrWhiteSpace(configuration[key]))
+            if (!string.IsNullOrWhiteSpace(configuration[publish.Key]))
             {
                 continue;
             }
 
-            var endpointName = _options.EndpointFor(resource);
-            Uri endpoint;
-            try
+            settings[publish.Key] = publish.Kind switch
             {
-                endpoint = application.GetEndpoint(resource, endpointName);
-            }
-            catch (Exception exception)
-            {
-                throw new InvalidOperationException(
-                    $"Aspire resource '{resource}' has no '{endpointName}' endpoint. Add one to the AppHost or point UseEndpoint at the one it exposes.",
-                    exception);
-            }
-
-            settings[key] = endpoint.ToString();
+                ProtoAspirePublishKind.Endpoint => ResolveEndpoint(application, publish),
+                _ => await ResolveConnectionStringAsync(application, publish, cancellationToken).ConfigureAwait(false)
+            };
         }
 
         return settings;
+    }
+
+    private string ResolveEndpoint(DistributedApplication application, ProtoAspirePublish publish)
+    {
+        var endpointName = _options.EndpointFor(publish.Resource);
+        try
+        {
+            return application.GetEndpoint(publish.Resource, endpointName).ToString();
+        }
+        catch (Exception exception)
+        {
+            throw new InvalidOperationException(
+                $"Aspire resource '{publish.Resource}' has no '{endpointName}' endpoint. Add one to the AppHost or point UseEndpoint at the one it exposes.",
+                exception);
+        }
+    }
+
+    private static async Task<string> ResolveConnectionStringAsync(
+        DistributedApplication application,
+        ProtoAspirePublish publish,
+        CancellationToken cancellationToken)
+    {
+        string? connectionString;
+        try
+        {
+            connectionString = await application.GetConnectionStringAsync(publish.Resource, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            throw new InvalidOperationException(
+                $"Aspire resource '{publish.Resource}' has no connection string. Add one to the AppHost or map an endpoint resource instead.",
+                exception);
+        }
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                $"Aspire resource '{publish.Resource}' published no connection string; the resource must expose one to fill '{publish.Key}'.");
+        }
+
+        return connectionString;
     }
 
     private Dictionary<string, string?> BuildEvidence(Dictionary<string, string> settings)
@@ -296,17 +430,21 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
         {
             ["aspire.entry_point"] = typeof(TEntryPoint).FullName,
         };
-        foreach (var resource in _resources)
+        foreach (var publish in _publishes)
         {
-            evidence[$"aspire.resource.{resource}.endpoint"] = _options.EndpointFor(resource);
-            if (settings.TryGetValue(BaseUrlKey(resource), out var address))
+            if (publish.Kind == ProtoAspirePublishKind.Endpoint)
             {
-                evidence[$"aspire.resource.{resource}.address"] = address;
+                evidence[$"aspire.resource.{publish.Resource}.endpoint"] = _options.EndpointFor(publish.Resource);
+            }
+
+            if (settings.TryGetValue(publish.Key, out var value))
+            {
+                evidence[$"aspire.resource.{publish.Resource}.{publish.KindTag}"] = value;
             }
             else
             {
-                // A configured key wins over the AppHost's address, so this run published none.
-                evidence[$"aspire.resource.{resource}.address_source"] = "configuration";
+                // A configured key wins over the AppHost's value, so this run published none.
+                evidence[$"aspire.resource.{publish.Resource}.{publish.KindTag}_source"] = "configuration";
             }
         }
 

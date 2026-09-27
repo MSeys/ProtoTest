@@ -15,17 +15,20 @@ public sealed class ProtoCellAssertions
     private readonly string _sheetName;
     private readonly ProtoExecutionContext? _context;
     private readonly bool _negated;
+    private readonly string? _label;
 
     internal ProtoCellAssertions(
         ProtoCell cell,
         string sheetName,
         ProtoExecutionContext? context,
-        bool negated)
+        bool negated,
+        string? label = null)
     {
         _cell = cell;
         _sheetName = sheetName;
         _context = context;
         _negated = negated;
+        _label = label;
     }
 
     /// <summary>
@@ -82,19 +85,28 @@ public sealed class ProtoCellAssertions
     private ProtoCell Assert(bool holds, string expectation)
     {
         var reference = $"{_sheetName}!{_cell.Reference}";
+        // A key-value entry passes its label, so the failure and the trace locate the block entry
+        // beside the cell it reads.
+        var subject = _label is null ? reference : $"{reference} for '{_label}'";
+        var attributes = new Dictionary<string, string?>
+        {
+            ["sheets.cell"] = reference,
+            ["sheets.expected"] = expectation,
+            ["sheets.actual"] = _cell.Display()
+        };
+        if (_label is not null)
+        {
+            attributes["sheets.label"] = _label;
+        }
+
         SheetAssertion.Run(
             _context,
-            $"Sheets · {reference}",
-            new Dictionary<string, string?>
-            {
-                ["sheets.cell"] = reference,
-                ["sheets.expected"] = expectation,
-                ["sheets.actual"] = _cell.Display()
-            },
+            $"Sheets · {subject}",
+            attributes,
             _negated,
             () => holds,
             () => new SheetAssertionFailure(
-                $"{SheetAssertion.Describe(reference, expectation, _negated)} but it was {_cell.Display()}."));
+                $"{SheetAssertion.Describe(subject, expectation, _negated)} but it was {_cell.Display()}."));
         return _cell;
     }
 }

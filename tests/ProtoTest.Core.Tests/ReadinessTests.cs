@@ -15,7 +15,9 @@ public sealed class ReadinessTests
         var order = new List<string>();
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
-        builder.AddInfrastructure(new OrderingInfrastructure(order));
+        builder.AddInfrastructure(
+            "ordering",
+            chain => chain.Use(new ProtoTargetProvider("ordering", new OrderingInfrastructure(order))));
         builder.AddReadinessProbe("piece ready", _ =>
         {
             order.Add("probe");
@@ -172,7 +174,10 @@ public sealed class ReadinessTests
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
         builder.AddInfrastructure(
-            new PublishedAddressInfrastructure("Api", listener.Address),
+            "Api address",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider("published", new PublishedAddressInfrastructure("Api", listener.Address))),
             "ProtoTest:Applications:Api:BaseUrl");
         builder.ConfigureReadiness(options => options.Interval = TimeSpan.FromMilliseconds(20));
         builder.AddHttpReadiness("Api");
@@ -202,7 +207,10 @@ public sealed class ReadinessTests
         builder.ConfigureTracing(options => options.Enabled = false);
         builder.AddHttpReadiness("Api");
         builder.AddInfrastructure(
-            new PublishedAddressInfrastructure("Api", "http://127.0.0.1:1"),
+            "Api address",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider("published", new PublishedAddressInfrastructure("Api", "http://127.0.0.1:1"))),
             "ProtoTest:Applications:Api:BaseUrl");
         await using var host = builder.Build();
 

@@ -10,7 +10,13 @@ public sealed class ProtoInfrastructureTests
     {
         var infrastructure = new FakeInfrastructure();
         var builder = new ProtoHostBuilder();
-        builder.AddInfrastructure(infrastructure, "ConnectionStrings:Thing", "ProtoTest:Thing:Connection");
+        builder.AddInfrastructure(
+            "thing",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider("fake", infrastructure)),
+            "ConnectionStrings:Thing",
+            "ProtoTest:Thing:Connection");
         await using var host = builder.Build();
         Assert.That(infrastructure.Started, Is.False, "Infrastructure starts with the run, not with the builder.");
 
@@ -30,7 +36,10 @@ public sealed class ProtoInfrastructureTests
     {
         var builder = new ProtoHostBuilder();
         Assert.Throws<ArgumentException>(() =>
-            builder.AddInfrastructure(new PlainInfrastructure(), "ConnectionStrings:Thing"));
+            builder.AddInfrastructure(
+                "thing",
+                chain => chain.Use(new ProtoTargetProvider("plain", new PlainInfrastructure())),
+                "ConnectionStrings:Thing"));
     }
 
     [Test]
@@ -51,7 +60,9 @@ public sealed class ProtoInfrastructureTests
     {
         var holder = CreateProbeBuilder(
             out var builder, new ClearingInfrastructure("thing:ok"), "ConnectionStrings:Thing");
-        builder.AddInfrastructure(new FailingInfrastructure("thing:fail"));
+        builder.AddInfrastructure(
+            "failing",
+            chain => chain.Use(new ProtoTargetProvider("failing", new FailingInfrastructure("thing:fail"))));
         await using var host = builder.Build();
 
         Assert.ThrowsAsync<InvalidOperationException>(async () => await host.StartAsync());
@@ -70,7 +81,12 @@ public sealed class ProtoInfrastructureTests
         var holder = new ProbeHolder();
         var local = new ProtoHostBuilder();
         local.ConfigureTracing(options => options.Enabled = false);
-        local.AddInfrastructure(infrastructure, keys);
+        local.AddInfrastructure(
+            "thing",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider("fake", infrastructure)),
+            keys);
         local.ConfigureServices(services => services.AddSingleton<IProtoRunHook>(provider =>
         {
             holder.Probe = new SettingsProbe(provider.GetRequiredService<ProtoInfrastructureSettings>());

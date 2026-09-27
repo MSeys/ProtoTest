@@ -42,6 +42,75 @@ public sealed class PublicSeamTests
     }
 
     [Test]
+    public async Task MinimalTargetProvider_ShouldServeThroughThePublicChainSeam()
+    {
+        var builder = new ProtoHostBuilder();
+        var provider = new MinimalTargetProvider();
+        builder.AddInfrastructure(
+            "MinimalStore",
+            chain => chain.UseConfigured().Use(provider),
+            "Minimal:Connection");
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("extensibility target", TestMethods.Placeholder);
+
+        var connection = context.TryService<ProtoInfrastructureSettings>()!.Values["Minimal:Connection"];
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                provider.Started,
+                Is.True,
+                "the configured provider did not hold, so the custom provider's piece started");
+            Assert.That(connection, Is.EqualTo("Host=minimal"));
+            Assert.That(
+                host.HasCapability(ProtoCapabilityKinds.Store),
+                Is.True,
+                "the winning provider's capability is declared from the public contract");
+        }
+    }
+
+    [Test]
+    public async Task MinimalTargetProvider_ShouldContributeServicesOnlyWhenItWins()
+    {
+        var builder = new ProtoHostBuilder();
+        var provider = new MinimalTargetProvider();
+        builder.AddInfrastructure(
+            "MinimalStore",
+            chain => chain.UseConfigured().Use(provider),
+            "Minimal:Connection");
+        await using var host = builder.Build();
+        await host.StartAsync();
+
+        var winnerContext = await host.StartTestAsync("extensibility winner", TestMethods.Placeholder);
+        var contributed = winnerContext.TryService<MinimalTargetProvider.MinimalWinnerMarker>();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        var configuredBuilder = new ProtoHostBuilder();
+        configuredBuilder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["Minimal:Connection"] = "Host=configured"
+            }));
+        configuredBuilder.AddInfrastructure(
+            "MinimalStore",
+            chain => chain.UseConfigured().Use(new MinimalTargetProvider()),
+            "Minimal:Connection");
+        await using var configuredHost = configuredBuilder.Build();
+        await configuredHost.StartAsync();
+        var loserContext = await configuredHost.StartTestAsync("extensibility loser", TestMethods.Placeholder);
+        var missing = loserContext.TryService<MinimalTargetProvider.MinimalWinnerMarker>();
+        await configuredHost.CompleteTestAsync(ProtoTestResult.Passed);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(contributed, Is.Not.Null, "the winner contributes its services through the public contract");
+            Assert.That(missing, Is.Null, "a losing provider leaves no service behind");
+        });
+    }
+
+    [Test]
     public async Task MinimalWebBackend_ShouldComposeThePublicWebBuildingBlocks()
     {
         var builder = new ProtoHostBuilder();

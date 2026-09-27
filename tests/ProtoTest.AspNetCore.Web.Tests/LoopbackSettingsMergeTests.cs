@@ -34,7 +34,11 @@ public sealed class LoopbackSettingsMergeTests
                 [FromConfigKey] = "config-value",
                 [SharedKey] = "config-value"
             }));
-        builder.AddInfrastructure(new StubSettingsInfrastructure(), FromSettingsKey, SharedKey);
+        builder.AddInfrastructure(
+            "LoopbackMergeSettings",
+            chain => chain.Use(new ProtoTargetProvider("settings", new StubSettingsInfrastructure())),
+            FromSettingsKey,
+            SharedKey);
         builder.AddLoopbackApplication("Merge", args =>
         {
             var application = WebApplication.CreateBuilder(args).Build();

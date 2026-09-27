@@ -50,7 +50,7 @@ public static class ProtoReadinessExtensions
         ArgumentNullException.ThrowIfNull(probe);
 
         var options = ResolveOptions(builder);
-        return builder.AddInfrastructure(new ReadinessProbeInfrastructure(name, probe, options, timeout));
+        return builder.AddRunPiece(new ReadinessProbeInfrastructure(name, probe, options, timeout));
     }
 
     /// <summary>
@@ -81,6 +81,6 @@ public static class ProtoReadinessExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(applicationName);
 
         var options = ResolveOptions(builder);
-        return builder.AddInfrastructure(new ApplicationReadinessInfrastructure(applicationName, path, ready, options, timeout));
+        return builder.AddRunPiece(new ApplicationReadinessInfrastructure(applicationName, path, ready, options, timeout));
     }
 }

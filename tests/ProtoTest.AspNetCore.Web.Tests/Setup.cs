@@ -51,7 +51,12 @@ public sealed class Setup : ProtoTestAssembly
         if (started.Resource is { } container)
         {
             builder
-                .AddInfrastructure(container, container.BaseUrlKey)
+                .AddInfrastructure(
+                    container.Application,
+                    chain => chain
+                        .UseConfigured()
+                        .UseContainer(container),
+                    container.BaseUrlKey)
                 .AddHttpReadiness(container.Application, "/")
                 .AddApplication(container.Application, app => app
                     .AddRest(rest => rest.AddClient(container.Application))

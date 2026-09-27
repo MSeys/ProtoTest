@@ -155,7 +155,12 @@ public sealed class AspireAppHostTests
             {
                 ["ProtoTest:Applications:api:BaseUrl"] = "http://127.0.0.1:9",
             }));
-        builder.AddInfrastructure(piece, piece.BaseUrlKeys.ToArray());
+        builder.AddInfrastructure(
+            "AppHost",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider("apphost", piece)),
+            piece.BaseUrlKeys.ToArray());
         await using var host = builder.Build();
         await host.StartAsync();
 
@@ -186,7 +191,12 @@ public sealed class AspireAppHostTests
             {
                 ["ProtoTest:Applications:api:BaseUrl"] = "http://127.0.0.1:9",
             }));
-        builder.AddInfrastructure(piece, piece.BaseUrlKeys.ToArray());
+        builder.AddInfrastructure(
+            "AppHost",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider("apphost", piece)),
+            piece.BaseUrlKeys.ToArray());
         await using var host = builder.Build();
 
         try

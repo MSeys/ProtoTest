@@ -12,8 +12,7 @@ using ProtoTest.SampleApp.Contracts;
 
 /// <summary>Usage becomes an invoice, the invoice is paid (or declines), and the plan is changed.</summary>
 [Application(NorthstarTargets.Api)]
-[NorthstarTenant(PlanIds.Growth)]
-[Auth<NorthstarAuthenticator>]
+[NorthstarMember(PlanIds.Growth)]
 public sealed class BillingJourney
 {
     [ProtoTest]

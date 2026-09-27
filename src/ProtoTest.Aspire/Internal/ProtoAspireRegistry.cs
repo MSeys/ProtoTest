@@ -2,13 +2,17 @@ namespace ProtoTest.Aspire.Internal;
 
 using ProtoTest.Core;
 
-/// <summary>The AppHosts a run composed, so a test can resolve a resource to its application target.</summary>
+/// <summary>
+/// The AppHosts a run composed, so a test can resolve a resource to the key its value was published
+/// under: the application's <c>BaseUrl</c> for an endpoint resource, the target's declared key for a
+/// connection string.
+/// </summary>
 internal sealed class ProtoAspireRegistry
 {
     private readonly ProtoLock _gate = new();
     private readonly Dictionary<string, ResourceHandle> _resources = new(StringComparer.Ordinal);
 
-    public void Add(Type entryPoint, string resource, string application)
+    public void Add(Type entryPoint, string resource, string key)
     {
         lock (_gate)
         {
@@ -20,7 +24,7 @@ internal sealed class ProtoAspireRegistry
                     $"register {entryPoint.FullName} under a different resource name instead.");
             }
 
-            _resources[resource] = new ResourceHandle(entryPoint, application);
+            _resources[resource] = new ResourceHandle(entryPoint, key);
         }
     }
 
@@ -35,7 +39,7 @@ internal sealed class ProtoAspireRegistry
     private Type? OwnerOfLocked(string resource)
         => _resources.TryGetValue(resource, out var existing) ? existing.EntryPoint : null;
 
-    public string ApplicationFor(string resource)
+    public string KeyFor(string resource)
     {
         lock (_gate)
         {
@@ -49,9 +53,9 @@ internal sealed class ProtoAspireRegistry
                     $"Unknown Aspire resource '{resource}'; {hint}.");
             }
 
-            return handle.Application;
+            return handle.Key;
         }
     }
 
-    private sealed record ResourceHandle(Type EntryPoint, string Application);
+    private sealed record ResourceHandle(Type EntryPoint, string Key);
 }

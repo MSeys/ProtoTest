@@ -1,10 +1,16 @@
 namespace ProtoTest.Sheets;
 
-/// <summary>Declares which sheet of the workbook a row record models, and where its headers live.</summary>
+/// <summary>Declares which sheet of the workbook a model binds to, its shape, and where its headers live.</summary>
 [AttributeUsage(AttributeTargets.Class)]
 public sealed class SheetAttribute(string name) : Attribute
 {
     public string Name { get; } = name;
+
+    /// <summary>
+    /// The sheet's shape: a table of rows under a header row by default, or a block of label/value
+    /// pairs read with <c>KeyValueModel</c>.
+    /// </summary>
+    public ProtoSheetKind Kind { get; init; } = ProtoSheetKind.Table;
 
     /// <summary>The one or more header rows; a merged group header plus subheaders is two rows.</summary>
     public int[] HeaderRows { get; init; } = [1];

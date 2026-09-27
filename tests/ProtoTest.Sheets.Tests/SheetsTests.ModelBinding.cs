@@ -33,6 +33,86 @@ public sealed partial class SheetsTests
     }
 
     [Test]
+    public async Task Model_MatchHeaders_ShouldAcceptTheDeclaredColumnsInOrder()
+    {
+        var (host, context) = Start("sheets match headers");
+        var model = context.Sheets().Open(_path).Model<SalesRow>();
+
+        var returned = model.Should.MatchHeaders();
+        var coverage = Coverage(context).Select(item => item.Identifier).ToArray();
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(returned, Is.SameAs(model));
+            Assert.That(coverage, Does.Contain("Sales!A1:C2"), "matching the headers reads them");
+        }
+    }
+
+    [Test]
+    public async Task Model_MatchHeaders_ShouldFailOnAReorderedSheet()
+    {
+        var (host, context) = Start("sheets header order");
+        var model = context.Sheets().Open(_path).Model<ReorderedRow>();
+
+        var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Should.MatchHeaders());
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        Assert.That(exception!.Message, Does.Contain("column 1 is 'Id' where the model declares 'Name'"),
+            "the sheet's order must be the model's declaration order");
+    }
+
+    [Test]
+    public async Task Model_MatchHeaders_ShouldFailWhenTheSheetDeclaresMoreColumns()
+    {
+        var (host, context) = Start("sheets header count");
+        var model = context.Sheets().Open(_path).Model<IdOnlyRow>();
+
+        var exception = Assert.Throws<SpreadsheetAssertionException>(() => model.Should.MatchHeaders());
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        Assert.That(exception!.Message, Does.Contain("it has 2 columns and the model declares 1"));
+    }
+
+    [Test]
+    public async Task Model_ShouldNotMatchHeaders_ShouldPassOnAReorderedSheet()
+    {
+        var (host, context) = Start("sheets negated headers");
+        var workbook = context.Sheets().Open(_path);
+        var reordered = workbook.Model<ReorderedRow>();
+        var sales = workbook.Model<SalesRow>();
+
+        var returned = reordered.ShouldNot.MatchHeaders();
+        var exception = Assert.Throws<SpreadsheetAssertionException>(() => sales.ShouldNot.MatchHeaders());
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(returned, Is.SameAs(reordered));
+            Assert.That(exception!.Message, Does.Contain("not to match SalesRow's declared columns in order"));
+        }
+    }
+
+    [Test]
+    public async Task Model_ShouldNotMatchModel_ShouldPassOnAViolation()
+    {
+        var (host, context) = Start("sheets negated model");
+        var workbook = context.Sheets().Open(_path);
+        var strict = workbook.Model<StrictSalesRow>();
+        var matching = workbook.Model<SalesRow>();
+
+        var returned = strict.ShouldNot.MatchModel();
+        var exception = Assert.Throws<SpreadsheetAssertionException>(() => matching.ShouldNot.MatchModel());
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(returned, Is.SameAs(strict));
+            Assert.That(exception!.Message, Does.Contain("not to match SalesRow but it did"));
+        }
+    }
+
+    [Test]
     public async Task Model_ShouldFailWithTheMissingColumn()
     {
         var (host, context) = Start("sheets model failure");

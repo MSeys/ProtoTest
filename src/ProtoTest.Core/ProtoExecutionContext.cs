@@ -384,6 +384,12 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     /// </summary>
     internal string? TryClientName(object client) => _clients.FindName(client);
 
+    /// <summary>
+    /// The names clients of the type are registered under for this test, in registration order; used by
+    /// name resolution to complete a bare name from a uniquely named client.
+    /// </summary>
+    internal IReadOnlyList<string> RegisteredClientNames(Type clientType) => _clients.Names(clientType);
+
     /// <summary>The registered clients in registration order; used by the completion phase.</summary>
     internal IReadOnlyList<object> RegisteredClients => _clients.Snapshot();
 

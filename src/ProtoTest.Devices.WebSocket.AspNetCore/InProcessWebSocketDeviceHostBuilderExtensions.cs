@@ -52,10 +52,13 @@ public static class InProcessWebSocketDeviceHostBuilderExtensions
             return builder;
         }
 
-        // The transport only serves an application that runs in-process. When the environment publishes
-        // the application's address the transport declines and the socket takes over, so the capability
-        // steps aside with it instead of advertising a transport the run will not use.
-        return builder.AddCapabilityUnlessConfigured(
+        // The transport only serves an application that the run hosts in-process: with a configured
+        // address, a loopback listener or an AppHost-served application it declines and the socket
+        // takes over, so the capability steps aside with it instead of advertising a transport the run
+        // will not use. When the application declares a provider chain, its winner decides; a host
+        // without a chain keeps the configured-address rule.
+        return builder.AddCapabilityWhenInProcess(
+            applicationName,
             new ProtoCapabilityDescriptor(
                 InProcessWebSocketDeviceTransport<TProgram>.TransportName,
                 ProtoCapabilityKinds.Device,

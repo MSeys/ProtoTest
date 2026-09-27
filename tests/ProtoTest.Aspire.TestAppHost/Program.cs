@@ -17,4 +17,11 @@ if (builder.Configuration.GetValue<bool>("Aspire:Test:TwoResources"))
     builder.AddProject<Projects.ProtoTest_Aspire_TestService>("api2");
 }
 
+// The connection-string journey declares a resource without an endpoint, so a mapped key resolves
+// the AppHost's own value instead of an application address.
+if (builder.Configuration.GetValue<bool>("Aspire:Test:ConnectionString"))
+{
+    builder.AddConnectionString("db", reference => reference.Append($"Host=apphost"));
+}
+
 builder.Build().Run();

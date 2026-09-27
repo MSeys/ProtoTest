@@ -798,7 +798,12 @@ public sealed class GrpcIntegrationTests
     {
         var builder = new ProtoHostBuilder();
         builder.AddInfrastructure(
-            new PublishedAddressInfrastructure("Echo", GrpcTestServer.Address),
+            "Echo address",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider(
+                    "published",
+                    new PublishedAddressInfrastructure("Echo", GrpcTestServer.Address))),
             "ProtoTest:Applications:Echo:BaseUrl");
         builder.AddApplication("Echo", app => app.AddGrpc(grpc => grpc.AddClient("Default")));
         await using var host = builder.Build();

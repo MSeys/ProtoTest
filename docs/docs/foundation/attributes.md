@@ -95,7 +95,7 @@ public sealed class SampleUserAttribute : ProtoAttribute
 }
 ```
 
-The sample suite's real pair is [`NorthstarTenantAttribute` and `SignedInAsAttribute`](../../../samples/Northstar.ProtoTest/NorthstarAttributes.cs).
+The sample suite's real pair is [`NorthstarTenantAttribute` and `SignedInAsAttribute`](../../../samples/Northstar.ProtoTest/NorthstarAttributes.cs), which the demo's journeys group as [`NorthstarMemberAttribute`](#composite-attributes).
 
 What makes these work well:
 
@@ -128,7 +128,46 @@ Where the attribute is declared doesn't affect ordering: class-level and method-
 
 Attributes are collected from the test's class (including base classes) and from the method (including overridden base methods). Put suite-wide capabilities on the class and scenario-specific ones on the method.
 
-Unlike `[Auth<T>]` — where a method-level attribute *replaces* class-level ones — `ProtoAttribute`s simply accumulate. If both the class and the method have a `[SampleUser]`, both run.
+Unlike `[Auth<T>]` — where a method-level attribute *replaces* class-level ones — `ProtoAttribute`s simply accumulate. If both the class and the method have a `[SampleUser]`, both run. The one exception is a composed attribute: the same declaration explicitly and through a composite runs once (see [Composite attributes](#composite-attributes)).
+
+## Composite attributes
+
+When a capability always comes with another one, declare the group once as a **composite attribute**: an attribute that names the attributes it composes. The framework expands it wherever attributes are resolved.
+
+```csharp
+public sealed class NorthstarMemberAttribute(string planId = PlanIds.Free) : ProtoCompositeAttribute
+{
+    public string PlanId { get; } = planId;
+
+    protected override IReadOnlyList<Attribute> Compose() =>
+    [
+        new NorthstarTenantAttribute(PlanId),         // provisions the tenant
+        new AuthAttribute<NorthstarAuthenticator>(),  // carries the member's bearer token
+    ];
+}
+```
+
+A journey now carries one declaration; the identity stays where it varies per test:
+
+```csharp
+[Application(NorthstarTargets.Api)]
+[NorthstarMember(PlanIds.Growth)]
+public sealed class BillingJourney
+{
+    [ProtoTest]
+    [SignedInAs]
+    public async Task UsageIsMeteredAgainstThePlanAllowance() { ... }
+}
+```
+
+How the expansion behaves:
+
+- **Order still decides.** Composed attributes run like declarations the test made itself: ascending `Order` before the test, reverse after. On a tie a composed attribute runs before the composite that declared it, so the composite's own `BeforeTestAsync` sees its dependencies. The composite's own behavior runs at its `Order` like any attribute.
+- **Recursive.** A composite may compose another composite. A cycle throws naming the chain when the attributes are resolved, before the lifecycle starts.
+- **Once per declaration.** An attribute that appears both explicitly and through a composite runs once. Two declarations are the same when their attribute type and every public property value match — collections compare element-wise and `Order` is a property, so an override makes a different declaration. The explicit declaration wins over the composed copy.
+- **Visible in the trace.** Every composed attribute gets its own `attribute.before`/`attribute.after` entry, and a composite's entries carry `attribute.composed` naming the types it expanded to, so the run shows what actually executed.
+
+`Compose()` returns `Attribute` instances, so a composite can also group metadata-only attributes that hooks read: `[Auth<T>]` is not a lifecycle attribute, and a composite that declares it reaches the HTTP auth hook the same way an explicit declaration does. `Compose()` must be a deterministic factory — the framework calls it once per attribute instance and runs the instances it returns.
 
 ## Services in attributes
 
@@ -177,5 +216,6 @@ Most of the capabilities in a real suite are ones you write — that's the point
 
 - C# attributes are created by reflection: no constructor injection. Resolve services from the context inside `BeforeTestAsync`/`AfterTestAsync`, and pass only compile-time constants to constructors.
 - Only `Order` decides sequencing, and ties put class-level attributes first; a failed setup rolls back only the components that completed, so teardown must tolerate partial state (`TryResolve`, early return).
+- A composite deduplicates by attribute type plus public property values. An attribute that hides configuration in private state cannot be recognized as the same declaration, so give it a public property; `Compose()` is called once per attribute instance, and a composite must not compose itself, directly or through another composite.
 - A skip condition only sees [registered capabilities](./skip-conditions.md): an integration that is not configured makes its tests skip, which is the point.
 - `[RequiresInProcess]` inspects capability registration only — it does not itself look at `BaseUrl`. Integrations make that registration honest: `AddAspNetCoreServer` drops its `server` capability when an address is configured, so the condition skips a published run.

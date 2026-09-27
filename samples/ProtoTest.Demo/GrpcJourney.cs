@@ -14,12 +14,11 @@ using ProtoTest.SampleApp.Domain;
 using ProtoTest.SampleApp.Grpc;
 
 /// <summary>
-/// The same application over gRPC: the shared <c>[Auth]</c> bearer token travels as metadata, the call
-/// is traced as a grpc.call span, and the reply is asserted like any other value.
+/// The same application over gRPC: the member's bearer token travels as metadata, the call is traced
+/// as a grpc.call span, and the reply is asserted like any other value.
 /// </summary>
 [Application(NorthstarTargets.Api)]
-[NorthstarTenant(PlanIds.Growth)]
-[Auth<NorthstarAuthenticator>]
+[NorthstarMember(PlanIds.Growth)]
 public sealed class GrpcJourney
 {
     private static readonly Marshaller<GetProjectRequest> GetRequestMarshaller = Marshallers.Create<GetProjectRequest>(

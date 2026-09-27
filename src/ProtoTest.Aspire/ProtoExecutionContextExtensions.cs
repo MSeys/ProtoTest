@@ -7,9 +7,10 @@ using ProtoTest.Core;
 public static class ProtoExecutionContextExtensions
 {
     /// <summary>
-    /// Gets the base address the AppHost published for the resource: the value of
-    /// <c>ProtoTest:Applications:{application}:BaseUrl</c> the test's settings resolve, so a
-    /// resource renamed with <c>MapResource</c> is found under its application name.
+    /// Gets the value the AppHost published for the resource: the application's
+    /// <c>ProtoTest:Applications:{application}:BaseUrl</c> for an endpoint resource, or the target's
+    /// declared key for a resource mapped with <c>MapConnectionString</c>. A resource renamed with
+    /// <c>MapResource</c> is found under its application name.
     /// </summary>
     public static string AspireResource(this ProtoExecutionContext context, string resource)
     {
@@ -20,10 +21,14 @@ public static class ProtoExecutionContextExtensions
             ?? throw new InvalidOperationException(
                 "This host was not built with ProtoTest.Aspire; register an AppHost with builder.AddAspireAppHost<TEntryPoint>().");
 
-        var application = registry.ApplicationFor(resource);
-        return ProtoApplication.BaseUrl(context, application)
+        var key = registry.KeyFor(resource);
+        return ProtoApplication.ResolveSetting(
+                context.Configuration,
+                context.TryService<ProtoInfrastructureSettings>(),
+                key)
             ?? throw new InvalidOperationException(
-                $"Aspire resource '{resource}' has no address yet. The AppHost publishes 'ProtoTest:Applications:{application}:BaseUrl' when the run starts; " +
-                "configure that key to point the suite at a deployed topology instead.");
+                $"Aspire resource '{resource}' has no value yet: the AppHost publishes '{key}' when the run starts. " +
+                "Set the key to point the suite at a deployed topology instead, or select the AppHost with " +
+                $"'{ProtoAspireOptions.SelectionKey}=true'.");
     }
 }

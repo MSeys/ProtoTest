@@ -17,8 +17,18 @@ dotnet add package ProtoTest.Hosting
 
 ```csharp
 builder
-    .AddInfrastructure(new PostgresDatabase(...), "ConnectionStrings:App")
-    .AddInfrastructure(new RabbitMqBroker(...), "ConnectionStrings:Broker")
+    .AddInfrastructure(
+        "AppStore",
+        chain => chain
+            .UseConfigured()
+            .UseContainer(new PostgresDatabase(...)),
+        "ConnectionStrings:App")
+    .AddInfrastructure(
+        "Broker",
+        chain => chain
+            .UseConfigured()
+            .UseContainer(new RabbitMqBroker(...)),
+        "ConnectionStrings:Broker")
     .AddWorkerHost<BillingWorker.Program>("Billing");
 ```
 
@@ -38,6 +48,32 @@ public async Task An_invoice_is_created_for_a_metered_session()
 ```
 
 `Proto.Context.Host<TProgram>()` returns the worker's `IHost` for anything the service lookup cannot answer, and both take a name when several workers host the same program.
+
+## Nested under an application
+
+A worker belongs to the application it consumes from: nest it with `AddWorkerHost` on the
+application's builder and it follows the application's provider chain instead of a key of its own (see
+[Environment resolution](../foundation/environment-resolution.md)):
+
+```csharp
+builder.AddApplication("Api", app => app
+    .UseConfigured()
+    .UseInProcess<Api.Program>()
+    .AddWorkerHost<BillingWorker.Program>("Billing", worker => worker
+        .UseEnvironment()   // the application runs elsewhere: the environment runs its worker too
+        .UseHost()));       // the run hosts the worker's entry point and bridges the test clock
+```
+
+- `UseEnvironment()` is available when the application's winner does not run it in-process (a
+  configured address, a loopback listener or an AppHost resource). The suite starts nothing: starting
+  the worker again would join a staging broker as a second consumer.
+- `UseHost()` is the fallback and the only provider that bridges the test clock and lets
+  `Proto.Context.Host<TProgram>()` resolve the running host.
+- Every winning provider declares the `worker` capability, so `[RequiresWorker<TProgram>]` passes in
+  every mode; only a hosted worker declares `clock`, so `[RequiresTestClock]` gates the tests that
+  advance the clock against one.
+- A worker registered on the host builder (`builder.AddWorkerHost<...>`) is not part of an application;
+  its chain defaults to `UseHost` and keeps today's behavior.
 
 ## Configuration
 
@@ -66,6 +102,8 @@ Register the worker after the pieces it needs: a [readiness probe](../foundation
 ## Limits
 
 - **In-process only.** A suite pointed at a published environment has no worker to start. Guard the tests that need one with `[RequiresWorker<TProgram>]` (the typed form of `[RequiresCapability(ProtoCapabilityKinds.Worker)]`, checked by the program assembly name). For an orchestrated topology instead of an in-process worker, see [Aspire](./aspire.md).
+- **A nested worker follows its application, not its own key.** `UseEnvironment()` decides from the application's winner; two workers with the same name are one lifecycle host-wide, and a nested worker's name must be unique across applications.
+- **A worker is not an application.** It has no address and no clients; if a worker image ever exposes a health endpoint, give it its own application target instead.
 - **One instance per run.** The worker is shared by every test in the run, exactly like the in-process application; tests must not assume a fresh worker per test.
 - **No per-test lifetime.** `AddWorkerHost` has no `PerTest` option; a worker that must restart between tests is not supported.
 - **A parameterless or argument-ignoring `Main` cannot see the overlay before `Build()`.** The run passes the overlay as command-line arguments; an entry point whose `Main()` takes no arguments, or that builds its host without passing `args`, still receives the values when the host is built (the in-memory overlay), so options factories and hosted services read them, but code between creating the builder and calling `Build()` reads only the worker's own sources. A parameterless `Main` also never receives the worker's `--contentRoot`/`--applicationName`, so it reads its own `appsettings.json` from the test process's content root. Build the host from `args` when `Main` itself reads configuration.

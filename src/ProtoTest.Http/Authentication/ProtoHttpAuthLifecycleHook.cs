@@ -20,7 +20,11 @@ public sealed class ProtoHttpAuthLifecycleHook(ProtoProtocol protocol) : IProtoT
     public Task BeforeTestAsync(ProtoExecutionContext context)
     {
         var method = context.TestMethod;
-        var methodAttributes = method.GetCustomAttributes(inherit: true);
+        // Composites are expanded here too: [Auth<T>] and [SignedInAs] ride in metadata attributes,
+        // not lifecycle ones, so this hook reads them from the same expanded resolution the
+        // lifecycle uses.
+        var methodAttributes = ProtoAttributeResolver
+            .Expand(method.GetCustomAttributes(inherit: true).OfType<Attribute>());
         // The signed-in test user names who the test acts as, not how a request is authenticated, so
         // it stays out of the method-over-class replacement [Auth] uses and rides along the winning
         // set instead.
@@ -34,7 +38,9 @@ public sealed class ProtoHttpAuthLifecycleHook(ProtoProtocol protocol) : IProtoT
             && (method.DeclaringType is null || method.DeclaringType.IsAssignableFrom(reflected))
                 ? reflected
                 : method.DeclaringType;
-        var classAttributes = classType is null ? [] : classType.GetCustomAttributes(inherit: true);
+        var classAttributes = classType is null
+            ? []
+            : ProtoAttributeResolver.Expand(classType.GetCustomAttributes(inherit: true).OfType<Attribute>());
         var classAuth = Applicable(classAttributes)
             .Where(metadata => metadata is not SignedInAsAttribute)
             .ToArray();
@@ -71,7 +77,7 @@ public sealed class ProtoHttpAuthLifecycleHook(ProtoProtocol protocol) : IProtoT
 
     public Task AfterTestAsync(ProtoExecutionContext context) => Task.CompletedTask;
 
-    private IEnumerable<IProtoHttpAuthMetadata> Applicable(IEnumerable<object> attributes)
+    private IEnumerable<IProtoHttpAuthMetadata> Applicable(IEnumerable<Attribute> attributes)
         => attributes
             .OfType<IProtoHttpAuthMetadata>()
             .Where(metadata => metadata.AppliesTo(_protocol.Key));

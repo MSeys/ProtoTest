@@ -66,6 +66,7 @@ On the opened workbook:
 | `Name`, `Sheets` | the workbook name and the sheets that were read (visible ones by default) |
 | `Sheet(name)` | finds a sheet; a failure lists the available names |
 | `Model<TRow>()` | binds a `[Sheet]`/`[Column]` record to the workbook |
+| `KeyValueModel<TModel>()` | binds a `[Sheet(..., Kind = ProtoSheetKind.KeyValue)]` record to a label/value sheet |
 
 On a sheet: `Cell(reference)`, `Cell(row, column)` (1-based), `Range(reference)`, `Table(params int[] headerRows)` (defaults to row 1), plus `Name`, `Index`, `IsHidden`, `RowCount` and `ColumnCount`.
 
@@ -133,6 +134,7 @@ public sealed record SalesRow(
 
 var sales = Proto.Context.Sheets().Open(response).Model<SalesRow>();
 
+sales.Should.MatchHeaders();                                                  // the header row is the declared columns, in order
 sales.Should.MatchModel();                                                    // every rule, every row
 sales.Column(row => row.Amount).Should.Be([1200m, 900m]);
 sales.Column(row => row.Amount).Should.BeSortedBy(ProtoSortDirection.Descending);
@@ -144,12 +146,35 @@ sales.Row(row => row.Region == "EMEA")
 `[Sheet(name)]` names the worksheet and its `HeaderRows` (default `[1]`). `[Column(path)]` binds a property to a header path and can carry `Optional`, `Min`, `Max`, `Pattern`, `OneOf` and `Unique`. `Model<TRow>()` requires `[Sheet]`, rejects a model with no `[Column]` properties, and rejects `Optional` on a non-nullable property; a missing header fails immediately with the names the sheet has.
 
 - `Rows` returns the projected records; `Row(predicate)` fails when nothing matches; `Column(row => row.Amount)` reads a typed column.
+- `Should.MatchHeaders()` compares the sheet's header row with the model's declared columns: every `[Column]` path must appear at its declaration position, the sheet must declare exactly as many columns as the model, and a single-segment path matches the end of a layered path. The read of the header row contributes coverage. `ShouldNot.MatchHeaders()` passes when the headers differ; `ShouldNot.MatchModel()` passes when the sheet has at least one violation.
 - Typed columns support `string`, `decimal`, `double`, `int`, `long`, `bool`, `DateTime` and their nullables. `Should.Be` uses `EqualityComparer<TValue?>.Default`, `Should.BeSortedBy` uses `Comparer<TValue?>.Default`, and `Should.All(predicate)` reports the first failing row (`ShouldNot.All` passes when at least one value does not match).
 - `Should.MatchModel()` checks every declared column and reports **all** violations in one failure — emptiness and non-nullability, conversion, `Min`/`Max` (numbers and date serial values), `Pattern`, `OneOf`, and `Unique` with kind-aware keys. The message shows up to ten, then `+N more`.
 - A row is matched with the same [shapes](../../foundation/shape-matching.md) as a JSON response: `table.Rows[0].Should.MatchShape(shape)` for a table row and `row.ShouldMatchShape(shape)` for a model row (a record is a user type, so C# cannot give it a `Should` extension property). A model row serializes with its record property names; a table row is keyed by each column's leaf header name with the cell's rendered value (a table whose leaves collide fails instead of guessing). The assertion is a traced `assert.json.shape` operation on the ambient test context with the same expected/actual evidence as a response assertion, and its failure names the row's `Sheet!Range` (or the record type) and keeps the mismatch details as the inner exception.
 
 `table.Rows[0].Should.MatchShape(shape, exact: true)` — or `row.ShouldMatchShape(shape, exact: true)` for a model row — is the exhaustive form: a field present in the row that the shape does not mention is a mismatch naming that field. A value constraint mentions its whole subtree. The [shape matching page](../../foundation/shape-matching.md#exact-matching) has the rules.
 - Records are constructed through their primary constructor, so its guards and normalization run; every constructor parameter must map to a `[Column]`, or the model fails naming the parameter. A class with a parameterless constructor is constructed and its declared `[Column]` properties are set, and a class with only a mapped parameterized constructor is constructed through it. An optional empty cell binds as `null`.
+
+### Key-value sheets
+
+A sheet that is really a label/value block — labels in the first column, values in the second — is modelled the same way, with the sheet's kind declared on the model:
+
+```csharp
+[Sheet("Summary", Kind = ProtoSheetKind.KeyValue)]
+public sealed record SummarySheet(
+    [property: Column("Month")] string Month,
+    [property: Column("Invoices")] int Count,
+    [property: Column("Total")] decimal Total);
+
+var summary = Proto.Context.Sheets().Open(response).KeyValueModel<SummarySheet>();
+
+summary.Should.MatchModel();                                  // every declared label
+summary.Column(s => s.Total).Should.Be(123.45m);              // the value under the label
+summary.Column(s => s.Total).ShouldNot.Be(0m);
+```
+
+`[Column("Total")]` declares the label text, so the string appears once in the model. The value is converted to the property's type like a table column and `Should.Be` compares with the cell assertion's rules. A label the sheet does not carry fails the read naming the labels the sheet has; a label that appears more than once fails naming its rows; `Unique` is rejected because a label already names one value; a `[Column]` with more than one segment is rejected because a label is a single text. An empty value binds `null` for a nullable or `Optional` property and fails the read otherwise. `MatchModel()` reports every violation in one failure, like the table model.
+
+`Model<TRow>()` and `KeyValueModel<TModel>()` follow the kind the model declares: reading a model with the other accessor fails naming the one to use.
 
 ### Hidden sheets
 
@@ -158,12 +183,12 @@ Hidden sheets are skipped unless `ProtoTest:Sheets:IncludeHiddenSheets` (or the 
 ## Tracing and coverage
 
 - `sheets.open` (source `ProtoTest.Sheets`) carries `sheets.name` and a Fields section listing every sheet read as `name · {rows}x{columns}[ hidden]`.
-- `sheets.model` carries `sheets.sheet` and `sheets.columns` when a typed model is read.
-- Every assertion is an `assert.sheets` operation with attributes such as `sheets.cell`, `sheets.header`, `sheets.range`, `sheets.column`, `sheets.expected` and `sheets.actual`. The operation opens before the check, so a failure still leaves evidence with the fixed polarity.
+- `sheets.model` carries `sheets.sheet` and `sheets.columns` when a table model is verified, or `sheets.labels` when a key-value model is verified; the operation records whether the sheet matched, and a negated `ShouldNot.MatchModel()` consumes a recorded violation.
+- Every assertion is an `assert.sheets` operation with attributes such as `sheets.cell`, `sheets.label`, `sheets.header`, `sheets.range`, `sheets.column`, `sheets.expected` and `sheets.actual`. The operation opens before the check, so a failure still leaves evidence with the fixed polarity.
 - Reading a cell or range records a `sheets.range` observation (`"{Sheet}!{reference}"`); `SheetsCoverageCollector` (category `Sheets`) aggregates those reads.
 - Opening a workbook records a `sheets.workbook` observation with a `sheets.count` metadata value. It is evidence, not coverage: opening a workbook is not an assertion and covers nothing, so only `sheets.range` marks a range covered.
 
-Reads are recorded by cell and range reads, `Table.Column`, `RowWhere`, `Rows`, the `ProtoTableRow` indexer, table-row shape assertions, and model `Rows`, `Column` and `Should.MatchModel()`. Building a table view records nothing, and a malformed reference throws before any read is recorded. Coverage therefore means **"verified"**, not "present in the file":
+Reads are recorded by cell and range reads, `Table.Column`, `RowWhere`, `Rows`, the `ProtoTableRow` indexer, table-row shape assertions, model `Rows`, `Column`, `Should.MatchHeaders()` and `Should.MatchModel()`, and a key-value model's `Column` and `Should.MatchModel()` (the label/value block). Building a table view records nothing, and a malformed reference throws before any read is recorded. Coverage therefore means **"verified"**, not "present in the file":
 
 ```csharp
 var coverage = Proto.Context.Services.GetServices<IProtoCollector>()
@@ -193,6 +218,8 @@ The capability is name `"Sheets"`, kind `document` (`ProtoCapabilityKinds.Docume
 - **Coverage is read-based.** A column present in the file but never read is uncovered; hidden sheets are excluded by default. Opening a workbook records `sheets.workbook` evidence but covers nothing.
 - **Integer reads are strict.** A cell read as `int` or `long` must be finite, integral and in range: `1200.75` does not round to `1201`, and `1e20` or a `NaN` cell fails the read with a cell-naming `FormatException` instead of saturating. Read a `double` or `decimal` when a fractional value is data.
 - **Header paths are ordinal.** Matching is case-sensitive, and a suffix match is only allowed when exactly one column matches.
+- **`Should.MatchHeaders()` is exact.** The sheet must declare the model's columns in declaration order with no extra column; a declared single-segment path matches the end of a layered path. Header matching reads the header rows, so coverage covers them.
+- **A key-value sheet is one label/value block.** Labels are the non-empty cells of the first column and values the second, so a sheet that uses those columns for anything else cannot be modelled as key-value; a label the model does not declare is ignored, and a duplicated label fails rather than picking a row.
 
 ## Links
 

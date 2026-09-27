@@ -29,7 +29,12 @@ public sealed class ContainerMidRunDeathTests
         var resource = new LoopbackContainerResource(() => container);
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.OutputPath = trace.Path);
-        builder.AddInfrastructure(resource, "ConnectionStrings:OrderDb");
+        builder.AddInfrastructure(
+            "OrderDb",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider("loopback-container", resource)),
+            "ConnectionStrings:OrderDb");
         await using var host = builder.Build();
         await host.StartAsync();
 

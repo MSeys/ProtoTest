@@ -35,7 +35,15 @@ public sealed class ProvidedAddressCapabilityTests
     {
         var builder = BuilderWith();
         builder.AddInfrastructure(
-            new DeclaredSettingsInfrastructure("broker:rabbitmq", ConnectionStringKey, "amqp://guest:guest@container:5672/"),
+            "BrokerAddress",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider(
+                    "settings",
+                    new DeclaredSettingsInfrastructure(
+                        "broker:rabbitmq",
+                        ConnectionStringKey,
+                        "amqp://guest:guest@container:5672/"))),
             ConnectionStringKey);
         builder.AddMessaging(messaging => messaging.UseRabbitMq());
 

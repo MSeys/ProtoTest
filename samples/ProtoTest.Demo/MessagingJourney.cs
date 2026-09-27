@@ -20,8 +20,7 @@ using ProtoTest.Web;
 /// suite stays honest in every environment.
 /// </summary>
 [Application(NorthstarTargets.Api)]
-[NorthstarTenant(PlanIds.Growth)]
-[Auth<NorthstarAuthenticator>]
+[NorthstarMember(PlanIds.Growth)]
 [WebSession("Default", DiscoverRoutes = true)]
 [RequiresCapability(ProtoCapabilityKinds.Broker)]
 public sealed class MessagingJourney
@@ -61,8 +60,7 @@ public sealed class MessagingJourney
 /// publishes the event, because the browser session follows that application's published address.
 /// </summary>
 [Application(NorthstarTargets.Console)]
-[NorthstarTenant(PlanIds.Growth)]
-[Auth<NorthstarAuthenticator>]
+[NorthstarMember(PlanIds.Growth)]
 [WebSession("Default", DiscoverRoutes = true)]
 [RequiresCapability(ProtoCapabilityKinds.Broker)]
 [RequiresCapability(

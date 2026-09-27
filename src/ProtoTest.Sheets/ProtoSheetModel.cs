@@ -72,7 +72,7 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
     /// <summary>Reads a whole column as typed values with property-style assertions.</summary>
     public ProtoModelColumn<TValue> Column<TValue>(Expression<Func<TRow, TValue>> property)
     {
-        var binding = BindingOf(PropertyOf(property));
+        var binding = BindingOf(SheetPropertyExpression.PropertyOf(property));
         _table.RecordRead(_table.ColumnRange(binding.Number));
         var values = new TValue?[_table.RowCount];
         for (var index = 0; index < values.Length; index++)
@@ -86,14 +86,29 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
     }
 
     /// <summary>The assertions of this model, for example <c>Should.MatchModel()</c>.</summary>
-    public ProtoSheetModelAssertions<TRow> Should => new(this);
+    public ProtoSheetModelAssertions<TRow> Should => new(this, negated: false);
+
+    /// <summary>The negated assertions of this model, for example <c>ShouldNot.MatchHeaders()</c>.</summary>
+    public ProtoSheetModelAssertions<TRow> ShouldNot => new(this, negated: true);
 
     /// <summary>Checks every declared column against the record's shape; all violations are reported.</summary>
     /// <remarks>Obsolete: use <c>Should.MatchModel()</c>.</remarks>
     [Obsolete("Use Should.MatchModel() instead.")]
     public void Verify() => AssertModel();
 
-    internal ProtoSheetModel<TRow> AssertModel()
+    internal ProtoExecutionContext? Context => _context;
+
+    /// <summary>The header paths the record declares, in declaration order.</summary>
+    internal IReadOnlyList<IReadOnlyList<string>> DeclaredHeaders
+        => [.. _columns.Select(column => column.Attribute.Path)];
+
+    /// <summary>The header paths the sheet carries, one per column, top level first.</summary>
+    internal IReadOnlyList<IReadOnlyList<string>> SheetHeaders => _table.Headers;
+
+    /// <summary>Records a read of the header rows, for coverage.</summary>
+    internal void RecordHeaderRead() => _table.RecordRead(_table.HeaderRange);
+
+    internal ProtoSheetModel<TRow> AssertModel(bool negated = false)
     {
         _table.RecordRead(_table.DataRange);
         var failures = new List<string>();
@@ -114,36 +129,9 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
                     continue;
                 }
 
-                if (!SheetCellValue.TryConvert(binding.Property.PropertyType, cell, out _))
+                if (!SheetColumnRules.Check(column, binding.Property.PropertyType, binding.Name, cell, failures))
                 {
-                    failures.Add($"'{binding.Name}' is not a {binding.Property.PropertyType.Name} at {cell.Reference} (was {cell.Display()})");
                     continue;
-                }
-
-                // Constraints compare the typed value: a date cell has no Number, and a numeric cell
-                // has no Text, so validating only those would silently skip the constraint.
-                if (!double.IsNaN(column.Min) && TypedNumber(cell) is { } below && below < column.Min)
-                {
-                    failures.Add($"'{binding.Name}' is {cell.Display()} at {cell.Reference}, below the minimum {column.Min}");
-                }
-
-                if (!double.IsNaN(column.Max) && TypedNumber(cell) is { } above && above > column.Max)
-                {
-                    failures.Add($"'{binding.Name}' is {cell.Display()} at {cell.Reference}, above the maximum {column.Max}");
-                }
-
-                if (column.Pattern is { } pattern
-                    && cell.RenderedValue is { } rendered
-                    && !System.Text.RegularExpressions.Regex.IsMatch(rendered, pattern))
-                {
-                    failures.Add($"'{binding.Name}' is '{rendered}' at {cell.Reference}, which does not match '{pattern}'");
-                }
-
-                if (column.OneOf is { Length: > 0 } allowed
-                    && cell.RenderedValue is { } candidate
-                    && !allowed.Contains(candidate, StringComparer.Ordinal))
-                {
-                    failures.Add($"'{binding.Name}' is '{candidate}' at {cell.Reference}, not one of {string.Join(", ", allowed)}");
                 }
 
                 if (seen is not null)
@@ -163,23 +151,39 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
             }
         }
 
+        var matches = failures.Count == 0;
+        SpreadsheetAssertionException? failure = null;
+        if (!matches)
+        {
+            var shown = failures.Take(10).ToArray();
+            failure = new SpreadsheetAssertionException(
+                $"'{Sheet.Name}' does not match {typeof(TRow).Name}: {string.Join("; ", shown)}" +
+                (failures.Count > shown.Length ? $" (+{failures.Count - shown.Length} more)" : string.Empty) + ".");
+        }
+
         using var operation = _context?.Trace
             .Operation("sheets.model", $"Sheets · model {typeof(TRow).Name}", ProtoSheets.TraceSource)
             .With("sheets.sheet", Sheet.Name)
             .With("sheets.columns", _columns.Count.ToString(CultureInfo.InvariantCulture))
             .Begin();
-        if (failures.Count == 0)
+        if (failure is null)
         {
             operation?.Succeed();
+        }
+        else
+        {
+            operation?.Fail(failure);
+        }
+
+        // The operation records whether the sheet matched; the facade's polarity decides whether that
+        // outcome is the assertion the test asked for.
+        if ((failure is null) != negated)
+        {
             return this;
         }
 
-        var shown = failures.Take(10).ToArray();
-        var exception = new SpreadsheetAssertionException(
-            $"'{Sheet.Name}' does not match {typeof(TRow).Name}: {string.Join("; ", shown)}" +
-            (failures.Count > shown.Length ? $" (+{failures.Count - shown.Length} more)" : string.Empty) + ".");
-        operation?.Fail(exception);
-        throw exception;
+        throw failure ?? new SpreadsheetAssertionException(
+            $"Expected '{Sheet.Name}' not to match {typeof(TRow).Name} but it did.");
     }
 
     internal static ProtoSheetModel<TRow> Read(ProtoWorkbook workbook, ProtoExecutionContext? context)
@@ -187,10 +191,21 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
         var attribute = typeof(TRow).GetCustomAttribute<SheetAttribute>()
             ?? throw new SpreadsheetAssertionException(
                 $"{typeof(TRow).Name} needs a [Sheet(\"...\")] attribute to model a sheet.");
+        if (attribute.Kind != ProtoSheetKind.Table)
+        {
+            throw new SpreadsheetAssertionException(
+                $"{typeof(TRow).Name} declares [Sheet(\"{attribute.Name}\", Kind = ProtoSheetKind.{attribute.Kind})]; " +
+                $"read it with KeyValueModel<{typeof(TRow).Name}>() for a label/value sheet.");
+        }
+
         var sheet = workbook.Sheet(attribute.Name);
         var table = sheet.Table(attribute.HeaderRows);
         var columns = new List<SheetColumnBinding>();
-        foreach (var property in typeof(TRow).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        // A record's properties arrive in metadata order - its declaration order - which is the order
+        // MatchHeaders compares the sheet's header row against.
+        foreach (var property in typeof(TRow)
+                     .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                     .OrderBy(property => property.MetadataToken))
         {
             if (property.GetCustomAttribute<ColumnAttribute>() is not { } column)
             {
@@ -336,29 +351,10 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
             ?? throw new SpreadsheetAssertionException(
                 $"'{typeof(TRow).Name}.{property.Name}' is not mapped to a column; mark it with a [Column(\"...\")] attribute.");
 
-    /// <summary>The numeric value a constraint compares: a number, or a date as its serial value.</summary>
-    private static double? TypedNumber(ProtoCell cell)
-        => cell.Number ?? cell.Date?.ToOADate();
-
     /// <summary>A uniqueness key that keeps text, numbers, booleans and dates apart.</summary>
     private static string UniqueKey(ProtoCell cell)
         => cell.Text is { } text ? $"text:{text}"
             : cell.Number is { } number ? $"number:{number.ToString("R", CultureInfo.InvariantCulture)}"
             : cell.Boolean is { } boolean ? $"boolean:{boolean}"
             : $"date:{cell.Date!.Value.ToString("O", CultureInfo.InvariantCulture)}";
-
-    private static PropertyInfo PropertyOf<TValue>(Expression<Func<TRow, TValue>> property)
-    {
-        ArgumentNullException.ThrowIfNull(property);
-        Expression body = property.Body;
-        // A cast, such as row => (long)row.Count, is a Convert node around the property access.
-        if (body is UnaryExpression { NodeType: ExpressionType.Convert } conversion)
-        {
-            body = conversion.Operand;
-        }
-
-        return body is MemberExpression { Member: PropertyInfo info }
-            ? info
-            : throw new ArgumentException("Use a property access like row => row.Amount.", nameof(property));
-    }
 }

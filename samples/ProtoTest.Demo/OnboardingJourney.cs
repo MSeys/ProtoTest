@@ -12,8 +12,7 @@ using ProtoTest.SampleApp.Contracts;
 
 /// <summary>A new customer signs up, is constrained by the free plan, and upgrades to grow.</summary>
 [Application(NorthstarTargets.Api)]
-[NorthstarTenant]
-[Auth<NorthstarAuthenticator>]
+[NorthstarMember]
 public sealed class OnboardingJourney
 {
     [ProtoTest]

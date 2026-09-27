@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <PackageReference Include="Docker.DotNet.Enhanced" />
     <PackageReference Include="Testcontainers" />
   </ItemGroup>
 

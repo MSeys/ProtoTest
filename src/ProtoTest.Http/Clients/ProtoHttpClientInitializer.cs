@@ -1,5 +1,8 @@
 namespace ProtoTest.Http;
 
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
+using Microsoft.Extensions.Options;
 using ProtoTest.Core;
 
 /// <summary>
@@ -75,9 +78,52 @@ public sealed class ProtoHttpClientInitializer(
 
     private HttpClient Register(ProtoExecutionContext context, Uri? baseAddress)
     {
-        var client = context.Service<IHttpClientFactory>().CreateClient(GetFactoryName(protocolName, Name));
+        var factoryName = GetFactoryName(protocolName, Name);
+        // A resolved address means the requests leave this process, so the primary handler's cookie
+        // container carries the test's sign-in state. The factory pools one handler per client name
+        // for the whole handler lifetime, which would hand that state to every parallel test of the
+        // run; build the named client's own pipeline over a handler this test owns instead. Without an
+        // address the registered client only backs the application's in-process transport, and the
+        // pooled client is what serves it.
+        var client = baseAddress is null
+            ? context.Service<IHttpClientFactory>().CreateClient(factoryName)
+            : CreatePerTestClient(context, factoryName);
         client.BaseAddress = baseAddress;
         context.RegisterClient(client, ScopedName);
+        return client;
+    }
+
+    /// <summary>
+    /// Rebuilds the named client's pipeline the way <see cref="IHttpClientFactory"/> would - the named
+    /// options' handler and client actions, composed with the registered builder filters - but over a
+    /// fresh primary handler, so its cookies and connections live and die with the test.
+    /// </summary>
+    private static HttpClient CreatePerTestClient(ProtoExecutionContext context, string factoryName)
+    {
+        var options = context.Service<IOptionsMonitor<HttpClientFactoryOptions>>().Get(factoryName);
+        var builder = context.Service<HttpMessageHandlerBuilder>();
+        builder.Name = factoryName;
+
+        Action<HttpMessageHandlerBuilder> configure = target =>
+        {
+            foreach (var action in options.HttpMessageHandlerBuilderActions)
+            {
+                action(target);
+            }
+        };
+        var filters = context.Services.GetServices<IHttpMessageHandlerBuilderFilter>().ToArray();
+        for (var index = filters.Length - 1; index >= 0; index--)
+        {
+            configure = filters[index].Configure(configure);
+        }
+
+        configure(builder);
+        var client = new HttpClient(builder.Build(), disposeHandler: true);
+        foreach (var action in options.HttpClientActions)
+        {
+            action(client);
+        }
+
         return client;
     }
 

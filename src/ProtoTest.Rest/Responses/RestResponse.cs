@@ -146,9 +146,10 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
     /// The shape assertion behind <see cref="RestShouldAssertions.MatchShape"/> and the obsolete
     /// <see cref="ShouldMatchShape"/> shim. A matcher failure is rethrown as a
     /// <see cref="Exceptions.RestAssertionException"/> whose message starts with the request
-    /// identifier, with the matcher exception - and its mismatch list - as the inner exception.
+    /// identifier, with the matcher exception - and its mismatch list - as the inner exception. In
+    /// exact mode a field present in the body that the shape does not mention is a mismatch.
     /// </summary>
-    internal RestResponse AssertResponseShape(object expectedShape, JsonSerializerOptions? options = null)
+    internal RestResponse AssertResponseShape(object expectedShape, JsonSerializerOptions? options = null, bool exact = false)
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
         try
@@ -178,7 +179,8 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
                             Method = RequestMethod,
                             RouteTemplate = RouteTemplate
                         })
-                    : null);
+                    : null,
+                exact);
         }
         catch (JsonShapeMismatchException exception)
         {
@@ -196,6 +198,208 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
     // names; a response asserted without one (an untraced assertion) keeps the message unchanged.
     private string PrefixIdentifier(string message)
         => string.IsNullOrEmpty(Identifier) ? message : $"{Identifier} — {message}";
+
+    /// <summary>Asserts the response body's media type, without its parameters.</summary>
+    internal RestResponse AssertContentType(string mediaType, bool negated)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(mediaType);
+        var actual = ContentHeaders.ContentType?.MediaType;
+        var expected = $"'{mediaType}'";
+        var holds = actual is not null && string.Equals(actual, mediaType, StringComparison.OrdinalIgnoreCase);
+        return AssertHttpFact(
+            "assert.http.content_type",
+            $"Assert content type · {ProtoAssertion.Describe(expected, negated)}",
+            new Dictionary<string, string?>
+            {
+                ["expected.content_type"] = mediaType,
+                ["actual.content_type"] = actual
+            },
+            ResultItem("content type", actual, expected, holds, negated),
+            holds,
+            negated,
+            () => $"Expected content type {ProtoAssertion.Describe(expected, negated)}, but received {DescribeValue(actual)}.");
+    }
+
+    /// <summary>Asserts the response carries a header, or that a header carries a value.</summary>
+    internal RestResponse AssertHeader(string name, string? expectedValue, bool negated)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var values = ReadHeaderValues(name);
+        var sanitized = SanitizeHeaderValues(name, values);
+        var holds = expectedValue is null
+            ? values.Count > 0
+            : values.Any(value => string.Equals(value, expectedValue, StringComparison.Ordinal));
+        var expectation = expectedValue is null
+            ? "to be present"
+            : $"to have value '{expectedValue}'";
+        return AssertHttpFact(
+            "assert.http.header",
+            $"Assert header · {name}",
+            new Dictionary<string, string?>
+            {
+                ["http.header.name"] = name,
+                ["expected.header.value"] = expectedValue,
+                ["actual.header.values"] = sanitized
+            },
+            ResultItem($"header '{name}'", sanitized, expectation, holds, negated),
+            holds,
+            negated,
+            () => expectedValue is null
+                ? $"Expected header '{name}' {ProtoAssertion.Describe(expectation, negated)}, but the response carried {(values.Count > 0 ? "it" : "none")}."
+                : values.Count == 0
+                    ? $"Expected header '{name}' {ProtoAssertion.Describe(expectation, negated)}, but the header was not present."
+                    : $"Expected header '{name}' {ProtoAssertion.Describe(expectation, negated)}, but it was {sanitized}.");
+    }
+
+    /// <summary>Asserts the response sets a cookie, or that a cookie carries a value.</summary>
+    internal RestResponse AssertCookie(string name, string? expectedValue, bool negated)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var cookies = ReadSetCookies();
+        var matches = cookies.Where(cookie => string.Equals(cookie.Name, name, StringComparison.Ordinal)).ToArray();
+        var holds = expectedValue is null
+            ? matches.Length > 0
+            : matches.Any(cookie => string.Equals(cookie.Value, expectedValue, StringComparison.Ordinal));
+        var actual = matches.Length > 0 ? SanitizeHeaderValues("Set-Cookie", [matches[0].Raw]) : null;
+        var expectation = expectedValue is null
+            ? "to be set"
+            : $"to have value '{expectedValue}'";
+        return AssertHttpFact(
+            "assert.http.cookie",
+            $"Assert cookie · {name}",
+            new Dictionary<string, string?>
+            {
+                ["http.cookie.name"] = name,
+                ["expected.cookie.value"] = expectedValue,
+                ["actual.cookie.value"] = actual
+            },
+            ResultItem($"cookie '{name}'", actual, expectation, holds, negated),
+            holds,
+            negated,
+            () => expectedValue is null
+                ? $"Expected cookie '{name}' {ProtoAssertion.Describe(expectation, negated)}, but the response set {(matches.Length > 0 ? "it" : "none")}."
+                : matches.Length == 0
+                    ? $"Expected cookie '{name}' {ProtoAssertion.Describe(expectation, negated)}, but the cookie was not set."
+                    : $"Expected cookie '{name}' {ProtoAssertion.Describe(expectation, negated)}, but it was {actual}.");
+    }
+
+    /// <summary>Asserts the response's <c>Location</c> header, as it arrived.</summary>
+    internal RestResponse AssertRedirectLocation(string location, bool negated)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(location);
+        var actual = RawResponse.Headers.Location?.OriginalString;
+        var expected = $"'{location}'";
+        var holds = actual is not null && string.Equals(actual, location, StringComparison.Ordinal);
+        return AssertHttpFact(
+            "assert.http.redirect_location",
+            $"Assert redirect location · {ProtoAssertion.Describe(expected, negated)}",
+            new Dictionary<string, string?>
+            {
+                ["expected.location"] = location,
+                ["actual.location"] = actual
+            },
+            ResultItem("redirect location", actual, expected, holds, negated),
+            holds,
+            negated,
+            () => $"Expected redirect location {ProtoAssertion.Describe(expected, negated)}, but received {DescribeValue(actual)}.");
+    }
+
+    // The Checks item every HTTP fact assertion records: the actual value, and the expectation when it
+    // did not hold. Presence-only assertions pass no expected value, so they read as "present".
+    private static ProtoTraceSection ResultItem(
+        string subject,
+        string? actual,
+        string? expected,
+        bool holds,
+        bool negated)
+    {
+        var satisfied = ProtoAssertion.IsSatisfied(holds, negated);
+        return new ProtoTraceSection(
+            "Result",
+            ProtoTraceSectionKind.Checks,
+            [
+                new(
+                    subject,
+                    actual ?? "none",
+                    satisfied ? null : $"expected {ProtoAssertion.Describe(expected ?? "present", negated)}",
+                    satisfied ? ProtoTraceSectionTone.Success : ProtoTraceSectionTone.Error)
+            ]);
+    }
+
+    // One assertion shape for the header-family facts: record the operation with its attributes and
+    // Checks section, fail it, and rethrow the REST assertion exception naming the request.
+    private RestResponse AssertHttpFact(
+        string kind,
+        string title,
+        IReadOnlyDictionary<string, string?> attributes,
+        ProtoTraceSection result,
+        bool holds,
+        bool negated,
+        Func<string> describeFailure)
+    {
+        var scope = Context?.Trace
+            .Operation(kind, title, ProtoRestBuilder.Protocol.TraceSource)
+            .With(attributes)
+            .With("assertion.negated", negated ? "true" : null)
+            .With("request.identifier", Identifier)
+            .Parent(RequestTraceId);
+        using var operation = scope?.Begin();
+        operation?.AddSection(result);
+        try
+        {
+            if (!ProtoAssertion.IsSatisfied(holds, negated))
+            {
+                throw new RestAssertionException(PrefixIdentifier(describeFailure()));
+            }
+
+            operation?.Succeed();
+            return this;
+        }
+        catch (Exception exception)
+        {
+            operation?.Fail(exception);
+            throw;
+        }
+    }
+
+    private static string DescribeValue(string? value) => value is null ? "none" : $"'{value}'";
+
+    // Response headers and content headers are one namespace for the assertions, as they are for
+    // header application: a custom content type is reachable through the content headers.
+    private IReadOnlyList<string> ReadHeaderValues(string name)
+    {
+        foreach (var headers in new HttpHeaders[] { RawResponse.Headers, RawResponse.Content.Headers })
+        {
+            if (headers.TryGetValues(name, out var values)) return [.. values];
+        }
+
+        return [];
+    }
+
+    // The Set-Cookie pair before the first attribute; the raw header is kept for the sanitized display.
+    private IReadOnlyList<(string Name, string Value, string Raw)> ReadSetCookies()
+    {
+        if (!RawResponse.Headers.TryGetValues("Set-Cookie", out var headers)) return [];
+        var cookies = new List<(string, string, string)>();
+        foreach (var header in headers)
+        {
+            var pair = header.Split(';', 2)[0];
+            var separator = pair.IndexOf('=');
+            if (separator <= 0) continue;
+            cookies.Add((pair[..separator].Trim(), pair[(separator + 1)..].Trim(), header));
+        }
+
+        return cookies;
+    }
+
+    // Header and cookie values follow the shared redaction rules before they reach a message or the
+    // trace, so an assertion failure never prints a token the diagnostics would hide.
+    private string? SanitizeHeaderValues(string name, IReadOnlyList<string> values)
+        => values.Count == 0
+            ? null
+            : ProtoHttpDiagnosticSanitizer.SanitizeHeaders(
+                [new KeyValuePair<string, IEnumerable<string>>(name, values)],
+                AttachmentOptions).Values.Single();
 
     // REST's half of the shared read: its exception type and its http.response.deserialize vocabulary.
     // Every failure the read detects is recorded once through TraceDeserializeFailure.

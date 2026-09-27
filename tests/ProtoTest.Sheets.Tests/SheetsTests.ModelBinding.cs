@@ -209,6 +209,91 @@ public sealed partial class SheetsTests
     }
 
     [Test]
+    public async Task TableRow_MatchShape_Exact_ShouldRejectColumnsTheShapeDoesNotMention()
+    {
+        var (host, context) = Start("sheets table row exact shape");
+        var table = context.Sheets().Open(_path).Sheet("Keys").Table(1);
+        var row = table.RowWhere("Id", "100");
+
+        row.Should.MatchShape(new { Id = "100" });
+
+        var exception = Assert.Throws<SpreadsheetAssertionException>(
+            () => row.Should.MatchShape(new { Id = "100" }, exact: true));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.Message, Does.StartWith("Keys!A2:B2 — Shape mismatch failed with 1 error(s):"));
+            Assert.That(exception.Message, Does.Contain("$.Name"));
+            Assert.That(exception.Message, Does.Contain("Property was not mentioned in the expected shape."));
+            Assert.That(exception.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
+                "the shared mismatch details stay inspectable");
+        }
+    }
+
+    [Test]
+    public async Task TableRow_MatchShape_Exact_ShouldPassWhenEveryColumnIsMentioned()
+    {
+        var (host, context) = Start("sheets table row exact success");
+        var table = context.Sheets().Open(_path).Sheet("Keys").Table(1);
+        var row = table.RowWhere("Id", "100");
+
+        var returned = row.Should.MatchShape(new { Id = "100", Name = "first" }, exact: true);
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        Assert.That(returned, Is.SameAs(row));
+    }
+
+    [Test]
+    public async Task TableRow_MatchShape_Exact_ShouldTreatAValueConstraintAsMentioningItsSubtree()
+    {
+        var (host, context) = Start("sheets table row exact constraint");
+        var table = context.Sheets().Open(_path).Sheet("Keys").Table(1);
+        var row = table.RowWhere("Id", "100");
+
+        row.Should.MatchShape(
+            new { Id = JsonValue.NotNull(), Name = JsonValue.StringContaining("fir") },
+            exact: true);
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
+    public async Task TableRow_MatchShape_Exact_ShouldKeepIgnoringExtraColumnsWithoutExact()
+    {
+        var (host, context) = Start("sheets table row partial shape");
+        var table = context.Sheets().Open(_path).Sheet("Keys").Table(1);
+        var row = table.RowWhere("Id", "100");
+
+        Assert.DoesNotThrow(() => row.Should.MatchShape(new { Id = "100" }));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
+    public async Task ModelRow_ShouldMatchShape_Exact_ShouldRejectPropertiesTheShapeDoesNotMention()
+    {
+        var (host, context) = Start("sheets model row exact shape");
+        var model = context.Sheets().Open(_path).Model<SalesRow>();
+        var emea = model.Row(row => row.Region == "EMEA");
+
+        var returned = emea.ShouldMatchShape(new { Region = "EMEA", Amount = 1200m, Count = 12 }, exact: true);
+
+        var mismatch = Assert.Throws<SpreadsheetAssertionException>(
+            () => emea.ShouldMatchShape(new { Region = "EMEA" }, exact: true));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(mismatch!));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(returned, Is.SameAs(emea));
+            Assert.That(mismatch!.Message, Does.StartWith("SalesRow — Shape mismatch failed with 2 error(s):"));
+            Assert.That(mismatch.Message, Does.Contain("$.Amount"));
+            Assert.That(mismatch.Message, Does.Contain("$.Count"));
+            Assert.That(mismatch.InnerException, Is.TypeOf<JsonShapeMismatchException>());
+        }
+    }
+
+    [Test]
     public async Task TableRow_ShouldMatchShape_ShouldMapAnEmptyCellToNull()
     {
         var (host, context) = Start("sheets table row empty shape");
@@ -268,12 +353,15 @@ public sealed partial class SheetsTests
         var mismatch = Assert.Throws<SpreadsheetAssertionException>(
             () => row.ShouldMatchShape(new { Name = "nope" }));
 #pragma warning restore CS0618
+        var exact = Assert.Throws<SpreadsheetAssertionException>(
+            () => row.Should.MatchShape(new { Id = "100" }, exact: true));
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(mismatch!));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(returned, Is.SameAs(row));
             Assert.That(mismatch!.Message, Does.StartWith("Keys!A2:B2 — Shape mismatch"));
+            Assert.That(exact!.Message, Does.Contain("$.Name"));
         }
     }
 

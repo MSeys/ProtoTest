@@ -101,13 +101,13 @@ public sealed class OrderTests
 
 - **Authentication** — `.Auth<T>(...)`, `.WithoutAuth()`, and `[Auth<T>]` on the class or method: [Authentication](./authentication.md).
 - **Attachments** — `.CaptureAttachments()` records sanitized request, response and expected-shape attachments: [Attachments and coverage](./attachments.md).
-- **Coverage** — attach `.AddCollector<RestCoverageCollector>()` to the client; [OpenAPI coverage](../openapi.md) consumes the shape assertions' matched paths.
+- **Coverage** — attach `.AddCollector<RestCoverageCollector>()` to the client; [OpenAPI coverage](../openapi.md) consumes the shape assertions' matched paths, and `.AddCollector<RestTrafficCoverageCollector>()` reports the fields no shape mentioned: [Coverage](../../observability/coverage.md#traffic-coverage-observed-but-unasserted).
 - **Multiple clients** — pass `.Rest("Billing")`, or bind one for the whole test with `[Application("Api", "Rest:Billing")]`.
 - **In-process server** — `AddAspNetCoreServer<Program>()` plus a client with no URL reuses its transport automatically; a configured `BaseUrl` takes precedence and leaves the server unstarted.
 
 ## Tracing and coverage
 
-Each request records an `http.request` operation (`REST · {METHOD} {route}`) under the protocol-scoped client entity (`client:HttpClient:Rest:{target}`), with the method, route, sanitized URL, header count and response status. Assertions record `assert.http.status` and `assert.json.shape` as children of that request. Observations: `http.response` for every response (method, route template, status, sanitized body and headers, duration), `http.failure` when sending or URI building fails, and `http.contract.shape` when a shape assertion matches. `RestCoverageCollector` turns `http.response` observations into `REST` coverage items. See [ProtoTrace](../../observability/prototrace.md) and [Coverage](../../observability/coverage.md).
+Each request records an `http.request` operation (`REST · {METHOD} {route}`) under the protocol-scoped client entity (`client:HttpClient:Rest:{target}`), with the method, route, sanitized URL, header count and response status. Assertions record `assert.http.status`, `assert.http.content_type`, `assert.http.header`, `assert.http.cookie`, `assert.http.redirect_location` and `assert.json.shape` as children of that request. Observations: `http.response` for every response (method, route template, status, sanitized body and headers, duration), `http.failure` when sending or URI building fails, and `http.contract.shape` when a shape assertion matches. `RestCoverageCollector` turns `http.response` observations into `REST` coverage items; `RestTrafficCoverageCollector` consumes `http.response` and `http.contract.shape` for its observed-but-unasserted section. See [ProtoTrace](../../observability/prototrace.md) and [Coverage](../../observability/coverage.md).
 
 ## Skip
 
@@ -117,7 +117,7 @@ Each request records an `http.request` operation (`REST · {METHOD} {route}`) un
 
 ## Limits
 
-- Shape assertions are positive-only, and `Should` / `ShouldNot` expose status assertions only.
+- Shape assertions are positive-only; `Should` / `ShouldNot` expose the status, content type, header, cookie and redirect-location assertions, and `MatchShape` is the only positive-only member.
 - Response bodies are always buffered whole in memory; there is no streaming read API.
 - Route tokens are `{name}` over ASCII letters, digits and `_`.
 - Registering the same client name twice keeps the first registration; `TryAddResponseOptions` is first-wins for the keyed instance, though configuration callbacks compose.
@@ -127,7 +127,7 @@ Each request records an `http.request` operation (`REST · {METHOD} {route}`) un
 
 - [Building requests](./requests.md) — verbs, route templates, bodies and headers.
 - [Responses and assertions](./responses.md) — status, JSON shapes and typed reads.
-- [Authentication](./authentication.md) — per-request, per-class and composed authenticators.
+- [Authentication](./authentication.md) — per-request, per-class and composed authenticators, and the built-in test user.
 - [Attachments and coverage](./attachments.md) — what gets captured, redacted and reported.
 
 The full flows live in the demo: [DeliveryJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/DeliveryJourney.cs) and [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs).

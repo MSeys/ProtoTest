@@ -296,6 +296,19 @@ same key set when it is called after `AddSql`.
   properties: `response.Should.MatchShape(shape)` (REST/GraphQL), `ProtoGrpcAssertions.For(reply)`,
   `message.Should.MatchShape(shape)`, `row.Should.MatchShape(shape)` (table rows). A model row is a
   user type, so `row.ShouldMatchShape(shape)` stays the documented generic-subject extension.
+- `Should.MatchShape(shape, exact: true)` is the exhaustive form on every shape surface — REST and
+  GraphQL responses, gRPC replies, consumed messages, Sheets table and model rows: a field present in
+  the actual JSON that the shape does not mention is a mismatch naming its path, while a value
+  constraint mentions its whole subtree. Every producer sets the shared
+  `ProtoShapeAssertionContext.Exact` (the HTTP-backed responses through `ProtoHttpResponse.AssertShape`),
+  so the one unmentioned-field walk (`JsonShapeMatcher.AssertExactMatch` calling
+  `FindUnmentionedFields`) also feeds `RestTrafficCoverageCollector`, and the assertion and the report
+  cannot disagree. REST's in-call shape (`Task<RestResponse>.ExpectAsync(shape)`) awaits the response
+  and runs the same facade assertion, disposing it on a mismatch.
+- REST's HTTP fact assertions (`HaveContentType`, `HaveHeader` presence/value, `HaveCookie`
+  presence/value, `HaveRedirectLocation`) live on `RestAssertions`, so `Should`/`ShouldNot` share one
+  implementation. Each records an `assert.http.*` operation and redacts header/cookie values through
+  `ProtoHttpDiagnosticSanitizer` before a message or attribute.
 - A shape producer wraps the shared matcher failure after `ProtoShapeAssertion.Assert` has recorded and
   failed the operation, so trace attributes/sections/observations stay byte-identical: the protocol's
   assertion exception starts with the subject (`request.identifier`, `graphql.operation`, the message
@@ -325,13 +338,18 @@ spirit (see `ProtoDataValueContext`).
   builder type of its own).
 - `sheets.workbook` is record-only evidence: opening a workbook is not an assertion, so
   `SheetsCoverageCollector` consumes only `sheets.range` (decided in A5; not changed).
+- Report item kinds are Core vocabulary (`ProtoReportItemKinds`), and each kind gets its own HTML
+  section. Coverage arithmetic (`ProtoReportItemExtensions.CoverageUnits`) counts only `coverage`-kind
+  items with a verdict, so `traffic`-kind items — fields that arrived in observed traffic but no
+  assertion mentioned — never count as covered; `RestTrafficCoverageCollector` emits them from
+  `http.response` + `http.contract.shape` observations keyed by method, route template and status code.
 - Messaging records the `messaging.publish` operation and the `messaging.published`, `messaging.receive`,
   `messaging.failure` and `messaging.contract.shape` observations as trace evidence and ships no collector;
   destinations are deliberately not a coverage category (A5 VOC-1 decision: the promise was deleted, not
   shipped).
 - Entity ids: `client:{type}:{name}`, `context:{type}`, `capability:{kind}:{name}` (with `:{instance}`
-  when the descriptor carries one), `device:{client}:{deviceType}:{id}`, infrastructure `Id`, resources
-  `Id`, value items `{type}:{identity}`.
+  when the descriptor carries one), `device:{client}:{deviceType}:{id}`, the test user `auth:user`,
+  infrastructure `Id`, resources `Id`, value items `{type}:{identity}`.
 - New vocabulary is additive to the wire; the viewer contract is not edited casually.
 - Failure diagnostics events are protocol-identified: `{protocol}.diagnostics.failed` carries the
   protocol's trace source (the old `http.diagnostics.failed`/`ProtoTest.Http` literal is gone), and
@@ -351,6 +369,15 @@ exception (its result carries no exception, so a cancelled test reads `Failed`).
 scope in a `finally`; TUnit appends row arguments through `ProtoTestName.ForRow`, the same form MSTest
 records. `AdapterContract` is the shared compliance
 suite; extend it, do not fork it.
+
+Low-ceremony auto-wrap is opt-in per suite and runner-owned: NUnit's `ProtoTestAutoWrapAttribute` is an
+assembly-level `IWrapSetUpTearDown` reusing the `ProtoTestAttribute` command (NUnit applies the nearest
+wrapper — method, then fixture, then assembly — so an explicit `[ProtoTest]` wins), and xUnit v3's
+`ProtoTestAutoWrapAttribute` is an assembly-level `IBeforeAfterTestAttribute` that steps aside for a
+method carrying `[ProtoTestFact]`/`[ProtoTestTheory]`. TUnit already wraps every `[Test]` through its
+assembly `[TestExecutor<ProtoTestExecutor>]`. MSTest has no assembly-wide hook (a custom
+`TestClassAttribute.GetTestMethodAttribute` wraps per class), and xUnit v2 needs a replacement
+`TestFramework` — both are recorded as the reason auto-wrap is not suite-wide there.
 
 ## Inventory — the one of everything
 
@@ -373,6 +400,7 @@ suite; extend it, do not fork it.
 | Capability | `ProtoCapabilityDescriptor`, `ProtoCapabilityKinds`, `AddCapabilityUnlessConfigured`, `AddCapabilityWhenProvided` | `src/ProtoTest.Core/Applications/ProtoCapability.cs` |
 | Client resolution | `ProtoClientRegistry`, `ProtoClientInitializerHook`, `ProtoClientResolution` | `src/ProtoTest.Core/Internal/` |
 | Application resolution | `ProtoApplication`, `ProtoApplicationResolution`, `[Application]` | `src/ProtoTest.Core/Applications/` |
+| Low-ceremony application | `ProtoTestHost.For<TProgram>` (the `AddApplication` + `AddAspNetCoreServer` one-liner; no behavior of its own) | `src/ProtoTest.AspNetCore/ProtoTestHost.cs` |
 | Options | `IProtoConfigurableOptions`, `ProtoOptionsRegistration` | `src/ProtoTest.Core/` |
 | Polling | `ProtoPolling` | `src/ProtoTest.Core/` |
 | Flow | `ProtoFlow`, `ProtoStepDescriptor` | `src/ProtoTest.Core/` |
@@ -386,6 +414,7 @@ suite; extend it, do not fork it.
 | Adapters | five runner packages + `tests/ProtoTest.AdapterContract` | `src/`, `tests/` |
 | Analyzers | `ProtoTest.Analyzers` (`PT0001`, `PT0002`; opt-in, never referenced as an analyzer by this repository's own projects) | `src/ProtoTest.Analyzers/` |
 | Substitution | `context.Override<TService>`, `[ReplaceService<TService>]`, `[FailDependency<TService>]`; a substituting test owns a dedicated per-test server, owned before it starts; the unnamed attributes gate on the test's selected application (fallback `Default`), a named one on its named server | `src/ProtoTest.AspNetCore/` |
+| Built-in test user | `[SignedInAs]`, `ProtoTestUser`, `ProtoTestUserHeader`, `context.SignIn`/`SignedInUser`, `TestUserAuthenticator` (`ProtoTest.Http`); app side `webHost.AddTestUserAuthentication()` (`ProtoTest.AspNetCore`) | `src/ProtoTest.Http/Authentication/`, `src/ProtoTest.AspNetCore/TestUserAuthentication.cs` |
 | Fakes | `ProtoTest.WireMock` (`WireMock` coverage collector; `protocol`-kind capability, instance = fake name); a per-run fake keeps its stubs and request log for the run and clears them on release or an explicit `Reset()`; an unmatched request records the `WireMockUnmatchedRequest` marker as the REST failure shape's exception type (no exception produced it) | `src/ProtoTest.WireMock/` |
 | Aspire | `ProtoTest.Aspire` (`net8.0`/`net9.0`/`net10.0` package assets; the suite's AppHost leg is `net10.0`); AppHost as run infrastructure, resources as application targets; configured keys win and the AppHost publishes only the missing ones | `src/ProtoTest.Aspire/` |
 

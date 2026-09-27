@@ -36,6 +36,9 @@ public static class ProtoReportItemKinds
 
     /// <summary>The environment facts the run recorded about itself, one item per configured key.</summary>
     public const string RunMetadata = "run_metadata";
+
+    /// <summary>Fields that arrived in observed traffic but that no assertion mentioned.</summary>
+    public const string Traffic = "traffic";
 }
 
 public enum ProtoReportStatus

@@ -1,5 +1,6 @@
 namespace ProtoTest.AspNetCore.SampleApi;
 
+using System.Security.Claims;
 using Microsoft.AspNetCore.Http.Metadata;
 
 public interface ITestMessageService
@@ -133,6 +134,18 @@ public sealed class Program
             Results.Text(context.Request.Cookies["prototest"] ?? "missing"));
         app.MapGet("/traceparent", (HttpContext context) =>
             Results.Text(context.Request.Headers["traceparent"].ToString()));
+        // The identity the app-side test-user authentication resolved, so a suite can prove what the
+        // application sees; anonymous requests answer with authenticated=false instead of a challenge.
+        app.MapGet("/auth/me", (HttpContext context) => Results.Ok(new AuthIdentity(
+            context.User.Identity?.IsAuthenticated ?? false,
+            context.User.Identity?.Name,
+            [.. context.User.FindAll(ClaimTypes.Role).Select(claim => claim.Value).Order(StringComparer.Ordinal)],
+            [.. context.User.Claims
+                .Where(claim => claim.Type != ClaimTypes.Name && claim.Type != ClaimTypes.Role)
+                .Select(claim => new AuthClaim(claim.Type, claim.Value))
+                .OrderBy(claim => claim.Type, StringComparer.Ordinal)])));
+        app.MapGet("/auth/admin", () => Results.Ok(new { role = "admin" }))
+            .RequireAuthorization(policy => policy.RequireRole("admin"));
         if (LatePageState.Enabled)
         {
             app.MapGet("/late", () => Results.Content("<h1>Late</h1>", "text/html"))
@@ -160,3 +173,9 @@ public static class LatePageState
 /// version of the short test send identical bodies.
 /// </summary>
 public sealed record BenchmarkOrderRequest(string Product, int Quantity);
+
+/// <summary>What the application's claims principal holds, as the auth probe reports it.</summary>
+public sealed record AuthIdentity(bool Authenticated, string? Name, string[] Roles, AuthClaim[] Claims);
+
+/// <summary>One non-role claim.</summary>
+public sealed record AuthClaim(string Type, string Value);

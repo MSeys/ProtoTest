@@ -26,6 +26,19 @@ builder.AddApplication("Api", app => app
     .AddRest(rest => rest.AddClient("Api")));
 ```
 
+The common case has a one-liner: `ProtoTestHost.For<Program>` registers the application in-process under the default name `Api`, and the optional callback composes its protocols on the same call.
+
+```csharp
+protected override void Configure(IProtoHostBuilder builder) => ProtoTestHost.For<Program>(builder);
+
+// or with the application's clients declared in the same line:
+protected override void Configure(IProtoHostBuilder builder) => ProtoTestHost.For<Program>(
+    builder,
+    configure: app => app.AddRest(rest => rest.AddClient()));
+```
+
+`ProtoTestHost.For` composes exactly `AddApplication("Api", app => app.AddAspNetCoreServer<Program>())`; it adds no behavior of its own, so the sections below apply unchanged. An unnamed `Proto.Context.Rest()` in a suite without a REST client still reaches the application through its in-process transport; register the client when the test needs REST options, attachments or the `REST` capability.
+
 ```csharp
 public static IProtoApplicationBuilder AddAspNetCoreServer<TProgram>(
     this IProtoApplicationBuilder application,
@@ -187,6 +200,17 @@ Proto.Context.Override<IEmailSender>(new RecordingEmailSender(), "Api");
 
 Substitution needs the in-process server: with `Server` set the attribute skips unless that named server is in-process; without it, the attribute gates on the test's selected application (falling back to `"Default"`), so a mixed run that publishes one application and hosts another in-process skips instead of failing when the substitution resolves. A configured `BaseUrl` drops the capability they gate on, and `Override` throws naming the address. Apply the override before the test first resolves application services.
 
+### Test users
+
+An application that should authorize the test user as its own principal opts in to the shipped app-side authentication:
+
+```csharp
+app.AddAspNetCoreServer<Program>(webHost => webHost.AddTestUserAuthentication())
+   .AddRest(rest => rest.AddClient("Api"));
+```
+
+The handler decodes the `ProtoTest-User` header a test's [`[SignedInAs]`](./rest/authentication.md#built-in-test-user) identity travels in and authenticates the request as that user: the name, a `ClaimTypes.Role` claim per role and the declared claims. It becomes the application's default authentication scheme, so the application's own `[Authorize]`, role checks and policies decide - a `[SignedInAs("alice", "admin")]` test reaches an admin endpoint, a `[SignedInAs("bob", "viewer")]` test gets the application's own `403`. No header means no result: anonymous requests stay anonymous and are challenged as usual.
+
 ## Page coverage
 
 When the server runs in-process, starting it also inventories its page-like GET routes: each becomes a `web.page.available` observation with metadata `web.application = {server name}` and `web.page.source = "aspnetcore"`, so the [web coverage report](./web/index.md#page-coverage) can show pages that exist but were never visited. The inventory is recorded once per run, by the first test that initializes the server, and coverage aggregates those observations for the whole run: later tests reuse the server without repeating them. A failed inventory resets the latch and traces `web.page.inventory.failed`; an **empty** discovery also does not latch, so a route added after the first test is still inventoried.
@@ -295,6 +319,7 @@ Either way the published instance is a real application, not the test host, so i
 - **Replacements are singletons of the dedicated server.** A stateful fake stays per test because the server is per test; a replacement that captures scoped services is the suite's responsibility.
 - **A failed dependency throws when resolved.** If the application resolves it while the server starts, the substitution fails the test's setup instead of its requests — prefer failing services the application resolves per request.
 - **Closed-box harnesses cannot be substituted.** A containerized or loopback application (`ApplicationContainer`, `AddLoopbackApplication`) and any future out-of-process host expose no service container to the suite: `[ReplaceService]`/`[FailDependency]` skip, and `Override` throws.
+- **The app-side test-user authentication replaces the application's default scheme** and exists only on the test host: a suite whose subject is the application's own authentication leaves it unregistered, and the identity's header is then ignored by the application.
 
 - **A startup throw is a setup failure with the application's own exception.** A pipeline build that
   throws - a startup filter or middleware factory - fails the test that starts the server: the

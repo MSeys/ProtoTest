@@ -52,9 +52,11 @@
   <Folder Name="/4. Tests/Adapters/">
     <Project Path="tests/ProtoTest.MSTest.Tests/ProtoTest.MSTest.Tests.csproj" Id="46d67240-27b6-4460-a3d1-558336e41c9f" />
     <Project Path="tests/ProtoTest.NUnit.Tests/ProtoTest.NUnit.Tests.csproj" Id="9ef7170a-1eed-4a16-b6d1-23f4c62f1d05" />
+    <Project Path="tests/ProtoTest.NUnit.AutoWrap.Tests/ProtoTest.NUnit.AutoWrap.Tests.csproj" />
     <Project Path="tests/ProtoTest.TUnit.Tests/ProtoTest.TUnit.Tests.csproj" Id="63bb53be-7578-4f88-bcf6-b0c420dbb1e1" />
     <Project Path="tests/ProtoTest.Xunit.Tests/ProtoTest.Xunit.Tests.csproj" Id="e6e507aa-df6c-438c-97b1-4297bab323de" />
     <Project Path="tests/ProtoTest.Xunit3.Tests/ProtoTest.Xunit3.Tests.csproj" Id="733750ce-a6f6-4fb7-8936-7e58c2ad76a5" />
+    <Project Path="tests/ProtoTest.Xunit3.AutoWrap.Tests/ProtoTest.Xunit3.AutoWrap.Tests.csproj" />
   </Folder>
   <Folder Name="/4. Tests/Integrations/">
     <Project Path="tests/ProtoTest.AspNetCore.TestApi/ProtoTest.AspNetCore.TestApi.csproj" />

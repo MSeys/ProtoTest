@@ -25,4 +25,15 @@ public sealed class ProtoTableRowAssertions
         ArgumentNullException.ThrowIfNull(expectedShape);
         return _row.AssertShape(expectedShape, options);
     }
+
+    /// <summary>
+    /// Matches the row against an expected shape exactly: a column of the row that the shape does not
+    /// mention is a mismatch naming the column, so the row cannot carry a value the test never
+    /// asserted. A value constraint mentions its whole subtree. Returns the row.
+    /// </summary>
+    public ProtoTableRow MatchShape(object expectedShape, bool exact, JsonSerializerOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(expectedShape);
+        return _row.AssertShape(expectedShape, options, exact);
+    }
 }

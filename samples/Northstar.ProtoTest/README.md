@@ -8,9 +8,9 @@ This is an example of what your setup using ProtoTest could look like.
 
 ## Includes
 
-- `[NorthstarTenant]` and `[SignedInAs]` for setup used by several scenarios.
+- `[NorthstarTenant]` plus the shipped `[SignedInAs]`, whose identity `NorthstarMember` turns into the tenant's owner (no role declared) or an invited member for the first declared role.
 - Typed contexts that pass the created tenant, member and token to other integrations.
-- `NorthstarAuthenticator` for authenticated HTTP and gRPC calls.
+- `NorthstarAuthenticator` for authenticated HTTP and gRPC calls; it resolves the member lazily, so the shipped identity is all a test declares.
 - Page objects and a login strategy for the Northstar console.
 - Data defaults and provisioners for Northstar fixtures.
 

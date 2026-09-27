@@ -174,7 +174,9 @@ examples).
 2. Kinds and categories come from the protocol descriptor/constants, not literals (audit VOC-2).
 3. A collector derives from `ProtoCoverageCollector(targetName)`; `CanCollect` matches the target and
    kind; the identifier becomes a coverage item with a hit count. Only an assertion-level observation
-   counts as covered — observed is not covered.
+   counts as covered — observed is not covered. A collector that reports observed-but-unasserted
+   fields gives them a non-`coverage` kind (the REST traffic collector's `traffic`), so the coverage
+   arithmetic and run gates never count them.
 4. Register it where the rest of the protocol registers (`AddCollector<T>` on the target, or
    `TryAddEnumerable` when intrinsic to the package) and document whether it is manual or automatic.
 5. Metadata passes the evidence boundary: no raw `object` exits.
@@ -189,6 +191,27 @@ examples).
   `ProtoMetadataRedaction`, `JsonDiagnosticSanitizer`); never trace header values, tokens or user
   credentials.
 - New wire vocabulary is additive; the viewer contract is not edited casually.
+
+## Recipe: a signed-in test user
+
+- `[SignedInAs("alice", "admin", Claims = new[] { "tenant=northstar" })]` declares the identity; it
+  implements the HTTP auth metadata, but it is excluded from the method-over-class replacement, so a
+  method-level identity keeps a class-level `[Auth<T>]` and composes with it. A test body can
+  `context.SignIn(new ProtoTestUser(...))` instead and read `context.SignedInUser()`.
+- The shipped `TestUserAuthenticator` writes the `ProtoTest-User` header (gRPC: `prototest-user`
+  metadata) only while the selected application is hosted in-process; otherwise it stays inert and the
+  `auth:user` entity records `auth.transport=inert` with the reason. There is no skip: a test that
+  needs the identity to be honoured must either run in-process or carry its own `[Auth<T>]`.
+- The app side is opt-in: `webHost.AddTestUserAuthentication()` inside `AddAspNetCoreServer` makes the
+  test user the application's default authentication scheme, so the application's own `[Authorize]`,
+  roles and policies decide. Register it only where a test user stands in for the application's
+  authentication.
+- Evidence: the `auth` entity `auth:user` (`auth.user`, `auth.roles`, `auth.claim_types`,
+  `auth.transport`, `auth.application`) plus `auth.user.sign-in`/`auth.user.inert`; the protocol auth
+  entity lists `SignedInAsAttribute` among `auth.types`. Claim values never reach the trace.
+- A suite whose own login is the subject keeps `[Auth<T>]` and maps `context.SignedInUser()` itself
+  (the sample's `NorthstarMember`); the built-in surface is the canonical form for the in-process
+  case, not a second auth mechanism.
 
 ## Recipe: a skip condition
 
@@ -205,7 +228,11 @@ and skip reasons, starts/completes the lifecycle through the framework's entry p
 re-implements lifecycle), maps the runner's outcome to `ProtoTestResult`, and publishes attachments
 through the runner's API. Add the real-run lifecycle boundary tests (skip-before-setup, setup failure,
 teardown failure, outcome capture, cancellation) and run `dotnet test` through the adapter — unit
-tests that call hooks directly create false confidence (Audit 3 class 7).
+tests that call hooks directly create false confidence (Audit 3 class 7). An opt-in auto-wrap reuses
+the adapter's existing lifecycle entry point (never a second command or handler), steps aside for a
+test that already carries the ProtoTest attribute, and ships a real-run project that opts in (NUnit's
+and xUnit v3's `ProtoTestAutoWrapAttribute`, `tests/ProtoTest.NUnit.AutoWrap.Tests` and
+`tests/ProtoTest.Xunit3.AutoWrap.Tests`).
 
 ## Recipe: an analyzer package
 
@@ -231,6 +258,11 @@ for known duplicates (audit TST-2).
   (`CreatingAnOrderReturnsIt`); pure unit fixtures keep `Subject_ShouldOutcome`.
 - `using` directives go inside the file-scoped namespace; only an assembly-attribute file (the TUnit
   and xUnit v3 `Setup.cs` files) puts them before the namespace.
+- The starter template's `--runner` choice (`nunit` default, `xunit`, `xunit3`, `tunit`, `mstest`)
+  selects `Starter.Tests/Setup.<runner>.cs`, generated as `Setup.cs`, and the runner's package
+  references; `OrderTests.cs` stays one file whose header swaps in the runner's usings and attributes.
+  The Microsoft Testing Platform variants (`xunit3`, `tunit`) also generate a `global.json` selecting
+  the MTP `dotnet test` runner; the VSTest-based variants keep the default VSTest runner.
 - A suite states a capability gate's skip reason once with
   `AddCapabilityReason(kind, reason, name?)`; a gate's own `Reason` still overrides it, and an
   unregistered `(kind, name)` falls back to the attribute's default message.

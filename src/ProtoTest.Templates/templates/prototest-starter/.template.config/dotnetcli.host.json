@@ -5,6 +5,10 @@
       "longName": "framework",
       "shortName": "f"
     },
+    "runner": {
+      "longName": "runner",
+      "shortName": ""
+    },
     "skipRestore": {
       "longName": "no-restore",
       "shortName": ""

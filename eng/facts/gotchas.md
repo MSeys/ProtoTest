@@ -79,6 +79,27 @@ audits carry the finding history.
   name alone (A1R-01 residual): a different `TProgram` under one server name is a silent no-op.
   The in-process device transport compares `(TProgram, application)` (audit DEV-1 fixed).
 
+## HTTP authentication
+
+- **The built-in test user rides the `[Auth]` set but never replaces it.** `[SignedInAs]` implements
+  the same metadata interface as `[Auth<T>]`, yet it is excluded from the method-over-class
+  replacement: a method-level identity keeps the class-level authenticators and composes with them
+  (the class owns the "how", the method names the "who"). The shipped `TestUserAuthenticator` writes
+  the `ProtoTest-User` header only while the test's selected application is hosted in-process;
+  otherwise the request goes out unchanged and the `auth:user` entity carries `auth.transport=inert`
+  with the reason. A published suite that honours the identity itself keeps `[Auth<T>]` and reads
+  `context.SignedInUser()` in its authenticator (the sample's `NorthstarMember`).
+- **The app-side test-user authentication replaces the application's default authentication scheme.**
+  `webHost.AddTestUserAuthentication()` inside `AddAspNetCoreServer` decodes the header into the
+  application's `ClaimsPrincipal` (name, `ClaimTypes.Role` roles, custom claims) and is test-host only
+  and opt-in; without it the header is ignored and the application stays anonymous. A malformed or
+  oversized header fails authentication, so the request stays anonymous instead of producing a 500.
+  Claim values never reach the trace - the `auth:user` entity records the claim types only, and a gRPC
+  call redacts the `prototest-user` metadata through the default sensitive keys.
+- **The identity is per-test state, not a credential.** `context.SignIn(user)` replaces the declared
+  identity for the rest of the test; the next test resolves none until it declares its own. Parallel
+  tests never share one because the state lives on the execution context.
+
 ## Addresses and readiness
 
 - **One address precedence: published settings → configuration, transport last.**

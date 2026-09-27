@@ -166,9 +166,10 @@ public sealed class GraphQLResponse : ProtoHttpResponse
     /// The shape assertion behind <see cref="GraphQLShouldAssertions.MatchShape"/> and the obsolete
     /// <see cref="ShouldMatchShape"/> shim. A matcher failure is rethrown as a
     /// <see cref="GraphQLAssertionException"/> whose message starts with the operation identifier,
-    /// with the matcher exception - and its mismatch list - as the inner exception.
+    /// with the matcher exception - and its mismatch list - as the inner exception. In exact mode a
+    /// field present in the data that the shape does not mention is a mismatch.
     /// </summary>
-    internal GraphQLResponse AssertResponseShape(object expectedShape, JsonSerializerOptions? options = null)
+    internal GraphQLResponse AssertResponseShape(object expectedShape, JsonSerializerOptions? options = null, bool exact = false)
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
         if (SelectedData is not { } selected || selected.ValueKind == JsonValueKind.Null)
@@ -202,7 +203,8 @@ public sealed class GraphQLResponse : ProtoHttpResponse
                         ProtoGraphQLBuilder.ShapeObservationKind,
                         Identifier!,
                         new GraphQLShapeMatchData(Identifier!, matched))
-                    : null);
+                    : null,
+                exact);
         }
         catch (JsonShapeMismatchException exception)
         {

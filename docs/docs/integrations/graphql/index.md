@@ -138,7 +138,7 @@ public sealed class ViewerTests
 
 ## Going further
 
-- **Authentication** — the same `[Auth<T>]`, `.Auth(...)` and `.WithoutAuth()` as [REST](../rest/authentication.md); narrow to GraphQL with `Protocols = ["GraphQL"]`.
+- **Authentication** — the same `[Auth<T>]`, `.Auth(...)` and `.WithoutAuth()` as [REST](../rest/authentication.md); narrow to GraphQL with `Protocols = ["GraphQL"]`. The [built-in test user](../rest/authentication.md#built-in-test-user) rides the same pipeline.
 - **Queries, mutations and uploads** — shape-driven, fluent and raw documents: [Queries and mutations](./operations.md).
 - **Subscriptions** — WebSocket or SSE, connection payloads, custom sockets: [Subscriptions](./subscriptions.md).
 - **Schema coverage** — point a client at your SDL: [Schema coverage](./coverage.md).

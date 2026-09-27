@@ -11,7 +11,7 @@ This tutorial builds a small suite against an ASP.NET Core API, one step at a ti
 ## 1. Create the project
 
 :::tip[Rather start from a working solution?]
-`dotnet new install ProtoTest.Templates`, then `dotnet new prototest -n Orders` creates an API and a suite for it that is already composed, traced and reported — steps 1 to 4 and 6 of this tutorial, ready to run. See [Installation](./installation.md#quick-start-the-template).
+`dotnet new install ProtoTest.Templates`, then `dotnet new prototest -n Orders` creates an API and a suite for it that is already composed, traced and reported — steps 1 to 4 and 6 of this tutorial, ready to run. The suite is NUnit by default; `--runner` writes it for xUnit v2, xUnit v3, TUnit or MSTest instead. See [Installation](./installation.md#quick-start-the-template).
 :::
 
 ```bash

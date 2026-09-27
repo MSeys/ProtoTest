@@ -41,7 +41,7 @@ This is NUnit behaviour, not ProtoTest's: a `[SetUpFixture]` **outside** any nam
 
 ## Quick start
 
-`[ProtoTest]` derives from `TestAttribute`, so it **replaces** `[Test]`. It also implements NUnit's `ITestAction`, which is how the context starts before the body and completes after it.
+`[ProtoTest]` derives from `TestAttribute`, so it **replaces** `[Test]`. It also implements NUnit's `IWrapSetUpTearDown`, which is how the lifecycle wraps `[SetUp]`, the body and `[TearDown]`.
 
 ```csharp
 using System.Net;
@@ -62,6 +62,16 @@ public class OrderTests
     }
 }
 ```
+
+## Low-ceremony mode (opt-in)
+
+A suite can skip `[ProtoTest]` on every method: apply the assembly-level auto-wrap once, and every plain `[Test]` runs through the same lifecycle.
+
+```csharp
+[assembly: ProtoTestAutoWrap]
+```
+
+NUnit applies the nearest `IWrapSetUpTearDown` attribute — method, then fixture, then assembly — so a test that already carries `[ProtoTest]` keeps its own wrapper and is never wrapped twice. The skip conditions, outcome mapping and attachments are the ones above, unchanged.
 
 ## Per-test lifecycle
 
@@ -100,9 +110,10 @@ Each test gets its own context and its own lane in the ProtoTrace run timeline.
 
 ## Limits
 
-- `ITestAction` is synchronous, so the host calls block — NUnit needs a synchronizing context.
+- `IWrapSetUpTearDown` is synchronous, so the host calls block — NUnit needs a synchronizing context.
 - `[SetUpFixture]` scoping is NUnit's own namespace rule; keep tests in or under the namespace of the setup class.
 - A skipped test is only reported by NUnit; ProtoTest records nothing for it.
+- Auto-wrap is assembly-wide and follows NUnit's nearest-wrapper rule: a fixture-level `IWrapSetUpTearDown` attribute other than `[ProtoTest]` suppresses it for that fixture, exactly as it would for `[ProtoTest]`.
 
 ## Next
 

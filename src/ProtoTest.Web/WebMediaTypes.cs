@@ -1,9 +1,10 @@
-namespace ProtoTest.Web.Internal;
+namespace ProtoTest.Web;
 
 /// <summary>Guesses a media type from a downloaded file's extension. It is a guess, never a promise.</summary>
-internal static class WebMediaTypes
+public static class WebMediaTypes
 {
-    internal const string Default = "application/octet-stream";
+    /// <summary>The media type a file with no known extension gets.</summary>
+    public const string Default = "application/octet-stream";
 
     private static readonly Dictionary<string, string> ByExtension = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -28,7 +29,8 @@ internal static class WebMediaTypes
         [".pptx"] = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
     };
 
-    internal static string Guess(string fileName)
+    /// <summary>Returns the media type for <paramref name="fileName"/>'s extension, or <see cref="Default"/>.</summary>
+    public static string Guess(string fileName)
     {
         ArgumentNullException.ThrowIfNull(fileName);
         return ByExtension.TryGetValue(Path.GetExtension(fileName), out var mediaType)

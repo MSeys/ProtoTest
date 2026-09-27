@@ -131,6 +131,30 @@ One broker is shared by the whole run and may publish concurrently; `CreateConsu
 
 `DeclareAsync` creates the destinations this suite owns — those declared with `Declare` — before the first tap is prepared. Declaration is idempotent: an existing destination is left as it is and a repeated declaration is a no-op. A broker whose destinations always exist (the in-memory broker) implements it as a no-op, and an adapter that cannot create a destination refuses instead of pretending: the default interface implementation throws `NotSupportedException` naming the adapter, so a `Declare` against it fails setup loudly.
 
+#### Writing an adapter
+
+An adapter's consumer derives from `ProtoMessageConsumerBase` and supplies only a source; the base owns the await queue the contract above describes:
+
+```csharp
+public abstract class ProtoMessageConsumerBase : IProtoMessageConsumer
+{
+    protected ProtoMessageConsumerBase(long position);
+    protected ValueTask<ProtoMessage> AwaitAsync(string destination, Func<ProtoMessage, bool> predicate,
+        TimeSpan timeout, CancellationToken cancellationToken, Func<IProtoMessageAwaitSource> sourceFactory);
+    protected void Reset(long position);
+    // PrepareAsync/DisposeAsync are virtual no-ops; a tap-based adapter overrides them.
+}
+
+public interface IProtoMessageAwaitSource
+{
+    ValueTask<ProtoMessageAwaitSnapshot> SnapshotAsync(string destination, long position,
+        CancellationToken cancellationToken);
+    ValueTask WaitAsync(ProtoMessageAwaitSnapshot snapshot, TimeSpan remaining, CancellationToken cancellationToken);
+}
+```
+
+An adapter's public `AwaitAsync` does whatever per-destination work it needs — declaring a tap, resolving the harness — and then calls the protected overload, which resolves the source factory inside the base's await gate. `ProtoMessageAwaitSnapshot` carries the candidates (`ProtoMessageAwaitEntry`: one delivery with its position) plus the wake-up that ends the next wait, when the source has one; the position is the first delivery the consumer may consume, so the in-memory broker starts after the shared history's creation position (`Reset` re-baselines a replaced source) while an empty tap starts at zero. An adapter never implements its own await gate, position, consumed set or deadline rescan.
+
 ## Quick start
 
 ```csharp

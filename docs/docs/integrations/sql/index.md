@@ -51,6 +51,8 @@ builder.AddSql(
 
 With at least one key declared, `AddSql` declares the `SQL` store capability only while one of them can provide a connection — a configured value, or a key a registered container declares and fills. When none can, the integration is inert: the connection is not opened during setup, and `Proto.Context.Sql()`, `SqlConnection()` and `SqlTransaction()` throw naming the missing keys and the `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate. `AddressKeys` is a code API — a `SqlAddressKeys` set that only `Add` (or a `SqlOptions` instance registered before `AddSql`) fills. No configuration section binds it, because the capability decision is made when the host is built and a key that only configuration knows could not have promised the connection the decision was made against. It is empty by default, which keeps the capability unconditional and the factory owning the address.
 
+A sibling access technology that wants the same honest capability shares the rule instead of re-deriving it: `SqlAddressRule.DeclaredKeys(services)` returns the keys the first `AddSql` recorded, so a package registers its own store capability with `AddCapabilityWhenProvided` over them, and `SqlAddressRule.IsInert(context, options)` (or `ThrowIfInert`) applies the same decision at use time. `AddEntityFrameworkCore` is the shipped example; a Dapper or raw ADO.NET package follows the same shape.
+
 ## Isolation
 
 `SqlIsolation` has two modes:

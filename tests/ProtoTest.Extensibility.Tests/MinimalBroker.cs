@@ -1,23 +1,54 @@
-namespace ProtoTest.Messaging.Internal;
+namespace ProtoTest.Extensibility.Tests;
+
+using ProtoTest.Messaging;
 
 /// <summary>
-/// The default broker: messages live for the run, ordered by a publish position, and every consumer
-/// snapshots the current position at creation, so it only ever matches messages published after its own
-/// test started. A matched message is consumed and never matched again; a delivery that matched no
-/// awaited predicate stays in the history for a later await, so concurrent awaits on one consumer
-/// neither lose nor steal each other's messages. One lock guards the history and the signal; predicates
-/// always run in the awaiting flow, so a slow or throwing predicate cannot stall publishers.
-/// It makes the API and the demo independent of infrastructure; a real adapter replaces it with the
-/// broker the system under test actually uses.
+/// A minimal broker adapter written against the public messaging surface only - this project has no
+/// InternalsVisibleTo grant, so it compiles exactly like a third-party adapter package. The broker
+/// keeps a publish-ordered history for the run and creates one consumer per test from the current
+/// position, so a consumer only matches messages published after its own test started. The consumer
+/// derives from <see cref="ProtoMessageConsumerBase"/> and supplies only an
+/// <see cref="IProtoMessageAwaitSource"/> (a snapshot and a wake-up), which is the documented adapter
+/// recipe: the base owns serialization, position, consumption and the deadline rescan.
 /// </summary>
-internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
+public sealed class MinimalBroker : IProtoMessageBroker
 {
     private readonly ProtoLock _gate = new();
-    private readonly List<Entry> _messages = [];
+    private readonly List<ProtoMessageAwaitEntry> _history = [];
     private TaskCompletionSource _published = NewSignal();
     private long _position;
 
-    public string Name => "InMemory";
+    /// <summary>The adapter name recorded on the capability and the broker entity.</summary>
+    public string Name => "Minimal";
+
+    /// <summary>How many messages this broker published for the run.</summary>
+    public long PublishedCount
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _position;
+            }
+        }
+    }
+
+    public ValueTask PublishAsync(ProtoMessage message, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        TaskCompletionSource signal;
+        lock (_gate)
+        {
+            _position++;
+            _history.Add(new ProtoMessageAwaitEntry(_position, message));
+            signal = _published;
+            _published = NewSignal();
+        }
+
+        // Completed outside the lock: a waiter woken by this signal scans the history the lock protects.
+        signal.TrySetResult();
+        return ValueTask.CompletedTask;
+    }
 
     public ValueTask<IProtoMessageConsumer> CreateConsumerAsync(CancellationToken cancellationToken = default)
     {
@@ -29,30 +60,10 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
 
         // The consumer may match from the next position on: everything published before it belongs to
         // an earlier test.
-        return new ValueTask<IProtoMessageConsumer>(new InMemoryProtoMessageConsumer(this, position + 1));
+        return new ValueTask<IProtoMessageConsumer>(new MinimalConsumer(this, position + 1));
     }
 
-    public ValueTask PublishAsync(ProtoMessage message, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(message);
-        TaskCompletionSource signal;
-        lock (_gate)
-        {
-            _position++;
-            _messages.Add(new Entry(_position, message));
-            signal = _published;
-            _published = NewSignal();
-        }
-
-        // Completed outside the lock: a waiter woken by this signal scans the history the lock protects.
-        signal.TrySetResult();
-        return ValueTask.CompletedTask;
-    }
-
-    /// <summary>
-    /// A declaration is a no-op: the in-memory broker has no topology to create, and every destination
-    /// already exists - publishing creates its history entry and awaiting reads it.
-    /// </summary>
+    /// <summary>Every destination exists in memory, so a declaration is a no-op.</summary>
     public ValueTask DeclareAsync(
         IReadOnlyCollection<string> destinations,
         CancellationToken cancellationToken = default)
@@ -64,14 +75,7 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
     private static TaskCompletionSource NewSignal()
         => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    private readonly record struct Entry(long Position, ProtoMessage Message);
-
-    /// <summary>
-    /// One test's consumer over the broker's shared history: the base owns the await queue, the source
-    /// is the broker's history, so the consumer itself carries no await state.
-    /// </summary>
-    private sealed class InMemoryProtoMessageConsumer(InMemoryProtoMessageBroker broker, long position)
-        : ProtoMessageConsumerBase(position)
+    private sealed class MinimalConsumer(MinimalBroker broker, long position) : ProtoMessageConsumerBase(position)
     {
         public override ValueTask<ProtoMessage> AwaitAsync(
             string destination,
@@ -85,7 +89,7 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
         /// awaited position and carries the publish signal captured before the copy, so a publish that
         /// lands during the scan completes the next wait instead of waiting for the deadline.
         /// </summary>
-        private sealed class Source(InMemoryProtoMessageBroker broker) : IProtoMessageAwaitSource
+        private sealed class Source(MinimalBroker broker) : IProtoMessageAwaitSource
         {
             public ValueTask<ProtoMessageAwaitSnapshot> SnapshotAsync(
                 string destination,
@@ -97,16 +101,13 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
                 List<ProtoMessageAwaitEntry> candidates = [];
                 lock (broker._gate)
                 {
-                    // The signal is captured before the copy: a publish that lands in between completes
-                    // this signal, so the wait cannot miss it, and one that landed before it is already
-                    // in the history the copy reads.
                     changed = broker._published.Task;
-                    foreach (var entry in broker._messages)
+                    foreach (var entry in broker._history)
                     {
                         if (entry.Position >= position &&
                             string.Equals(entry.Message.Destination, destination, StringComparison.Ordinal))
                         {
-                            candidates.Add(new ProtoMessageAwaitEntry(entry.Position, entry.Message));
+                            candidates.Add(entry);
                         }
                     }
                 }

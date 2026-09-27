@@ -77,7 +77,7 @@ jobs:
       # The viewer's recipe traces are regenerated from the demo this job just built and tested, so a
       # recipe filter that matches no test (or a generator break) fails CI. The committed snapshots
       # carry wall-clock timestamps and per-run ids, so this proves generation, not byte equality
-      # (eng/facts/gotchas.md, "Versioning, feeds and gates").
+      # (records facts/gotchas.md, "Versioning, feeds and gates").
       - name: Regenerate the viewer recipe traces
         shell: pwsh
         run: ./eng/generate-recipe-traces.ps1 -NoBuild

@@ -276,6 +276,45 @@ All ProtoTest packages share one version; breaking API changes are called out be
   envelope needs no `MT-*` transport headers (those belong to MassTransit's raw serializer). Both
   directions are proved against a real RabbitMQ bus (`MassTransit.RabbitMQ` 8.5.10 is a test
   dependency only).
+- Messaging adapters get the await contract they were previously friend-only: `ProtoMessageConsumerBase`
+  owns the one await queue (serialized awaits, position, consumed set, deadline rescan), and an adapter
+  derives from it and supplies only an `IProtoMessageAwaitSource` (`ProtoMessageAwaitEntry`/
+  `ProtoMessageAwaitSnapshot` carry the candidates and the wake-up). The in-memory, RabbitMQ and
+  MassTransit consumers derive from the base, so no integration package needs internals; the messaging
+  page documents the shape under [Writing an adapter](https://prototest.dev/docs/integrations/messaging/#writing-an-adapter).
+- HTTP protocol integrations wire their builders up through the public surface: `UseAuthenticatorFactory`
+  and `UseBaseAddressResolver` on `ProtoHttpRequestBuilder<TResponse, TBuilder>` adopt the lifecycle
+  hook's authenticator and the client resolution's per-test base-address resolver, and
+  `ProtoHttpOptionsResolver` resolves the keyed response/attachment options a protocol registered — the
+  seam REST and GraphQL use, now available to any HTTP-based protocol.
+- `ProtoTestContextPropagation` (ProtoTest.AspNetCore) is the public in-process request rule: `ApplyTo`
+  for an `HttpRequestMessage` or an `HttpRequest` adds the ambient trace context and the active test's
+  id (`TestIdHeader`, `x-prototest-test`), so a hand-written in-process transport gets the same clock
+  parity as the in-process HTTP client.
+- `ProtoDeviceConnect.WithTimeoutAsync` is the shared device connect bound: a transport runs its connect
+  under a linked attempt token and an elapsed attempt is a `TimeoutException` naming the target, while a
+  caller's cancellation is never reclassified. Both WebSocket transports (socket and in-process) use it.
+- `ProtoOptionsRegistration.ConfigureKeyed` registers a keyed per-client options instance through the one
+  options primitive: callbacks compose in registration order, the section binds over them, and
+  `registerDefault: true` also registers the unkeyed run-wide instance without any named client's
+  callbacks. HTTP response/attachment options and gRPC client options are registered through it instead
+  of each keeping a private copy of the loop.
+- The extension points a third-party integration needs are public, so no integration reaches into
+  another package's internals: `ProtoRegistrationGuard` gained a marker overload taking the caller's
+  identity rule, and `Find`, alongside the existing type-marker and weak-table forms;
+  `ProtoClientResolution.RegisteredName` resolves the registry key of a client instance;
+  `ProtoClockRegistry` exposes its host-scoped `Find(testId)` (the registry stays the host service it
+  always was); `ProtoTest.Web` publishes the backend building blocks -
+  `WebBackendOptions.Resolve`, `WebBackendErrors`, `WebFailureArtifacts`, `WebProbeLoop`/`WebProbe`,
+  `WebBackendDefaults` (timing) and `WebArtifactNames` (safe names), with `WebMediaTypes` - while the
+  internal `WebTiming`/`WebNames` remain the implementation behind the new facade types;
+  `SqlAddressRule` publishes the declared-keys lookup and the inert predicate a sibling SQL provider
+  gates its Store capability with; and `ProtoTestContextPropagation` publishes the in-process trace
+  context and test-id header for a transport that opens raw requests. Every `InternalsVisibleTo` grant
+  to an integration package is removed; the remaining grants target test assemblies only, plus the
+  in-repo sample's own assemblies under `samples/` (the one recorded exception; never `src/`).
+- `tests/ProtoTest.Extensibility.Tests` compiles a minimal broker adapter and a minimal web backend
+  against the public surface only, so an extension point that regresses to internals fails the build.
 
 ### Changed
 
@@ -285,7 +324,7 @@ All ProtoTest packages share one version; breaking API changes are called out be
   `UseMassTransit`) are unchanged. In the same pass the in-memory, RabbitMQ and MassTransit consumers
   share one await machinery, so "awaits on one consumer serialize in call order", "a delivery that
   matched no awaited predicate stays for a later await" and "a matched message is consumed once" hold
-  identically across the brokers; no messaging API changed.
+  identically across the brokers; the adapter-facing await contract is public (see Added).
 - A per-run WireMock fake keeps its stubs and request log for the whole run: teardown reports the
   test's requests but no longer resets the shared fake, so a stub one test registers still matches in
   the next. `Reset()` clears the shared fake between tests, and release clears it with the run.
@@ -302,6 +341,10 @@ All ProtoTest packages share one version; breaking API changes are called out be
   identity now keeps the class-level authenticators and composes with them, so the common "class owns
   the authenticator, method names the user" shape works. The REST/GraphQL/gRPC auth entity still
   reports `auth.source` for the `[Auth]` attributes and lists the test user among `auth.types`.
+- `eng/lint.ps1` fails when an `InternalsVisibleTo` grant — the assembly attribute or the csproj item
+  form — targets an assembly that does not end in `.Tests`, and `eng/test-gates.ps1` proves both
+  directions in the `lint-friend-edges` fixture. An integration that needs a type it cannot see now
+  publishes the contract or moves the code instead of widening the grant.
 
 ### Fixed
 

@@ -2,7 +2,6 @@ namespace ProtoTest.Web.Playwright;
 
 using Microsoft.Playwright;
 using ProtoTest.Core;
-using ProtoTest.Web.Internal;
 
 public enum PlaywrightBrowser
 {
@@ -47,7 +46,7 @@ public sealed class PlaywrightWebOptions : IProtoConfigurableOptions
     /// Playwright's own default is 30 seconds, which is longer than a polling assertion's budget; this
     /// matches the Selenium option of the same name so the two backends fail at the same speed.
     /// </summary>
-    public TimeSpan ActionTimeout { get; set; } = WebTiming.DefaultTimeout;
+    public TimeSpan ActionTimeout { get; set; } = WebBackendDefaults.DefaultTimeout;
 
     /// <summary>
     /// Downloads the selected browser through the Playwright driver before the first launch, so a clean

@@ -281,15 +281,24 @@ public static class ProtoCapabilityExtensions
             services => services.AddSingleton(new ProtoCapabilityReason(kind, name, reason)));
     }
 
-    // Descriptors are metadata by value: registering the same one twice - a helper called twice, two
-    // integrations declaring the same adapter - must report one capability, while distinct descriptors
-    // of the same CLR type still each register.
-    internal static void AddCapability(IServiceCollection services, ProtoCapabilityDescriptor capability)
+    /// <summary>
+    /// Records a capability or adapter into a service collection. This is the service-collection form
+    /// of <see cref="AddCapability(IProtoHostBuilder, ProtoCapabilityDescriptor)"/> for an integration
+    /// whose registration helper serves both the host and application builders and therefore only has
+    /// the collection at hand; the builder overloads are the usual entry point. Registering here and on
+    /// a builder is the same declaration, so a helper can switch between the two forms freely.
+    /// </summary>
+    public static void AddCapability(IServiceCollection services, ProtoCapabilityDescriptor capability)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(capability);
         AddDescriptor(services, capability);
         AddUnconditionalDeclaration(services, capability);
     }
 
+    // Descriptors are metadata by value: registering the same one twice - a helper called twice, two
+    // integrations declaring the same adapter - must report one capability, while distinct descriptors
+    // of the same CLR type still each register.
     private static void AddDescriptor(IServiceCollection services, ProtoCapabilityDescriptor capability)
         => ProtoRegistration.TryAdd(services, capability, existing => existing == capability);
 

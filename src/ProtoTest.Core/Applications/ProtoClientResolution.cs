@@ -98,4 +98,17 @@ public static class ProtoClientResolution
 
         return (null, resolvedName, null);
     }
+
+    /// <summary>
+    /// Returns the registry key a client instance is registered under for this test, or
+    /// <see langword="null"/> when it is not registered. <see cref="Find{TClient}"/> returns the key of
+    /// the client that satisfied a lookup; this form resolves an instance the caller already holds -
+    /// the application's in-process transport, for example - so its trace entity uses the same identity.
+    /// </summary>
+    public static string? RegisteredName(ProtoExecutionContext context, object client)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(client);
+        return context.TryClientName(client);
+    }
 }

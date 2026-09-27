@@ -1,15 +1,18 @@
-namespace ProtoTest.Web.Internal;
+namespace ProtoTest.Web;
 
 using ProtoTest.Core;
 
 /// <summary>
 /// Captures the failure artifacts both backends produce — screenshot, DOM and location — with one
 /// naming rule, one set of descriptions and one location format. Each capture is isolated so a failing
-/// artifact never replaces the original web error.
+/// artifact never replaces the original web error. A hand-written backend calls this from
+/// <see cref="IWebBackendDiagnostics.CaptureFailureAsync"/> so its artifacts match the documented
+/// <c>web-{session}-{element}-{n}-…</c> naming.
 /// </summary>
-internal static class WebFailureArtifacts
+public static class WebFailureArtifacts
 {
-    internal static async ValueTask<IReadOnlyList<ProtoTestAttachment>> CaptureAsync(
+    /// <summary>Captures the failure artifacts, one attachment per capture that produced a value.</summary>
+    public static async ValueTask<IReadOnlyList<ProtoTestAttachment>> CaptureAsync(
         ProtoExecutionContext context,
         string traceSource,
         string backendName,

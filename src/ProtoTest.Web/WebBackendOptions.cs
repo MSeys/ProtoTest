@@ -1,4 +1,4 @@
-namespace ProtoTest.Web.Internal;
+namespace ProtoTest.Web;
 
 using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
@@ -7,10 +7,12 @@ using ProtoTest.Core;
 /// The backend options bootstrap every factory shares: create the options, apply the code callback, then
 /// bind configuration once - started infrastructure overrides it, and the backend's own section
 /// (<c>ProtoTest:Web:{backend}</c>) overrides the code callback - and validate the bound result once.
+/// A hand-written backend's factory calls this so it resolves options exactly like the shipped ones.
 /// </summary>
-internal static class WebBackendOptions
+public static class WebBackendOptions
 {
-    internal static TOptions Resolve<TOptions>(
+    /// <summary>Creates, configures, binds and validates the backend's options for one test.</summary>
+    public static TOptions Resolve<TOptions>(
         ProtoExecutionContext context,
         Action<TOptions>? configure = null,
         Action<TOptions>? validate = null)

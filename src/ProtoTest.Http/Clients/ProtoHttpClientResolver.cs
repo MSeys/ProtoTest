@@ -68,7 +68,7 @@ public static class ProtoHttpClientResolver
             if (transport is not null)
             {
                 client = transport;
-                clientEntityName = context.TryClientName(transport) ?? clientEntityName;
+                clientEntityName = ProtoClientResolution.RegisteredName(context, transport) ?? clientEntityName;
                 var endpointPath = entry?.Endpoint is null || application is null
                     ? null
                     : ProtoApplication.Endpoint(context.Configuration, application, entry.Endpoint);

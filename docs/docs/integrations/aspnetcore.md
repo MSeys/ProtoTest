@@ -158,7 +158,7 @@ builder.AddAspNetCoreServer<Program>(
     configureClientOptions: options => options.AllowAutoRedirect = false);
 ```
 
-The handler chain mirrors `WebApplicationFactoryClientOptions`: a redirect handler when `AllowAutoRedirect` is set and a cookie container when `HandleCookies` is set, with ProtoTest's `ProtoTraceContextHandler` appended after them. In published mode the same chain wraps a real socket, and an explicitly set `options.BaseAddress` overrides the configured address.
+The handler chain mirrors `WebApplicationFactoryClientOptions`: a redirect handler when `AllowAutoRedirect` is set and a cookie container when `HandleCookies` is set, with ProtoTest's context-propagating handler appended after them (see [Tracing](#tracing)). In published mode the same chain wraps a real socket, and an explicitly set `options.BaseAddress` overrides the configured address.
 
 `configureWebHost` customizes the server for every test of the run. For a replacement that applies to one test and resets afterwards, see [Substituting services per test](#substituting-services-per-test).
 
@@ -255,7 +255,7 @@ The server is both an event and a state entity — or a single skipped event whe
 
 A substitution records one operation per replaced service — `service.substitute` for an `Override` or `[ReplaceService]`, `service.fail` for a `[FailDependency]` — carrying `service.type`, `service.server` and `service.replacement`, linked to the server entity. The test's dedicated server re-records the initialize event and merges `aspnetcore.server.substituted = true` with `aspnetcore.server.substitutions` (the substituted service types) into the server entity state.
 
-The `HttpClient` is a regular ProtoTest client, so its REST and GraphQL calls are traced by those packages. In addition, `ProtoTraceContextHandler` propagates the current trace context: when an `Activity.Current` exists and the outgoing request has no `traceparent`, the handler adds `00-{TraceId}-{SpanId}-{01|00}`; an existing `traceparent` is left untouched.
+The `HttpClient` is a regular ProtoTest client, so its REST and GraphQL calls are traced by those packages. In addition, `ProtoTestContextPropagation.ApplyTo` propagates the current context: when an `Activity.Current` exists and the request has no `traceparent`, it adds `00-{TraceId}-{SpanId}-{01|00}`, and while a test is active on the flow it adds the test's id under `ProtoTestContextPropagation.TestIdHeader` (`x-prototest-test`); existing headers are left untouched. The in-process HTTP client's handler applies it to every request, and a transport that opens a raw in-process request — a WebSocket handshake, for example — applies `ApplyTo(HttpRequest)` itself, so the application's clock filter pushes the connecting test's clock. The helper is the entry point for any in-process transport that wants the same clock parity.
 
 ## The /test-support convention
 

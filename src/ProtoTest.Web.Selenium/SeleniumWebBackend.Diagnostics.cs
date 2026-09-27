@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.Text.Json;
 using OpenQA.Selenium;
 using ProtoTest.Core;
-using ProtoTest.Web.Internal;
 
 public sealed partial class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics
 {
@@ -58,7 +57,7 @@ public sealed partial class SeleniumWebBackend : IWebBackend, IWebBackendJavaScr
                 entries = _diagnostics.ToArray()
             };
             _context.AddAttachment(
-                $"selenium-{WebNames.SafeName(_sessionName)}-diagnostics.json",
+                $"selenium-{WebArtifactNames.SafeName(_sessionName)}-diagnostics.json",
                 JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }),
                 "application/json",
                 "Selenium backend diagnostic timeline embedded in ProtoTrace.");

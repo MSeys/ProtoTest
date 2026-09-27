@@ -1,4 +1,4 @@
-namespace ProtoTest.Messaging.Internal;
+namespace ProtoTest.Messaging;
 
 /// <summary>
 /// One scan of a consumer's source: the candidate deliveries at or after the awaited position, and the
@@ -6,6 +6,6 @@ namespace ProtoTest.Messaging.Internal;
 /// held - a log the consumer reads itself - leaves <see cref="Changed"/> null, because its next wait
 /// watches that storage directly.
 /// </summary>
-internal readonly record struct ProtoMessageAwaitSnapshot(
+public readonly record struct ProtoMessageAwaitSnapshot(
     IReadOnlyList<ProtoMessageAwaitEntry> Candidates,
     Task? Changed);

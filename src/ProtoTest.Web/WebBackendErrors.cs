@@ -1,10 +1,11 @@
-namespace ProtoTest.Web.Internal;
+namespace ProtoTest.Web;
 
 /// <summary>
 /// The failure messages both backends report for the shared resolution and actionability contract, so
-/// the same situation reads the same whichever backend produced it.
+/// the same situation reads the same whichever backend produced it. A hand-written backend composes
+/// them so its failures stay indistinguishable from the shipped ones.
 /// </summary>
-internal static class WebBackendErrors
+public static class WebBackendErrors
 {
     /// <summary>An action that never became actionable, with the backend's last observation when it has one.</summary>
     public static WebActionabilityException NotActionable(

@@ -4,6 +4,7 @@ using System.Data;
 using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 
 /// <summary>
@@ -245,6 +246,28 @@ public sealed class SqlAddressKeysTests
                 keys.ToArray(),
                 Is.EqualTo(new[] { "ConnectionStrings:Orders", "ConnectionStrings:Billing" }));
             Assert.Throws<ArgumentException>(() => keys.Add(" "));
+        });
+    }
+
+    [Test]
+    public void SqlAddressRule_DeclaredKeys_ShouldReturnWhatTheFirstAddSqlRecorded()
+    {
+        var withoutSql = SqlAddressRule.DeclaredKeys(new ServiceCollection());
+
+        IServiceCollection? captured = null;
+        var builder = new ProtoHostBuilder();
+        builder.AddSql(
+            _ => new SqliteConnection("Data Source=:memory:"),
+            sql => sql.AddressKeys.Add("ConnectionStrings:Orders", "ConnectionStrings:Billing"));
+        builder.ConfigureServices(services => captured = services);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(withoutSql, Is.Empty, "without AddSql there is no declaration to read");
+            Assert.That(
+                SqlAddressRule.DeclaredKeys(captured!),
+                Is.EqualTo(new[] { "ConnectionStrings:Orders", "ConnectionStrings:Billing" }),
+                "a sibling provider reads the same declaration the SQL Store capability was gated on");
         });
     }
 }

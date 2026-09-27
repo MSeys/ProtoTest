@@ -3,24 +3,23 @@ namespace ProtoTest.Messaging.MassTransit.Internal;
 using global::MassTransit.Testing;
 using ProtoTest.Core;
 using ProtoTest.Messaging;
-using ProtoTest.Messaging.Internal;
 
 /// <summary>
 /// One test's view of the harness. The harness keeps every published message for the whole run, so the
 /// consumer snapshots the published position at its first use - during setup for a declared destination,
-/// at the first await otherwise - and only ever matches later messages. The shared await queue
-/// serializes awaits in call order and leaves a message that matched no awaited predicate for a later
-/// await, so concurrent awaits neither lose nor steal each other's messages.
+/// at the first await otherwise - and only ever matches later messages. The base consumer owns the await
+/// queue, so awaits serialize in call order and a message that matched no awaited predicate is left for
+/// a later await.
 /// </summary>
-internal sealed class MassTransitProtoMessageConsumer<TProgram>(MassTransitMessageBroker<TProgram> broker) : IProtoMessageConsumer
+internal sealed class MassTransitProtoMessageConsumer<TProgram>(MassTransitMessageBroker<TProgram> broker)
+    : ProtoMessageConsumerBase(0)
     where TProgram : class
 {
     private readonly MassTransitMessageBroker<TProgram> _broker = broker;
-    private readonly ProtoMessageAwaitQueue _queue = new(0);
     private readonly ProtoLock _gate = new();
     private ITestHarness? _harness;
 
-    public ValueTask PrepareAsync(
+    public override ValueTask PrepareAsync(
         IReadOnlyCollection<string> destinations,
         CancellationToken cancellationToken = default)
     {
@@ -42,7 +41,7 @@ internal sealed class MassTransitProtoMessageConsumer<TProgram>(MassTransitMessa
         return ValueTask.CompletedTask;
     }
 
-    public async ValueTask<ProtoMessage> AwaitAsync(
+    public override async ValueTask<ProtoMessage> AwaitAsync(
         string destination,
         Func<ProtoMessage, bool> predicate,
         TimeSpan timeout,
@@ -53,15 +52,13 @@ internal sealed class MassTransitProtoMessageConsumer<TProgram>(MassTransitMessa
 
         // The harness is resolved inside the await gate, so a substitution that changed it since the
         // last await re-baselines the consumer without racing an await that is already in flight.
-        return await _queue.AwaitAsync(destination, predicate, timeout, cancellationToken, () =>
+        return await AwaitAsync(destination, predicate, timeout, cancellationToken, () =>
         {
             var harness = _broker.Harness();
             EnsurePosition(harness);
             return new Source(harness);
         }).ConfigureAwait(false);
     }
-
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     /// <summary>
     /// Pins the position the consumer starts from in <paramref name="harness"/>: the number of messages
@@ -82,7 +79,7 @@ internal sealed class MassTransitProtoMessageConsumer<TProgram>(MassTransitMessa
                 return;
             }
 
-            _queue.Reset(_harness is null ? harness.Published.Count(CancellationToken.None) : 0);
+            Reset(_harness is null ? harness.Published.Count(CancellationToken.None) : 0);
             _harness = harness;
         }
     }

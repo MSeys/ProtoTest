@@ -13,6 +13,7 @@ Everything the built-in integrations do is built on public extension points. Thi
 | package setup for *some* tests | a [`ProtoAttribute`](../foundation/attributes.md) |
 | run code around *every* test or the whole run | a [hook](../foundation/hooks.md) |
 | give tests a new client | a [client initializer](../foundation/clients.md) + an extension method |
+| publish and await over your own broker | an [`IProtoMessageBroker`](../integrations/messaging/index.md#the-adapter-contract) whose consumer derives from [`ProtoMessageConsumerBase`](../integrations/messaging/index.md#writing-an-adapter) |
 | pass data between setup and tests | [typed state](../foundation/execution-context.md#typed-state) |
 | authenticate HTTP requests | an [`IProtoHttpAuthenticator`](../integrations/rest/authentication.md#writing-your-own) |
 | log a browser in | an [`IWebLoginStrategy`](../integrations/web/login.md) |

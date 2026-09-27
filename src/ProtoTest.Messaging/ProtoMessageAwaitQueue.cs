@@ -1,4 +1,4 @@
-namespace ProtoTest.Messaging.Internal;
+namespace ProtoTest.Messaging;
 
 using System.Diagnostics;
 
@@ -8,11 +8,13 @@ using System.Diagnostics;
 /// match, a matched message is consumed exactly once, and a message that matched no awaited predicate
 /// stays in the source for a later await. The scan runs before every wait and again when the wait
 /// returns at the deadline, so a delivery assigned at the same instant as the timeout still wins.
+/// An adapter contributes an <see cref="IProtoMessageAwaitSource"/> over its own storage and owns one
+/// queue per consumer; it never implements its own await loop, gate, position or consumed set.
 /// </summary>
 /// <param name="position">
 /// The first position an await may consume; a source's older messages can never match.
 /// </param>
-internal sealed class ProtoMessageAwaitQueue(long position)
+public sealed class ProtoMessageAwaitQueue(long position)
 {
     private readonly SemaphoreSlim _awaitGate = new(1, 1);
     private readonly ProtoLock _stateGate = new();

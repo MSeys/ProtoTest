@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
 using ProtoTest.Sql.EntityFrameworkCore.Internal;
-using ProtoTest.Sql.Internal;
 
 public static class ProtoHostBuilderExtensions
 {
@@ -42,7 +41,7 @@ public static class ProtoHostBuilderExtensions
         {
             // The SQL registration recorded the keys its address rule uses; following the same rule
             // keeps the store capability honest when the SQL integration is inert.
-            var addressKeys = SqlAddressKeyDeclaration.Find(services)?.Keys ?? [];
+            var addressKeys = SqlAddressRule.DeclaredKeys(services);
             if (addressKeys.Count == 0)
             {
                 builder.AddCapability(capability);

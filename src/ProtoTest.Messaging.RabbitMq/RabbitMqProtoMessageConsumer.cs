@@ -6,7 +6,6 @@ using global::RabbitMQ.Client;
 using global::RabbitMQ.Client.Events;
 using global::RabbitMQ.Client.Exceptions;
 using ProtoTest.Messaging;
-using ProtoTest.Messaging.Internal;
 
 /// <summary>
 /// One test's RabbitMQ consumer: an exclusive, auto-delete tap queue per destination, each on its own
@@ -15,26 +14,26 @@ using ProtoTest.Messaging.Internal;
 /// that cannot be declared - a missing exchange closes its channel - from poisoning the taps that were
 /// already prepared. Prepared queues are declared before the act; a destination that was never prepared
 /// is declared just in time at the first await, which only sees messages published after the await
-/// begins. The shared await queue serializes awaits in call order and keeps a delivery that matched no
-/// awaited predicate for a later await, so concurrent awaits neither lose nor steal each other's
-/// messages. All queues are deleted when the consumer is disposed with the test, and an exclusive queue
-/// never competes with the application's own consumers.
+/// begins. The base consumer owns the await queue, so awaits serialize in call order and a delivery
+/// that matched no awaited predicate stays for a later await. All queues are deleted when the consumer
+/// is disposed with the test, and an exclusive queue never competes with the application's own
+/// consumers.
 /// </summary>
-internal sealed class RabbitMqProtoMessageConsumer : IProtoMessageConsumer
+internal sealed class RabbitMqProtoMessageConsumer : ProtoMessageConsumerBase
 {
     private readonly RabbitMqMessageBroker _broker;
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private readonly ProtoMessageAwaitQueue _queue = new(0);
     private readonly Dictionary<string, Tap> _taps = new(StringComparer.Ordinal);
     private bool _disposed;
 
     public RabbitMqProtoMessageConsumer(RabbitMqMessageBroker broker)
+        : base(0)
     {
         ArgumentNullException.ThrowIfNull(broker);
         _broker = broker;
     }
 
-    public async ValueTask PrepareAsync(
+    public override async ValueTask PrepareAsync(
         IReadOnlyCollection<string> destinations,
         CancellationToken cancellationToken = default)
     {
@@ -57,7 +56,7 @@ internal sealed class RabbitMqProtoMessageConsumer : IProtoMessageConsumer
         }
     }
 
-    public async ValueTask<ProtoMessage> AwaitAsync(
+    public override async ValueTask<ProtoMessage> AwaitAsync(
         string destination,
         Func<ProtoMessage, bool> predicate,
         TimeSpan timeout,
@@ -79,12 +78,12 @@ internal sealed class RabbitMqProtoMessageConsumer : IProtoMessageConsumer
             _gate.Release();
         }
 
-        // The shared queue owns the serialization and the consumed set; the source scans the tap's log
+        // The base consumer owns the serialization and the consumed set; the source scans the tap's log
         // and reads new deliveries from its channel.
-        return await _queue.AwaitAsync(destination, predicate, timeout, cancellationToken, () => new Source(tap)).ConfigureAwait(false);
+        return await AwaitAsync(destination, predicate, timeout, cancellationToken, () => new Source(tap)).ConfigureAwait(false);
     }
 
-    public async ValueTask DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
         Tap[] taps;
         await _gate.WaitAsync().ConfigureAwait(false);

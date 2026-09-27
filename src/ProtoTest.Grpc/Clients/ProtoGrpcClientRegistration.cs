@@ -1,7 +1,6 @@
 namespace ProtoTest.Grpc.Clients;
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
 using ProtoTest.Http;
 
@@ -81,26 +80,14 @@ internal static class ProtoGrpcClientRegistration
         string scopedName,
         Action<GrpcClientOptions>? configure)
     {
-        if (configure is not null)
-        {
-            services.AddKeyedSingleton(scopedName, new ConfigureCallback(configure));
-        }
-
-        services.TryAddKeyedSingleton<GrpcClientOptions>(scopedName, (serviceProvider, _) =>
-            ProtoOptionsRegistration.Resolve<GrpcClientOptions>(serviceProvider, options =>
-            {
-                foreach (var callback in serviceProvider.GetKeyedServices<ConfigureCallback>(scopedName))
-                {
-                    callback.Callback(options);
-                }
-            }));
-
-        // The unkeyed instance is the run-wide default: the transport-backed client the accessor
+        // Per named client, plus the run-wide unkeyed default: the transport-backed client the accessor
         // creates for a target with no registration of its own reads it, and it binds the shared
         // section without any named client's callbacks.
-        services.TryAddSingleton(serviceProvider =>
-            ProtoOptionsRegistration.Resolve<GrpcClientOptions>(serviceProvider));
+        ProtoOptionsRegistration.ConfigureKeyed(
+            services,
+            scopedName,
+            () => new GrpcClientOptions(),
+            configure,
+            registerDefault: true);
     }
-
-    private sealed record ConfigureCallback(Action<GrpcClientOptions> Callback);
 }

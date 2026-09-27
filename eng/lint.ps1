@@ -1,10 +1,6 @@
 [CmdletBinding()]
 param(
-    [switch]$NoRestore,
-
-    # Optional semicolon-separated files or directories (relative to the repository or absolute) to
-    # format-check instead of the whole solution; verify.ps1 passes the projects a stage touched.
-    [string]$Include = ""
+    [switch]$NoRestore
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,7 +20,8 @@ if (-not $NoRestore) {
 # contains one of the known roots (FreePort, ServeOnceAsync, TemporaryTrace, SingleConnectionListener)
 # fails here with the file and line, so GetFreePort or LazyTemporaryTrace cannot drift back either.
 # The rule is deliberately a deny list of the known copies, not a shape scan: a helper renamed to an
-# unrelated name (say AcquirePort) is not detected, and that limit is stated in eng/facts/gotchas.md.
+# unrelated name (say AcquirePort) is not detected, and that limit is stated in the records checkout's
+# facts/gotchas.md.
 $supportRoot = [IO.Path]::GetFullPath((Join-Path $repository "tests/ProtoTest.TestSupport"))
 $duplicationRules = @(
     @{ Name = "FreePort"; Pattern = '\bstatic\b[^\r\n;{}=]*\b(\w*FreePort\w*)\s*\(' },
@@ -62,17 +59,67 @@ if ($duplicates.Count -gt 0) {
     throw "use the shared helpers in tests/ProtoTest.TestSupport instead of copying them."
 }
 
+# An InternalsVisibleTo grant is a test-only edge: no integration may reach into another package's
+# internals, so every target must be a *.Tests assembly. When an integration needs a type it cannot see,
+# the owning package publishes the contract or moves the code. The scan covers the attribute form in
+# source (plain, Attribute-suffixed and verbatim strings) and the csproj item and AssemblyAttribute
+# forms, and skips build output, tooling and the gitignored assets/ scratch so a fixture or worktree
+# copy cannot trip it. The in-repo sample's own assemblies are the one recorded exception, and only
+# under samples/.
+$ignoredFriendEdgePaths = '[\\/](bin|obj|node_modules|\.git|artifacts|assets[\\/]internal)[\\/]'
+$friendEdgePatterns = @(
+    @{ Form = "assembly attribute"; Pattern = 'InternalsVisibleTo(?:Attribute)?\s*\(\s*@?"([^"]+)"' },
+    @{ Form = "csproj item"; Pattern = 'InternalsVisibleTo[\s\S]{0,300}?Include\s*=\s*"([^"]+)"' },
+    @{ Form = "assembly attribute item"; Pattern = 'InternalsVisibleToAttribute[\s\S]{0,300}?<_Parameter1>\s*([^<,]+?)\s*</_Parameter1>' }
+)
+# Runtime-generated proxy assemblies never ship and cannot be named a *.Tests project; none exist today.
+$allowedFriendEdgeNames = @('^DynamicProxyGenProxies')
+# The in-repo sample's own assemblies are neither shipped nor integrations: the sample app, its suite
+# support and the demo suite grant each other internals like one product would. They are allowed only
+# under samples/ and stay listed until the sample models the public-contract pattern; nothing under
+# src/ may ever join them.
+$allowedSampleFriendEdgeNames = @('^ProtoTest\.SampleApp$', '^Northstar\.ProtoTest$', '^ProtoTest\.Demo$')
+$friendEdgeViolations = New-Object System.Collections.Generic.List[string]
+$friendEdgeFiles = Get-ChildItem -LiteralPath $repository -Recurse -File -Include *.cs,*.csproj |
+    Where-Object { $_.FullName -notmatch $ignoredFriendEdgePaths }
+
+foreach ($file in $friendEdgeFiles) {
+    $text = Get-Content -Raw -LiteralPath $file.FullName
+    foreach ($pattern in $friendEdgePatterns) {
+        foreach ($match in [regex]::Matches($text, $pattern.Pattern)) {
+            $target = $match.Groups[1].Value.Trim()
+            if ($target.EndsWith(".Tests", [StringComparison]::OrdinalIgnoreCase)) {
+                continue
+            }
+
+            if ($allowedFriendEdgeNames.Count -gt 0 -and $target -match ($allowedFriendEdgeNames -join '|')) {
+                continue
+            }
+
+            $relative = $file.FullName.Substring($repository.Length + 1).Replace('\', '/')
+            if ($relative.StartsWith("samples/", [StringComparison]::OrdinalIgnoreCase) -and
+                $target -match ($allowedSampleFriendEdgeNames -join '|')) {
+                continue
+            }
+
+            $line = ($text.Substring(0, $match.Index) -split "`n").Count
+            $friendEdgeViolations.Add(("{0}:{1}: InternalsVisibleTo targets '{2}'; only *.Tests assemblies may receive internals" -f $relative, $line, $target))
+        }
+    }
+}
+
+if ($friendEdgeViolations.Count -gt 0) {
+    Write-Host "Integration packages must not receive internals through InternalsVisibleTo:"
+    foreach ($violation in $friendEdgeViolations) { Write-Host "  $violation" }
+    throw "publish the contract the integration needs, or move the code, instead of granting it internals."
+}
+
 # The build enforces analyzers and the repository .editorconfig with warnings as errors; the format
 # check additionally proves no file needs rewriting. Both run on every verify so a style regression
-# fails the same run that would have introduced it.
+# fails the same run that would have introduced it. The check is not scoped on purpose:
+# `dotnet format --include` silently reports nothing for code-style/analyzer diagnostics, so a scoped
+# check was a false green (measured twice).
 $formatArguments = @($solution, "--verify-no-changes", "--no-restore")
-if (-not [string]::IsNullOrWhiteSpace($Include)) {
-    $resolvedInclude = @($Include.Split(';', [StringSplitOptions]::RemoveEmptyEntries) | ForEach-Object {
-            $path = $_.Trim()
-            if ([IO.Path]::IsPathRooted($path)) { $path } else { Join-Path $repository $path }
-        })
-    $formatArguments += @("--include") + $resolvedInclude
-}
 
 & dotnet format @formatArguments
 if ($LASTEXITCODE -ne 0) {

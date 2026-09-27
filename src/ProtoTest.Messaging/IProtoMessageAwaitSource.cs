@@ -1,11 +1,13 @@
-namespace ProtoTest.Messaging.Internal;
+namespace ProtoTest.Messaging;
 
 /// <summary>
-/// The ordered deliveries one consumer awaits over, plus the wait that wakes its scan. Every adapter
+/// The ordered deliveries one consumer awaits over, plus the wait that wakes its scan. An adapter
 /// implements it over its own storage: the in-memory broker and the MassTransit harness over their
-/// published history, the RabbitMQ tap over its log and channel.
+/// published history, the RabbitMQ tap over its log and channel. The consumer owns a
+/// <see cref="ProtoMessageAwaitQueue"/> and supplies this source; the queue enforces the serialized,
+/// consumed-once semantics.
 /// </summary>
-internal interface IProtoMessageAwaitSource
+public interface IProtoMessageAwaitSource
 {
     /// <summary>
     /// Returns the candidate deliveries at or after <paramref name="position"/>, in arrival order. The

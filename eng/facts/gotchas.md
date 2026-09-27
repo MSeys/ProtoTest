@@ -154,9 +154,13 @@ last error.
   `Tap_ShouldPreBind...` round trip and `tests/ProtoTest.Messaging.Tests/MessagingTapTests.cs`.)
 - **Awaits on one consumer serialize, and an unmatched delivery is kept.** The shared concurrency
   contract: concurrent awaits on one consumer run in call order, and a delivery matching no awaited
-  predicate stays buffered for a later await, so nothing is lost or stolen. Both adapters follow it
-  (canonical: `tests/ProtoTest.TestSupport/MessagingConcurrencyContract.cs`, called by the in-memory
-  and RabbitMQ suites).
+  predicate stays available to a later await, so nothing is lost or stolen. All three brokers follow it
+  through one implementation, `ProtoMessageAwaitQueue` in `src/ProtoTest.Messaging/Internal/`; an
+  adapter contributes an `IProtoMessageAwaitSource` (a snapshot and a wait), never its own await loop,
+  gate, position or consumed set. The deadline rescans once before it times out, so a delivery assigned
+  at the timeout boundary wins. (Canonical: `tests/ProtoTest.TestSupport/MessagingConcurrencyContract.cs`,
+  called by the in-memory, RabbitMQ and MassTransit suites; `tests/ProtoTest.Messaging.Tests/ProtoMessageAwaitQueueTests.cs`
+  pins the machinery itself.)
 - **`UseRabbitMq` declares the `Broker` capability conditionally on
   `ProtoTest:Messaging:RabbitMq:ConnectionString`.** A run with a configured key or a broker container
   that declares it keeps the capability; with neither it is absent and gated tests skip instead of
@@ -190,6 +194,43 @@ last error.
   inspection, and the UTF-8-string limit is unchanged. Unlike REST/GraphQL required reads, a messaging
   read records no deserialize trace event (no new messaging vocabulary; the await already traces the
   payload section).
+- **The MassTransit bridge's harness mode is in-process only; `MassTransitEnvelope` is the closed-box path.** `UseMassTransit<TProgram>(application)`
+  resolves `ITestHarness` from the application's `AddAspNetCoreServer` server, so `AddMessaging` must be
+  registered after the application's server (the initializer prepares taps during setup, when the
+  server must already exist); a loopback, container or Aspire application is a different process
+  boundary and is not served. The `Broker` capability is declared with `AddCapabilityUnlessConfigured`
+  over `ProtoTest:Applications:{application}:BaseUrl`: a published application drops it and gated tests
+  skip, while a missing server or a missing `AddMassTransitTestHarness` fails at first use naming the
+  fix. There is no container package for the bus — MassTransit is a bus library, not a server — so a
+  RabbitMQ container comes from `ProtoTest.Messaging.RabbitMq.Testcontainers`. (Canonical:
+  `tests/ProtoTest.Messaging.MassTransit.Tests/MassTransitCapabilityTests.cs`.)
+- **The MassTransit harness keeps its published history for the whole run.** Each test's consumer
+  snapshots the published count at its first use - during setup for a `Tap`ped destination, at the
+  first await otherwise - so an act-then-await flow needs `Tap`. A substitution mid-test replaces the
+  run's server with the test's dedicated one, hence a fresh harness: the consumer re-baselines to it
+  (position zero, no consumed indices), because every message on that harness is this test's. A null
+  or empty payload publishes the contract's default instance, so a contract with no parameterless
+  shape (a positional record) fails the publish naming the contract and the fix; a publish and a
+  tapped destination resolve the name (an unknown one, or a short name two contracts share, fails
+  naming it), while an untapped await matches the name as written. A destination is a message contract
+  type (short name, full name or `urn:message:` URN); a publish needs a concrete contract and
+  re-serializes the awaited contract with the shared web JSON defaults (the wire bytes and the
+  envelope are not retained); the await observes publishes, not consumption; and `Declare` is a no-op
+  because MassTransit owns topology. (Canonical:
+  `tests/ProtoTest.Messaging.MassTransit.Tests/MassTransitRoundTripTests.cs`.)
+- **The MassTransit wire envelope is pure and harness-free; a published application is tested with it
+  through the broker adapter.** `MassTransitEnvelope.Wrap` builds the package's own
+  `JsonMessageEnvelope` with `SystemTextJsonMessageSerializer.Options` (camelCase; decimals as strings)
+  - the contract's `MessageTypeCache` URNs in `messageType`, `NewId`-derived message id/sent time and
+  conversation id, caller headers in the envelope and on the frame, `HostMetadataCache.Host`, content
+  type `application/vnd.masstransit+json` - and returns it as a `ProtoMessage`, so any adapter
+  publishes it; `Unwrap`/`Unwrap<T>` read it back with the same package options and fail with
+  `MessagingAssertionException` naming the destination when the frame is not an envelope or its
+  `messageType` does not declare `T`. The envelope path expects no `MT-*` transport headers (they belong
+  to MassTransit's raw serializer), and the destination is the bus's own entity address (on RabbitMQ
+  `Namespace:Type` from the entity name formatter), not a contract name. (Canonical:
+  `tests/ProtoTest.Messaging.MassTransit.Tests/MassTransitEnvelopeBrokerTests.cs`; the in-memory round trip is in
+  `MassTransitEnvelopeTests.cs`.)
 
 ## Clock and time
 

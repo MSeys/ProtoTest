@@ -6,7 +6,7 @@ description: "Publish a message, then await the one that matters with a predicat
 
 # Messaging
 
-`ProtoTest.Messaging` gives each test a broker client: publish a message to a destination, then await the one that matters with a predicate and a timeout. Failing to arrive is a `TimeoutException` and a test failure, not a sleep. Without an adapter the client runs against an in-memory broker, so the API works anywhere; `ProtoTest.Messaging.RabbitMq` replaces it with RabbitMQ, and `ProtoTest.Messaging.RabbitMq.Testcontainers` owns a broker for the whole run.
+`ProtoTest.Messaging` gives each test a broker client: publish a message to a destination, then await the one that matters with a predicate and a timeout. Failing to arrive is a `TimeoutException` and a test failure, not a sleep. Without an adapter the client runs against an in-memory broker, so the API works anywhere; `ProtoTest.Messaging.RabbitMq` replaces it with RabbitMQ, `ProtoTest.Messaging.RabbitMq.Testcontainers` owns a broker for the whole run, and `ProtoTest.Messaging.MassTransit` bridges the surface to an in-process application's MassTransit test harness - or, through its `MassTransitEnvelope` helper, speaks the MassTransit wire envelope over any adapter, published applications included.
 
 ## Install
 
@@ -14,15 +14,17 @@ description: "Publish a message, then await the one that matters with a predicat
 dotnet add package ProtoTest.Messaging
 dotnet add package ProtoTest.Messaging.RabbitMq
 dotnet add package ProtoTest.Messaging.RabbitMq.Testcontainers
+dotnet add package ProtoTest.Messaging.MassTransit
 ```
 
-The packages target .NET 8, 9 and 10 (the project template defaults to `net10.0`; pass `-f net8.0` or `net9.0` for an older runtime). The first is the capability. The other two are optional: add the RabbitMQ adapter to talk to a real broker, and the container package when the run should start one. `ProtoTest.Messaging.RabbitMq` brings `ProtoTest.Messaging` with it.
+The packages target .NET 8, 9 and 10 (the project template defaults to `net10.0`; pass `-f net8.0` or `net9.0` for an older runtime). The first is the capability. The others are optional adapters: add RabbitMQ to talk to a real broker (with the container package when the run should start one), or `ProtoTest.Messaging.MassTransit` to use an in-process application's MassTransit test harness — see [MassTransit](./masstransit.md). `ProtoTest.Messaging.RabbitMq` and `ProtoTest.Messaging.MassTransit` bring `ProtoTest.Messaging` with them.
 
 ## Registering
 
 ```csharp
 builder.AddMessaging();                                     // in-memory broker
 builder.AddMessaging(messaging => messaging.UseRabbitMq()); // RabbitMQ
+builder.AddMessaging(messaging => messaging.UseMassTransit<Program>()); // the app's MassTransit harness
 ```
 
 ```csharp
@@ -30,6 +32,9 @@ IProtoHostBuilder AddMessaging(this IProtoHostBuilder builder, Action<ProtoMessa
 
 ProtoMessagingBuilder UseBroker(this ProtoMessagingBuilder messaging,
     Func<IServiceProvider, IProtoMessageBroker> factory);
+
+ProtoMessagingBuilder UseBrokerUnlessConfigured(this ProtoMessagingBuilder messaging,
+    Func<IServiceProvider, IProtoMessageBroker> factory, params string[] addressKeys);
 
 ProtoMessagingBuilder CaptureAttachments(this ProtoMessagingBuilder messaging,
     Action<MessagingAttachmentOptions>? configure = null);
@@ -42,9 +47,12 @@ ProtoMessagingBuilder Declare(this ProtoMessagingBuilder messaging,
 
 ProtoMessagingBuilder UseRabbitMq(this ProtoMessagingBuilder messaging,
     Action<RabbitMqOptions>? configure = null);
+
+ProtoMessagingBuilder UseMassTransit<TProgram>(this ProtoMessagingBuilder messaging,
+    string application = "Default");
 ```
 
-`UseBroker` is the adapter seam; `UseRabbitMq` is the built-in implementation of it. `Tap` declares the destinations this suite awaits, in code, so an adapter can bind each test's tap during setup — see [Destinations](#destinations). `Declare` declares the destinations this suite owns, in code, so an adapter creates them during setup before any tap binds — see [Suite-owned topology](#suite-owned-topology). `AddMessaging` registers the options, the `ProtoMessageClient` initializer for every test, the run-scoped `messaging:broker` resource, and — only when an adapter is configured — the `Messaging` capability with kind `broker`.
+`UseBroker` is the adapter seam; `UseRabbitMq` and `UseMassTransit` are the built-in implementations of it. `UseBroker` declares the `Broker` capability only while at least one of its `addressKeys` can provide an address, while `UseBrokerUnlessConfigured` declares it only while none is configured — the in-process direction the MassTransit bridge needs, because a configured `BaseUrl` means the application runs published with no test harness here. `Tap` declares the destinations this suite awaits, in code, so an adapter can bind each test's tap during setup — see [Destinations](#destinations). `Declare` declares the destinations this suite owns, in code, so an adapter creates them during setup before any tap binds — see [Suite-owned topology](#suite-owned-topology). `AddMessaging` registers the options, the `ProtoMessageClient` initializer for every test, the run-scoped `messaging:broker` resource, and — only when an adapter is configured — the `Messaging` capability with kind `broker`.
 
 A repeated `AddMessaging` is not a no-op: its `configure` callback always runs, so a later call can add an adapter to an adapter-less first call or extend attachment options. Infrastructure stays idempotent — one options object, one broker holder, one initializer, one capability and one run resource — and the first adapter configured wins. A call whose `configure` throws leaves no guard behind, so a later successful call still composes.
 
@@ -199,6 +207,10 @@ builder.AddMessaging(messaging => messaging
 ```
 
 `AddInfrastructure` starts the container with the host and fills every key with the started connection string, so the adapter and the application under test reach the same broker. It starts before any test-level skip condition is evaluated, so a machine without a container runtime fails the run at start. `RabbitMqBroker.Container()` creates the resource without starting it; `Start()` starts now or throws with the reason; `TryStart(configure)` reports the reason in its result instead, for a fixture that decides before registering infrastructure. The default image is `rabbitmq:3`, configurable through the builder passed to `Container`. Registering with `AddResource` only owns the release — it neither starts the container nor fills settings. With no application initializer to declare the event exchanges, the suite declares its own with `Declare` (see [Suite-owned topology](#suite-owned-topology)) — no raw broker client in the suite.
+
+### MassTransit bridge
+
+An application that composes `AddMassTransitTestHarness` can be the broker itself: `ProtoTest.Messaging.MassTransit` publishes and awaits over the application's in-process `ITestHarness`, so the events the application publishes through its own `IPublishEndpoint` are the ones a test awaits. A destination names a message contract type (its full name, short name or `urn:message:` URN); `Declare` is a no-op because MassTransit owns message topology; and the `Broker` capability is declared only while the application's `BaseUrl` is not configured, so a published application skips instead of failing. For a published application - or any suite that talks to the broker itself - the package's `MassTransitEnvelope` builds and reads the MassTransit wire envelope (`application/vnd.masstransit+json`) through whichever adapter is configured, no harness needed. The [MassTransit page](./masstransit.md) has the registration, the ordering rule, the envelope interop and the limits. There is no container package for the bus: MassTransit is a bus library, not a server, so a harness-mode suite needs none, and an envelope-mode suite over RabbitMQ starts `ProtoTest.Messaging.RabbitMq.Testcontainers` (see [Owning a broker](#owning-a-broker)).
 
 ### Attachments
 

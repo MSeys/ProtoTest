@@ -27,7 +27,9 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
             position = _position;
         }
 
-        return new ValueTask<IProtoMessageConsumer>(new InMemoryProtoMessageConsumer(this, position));
+        // The consumer may match from the next position on: everything published before it belongs to
+        // an earlier test.
+        return new ValueTask<IProtoMessageConsumer>(new InMemoryProtoMessageConsumer(this, position + 1));
     }
 
     public ValueTask PublishAsync(ProtoMessage message, CancellationToken cancellationToken = default)
@@ -59,57 +61,17 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
         return ValueTask.CompletedTask;
     }
 
-    /// <summary>Returns the first message after <paramref name="position"/> that matches, or null.</summary>
-    private MatchedMessage? Find(
-        string destination,
-        Func<ProtoMessage, bool> predicate,
-        long position,
-        HashSet<long> consumed)
-    {
-        Entry[] candidates;
-        lock (_gate)
-        {
-            candidates = [.. _messages.Where(entry => entry.Position > position)];
-        }
-
-        foreach (var entry in candidates)
-        {
-            if (consumed.Contains(entry.Position))
-            {
-                continue;
-            }
-
-            if (!string.Equals(entry.Message.Destination, destination, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            if (predicate(entry.Message))
-            {
-                return new MatchedMessage(entry.Message, entry.Position);
-            }
-        }
-
-        return null;
-    }
-
     private static TaskCompletionSource NewSignal()
         => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private readonly record struct Entry(long Position, ProtoMessage Message);
 
-    private readonly record struct MatchedMessage(ProtoMessage Message, long Position);
-
-    private sealed class InMemoryProtoMessageConsumer(InMemoryProtoMessageBroker broker, long afterPosition)
+    private sealed class InMemoryProtoMessageConsumer(InMemoryProtoMessageBroker broker, long position)
         : IProtoMessageConsumer
     {
-        // One consumer serves one await at a time, in call order, and a matched message is consumed
-        // exactly once. A delivery that matched no awaited predicate stays in the history, so a later
-        // await on this consumer can still match it and two concurrent awaits cannot steal each
-        // other's messages. Both fields are only touched while _awaitGate is held.
-        private readonly SemaphoreSlim _awaitGate = new(1, 1);
-        private readonly HashSet<long> _consumed = [];
-        private readonly long _position = afterPosition;
+        // The queue owns the await gate, the position and the consumed set; the source is the broker's
+        // shared history, so the consumer itself carries no await state.
+        private readonly ProtoMessageAwaitQueue _queue = new(position);
 
         public ValueTask PrepareAsync(
             IReadOnlyCollection<string> destinations,
@@ -119,77 +81,60 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
             return ValueTask.CompletedTask;
         }
 
-        public async ValueTask<ProtoMessage> AwaitAsync(
+        public ValueTask<ProtoMessage> AwaitAsync(
             string destination,
             Func<ProtoMessage, bool> predicate,
             TimeSpan timeout,
             CancellationToken cancellationToken = default)
-        {
-            await _awaitGate.WaitAsync(cancellationToken);
-            try
-            {
-                var matched = await AwaitMatchAsync(
-                    destination,
-                    predicate,
-                    timeout,
-                    _position,
-                    cancellationToken);
-                // A match is consumed: a later await on this consumer never matches it again, exactly
-                // like an auto-acking RabbitMQ tap.
-                _consumed.Add(matched.Position);
-                return matched.Message;
-            }
-            finally
-            {
-                _awaitGate.Release();
-            }
-        }
+            => _queue.AwaitAsync(destination, predicate, timeout, cancellationToken, () => new Source(broker));
 
-        private async ValueTask<MatchedMessage> AwaitMatchAsync(
-            string destination,
-            Func<ProtoMessage, bool> predicate,
-            TimeSpan timeout,
-            long position,
-            CancellationToken cancellationToken)
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        /// <summary>
+        /// The broker's history as an await source: a snapshot copies the messages at or after the
+        /// awaited position and carries the publish signal captured before the copy, so a publish that
+        /// lands during the scan completes the next wait instead of waiting for the deadline.
+        /// </summary>
+        private sealed class Source(InMemoryProtoMessageBroker broker) : IProtoMessageAwaitSource
         {
-            var deadline = DateTime.UtcNow + timeout;
-            while (true)
+            public ValueTask<ProtoMessageAwaitSnapshot> SnapshotAsync(
+                string destination,
+                long position,
+                CancellationToken cancellationToken)
             {
-                Task signal;
+                cancellationToken.ThrowIfCancellationRequested();
+                Task changed;
+                List<ProtoMessageAwaitEntry> candidates = [];
                 lock (broker._gate)
                 {
-                    // The signal is captured before the scan: a publish that lands in between completes
+                    // The signal is captured before the copy: a publish that lands in between completes
                     // this signal, so the wait cannot miss it, and one that landed before it is already
-                    // in the history the scan reads.
-                    signal = broker._published.Task;
-                }
-
-                if (broker.Find(destination, predicate, position, _consumed) is { } matched)
-                {
-                    return matched;
-                }
-
-                var remaining = deadline - DateTime.UtcNow;
-                if (remaining <= TimeSpan.Zero)
-                {
-                    // A match assigned at the same instant the deadline passes must win, never time out.
-                    if (broker.Find(destination, predicate, position, _consumed) is { } lateMatch)
+                    // in the history the copy reads.
+                    changed = broker._published.Task;
+                    foreach (var entry in broker._messages)
                     {
-                        return lateMatch;
+                        if (entry.Position >= position &&
+                            string.Equals(entry.Message.Destination, destination, StringComparison.Ordinal))
+                        {
+                            candidates.Add(new ProtoMessageAwaitEntry(entry.Position, entry.Message));
+                        }
                     }
-
-                    throw new TimeoutException(
-                        $"No message matching the predicate arrived on '{destination}' within {timeout.TotalSeconds:0.###}s.");
                 }
 
-                var timeoutTask = Task.Delay(remaining, CancellationToken.None);
-                var cancellation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                using var registration = cancellationToken.Register(() => cancellation.TrySetResult());
-                await Task.WhenAny(signal, timeoutTask, cancellation.Task);
+                return new(new ProtoMessageAwaitSnapshot(candidates, changed));
+            }
+
+            public async ValueTask WaitAsync(
+                ProtoMessageAwaitSnapshot snapshot,
+                TimeSpan remaining,
+                CancellationToken cancellationToken)
+            {
+                var delay = Task.Delay(remaining, CancellationToken.None);
+                var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                using var registration = cancellationToken.Register(() => cancelled.TrySetResult());
+                await Task.WhenAny(snapshot.Changed ?? delay, delay, cancelled.Task).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
             }
         }
-
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

@@ -31,8 +31,12 @@ Copy the shape of `ProtoTest.Messaging` or `ProtoTest.Devices` (small) or `Proto
    → skip, never a setup failure) — `AddSql`/`SqlOptions.AddressKeys`, `AddEntityFrameworkCore` (same
    keys) and `UseRabbitMq` are the canonical examples — and `AddCapabilityUnlessConfigured` when the
    environment already provides what the integration would start (`AddAspNetCoreServer`, the in-process
-   device transport). That is the P4f consumer rule (audit ADDR-1). A missing address must produce a
-   skip, not a setup failure.
+   device transport, and the MassTransit bridge's `UseMassTransit<TProgram>`, whose harness exists only
+   while the application is hosted in-process). That is the P4f consumer rule (audit ADDR-1). A missing
+   address must produce a skip, not a setup failure.
+   The messaging seam has both directions: `UseBroker(factory, addressKeys)` declares the `Broker`
+   capability while a key can provide the address, `UseBrokerUnlessConfigured(factory, addressKeys)`
+   while none is configured.
 4. Options implement `IProtoConfigurableOptions` with a section name and `Validate()`; register through
    `ProtoOptionsRegistration.Configure` (callbacks compose, configuration binds over them).
 5. Trace vocabulary: one trace-source constant, operation names and observation kinds as constants at

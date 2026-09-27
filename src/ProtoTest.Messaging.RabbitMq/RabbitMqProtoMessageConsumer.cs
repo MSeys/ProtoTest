@@ -6,6 +6,7 @@ using global::RabbitMQ.Client;
 using global::RabbitMQ.Client.Events;
 using global::RabbitMQ.Client.Exceptions;
 using ProtoTest.Messaging;
+using ProtoTest.Messaging.Internal;
 
 /// <summary>
 /// One test's RabbitMQ consumer: an exclusive, auto-delete tap queue per destination, each on its own
@@ -14,16 +15,16 @@ using ProtoTest.Messaging;
 /// that cannot be declared - a missing exchange closes its channel - from poisoning the taps that were
 /// already prepared. Prepared queues are declared before the act; a destination that was never prepared
 /// is declared just in time at the first await, which only sees messages published after the await
-/// begins. Awaits on one consumer serialize in call order, and a delivery that matches no awaited
-/// predicate is buffered and offered to a later await instead of being discarded, so concurrent awaits
-/// neither lose nor steal each other's messages. All queues are deleted when the consumer is disposed
-/// with the test, and an exclusive queue never competes with the application's own consumers.
+/// begins. The shared await queue serializes awaits in call order and keeps a delivery that matched no
+/// awaited predicate for a later await, so concurrent awaits neither lose nor steal each other's
+/// messages. All queues are deleted when the consumer is disposed with the test, and an exclusive queue
+/// never competes with the application's own consumers.
 /// </summary>
 internal sealed class RabbitMqProtoMessageConsumer : IProtoMessageConsumer
 {
     private readonly RabbitMqMessageBroker _broker;
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private readonly SemaphoreSlim _awaitGate = new(1, 1);
+    private readonly ProtoMessageAwaitQueue _queue = new(0);
     private readonly Dictionary<string, Tap> _taps = new(StringComparer.Ordinal);
     private bool _disposed;
 
@@ -78,65 +79,9 @@ internal sealed class RabbitMqProtoMessageConsumer : IProtoMessageConsumer
             _gate.Release();
         }
 
-        // Awaits serialize on _awaitGate: the active one inspects the deliveries no earlier await
-        // matched first, then reads new ones. A delivery that does not match stays in the tap's
-        // buffer instead of being discarded, so the waiter it belongs to still finds it.
-        await _awaitGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            var deadline = DateTime.UtcNow + timeout;
-            var scanned = 0;
-            while (true)
-            {
-                while (scanned < tap.Buffered.Count)
-                {
-                    var candidate = tap.Buffered[scanned];
-                    if (predicate(candidate))
-                    {
-                        tap.Buffered.RemoveAt(scanned);
-                        return candidate;
-                    }
-
-                    scanned++;
-                }
-
-                var remaining = deadline - DateTime.UtcNow;
-                if (remaining <= TimeSpan.Zero)
-                {
-                    throw Timeout(destination, timeout);
-                }
-
-                ProtoMessage message;
-                using var expiry = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                expiry.CancelAfter(remaining);
-                try
-                {
-                    message = await tap.Deliveries.ReadAsync(expiry.Token).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-                {
-                    // A delivery assigned at the same instant the deadline passes must win, never be
-                    // dropped: inspect one already-consumed delivery before giving up on the timeout.
-                    if (tap.Deliveries.TryRead(out var late))
-                    {
-                        if (predicate(late))
-                        {
-                            return late;
-                        }
-
-                        tap.Buffered.Add(late);
-                    }
-
-                    throw Timeout(destination, timeout);
-                }
-
-                tap.Buffered.Add(message);
-            }
-        }
-        finally
-        {
-            _awaitGate.Release();
-        }
+        // The shared queue owns the serialization and the consumed set; the source scans the tap's log
+        // and reads new deliveries from its channel.
+        return await _queue.AwaitAsync(destination, predicate, timeout, cancellationToken, () => new Source(tap)).ConfigureAwait(false);
     }
 
     public async ValueTask DisposeAsync()
@@ -184,9 +129,6 @@ internal sealed class RabbitMqProtoMessageConsumer : IProtoMessageConsumer
         }
     }
 
-    private static TimeoutException Timeout(string destination, TimeSpan timeout)
-        => new($"No message matching the predicate arrived on '{destination}' within {timeout.TotalSeconds:0.###}s.");
-
     private async Task<Tap> DeclareAsync(string destination, CancellationToken cancellationToken)
     {
         // One channel per tap: a destination whose exchange is missing closes its own channel on the
@@ -225,9 +167,9 @@ internal sealed class RabbitMqProtoMessageConsumer : IProtoMessageConsumer
 
         var deliveries = Channel.CreateUnbounded<ProtoMessage>(new UnboundedChannelOptions
         {
-            // Awaits serialize on _awaitGate, but the channel stays honest without it: a second reader
-            // must be possible, because a silent SingleReader violation is what let a racing await
-            // consume the delivery another await owned.
+            // Awaits serialize on the consumer's await queue, but the channel stays honest without it:
+            // a second reader must be possible, because a silent SingleReader violation is what let a
+            // racing await consume the delivery another await owned.
             SingleReader = false,
             SingleWriter = false
         });
@@ -297,12 +239,73 @@ internal sealed class RabbitMqProtoMessageConsumer : IProtoMessageConsumer
             properties.ContentType);
     }
 
-    private sealed record Tap(string Queue, ChannelReader<ProtoMessage> Deliveries, IChannel Channel)
+    /// <summary>
+    /// One destination's tap: the queue that was declared for the test, its delivery channel and
+    /// channel, and the log of every delivery the tap has read. The log is append-only and positions
+    /// are the log indices; a delivery that matched an await is consumed by the shared queue, so an
+    /// unmatched one stays for a later await.
+    /// </summary>
+    private sealed class Tap(string queue, ChannelReader<ProtoMessage> deliveries, IChannel channel)
     {
-        /// <summary>
-        /// Deliveries read by an await whose predicate did not match. They are not consumed and a later
-        /// await on the same consumer still inspects them, so a racing await cannot steal them.
-        /// </summary>
-        public List<ProtoMessage> Buffered { get; } = [];
+        public string Queue { get; } = queue;
+
+        public ChannelReader<ProtoMessage> Deliveries { get; } = deliveries;
+
+        public IChannel Channel { get; } = channel;
+
+        public List<ProtoMessage> Log { get; } = [];
+
+        public void Append(ProtoMessage message) => Log.Add(message);
+    }
+
+    /// <summary>
+    /// The tap's log and channel as an await source: a snapshot reads the log, and the wait reads one
+    /// delivery from the channel within the remaining time, appending whatever it read - including a
+    /// delivery assigned at the same instant as the deadline, which the queue's post-deadline scan
+    /// still sees.
+    /// </summary>
+    private sealed class Source(Tap tap) : IProtoMessageAwaitSource
+    {
+        public ValueTask<ProtoMessageAwaitSnapshot> SnapshotAsync(
+            string destination,
+            long position,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var log = tap.Log;
+            var candidates = new List<ProtoMessageAwaitEntry>(log.Count);
+            for (var index = 0; index < log.Count; index++)
+            {
+                if (index >= position)
+                {
+                    candidates.Add(new ProtoMessageAwaitEntry(index, log[index]));
+                }
+            }
+
+            return new(new ProtoMessageAwaitSnapshot(candidates, Changed: null));
+        }
+
+        public async ValueTask WaitAsync(
+            ProtoMessageAwaitSnapshot snapshot,
+            TimeSpan remaining,
+            CancellationToken cancellationToken)
+        {
+            using var expiry = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            expiry.CancelAfter(remaining);
+            try
+            {
+                tap.Append(await tap.Deliveries.ReadAsync(expiry.Token).ConfigureAwait(false));
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // A delivery assigned at the same instant the deadline passes must win, never be
+                // dropped: append whatever the channel still holds, so the queue's post-deadline scan
+                // gives it its chance before the await times out.
+                if (tap.Deliveries.TryRead(out var late))
+                {
+                    tap.Append(late);
+                }
+            }
+        }
     }
 }

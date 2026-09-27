@@ -19,7 +19,7 @@ The current line is in progress. Everything below is committed to 1.1, in this o
 - **Shape and truth:** the package review — a package exists only when a consumer can reference it directly or it isolates a dependency — and the one tiny package retired into the docs.
 - **Devices on a real product:** the reference demo's OCPP gateway and charge-point simulator, and the WebSocket device backend proven on it.
 - **Product surface:** the demo's dashboard, browser journeys, and the monthly export through Sheets.
-- **More layers testable:** per-test service substitution and fault injection, expected/exhaustive shape assertions, traffic coverage (fields that arrived as *observed but unasserted*), `Should` vocabulary parity, a built-in test user, WireMock and Aspire integrations, and template `--runner` variants.
+- **More layers testable:** per-test service substitution and fault injection, expected/exhaustive shape assertions, traffic coverage (fields that arrived as *observed but unasserted*), `Should` vocabulary parity, a built-in test user, WireMock, Aspire and MassTransit integrations, and template `--runner` variants.
 - **Topology under test:** container topology, deployed mode, fault injection, and a nightly reference run.
 - **A second device protocol:** MQTT, after OCPP proves the transport model.
 - **Agent and sharing layer:** the `ProtoTest.Mcp` tool over traces and reports, a GitHub Action that posts the failure digest and trace link, the static trace index, and the docs and skills page.
@@ -32,8 +32,7 @@ Each item is in the internal plan with acceptance criteria; when one ships, it l
 
 ## Exploring — genuinely considered, not committed
 
-- **MassTransit bridge** - wrapping `ITestHarness` in the existing messaging client surface, the way other integrations wrap their libraries.
-- **Wolverine.Tracking bridge** - the same shape, only if users ask for it.
+- **Wolverine.Tracking bridge** - the same shape as the MassTransit bridge, only if users ask for it.
 - **Allure and ReportPortal sinks** - built on the existing sink contract; community-friendly once the integration template exists.
 - **Further device transports** (TCP, serial, Sigfox) and MQTT variants - after the first OCPP suite and the MQTT backend have real users.
 

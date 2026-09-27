@@ -21,6 +21,12 @@ public sealed class ProtoMessagingBuilder
     internal IReadOnlyList<string> BrokerAddressKeys { get; private set; } = [];
 
     /// <summary>
+    /// How <see cref="BrokerAddressKeys"/> decides the <c>Broker</c> capability: an adapter whose
+    /// address must exist, or one that serves only while the environment does not provide it.
+    /// </summary>
+    internal ProtoBrokerAddressRule BrokerAddressRule { get; private set; } = ProtoBrokerAddressRule.AddressRequired;
+
+    /// <summary>
     /// Replaces the default in-memory broker with an adapter, for example RabbitMQ. The broker the
     /// factory returns is owned by ProtoTest: it is released with the run.
     /// </summary>
@@ -43,6 +49,27 @@ public sealed class ProtoMessagingBuilder
         ArgumentNullException.ThrowIfNull(factory);
         AdapterFactory = factory;
         BrokerAddressKeys = addressKeys ?? [];
+        BrokerAddressRule = ProtoBrokerAddressRule.AddressRequired;
+        return this;
+    }
+
+    /// <summary>
+    /// Replaces the default in-memory broker with an adapter that serves only while
+    /// <paramref name="addressKeys"/> are <b>not</b> configured - an in-process resource whose
+    /// address being configured means the environment provides it elsewhere. The <c>Broker</c>
+    /// capability is declared only while no key is configured, so a run that configures one skips
+    /// instead of advertising an adapter that cannot serve; the MassTransit bridge over the
+    /// application's in-process test harness is the example. The broker the factory returns is owned
+    /// by ProtoTest: it is released with the run.
+    /// </summary>
+    public ProtoMessagingBuilder UseBrokerUnlessConfigured(
+        Func<IServiceProvider, IProtoMessageBroker> factory,
+        params string[] addressKeys)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        AdapterFactory = factory;
+        BrokerAddressKeys = addressKeys ?? [];
+        BrokerAddressRule = ProtoBrokerAddressRule.AddressAbsent;
         return this;
     }
 
@@ -155,7 +182,10 @@ public static class ProtoHostBuilderExtensions
     /// declares its address keys (see
     /// <see cref="ProtoMessagingBuilder.UseBroker(Func{IServiceProvider, IProtoMessageBroker}, string[])"/>)
     /// declares the capability conditionally: it is absent while no key can provide the address, so
-    /// <c>[RequiresCapability(ProtoCapabilityKinds.Broker)]</c> skips instead of failing.
+    /// <c>[RequiresCapability(ProtoCapabilityKinds.Broker)]</c> skips instead of failing. An adapter
+    /// that serves only while the address is absent
+    /// (see <see cref="ProtoMessagingBuilder.UseBrokerUnlessConfigured"/>) declares it the other way:
+    /// it is absent once a key is configured.
     /// </summary>
     /// <remarks>
     /// A repeated call is not a no-op: its <c>configure</c> callback always runs, so a later call can add
@@ -195,12 +225,17 @@ public static class ProtoHostBuilderExtensions
             // double, so [RequiresCapability(ProtoCapabilityKinds.Broker)] skips where no broker is
             // reachable and runs where one is, instead of always passing against the double. An
             // adapter that names its address keys is honest in both directions: a run with neither a
-            // configured value nor a piece that declares one drops the capability and skips.
+            // configured value nor a piece that declares one drops the capability and skips, and an
+            // in-process adapter drops it when the environment provides the address it would use.
             var capability = new ProtoCapabilityDescriptor(
                 ProtoMessagingProtocol.Protocol.Name, ProtoCapabilityKinds.Broker, ProtoMessagingProtocol.Protocol.TraceSource);
             if (messaging.BrokerAddressKeys.Count == 0)
             {
                 builder.AddCapability(capability);
+            }
+            else if (messaging.BrokerAddressRule == ProtoBrokerAddressRule.AddressAbsent)
+            {
+                builder.AddCapabilityUnlessConfigured(capability, [.. messaging.BrokerAddressKeys]);
             }
             else
             {
@@ -278,4 +313,14 @@ public static class ProtoHostBuilderExtensions
             return false;
         }
     }
+}
+
+/// <summary>How a configured adapter's address keys decide the <c>Broker</c> capability.</summary>
+internal enum ProtoBrokerAddressRule
+{
+    /// <summary>The adapter needs an address: the capability is declared while a key can provide one.</summary>
+    AddressRequired,
+
+    /// <summary>The adapter serves only while the address is absent: the capability drops once a key is configured.</summary>
+    AddressAbsent
 }

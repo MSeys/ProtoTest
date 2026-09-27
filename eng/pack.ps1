@@ -57,6 +57,7 @@ $packages = @(
     "src/ProtoTest.Devices.WebSocket/ProtoTest.Devices.WebSocket.csproj",
     "src/ProtoTest.Devices.WebSocket.AspNetCore/ProtoTest.Devices.WebSocket.AspNetCore.csproj",
     "src/ProtoTest.Hosting/ProtoTest.Hosting.csproj",
+    "src/ProtoTest.Aspire/ProtoTest.Aspire.csproj",
     "src/ProtoTest.OpenApi/ProtoTest.OpenApi.csproj",
     "src/ProtoTest.Reporting/ProtoTest.Reporting.csproj",
     "src/ProtoTest.Traces/ProtoTest.Traces.csproj",
@@ -64,6 +65,7 @@ $packages = @(
     "src/ProtoTest.Web/ProtoTest.Web.csproj",
     "src/ProtoTest.Web.Playwright/ProtoTest.Web.Playwright.csproj",
     "src/ProtoTest.Web.Selenium/ProtoTest.Web.Selenium.csproj",
+    "src/ProtoTest.WireMock/ProtoTest.WireMock.csproj",
     "src/ProtoTest.Templates/ProtoTest.Templates.csproj",
     "src/ProtoTest.Cli/ProtoTest.Cli.csproj",
     "src/ProtoTest.Analyzers/ProtoTest.Analyzers.csproj"

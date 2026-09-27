@@ -147,6 +147,22 @@ public abstract class ProtoHttpResponse : IDisposable
         JsonSerializerOptions? options,
         IReadOnlyDictionary<string, string?> extraAttributes,
         Func<IReadOnlyList<string>, ProtoObservation?> observation)
+        => AssertShape(source, title, actualJson, expectedShape, options, extraAttributes, observation, exact: false);
+
+    /// <summary>
+    /// Asserts a JSON body's shape through the shared matcher; see
+    /// <see cref="AssertShape(string, string, string?, object, JsonSerializerOptions?, IReadOnlyDictionary{string, string?}, Func{IReadOnlyList{string}, ProtoObservation?})"/>.
+    /// In exact mode a field present in the body that the shape does not mention is a mismatch.
+    /// </summary>
+    protected void AssertShape(
+        string source,
+        string title,
+        string? actualJson,
+        object expectedShape,
+        JsonSerializerOptions? options,
+        IReadOnlyDictionary<string, string?> extraAttributes,
+        Func<IReadOnlyList<string>, ProtoObservation?> observation,
+        bool exact)
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
         var attachmentName = NextExpectedShapeAttachmentName();
@@ -159,7 +175,10 @@ public abstract class ProtoHttpResponse : IDisposable
                 ExtraAttributes: extraAttributes,
                 CaptureExpectedShape: attachmentName is not null,
                 AttachmentName: attachmentName,
-                AttachmentDescription: Identifier),
+                AttachmentDescription: Identifier)
+            {
+                Exact = exact
+            },
             actualJson,
             expectedShape,
             options,

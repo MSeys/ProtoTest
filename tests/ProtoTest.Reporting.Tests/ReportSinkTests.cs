@@ -139,6 +139,39 @@ public sealed class ReportSinkTests
     }
 
     [Test]
+    public async Task HtmlSink_ShouldRenderTrafficItemsInTheirOwnSection()
+    {
+        var directory = CreateTempDirectory();
+        var path = Path.Combine(directory, "report.html");
+        try
+        {
+            var items = new[]
+            {
+                new ProtoReportItem("Orders", "REST traffic", "GET /orders/{id} · 200",
+                    ProtoReportItemKinds.Traffic, ProtoReportStatus.Neutral,
+                    Message: "Fields that arrived in a response but no shape assertion mentioned.",
+                    Children:
+                    [
+                        new ProtoReportItem("Orders", "REST traffic", "$.name",
+                            ProtoReportItemKinds.Traffic, ProtoReportStatus.Neutral, IsCovered: false)
+                    ])
+            };
+            var sink = new HtmlReportSink(new HtmlReportSinkOptions { OutputPath = path });
+
+            await sink.ExportAsync(items);
+
+            var html = await File.ReadAllTextAsync(path);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(html, Does.Contain("data-report-section data-kind=\"traffic\""));
+                Assert.That(html, Does.Contain(">Traffic (observed but unasserted)</h3>"));
+                Assert.That(html, Does.Contain("$.name"));
+            }
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
     public async Task HtmlSink_ShouldGiveAnUnknownKindItsOwnSection()
     {
         var directory = CreateTempDirectory();

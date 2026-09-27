@@ -31,6 +31,7 @@ builder
 | Collector | Reports |
 | --- | --- |
 | `RestCoverageCollector` | every REST endpoint your suite called, with hit counts |
+| `RestTrafficCoverageCollector` | the fields that arrived in REST responses but that no shape assertion mentioned, in their own section (opt-in; never counted as covered) |
 | [`OpenApiCoverageCollector`](../integrations/openapi.md) | the **whole** OpenAPI document: endpoints → responses → response properties, covered or not |
 | [GraphQL schema coverage](../integrations/graphql/coverage.md) | the whole schema: types → fields → arguments, and input types → input fields |
 | `GrpcCoverageCollector` | every gRPC service/method your suite called, from the client's `grpc.response` observations (a failed call records `grpc.failure` and does not count as covered) |
@@ -62,6 +63,33 @@ The summary at the top of each report gives the total, covered and uncovered cou
 :::tip[Coverage rewards shape assertions]
 Property coverage comes from the paths `Should.MatchShape` matched. A test that only checks the status code covers the endpoint and the status, but none of the fields. That's deliberate — a field nobody asserts is a field that can break silently.
 :::
+
+## Traffic coverage (observed but unasserted)
+
+`RestCoverageCollector` counts the routes your suite called; traffic coverage looks inside the responses. It reports the fields that arrived in a response and that **no shape assertion mentioned**, in its own report section. It is opt-in:
+
+```csharp
+builder.AddRest(rest => rest
+    .AddClient("Api")
+    .AddCollector<RestTrafficCoverageCollector>());
+```
+
+```
+Traffic (observed but unasserted)
+REST traffic  GET /api/v1/organizations/{id} · 200
+              └ $.seatCount
+              └ $.owner.email
+```
+
+Observed fields never count as covered — that is the point. The report's coverage percentage, the run gates and the OpenAPI property table keep counting only what an assertion matched, so a field can appear here and still be uncovered there. The section is built from the observations the run already records: response bodies (`http.response`) and the matched paths of shape assertions (`http.contract.shape`).
+
+The rules, so the section is read correctly:
+
+- The comparison is per method, route template and status code. A field any shape mentioned for that same combination counts as asserted for the run.
+- A response no shape touched reports all of its fields — that is the gap the endpoint-level report cannot show.
+- `JsonValue.Any()`/`NotNull()` mention the whole value but not the fields inside it, so those fields appear here.
+- The collector reads the sanitized bodies the trace already carries; a body truncated by the diagnostic cap cannot be analyzed and contributes nothing.
+- A shape assertion made without an execution context records no structured route and cannot claim a field.
 
 ## How it works
 
@@ -193,7 +221,7 @@ public sealed record ProtoReportItem(
     string? DisplayGroup = null);
 ```
 
-Items nest through `Children`, and the kinds cover more than coverage: a `Metric` with a `Value` and `Unit`, or a `Finding` with a `Warning` status and a `Message`, show up in the same reports. A kind is an open string, so an integration can define its own; the built-in ones are named by `ProtoReportItemKinds`. The HTML report keeps the kinds in their own sections — coverage, findings, run gates, resources, run metadata — and gives an unknown kind its own section titled after it, so a passed gate is never read as a finding.
+Items nest through `Children`, and the kinds cover more than coverage: a `Metric` with a `Value` and `Unit`, or a `Finding` with a `Warning` status and a `Message`, show up in the same reports. A kind is an open string, so an integration can define its own; the built-in ones are named by `ProtoReportItemKinds`. The HTML report keeps the kinds in their own sections — coverage, traffic, findings, run gates, resources, run metadata — and gives an unknown kind its own section titled after it, so a passed gate is never read as a finding.
 
 ## Links
 

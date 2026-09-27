@@ -105,6 +105,59 @@ When several of these apply, this is what wins:
 
 The REST and GraphQL lifecycle hooks (`ProtoHookOrder.Authentication`) resolve the attributes before each test and record a `Auth` entity state under the protocol name with `auth.source` (`method`, `class` or `none`), `auth.count` and `auth.types`. Per request, the applied authenticator is recorded on the request operation: `auth.outcome` is `applied` or `skipped`, with `auth.type` when applied. Header **values** are never traced; the trace records the header count and each header's name with `http.header.value_recorded=false`.
 
+## Built-in test user
+
+When the application under test runs in-process and a test only needs "this request arrives as a signed-in user", the shipped test user replaces hand-written token plumbing. Declare the identity on the test:
+
+```csharp
+[ProtoTest]
+[SignedInAs("alice", "Administrator", "Billing", Claims = new[] { "tenant=northstar" })]
+public async Task AdministratorsCanCreateProjects()
+{
+    var user = Proto.Context.SignedInUser();   // alice · Administrator, Billing · tenant=northstar
+    using var response = await Proto.Context.Rest().PostAsync("/api/projects");
+}
+```
+
+| Piece | What it does |
+| --- | --- |
+| `[SignedInAs(name, roles…)]` | Declares the identity; roles follow the name, `Claims` adds `type=value` entries. Everything is constant attribute data - declare names, not secrets. |
+| `context.SignIn(user)` | The same identity from the test body; it replaces the declared one for the rest of the test. |
+| `context.SignedInUser()` | Reads it, or throws naming both ways to get one. |
+| `TestUserAuthenticator` | The authenticator the declaration composes; it writes the `ProtoTest-User` header (Base64 JSON) on each request. |
+
+The identity rides the existing pipeline: REST, GraphQL and gRPC requests carry it, and the protocol's `Auth` entity names `SignedInAsAttribute` among its authenticators. A method-level `[SignedInAs]` **composes** with a class-level `[Auth<T>]` instead of replacing it (the method-over-class replacement is for `[Auth<T>]`), so a class can own the "how" while a method names the "who".
+
+### The app side
+
+The header means something only to an application that opts in to read it. Add the shipped authentication inside the application's web-host callback:
+
+```csharp
+builder.AddApplication("Api", app => app
+    .AddAspNetCoreServer<Program>(webHost => webHost.AddTestUserAuthentication())
+    .AddRest(rest => rest.AddClient("Api")));
+```
+
+It decodes the header into the application's `ClaimsPrincipal` - the name, a `ClaimTypes.Role` per role, and your custom claims - and becomes the application's default authentication scheme, so the application's own `[Authorize]`, `[Authorize(Roles = "…")]` and policies decide exactly as in production:
+
+```csharp
+[SignedInAs("alice", "admin")]
+public async Task AdministratorsCanCreateProjects() { /* 201 */ }
+
+[SignedInAs("alice", "viewer")]
+public async Task ViewersCannotCreateProjects() { /* 403 */ }
+```
+
+The identity is per-test state: the next test starts with none, and parallel tests never share one. The trace records an `auth` entity with id `auth:user` (name, roles, claim **types**, application) plus an `auth.user.sign-in` event.
+
+### Limits
+
+- **In-process only.** The shipped handler is installed into the test host; against a published application the request goes out unchanged and the trace marks `auth.transport = inert` with the reason. A suite whose published environment accepts the identity declares its own `[Auth<T>]` authenticator that reads `context.SignedInUser()`.
+- **It replaces the application's default authentication scheme.** Register `AddTestUserAuthentication` where a test user stands in for the application's own authentication, not in a suite whose subject is that authentication; the application's named schemes still serve endpoints that ask for them explicitly with `[Authorize(AuthenticationSchemes = "…")]`.
+- **The header is not a credential.** It carries test data only, and an application that never registers the handler ignores it and stays anonymous - the test's own assertions fail instead of silently passing. The handler trusts any well-formed header on an in-process request, so register it only where a test user stands in for the application's own authentication; a malformed or oversized value fails authentication and the request stays anonymous.
+- **Claim values stay off the trace.** They travel in the header; the `auth:user` entity records the name, roles and claim *types*, never the values, and a gRPC call's `prototest-user` metadata is redacted in the trace.
+- **One identity per test.** Declaring it twice replaces, not merges. A test that needs several simultaneous identities keeps using `.Auth(...)` per request or the application's own provisioning.
+
 ## Writing your own
 
 Most real suites need one. Here's the one from the sample app, which authenticates as whichever user the test's `[SampleUser]` attribute created:

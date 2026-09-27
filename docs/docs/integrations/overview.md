@@ -9,7 +9,7 @@ import StackBuilder from '@site/src/components/StackBuilder';
 
 # Integrations overview
 
-Each integration is a NuGet package that joins the foundation: most bring a client to `ProtoExecutionContext`, others contribute collectors, resources or host capabilities. They all share the [foundation](../foundation/overview.md) — lifecycle, attributes, attachments, tracing, coverage — so using several in one test doesn't mean learning several models. Every library and runner package targets .NET 8, 9 and 10 and is stable on NuGet, so `dotnet add package` lines install directly.
+Each integration is a NuGet package that joins the foundation: most bring a client to `ProtoExecutionContext`, others contribute collectors, resources or host capabilities. They all share the [foundation](../foundation/overview.md) - lifecycle, attributes, attachments, tracing, coverage - so using several in one test doesn't mean learning several models. Every library and runner package targets .NET 8, 9 and 10 and is stable on NuGet, so `dotnet add package` lines install directly.
 
 ## Quick start
 
@@ -87,8 +87,10 @@ The composer above gives a suite its direct starting packages. This reference in
 | `ProtoTest.Web` | `dotnet add package ProtoTest.Web` | backend-neutral sessions, page objects, flows, login and page coverage | `Proto.Context.Web()` |
 | `ProtoTest.Web.Playwright` | `dotnet add package ProtoTest.Web.Playwright` | Playwright backend, browser pool and `[RequiresPlaywrightBrowser]` probe | `builder.AddWeb()` |
 | `ProtoTest.Web.Selenium` | `dotnet add package ProtoTest.Web.Selenium` | Selenium backend with its own actionability loop | `builder.AddWeb(createDriver)` |
-| `ProtoTest.AspNetCore` | `dotnet add package ProtoTest.AspNetCore` | in-process ASP.NET Core application, server DI access, page inventory | `Proto.Context.ServerFactory<TProgram>()` |
+| `ProtoTest.AspNetCore` | `dotnet add package ProtoTest.AspNetCore` | in-process ASP.NET Core application, server DI access, page inventory, app-side test-user authentication | `Proto.Context.ServerFactory<TProgram>()`, `webHost.AddTestUserAuthentication()` |
+| `ProtoTest.Aspire` | `dotnet add package ProtoTest.Aspire` | run-scoped Aspire AppHost, resources as application targets | `builder.AddAspireAppHost<TEntryPoint>("api")` |
 | `ProtoTest.OpenApi` | `dotnet add package ProtoTest.OpenApi` | OpenAPI contract coverage over REST response and shape observations | `.AddCollector<OpenApiCoverageCollector>()` |
+| `ProtoTest.WireMock` | `dotnet add package ProtoTest.WireMock` | per-test fake HTTP services with scenario-like stubs, REST-shaped trace evidence and stub coverage | `Proto.Context.WireMock()` |
 | `ProtoTest.Sql.Testcontainers` | `dotnet add package ProtoTest.Sql.Testcontainers` | a PostgreSQL container owned by the run | `builder.AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar")` |
 | `ProtoTest.Messaging.RabbitMq.Testcontainers` | `dotnet add package ProtoTest.Messaging.RabbitMq.Testcontainers` | a RabbitMQ container owned by the run | `builder.AddInfrastructure(RabbitMqBroker.Container(), RabbitMqOptions.ConnectionStringSetting, …)` |
 

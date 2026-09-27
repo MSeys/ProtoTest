@@ -79,6 +79,27 @@ audits carry the finding history.
   name alone (A1R-01 residual): a different `TProgram` under one server name is a silent no-op.
   The in-process device transport compares `(TProgram, application)` (audit DEV-1 fixed).
 
+## HTTP authentication
+
+- **The built-in test user rides the `[Auth]` set but never replaces it.** `[SignedInAs]` implements
+  the same metadata interface as `[Auth<T>]`, yet it is excluded from the method-over-class
+  replacement: a method-level identity keeps the class-level authenticators and composes with them
+  (the class owns the "how", the method names the "who"). The shipped `TestUserAuthenticator` writes
+  the `ProtoTest-User` header only while the test's selected application is hosted in-process;
+  otherwise the request goes out unchanged and the `auth:user` entity carries `auth.transport=inert`
+  with the reason. A published suite that honours the identity itself keeps `[Auth<T>]` and reads
+  `context.SignedInUser()` in its authenticator (the sample's `NorthstarMember`).
+- **The app-side test-user authentication replaces the application's default authentication scheme.**
+  `webHost.AddTestUserAuthentication()` inside `AddAspNetCoreServer` decodes the header into the
+  application's `ClaimsPrincipal` (name, `ClaimTypes.Role` roles, custom claims) and is test-host only
+  and opt-in; without it the header is ignored and the application stays anonymous. A malformed or
+  oversized header fails authentication, so the request stays anonymous instead of producing a 500.
+  Claim values never reach the trace - the `auth:user` entity records the claim types only, and a gRPC
+  call redacts the `prototest-user` metadata through the default sensitive keys.
+- **The identity is per-test state, not a credential.** `context.SignIn(user)` replaces the declared
+  identity for the rest of the test; the next test resolves none until it declares its own. Parallel
+  tests never share one because the state lives on the execution context.
+
 ## Addresses and readiness
 
 - **One address precedence: published settings → configuration, transport last.**
@@ -114,7 +135,10 @@ last error.
   first, it keeps the unconditional capability and the SQL keys are not part of its decision.
 - **Containers must declare every key they fill.** `AddInfrastructure` skips only when *all* declared
   keys are configured; a missing one starts the container anyway (a configured CI without Docker then
-  fails). Check the README recipes for all keys.
+  fails). Check the README recipes for all keys. A started piece whose keys are only partly configured
+  must not publish the configured ones: `AddAspireAppHost` publishes only the declared resource keys
+  configuration does not fill, because a published setting wins over configuration at use time (a
+  multi-resource AppHost in a mixed run would otherwise mask the environment's address).
 - **A containerized application declares no `server` capability.** `ApplicationContainer` publishes an
   address, not an in-process server: `[RequiresInProcess]` skips with its default reason, and a suite
   needing the test host gives the published instance its own application name.
@@ -244,6 +268,15 @@ last error.
   `SingleConnectionListener`) outside that project, so `GetFreePort` or `LazyTemporaryTrace` cannot
   drift back either (audit TST-2/A5-64). The rule is a deny list, not a shape scan: a helper renamed
   completely away from those roots (say `AcquirePort`) is not detected.
+- **A substituting test pays a second server start.** The dedicated per-test server is built with the
+  replacement before the build; a shared per-run server is never reconfigured, so one test's override
+  cannot leak into the next. Substitution in published mode throws naming the address; closed-box
+  harnesses (Aspire) cannot be substituted — choose `AddWorkerHost` white-box tests or Aspire topology
+  runs, not both on one application. The unnamed `[ReplaceService]`/`[FailDependency]` gate follows the
+  test's selected application (falling back to `Default`), the same resolution the substitution uses, so
+  a mixed run that publishes the selected application skips instead of failing setup; a named one gates
+  on its named server. The dedicated server is owned before it starts, so a registration that throws
+  once the test started releasing cannot leak a started server.
 - **A worktree checkout has no built SPA.** `samples/ProtoTest.SampleApp/Ui/dist` is untracked, so the
   demo's console journeys skip in a worktree and a green worktree gate does not cover them; run those
   tests in the main checkout (or build the console there) before trusting a gate on setup or attribute
@@ -269,6 +302,10 @@ last error.
   in-process HTTP client over the `TestServer`'s handler so the test context is its only owner; a
   suite that calls `CreateClient`/`CreateDefaultClient` on `ServerFactory<T>()` from parallel tests
   re-opens that ledger, and its teardown enumeration crashes the run.
+- **A per-run WireMock fake keeps its stubs and request log for the whole run.** Teardown reports only
+  the new requests; it no longer resets the fake, so a stub one test registers still matches in the
+  next and `ReceivedRequests` accumulates. Clear shared state with `Reset()` when a test needs a
+  clean fake, and keep the suite serial while tests share one server.
 - **A test's setup runs inside the per-test transaction.** `ProtoTest.Sql` opens the connection and
   begins the transaction before hooks and attributes run, so DDL in a test hook or body is rolled back
   with the test (the postgres-ef trial: a table created in one test is gone in the next). Run-owned

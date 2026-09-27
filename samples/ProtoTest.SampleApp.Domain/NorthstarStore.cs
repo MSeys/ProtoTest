@@ -28,7 +28,7 @@ internal sealed class NorthstarStore(
     private static readonly TimeSpan RateWindow = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan WebhookBackoff = TimeSpan.FromMilliseconds(150);
 
-    private readonly object _gate = new();
+    private readonly ProtoLock _gate = new();
     private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
 
     public DateTimeOffset Now(Organization organization) => time.GetUtcNow() + organization.ClockOffset;

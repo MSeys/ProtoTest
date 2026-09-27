@@ -92,7 +92,7 @@ public sealed record WorkerMainProbe(
 /// <summary>What the worker's hosted service observed, for tests to assert against.</summary>
 public sealed class WorkerProbe
 {
-    private readonly object _gate = new();
+    private readonly ProtoLock _gate = new();
     private bool _started;
     private bool _stopped;
     private string? _value;

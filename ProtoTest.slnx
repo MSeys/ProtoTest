@@ -13,6 +13,7 @@
     <Project Path="src/ProtoTest.GraphQL/ProtoTest.GraphQL.csproj" Id="81af1d3a-d24c-465e-b1a0-ee742ca6bf6e" />
     <Project Path="src/ProtoTest.Grpc/ProtoTest.Grpc.csproj" Id="f13ed54f-e401-4cd6-ba89-efebd1861e89" />
     <Project Path="src/ProtoTest.Hosting/ProtoTest.Hosting.csproj" />
+    <Project Path="src/ProtoTest.Aspire/ProtoTest.Aspire.csproj" />
     <Project Path="src/ProtoTest.Messaging/ProtoTest.Messaging.csproj" />
     <Project Path="src/ProtoTest.Messaging.RabbitMq/ProtoTest.Messaging.RabbitMq.csproj" />
     <Project Path="src/ProtoTest.Messaging.RabbitMq.Testcontainers/ProtoTest.Messaging.RabbitMq.Testcontainers.csproj" />
@@ -28,6 +29,7 @@
     <Project Path="src/ProtoTest.Web/ProtoTest.Web.csproj" />
     <Project Path="src/ProtoTest.Web.Playwright/ProtoTest.Web.Playwright.csproj" />
     <Project Path="src/ProtoTest.Web.Selenium/ProtoTest.Web.Selenium.csproj" />
+    <Project Path="src/ProtoTest.WireMock/ProtoTest.WireMock.csproj" />
   </Folder>
   <Folder Name="/3. Adapters/">
     <Project Path="src/ProtoTest.MSTest/ProtoTest.MSTest.csproj" Id="f11a8aa9-96e0-42c5-9a62-c27b908d0c5e" />
@@ -50,9 +52,11 @@
   <Folder Name="/4. Tests/Adapters/">
     <Project Path="tests/ProtoTest.MSTest.Tests/ProtoTest.MSTest.Tests.csproj" Id="46d67240-27b6-4460-a3d1-558336e41c9f" />
     <Project Path="tests/ProtoTest.NUnit.Tests/ProtoTest.NUnit.Tests.csproj" Id="9ef7170a-1eed-4a16-b6d1-23f4c62f1d05" />
+    <Project Path="tests/ProtoTest.NUnit.AutoWrap.Tests/ProtoTest.NUnit.AutoWrap.Tests.csproj" />
     <Project Path="tests/ProtoTest.TUnit.Tests/ProtoTest.TUnit.Tests.csproj" Id="63bb53be-7578-4f88-bcf6-b0c420dbb1e1" />
     <Project Path="tests/ProtoTest.Xunit.Tests/ProtoTest.Xunit.Tests.csproj" Id="e6e507aa-df6c-438c-97b1-4297bab323de" />
     <Project Path="tests/ProtoTest.Xunit3.Tests/ProtoTest.Xunit3.Tests.csproj" Id="733750ce-a6f6-4fb7-8936-7e58c2ad76a5" />
+    <Project Path="tests/ProtoTest.Xunit3.AutoWrap.Tests/ProtoTest.Xunit3.AutoWrap.Tests.csproj" />
   </Folder>
   <Folder Name="/4. Tests/Integrations/">
     <Project Path="tests/ProtoTest.AspNetCore.TestApi/ProtoTest.AspNetCore.TestApi.csproj" />
@@ -67,6 +71,9 @@
     <Project Path="tests/ProtoTest.Grpc.Tests/ProtoTest.Grpc.Tests.csproj" />
     <Project Path="tests/ProtoTest.Hosting.TestWorker/ProtoTest.Hosting.TestWorker.csproj" />
     <Project Path="tests/ProtoTest.Hosting.Tests/ProtoTest.Hosting.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Aspire.TestService/ProtoTest.Aspire.TestService.csproj" />
+    <Project Path="tests/ProtoTest.Aspire.TestAppHost/ProtoTest.Aspire.TestAppHost.csproj" />
+    <Project Path="tests/ProtoTest.Aspire.Tests/ProtoTest.Aspire.Tests.csproj" />
     <Project Path="tests/ProtoTest.OpenApi.Tests/ProtoTest.OpenApi.Tests.csproj" Id="4d4c7e56-9c4e-4193-b73e-64b067c9268b" />
     <Project Path="tests/ProtoTest.Reporting.Tests/ProtoTest.Reporting.Tests.csproj" />
     <Project Path="tests/ProtoTest.Rest.Tests/ProtoTest.Rest.Tests.csproj" Id="da8c0737-a839-4f92-a4c2-f9bdecd6c96b" />
@@ -74,6 +81,7 @@
     <Project Path="tests/ProtoTest.Sql.Tests/ProtoTest.Sql.Tests.csproj" />
     <Project Path="tests/ProtoTest.Testcontainers.Tests/ProtoTest.Testcontainers.Tests.csproj" />
     <Project Path="tests/ProtoTest.Web.Tests/ProtoTest.Web.Tests.csproj" />
+    <Project Path="tests/ProtoTest.WireMock.Tests/ProtoTest.WireMock.Tests.csproj" />
   </Folder>
   <Folder Name="/5. Demo/">
     <Project Path="samples/ProtoTest.Demo/ProtoTest.Demo.csproj" />

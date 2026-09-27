@@ -62,6 +62,16 @@ public class OrderTests
 
 A `[ProtoTestTheory]` behaves the same way; each `[InlineData]` row is a test of its own and is recorded under xUnit's display name, with the arguments included, so the rows stay apart.
 
+## Low-ceremony mode (opt-in)
+
+A suite can skip `[ProtoTestFact]`/`[ProtoTestTheory]` on every method: apply the assembly-level auto-wrap once, and every plain `[Fact]` and `[Theory]` runs through the same lifecycle.
+
+```csharp
+[assembly: ProtoTestAutoWrap]
+```
+
+A test that already carries `[ProtoTestFact]` or `[ProtoTestTheory]` keeps its own handler and is never wrapped twice. The skip conditions, outcome mapping and attachments are the ones above, unchanged.
+
 ## Per-test lifecycle
 
 `Before` resolves the test's attributes and conditions, then calls `StartTestAsync`; `After` reads `TestContext.Current.TestState` and completes the context with the mapped result. The lifecycle handler calls the host synchronously (`.GetAwaiter().GetResult()`), so a synchronizing context is required - the same reason NUnit blocks.
@@ -93,6 +103,7 @@ Artifacts go through xUnit's own API — `TestContext.Current.AddAttachment(name
 - The context starts in the before-attribute: class construction, `IAsyncLifetime.InitializeAsync` and class disposal are outside it.
 - A throwing sibling `IBeforeAfterTestAttribute` prevents xUnit from running the after methods; the run's contract check reports the unfinished test at teardown.
 - The assembly fixture is mandatory; there is no collection-level variant.
+- Auto-wrap is assembly-wide: the attribute is declared on the assembly, and there is no per-class opt-in.
 
 ## Next
 

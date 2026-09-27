@@ -60,4 +60,12 @@ public sealed class GraphQLShouldAssertions : GraphQLAssertions
     /// </summary>
     public GraphQLResponse MatchShape(object expectedShape, JsonSerializerOptions? options = null)
         => Response.AssertResponseShape(expectedShape, options);
+
+    /// <summary>
+    /// Matches the selected data against the expected shape exactly: a field present in the data that
+    /// the shape does not mention is a mismatch naming the field. A value constraint mentions its whole
+    /// subtree. Returns the response.
+    /// </summary>
+    public GraphQLResponse MatchShape(object expectedShape, bool exact, JsonSerializerOptions? options = null)
+        => Response.AssertResponseShape(expectedShape, options, exact);
 }

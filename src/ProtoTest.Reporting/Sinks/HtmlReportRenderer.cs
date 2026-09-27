@@ -134,6 +134,7 @@ internal sealed partial class HtmlReportRenderer
     private static readonly (string Kind, string Title)[] Sections =
     [
         (ProtoReportItemKinds.Coverage, "Coverage"),
+        (ProtoReportItemKinds.Traffic, "Traffic (observed but unasserted)"),
         (ProtoReportItemKinds.Finding, "Findings"),
         (ProtoReportItemKinds.Gate, "Run gates"),
         (ProtoReportItemKinds.Resource, "Resources"),

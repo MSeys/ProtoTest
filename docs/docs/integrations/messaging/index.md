@@ -96,6 +96,8 @@ The payload reads are typed: `message.ReadAsJson<T>()` deserializes with `ProtoJ
 
 `message.Should.MatchShape(shape)` matches the payload with the same [shape matcher](../rest/responses.md#matchshape) as REST, GraphQL and gRPC. It records an `assert.json.shape` operation with a `messaging.contract.shape` observation on the ambient test context; a mismatch throws `MessagingAssertionException` whose message starts with the destination, keeping the shared `JsonShapeMismatchException` as `InnerException`, and a payload that is empty or not JSON fails the same way naming the destination.
 
+`message.Should.MatchShape(shape, exact: true)` is the exhaustive form: a field present in the payload that the shape does not mention is a mismatch naming that field. A value constraint mentions its whole subtree. The [shape matching page](../../foundation/shape-matching.md#exact-matching) has the rules.
+
 ### The adapter contract
 
 An adapter implements two interfaces. The capability owns the broker resource and the test-side API; an adapter owns the client technology, and no broker-specific type reaches the test or the trace:

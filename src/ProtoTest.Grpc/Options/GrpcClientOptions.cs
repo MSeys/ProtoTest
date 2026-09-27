@@ -31,11 +31,12 @@ public sealed class GrpcClientOptions : IProtoConfigurableOptions
 
     /// <summary>
     /// Metadata keys whose values are redacted in the trace. Matching is case-insensitive and by
-    /// substring, so <c>authorization</c> also covers <c>proxy-authorization</c>. Configuration
-    /// under <c>ProtoTest:Grpc:Client:SensitiveMetadataKeys</c> extends these defaults.
+    /// substring, so <c>authorization</c> also covers <c>proxy-authorization</c>. The built-in test
+    /// user's Base64 identity travels as <c>prototest-user</c> metadata and is redacted by default.
+    /// Configuration under <c>ProtoTest:Grpc:Client:SensitiveMetadataKeys</c> extends these defaults.
     /// </summary>
     public List<string> SensitiveMetadataKeys { get; set; } =
-        ["authorization", "cookie", "set-cookie", "x-api-key", "api-key", "token", "x-auth-token"];
+        ["authorization", "cookie", "set-cookie", "x-api-key", "api-key", "token", "x-auth-token", "prototest-user"];
 
     /// <inheritdoc />
     public void Validate()

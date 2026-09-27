@@ -21,6 +21,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     private readonly ProtoClockRegistry? _clockRegistry;
     private int _disposeStarted;
     private int _findingSequence;
+    private int _clientReplacementSequence;
 
     public ProtoExecutionContext(string testName, IServiceScope scope, string testId, MethodInfo testMethod)
         : this(testName, scope, ProtoTestId.Parse(testId), testMethod)
@@ -322,6 +323,51 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     public TClient? TryClient<TClient>(string name = "Default") where TClient : class
     {
         return _clients.TryGet<TClient>(name);
+    }
+
+    /// <summary>
+    /// Replaces a named client registered for this test and takes ownership of the replacement under
+    /// the same ownership. A per-test substitution points the test at a rebuilt client this way while
+    /// the instance the registration replaced keeps its own teardown release, so every instance is
+    /// still disposed exactly once. Passing the already-registered instance is a no-op: the instance
+    /// already has an owner, and a second release would dispose it twice. The replacement is traced on
+    /// the same client entity with a <c>replaced</c> change. Throws when no client is registered under
+    /// the name: a replacement always follows a registration, it never creates one.
+    /// </summary>
+    public void ReplaceClient<TClient>(
+        TClient client,
+        string name = "Default",
+        ProtoClientOwnership ownership = ProtoClientOwnership.Context)
+        where TClient : class
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        var owned = ownership is ProtoClientOwnership.Context;
+        if (!_clients.Replace(client, name))
+        {
+            return;
+        }
+
+        var clientId = ProtoClientTrace.Id(typeof(TClient), name);
+        var generation = Interlocked.Increment(ref _clientReplacementSequence);
+        RegisterOwned(new ProtoResource(
+            $"{clientId}#replaced-{generation}",
+            "client",
+            $"Replaced client {typeof(TClient).Name} '{name}'",
+            context => ReleaseClientAsync(client, owned)));
+        Trace.SetEntityState(
+            ProtoTraceEntityKinds.Client,
+            clientId,
+            $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
+            new Dictionary<string, string?>
+            {
+                ["client.name"] = name,
+                ["client.type"] = typeof(TClient).FullName,
+                ["instance.type"] = client.GetType().FullName,
+                ["client.owned"] = owned ? "true" : "false",
+                ["client.replaced"] = "true"
+            },
+            scope: TestName,
+            change: "replaced");
     }
 
     /// <summary>Registers a non-owning lookup alias for a client already registered under a scoped name.</summary>

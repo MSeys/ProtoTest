@@ -90,6 +90,80 @@ public sealed class ProtoGrpcAssertionsTests
     }
 
     [Test]
+    public async Task For_Should_MatchShape_Exact_ShouldRejectFieldsTheShapeDoesNotMention()
+    {
+        var builder = new ProtoHostBuilder();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("grpc exact shape", TestMethods.Placeholder);
+        var reply = new EchoReply { Message = "hello" };
+
+        ProtoGrpcAssertions.For(reply).Should.MatchShape(new { message = "hello" });
+
+        var exception = Assert.Throws<GrpcAssertionException>(
+            () => ProtoGrpcAssertions.For(reply).Should.MatchShape(new { message = "hello" }, exact: true));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.Message, Does.Contain("$.password"));
+            Assert.That(exception.Message, Does.Contain("Property was not mentioned in the expected shape."));
+            Assert.That(exception.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
+                "the shared mismatch data stays reachable");
+        }
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        await host.StopAsync();
+    }
+
+    [Test]
+    public async Task For_Should_MatchShape_Exact_ShouldPassWhenEveryFieldIsMentioned()
+    {
+        var builder = new ProtoHostBuilder();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("grpc exact success", TestMethods.Placeholder);
+        var reply = new EchoReply { Message = "hello", Password = "secret" };
+
+        var returned = ProtoGrpcAssertions.For(reply).Should.MatchShape(
+            new { message = "hello", password = "secret" }, exact: true);
+
+        Assert.That(returned, Is.SameAs(reply));
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
+
+    [Test]
+    public async Task For_Should_MatchShape_Exact_ShouldTreatAValueConstraintAsMentioningItsSubtree()
+    {
+        var builder = new ProtoHostBuilder();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("grpc exact constraint", TestMethods.Placeholder);
+        var reply = new EchoReply { Message = "hello", Password = "secret" };
+
+        ProtoGrpcAssertions.For(reply).Should.MatchShape(
+            new { message = "hello", password = JsonValue.NotNull() }, exact: true);
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
+
+    [Test]
+    public async Task For_Should_MatchShape_Exact_ShouldKeepIgnoringExtraFieldsWithoutExact()
+    {
+        var builder = new ProtoHostBuilder();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("grpc partial shape", TestMethods.Placeholder);
+        var reply = new EchoReply { Message = "hello" };
+
+        Assert.DoesNotThrow(() => ProtoGrpcAssertions.For(reply).Should.MatchShape(new { message = "hello" }));
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
+
+    [Test]
     public async Task Obsolete_ShouldMatchShape_ShouldStillDelegateToTheFacade()
     {
         var builder = new ProtoHostBuilder();
@@ -101,12 +175,19 @@ public sealed class ProtoGrpcAssertionsTests
         // Intentional: pins the obsolete shim while it delegates to the facade; CS0618 is expected.
 #pragma warning disable CS0618
         var returned = reply.ShouldMatchShape(new { message = "hello" }).ShouldMatchShape(new { message = "hello" });
+        var failure = Assert.Throws<GrpcAssertionException>(
+            () => reply.ShouldMatchShape(new { message = "other" }));
 #pragma warning restore CS0618
 
-        Assert.That(returned, Is.SameAs(reply));
-        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(returned, Is.SameAs(reply));
+            Assert.That(failure!.Message, Does.Contain("$.message"));
+        }
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(failure!));
         Assert.That(host.Trace.Snapshot().Tests.Single().Entries
-            .Count(entry => entry.Kind == "assert.json.shape"), Is.EqualTo(2),
+            .Count(entry => entry.Kind == "assert.json.shape"), Is.EqualTo(3),
             "the obsolete extension still records its own assertion");
         await host.StopAsync();
     }

@@ -7,7 +7,7 @@ namespace ProtoTest.Core;
 /// </summary>
 public sealed class ProtoTestHostLifetime
 {
-    private readonly object _gate = new();
+    private readonly ProtoLock _gate = new();
     private readonly string _initializationHint;
     private ProtoHost? _host;
     private Task<ProtoHost>? _starting;

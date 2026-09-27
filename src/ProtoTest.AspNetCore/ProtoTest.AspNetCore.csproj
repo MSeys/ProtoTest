@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <!-- The test user's wire form is shared with the HTTP auth surface. -->
+    <ProjectReference Include="..\ProtoTest.Http\ProtoTest.Http.csproj" />
     <!-- The in-process server contributes the same page inventory the browser sessions consume. -->
     <ProjectReference Include="..\ProtoTest.Web.Pages\ProtoTest.Web.Pages.csproj" />
   </ItemGroup>

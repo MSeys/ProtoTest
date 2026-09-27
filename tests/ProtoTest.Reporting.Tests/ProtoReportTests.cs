@@ -106,6 +106,33 @@ public sealed class ProtoReportTests
     }
 
     [Test]
+    public void Create_ShouldNotCountTrafficItemsAsCoverage()
+    {
+        var report = ProtoReport.Create(
+        [
+            // Observed-but-unasserted fields are a separate kind: they carry a false verdict of their
+            // own but never enter the coverage arithmetic, so the assertion-level ratio stays honest.
+            new ProtoReportItem("Orders", "REST traffic", "GET /orders · 200",
+                Kind: ProtoReportItemKinds.Traffic, IsCovered: null,
+                Children:
+                [
+                    new ProtoReportItem("Orders", "REST traffic", "$.name",
+                        Kind: ProtoReportItemKinds.Traffic, IsCovered: false)
+                ]),
+            new ProtoReportItem("Orders", "OpenAPI", "$.id",
+                Kind: ProtoReportItemKinds.Coverage, IsCovered: true)
+        ]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(report.Summary.CoverageTotal, Is.EqualTo(1));
+            Assert.That(report.Summary.Covered, Is.EqualTo(1));
+            Assert.That(report.Summary.Uncovered, Is.Zero);
+            Assert.That(report.Summary.CoveragePercentage, Is.EqualTo(100));
+        }
+    }
+
+    [Test]
     public void CoverageSummaries_ShouldIgnoreNullCoveredAggregatesLikeTheReport()
     {
         var items = new[]

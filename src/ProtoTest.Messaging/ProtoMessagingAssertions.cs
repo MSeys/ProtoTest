@@ -47,6 +47,14 @@ public sealed class ProtoMessageAssertions
     /// the destination, with the matcher exception as the inner exception. Returns the message.
     /// </summary>
     public ProtoMessage MatchShape(object expectedShape, JsonSerializerOptions? options = null)
+        => MatchShape(expectedShape, exact: false, options);
+
+    /// <summary>
+    /// Matches the payload against the expected shape exactly through the shared matcher, so a field
+    /// the shape does not mention is a mismatch naming the field; a value constraint mentions its whole
+    /// subtree. Returns the message.
+    /// </summary>
+    public ProtoMessage MatchShape(object expectedShape, bool exact, JsonSerializerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(expectedShape);
         var context = Proto.Context;
@@ -58,7 +66,10 @@ public sealed class ProtoMessageAssertions
                     context,
                     ProtoMessagingProtocol.Protocol.TraceSource,
                     "Assert message shape",
-                    ExtraAttributes: new Dictionary<string, string?> { ["messaging.destination"] = _message.Destination }),
+                    ExtraAttributes: new Dictionary<string, string?> { ["messaging.destination"] = _message.Destination })
+                {
+                    Exact = exact
+                },
                 _message.Payload,
                 expectedShape,
                 options,

@@ -23,6 +23,7 @@ public GraphQLResponse HaveNoErrors();                                          
 public GraphQLResponse HaveErrors();
 public GraphQLResponse HaveError(string code);                                  // matches extensions.code, case-insensitive
 public GraphQLResponse MatchShape(object expectedShape, JsonSerializerOptions? options = null);  // on GraphQLShouldAssertions
+public GraphQLResponse MatchShape(object expectedShape, bool exact, JsonSerializerOptions? options = null);  // on GraphQLShouldAssertions
 ```
 
 `ShouldNot.HaveHttpStatus(expected)` asserts the HTTP status is **anything but** `expected`. The error assertions honor the same polarity, so `ShouldNot.HaveErrors()` is the same check as `Should.HaveNoErrors()`. Shape is positive-only, so `MatchShape` lives on the `Should` facade and `ShouldNot` has no shape form.
@@ -48,6 +49,8 @@ Each records its own operation — `assert.graphql.no_errors`, `assert.graphql.h
 ### Shape assertions
 
 `Should.MatchShape` uses the same rules as REST's — partial objects, exact arrays, `JsonValue` constraints — see [Shape matching](../../foundation/shape-matching.md). For shape-driven operations it compares against the **root field's value**; for fluent and raw operations, against the whole `data` object.
+
+`MatchShape(shape, exact: true)` is the exhaustive form: a field present in the response that the shape does not mention is a mismatch naming that field. A value constraint mentions its whole subtree. The [shape matching page](../../foundation/shape-matching.md#exact-matching) has the rules.
 
 The assertion records an `assert.json.shape` operation with the expected type and the operation identifier (`graphql.operation`), and on success records a `graphql.contract.shape` observation carrying the request identifier and the matched property paths.
 

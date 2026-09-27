@@ -28,7 +28,8 @@ The GraphQL error assertions are the exception: they name the opposite state dir
 
 | Subject | Surface |
 | --- | --- |
-| REST response, GraphQL response | `Should`: `HaveHttpStatus`, `MatchShape`; `ShouldNot`: `HaveHttpStatus` — and for GraphQL both also carry `HaveNoErrors`, `HaveErrors`, `HaveError(code)` |
+| REST response | `Should`: `HaveHttpStatus`, `HaveContentType`, `HaveHeader`, `HaveCookie`, `HaveRedirectLocation`, `MatchShape`; `ShouldNot`: the same except `MatchShape` |
+| GraphQL response | `Should`: `HaveHttpStatus`, `MatchShape`, `HaveNoErrors`, `HaveErrors`, `HaveError(code)`; `ShouldNot`: `HaveHttpStatus` and the error assertions |
 | gRPC reply | `ProtoGrpcAssertions.For(reply).Should.MatchShape(shape)`, returning the reply |
 | gRPC failed call | `ProtoGrpcAssertions.For(exception).Should.HaveStatus(status)` / `.ShouldNot.HaveStatus(status)` |
 | Consumed message | `message.Should.MatchShape(shape)`, returning the message |
@@ -50,6 +51,17 @@ GET /api/orders/42 — Shape mismatch failed with 1 error(s):
 The subject is the REST request identifier (method and route), the GraphQL operation, the gRPC message type, the messaging destination, or the sheet row's `Sheet!Range`; a model row names the record type. The underlying `JsonShapeMismatchException` — with the full `Mismatches` list — stays reachable as the failure's `InnerException`, and the trace evidence is unchanged.
 
 A table row has no record type, so its shape is keyed by each column's leaf header name and each value is the cell's rendered value; a model row serializes with its record property names.
+
+`MatchShape(shape, exact: true)` is the exhaustive form: a field present in the response that the shape does not mention is a mismatch naming that field, so a response cannot grow a field the test never asserted. A value constraint (`JsonValue.Any()`, `JsonValue.NotNull()`) mentions its whole subtree and never fails an exact match. `PostAsync(…).ExpectAsync(shape)` is the in-call form for REST: it awaits the response and runs the same facade assertion, so the in-call and the after-the-fact spelling share one implementation. The [shape matching page](./shape-matching.md#exact-matching) has the rules.
+
+The HTTP fact assertions name the request too, and read the same on `ShouldNot`:
+
+```csharp
+response.Should.HaveContentType("application/json");
+response.Should.HaveHeader("X-Correlation", "abc");       // or HaveHeader("X-Correlation") for presence
+response.Should.HaveCookie("session");
+response.Should.HaveRedirectLocation("/orders/42");
+```
 
 ## Deliberate exceptions
 

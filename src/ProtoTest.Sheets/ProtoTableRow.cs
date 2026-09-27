@@ -62,7 +62,7 @@ public sealed class ProtoTableRow
     /// extension shim. The subject is the row's <c>Sheet!Range</c> reference, traced on the owning
     /// table's context, so the assertion lands under the test that read the row whatever flow runs it.
     /// </summary>
-    internal ProtoTableRow AssertShape(object expectedShape, JsonSerializerOptions? options = null)
+    internal ProtoTableRow AssertShape(object expectedShape, JsonSerializerOptions? options = null, bool exact = false)
     {
         var actual = JsonSerializer.SerializeToElement(ShapeValues(), options);
         SheetModelAssertions.AssertShape(
@@ -71,7 +71,8 @@ public sealed class ProtoTableRow
             _table.RowRange(RowNumber),
             expectedShape,
             options,
-            _table.Context);
+            _table.Context,
+            exact);
         return this;
     }
 }

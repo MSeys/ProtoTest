@@ -17,7 +17,15 @@ public sealed record ProtoShapeAssertionContext(
     IReadOnlyDictionary<string, string?>? ExtraAttributes = null,
     bool CaptureExpectedShape = false,
     string? AttachmentName = null,
-    string? AttachmentDescription = null);
+    string? AttachmentDescription = null)
+{
+    /// <summary>
+    /// Requires the actual JSON to carry no field the expected shape does not mention, through
+    /// <see cref="JsonShapeMatcher.AssertExactMatch(string, object?, JsonSerializerOptions?)"/>. A value
+    /// constraint mentions its whole subtree, so constrained values never fail an exact match.
+    /// </summary>
+    public bool Exact { get; init; }
+}
 
 /// <summary>
 /// The one traced shape assertion REST, GraphQL, gRPC and messaging share. It records the
@@ -45,14 +53,17 @@ public static class ProtoShapeAssertion
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        using var operation = context.Execution is null
-            ? null
-            : context.Execution.Trace
-                .Operation("assert.json.shape", context.Title, context.Source)
-                .With("expected.type", expectedShape?.GetType().FullName)
-                .With(context.ExtraAttributes)
-                .Parent(context.ParentOperationId)
-                .Begin();
+        var scope = context.Execution?.Trace
+            .Operation("assert.json.shape", context.Title, context.Source)
+            .With("expected.type", expectedShape?.GetType().FullName)
+            .With(context.ExtraAttributes)
+            .Parent(context.ParentOperationId);
+        if (context.Exact)
+        {
+            scope = scope?.With("shape.exact", "true");
+        }
+
+        using var operation = scope?.Begin();
 
         try
         {
@@ -74,7 +85,9 @@ public static class ProtoShapeAssertion
                     context.AttachmentDescription);
             }
 
-            var matchedProperties = JsonShapeMatcher.AssertMatch(actualJson ?? string.Empty, expectedShape, options);
+            var matchedProperties = context.Exact
+                ? JsonShapeMatcher.AssertExactMatch(actualJson ?? string.Empty, expectedShape, options)
+                : JsonShapeMatcher.AssertMatch(actualJson ?? string.Empty, expectedShape, options);
             operation?.SetAttribute("matched.property_count", matchedProperties.Count.ToString());
             operation?.SetAttribute("matched.properties", string.Join(", ", matchedProperties));
             operation?.SetAttribute("shape.matches", JsonDiagnosticSanitizer.Serialize(matchedProperties, diagnosticOptions));

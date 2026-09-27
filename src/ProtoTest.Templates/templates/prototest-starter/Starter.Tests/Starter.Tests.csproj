@@ -6,12 +6,33 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+<!--#if (runner == "tunit") -->
+    <OutputType>Exe</OutputType>
+<!--#endif -->
   </PropertyGroup>
 
   <ItemGroup>
+<!--#if (runner == "nunit") -->
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="6.3.0" />
     <PackageReference Include="ProtoTest.NUnit" Version="PROTOTEST_VERSION" />
+<!--#elif (runner == "xunit") -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0" />
+    <PackageReference Include="ProtoTest.Xunit" Version="PROTOTEST_VERSION" />
+<!--#elif (runner == "xunit3") -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="xunit.v3" Version="4.0.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0" />
+    <PackageReference Include="ProtoTest.Xunit3" Version="PROTOTEST_VERSION" />
+<!--#elif (runner == "tunit") -->
+    <PackageReference Include="TUnit" Version="1.66.0" />
+    <PackageReference Include="ProtoTest.TUnit" Version="PROTOTEST_VERSION" />
+<!--#elif (runner == "mstest") -->
+    <PackageReference Include="MSTest" Version="4.4.0" />
+    <PackageReference Include="ProtoTest.MSTest" Version="PROTOTEST_VERSION" />
+<!--#endif -->
     <PackageReference Include="ProtoTest.AspNetCore" Version="PROTOTEST_VERSION" />
     <PackageReference Include="ProtoTest.Rest" Version="PROTOTEST_VERSION" />
     <PackageReference Include="ProtoTest.Reporting" Version="PROTOTEST_VERSION" />

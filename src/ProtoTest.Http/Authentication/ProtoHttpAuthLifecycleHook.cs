@@ -8,7 +8,8 @@ using ProtoTest.Core;
 /// composite authenticator when more than one applies, and records the resolved configuration as the
 /// protocol's auth entity state. The client a test uses is chosen separately by <c>[Application]</c>.
 /// The state is stored under the protocol's key, so protocols sharing this hook never overwrite each
-/// other.
+/// other. A test's <c>[SignedInAs]</c> declaration rides along the winning authenticator set, because
+/// it names who the test acts as rather than how a request is authenticated.
 /// </summary>
 public sealed class ProtoHttpAuthLifecycleHook(ProtoProtocol protocol) : IProtoTestHook
 {
@@ -19,7 +20,13 @@ public sealed class ProtoHttpAuthLifecycleHook(ProtoProtocol protocol) : IProtoT
     public Task BeforeTestAsync(ProtoExecutionContext context)
     {
         var method = context.TestMethod;
-        var methodAuth = Applicable(method.GetCustomAttributes(inherit: true)).ToArray();
+        var methodAttributes = method.GetCustomAttributes(inherit: true);
+        // The signed-in test user names who the test acts as, not how a request is authenticated, so
+        // it stays out of the method-over-class replacement [Auth] uses and rides along the winning
+        // set instead.
+        var methodAuth = Applicable(methodAttributes)
+            .Where(metadata => metadata is not SignedInAsAttribute)
+            .ToArray();
         // A test method inherited from a base class is reflected on the test class that runs it, so the
         // class-level [Auth] attributes are read from the reflected type; inherit:true walks the base
         // hierarchy, so attributes declared on a base test class are found too.
@@ -27,9 +34,15 @@ public sealed class ProtoHttpAuthLifecycleHook(ProtoProtocol protocol) : IProtoT
             && (method.DeclaringType is null || method.DeclaringType.IsAssignableFrom(reflected))
                 ? reflected
                 : method.DeclaringType;
-        var classAuth = classType is null ? [] : Applicable(classType.GetCustomAttributes(inherit: true)).ToArray();
+        var classAttributes = classType is null ? [] : classType.GetCustomAttributes(inherit: true);
+        var classAuth = Applicable(classAttributes)
+            .Where(metadata => metadata is not SignedInAsAttribute)
+            .ToArray();
         var auth = methodAuth.Length > 0 ? methodAuth : classAuth;
-        var orderedAuth = auth.OrderBy(attribute => attribute.Order).ToArray();
+        var orderedAuth = auth
+            .Concat(methodAttributes.Concat(classAttributes).OfType<SignedInAsAttribute>())
+            .OrderBy(attribute => attribute.Order)
+            .ToArray();
 
         context.SetContext(
             _protocol.Key,

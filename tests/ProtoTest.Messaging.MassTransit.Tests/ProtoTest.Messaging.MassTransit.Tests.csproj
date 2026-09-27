@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="MassTransit.RabbitMQ" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit3TestAdapter" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.AspNetCore.TestApi\ProtoTest.AspNetCore.TestApi.csproj" />
+    <ProjectReference Include="..\ProtoTest.Messaging.MassTransit.TestApi\ProtoTest.Messaging.MassTransit.TestApi.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.AspNetCore\ProtoTest.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Messaging.MassTransit\ProtoTest.Messaging.MassTransit.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Messaging\ProtoTest.Messaging.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Messaging.RabbitMq\ProtoTest.Messaging.RabbitMq.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Messaging.RabbitMq.Testcontainers\ProtoTest.Messaging.RabbitMq.Testcontainers.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.TestSupport\ProtoTest.TestSupport.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\NUnitParallelization.cs" Link="NUnitParallelization.cs" />
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+</Project>

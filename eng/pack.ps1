@@ -51,6 +51,7 @@ $packages = @(
     "src/ProtoTest.Messaging/ProtoTest.Messaging.csproj",
     "src/ProtoTest.Messaging.RabbitMq/ProtoTest.Messaging.RabbitMq.csproj",
     "src/ProtoTest.Messaging.RabbitMq.Testcontainers/ProtoTest.Messaging.RabbitMq.Testcontainers.csproj",
+    "src/ProtoTest.Messaging.MassTransit/ProtoTest.Messaging.MassTransit.csproj",
     "src/ProtoTest.Sheets/ProtoTest.Sheets.csproj",
     "src/ProtoTest.AspNetCore/ProtoTest.AspNetCore.csproj",
     "src/ProtoTest.Devices/ProtoTest.Devices.csproj",

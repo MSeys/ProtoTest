@@ -120,8 +120,10 @@ foreach ($file in @($docsContentFiles + $docsSourceFiles)) {
 
 $apiAllowlist = @(
     'AddBus',                  # a reader-written extension example (advanced/extending.md)
+    'AddConsumer',             # MassTransit's registration configurator (integrations/messaging/masstransit.md)
     'AddEnvironmentVariables', # Microsoft.Extensions.Configuration
     'AddJsonFile',             # Microsoft.Extensions.Configuration
+    'AddMassTransitTestHarness', # MassTransit.Testing's app-side composition (integrations/messaging/masstransit.md)
     'AddMinutes',              # System.DateTimeOffset
     'AddOtlpExporter'          # OpenTelemetry exporter builder
     'AddSource'                # OpenTelemetry source subscription

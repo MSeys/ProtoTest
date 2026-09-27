@@ -15,7 +15,7 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
     private readonly Func<TContainer, CancellationToken, Task> _start;
     private readonly Func<TContainer, string> _connectionString;
     private readonly List<(string Name, Func<TContainer, CancellationToken, ValueTask<bool>> Check)> _readiness = [];
-    private readonly object _containerGate = new();
+    private readonly ProtoLock _containerGate = new();
     private TContainer? _container;
     private Task? _startTask;
     private int _started;

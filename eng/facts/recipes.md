@@ -67,6 +67,15 @@ and the device client (`ProtoDeviceClient` + registration store). The shared rul
 - Response reads go through the shared mechanics: `ProtoJsonRead.Read` with the protocol's
   `ProtoJsonReadSemantics` for JSON-at-path reads, and `ProtoHttpResponse.ResolveStatusDiagnosticOptions`
   for status-body clamping; do not hand-roll a second reader.
+- A substituting test owns a dedicated server: `context.Override<TService>`,
+  `[ReplaceService<TService>]` and `[FailDependency<TService>]` build a per-test server with the
+  replacement applied before the build, so a shared per-run server is never reconfigured; replacements
+  are singletons of the dedicated server, resolved by explicit name, then `[Application]`, then
+  `Default`. Use the trace (`service.substitute`/`service.fail`) to prove the substitution, not the
+  server instance.
+- Matched fakes reuse the REST `http.response`/`RestResponseData` shape (the OpenAPI precedent):
+  `ProtoTest.WireMock` records hits as HTTP responses, so the trace, the viewer and REST consumers read
+  them without a new contract.
 
 Accessor shape: `context.<Protocol>()` returns a **client** for the protocols that address named clients
 (Rest, GraphQL, gRPC, Devices, Web) and the **capability interface** for the integrations that own one

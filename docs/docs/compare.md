@@ -47,7 +47,7 @@ Alba is the closest neighbour: a mature declarative testing library for ASP.NET 
 - The trace is a versioned, documented file ([format 2.0](./observability/prototrace.md)) with a static viewer, so a CI failure is readable where it happened.
 - Five [runner adapters](./runners/overview.md) rather than one testing style.
 
-Service substitution is the honest gap: ProtoTest does not ship per-test service replacement or fault injection yet. For tests built around DI-level stubbing today, Alba is the stronger tool.
+Service substitution is shipped: `context.Override<T>()`, `[ReplaceService<T>]` and `[FailDependency<T>]` replace or fail a dependency in the application under test per test (a dedicated server is built with the substitution, so a shared server never leaks one test's override into the next). Alba remains stronger for suites built entirely around declarative HTTP scenarios with DI stubbing.
 
 ## Aspire testing
 
@@ -65,7 +65,7 @@ Service substitution is the honest gap: ProtoTest does not ship per-test service
 - No AppHost requirement. In-process hosting with Testcontainers runs on .NET 8, 9 and 10 today, with less CI machinery.
 - The same suite can point at a deployed environment through [configuration](./getting-started/environments.md) when closed-box fidelity is what a given run needs.
 
-These are complementary rather than competing. Keep Aspire where deployment topology matters, and a ProtoTest suite can test the same system from outside. A ProtoTest Aspire adapter is not shipped today; when it exists it will compose through the same infrastructure hooks.
+These are complementary rather than competing. Keep Aspire where deployment topology matters, and a ProtoTest suite can test the same system from outside; `ProtoTest.Aspire` composes an AppHost through the same infrastructure hooks and publishes its resources as application targets.
 
 ## Playwright .NET alone
 
@@ -105,7 +105,7 @@ A framework you own completely is the right answer when the problem is truly you
 - **You only test HTTP endpoints.** `WebApplicationFactory` plus an assertion library is smaller and has no lifecycle to learn.
 - **You want zero framework dependencies.** Every ProtoTest integration is an opinionated wrapper. That is the design, and it is fair to decline it.
 - **Closed-box topology is the requirement.** Aspire testing tests processes as they deploy; ProtoTest's in-process strengths are the wrong fit for that.
-- **You need service substitution today.** It is planned but not shipped; a DI-stubbing library is the stronger choice until it is.
+- **You need per-test DI-level stubbing over a declarative HTTP scenario.** ProtoTest's substitution works and is traced, but a library built entirely around scenario stubbing has a smaller surface.
 - **You are not on .NET 8, 9 or 10.** ProtoTest targets those three runtimes; earlier frameworks are out of scope.
 - **Your team already has a foundation it likes.** Do not replace working infrastructure to gain a trace.
 

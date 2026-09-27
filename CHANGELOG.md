@@ -180,8 +180,52 @@ All ProtoTest packages share one version; breaking API changes are called out be
   available at its registration position as command-line arguments, and releases the application
   with the run. The published instance is separate from `AddAspNetCoreServer`, with no
   `ServerFactory` or `[RequiresInProcess]`.
+- Per-test service substitution (`ProtoTest.AspNetCore`): `context.Override<TService>(...)`,
+  `[ReplaceService<TService>(typeof(TImplementation))]` and `[FailDependency<TService>]` build a
+  dedicated per-test server (both lifetimes) with the replacement applied before the server builds, so
+  a shared per-run server never leaks one test's override into the next. A scope resolved before the
+  override still serves the shared server — apply the override before first resolving application
+  services. Substitutions are traced as
+  `service.substitute`/`service.fail` with `aspnetcore.server.substituted` on the server entity; a
+  `RequiresCapability`-style skip applies when the application is not in-process, and closed-box
+  harnesses cannot be substituted. `ProtoExecutionContext.ReplaceClient` swaps a registered client.
+- `ProtoTest.WireMock` fakes HTTP dependencies per test on WireMock.Net: `AddWireMock(name)` with
+  per-test servers by default and `PerRun()`/`Port(n)` opt-ins, scenario-like `Stub(method,
+  path).RespondJson(...)` stubbing, matched requests traced as `http.response` with the REST response
+  payload (`http.failure` when unmatched, never covered), and an automatic `WireMock` coverage collector
+  where registered stubs are gaps until hit. Matched and unmatched requests reuse the REST response
+  and failure kinds (`ProtoRestBuilder.ResponseObservationKind`/`FailureObservationKind`), so the kinds
+  cannot drift apart; the `aspire` capability kind lives on `ProtoCapabilityKinds`.
+- `ProtoTest.Aspire` runs an Aspire AppHost with the suite (`net8.0`/`net9.0`/`net10.0` package assets; Aspire 13.5.4):
+  `AddAspNetCoreServer` stays for white-box servers; `AddAspireAppHost<TEntryPoint>()` starts the
+  AppHost's own entry point once per run, publishes each resource's endpoint as
+  `ProtoTest:Applications:{resource}:BaseUrl`, and stops it with the run. When only some declared
+  resource keys are configured, the AppHost starts for the rest and publishes only the missing keys,
+  so a configured address is never masked. Closed box: no per-test substitution, no in-process
+  assertions. The test AppHost and suite stay `net10.0`: DCP launches `AddProject` resources with
+  `dotnet run`, which cannot choose a target framework for a multi-targeted project. The
+  `Aspire.AppHost.Sdk` version is pinned once in `global.json` (`msbuild-sdks`).
+
+### Changed
+
+- A per-run WireMock fake keeps its stubs and request log for the whole run: teardown reports the
+  test's requests but no longer resets the shared fake, so a stub one test registers still matches in
+  the next. `Reset()` clears the shared fake between tests, and release clears it with the run.
+- An unnamed `[ReplaceService<T>]`/`[FailDependency<T>]` gates on the test's selected application
+  (falling back to `Default`), the same target the substitution resolves, instead of any in-process
+  server: a mixed run that publishes the selected application and hosts another in-process now skips
+  that test instead of failing its setup. A named one still gates on its named server.
+- `ProtoExecutionContext.ReplaceClient` with the already-registered instance is a no-op: the instance
+  keeps its existing owner instead of registering a second release that disposed it twice.
+- A substituting test's dedicated server is owned before it starts: a registration that throws once
+  the test started releasing (the sealed client registry, a racing override) disposes the server
+  instead of leaking a started one.
 
 ### Fixed
+
+- An Aspire AppHost that starts for a partly configured multi-resource topology no longer masks the
+  configured addresses: it publishes only the keys configuration does not already fill, and its
+  evidence marks `aspire.resource.{resource}.address_source = configuration` for the rest.
 
 - A browser download is named binary content: `WebDownload` implements `IProtoBinaryContent`, so a
   downloaded file feeds anything consuming named bytes (for example `ProtoSheets.Open`) in one line

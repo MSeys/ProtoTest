@@ -8,7 +8,7 @@ internal sealed class ProtoDataService : IProtoData
     private readonly ProtoDataRegistry _registry;
     private readonly IServiceProvider _services;
 
-    private readonly object _gate = new();
+    private readonly ProtoLock _gate = new();
     private readonly List<ProvisionedObject> _provisioned = [];
     private long _objectSequence;
     private long _valueSequence;

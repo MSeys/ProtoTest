@@ -21,13 +21,13 @@ public sealed class WebDownloadTests
         Assert.That(download, Is.InstanceOf<IProtoBinaryContent>());
         var content = (IProtoBinaryContent)download;
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(content!.FileName, Is.EqualTo("invoices-2030-06.xlsx"));
             Assert.That(
                 content.MediaType,
                 Is.EqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
             Assert.That(content.Content.ToArray(), Is.EqualTo(bytes));
-        });
+        }
     }
 }

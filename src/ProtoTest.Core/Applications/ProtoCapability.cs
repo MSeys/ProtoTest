@@ -35,6 +35,7 @@ public static class ProtoCapabilityKinds
     public const string Broker = "broker";
     public const string Data = "data";
     public const string Document = "document";
+    public const string Aspire = "aspire";
 }
 
 /// <summary>

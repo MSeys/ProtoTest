@@ -1,0 +1,23 @@
+<Project Sdk="Aspire.AppHost.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- The suite runs this AppHost on net10.0: DCP launches the referenced service with
+         `dotnet run`, which cannot choose a target framework for a multi-targeted project. The
+         adapter package's net8/net9 assets are proven by compile and pack (eng/pack.ps1). -->
+    <TargetFramework>net10.0</TargetFramework>
+    <IsTestProject>false</IsTestProject>
+    <!-- The suite drives this AppHost through the Aspire testing host; the CLI bundle it would
+         use for `aspire run` and deployment is not needed, so its absence is not a build error. -->
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Aspire.TestService\ProtoTest.Aspire.TestService.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Remove="ProtoTest.TestSupport" />
+  </ItemGroup>
+
+</Project>

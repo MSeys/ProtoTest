@@ -1,0 +1,57 @@
+namespace ProtoTest.Aspire.Internal;
+
+using ProtoTest.Core;
+
+/// <summary>The AppHosts a run composed, so a test can resolve a resource to its application target.</summary>
+internal sealed class ProtoAspireRegistry
+{
+    private readonly ProtoLock _gate = new();
+    private readonly Dictionary<string, ResourceHandle> _resources = new(StringComparer.Ordinal);
+
+    public void Add(Type entryPoint, string resource, string application)
+    {
+        lock (_gate)
+        {
+            var owner = OwnerOfLocked(resource);
+            if (owner is not null && owner != entryPoint)
+            {
+                throw new InvalidOperationException(
+                    $"Aspire resource '{resource}' is already hosted by {owner.FullName}; " +
+                    $"register {entryPoint.FullName} under a different resource name instead.");
+            }
+
+            _resources[resource] = new ResourceHandle(entryPoint, application);
+        }
+    }
+
+    internal Type? OwnerOf(string resource)
+    {
+        lock (_gate)
+        {
+            return OwnerOfLocked(resource);
+        }
+    }
+
+    private Type? OwnerOfLocked(string resource)
+        => _resources.TryGetValue(resource, out var existing) ? existing.EntryPoint : null;
+
+    public string ApplicationFor(string resource)
+    {
+        lock (_gate)
+        {
+            if (!_resources.TryGetValue(resource, out var handle))
+            {
+                var known = _resources.Keys.OrderBy(name => name, StringComparer.Ordinal).ToArray();
+                var hint = known.Length == 0
+                    ? "register one with builder.AddAspireAppHost<TEntryPoint>(\"resource\")"
+                    : $"known resources: {string.Join(", ", known.Select(name => $"'{name}'"))}";
+                throw new InvalidOperationException(
+                    $"Unknown Aspire resource '{resource}'; {hint}.");
+            }
+
+            return handle.Application;
+        }
+    }
+
+    private sealed record ResourceHandle(Type EntryPoint, string Application);
+}

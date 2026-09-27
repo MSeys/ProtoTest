@@ -6,7 +6,7 @@ using ProtoTest.SampleApp.Domain;
 /// <summary>A configurable receiving endpoint used by the demo to observe webhook deliveries.</summary>
 internal sealed class WebhookSinkRegistry
 {
-    private readonly object _gate = new();
+    private readonly ProtoLock _gate = new();
     private readonly Dictionary<string, Sink> _sinks = new(StringComparer.Ordinal);
 
     public (string Id, Uri Url) Create(Uri baseUrl, int failuresBeforeSuccess)

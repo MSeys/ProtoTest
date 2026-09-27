@@ -13,6 +13,14 @@ public sealed record RestResponseData(
     TimeSpan? Duration = null
 );
 
+/// <summary>
+/// Data payload sent when an HTTP request fails.
+/// </summary>
+/// <param name="ExceptionType">
+/// The exception that produced the failure, or a producer-defined marker when the failure is
+/// synthetic: WireMock.Net records an unmatched request without an exception, so the fake reports
+/// <c>WireMockUnmatchedRequest</c> instead of inventing a type.
+/// </param>
 public sealed record RestFailureData(
     string Method,
     string RouteTemplate,

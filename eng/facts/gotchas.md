@@ -114,7 +114,10 @@ last error.
   first, it keeps the unconditional capability and the SQL keys are not part of its decision.
 - **Containers must declare every key they fill.** `AddInfrastructure` skips only when *all* declared
   keys are configured; a missing one starts the container anyway (a configured CI without Docker then
-  fails). Check the README recipes for all keys.
+  fails). Check the README recipes for all keys. A started piece whose keys are only partly configured
+  must not publish the configured ones: `AddAspireAppHost` publishes only the declared resource keys
+  configuration does not fill, because a published setting wins over configuration at use time (a
+  multi-resource AppHost in a mixed run would otherwise mask the environment's address).
 - **A containerized application declares no `server` capability.** `ApplicationContainer` publishes an
   address, not an in-process server: `[RequiresInProcess]` skips with its default reason, and a suite
   needing the test host gives the published instance its own application name.
@@ -244,6 +247,15 @@ last error.
   `SingleConnectionListener`) outside that project, so `GetFreePort` or `LazyTemporaryTrace` cannot
   drift back either (audit TST-2/A5-64). The rule is a deny list, not a shape scan: a helper renamed
   completely away from those roots (say `AcquirePort`) is not detected.
+- **A substituting test pays a second server start.** The dedicated per-test server is built with the
+  replacement before the build; a shared per-run server is never reconfigured, so one test's override
+  cannot leak into the next. Substitution in published mode throws naming the address; closed-box
+  harnesses (Aspire) cannot be substituted — choose `AddWorkerHost` white-box tests or Aspire topology
+  runs, not both on one application. The unnamed `[ReplaceService]`/`[FailDependency]` gate follows the
+  test's selected application (falling back to `Default`), the same resolution the substitution uses, so
+  a mixed run that publishes the selected application skips instead of failing setup; a named one gates
+  on its named server. The dedicated server is owned before it starts, so a registration that throws
+  once the test started releasing cannot leak a started server.
 - **A worktree checkout has no built SPA.** `samples/ProtoTest.SampleApp/Ui/dist` is untracked, so the
   demo's console journeys skip in a worktree and a green worktree gate does not cover them; run those
   tests in the main checkout (or build the console there) before trusting a gate on setup or attribute
@@ -269,6 +281,10 @@ last error.
   in-process HTTP client over the `TestServer`'s handler so the test context is its only owner; a
   suite that calls `CreateClient`/`CreateDefaultClient` on `ServerFactory<T>()` from parallel tests
   re-opens that ledger, and its teardown enumeration crashes the run.
+- **A per-run WireMock fake keeps its stubs and request log for the whole run.** Teardown reports only
+  the new requests; it no longer resets the fake, so a stub one test registers still matches in the
+  next and `ReceivedRequests` accumulates. Clear shared state with `Reset()` when a test needs a
+  clean fake, and keep the suite serial while tests share one server.
 - **A test's setup runs inside the per-test transaction.** `ProtoTest.Sql` opens the connection and
   begins the transaction before hooks and attributes run, so DDL in a test hook or body is rolled back
   with the test (the postgres-ef trial: a table created in one test is gone in the next). Run-owned

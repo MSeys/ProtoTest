@@ -18,7 +18,7 @@ internal sealed class ProtoWorkerHost<TProgram> : IProtoConfiguredInfrastructure
     private readonly string _name;
     private readonly ProtoWorkerOptions _options;
     private readonly ProtoWorkerRegistry _registry;
-    private readonly object _gate = new();
+    private readonly ProtoLock _gate = new();
     private Func<string[], object>? _factory;
     private IReadOnlyDictionary<string, string?> _configuration = new Dictionary<string, string?>(StringComparer.Ordinal);
     private TimeProvider _timeProvider = TimeProvider.System;

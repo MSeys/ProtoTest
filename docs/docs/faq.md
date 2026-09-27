@@ -29,8 +29,8 @@ They are also not hidden. Clients are registered on the context and can be retri
 
 ## Why not Alba? Why not Aspire testing? Why not Playwright alone?
 
-- **Alba** is excellent at what it does - declarative HTTP scenarios with dependency-injection stubbing and deep JasperFx integration. Choose it if that is the centre of your testing. Choose ProtoTest when one test needs to cross API, database, messaging and browser in one trace. One honest gap: service substitution is not shipped yet. [The full section](./compare.md#alba).
-- **Aspire testing** is the better tool when deployment topology itself must be tested closed-box. ProtoTest's strength is the opposite - in-process speed and direct assertions - and the two are complementary. An Aspire adapter is not shipped. [The full section](./compare.md#aspire-testing).
+- **Alba** is excellent at what it does - declarative HTTP scenarios with dependency-injection stubbing and deep JasperFx integration. Choose it if that is the centre of your testing. Choose ProtoTest when one test needs to cross API, database, messaging and browser in one trace. Service substitution is now shipped: `context.Override<T>()`, `[ReplaceService<T>]` and `[FailDependency<T>]` replace or fail a dependency in the application under test per test. [The full section](./compare.md#alba).
+- **Aspire testing** is the better tool when deployment topology itself must be tested closed-box. ProtoTest's strength is the opposite - in-process speed and direct assertions - and the two are complementary: `ProtoTest.Aspire` can start an AppHost with the run and publish its resources as application targets. [The full section](./compare.md#aspire-testing).
 - **Playwright alone** is simpler when the browser is the whole problem. ProtoTest is for when the browser is one hop in a longer journey and you want the other hops in the same test and trace. [The full section](./compare.md#playwright-net-alone).
 
 ## Which test runners work?

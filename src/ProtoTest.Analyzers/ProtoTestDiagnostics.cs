@@ -24,13 +24,4 @@ internal static class ProtoTestDiagnostics
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: "A runner-registered test without a ProtoTest attribute has no ambient execution context, so Proto.Context throws before the test can use it. Register the test with the ProtoTest attribute instead of the plain runner attribute.");
-
-    public static readonly DiagnosticDescriptor ColumnOnKeyValueSheet = new(
-        id: "PT0003",
-        title: "Column attribute on a key-value sheet model",
-        messageFormat: "'{0}' on '{1}' declares [Column] on a key-value sheet model. A key-value label is declared with [Label(\"...\")]; [Column] is the table mapping.",
-        category: Category,
-        defaultSeverity: DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        description: "A model whose [Sheet] declares Kind = ProtoSheetKind.KeyValue maps each property to a label with [Label(\"...\")]. [Column] on such a property still compiles and still reads the label, but it is the table mapping and cannot carry a header path or Unique; the key-value model rejects those. Migrate the property to [Label].");
 }

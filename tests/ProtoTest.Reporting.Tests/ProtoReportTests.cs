@@ -170,23 +170,60 @@ public sealed class ProtoReportTests
     }
 
     [Test]
-    public async Task GetArtifacts_ShouldBeEmptyWhenNoFileExists()
+    public async Task ReadJson_ShouldRoundTripAReportTheSinkWrote()
     {
         var directory = Path.Combine(Path.GetTempPath(), "ProtoTest.Reporting.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, "report.json");
         try
         {
+            var items = new[]
+            {
+                new ProtoReportItem("Api", "OpenAPI", "spec", Kind: ProtoReportItemKinds.Coverage, IsCovered: null,
+                    Metadata: new Dictionary<string, object> { ["spec.source"] = "openapi.json", ["spec.hash"] = "abc" }),
+                new ProtoReportItem("Api", "OpenAPI", "GET /a", Kind: ProtoReportItemKinds.Coverage,
+                    Status: ProtoReportStatus.Success, Count: 2, IsCovered: true)
+            };
             var sink = new JsonReportSink(new JsonReportSinkOptions { OutputPath = path });
-            Assert.That(sink.GetArtifacts(), Is.Empty, "No export has run yet.");
+            await sink.ExportAsync(items);
 
-            await sink.ExportAsync(
-                [new ProtoReportItem("Api", "REST", "GET /a", ProtoReportItemKinds.Coverage, IsCovered: true)]);
-            Assert.That(sink.GetArtifacts(), Has.Count.EqualTo(1));
+            var report = ProtoReport.ReadJson(path);
 
-            File.Delete(path);
-            Assert.That(sink.GetArtifacts(), Is.Empty, "The exported file is gone from disk.");
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(report.Summary.Covered, Is.EqualTo(1));
+                Assert.That(report.Summary.CoverageTotal, Is.EqualTo(1));
+                Assert.That(report.Items, Has.Count.EqualTo(2));
+                Assert.That(report.Items[1].Count, Is.EqualTo(2));
+                Assert.That(report.Items[1].Status, Is.EqualTo(ProtoReportStatus.Success));
+                Assert.That(report.Items[0].Metadata!["spec.hash"].ToString(), Is.EqualTo("abc"),
+                    "Metadata reads back as JSON element text and the spec keys stay readable.");
+            }
         }
         finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public void ReadJson_ShouldNameAMissingFile()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"prototest-missing-{Guid.NewGuid():N}.json");
+
+        var exception = Assert.Throws<InvalidOperationException>(() => ProtoReport.ReadJson(path));
+
+        Assert.That(exception!.Message, Does.Contain(path));
+    }
+
+    [Test]
+    public void ReadJson_ShouldNameContentThatIsNotAReport()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"prototest-invalid-{Guid.NewGuid():N}.json");
+        File.WriteAllText(path, """{ "not": "a report" }""");
+        try
+        {
+            var exception = Assert.Throws<InvalidOperationException>(() => ProtoReport.ReadJson(path));
+
+            Assert.That(exception!.Message, Does.Contain("not a ProtoTest report"));
+        }
+        finally { File.Delete(path); }
     }
 }

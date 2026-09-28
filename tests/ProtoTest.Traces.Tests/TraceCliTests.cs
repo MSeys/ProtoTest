@@ -14,7 +14,7 @@ public sealed class TraceCliTests
             // Act
             using var output = new StringWriter();
             using var error = new StringWriter();
-            var exit = CliHost.Run(["trace", "summary", path], output, error);
+            var exit = CliHost.Run(["summary", path], output, error);
 
             // Assert
             using (Assert.EnterMultipleScope())
@@ -40,7 +40,7 @@ public sealed class TraceCliTests
         Assert.Multiple(() =>
         {
             Assert.That(exit, Is.EqualTo(1));
-            Assert.That(error.ToString(), Does.Contain("usage: prototest trace summary"));
+            Assert.That(error.ToString(), Does.Contain("usage: prototest summary"));
         });
     }
 
@@ -50,7 +50,7 @@ public sealed class TraceCliTests
         using var output = new StringWriter();
         using var error = new StringWriter();
 
-        var exit = CliHost.Run(["trace", "summary", "does-not-exist.prototrace"], output, error);
+        var exit = CliHost.Run(["summary", "does-not-exist.prototrace"], output, error);
 
         Assert.Multiple(() =>
         {

@@ -17,6 +17,7 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
     private readonly OpenApiDocument _document;
     private readonly OpenApiRouteMatcher _routes;
     private readonly OpenApiCoverageLedger _ledger = new();
+    private readonly IReadOnlyDictionary<string, object>? _specIdentity;
 
     public override string Category => "OpenAPI";
 
@@ -38,15 +39,19 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
                 ProtoApplication.MissingSettingMessage(applicationName, "OpenApi:Specification"));
         }
 
-        _document = OpenApiSpecLoader.Load(source, application["BaseUrl"]);
+        var loaded = OpenApiSpecLoader.LoadWithContent(source, application["BaseUrl"]);
+        _document = loaded.Document;
         _routes = new OpenApiRouteMatcher(_document);
+        _specIdentity = ProtoSpecIdentity.Metadata(source, loaded.Content);
     }
 
     public OpenApiCoverageCollector(string targetName, string openApiSpecSource)
         : base(targetName)
     {
-        _document = OpenApiSpecLoader.Load(openApiSpecSource);
+        var loaded = OpenApiSpecLoader.LoadWithContent(openApiSpecSource);
+        _document = loaded.Document;
         _routes = new OpenApiRouteMatcher(_document);
+        _specIdentity = ProtoSpecIdentity.Metadata(openApiSpecSource, loaded.Content);
     }
 
     public OpenApiCoverageCollector(string targetName, OpenApiDocument document)
@@ -86,9 +91,22 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
     {
         lock (_lock)
         {
-            return OpenApiReportBuilder.Build(_document, _ledger, TargetName, Category);
+            var items = OpenApiReportBuilder.Build(_document, _ledger, TargetName, Category);
+            return _specIdentity is null ? items : [SpecIdentityItem(), .. items];
         }
     }
+
+    /// <summary>The aggregate item carrying the loaded document's identity. It has no verdict, so the
+    /// coverage arithmetic and every existing report row stay untouched.</summary>
+    private ProtoReportItem SpecIdentityItem() => new(
+        TargetName,
+        Category,
+        ProtoSpecIdentity.ReportIdentifier,
+        Kind: ProtoReportItemKinds.Coverage,
+        Status: ProtoReportStatus.Neutral,
+        IsCovered: null,
+        Metadata: _specIdentity,
+        DisplayName: "Specification");
 
     private void RecordRestHit(RestResponseData hit)
     {

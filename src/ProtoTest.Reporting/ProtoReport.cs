@@ -1,5 +1,7 @@
 namespace ProtoTest.Reporting;
 
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using ProtoTest.Core;
 
 public sealed record ProtoReport(
@@ -7,6 +9,12 @@ public sealed record ProtoReport(
     ProtoReportSummary Summary,
     IReadOnlyList<ProtoReportItem> Items)
 {
+    private static readonly JsonSerializerOptions JsonReadOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() }
+    };
+
     public static ProtoReport Create(IEnumerable<ProtoReportItem> items)
     {
         ArgumentNullException.ThrowIfNull(items);
@@ -37,6 +45,39 @@ public sealed record ProtoReport(
                 Gates: flattened.Count(item => item.IsKind(ProtoReportItemKinds.Gate)),
                 Resources: flattened.Count(item => item.IsKind(ProtoReportItemKinds.Resource))),
             roots);
+    }
+
+    /// <summary>
+    /// Reads the JSON report a <see cref="JsonReportSink"/> wrote, with the same options the sink
+    /// writes, so the summary, the item tree, the enums and the metadata round-trip. Metadata values
+    /// arrive as <see cref="JsonElement"/>; the arithmetic does not read them.
+    /// </summary>
+    public static ProtoReport ReadJson(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        if (!File.Exists(path))
+        {
+            throw new InvalidOperationException(
+                $"No report file exists at '{path}'. Write one with a ProtoTest.Reporting sink first.");
+        }
+
+        ProtoReport? report = null;
+        try
+        {
+            using var stream = File.OpenRead(path);
+            report = JsonSerializer.Deserialize<ProtoReport>(stream, JsonReadOptions);
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidOperationException($"'{path}' is not a ProtoTest report: {exception.Message}", exception);
+        }
+
+        if (report?.Summary is null || report.Items is null)
+        {
+            throw new InvalidOperationException($"'{path}' is not a ProtoTest report: it has no summary and items.");
+        }
+
+        return report;
     }
 
     /// <summary>

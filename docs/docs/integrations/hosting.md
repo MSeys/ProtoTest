@@ -73,7 +73,7 @@ builder.AddApplication("Api", app => app
   every mode; only a hosted worker declares `clock`, so `[RequiresTestClock]` gates the tests that
   advance the clock against one.
 - A worker registered on the host builder (`builder.AddWorkerHost<...>`) is not part of an application;
-  its chain defaults to `UseHost` and keeps today's behavior.
+  its chain defaults to `UseHost`, so the run hosts its entry point and bridges the test clock.
 
 ## Configuration
 

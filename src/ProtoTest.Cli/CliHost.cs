@@ -1,9 +1,14 @@
 namespace ProtoTest.Cli;
 
+using System.Text.Json;
+using ProtoTest.Diagnosis;
+using ProtoTest.Feedback;
 using ProtoTest.Traces;
+using ProtoTest.Verification;
 
 /// <summary>
-/// The command-line surface, separated from the entry point so tests can drive it with their own writers.
+/// The command-line surface, separated from the entry point so tests can drive it with their own
+/// writers. Environment variables carry the feedback channel targets, the GitHub Actions convention.
 /// </summary>
 public static class CliHost
 {
@@ -14,11 +19,24 @@ public static class CliHost
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
 
-        if (args.Length == 3
-            && string.Equals(args[0], "trace", StringComparison.Ordinal)
-            && string.Equals(args[1], "summary", StringComparison.Ordinal))
+        if (args.Length == 2 && string.Equals(args[0], "summary", StringComparison.Ordinal))
         {
-            return Summary(args[2], output, error);
+            return Summary(args[1], output, error);
+        }
+
+        if (args.Length == 2 && string.Equals(args[0], "index", StringComparison.Ordinal))
+        {
+            return Index(args[1], output, error);
+        }
+
+        if (args.Length >= 2 && string.Equals(args[0], "feedback", StringComparison.Ordinal))
+        {
+            return Feedback(args, output, error);
+        }
+
+        if (args.Length == 3 && string.Equals(args[0], "verify", StringComparison.Ordinal))
+        {
+            return Verify(args[1], args[2], output, error);
         }
 
         WriteUsage(error);
@@ -35,7 +53,7 @@ public static class CliHost
 
         try
         {
-            ProtoTraceSummaryText.Write(ProtoTraceArchive.Open(path), output);
+            ProtoTraceSummaryText.Write(ProtoDiagnosis.Read(path), output);
             return 0;
         }
         catch (Exception exception)
@@ -45,6 +63,230 @@ public static class CliHost
         }
     }
 
+    private static int Index(string folder, TextWriter output, TextWriter error)
+    {
+        if (string.IsNullOrWhiteSpace(folder))
+        {
+            WriteUsage(error);
+            return 1;
+        }
+
+        ProtoTraceFolderRuns discovered;
+        try
+        {
+            discovered = ProtoTraceDiscovery.Discover(folder);
+        }
+        catch (DirectoryNotFoundException exception)
+        {
+            error.WriteLine(exception.Message);
+            return 1;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            error.WriteLine($"Could not read '{folder}': {exception.Message}");
+            return 1;
+        }
+
+        if (discovered.Runs.Count == 0)
+        {
+            error.WriteLine($"No readable .prototrace archive under '{discovered.Root}' ({discovered.Skipped.Count} skipped).");
+            foreach (var skip in discovered.Skipped)
+            {
+                error.WriteLine($"  {skip.TraceFile}: {skip.Reason}");
+            }
+
+            return 1;
+        }
+
+        try
+        {
+            var result = ProtoTraceIndex.Write(discovered);
+            output.WriteLine($"Indexed {Runs(result.Runs)} into '{result.PagePath}'.");
+            foreach (var skip in result.Skipped)
+            {
+                output.WriteLine($"Skipped '{skip.TraceFile}': {skip.Reason}");
+            }
+
+            return 0;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            error.WriteLine($"Could not write the index under '{discovered.Root}': {exception.Message}");
+            return 1;
+        }
+    }
+
+    private static int Feedback(string[] args, TextWriter output, TextWriter error)
+    {
+        string? digestPath = null;
+        for (var index = 2; index < args.Length; index++)
+        {
+            if (string.Equals(args[index], "--digest", StringComparison.Ordinal) && index + 1 < args.Length)
+            {
+                digestPath = args[++index];
+                continue;
+            }
+
+            WriteUsage(error);
+            return 1;
+        }
+
+        var path = args[1];
+        if (!File.Exists(path))
+        {
+            error.WriteLine($"Trace file not found: {path}");
+            return 1;
+        }
+
+        ProtoDiagnosisDocument digest;
+        try
+        {
+            digest = ProtoFeedback.ReadDigest(path);
+        }
+        catch (Exception exception)
+        {
+            error.WriteLine($"Could not read '{path}': {exception.Message}");
+            return 1;
+        }
+
+        if (digestPath is { Length: > 0 })
+        {
+            try
+            {
+                File.WriteAllText(digestPath, ProtoFeedback.DigestJson(digest));
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                error.WriteLine($"Could not write '{digestPath}': {exception.Message}");
+                return 1;
+            }
+        }
+
+        ProtoFeedbackReport report;
+        using var client = new HttpClient();
+        try
+        {
+            report = ProtoFeedback.PostAsync(digest, Target(), client, output).GetAwaiter().GetResult();
+        }
+        catch (Exception exception)
+        {
+            error.WriteLine($"Feedback failed: {exception.Message}");
+            return 1;
+        }
+
+        foreach (var channel in report.Channels)
+        {
+            var reason = channel.Reason is { Length: > 0 } text ? $" ({text})" : string.Empty;
+            error.WriteLine($"prototest feedback: {channel.Channel} {channel.Status}{reason}");
+        }
+
+        return report.Failed ? 1 : 0;
+    }
+
+    private static int Verify(string baselinePath, string currentPath, TextWriter output, TextWriter error)
+    {
+        foreach (var path in new[] { baselinePath, currentPath })
+        {
+            if (!File.Exists(path))
+            {
+                error.WriteLine($"Report file not found: {path}");
+                return 1;
+            }
+        }
+
+        ProtoVerificationVerdict verdict;
+        try
+        {
+            verdict = ProtoVerification.Verify(
+                ProtoVerificationRun.FromReportFile(baselinePath),
+                ProtoVerificationRun.FromReportFile(currentPath));
+        }
+        catch (Exception exception)
+        {
+            error.WriteLine($"Could not verify: {exception.Message}");
+            return 1;
+        }
+
+        foreach (var finding in verdict.Findings.Where(finding => finding.Severity == ProtoVerificationSeverities.Fail))
+        {
+            output.WriteLine(ProtoWorkflowCommand.Error($"{finding.Class}: {finding.Message}"));
+        }
+
+        ProtoVerificationText.Write(verdict, output);
+        return verdict.Failed ? 1 : 0;
+    }
+
+    private static ProtoFeedbackTarget Target()
+        => new()
+        {
+            Token = Value("GITHUB_TOKEN"),
+            Repository = Value("GITHUB_REPOSITORY"),
+            PullRequestNumber = PullRequestNumber(),
+            ApiUrl = AbsoluteUrl("GITHUB_API_URL"),
+            TraceLink = Value("PROTOTEST_FEEDBACK_TRACE_URL"),
+            WebhookUrl = AbsoluteUrl("PROTOTEST_FEEDBACK_WEBHOOK_URL"),
+            WebhookSecret = Value("PROTOTEST_FEEDBACK_WEBHOOK_SECRET"),
+            WebhookSecretHeader = Value("PROTOTEST_FEEDBACK_WEBHOOK_SECRET_HEADER")
+        };
+
+    private static string? Value(string name)
+    {
+        var value = Environment.GetEnvironmentVariable(name);
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    private static Uri? AbsoluteUrl(string name)
+    {
+        var value = Value(name);
+        if (value is null)
+        {
+            return null;
+        }
+
+        return Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            ? uri
+            : throw new InvalidOperationException($"'{value}' is not an absolute URL for {name}.");
+    }
+
+    private static int? PullRequestNumber()
+    {
+        var path = Value("GITHUB_EVENT_PATH");
+        if (path is null || !File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            var root = document.RootElement;
+            return SectionNumber(root, "pull_request")
+                ?? SectionNumber(root, "issue")
+                ?? (root.TryGetProperty("number", out var number) && number.TryGetInt32(out var value) ? value : null);
+        }
+        catch (Exception exception) when (exception is JsonException or IOException)
+        {
+            return null;
+        }
+    }
+
+    private static int? SectionNumber(JsonElement root, string name)
+        => root.TryGetProperty(name, out var section)
+            && section.ValueKind == JsonValueKind.Object
+            && section.TryGetProperty("number", out var number)
+            && number.TryGetInt32(out var value)
+                ? value
+                : null;
+
     private static void WriteUsage(TextWriter writer)
-        => writer.WriteLine("usage: prototest trace summary <file.prototrace>");
+        => writer.WriteLine(
+            """
+            usage: prototest summary <file.prototrace>
+                   prototest index <folder>
+                   prototest feedback <file.prototrace> [--digest <path>]
+                   prototest verify <baseline-report.json> <current-report.json>
+            """);
+
+    private static string Runs(int count)
+        => count == 1 ? "1 run" : $"{count} runs";
 }

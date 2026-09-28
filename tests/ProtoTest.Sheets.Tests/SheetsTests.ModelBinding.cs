@@ -424,31 +424,6 @@ public sealed partial class SheetsTests
     }
 
     [Test]
-    public async Task Obsolete_TableRowShouldMatchShape_ShouldStillDelegateToTheFacade()
-    {
-        var (host, context) = Start("sheets obsolete row shape");
-        var table = context.Sheets().Open(_path).Sheet("Keys").Table(1);
-        var row = table.RowWhere("Id", "100");
-
-        // Intentional: pins the obsolete shim while it delegates to the facade; CS0618 is expected.
-#pragma warning disable CS0618
-        var returned = row.ShouldMatchShape(new { Id = "100", Name = "first" });
-        var mismatch = Assert.Throws<SpreadsheetAssertionException>(
-            () => row.ShouldMatchShape(new { Name = "nope" }));
-#pragma warning restore CS0618
-        var exact = Assert.Throws<SpreadsheetAssertionException>(
-            () => row.Should.MatchShape(new { Id = "100" }, exact: true));
-
-        await host.CompleteTestAsync(ProtoTestResult.Failed(mismatch!));
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(returned, Is.SameAs(row));
-            Assert.That(mismatch!.Message, Does.StartWith("Keys!A2:B2 — Shape mismatch"));
-            Assert.That(exact!.Message, Does.Contain("$.Name"));
-        }
-    }
-
-    [Test]
     public async Task Open_ShouldAcceptNamedContent()
     {
         var (host, context) = Start("sheets content");

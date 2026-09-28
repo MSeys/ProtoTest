@@ -78,6 +78,27 @@ public sealed class GraphQLSchemaCoverageAdvancedTests
         });
     }
 
+    [Test]
+    public void SchemaCollector_ShouldRecordTheSpecIdentityAsAnAggregate()
+    {
+        var collector = new GraphQLSchemaCoverageCollector("Catalog", Schema);
+
+        var identity = collector.GetReportItems()
+            .Single(item => item.Identifier == ProtoSpecIdentity.ReportIdentifier);
+        var units = collector.GetReportItems().Flatten().CoverageUnits().ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(identity.IsCovered, Is.Null, "The identity row is an aggregate, not a coverage unit.");
+            Assert.That(identity.Category, Is.EqualTo("GraphQL schema"));
+            Assert.That(identity.Metadata![ProtoSpecIdentity.SourceMetadataKey], Is.EqualTo(Schema));
+            Assert.That(identity.Metadata![ProtoSpecIdentity.HashMetadataKey],
+                Is.EqualTo(ProtoSpecIdentity.Hash(Schema)));
+            Assert.That(units.Any(item => item.Identifier == ProtoSpecIdentity.ReportIdentifier), Is.False,
+                "The identity row stays out of the coverage arithmetic.");
+            Assert.That(units.Any(item => item.Identifier == "RootQuery.node"), Is.True);
+        }
+    }
+
     private static ProtoObservation Observation(string document, string operation, string variables)
         => new("Catalog", "graphql.response", operation,
             new GraphQLResponseData("query", operation, document, 200, 0, [], TimeSpan.Zero, variables));

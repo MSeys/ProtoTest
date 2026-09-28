@@ -9,10 +9,13 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>prototest</ToolCommandName>
     <PackageId>ProtoTest.Cli</PackageId>
-    <Description>Command-line access to ProtoTest traces: the failure digest without a browser.</Description>
+    <Description>Command-line access to ProtoTest evidence: the failure digest, the feedback channels and the cross-run verdict without a browser.</Description>
     <PackageTags>testing;trace;cli;tool;dotnet</PackageTags>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Diagnosis\ProtoTest.Diagnosis.csproj" />
+    <ProjectReference Include="..\ProtoTest.Feedback\ProtoTest.Feedback.csproj" />
     <ProjectReference Include="..\ProtoTest.Traces\ProtoTest.Traces.csproj" />
+    <ProjectReference Include="..\ProtoTest.Verification\ProtoTest.Verification.csproj" />
   </ItemGroup>
 </Project>

@@ -66,7 +66,6 @@ internal static class AnalyzerTestFixture
         Add(typeof(ProtoTest.Core.Proto).Assembly);
         Add(typeof(ProtoTest.Rest.ProtoExecutionContextExtensions).Assembly);
         Add(typeof(ProtoTest.Http.ProtoHttpResponse).Assembly);
-        Add(typeof(ProtoTest.Sheets.SheetAttribute).Assembly);
         Add(typeof(ProtoTest.NUnit.ProtoTestAttribute).Assembly);
         Add(typeof(global::NUnit.Framework.TestAttribute).Assembly);
         Add(typeof(ProtoTest.Xunit3.ProtoTestFactAttribute).Assembly);

@@ -164,42 +164,6 @@ public static class ProtoHostBuilderExtensions
         return chain.Use(AspireProvider<TEntryPoint>(resource, piece));
     }
 
-    /// <summary>
-    /// Records that the AppHost registered on this builder publishes <paramref name="resource"/>'s
-    /// connection string under <paramref name="key"/>, so the run's readers resolve the AppHost's
-    /// database or broker under a key no target declares. Register the AppHost first; a configured key
-    /// is never overwritten, and the AppHost only starts when the selection keys start it.
-    /// </summary>
-    /// <param name="builder">The host builder with a registered AppHost.</param>
-    /// <param name="resource">The AppHost resource, for example <c>postgres</c>.</param>
-    /// <param name="key">The key the resource's connection string fills.</param>
-    public static IProtoHostBuilder MapConnectionString(this IProtoHostBuilder builder, string resource, string key)
-    {
-        ArgumentNullException.ThrowIfNull(builder);
-        ArgumentException.ThrowIfNullOrWhiteSpace(resource);
-        ArgumentException.ThrowIfNullOrWhiteSpace(key);
-
-        var composition = Compose(builder);
-        var owner = composition.Registry.OwnerOf(resource)
-            ?? throw new InvalidOperationException(
-                $"Aspire resource '{resource}' is not hosted by an AppHost on this builder; register one with " +
-                $"AddAspireAppHost<TEntryPoint>(\"{resource}\") first.");
-        if (!composition.Pieces.TryGetValue(owner, out var piece))
-        {
-            throw new InvalidOperationException(
-                $"Aspire resource '{resource}' is registered without an AppHost piece; register it with AddAspireAppHost<TEntryPoint>().");
-        }
-
-        piece.AddPublish(resource, key, ProtoAspirePublishKind.ConnectionString, replaceEndpoints: true);
-        composition.Registry.Add(owner, resource, key);
-        // The mapped key joins the AppHost piece's registration, so the run's declared keys and
-        // provided-key decisions see it; the piece's publish mappings decide the configured step-aside.
-#pragma warning disable CS0618
-        builder.AddInfrastructure(piece, key);
-#pragma warning restore CS0618
-        return builder;
-    }
-
     // The composition lives in the builder's service collection, so a host-level call and a provider
     // reached from inside AddApplication resolve the same AppHost pieces.
     private static ProtoAspireComposition Compose(IProtoHostBuilder builder)

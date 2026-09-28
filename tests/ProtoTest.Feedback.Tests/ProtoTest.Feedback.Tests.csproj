@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit3TestAdapter" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ProtoTest.Cli\ProtoTest.Cli.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Core\ProtoTest.Core.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Diagnosis\ProtoTest.Diagnosis.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Feedback\ProtoTest.Feedback.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Reporting\ProtoTest.Reporting.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Traces\ProtoTest.Traces.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Verification\ProtoTest.Verification.csproj" />
+    <ProjectReference Include="..\ProtoTest.TestSupport\ProtoTest.TestSupport.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\NUnitParallelization.cs" Link="NUnitParallelization.cs" />
+  </ItemGroup>
+</Project>

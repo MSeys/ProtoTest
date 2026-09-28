@@ -25,7 +25,7 @@ The package targets `net8.0`, `net9.0` and `net10.0`; the Aspire release is pinn
 - The run's configuration and the settings earlier infrastructure published travel to the AppHost as
   command-line arguments (the options' `Set` values last), so the AppHost's own graph reads the
   addresses the suite resolved.
-- `MapConnectionString(resource, key)` (on the options or the builder) fills a key no target declares.
+- `ProtoAspireOptions.MapConnectionString(resource, key)` fills a key no target declares.
 - A run that configures every declared resource's key skips the AppHost even when selected and points
   at that environment instead; with only some configured, it starts and publishes only the selected
   missing keys, so a configured address is never masked.
@@ -48,8 +48,8 @@ The package targets `net8.0`, `net9.0` and `net10.0`; the Aspire release is pinn
 - The AppHost receives the run's configuration and settings as arguments; bridging them into its
   projects (`AddConnectionString`, `WithEnvironment`) stays the AppHost project's code, because only
   it knows its graph.
-- A connection-string resource has no endpoint: `MapConnectionString` replaces its endpoint publish,
-  and a resource that exposes neither fails the AppHost start naming it.
+- A connection-string resource has no endpoint: `ProtoAspireOptions.MapConnectionString` replaces its
+  endpoint publish, and a resource that exposes neither fails the AppHost start naming it.
 - The AppHost needs Aspire's orchestration binaries (DCP, dashboard) at runtime; they restore with
   the AppHost SDK from NuGet. A suite that must run without them catches
   `ProtoAspireUnavailableException` at startup and skips with its message.

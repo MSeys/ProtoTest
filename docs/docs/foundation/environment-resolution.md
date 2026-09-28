@@ -139,13 +139,14 @@ capability as it always did.
 | ProtoTest.AspNetCore | `UseLoopback(createApp)` | always; publishes the loopback address |
 | ProtoTest.Testcontainers | `UseContainer(container)` | `DockerProbe.IsAvailable()` (the same endpoint Testcontainers uses) |
 | ProtoTest.Aspire | `UseAspireResource<TAppHost>(resource)` | `ProtoTest:Aspire:Enabled`, or the resource's own `ProtoTest:Aspire:Resources:{resource}:Enabled`, is set - the integration-owned selection keys |
-| ProtoTest.Aspire | `MapConnectionString(resource, key)` | a registered AppHost publishes the resource's connection string under `key` |
+| ProtoTest.Aspire | `ProtoAspireOptions.MapConnectionString(resource, key)` | a registered AppHost publishes the resource's connection string under `key` |
 | ProtoTest.Hosting | `UseEnvironment()` / `UseHost()` | the application is served elsewhere / always |
 
 `UseAspireResource` on an application chain publishes the resource's endpoint under the application's
 derived `BaseUrl`; on an infrastructure chain it publishes the resource's connection string under every
-key the target declares. `MapConnectionString(resource, key)` is the explicit form for a key no target
-declares. A configured provider earlier in the chain always wins, so the same composition runs against
+key the target declares. `ProtoAspireOptions.MapConnectionString(resource, key)` is the explicit form
+for a key no target declares, declared with the AppHost's other mappings. A configured provider earlier
+in the chain always wins, so the same composition runs against
 an existing environment without starting anything. The global selection key selects every AppHost
 provider; a resource's own key selects only its targets, which is how "AppHost infrastructure with an
 in-process application" and its reverse are expressed.

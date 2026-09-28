@@ -75,7 +75,7 @@ public sealed class InProcessWebSocketDeviceTransport<TProgram>(
         // TestServer can surface an aborted handshake as an incomplete-handshake response instead of an
         // OperationCanceledException; ProtoDeviceConnect treats the attempt token as the timeout
         // authority either way.
-        var socket = await ProtoDeviceConnect
+        var socket = await ProtoTest.Devices.ProtoDeviceConnect
             .WithTimeoutAsync(
                 path,
                 _options.ConnectTimeout,

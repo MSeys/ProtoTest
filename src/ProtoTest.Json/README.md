@@ -13,5 +13,5 @@ This is mostly a transitive package.
 ## Learn more
 
 - [Shape matching](https://prototest.dev/docs/foundation/shape-matching)
-- [Diagnostics showcase](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/DiagnosticsShowcase.cs)
+- [Diagnostics showcase](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/FailureDrills.cs)
 - [ProtoTest documentation](https://prototest.dev/)

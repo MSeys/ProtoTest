@@ -120,27 +120,49 @@ export function humanize(name: string): string {
   return `${words.join(" ")}${suffix}`;
 }
 
+/* Derived names are pure per test and read once per row per render, so each test caches its own. */
+const codeNames = new WeakMap<TestTrace, string>();
+const titles = new WeakMap<TestTrace, string>();
+const groups = new WeakMap<TestTrace, string>();
+const searchValues = new WeakMap<TestTrace, string[]>();
+
 /** The method name with any parameter suffix, as the runner named the test. */
 export function testCodeName(test: TestTrace): string {
+  const cached = codeNames.get(test);
+  if (cached !== undefined) return cached;
   const prefix = test.className ? `${test.className}.${test.method}` : test.method;
   const suffix = test.name.startsWith(prefix) ? test.name.slice(prefix.length) : "";
-  return `${test.method}${suffix}`;
+  const value = `${test.method}${suffix}`;
+  codeNames.set(test, value);
+  return value;
 }
 
 export function testTitle(test: TestTrace): string {
-  return humanize(testCodeName(test));
+  const cached = titles.get(test);
+  if (cached !== undefined) return cached;
+  const value = humanize(testCodeName(test));
+  titles.set(test, value);
+  return value;
 }
 
 export function testGroup(test: TestTrace): string {
+  const cached = groups.get(test);
+  if (cached !== undefined) return cached;
   const className = test.className ?? "Other tests";
-  return humanize(className.split(".").at(-1) || className);
+  const value = humanize(className.split(".").at(-1) || className);
+  groups.set(test, value);
+  return value;
 }
 
 export function testMatches(test: TestTrace, query: string): boolean {
   const text = query.trim().toLocaleLowerCase();
   if (!text) return true;
-  return [testCodeName(test), testTitle(test), test.className ?? "", testGroup(test)]
-    .some(value => value.toLocaleLowerCase().includes(text));
+  let values = searchValues.get(test);
+  if (values === undefined) {
+    values = [testCodeName(test), testTitle(test), test.className ?? "", testGroup(test)].map(value => value.toLocaleLowerCase());
+    searchValues.set(test, values);
+  }
+  return values.some(value => value.includes(text));
 }
 
 /** A type reads better without its namespace or generic arity: ProtoTest.Core.Internal.Hook`1 becomes Hook. */

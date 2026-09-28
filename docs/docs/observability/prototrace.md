@@ -21,9 +21,10 @@ builder.ConfigureTracing(trace =>
 });
 ```
 
-With `Enabled = false`, no trace file is written and application spans from the configured sources are not
-captured. ProtoTest still records tests and run state in memory (run gates and `Trace.Snapshot()` can use
-it), and observations and reports keep working.
+With `Enabled = false`, no trace file is written, application spans from the configured sources are not
+captured, and the in-memory recorder drops operations and records (observations, attachments, findings
+and tracked values). The run snapshot still lists each test with its outcome, and the reports keep
+working: run gates read report items, not the operation tree.
 
 ## Correlating a trace with the run that produced it
 

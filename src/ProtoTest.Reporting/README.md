@@ -18,4 +18,4 @@ Reports are written once at the end of the run. Coverage collectors and other re
 
 - [Reporting](https://prototest.dev/docs/observability/reporting)
 - [Coverage](https://prototest.dev/docs/observability/coverage)
-- [Demo setup](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs)
+- [Demo setup](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs)

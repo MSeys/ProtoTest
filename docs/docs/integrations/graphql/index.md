@@ -174,4 +174,4 @@ Queries and mutations record a `graphql.operation` operation (`GraphQL · {type}
 - [Subscriptions](./subscriptions.md) — streaming results over WebSocket or SSE.
 - [Schema coverage](./coverage.md) — which types, fields and arguments your suite exercised.
 
-The full flows live in the demo: [PlatformJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/PlatformJourney.cs) and [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs).
+The full flows live in the demo: [PlatformJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/PlatformJourney.cs) and [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs).

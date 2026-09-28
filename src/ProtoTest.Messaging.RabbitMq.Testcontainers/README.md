@@ -14,4 +14,4 @@ The container starts before individual test skip conditions are evaluated. Check
 
 - [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
 - [Messaging integration](https://prototest.dev/docs/integrations/messaging/)
-- [Demo setup](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs)
+- [Demo setup](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs)

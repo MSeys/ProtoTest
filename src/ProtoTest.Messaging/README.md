@@ -40,4 +40,4 @@ Publishing, waiting and matched payloads can be traced and captured as attachmen
 
 - [Messaging integration](https://prototest.dev/docs/integrations/messaging/)
 - [API publishes an event](https://prototest.dev/docs/recipes/api-publishes-an-event)
-- [Messaging demo](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/MessagingJourney.cs)
+- [Messaging demo](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/BrokerJourney.cs)

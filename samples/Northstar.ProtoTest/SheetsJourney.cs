@@ -1,20 +1,18 @@
-namespace ProtoTest.Demo;
+namespace Northstar.ProtoTest;
 
 using System.Net;
 using global::NUnit.Framework;
-using Northstar.ProtoTest;
-using ProtoTest.Core;
-using ProtoTest.Data;
-using ProtoTest.Http;
-using ProtoTest.NUnit;
-using ProtoTest.Rest;
-using ProtoTest.SampleApp.Contracts;
-using ProtoTest.SampleApp.Domain;
-using ProtoTest.Sheets;
+using global::ProtoTest.Core;
+using global::ProtoTest.Data;
+using global::ProtoTest.Http;
+using global::ProtoTest.NUnit;
+using global::ProtoTest.Rest;
+using global::ProtoTest.SampleApp.Contracts;
+using global::ProtoTest.Sheets;
 
 /// <summary>
 /// The generated monthly report: the application writes a real OpenXML workbook, the test downloads it
-/// and asserts it through the record model - no spreadsheet library involved on either side.
+/// and asserts it through the record model, with no spreadsheet library involved on either side.
 /// </summary>
 [Application(NorthstarTargets.Api)]
 [NorthstarMember(PlanIds.Growth)]

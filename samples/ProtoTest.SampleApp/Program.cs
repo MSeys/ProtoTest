@@ -9,7 +9,13 @@ using ProtoTest.SampleApp.Northstar;
 
 public class Program
 {
-    public static async Task Main(string[] args)
+    public static async Task Main(string[] args) => await CreateApp(args).RunAsync().ConfigureAwait(false);
+
+    /// <summary>
+    /// Builds the application without running it, so a suite can host it in-process or on its own
+    /// loopback listener for a browser journey.
+    /// </summary>
+    public static WebApplication CreateApp(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
@@ -58,8 +64,10 @@ public class Program
         else
         {
             var eventPublisher = new RabbitMqEventPublisher(messagingConnection);
-            await eventPublisher.EnsureTopologyAsync();
             builder.Services.AddSingleton<IEventPublisher>(eventPublisher);
+            // The event exchange is part of the application's contract, so it exists before a consumer
+            // binds its tap; declaring it at startup is the migration a deployment would run.
+            builder.Services.AddSingleton<IHostedService>(new EventPublisherTopology(eventPublisher));
         }
         // A second instance serving only the UI must not dispatch webhooks the suite's instance also sends.
         if (!string.Equals(
@@ -117,7 +125,7 @@ public class Program
         app.MapGraphQL("/graphql");
         app.UseNorthstarConsole();
 
-        await app.RunAsync();
+        return app;
     }
 
     private static bool IsTestSupportEnabled(IConfiguration configuration)

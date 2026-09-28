@@ -15,7 +15,9 @@ using ProtoTest.Messaging;
 /// queue destination and the transport's routing key. Each queue is fed by an asynchronous consumer
 /// into an unbounded channel, so an await reacts to a delivery instead of polling. A channel per
 /// destination keeps one destination that cannot be prepared - a missing exchange or queue closes its
-/// channel - from poisoning the destinations that were already prepared. Prepared destinations are
+/// channel - from poisoning the destinations that were already prepared. The destinations named in
+/// one prepare are prepared concurrently: each tap declares on its own channel, so their broker
+/// round trips overlap and every destination is still attempted. Prepared destinations are
 /// bound before the act; a destination that was never prepared is prepared just in time at the first
 /// await, which only sees messages published after the await begins (a queue consume reads the
 /// queue's backlog as well). The base consumer owns the await queue, so awaits serialize in call
@@ -43,21 +45,76 @@ internal sealed class RabbitMqProtoMessageConsumer : ProtoMessageConsumerBase, I
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(destinations);
+
+        // The destinations are prepared concurrently: each tap owns its channel, so their round trips
+        // overlap and one destination that cannot be prepared (a missing exchange or queue) closes only
+        // its own channel. Every destination is attempted; Task.WhenAll rethrows the first failure once
+        // all of them have finished.
+        var requested = destinations
+            .Where(destination => !string.IsNullOrWhiteSpace(destination))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        await Task.WhenAll(requested.Select(destination => PrepareOneAsync(destination, cancellationToken)))
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Prepares one destination. The declare runs outside the consumer's gate so prepares for
+    /// different destinations overlap; registration takes the gate again, so a race with a just-in-time
+    /// await resolves to one registered tap and the extra queue is released.
+    /// </summary>
+    private async Task PrepareOneAsync(string destination, CancellationToken cancellationToken)
+    {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            foreach (var destination in destinations)
+            if (_taps.ContainsKey(destination))
             {
-                if (!string.IsNullOrWhiteSpace(destination) && !_taps.ContainsKey(destination))
-                {
-                    await DeclareAsync(destination, cancellationToken).ConfigureAwait(false);
-                }
+                return;
             }
         }
         finally
         {
             _gate.Release();
+        }
+
+        var tap = await DeclareAsync(destination, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await RegisterTapAsync(destination, tap, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // The consumer was disposed while the tap declared: the tap never reached the registry,
+            // so its queue and channel are released here.
+            await DisposeTapAsync(tap).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private async Task RegisterTapAsync(string destination, Tap tap, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        Tap? extra = null;
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (!_taps.TryAdd(destination, tap))
+            {
+                extra = tap;
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        if (extra is not null)
+        {
+            // A just-in-time await prepared the same destination while this declare ran: the registered
+            // tap keeps the deliveries and the extra queue is released.
+            await DisposeTapAsync(extra).ConfigureAwait(false);
         }
     }
 
@@ -90,9 +147,16 @@ internal sealed class RabbitMqProtoMessageConsumer : ProtoMessageConsumerBase, I
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            tap = _taps.TryGetValue(destination, out var existing)
-                ? existing
-                : await DeclareAsync(destination, cancellationToken).ConfigureAwait(false);
+            if (_taps.TryGetValue(destination, out var existing))
+            {
+                tap = existing;
+            }
+            else
+            {
+                tap = await DeclareAsync(destination, cancellationToken).ConfigureAwait(false);
+                _taps.Add(destination, tap);
+            }
+
             if (routingKey is not null && !ProtoDestination.IsQueue(destination))
             {
                 await tap.BindAsync(destination, routingKey, cancellationToken).ConfigureAwait(false);
@@ -133,28 +197,33 @@ internal sealed class RabbitMqProtoMessageConsumer : ProtoMessageConsumerBase, I
             _gate.Release();
         }
 
-        foreach (var tap in taps)
-        {
-            try
-            {
-                if (tap.OwnsQueue && tap.Channel.IsOpen)
-                {
-                    await tap.Channel.QueueDeleteAsync(tap.Queue, ifUnused: false, ifEmpty: false).ConfigureAwait(false);
-                }
-            }
-            catch (Exception)
-            {
-                // Cleanup only: a queue that is already gone must not fail the test's teardown.
-            }
+        // Taps are independent - one channel and one queue each - so they are released together
+        // instead of one round trip after another; every tap is still attempted and a failure in one
+        // never stops the others.
+        await Task.WhenAll(taps.Select(DisposeTapAsync)).ConfigureAwait(false);
+    }
 
-            try
+    private static async Task DisposeTapAsync(Tap tap)
+    {
+        try
+        {
+            if (tap.OwnsQueue && tap.Channel.IsOpen)
             {
-                await tap.Channel.DisposeAsync().ConfigureAwait(false);
+                await tap.Channel.QueueDeleteAsync(tap.Queue, ifUnused: false, ifEmpty: false).ConfigureAwait(false);
             }
-            catch (Exception)
-            {
-                // Cleanup only: a channel the broker already closed must not fail the test's teardown.
-            }
+        }
+        catch (Exception)
+        {
+            // Cleanup only: a queue that is already gone must not fail the test's teardown.
+        }
+
+        try
+        {
+            await tap.Channel.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Cleanup only: a channel the broker already closed must not fail the test's teardown.
         }
     }
 
@@ -238,7 +307,6 @@ internal sealed class RabbitMqProtoMessageConsumer : ProtoMessageConsumerBase, I
         }
 
         var tap = new Tap(queue, deliveries.Reader, channel, destination, ownsQueue: true);
-        _taps[destination] = tap;
         return tap;
     }
 
@@ -310,7 +378,6 @@ internal sealed class RabbitMqProtoMessageConsumer : ProtoMessageConsumerBase, I
         }
 
         var tap = new Tap(queue, deliveries.Reader, channel, destination, ownsQueue: false);
-        _taps[destination] = tap;
         return tap;
     }
 

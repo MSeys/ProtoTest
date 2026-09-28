@@ -6,8 +6,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repository = Split-Path -Parent $PSScriptRoot
-$project = Join-Path $repository "samples/ProtoTest.Demo/ProtoTest.Demo.csproj"
-$trace = Join-Path $repository "samples/ProtoTest.Demo/bin/$Configuration/net8.0/TestResults/ProtoTest.Demo/prototest-demo.prototrace"
+$project = Join-Path $repository "samples/Northstar.ProtoTest/Northstar.ProtoTest.csproj"
+$trace = Join-Path $repository "samples/Northstar.ProtoTest/bin/$Configuration/net8.0/TestResults/Northstar.ProtoTest/northstar.prototrace"
 $destination = Join-Path $repository "viewer/public/demos/recipes"
 
 $recipes = @(

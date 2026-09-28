@@ -53,7 +53,7 @@ public static WebFlow<TComponent> Flow<TComponent>(this TComponent component, st
     where TComponent : WebComponent;
 ```
 
-The demo's real login strategy drives its login page through a flow — see [StandaloneSampleApp.cs](../../../../samples/ProtoTest.Demo/Support/StandaloneSampleApp.cs).
+The sample drives its own sign-in page through a flow - see [WebJourney.cs](../../../../samples/Northstar.ProtoTest/WebJourney.cs).
 
 ## Rules
 

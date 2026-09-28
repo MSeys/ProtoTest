@@ -56,7 +56,7 @@ public sealed class BackOfficeLogin(ICredentialStore credentials) : IWebLoginStr
 }
 ```
 
-The demo's strategy against the sample application's own login page is in [StandaloneSampleApp.cs](../../../../samples/ProtoTest.Demo/Support/StandaloneSampleApp.cs).
+The sample's strategy against the application's own sign-in page is in [WebJourney.cs](../../../../samples/Northstar.ProtoTest/WebJourney.cs).
 
 ### Using state another attribute created
 

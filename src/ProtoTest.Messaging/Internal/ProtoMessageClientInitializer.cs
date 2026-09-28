@@ -44,29 +44,46 @@ internal sealed class ProtoMessageClientInitializer(string name) : IProtoClientI
         {
             // Bind the test's taps before it acts: a message published after this point is never missed.
             // Tap callbacks and the configuration section can both name a destination, so the set is
-            // filtered and deduped here, the one place every adapter reads it. Each destination is
-            // prepared on its own: one that cannot be declared (a missing exchange) must fail only the
-            // tests that await it, with the adapter's named error, instead of every test in the class
-            // during setup. The client rethrows the recorded failure from AwaitAsync for that
-            // destination.
+            // filtered and deduped here, the one place every adapter reads it. The destinations are
+            // prepared concurrently - each tap owns its channel, so the broker round trips overlap -
+            // and every one is attempted: a destination that cannot be declared (a missing exchange)
+            // must fail only the tests that await it, with the adapter's named error, instead of every
+            // test in the class during setup. The client rethrows the recorded failure from AwaitAsync
+            // for that destination.
             var destinations = options.Destinations
                 .Where(destination => !string.IsNullOrWhiteSpace(destination))
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
-            foreach (var destination in destinations)
+            var prepared = await Task.WhenAll(destinations.Select(destination => PrepareAsync(consumer, destination)));
+            foreach (var (destination, failure) in prepared)
             {
-                try
+                if (failure is not null)
                 {
-                    await consumer.PrepareAsync([destination], CancellationToken.None);
-                }
-                catch (Exception exception)
-                {
-                    prepareFailures[destination] = exception;
+                    prepareFailures[destination] = failure;
                 }
             }
         }
 
         context.RegisterClient(new ProtoMessageClient(context, broker, consumer, options, prepareFailures), Name);
         return true;
+    }
+
+    /// <summary>
+    /// Prepares one destination and returns its failure instead of throwing, so the caller can record
+    /// each destination's outcome while the others keep preparing.
+    /// </summary>
+    private static async Task<(string Destination, Exception? Failure)> PrepareAsync(
+        IProtoMessageConsumer consumer,
+        string destination)
+    {
+        try
+        {
+            await consumer.PrepareAsync([destination], CancellationToken.None);
+            return (destination, null);
+        }
+        catch (Exception exception)
+        {
+            return (destination, exception);
+        }
     }
 }

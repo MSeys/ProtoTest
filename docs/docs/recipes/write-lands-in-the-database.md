@@ -10,7 +10,7 @@ import TraceExample from '@site/src/components/TraceExample';
 
 The API answers `201 Created`, but did the order reach the database with the right status? The test creates it over REST, then reads the row itself — on a database the run started, shared with the in-process application.
 
-The same journey runs in the demo — [DomainAccessJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/DomainAccessJourney.cs) writes through REST and reads the committed row through the test-side SQL connection; [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs) composes both sides over the same store. The full API surface is in [SQL](../integrations/sql/index.md).
+The same journey runs in the demo — [DomainAccessJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/DomainAccessJourney.cs) writes through REST and reads the committed row through the test-side SQL connection; [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs) composes both sides over the same store. The full API surface is in [SQL](../integrations/sql/index.md).
 
 <TraceExample
   demo="rest-database"

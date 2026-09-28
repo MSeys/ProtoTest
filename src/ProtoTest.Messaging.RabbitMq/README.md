@@ -33,4 +33,4 @@ The RabbitMQ connection is shared for the run, while awaited messages remain iso
 
 - [Messaging integration](https://prototest.dev/docs/integrations/messaging/)
 - [API publishes an event](https://prototest.dev/docs/recipes/api-publishes-an-event)
-- [Messaging demo](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/MessagingJourney.cs)
+- [Messaging demo](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/BrokerJourney.cs)

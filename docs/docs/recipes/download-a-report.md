@@ -10,7 +10,7 @@ import TraceExample from '@site/src/components/TraceExample';
 
 The application generates a monthly report as an `.xlsx`. The test downloads it over the API and checks it the way a reader would: the right sheet, the right columns, every value within its rules, and the row for the project the test created.
 
-The same journey runs in the demo — [SheetsJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/SheetsJourney.cs) (test); its host calls `.AddSheets()` in [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs). The full API surface is in [Sheets](../integrations/sheets/index.md).
+The same journey runs in the demo — [SheetsJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/SheetsJourney.cs) (test); its host calls `.AddSheets()` in [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs). The full API surface is in [Sheets](../integrations/sheets/index.md).
 
 ## Compose
 

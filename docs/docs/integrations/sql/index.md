@@ -237,4 +237,4 @@ With `AddressKeys` declared and none of them provided, the `SQL` capability is a
 - [Integrations overview](../overview.md) — where the store packages sit.
 - [One suite, three environments](../../getting-started/environments.md) — the demo's SQLite and PostgreSQL switch.
 - [Infrastructure](../../foundation/infrastructure.md) — how `PostgresDatabase.Container()` starts and fills settings.
-- EF Core registration order and enlistment in [`tests/ProtoTest.Sql.Tests/SqlIsolationTests.cs`](https://github.com/MSeys/ProtoTest/blob/main/tests/ProtoTest.Sql.Tests/SqlIsolationTests.cs), and the demo's composition in [`samples/ProtoTest.Demo/Setup.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs).
+- EF Core registration order and enlistment in [`tests/ProtoTest.Sql.Tests/SqlIsolationTests.cs`](https://github.com/MSeys/ProtoTest/blob/main/tests/ProtoTest.Sql.Tests/SqlIsolationTests.cs), and the demo's composition in [`samples/Northstar.ProtoTest/Setup.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs).

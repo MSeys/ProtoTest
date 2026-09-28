@@ -78,8 +78,8 @@ $vstestProjects = Get-ChildItem -Path $testsRoot -Recurse -Filter *.csproj |
 
 # Test projects follow the *.Tests naming convention, so the directories under tests/ are the expected
 # discovered set. Comparing against them fails loudly when the discovery predicate drifts instead of
-# silently dropping a suite; a new *.Tests project is expected the moment it exists. The Demo sample is
-# appended after this check because it lives under samples/, not tests/.
+# silently dropping a suite; a new *.Tests project is expected the moment it exists. The sample suites
+# are appended after this check because they live under samples/, not tests/.
 $expectedProjects = @(Get-ChildItem -Path $testsRoot -Directory |
     Where-Object { $_.Name.EndsWith(".Tests", [StringComparison]::Ordinal) } |
     ForEach-Object { $_.Name } |
@@ -92,7 +92,9 @@ if ($missingProjects.Count -gt 0) {
     throw "Test discovery missed $($missingProjects.Count) project(s): $($missingProjects -join ', ')."
 }
 
-$vstestProjects += (Join-Path $repository "samples/ProtoTest.Demo/ProtoTest.Demo.csproj")
+# The app-specific test layer under samples/ is the Learning demo suite; it is discovered by path
+# because the *.Tests convention lives under tests/.
+$vstestProjects += (Join-Path $repository "samples/Northstar.ProtoTest/Northstar.ProtoTest.csproj")
 
 # A scoped run passes the project directories a stage can reach; the discovery guard above still
 # checked every expected project before this filter runs.

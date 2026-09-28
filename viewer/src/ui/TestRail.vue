@@ -101,6 +101,8 @@ function reason(test: TestTrace): string {
   border-radius: var(--radius-chip);
   background: transparent;
   text-align: left;
+  /* Rows are uniform and independent, so one row's change never re-lays-out the list. */
+  contain: layout paint;
 }
 .rail-row:hover { background: var(--hover); }
 .rail-row.active { border-color: var(--blueprint); background: var(--blueprint-soft); }

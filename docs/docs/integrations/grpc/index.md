@@ -242,5 +242,5 @@ The client is state, not history: it appears once with `client.name`, `client.pr
 
 ## Links
 
-- The demo's full journey: [`samples/ProtoTest.Demo/GrpcJourney.cs`](../../../../samples/ProtoTest.Demo/GrpcJourney.cs) and the host wiring in [`samples/ProtoTest.Demo/Setup.cs`](../../../../samples/ProtoTest.Demo/Setup.cs).
+- The gRPC client registration and a real round trip: [`tests/ProtoTest.Grpc.Tests`](https://github.com/MSeys/ProtoTest/tree/main/tests/ProtoTest.Grpc.Tests).
 - Related: [Coverage and observations](../../observability/coverage.md), [ProtoTrace](../../observability/prototrace.md), [Shape matching](../../foundation/shape-matching.md), [Skip conditions](../../foundation/skip-conditions.md).

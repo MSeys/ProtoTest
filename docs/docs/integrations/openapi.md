@@ -156,4 +156,4 @@ The package has no capability descriptor and no package-specific attributes. `[R
 - [REST responses and assertions](./rest/responses.md) — the shape assertions that produce property hits.
 - [Coverage](../observability/coverage.md) — collectors and report items.
 - [Reporting](../observability/reporting.md) — seeing the items in a report.
-- The demo registers the collector in [`samples/ProtoTest.Demo/Setup.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs).
+- The collector registers on the REST client's chain like every other collector; the package tests are in [`tests/ProtoTest.OpenApi.Tests`](https://github.com/MSeys/ProtoTest/tree/main/tests/ProtoTest.OpenApi.Tests).

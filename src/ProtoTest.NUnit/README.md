@@ -14,4 +14,4 @@ The adapter starts and completes the test context, evaluates ProtoTest skip cond
 
 - [NUnit setup](https://prototest.dev/docs/runners/nunit)
 - [Test runners](https://prototest.dev/docs/runners/overview)
-- [Demo tests](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.Demo)
+- [Test suite](https://github.com/MSeys/ProtoTest/tree/main/samples/Northstar.ProtoTest)

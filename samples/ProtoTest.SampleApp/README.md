@@ -1,7 +1,8 @@
 # ProtoTest.SampleApp
 
-**Northstar** — a multi-tenant release/deployment control-plane SaaS used by the ProtoTest demos.
-It is a real runnable ASP.NET Core application rather than a mock server.
+**Northstar** — a multi-tenant release/deployment control-plane SaaS and the application under
+test in the [Learning demo suite](../Northstar.ProtoTest/README.md). It is a real runnable
+ASP.NET Core application rather than a mock server.
 
 ```bash
 dotnet run --project samples/ProtoTest.SampleApp

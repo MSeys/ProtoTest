@@ -125,7 +125,7 @@ cd Shop
 dotnet test
 ```
 
-[Additional demo suite](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.Demo)
+[The Learning demo suite](https://github.com/MSeys/ProtoTest/tree/main/samples/Northstar.ProtoTest)
 
 ## Bonus: Behind the name
 

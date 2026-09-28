@@ -1,5 +1,7 @@
 namespace ProtoTest.Messaging.RabbitMq.Tests;
 
+using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
 using System.Text;
 using global::RabbitMQ.Client;
@@ -598,6 +600,54 @@ public sealed class RabbitMqTests
     }
 
     [Test]
+    public async Task Prepare_WhenOneDestinationFails_ShouldStillPrepareTheOthers()
+    {
+        var connectionString = RequireBroker();
+
+        var healthy = $"prototest.tests.{Guid.NewGuid():N}.healthy";
+        var missing = $"prototest.tests.{Guid.NewGuid():N}.missing";
+        // Durable and not auto-delete: the tap binds from a later connection.
+        await DeclareExchangeAsync(connectionString, healthy, ExchangeType.Fanout, durable: true, autoDelete: false);
+
+        try
+        {
+            var builder = new ProtoHostBuilder();
+            builder.AddMessaging(messaging => messaging.UseRabbitMq(options =>
+                options.ConnectionString = connectionString));
+            await using var host = builder.Build();
+            await host.StartAsync();
+            var context = await host.StartTestAsync("rabbit prepare every destination", TestMethods.Placeholder);
+            var messages = context.Messaging();
+            var consumer = await context.Service<IProtoMessageBroker>().CreateConsumerAsync();
+            context.RegisterResource("messaging:consumer:batch", "consumer", "Batch prepare consumer",
+                _ => consumer.DisposeAsync());
+
+            // One batch names a missing exchange and one that exists: the failure is reported once every
+            // destination has been attempted, and the healthy tap is bound before the act, so the
+            // publish is caught instead of falling to a just-in-time bind.
+            var failure = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await consumer.PrepareAsync([missing, healthy]));
+
+            await messages.PublishAsync(healthy, "{\"id\":1}");
+            var received = await consumer.AwaitAsync(
+                healthy,
+                message => message.Payload == "{\"id\":1}",
+                TimeSpan.FromSeconds(15));
+
+            await host.CompleteTestAsync(ProtoTestResult.Failed(failure!));
+            Assert.Multiple(() =>
+            {
+                Assert.That(failure!.Message, Does.Contain(missing));
+                Assert.That(received.Payload, Is.EqualTo("{\"id\":1}"), "the healthy tap was prepared");
+            });
+        }
+        finally
+        {
+            await DeleteExchangeAsync(connectionString, healthy);
+        }
+    }
+
+    [Test]
     public async Task ConcurrentAwaitsOnOneDestination_ShouldNotLoseOrStealMessages()
     {
         var connectionString = RequireBroker();
@@ -627,6 +677,59 @@ public sealed class RabbitMqTests
         finally
         {
             await DeleteExchangeAsync(connectionString, exchange);
+        }
+    }
+
+    [Test]
+    public async Task AwaitsOnTwoDestinations_ShouldEachSeeTheirFirstDelivery()
+    {
+        var connectionString = RequireBroker();
+
+        var invoices = $"prototest.tests.{Guid.NewGuid():N}.invoices";
+        var shipments = $"prototest.tests.{Guid.NewGuid():N}.shipments";
+        await DeclareExchangeAsync(connectionString, invoices, ExchangeType.Fanout);
+        await DeclareExchangeAsync(connectionString, shipments, ExchangeType.Fanout);
+
+        try
+        {
+            var builder = new ProtoHostBuilder();
+            builder.AddMessaging(messaging => messaging.UseRabbitMq(options =>
+                options.ConnectionString = connectionString));
+            await using var host = builder.Build();
+            await host.StartAsync();
+            var context = await host.StartTestAsync("rabbit two destinations", TestMethods.Placeholder);
+            var messages = context.Messaging();
+            var consumer = await context.Service<IProtoMessageBroker>().CreateConsumerAsync();
+            context.RegisterResource("messaging:consumer:two", "consumer", "Two-destination consumer",
+                _ => consumer.DisposeAsync());
+
+            // The two taps are prepared concurrently, and each tap numbers its first delivery at its
+            // own position zero: the second await still sees the shipments delivery after the first
+            // await consumed the invoices delivery at the same position in the other tap.
+            await consumer.PrepareAsync([invoices, shipments]);
+            await messages.PublishAsync(invoices, "{\"id\":1}");
+            await messages.PublishAsync(shipments, "{\"id\":2}");
+
+            var invoice = await consumer.AwaitAsync(
+                invoices,
+                message => message.Payload == "{\"id\":1}",
+                TimeSpan.FromSeconds(15));
+            var shipment = await consumer.AwaitAsync(
+                shipments,
+                message => message.Payload == "{\"id\":2}",
+                TimeSpan.FromSeconds(15));
+
+            await host.CompleteTestAsync(ProtoTestResult.Passed);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(invoice.Destination, Is.EqualTo(invoices));
+                Assert.That(shipment.Destination, Is.EqualTo(shipments), "an await on one tap never hides another tap's delivery");
+            }
+        }
+        finally
+        {
+            await DeleteExchangeAsync(connectionString, invoices);
+            await DeleteExchangeAsync(connectionString, shipments);
         }
     }
 
@@ -840,6 +943,136 @@ public sealed class RabbitMqTests
             Assert.That(error.Message, Does.Contain("does not exist"));
         }
     }
+
+    /// <summary>
+    /// The per-test cost of the messaging tap lifecycle: the same host and broker with no destinations
+    /// and with the three destinations a broker-backed suite taps for every test. The difference is
+    /// what a test pays for its own isolated consumer, and it is the number the OpenCSMS benchmark's
+    /// health check is dominated by; the assertions are generous sanity bounds, not targets.
+    /// </summary>
+    [Test]
+    [Category("Benchmark")]
+    public async Task PerTestTapLifecycle_ShouldStayWithinTheSanityBound()
+    {
+        var connectionString = RequireBroker();
+        var exchanges = new[]
+        {
+            $"prototest.benchmark.{Guid.NewGuid():N}.a",
+            $"prototest.benchmark.{Guid.NewGuid():N}.b",
+            $"prototest.benchmark.{Guid.NewGuid():N}.c"
+        };
+        foreach (var exchange in exchanges)
+        {
+            // Durable and not auto-delete: the tap is prepared by a later connection, so an exchange
+            // that dies with this connection would make every preparation fail.
+            await DeclareExchangeAsync(connectionString, exchange, ExchangeType.Fanout, durable: true, autoDelete: false);
+        }
+
+        try
+        {
+            var bare = await MeasureTapCycleAsync(connectionString, destinations: []);
+            var tapped = await MeasureTapCycleAsync(connectionString, destinations: exchanges);
+            TestContext.Progress.WriteLine(
+                "[tap] mode=bare destinations=0 start=" + F(bare.StartMedianMs) + " ms" +
+                " complete=" + F(bare.CompleteMedianMs) + " ms" +
+                " total=" + F(bare.TotalMedianMs) + " ms");
+            TestContext.Progress.WriteLine(
+                "[tap] mode=tapped destinations=3 start=" + F(tapped.StartMedianMs) + " ms" +
+                " complete=" + F(tapped.CompleteMedianMs) + " ms" +
+                " total=" + F(tapped.TotalMedianMs) + " ms");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(bare.TotalMedianMs, Is.LessThan(25), "a test with no tapped destination stays cheap");
+                Assert.That(tapped.TotalMedianMs, Is.LessThan(250), "a test with three taps stays far below 250 ms");
+                Assert.That(
+                    tapped.StartMedianMs, Is.GreaterThan(0).And.LessThan(150),
+                    "the three taps are prepared within the start phase");
+                Assert.That(
+                    tapped.CompleteMedianMs, Is.GreaterThan(0).And.LessThan(150),
+                    "the three taps are released within the complete phase");
+            });
+        }
+        finally
+        {
+            foreach (var exchange in exchanges)
+            {
+                await DeleteExchangeAsync(connectionString, exchange);
+            }
+        }
+    }
+
+    private static async Task<TapCycle> MeasureTapCycleAsync(string connectionString, string[] destinations)
+    {
+        const int warmup = 16;
+        const int iterations = 64;
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options =>
+        {
+            options.Enabled = false;
+            options.EmbedSources = false;
+            options.EmbedArtifacts = false;
+        });
+        builder.AddMessaging(messaging =>
+        {
+            if (destinations.Length > 0)
+            {
+                messaging.Tap(destinations);
+            }
+
+            messaging.UseRabbitMq(options => options.ConnectionString = connectionString);
+        });
+        await using var host = builder.Build();
+        await host.StartAsync();
+
+        var sequence = 0;
+        for (var index = 0; index < warmup; index++)
+        {
+            await RunTapCycleAsync(host, sequence++);
+        }
+
+        var starts = new List<double>(iterations);
+        var completes = new List<double>(iterations);
+        var totals = new List<double>(iterations);
+        for (var index = 0; index < iterations; index++)
+        {
+            var total = Stopwatch.StartNew();
+            var (start, complete) = await RunTapCycleAsync(host, sequence++);
+            total.Stop();
+            starts.Add(start);
+            completes.Add(complete);
+            totals.Add(total.Elapsed.TotalMilliseconds);
+        }
+
+        await host.StopAsync();
+        return new TapCycle(Median(starts), Median(completes), Median(totals));
+    }
+
+    private static async Task<(double Start, double Complete)> RunTapCycleAsync(ProtoHost host, int sequence)
+    {
+        var started = Stopwatch.StartNew();
+        await host.StartTestAsync(
+            "tap cycle",
+            sequence.ToString("D5", CultureInfo.InvariantCulture),
+            TestMethods.Placeholder);
+        started.Stop();
+
+        var completed = Stopwatch.StartNew();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        completed.Stop();
+        return (started.Elapsed.TotalMilliseconds, completed.Elapsed.TotalMilliseconds);
+    }
+
+    private static double Median(List<double> values)
+    {
+        var sorted = new List<double>(values);
+        sorted.Sort();
+        return sorted[sorted.Count / 2];
+    }
+
+    private static string F(double value) => value.ToString("F2", CultureInfo.InvariantCulture);
+
+    private sealed record TapCycle(double StartMedianMs, double CompleteMedianMs, double TotalMedianMs);
 
     private static string RequireBroker()
     {

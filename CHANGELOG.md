@@ -529,6 +529,13 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ### Changed
 
+- A RabbitMQ test consumer releases its tap queues and channels in parallel instead of one destination
+  after another: the taps are independent, every tap is still attempted and a failure in one never stops
+  the others. Three tapped destinations drop from about 17 ms to about 13 ms of per-test teardown
+  (`PerTestTapLifecycle_ShouldStayWithinTheSanityBound` in `tests/ProtoTest.Messaging.RabbitMq.Tests`).
+- The ProtoTrace docs now state what `Enabled = false` does: no archive, no activity listener, and no
+  in-memory operations or records; the run snapshot still lists each test with its outcome, and reports
+  and run gates (which read report items) are unaffected.
 - `AddAspireAppHost` follows one AppHost selection semantics with the `UseAspireResource` providers:
   the AppHost starts only when `ProtoTest:Aspire:Enabled` or one of its resources' own
   `ProtoTest:Aspire:Resources:{resource}:Enabled` is set, and only when at least one key it fills is
@@ -581,6 +588,19 @@ All ProtoTest packages share one version; breaking API changes are called out be
   protocol's registered names so the fix is discoverable.
 - `prototest summary` separates the recorded timestamps of its time range with a plain hyphen, so the
   CLI's own output follows the same no em or en dash rule as the docs.
+- The viewer stays responsive at 1,000+ tests: each test caches its label, title, group and search text,
+  the run view stays mounted behind an open test, and run and rail rows contain their own layout. On a
+  generated 1,200-test trace, typing in the run search drops from 365 ms to 231 ms, filtering to 53 ms,
+  opening a test to 151 ms and returning to the run list from 650 ms to 566 ms; the numbers, the method
+  and what remains (a streaming reader and a windowed list) are on the benchmarks page.
+- The in-repo teaching sample is Northstar with the Learning demo suite (`samples/Northstar.ProtoTest`)
+  as the Learn track's fixture: the suite hosts the application in-process for the clock journeys and on
+  a loopback listener for the browser journey, owns SQLite or PostgreSQL and RabbitMQ when asked, keeps
+  the REST-to-GraphQL, REST-to-database and workbook journeys, gates the broker and browser journeys on
+  their capabilities with named reasons, and pairs four opt-in failure drills with the green tests that
+  do each journey right. The old cross-layer demo suite (`samples/ProtoTest.Demo`) retires behind it;
+  GraphQL subscriptions, gRPC, OpenAPI and webhook delivery leave the in-repo sample and stay covered by
+  the packages' own test suites and the external OpenCSMS product demo.
 
 ### Fixed
 
@@ -596,6 +616,10 @@ All ProtoTest packages share one version; breaking API changes are called out be
   `[ReplaceService]`) awaits the messages its dedicated server's fresh harness publishes: the
   consumer re-baselines to that harness instead of applying the replaced harness's position and
   skipping its first messages.
+- A RabbitMQ consumer awaiting two destinations no longer misses the second destination's first
+  delivery: each tap numbers its deliveries from zero, so the await queue scopes its consumed set to
+  the destination instead of comparing positions across taps (`AwaitsOnTwoDestinations_ShouldEachSeeTheirFirstDelivery`
+  in `tests/ProtoTest.Messaging.RabbitMq.Tests`).
 - A gRPC call made by a signed-in test redacts the built-in test user's metadata: `prototest-user`
   joins the default `GrpcClientOptions.SensitiveMetadataKeys`, so the Base64 identity and its claim
   values never reach the trace (`rpc.metadata.prototest-user` records `(redacted)`) while the

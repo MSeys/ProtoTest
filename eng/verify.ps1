@@ -133,7 +133,7 @@ function Get-TestProjectInclude {
     }
 
     $tests = @($affected | Where-Object {
-            $_ -match '[\\/]tests[\\/]' -or $_ -match '[\\/]samples[\\/]ProtoTest\.Demo'
+            $_ -match '[\\/]tests[\\/]' -or $_ -match '[\\/]samples[\\/]Northstar\.ProtoTest'
         })
     if ($tests.Count -eq 0 -or $tests.Count -gt 12) { return "" }
     return ($tests -join ';')

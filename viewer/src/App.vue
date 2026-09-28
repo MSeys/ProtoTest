@@ -345,26 +345,31 @@ const problemTitle = computed(() => ({
           <p>The link names <code>{{ missingTestId }}</code>, which is not in {{ fileName }}. It may come from another run.</p>
           <AppButton variant="primary" @click="navigate({ name: 'run' })">Back to the run</AppButton>
         </div>
-        <RunView v-else-if="!selectedTest" :run="run" :file-name="fileName" @select="showTest" @artifact="openArtifact = $event" />
-        <div v-else class="test">
-          <header class="test-head">
-            <b>{{ pad(selectedTest.number) }}</b>
-            <div class="test-title">
-              <h1>{{ testTitle(selectedTest) }}</h1>
-              <p><span>{{ testGroup(selectedTest) }}</span><code>{{ testCodeName(selectedTest) }}</code></p>
-            </div>
-            <OutcomePill :outcome="selectedTest.outcome" :detail="formatDuration(selectedTest.duration)" />
-          </header>
-          <FailureCard v-if="selectedTest.failure && selectedTest.outcome !== 'succeeded'" :failure="selectedTest.failure"
-                       :outcome="selectedTest.outcome" @select="selectSpan" />
-          <StoryView v-if="view === 'story'" :test="selectedTest" :selected="selectedSpan?.id" @select="selectSpan" />
-          <StateView v-else-if="view === 'state'" :test="selectedTest" :selected="itemSelection" :selected-span="selectedSpan?.id"
-                     @select-item="selectItem" @select-span="selectSpan" />
-          <Panel v-else-if="view === 'files'" title="Files" subtitle="Everything this test attached, in the order it produced them." pad="none">
-            <FileList :entries="testFiles" @open="openArtifact = $event" />
-          </Panel>
-          <SpansView v-else :test="selectedTest" :selected="selectedSpan?.id" @select="selectSpan" />
-        </div>
+        <template v-else>
+          <!-- Cached so returning from a test keeps the run list instead of rebuilding it; deactivation detaches its DOM. -->
+          <KeepAlive>
+            <RunView v-if="!selectedTest" :run="run" :file-name="fileName" @select="showTest" @artifact="openArtifact = $event" />
+          </KeepAlive>
+          <div v-if="selectedTest" class="test">
+            <header class="test-head">
+              <b>{{ pad(selectedTest.number) }}</b>
+              <div class="test-title">
+                <h1>{{ testTitle(selectedTest) }}</h1>
+                <p><span>{{ testGroup(selectedTest) }}</span><code>{{ testCodeName(selectedTest) }}</code></p>
+              </div>
+              <OutcomePill :outcome="selectedTest.outcome" :detail="formatDuration(selectedTest.duration)" />
+            </header>
+            <FailureCard v-if="selectedTest.failure && selectedTest.outcome !== 'succeeded'" :failure="selectedTest.failure"
+                         :outcome="selectedTest.outcome" @select="selectSpan" />
+            <StoryView v-if="view === 'story'" :test="selectedTest" :selected="selectedSpan?.id" @select="selectSpan" />
+            <StateView v-else-if="view === 'state'" :test="selectedTest" :selected="itemSelection" :selected-span="selectedSpan?.id"
+                       @select-item="selectItem" @select-span="selectSpan" />
+            <Panel v-else-if="view === 'files'" title="Files" subtitle="Everything this test attached, in the order it produced them." pad="none">
+              <FileList :entries="testFiles" @open="openArtifact = $event" />
+            </Panel>
+            <SpansView v-else :test="selectedTest" :selected="selectedSpan?.id" @select="selectSpan" />
+          </div>
+        </template>
       </div>
 
       <ColumnResizer v-if="inspecting" class="inspector-resizer" label="Resize the details"

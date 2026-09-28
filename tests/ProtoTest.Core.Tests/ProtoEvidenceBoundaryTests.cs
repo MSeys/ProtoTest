@@ -5,9 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
 /// The evidence boundary honors the tracing switch and an
-/// artifact size cap. Disabled tracing keeps in-memory recording for gates and tests but installs no
-/// activity listener and captures no sink artifacts; an over-limit attachment is recorded as an error
-/// artifact without its content.
+/// artifact size cap. Disabled tracing records no operations or records, installs no activity listener
+/// and writes no archive, while the run snapshot still lists the tests; an over-limit attachment is
+/// recorded as an error artifact without its content.
 /// </summary>
 [TestFixture]
 public sealed class ProtoEvidenceBoundaryTests
@@ -35,6 +35,35 @@ public sealed class ProtoEvidenceBoundaryTests
 
         // Assert
         Assert.That(host.Trace.Snapshot().Entries, Is.Empty);
+    }
+
+    [Test]
+    public async Task DisabledTracing_ShouldNotRecordOperationsOrWriteAnArchive()
+    {
+        // The pin for what the benchmark's "tracing off" mode measures: with Enabled = false the
+        // recorder drops operations and records, and no archive is written. Application spans are
+        // covered by the listener test above.
+        var output = Path.Combine(Path.GetTempPath(), $"prototest-disabled-{Guid.NewGuid():N}.prototrace");
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options =>
+        {
+            options.Enabled = false;
+            options.OutputPath = output;
+        });
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("disabled tracing", "00001", TestMethods.Placeholder);
+        context.Trace.Operation("benchmark.operation", "Benchmark operation", "ProtoTest.Core.Tests").Begin().Succeed();
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        var run = host.Trace.Snapshot();
+        Assert.Multiple(() =>
+        {
+            Assert.That(run.Tests, Has.Count.EqualTo(1), "the test is still part of the in-memory run");
+            Assert.That(run.Tests[0].Entries, Is.Empty, "no operation or event is recorded");
+            Assert.That(File.Exists(output), Is.False, "the export hook writes nothing");
+        });
     }
 
     [Test]

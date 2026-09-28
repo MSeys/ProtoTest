@@ -40,4 +40,4 @@ ProtoTest 1.0 packages are available on NuGet. The template targets `net10.0` by
 
 ## See it in a real suite
 
-The repository contains [Northstar](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.SampleApp), a multi-tenant sample application, and a [ProtoTest.Demo](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.Demo) suite that tests it across API, messaging, browser, database and workbook boundaries. Examples throughout these docs come from that suite.
+The repository contains [Northstar](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.SampleApp), a multi-tenant sample application, and a [Learning demo](https://github.com/MSeys/ProtoTest/tree/main/samples/Northstar.ProtoTest) suite that tests it across API, messaging, browser, database and workbook boundaries. Examples throughout these docs come from that suite.

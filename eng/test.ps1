@@ -114,12 +114,15 @@ $parallelProjectNames = @(
     "ProtoTest.Devices.Tests",
     "ProtoTest.Devices.WebSocket.AspNetCore.Tests",
     "ProtoTest.Devices.WebSocket.Tests",
+    "ProtoTest.Diagnosis.Tests",
     "ProtoTest.Extensibility.Tests",
+    "ProtoTest.Feedback.Tests",
     "ProtoTest.GraphQL.Tests",
     "ProtoTest.Grpc.Tests",
     "ProtoTest.Hosting.Tests",
     "ProtoTest.Http.Tests",
     "ProtoTest.Json.Tests",
+    "ProtoTest.Mcp.Tests",
     "ProtoTest.Messaging.Tests",
     "ProtoTest.MSTest.Tests",
     "ProtoTest.NUnit.Tests",
@@ -129,6 +132,7 @@ $parallelProjectNames = @(
     "ProtoTest.SampleApp.Domain.Tests",
     "ProtoTest.Sheets.Tests",
     "ProtoTest.Traces.Tests",
+    "ProtoTest.Verification.Tests",
     "ProtoTest.Xunit.Tests"
 )
 

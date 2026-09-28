@@ -128,6 +128,7 @@ OpenAPI              GET /api/orders/{id}      12 hits
 - Endpoints use category `OpenAPI` and identifier `{METHOD} {path}` with the method uppercased.
 - Responses use category `OpenAPI Response`; the display is `Default response` for `default`, otherwise `{key} response`.
 - Properties use category `OpenAPI Property`, identifier = schema path, and a display computed from it: `$` becomes `Response body`, `[]` becomes `.item`, and the remaining segments are joined with `›`.
+- One aggregate item records the specification identity: identifier `spec`, display `Specification`, metadata `spec.source` (the configured source, with URL credentials and known token query values removed) and `spec.hash` (SHA-256 of the loaded content). It has no covered verdict, so the coverage totals, run gates and the report percentage ignore it, and a cross-run comparison can tell the same specification from a changed one.
 
 All items are coverage items: covered ones are successful with a hit count, uncovered ones neutral. Register a [report sink](../observability/reporting.md) to see them, and read [Coverage](../observability/coverage.md) for how to use them.
 
@@ -147,6 +148,7 @@ The package has no capability descriptor and no package-specific attributes. `[R
 - **A missing specification fails at construction.** The configuration overload throws when the DI-resolved collector is created, not at report time.
 - **Unknown constraints are assumed to match.** Only the listed constraint names are enforced.
 - **No base-path rewriting or authentication**, and no refetch on retry — the loader reads the source once.
+- **The specification identity row is not coverage.** One aggregate item per target records `spec.source` and `spec.hash`; it carries no verdict, so no total or gate changes because of it.
 - **Spec-version support is whatever `Microsoft.OpenApi.Readers` 1.6.31 parses.**
 
 ## Links

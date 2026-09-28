@@ -23,7 +23,7 @@ The established .NET combination: host the application with `WebApplicationFacto
 **Where ProtoTest wins**
 
 - One host, one [execution context](./foundation/execution-context.md) and one [lifecycle](./foundation/lifecycle.md) across every integration a test uses, so the API, the database, the broker and the browser share the setup that already ran.
-- One [`.prototrace`](./observability/prototrace.md) per run: the operations of every integration, with the failing assertion in place, readable in the static [trace viewer](https://trace.prototest.dev) or summarized with `prototest trace summary` in CI.
+- One [`.prototrace`](./observability/prototrace.md) per run: the operations of every integration, with the failing assertion in place, readable in the static [trace viewer](https://trace.prototest.dev) or summarized with `prototest summary` in CI.
 - [Contract coverage](./observability/coverage.md) - which endpoints, responses and fields the suite actually asserted - which the four-library stack does not provide.
 - [Provisioners and seed data](./integrations/data/provisioners.md) as reusable setup instead of helpers that grow inside the test project.
 - Five [test-runner adapters](./runners/overview.md): the same suite shape works on NUnit, xUnit v2/v3, MSTest and TUnit.

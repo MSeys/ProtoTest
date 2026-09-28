@@ -45,13 +45,17 @@
     <Project Path="tests/ProtoTest.AdapterContract/ProtoTest.AdapterContract.csproj" />
     <Project Path="tests/ProtoTest.TestSupport/ProtoTest.TestSupport.csproj" />
     <Project Path="tests/ProtoTest.Core.Tests/ProtoTest.Core.Tests.csproj" Id="5c324d8d-8d2d-40d2-a7ca-8c8c9defd042" />
+    <Project Path="tests/ProtoTest.Diagnosis.Tests/ProtoTest.Diagnosis.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Feedback.Tests/ProtoTest.Feedback.Tests.csproj" />
     <Project Path="tests/ProtoTest.Http.Tests/ProtoTest.Http.Tests.csproj" />
     <Project Path="tests/ProtoTest.Json.Tests/ProtoTest.Json.Tests.csproj" />
     <Project Path="tests/ProtoTest.Messaging.Tests/ProtoTest.Messaging.Tests.csproj" />
     <Project Path="tests/ProtoTest.Messaging.RabbitMq.Tests/ProtoTest.Messaging.RabbitMq.Tests.csproj" />
     <Project Path="tests/ProtoTest.Messaging.MassTransit.Tests/ProtoTest.Messaging.MassTransit.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Mcp.Tests/ProtoTest.Mcp.Tests.csproj" />
     <Project Path="tests/ProtoTest.Sheets.Tests/ProtoTest.Sheets.Tests.csproj" />
     <Project Path="tests/ProtoTest.Traces.Tests/ProtoTest.Traces.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Verification.Tests/ProtoTest.Verification.Tests.csproj" />
   </Folder>
   <Folder Name="/4. Tests/Adapters/">
     <Project Path="tests/ProtoTest.MSTest.Tests/ProtoTest.MSTest.Tests.csproj" Id="46d67240-27b6-4460-a3d1-558336e41c9f" />
@@ -92,6 +96,7 @@
   </Folder>
   <Folder Name="/5. Demo/">
     <Project Path="samples/ProtoTest.Demo/ProtoTest.Demo.csproj" />
+    <Project Path="samples/ProtoTest.Mcp.DemoEndpoint/ProtoTest.Mcp.DemoEndpoint.csproj" />
   </Folder>
   <Folder Name="/5. Demo/Supporting projects/">
     <Project Path="samples/ProtoTest.SampleApp.Contracts/ProtoTest.SampleApp.Contracts.csproj" />
@@ -104,7 +109,11 @@
   </Folder>
   <Folder Name="/7. Tools/">
     <Project Path="src/ProtoTest.Cli/ProtoTest.Cli.csproj" />
+    <Project Path="src/ProtoTest.Diagnosis/ProtoTest.Diagnosis.csproj" />
+    <Project Path="src/ProtoTest.Feedback/ProtoTest.Feedback.csproj" />
+    <Project Path="src/ProtoTest.Mcp/ProtoTest.Mcp.csproj" />
     <Project Path="src/ProtoTest.Traces/ProtoTest.Traces.csproj" />
+    <Project Path="src/ProtoTest.Verification/ProtoTest.Verification.csproj" />
   </Folder>
   <Folder Name="/8. Analyzers/">
     <Project Path="src/ProtoTest.Analyzers/ProtoTest.Analyzers.csproj" />

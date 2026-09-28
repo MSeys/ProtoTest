@@ -17,7 +17,8 @@ public static class ProtoHostBuilderExtensions
     /// point to build its host, starts it after the infrastructure registered before it, and stops it
     /// when the run ends. The worker reads the run's settings (started containers' connection strings
     /// and the suite's configuration) through its normal configuration; override values with
-    /// <paramref name="configure"/>.
+    /// <paramref name="configure"/>. It is the shorthand for the chain overload with
+    /// <c>UseHost()</c>, so the top-level worker is hosted in this process and bridges the test clock.
     /// </summary>
     /// <typeparam name="TProgram">The entry point class of the worker application.</typeparam>
     /// <param name="builder">The <see cref="IProtoHostBuilder"/> instance.</param>
@@ -40,17 +41,11 @@ public static class ProtoHostBuilderExtensions
             return builder;
         }
 
-        var worker = ProtoWorkerHost<TProgram>.Create(name, options, registrations.Registry);
-        // This compatibility overload keeps the plain worker registration; the chain overload with
-        // UseHost is the replacement for a caller.
-#pragma warning disable CS0618
-        builder.AddInfrastructure(worker);
-#pragma warning restore CS0618
+        var worker = new ProtoWorkerChainBuilder<TProgram>(name, options, registrations.Registry);
+        worker.UseHost();
+        worker.Register(builder);
         RegisterRegistry(builder, registrations);
-        return builder.AddCapability(new ProtoCapabilityDescriptor(
-            typeof(TProgram).Assembly.GetName().Name ?? typeof(TProgram).FullName!,
-            ProtoCapabilityKinds.Worker,
-            "ProtoTest.Hosting"));
+        return builder;
     }
 
     /// <summary>

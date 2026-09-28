@@ -1,5 +1,9 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { checkItems, deriveVisibility, findFailure, shapeMismatches } from "./analysis";
+import { openTraceArchive } from "./archive";
+import { buildRun } from "./model";
 import type { Change, ChangeSource, Item, SectionItem, Span, TestTrace } from "./model";
 
 function span(overrides: Partial<Span>): Span {
@@ -108,5 +112,38 @@ describe("deriveVisibility", () => {
     expect(visibility.backends).toEqual(["Northstar", "Postgres"]);
     expect(visibility.sources).toEqual(["testside", "observed", "applicationside"]);
     expect(visibility.applicationInstrumented).toBe(true);
+  });
+});
+
+/** Walks up from the test's working directory so the file is found from the viewer or the repository root. */
+function repositoryFile(relative: string): string {
+  let directory = process.cwd();
+  for (;;) {
+    const candidate = join(directory, relative);
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(directory);
+    if (parent === directory) throw new Error(`Could not find ${relative} from ${process.cwd()}.`);
+    directory = parent;
+  }
+}
+
+describe("findFailure over the committed demo trace", () => {
+  it("selects the failures the diagnosis and the CLI pin", async () => {
+    const bytes = readFileSync(repositoryFile("viewer/public/demos/prototest-demo.prototrace"));
+    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+
+    const archive = await openTraceArchive(buffer);
+    const run = buildRun(archive.spans, archive.state);
+    const failureOf = (name: string) => run.tests.find(test => test.name.endsWith(name))?.failure;
+
+    expect(failureOf("AFailedOperationRecordsItsDiagnosticsAndTheRunContinues")?.span.kind).toBe("northstar.webhook.deliver");
+    expect(failureOf("ShapeMismatchesAreCapturedWithoutFailingTheRun")?.span.kind).toBe("assert.json.shape");
+    expect(failureOf("TheDashboardNeverShowsAnotherTenantsPlan")?.span.kind).toBe("assert.web");
+    expect(failureOf("TheOrganizationReportsItsPlanAndProjectCount")?.span.kind).toBe("assert.json.shape");
+
+    // The shape checks were judged on a protocol call, so the failure names that call.
+    expect(failureOf("ShapeMismatchesAreCapturedWithoutFailingTheRun")?.call?.kind).toBe("http.request");
+    expect(failureOf("TheOrganizationReportsItsPlanAndProjectCount")?.call?.kind).toBe("http.request");
+    expect(failureOf("TheDashboardNeverShowsAnotherTenantsPlan")?.call).toBeNull();
   });
 });

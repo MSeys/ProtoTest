@@ -174,7 +174,7 @@ summary.Column(s => s.Total).ShouldNot.Be(0m);
 
 `[Label("Total")]` declares the label text, so the string appears once in the model. The value is converted to the property's type like a table column and `Should.Be` compares with the cell assertion's rules. A label the sheet does not carry fails the read naming the labels the sheet has; a label that appears more than once fails naming its rows. An empty value binds `null` for a nullable or `Optional` property and fails the read otherwise. `MatchModel()` reports every violation in one failure, like the table model.
 
-`[Column]` on a key-value property is the older spelling: it still reads the label, so an existing model keeps compiling, but it is deprecated there and the analyzer (`PT0003`) reports it - migrate the property to `[Label]`. The table-only knobs are rejected on a key-value model: `Unique` because a label already names one value, and a multi-segment path because a label is a single text; `Min`, `Max`, `Pattern` and `OneOf` apply to the value under the label on either spelling.
+`[Column]` is the table mapping only: a key-value property that declares it fails the read naming `[Label("...")]`, so the table's header-path and `Unique` knobs cannot leak into a label model. `Optional`, `Min`, `Max`, `Pattern` and `OneOf` apply to the value under the label.
 
 `Model<TRow>()` and `KeyValueModel<TModel>()` follow the kind the model declares: reading a model with the other accessor fails naming the one to use.
 

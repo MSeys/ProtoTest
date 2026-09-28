@@ -13,10 +13,19 @@ internal static class OpenApiSpecLoader
     /// Loads and parses an OpenAPI document from a local file path, URL, or raw JSON/YAML content.
     /// </summary>
     public static OpenApiDocument Load(string source, string? baseUrl = null, HttpClient? httpClient = null)
+        => LoadWithContent(source, baseUrl, httpClient).Document;
+
+    /// <summary>Loads an OpenAPI document together with the content it was parsed from, so a collector
+    /// can record the document's identity beside its coverage.</summary>
+    public static (string Content, OpenApiDocument Document) LoadWithContent(
+        string source,
+        string? baseUrl = null,
+        HttpClient? httpClient = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
 
-        return LoadFromContent(ProtoDocumentSource.LoadText(source, baseUrl, httpClient, "openapi:", "swagger:"));
+        var content = ProtoDocumentSource.LoadText(source, baseUrl, httpClient, "openapi:", "swagger:");
+        return (content, LoadFromContent(content));
     }
 
     private static OpenApiDocument LoadFromContent(string content)

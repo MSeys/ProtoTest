@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <IsPackable>true</IsPackable>
+    <!-- New in 1.1: no baseline package exists yet; enable once 1.1 ships. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <PackageValidationOptOutReason>New in 1.1; no released baseline exists yet. Validate against the 1.1.0 baseline after it publishes (RELEASING.md).</PackageValidationOptOutReason>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>prototest-mcp</ToolCommandName>
+    <PackageId>ProtoTest.Mcp</PackageId>
+    <Description>Read-only MCP server over .prototrace evidence: an agent lists runs, reads a failure and reads coverage without leaving the machine.</Description>
+    <PackageTags>testing;trace;mcp;agent;tool;dotnet</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.Diagnosis\ProtoTest.Diagnosis.csproj" />
+    <ProjectReference Include="..\ProtoTest.Traces\ProtoTest.Traces.csproj" />
+  </ItemGroup>
+</Project>

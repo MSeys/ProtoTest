@@ -45,8 +45,7 @@ public sealed class LabelAttribute(string label) : Attribute, ISheetValueRules
 
 /// <summary>
 /// Binds one record property to a header path, for example <c>[Column("FY26", "Amount")]</c>. A
-/// key-value model declares its labels with <see cref="LabelAttribute"/>; a <c>[Column]</c> on a
-/// key-value property is still accepted, but it is the table mapping and is deprecated there.
+/// key-value model declares its labels with <see cref="LabelAttribute"/> instead.
 /// </summary>
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Parameter)]
 public sealed class ColumnAttribute(params string[] path) : Attribute, ISheetValueRules

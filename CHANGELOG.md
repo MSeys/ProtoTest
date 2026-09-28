@@ -15,8 +15,7 @@ All ProtoTest packages share one version; breaking API changes are called out be
   `DeviceEndpoint.Setting`. A credential belongs in a setting rather than the address, which the trace
   records.
 - `ProtoDeviceConnect` moved from `ProtoTest.Devices.WebSocket` into `ProtoTest.Devices`, so the socket,
-  in-process and MQTT transports share one connect bound; the old location stays as an obsolete
-  forwarding alias for existing callers.
+  in-process and MQTT transports share one connect bound.
 - The integrations overview lists the `ProtoTest.Devices*` packages with their one-line purposes:
   `ProtoTest.Devices`, `ProtoTest.Devices.WebSocket`, `ProtoTest.Devices.WebSocket.AspNetCore`,
   `ProtoTest.Devices.Mqtt` and `ProtoTest.Devices.Mqtt.Testcontainers`.
@@ -75,7 +74,7 @@ All ProtoTest packages share one version; breaking API changes are called out be
 - Aspire resources serve targets through the chain:
   `UseAspireResource<TAppHost>(resource)` on an application publishes the resource's endpoint under its
   `BaseUrl` and on an infrastructure chain publishes the resource's connection string under the
-  target's declared keys; `MapConnectionString(resource, key)` (options or builder) fills a key no
+  target's declared keys; `ProtoAspireOptions.MapConnectionString(resource, key)` fills a key no
   target declares. The AppHost's providers serve when `ProtoTest:Aspire:Enabled` is set - every
   resource - or when a resource's own `ProtoTest:Aspire:Resources:{resource}:Enabled` is set, which
   resolves only that resource's targets, so "AppHost infrastructure with an in-process application"
@@ -432,27 +431,101 @@ All ProtoTest packages share one version; breaking API changes are called out be
   `ProtoTestPreparation.StartAsync` gained a token overload for an adapter that has one, and
   `ProtoHost.StartTestAsync` gained the overload that carries the prepared attribute set, the
   attachment publisher and the token together.
-- Key-value sheets declare their labels with `[Label("Total")]`: the new mapping attribute on
-  `ProtoTest.Sheets` reads the same label/value block as the older spelling, with `Optional`, `Min`,
-  `Max`, `Pattern` and `OneOf` applying to the value under the label. `[Column]` on a key-value
-  property is deprecated there (see Deprecated), and `ProtoTest.Analyzers` reports it as `PT0003` with
-  a message naming `[Label]`.
+- Key-value sheets declare their labels with `[Label("Total")]`: the mapping attribute on
+  `ProtoTest.Sheets` reads the label/value block, with `Optional`, `Min`, `Max`, `Pattern` and `OneOf`
+  applying to the value under the label. A `[Column]` on a key-value property fails the read naming
+  `[Label]`; `[Column]` stays the table mapping.
+- `ProtoTest.Mcp` is the read-only MCP server over `.prototrace` evidence: `prototest-mcp` speaks the
+  Model Context Protocol (the official `ModelContextProtocol` SDK, Apache-2.0) over stdio, and the
+  transport-agnostic tools - `list_runs`, `get_failure`, `get_coverage` - read only archives and the
+  report a run embedded. No trace is written, no suite is rerun, no port is bound, nothing leaves the
+  machine. Discovery follows one precedence (`--trace <file>`, then `--project <folder>`, then
+  `PROTOTEST_PROJECT`, then the current directory): the folder's `TestResults/` first, then the tree
+  with `bin`, `obj`, `.git` and `node_modules` pruned; "newest" is the greatest recorded
+  `runStartedAtUtc`, and an unreadable archive is skipped with a named reason. Hard caps bound every
+  payload, and a missing file, folder or report is a named error, never a fallback.
+- `ProtoTest.Traces` declares the run- and test-level artifacts an archive carries
+  (`ProtoTraceArchive.Artifacts`, `ProtoTraceTest.Artifacts`) and reads a declared artifact's
+  content on request (`ReadArtifact`), so a consumer reaches the embedded report without unpacking
+  the archive itself; an archive read from a stream has no artifact content to read.
+- The demo-only MCP endpoint is built in the repository (`samples/ProtoTest.Mcp.DemoEndpoint`, not a
+  package): the same read-only tools over the bundled demo trace, rate-limited per caller, loopback
+  only, with no accounts, uploads or retention. It is not hosted yet; the local stdio server stays
+  the product surface and the recorded local session is the evidence.
+- `ProtoTest.Diagnosis` is the deterministic diagnosis over one `.prototrace` run:
+  `ProtoDiagnosis.Read` builds the digest (run identity, timing and environment, outcome counts, each
+  non-succeeded test's selected failure with its rule and mismatches, run gates, findings and the
+  coverage the embedded report published), and `ProtoDiagnosis.ReadContext` returns one failing test's
+  context package (the ancestor chain and the nearest protocol call, section previews, the embedded
+  source snippet, the test's artifacts with content on request, the state the operation changed and the
+  report rows it touched). The rules are ordered and deterministic: a failed `assert.*` with recorded
+  checks or `shape.mismatches`, a failed operation with an error, a runner-reported failure, a finding
+  on a test the runner did not fail, and a failed run gate; anything else is unexplained with a pointer
+  to the viewer. No LLM, no network, no coverage re-derivation, hard caps on every list, and the same
+  archive produces byte-identical JSON (`ProtoDiagnosisJson`).
+- `ProtoTest.Traces` reads the whole 2.0 archive: each operation's sections and moments, the recorded
+  evidence (observations, attachments, findings), the run attributes and run-level events, the embedded
+  sources (`ReadSource`), the tracked state (`ReadState`) and the embedded report (`ProtoTraceReport`,
+  capped at 64 MB). `ProtoTraceTest.Failure` now selects the same failure the viewer selects: the
+  deepest failing operation, an `assert.*` check outranking anything with an error, phase spans
+  (`test.*`) last, with `Ancestors`, `CallAncestor` and `ProtoTraceOperation.ReadMismatches` beside it.
+- `prototest summary` prints the diagnosis document, so the CLI, the MCP tools and the feedback
+  channels tell one story. `ProtoTraceSummaryText` lives in `ProtoTest.Diagnosis`; the MCP server gains
+  `get_diagnosis` (`detail=context` returns one failing test's context package), and `get_failure` and
+  `get_coverage` read the same failure selector and report projection.
+- The OpenAPI and GraphQL schema coverage collectors record the specification identity beside their
+  coverage: one aggregate item per target (identifier `spec`, metadata `spec.source` and `spec.hash`,
+  the SHA-256 of the loaded content) with no covered verdict, so every coverage total, run gate and
+  report percentage is unchanged, while a cross-run comparison can tell the same specification from
+  a changed one. `ProtoReport.ReadJson` reads the JSON report a `ProtoTest.Reporting` sink wrote,
+  summary, items and metadata included, and names a missing or foreign file.
+- `ProtoTest.Verification` compares a baseline report with the candidate report a pull request
+  carries. Coverage regressions (covered to uncovered) and new uncovered units come from the
+  report's own arithmetic (`CoverageUnits`/`CoverageTotals`), the recorded specification identity is
+  checked against the candidate files you give (a remote source is recorded and never fetched, a
+  missing candidate report is `missing`), and the candidate's failed run gates are surfaced as it
+  recorded them. The verdict carries deterministic findings with a class, a severity from
+  `ProtoVerificationOptions`, the target, category and unit, the baseline versus current values and
+  an evidence pointer; `ProtoVerificationVerdict.Failed` is the gate.
+- `prototest index <folder>` writes the static index over a folder of runs: `index.html` beside the
+  traces, each run with its id, start and completion time, outcome counts and the tests that did not
+  pass, linked to its `.prototrace` and its `<trace>.digest.json` digest. The digest is the one
+  `ProtoDiagnosis` document, the page is deterministic for the same folder, and an archive the reader
+  cannot open is listed on the page with the reason. No server and no script. The folder scan lives
+  in `ProtoTest.Traces` (`ProtoTraceDiscovery.Discover`), shared by the CLI and the MCP tools.
+- `ProtoTest.Feedback` posts a failing run's digest where a pull request reads it. The digest is the
+  `ProtoTest.Diagnosis` document, so the comment cannot disagree with `prototest summary`. The
+  channels are pure functions of it: `github-pr-comment` posts the Markdown digest with the composed
+  trace link to the pull request the event payload named, `github-annotations` writes one workflow
+  `::error` per failing test with its source location and per failed run gate, and `webhook` posts the
+  digest JSON to a configured address with an optional shared-secret header. A missing target skips
+  its channel with the reason and a refused target fails it; the comment posts only for a run with a
+  failure or a failed gate.
+- `prototest feedback <file.prototrace>` runs the channels, reading the targets from the GitHub Actions
+  environment (`GITHUB_TOKEN`, `GITHUB_REPOSITORY`, `GITHUB_EVENT_PATH`, `GITHUB_API_URL`) and the
+  webhook and trace-link variables (`PROTOTEST_FEEDBACK_WEBHOOK_URL`,
+  `PROTOTEST_FEEDBACK_WEBHOOK_SECRET`, `PROTOTEST_FEEDBACK_WEBHOOK_SECRET_HEADER`,
+  `PROTOTEST_FEEDBACK_TRACE_URL`); `--digest <path>` also writes the digest JSON. `prototest verify
+  <baseline.json> <current.json>` prints the `ProtoTest.Verification` verdict, exits 1 on a failing
+  finding and writes one `::error` annotation per failing finding; `ProtoVerificationText` is the
+  verdict's text rendering.
+- The **ProtoTest Feedback** GitHub Action (`.github/actions/feedback`) uploads the trace as an
+  artifact, posts the digest through `prototest feedback` with the artifact URL as the trace link, and
+  runs `prototest verify` against a baseline report when one is given.
+- A copy-in skill for coding agents ships in the repository
+  (`skills/prototest-evidence-loop/SKILL.md`): it teaches the evidence loop, the four MCP tools and
+  when to run the `summary`, `index`, `verify` and `feedback` verbs, with the agent-workflows pages
+  linked. It is a repository file, not a package, and the Setup page documents copying it into a
+  client's skills directory or instructions file.
 
 ### Deprecated
 
-- `[Column]` on a property of a key-value sheet model
-  (`[Sheet("Summary", Kind = ProtoSheetKind.KeyValue)]`) is deprecated in favor of `[Label("...")]`.
-  The mapping still compiles and still reads the label - obsoletion is per symbol and `ColumnAttribute`
-  is the table mapping - so an existing model keeps working until it migrates; the analyzer rule
-  `PT0003` and the model's own failures name `[Label]`. A key-value model still rejects the table-only
-  knobs (`Unique`, a multi-segment path). The table `[Column]` mapping is unchanged.
 - The skip-key registration is obsolete: `AddInfrastructure(piece, keys)` keeps its all-configured skip
   rule for 1.x and `AddInfrastructureAlways` keeps the always-start opt-out, while
   `AddInfrastructure(name, chain, keys)` with `UseConfigured()` and `Use(provider)`/`UseContainer(...)`
-  providers is the replacement. The samples, tests and docs moved to the chain; the framework's own
-  retained legacy registrations (the top-level worker host and the loopback application) keep the old
-  surface behind a scoped `CS0618` suppression that names the replacement - the top-level worker host,
-  the loopback application and the Aspire AppHost registration are the retained sites.
+  providers is the replacement. The samples, tests and docs moved to the chain; the loopback
+  application keeps its all-configured rule behind a scoped `CS0618` suppression that names the
+  replacement.
 
 ### Changed
 
@@ -506,6 +579,8 @@ All ProtoTest packages share one version; breaking API changes are called out be
   never re-qualified with the selected application. The unnamed accessor keeps the selected
   application's binding, first client and `Default` fallback unchanged, and a client miss now lists the
   protocol's registered names so the fix is discoverable.
+- `prototest summary` separates the recorded timestamps of its time range with a plain hyphen, so the
+  CLI's own output follows the same no em or en dash rule as the docs.
 
 ### Fixed
 

@@ -36,16 +36,4 @@ internal static class ProtoTestVocabulary
 
     /// <summary>The property that resolves the ambient execution context.</summary>
     public const string ContextProperty = "Context";
-
-    /// <summary>The sheet attribute that declares a model's sheet and shape.</summary>
-    public const string SheetAttribute = "ProtoTest.Sheets.SheetAttribute";
-
-    /// <summary>The enum whose <see cref="SheetKindKeyValue"/> member marks a label/value sheet.</summary>
-    public const string SheetKindType = "ProtoTest.Sheets.ProtoSheetKind";
-
-    /// <summary>The sheet-kind member that marks a key-value model.</summary>
-    public const string SheetKindKeyValue = "KeyValue";
-
-    /// <summary>The table-mapping attribute a key-value model deprecates.</summary>
-    public const string ColumnAttribute = "ProtoTest.Sheets.ColumnAttribute";
 }

@@ -34,6 +34,7 @@ ProtoTest 1.0 packages are available on NuGet. The template targets `net10.0` by
 | stop hand-writing test data | [Data](./integrations/data/index.md) |
 | know what your suite misses | [Coverage](./observability/coverage.md) |
 | debug a failure from CI | [ProtoTrace](./observability/prototrace.md) |
+| point a coding agent at a failing run | [Agent workflows](./agent-workflows/coding-agents.md) |
 | keep traces and reports in CI | [Continuous integration](./continuous-integration/index.md) |
 | add your own integration | [Extending ProtoTest](./advanced/extending.md) |
 

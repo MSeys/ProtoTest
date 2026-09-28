@@ -65,8 +65,8 @@ builder
 - `UseAspireResource<OpenCsmsAppHost>("api")` on an application chain publishes the resource's
   endpoint under the application's derived `BaseUrl`. On an infrastructure chain it publishes the
   resource's **connection string** under every key the target declares.
-- `ProtoAspireOptions.MapConnectionString` (or `builder.MapConnectionString(resource, key)` after
-  registering the AppHost) fills a key no target declares.
+- `ProtoAspireOptions.MapConnectionString(resource, key)` fills a key no target declares; the mapping
+  is declared on the AppHost registration, so it joins the chain's keys like every other mapping.
 - The AppHost starts **once** when it wins any target, at its registration position; a losing provider
   never starts it, and a target whose configured provider wins skips it without starting anything.
 - The mixed compositions are one selection key away. Setting only

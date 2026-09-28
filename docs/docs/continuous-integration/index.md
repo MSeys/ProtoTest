@@ -160,4 +160,5 @@ Open a downloaded `.prototrace` in the [ProtoTrace viewer](https://trace.protote
 - [ProtoTrace](../observability/prototrace.md) explains the archive and viewer.
 - [Reporting](../observability/reporting.md) configures JSON and HTML sinks.
 - [Attachments](../foundation/attachments.md) explains what runners publish.
+- [Agent workflows](../agent-workflows/loop.md) turns the same artifacts into a pull request verdict and comment.
 - [Troubleshooting](../getting-started/troubleshooting.md#the-ci-artifact-is-empty) covers missing CI output.

@@ -144,7 +144,7 @@ public sealed class GraphQLFluentAndProtocolTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(exception!.Message, Does.StartWith(
-                    "query <anonymous> — Shape mismatch failed with 1 error(s):"));
+                    "query <anonymous> - Shape mismatch failed with 1 error(s):"));
                 Assert.That(exception.Message, Does.Contain("$.value"));
                 Assert.That(exception.InnerException, Is.TypeOf<ProtoTest.Json.JsonShapeMismatchException>(),
                     "the shared mismatch data stays reachable");
@@ -172,7 +172,7 @@ public sealed class GraphQLFluentAndProtocolTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(exception!.Message, Does.StartWith(
-                    "query <anonymous> — Shape mismatch failed with 1 error(s):"));
+                    "query <anonymous> - Shape mismatch failed with 1 error(s):"));
                 Assert.That(exception.Message, Does.Contain("$.extra"));
                 Assert.That(exception.Message, Does.Contain("Property was not mentioned in the expected shape."));
                 Assert.That(exception.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
@@ -623,7 +623,7 @@ public sealed class GraphQLFluentAndProtocolTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(exception!.Message, Does.StartWith(
-                    "query <anonymous> — The JSON path '$.missing' did not match: the member 'missing' was not found."));
+                    "query <anonymous> - The JSON path '$.missing' did not match: the member 'missing' was not found."));
                 Assert.That(exception.InnerException, Is.TypeOf<ProtoTest.Json.JsonPathException>());
             }
         }
@@ -687,7 +687,7 @@ public sealed class GraphQLFluentAndProtocolTests
             var exception = Assert.Throws<GraphQLAssertionException>(() => response.ReadRequired<int>());
 
             Assert.That(exception!.Message, Is.EqualTo(
-                "query <anonymous> — ReadRequired<Int32> failed: the response did not contain data."));
+                "query <anonymous> - ReadRequired<Int32> failed: the response did not contain data."));
         }
         finally { await host.CompleteTestAsync(); }
     }
@@ -706,7 +706,7 @@ public sealed class GraphQLFluentAndProtocolTests
             var exception = Assert.Throws<GraphQLAssertionException>(() => response.ReadRequired<string>("$.note"));
 
             Assert.That(exception!.Message, Is.EqualTo(
-                "query <anonymous> — ReadRequired<String>('$.note') failed: the value at '$.note' was JSON null."));
+                "query <anonymous> - ReadRequired<String>('$.note') failed: the value at '$.note' was JSON null."));
         }
         finally { await host.CompleteTestAsync(); }
     }
@@ -728,7 +728,7 @@ public sealed class GraphQLFluentAndProtocolTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exception!.Message, Is.EqualTo(
-                "query <anonymous> — ReadRequired<Int32>('$.note') failed: the value at '$.note' was JSON null."));
+                "query <anonymous> - ReadRequired<Int32>('$.note') failed: the value at '$.note' was JSON null."));
             Assert.That(operation.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
             Assert.That(operation.Attributes["target.type"], Is.EqualTo(typeof(int).FullName));
             Assert.That(operation.Attributes["graphql.path"], Is.EqualTo("$.note"));
@@ -750,7 +750,7 @@ public sealed class GraphQLFluentAndProtocolTests
             var exception = Assert.Throws<GraphQLAssertionException>(() => response.ReadRequired<int>());
 
             Assert.That(exception!.Message, Is.EqualTo(
-                "query <anonymous> — ReadRequired<Int32> failed: the response did not contain data."));
+                "query <anonymous> - ReadRequired<Int32> failed: the response did not contain data."));
         }
         finally { await host.CompleteTestAsync(); }
     }

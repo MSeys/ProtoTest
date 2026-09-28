@@ -11,16 +11,6 @@ description: "A per-test GraphQL client for queries, mutations and subscriptions
 
 `ProtoTest.GraphQL` gives each test a GraphQL client for queries, mutations and subscriptions (WebSocket or SSE), with file uploads, shape assertions and schema coverage. It shares its HTTP plumbing, [authentication model](../rest/authentication.md) and capture options with REST.
 
-## Install
-
-```bash
-dotnet add package ProtoTest.GraphQL
-```
-
-ProtoTest targets **.NET 8, 9 and 10**. The template defaults to `net10.0` unless you pass `-f net8.0` (or `net9.0`) to `dotnet new`.
-
-## The idea
-
 Most GraphQL test code says the same thing twice: once as a selection set, once as the assertion. ProtoTest lets one anonymous object do both.
 
 ```csharp
@@ -41,6 +31,14 @@ response.Should.HaveNoErrors();
 ```
 
 `ExpectAsync` turns the shape into `{ id product total status }`, sends the mutation with `$input` declared as `CreateOrderInput!`, and asserts the result against the same shape.
+
+## Install
+
+```bash
+dotnet add package ProtoTest.GraphQL
+```
+
+ProtoTest targets **.NET 8, 9 and 10**. The template defaults to `net10.0` unless you pass `-f net8.0` (or `net9.0`) to `dotnet new`.
 
 ## Compose
 
@@ -110,7 +108,7 @@ graphQL.AddClient("GraphQL")
 | `ProtoTest:Applications:{app}:GraphQL` | `SubscriptionTransport` | `WebSocket`; `Sse` is the other valid value |
 | | `Schema` | schema source for `WithSchemaCoverage()` |
 
-Tune the options in code with `ConfigureResponses(...)` and `CaptureAttachments(...)`; code callbacks compose in registration order and the known section binds over the result, so configuration wins over code. The transport can come from configuration too — an invalid value throws when the test first calls `GraphQL()`, naming `WebSocket` and `Sse`.
+Tune the options in code with `ConfigureResponses(...)` and `CaptureAttachments(...)`; code callbacks compose in registration order and the known section binds over the result, so configuration wins over code. The transport can come from configuration too; an invalid value throws when the test first calls `GraphQL()`, naming `WebSocket` and `Sse`.
 
 ### Context API
 
@@ -118,7 +116,7 @@ Tune the options in code with `ConfigureResponses(...)` and `CaptureAttachments(
 GraphQLRequestBuilder GraphQL(this ProtoExecutionContext context, string? clientName = null);
 ```
 
-`Proto.Context.GraphQL(name)` resolves the client in this order: the requested name, the client bound by `[Application(…)]` for GraphQL, the application's first registered GraphQL client, then `"Default"`. A requested name first tries its application-qualified form, then the name as given, then — when exactly one client of the protocol has that unqualified name — the client another application registered under that name; two applications sharing the name must be qualified (`App:Client`). A client with no base address and no owner for its address falls back to the application's in-process transport, rooted at the endpoint the client registered, then `"GraphQL"`, then the requested name — looking up `ProtoTest:Applications:{application}:Endpoints:{name}`. A per-test resolver beats `HttpClient.BaseAddress`; if nothing resolves, the call throws `InvalidOperationException` listing the registered client names.
+`Proto.Context.GraphQL(name)` resolves the client in this order: the requested name, the client bound by `[Application(…)]` for GraphQL, the application's first registered GraphQL client, then `"Default"`. A requested name first tries its application-qualified form, then the name as given, then the same name another application registered when exactly one client of the protocol has it; two applications sharing the name must be qualified (`App:Client`). A client with no base address and no owner for its address falls back to the application's in-process transport, rooted at the endpoint the client registered, then `"GraphQL"`, then the requested name, looking up `ProtoTest:Applications:{application}:Endpoints:{name}`. A per-test resolver beats `HttpClient.BaseAddress`; if nothing resolves, the call throws `InvalidOperationException` listing the registered client names.
 
 Creating the builder records a `graphql.builder.create` event with the client, application, resolved source client, whether auth is configured and which resolver supplied the endpoint.
 
@@ -142,18 +140,18 @@ public sealed class ViewerTests
 
 ### Going further
 
-- **Authentication** — the same `[Auth<T>]`, `.Auth(...)` and `.WithoutAuth()` as [REST](../rest/authentication.md); narrow to GraphQL with `Protocols = ["GraphQL"]`. The [built-in test user](../rest/authentication.md#built-in-test-user) rides the same pipeline.
-- **Queries, mutations and uploads** — shape-driven, fluent and raw documents: [Queries and mutations](./operations.md).
-- **Subscriptions** — WebSocket or SSE, connection payloads, custom sockets: [Subscriptions](./subscriptions.md).
-- **Schema coverage** — point a client at your SDL: [Schema coverage](./coverage.md).
-- **Multiple clients** — pass `.GraphQL("Reporting")`, or bind one with `[Application("Api", "GraphQL:Reporting")]`.
-- **In-process server** — a client with no URL reuses the application's transport automatically; a configured `BaseUrl` takes precedence.
+- **Authentication** - the same `[Auth<T>]`, `.Auth(...)` and `.WithoutAuth()` as [REST](../rest/authentication.md); narrow to GraphQL with `Protocols = ["GraphQL"]`. The [built-in test user](../rest/authentication.md#built-in-test-user) rides the same pipeline.
+- **Queries, mutations and uploads** - shape-driven, fluent and raw documents: [Queries and mutations](./operations.md).
+- **Subscriptions** - WebSocket or SSE, connection payloads, custom sockets: [Subscriptions](./subscriptions.md).
+- **Schema coverage** - point a client at your SDL: [Schema coverage](./coverage.md).
+- **Multiple clients** - pass `.GraphQL("Reporting")`, or bind one with `[Application("Api", "GraphQL:Reporting")]`.
+- **In-process server** - a client with no URL reuses the application's transport automatically; a configured `BaseUrl` takes precedence.
 
 ## In the trace and coverage
 
 Queries and mutations record a `graphql.operation` operation (`GraphQL · {type} {name}`) under the protocol-scoped client entity (`client:HttpClient:GraphQL:{target}`), with a `graphql.endpoint.resolve` child, the operation type and name, header count, response status and error count; assertions record `assert.http.status`, `assert.graphql.*` and `assert.json.shape` as children. Deserialization records `graphql.response.deserialize`. Observations: `graphql.response` for every response, `graphql.failure` when sending fails, and `graphql.contract.shape` when a shape assertion matches. Subscriptions add `graphql.subscription.start|next|complete` events.
 
-`GraphQLCoverageCollector` reports operation-level hits; `GraphQLSchemaCoverageCollector` walks the SDL — see [Schema coverage](./coverage.md) and [Coverage](../../observability/coverage.md).
+`GraphQLCoverageCollector` reports operation-level hits; `GraphQLSchemaCoverageCollector` walks the SDL. See [Schema coverage](./coverage.md) and [Coverage](../../observability/coverage.md).
 
 ## Skip
 
@@ -164,7 +162,7 @@ Queries and mutations record a `graphql.operation` operation (`GraphQL · {type}
 ## Limits
 
 - No batching, persisted operations or incremental delivery (`@defer`).
-- WebSocket subscriptions speak only `graphql-transport-ws` — no legacy `graphql-ws` protocol.
+- WebSocket subscriptions speak only `graphql-transport-ws`; the legacy `graphql-ws` protocol is not supported.
 - A fluent `.Argument("file", Gql.Upload(...))` is **not** routed through the multipart normalizer; uploads are discovered in shape-driven arguments and in `.Variables(...)`.
 - Shape variable type strings are parsed when you create the variable, so an invalid type fails immediately.
 - Only one `NextAsync` may be pending at a time.
@@ -173,9 +171,9 @@ Queries and mutations record a `graphql.operation` operation (`GraphQL · {type}
 
 ## Next
 
-- [Queries and mutations](./operations.md) — shape-driven operations, variables, the fluent builder and uploads.
-- [Responses](./responses.md) — errors, data and assertions.
-- [Subscriptions](./subscriptions.md) — streaming results over WebSocket or SSE.
-- [Schema coverage](./coverage.md) — which types, fields and arguments your suite exercised.
+- [Queries and mutations](./operations.md) - shape-driven operations, variables, the fluent builder and uploads.
+- [Responses](./responses.md) - errors, data and assertions.
+- [Subscriptions](./subscriptions.md) - streaming results over WebSocket or SSE.
+- [Schema coverage](./coverage.md) - which types, fields and arguments your suite exercised.
 
 The full flows live in the demo: [PlatformJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/PlatformJourney.cs) and [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs).

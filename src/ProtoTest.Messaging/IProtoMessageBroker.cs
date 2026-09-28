@@ -61,8 +61,8 @@ public sealed record ProtoMessage(
     // Messaging's half of the shared read: its exception type and destination subject. Messaging records
     // no deserialize trace event (the assertion exception is the evidence), so the sink stays null.
     private ProtoJsonReadSemantics ReadSemantics<T>() => new(
-        RequiredFailure: message => new MessagingAssertionException($"{Destination} — {message}"),
-        PathMissFailure: (message, inner) => new MessagingAssertionException($"{Destination} — {message}", inner),
+        RequiredFailure: message => new MessagingAssertionException($"{Destination} - {message}"),
+        PathMissFailure: (message, inner) => new MessagingAssertionException($"{Destination} - {message}", inner),
         EmptyBodyReason: "the payload was empty",
         NullBodyReason: "the payload was JSON null");
 }

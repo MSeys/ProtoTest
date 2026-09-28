@@ -6,7 +6,7 @@ description: "Set ProtoTest options in code, in configuration, or both, so one s
 
 # Configuration
 
-Most ProtoTest options can be set in code, in configuration files, or both. That lets one suite run in-process on a laptop and against a deployed environment in CI, with nothing but a different settings file.
+Most ProtoTest options can be set in code, in configuration files, or both. One suite can run in-process on a laptop and against a deployed environment in CI, with nothing but a different settings file.
 
 ## Adding configuration sources
 
@@ -18,7 +18,7 @@ builder.ConfigureAppConfiguration(configuration => configuration
     .AddEnvironmentVariables());
 ```
 
-`AddJsonFile` and `AddEnvironmentVariables` come from the `Microsoft.Extensions.Configuration.Json` and `…EnvironmentVariables` packages. Make sure JSON files are copied to the output directory:
+`AddJsonFile` and `AddEnvironmentVariables` come from the `Microsoft.Extensions.Configuration.Json` and `Microsoft.Extensions.Configuration.EnvironmentVariables` packages. Make sure JSON files are copied to the output directory:
 
 ```xml
 <None Update="appsettings.Test.json" CopyToOutputDirectory="PreserveNewest" />
@@ -41,21 +41,21 @@ Tests read configuration through `Proto.Context.Configuration`.
 
 ## Host options (code only)
 
-Two option sets are set in code while the host is built; neither binds from configuration, because Core options do not implement `IProtoConfigurableOptions` and so have no configuration section.
+Two option sets are set in code while the host is built. Neither binds from configuration, because Core options do not implement `IProtoConfigurableOptions` and so have no configuration section.
 
 `ConfigureTestIds` fills a `ProtoTestIdOptions`:
 
 | Key | Type | Default |
 | --- | --- | --- |
 | `RunPrefix` | `long?` | a random six-digit number per host |
-| `SequenceDigits` | `int` | `6` (valid 1–9) |
+| `SequenceDigits` | `int` | `6` (valid 1 to 9) |
 
 `ConfigureTracing` fills a `ProtoTraceOptions`:
 
 | Key | Type | Default |
 | --- | --- | --- |
 | `Enabled` | `bool` | `true` |
-| `OutputPath` | `string?` | `null` → `TestResults/prototest-{runId}.prototrace` |
+| `OutputPath` | `string?` | `null`, which means `TestResults/prototest-{runId}.prototrace` |
 | `ActivitySources` | `IList<string>` | empty |
 | `CaptureSourceLocations` | `bool` | `true` |
 | `EmbedSources` | `bool` | `true`; embedding requires `CaptureSourceLocations && EmbedSources` |
@@ -74,7 +74,7 @@ To replace the id scheme entirely, register your own `IProtoTestIdGenerator` wit
 
 ## Repeated registration
 
-The rule of thumb: **infrastructure registers once, clients compose, config callbacks accumulate** — with hooks and gates as the exception. A repeated `Add…` is safe by design, but what the second call does depends on what it registers:
+The rule of thumb: **infrastructure registers once, clients compose, config callbacks accumulate**, with hooks and gates as the exception. A repeated `Add...` is safe by design, but what the second call does depends on what it registers:
 
 | You call | What a second call does |
 | --- | --- |
@@ -89,11 +89,11 @@ The rule of thumb: **infrastructure registers once, clients compose, config call
 | `AddData` | composes onto one registry; every call's callback runs |
 | `AddCollector<TCollector>` | the same collector type for the same target registers once |
 
-Some repeat rules are errors rather than no-ops: a different run resource under an existing id throws, `AddInfrastructure` rejects a resource whose `Scope` is not `Run` and rejects settings keys on a piece that provides no addresses, and a duplicate client type and name throws during setup. A `configure` callback that throws is not remembered — a later successful call can still compose the integration.
+Some repeat rules are errors rather than no-ops: a different run resource under an existing id throws, `AddInfrastructure` rejects a resource whose `Scope` is not `Run` and rejects settings keys on a piece that provides no addresses, and a duplicate client type and name throws during setup. A `configure` callback that throws is not remembered: a later successful call can still compose the integration.
 
 ## Which value wins
 
-For options that support both, values are applied in this order — **later wins**:
+For options that support both, values are applied in this order, and the later wins:
 
 1. the option's **default**,
 2. your **code** (the `configure` callback),
@@ -101,7 +101,7 @@ For options that support both, values are applied in this order — **later wins
 
 So code sets sensible defaults for the suite, and an environment overrides them without a rebuild.
 
-The one exception is a base address: a URL passed directly to `AddClient("Api", "https://…")` wins over the client's base address under `ProtoTest:Applications:{app}` — the application's `BaseUrl` joined with `Endpoints:{client}` when that endpoint is configured. Leave it out of code when you want configuration to decide.
+The one exception is a base address: a URL passed directly to `AddClient("Api", "https://...")` wins over the client's base address under `ProtoTest:Applications:{app}`. That base address is the application's `BaseUrl` joined with `Endpoints:{client}` when that endpoint is configured. Leave it out of code when you want configuration to decide.
 
 ## Everything configurable
 
@@ -138,4 +138,10 @@ An integration's own options bind from one section named `ProtoTest:<Integration
 
 A renamed section keeps its old key working as a deprecated fallback for one release: `ProtoTest:Grpc:Client` binds over the legacy `ProtoTest:Grpc`, and a value under the current section wins. The next major removes the fallback.
 
-Configured only in code: tracing (`ConfigureTracing`), test ids (`ConfigureTestIds`) and data defaults (`AddData`). Those callbacks run while the host is being built, before configuration exists, so they can't read `IConfiguration`. If a value needs to vary per environment, read it yourself — for example `trace.OutputPath = Environment.GetEnvironmentVariable("TRACE_PATH") ?? "TestResults/run.prototrace";`. Inside tests, hooks and attributes, `context.Configuration` has everything.
+Configured only in code: tracing (`ConfigureTracing`), test ids (`ConfigureTestIds`) and data defaults (`AddData`). Those callbacks run while the host is being built, before configuration exists, so they cannot read `IConfiguration`. If a value needs to vary per environment, read it yourself, for example `trace.OutputPath = Environment.GetEnvironmentVariable("TRACE_PATH") ?? "TestResults/run.prototrace";`. Inside tests, hooks and attributes, `context.Configuration` has everything.
+
+## Where to next
+
+- [Environments](./environments.md): the same suite in-process, container-backed or against a published system.
+- [Infrastructure](../foundation/infrastructure.md): pieces the run starts and the settings they publish.
+- [Troubleshooting](./troubleshooting.md): when a client or a container does not come up.

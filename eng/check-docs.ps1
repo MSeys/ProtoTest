@@ -1,15 +1,17 @@
 [CmdletBinding()]
 param()
 
-# Documentation enforcement for docs/docs and docs/src. It runs before the Docusaurus build so that
-# removed symbols, dead API names, configuration keys and sample links cannot drift back in. This
-# mirrors the enforcement list in assets/internal/docs-rework-plan.md.
+# Documentation enforcement for the Docusaurus content roots, docs/docs and docs/learn, plus docs/src.
+# It runs before the Docusaurus build so that removed symbols, dead API names, configuration keys and
+# sample links cannot drift back in. This mirrors the enforcement list in
+# assets/internal/docs-rework-plan.md.
 
 $ErrorActionPreference = "Stop"
 
 $repository = Split-Path -Parent $PSScriptRoot
 $docsRoot = Join-Path $repository "docs"
 $docsContentRoot = Join-Path $docsRoot "docs"
+$learnContentRoot = Join-Path $docsRoot "learn"
 $docsSourceRoot = Join-Path $docsRoot "src"
 $factsRoot = Join-Path $repository "assets\internal\records\docs-facts"
 
@@ -17,6 +19,9 @@ $generatedFolders = '[\\/](build|\.docusaurus|node_modules|obj|bin)[\\/]'
 
 $docsContentFiles = @(Get-ChildItem -LiteralPath $docsContentRoot -Recurse -File |
     Where-Object { $_.Extension -in '.md', '.mdx' -and $_.FullName -notmatch $generatedFolders })
+$learnContentFiles = @(Get-ChildItem -LiteralPath $learnContentRoot -Recurse -File |
+    Where-Object { $_.Extension -in '.md', '.mdx' -and $_.FullName -notmatch $generatedFolders })
+$contentFiles = @($docsContentFiles + $learnContentFiles)
 $docsSourceFiles = @(Get-ChildItem -LiteralPath $docsSourceRoot -Recurse -File |
     Where-Object { $_.Extension -in '.ts', '.tsx', '.md', '.mdx' -and $_.FullName -notmatch $generatedFolders })
 
@@ -98,7 +103,7 @@ foreach ($suppressionFile in Get-ChildItem -Path (Join-Path $repository "src") -
 
 $forbiddenSymbols = @($forbiddenVocabulary) + @($removedApiSymbols | Sort-Object)
 
-foreach ($file in @($docsContentFiles + $docsSourceFiles)) {
+foreach ($file in @($contentFiles + $docsSourceFiles)) {
     $relative = Get-RelativePath $file.FullName
     $lines = @(Get-Content -LiteralPath $file.FullName)
     for ($lineNumber = 0; $lineNumber -lt $lines.Count; $lineNumber++) {
@@ -148,7 +153,7 @@ foreach ($sourceRoot in $sourceRoots) {
     }
 }
 
-foreach ($file in @($docsContentFiles + $docsSourceFiles)) {
+foreach ($file in @($contentFiles + $docsSourceFiles)) {
     $relative = Get-RelativePath $file.FullName
     $lines = @(Get-Content -LiteralPath $file.FullName)
     for ($lineNumber = 0; $lineNumber -lt $lines.Count; $lineNumber++) {
@@ -249,7 +254,7 @@ function Test-KeyCovered {
     return $false
 }
 
-$docsKeys = Get-ConfigurationKeys -Files @($docsContentFiles + $docsSourceFiles | ForEach-Object { $_.FullName })
+$docsKeys = Get-ConfigurationKeys -Files @($contentFiles + $docsSourceFiles | ForEach-Object { $_.FullName })
 $factKeys = Get-ConfigurationKeys -Files @($factFiles | ForEach-Object { $_.FullName })
 $keyCrossCheckSkipped = $factFiles.Count -eq 0
 $publicCandidates = @($publicSections) + @($publicAllowedKeys)
@@ -285,7 +290,7 @@ if (-not $keyCrossCheckSkipped) {
 # cannot see, because no link markup is there to follow.
 
 $linkPattern = [regex]'\]\(([^()\s]+)\)'
-foreach ($file in $docsContentFiles) {
+foreach ($file in $contentFiles) {
     $relative = Get-RelativePath $file.FullName
     $lines = @(Get-Content -LiteralPath $file.FullName)
     for ($lineNumber = 0; $lineNumber -lt $lines.Count; $lineNumber++) {
@@ -322,7 +327,7 @@ foreach ($file in $docsContentFiles) {
 # layout (Next.js's `src/pages`): this repository names its projects in PascalCase, so a lowercase
 # first segment is prose about another tree and is left alone. Relative links were resolved above.
 $repoPathPattern = [regex]'(?<![\w./\\-])(samples|src)/([A-Za-z0-9_.\-]+(?:/[A-Za-z0-9_.\-]+)*)'
-foreach ($file in @($docsContentFiles + $docsSourceFiles)) {
+foreach ($file in @($contentFiles + $docsSourceFiles)) {
     $relative = Get-RelativePath $file.FullName
     $lines = @(Get-Content -LiteralPath $file.FullName)
     for ($lineNumber = 0; $lineNumber -lt $lines.Count; $lineNumber++) {
@@ -390,7 +395,7 @@ else {
 
 # Summary -----------------------------------------------------------------------
 
-$checkedFiles = $docsContentFiles.Count + $docsSourceFiles.Count + $factFiles.Count
+$checkedFiles = $contentFiles.Count + $docsSourceFiles.Count + $factFiles.Count
 $totalFailures = $forbiddenFailures.Count + $apiFailures.Count + $keyFailures.Count + $linkFailures.Count + $shapeFailures.Count + $releaseFailures.Count
 
 if ($totalFailures -gt 0) {
@@ -421,8 +426,8 @@ if ($totalFailures -gt 0) {
     }
 }
 
-$summary = "check-docs: checked {0} files ({1} docs pages, {2} source files, {3} fact sheets); {4} failure(s)." -f
-    $checkedFiles, $docsContentFiles.Count, $docsSourceFiles.Count, $factFiles.Count, $totalFailures
+$summary = "check-docs: checked {0} files ({1} docs pages, {2} learn pages, {3} source files, {4} fact sheets); {5} failure(s)." -f
+    $checkedFiles, $docsContentFiles.Count, $learnContentFiles.Count, $docsSourceFiles.Count, $factFiles.Count, $totalFailures
 $summary += " The integration shape check covered {0} page(s)." -f $integrationShapePages.Count
 if ($keyCrossCheckSkipped) {
     $summary += " The private fact sheets are absent; the key cross-check ran against docs/configuration-keys.json (source section constants and documented exceptions), so a docs key no source section backs still fails. The fact-sheet-to-docs half needs the private records checkout."

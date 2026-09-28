@@ -1,7 +1,7 @@
 ---
 sidebar_position: 2
 title: Building requests
-description: "Build a REST request fluently — route parameters, body, headers, authentication — and send it with a verb method."
+description: "Build a REST request fluently with route parameters, body, headers and authentication, and send it with a verb method."
 ---
 
 # Building requests
@@ -28,7 +28,7 @@ Task<RestResponse> OptionsAsync(...);
 Task<RestResponse> SendAsync(HttpMethod method, string routeTemplate, object? routeAndQueryParams = null, CancellationToken ct = default);
 ```
 
-`RestResponse` is `IDisposable` — use `using var` (the response body is already buffered, so disposing doesn't cut anything short).
+`RestResponse` is `IDisposable`; use `using var` (the response body is already buffered, so disposing doesn't cut anything short).
 
 ## Route templates and parameters
 
@@ -44,8 +44,8 @@ await Proto.Context.Rest().GetAsync(
 
 The rules, precisely:
 
-- Placeholders match `{name}` — ASCII letters, digits and `_` — and are resolved **case-insensitively** against the object's public properties. A dictionary with string keys works too.
-- A placeholder with no matching value — or a null one — throws `ArgumentException` naming the parameter.
+- Placeholders match `{name}`, ASCII letters, digits and `_`, and are resolved **case-insensitively** against the object's public properties. A dictionary with string keys works too.
+- A placeholder with no matching value, or a null one, throws `ArgumentException` naming the parameter.
 - Every remaining non-null property becomes a query parameter.
 - Keys and values are escaped with `Uri.EscapeDataString`, so `"c# & .net"` is safe to pass.
 - Nulls are skipped entirely.

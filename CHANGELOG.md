@@ -529,6 +529,9 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ### Changed
 
+- Assertion messages across GraphQL, gRPC, messaging, REST and Sheets separate the subject from the
+  message with a plain hyphen (` - `) instead of an em-dash, matching the text the docs and the CLI
+  quote.
 - A RabbitMQ test consumer releases its tap queues and channels in parallel instead of one destination
   after another: the taps are independent, every tap is still attempted and a failure in one never stops
   the others. Three tapped destinations drop from about 17 ms to about 13 ms of per-test teardown

@@ -6,9 +6,17 @@ description: "How the ProtoTest host is built, started and stopped, and the orde
 
 # Host and lifecycle
 
-## Building the host
+## What it is
 
-Your runner's [assembly setup](../runners/overview.md) gives you an `IProtoHostBuilder`:
+`ProtoHost` is built once per test process by your runner's [assembly setup](../runners/overview.md). It owns the dependency injection container, runs suite-wide hooks and [run gates](#run-gates-and-resources), starts [infrastructure](./infrastructure.md), and starts and completes each test.
+
+`ProtoExecutionContext` exists for exactly one test. It holds that test's clients, typed state, resources, attachments and observations. See [Execution context](./execution-context.md).
+
+## How it works
+
+### Building the host
+
+The runner's setup class receives an `IProtoHostBuilder`:
 
 ```csharp
 protected override void Configure(IProtoHostBuilder builder) =>
@@ -35,45 +43,9 @@ IProtoHostBuilder AddResource(IProtoResource resource);
 ProtoHost Build();
 ```
 
-Every integration's `Add…` method is an extension on this same builder. A builder can only build once. The option tables for `ProtoTestIdOptions` and `ProtoTraceOptions` are in [Configuration](../getting-started/configuration.md#host-options-code-only).
+Every integration's `Add...` method is an extension on this same builder. A builder can only build once. The option tables for `ProtoTestIdOptions` and `ProtoTraceOptions` are in [Configuration](../getting-started/configuration.md#host-options-code-only).
 
-## Run gates and resources
-
-`AddRunGate` registers a check that runs **once, after the last test and before the reports are written**, so it can see everything the run's collectors produced. `ProtoRunGateContext` exposes `Items`, `ItemsOfKind`, `InCategory`, `ForTarget` and `WithStatus`, plus coverage helpers such as `CoverageFor(target)`. A result is `Passed`, `Warning`, `Failed` or `Skipped`; a gate that returns no result is treated as failed, and a failed gate throws `ProtoRunGateException` out of `AfterRunAsync`. The delegate overload is the quick form:
-
-```csharp
-builder.AddRunGate("no error findings", context => context
-    .ItemsOfKind(ProtoReportItemKinds.Finding)
-    .Any(item => item.Status == ProtoReportStatus.Error)
-    ? ProtoRunGateResult.Failed("The run recorded error findings.")
-    : ProtoRunGateResult.Passed("No error findings were recorded."));
-```
-
-`AddResource(IProtoResource)` registers an already-created, run-scoped resource — a started container, a connection — that the host owns and releases with the run, without starting anything. `AddInfrastructure` is the variant that starts with the run and fills settings; see [Infrastructure](./infrastructure.md).
-
-## Test ids
-
-Every test gets a numeric id, and everything the test produces is keyed by it — trace entries, archived artifacts, and often the data your own attributes create (`$"test-{context.TestId}"`).
-
-An id is a **run prefix** followed by a **sequence**: with the defaults, `482913000001`, `482913000002`, …
-
-| `ProtoTestIdOptions` | Default |
-| --- | --- |
-| `RunPrefix` | a random six-digit number per host |
-| `SequenceDigits` | `6` (1–9) |
-
-The random prefix keeps ids from colliding when several test processes create data in the same shared environment. Set a fixed `RunPrefix` — for example from a CI build number — when you want ids you can trace back to a pipeline run. Ids are at most 18 digits; running out of sequence numbers throws.
-
-To replace the scheme entirely, register your own `IProtoTestIdGenerator`:
-
-```csharp
-public interface IProtoTestIdGenerator
-{
-    ProtoTestId Next(MethodInfo testMethod);
-}
-```
-
-## The run
+### The run
 
 ```mermaid
 sequenceDiagram
@@ -82,7 +54,7 @@ sequenceDiagram
     participant RunHooks as Run hooks
     Runner->>Host: StartAsync
     Host->>RunHooks: BeforeRunAsync (ascending Order)
-    Note over Runner,Host: …tests run…
+    Note over Runner,Host: tests run
     Runner->>Host: StopAsync
     Host->>RunHooks: AfterRunAsync (descending Order)
     Note over Host: gates evaluate, report sinks export, run resources release, then the .prototrace is written
@@ -94,9 +66,7 @@ sequenceDiagram
 
 ProtoTest's own run hooks are ordered to run **last** on the way out: run gates evaluate first, report sinks export next, run-scoped resources release, and the trace archive is written last, so it can include the reports.
 
-## A test
-
-### Setup
+### A test
 
 When the runner starts a test:
 
@@ -105,9 +75,7 @@ When the runner starts a test:
 3. **Every `ProtoAttribute`** on the test runs `BeforeTestAsync`, in ascending `Order`.
 4. Your test body runs.
 
-**All hooks run before any attribute**, whatever their `Order` values. Among attributes, only `Order` matters — whether an attribute sits on the class or the method doesn't change when it runs; ties keep class attributes first.
-
-### Teardown
+**All hooks run before any attribute**, whatever their `Order` values. Among attributes, only `Order` matters: whether an attribute sits on the class or the method does not change when it runs, and ties keep class attributes first.
 
 When the runner completes the test:
 
@@ -115,9 +83,9 @@ When the runner completes the test:
 2. Hooks run `AfterTestAsync` in **reverse** order.
 3. [Attachments](./attachments.md) are published to the runner.
 4. `context.DisposeAsync` releases owned resources in reverse registration order, then disposes the DI scope.
-5. The test's trace artifacts are captured and the recorder is completed with its outcome; `Proto.Context` is cleared.
+5. The test's trace artifacts are captured and the recorder is completed with its outcome. `Proto.Context` is cleared.
 
-**Every step is attempted**, even when an earlier one throws. A teardown failure is recorded as an `Error` finding and does not replace the outcome the test already reported — a cleanup error never hides a failed assertion. The failure still surfaces to the runner: one exception is rethrown as-is, several become one `AggregateException`.
+**Every step is attempted**, even when an earlier one throws. A teardown failure is recorded as an `Error` finding and does not replace the outcome the test already reported, so a cleanup error never hides a failed assertion. The failure still surfaces to the runner: one exception is rethrown as-is, several become one `AggregateException`.
 
 ### When setup fails
 
@@ -127,7 +95,7 @@ If a hook or attribute throws during setup, ProtoTest **rolls back**: only the c
 FirstHook:Before
 SecondHook:Before
 FirstAttribute:Before
-FailingAttribute:Before   ← throws
+FailingAttribute:Before   <- throws
 FirstAttribute:After
 SecondHook:After
 FirstHook:After
@@ -141,7 +109,23 @@ This is why teardown code should tolerate partial setup. The sample environment 
 
 A context is tied to the async flow that started it. Starting a second test on the same flow before completing the first throws, as does completing a test from a different host. Skipped tests never reach this point: a [skip condition](./skip-conditions.md) is evaluated before `StartTestAsync`, so there is no context to complete.
 
-## `ProtoHost`
+## How to use it
+
+Runner packages call `StartTestAsync` and `CompleteTestAsync` for you. You would only call them yourself when building a runner integration, or when testing ProtoTest extensions, as the repository's own tests do:
+
+```csharp
+var host = new ProtoHostBuilder().AddRest().Build();
+await using var ownedHost = host;
+await host.StartAsync();
+
+var context = await host.StartTestAsync("my test", testMethod);
+// ...
+await host.CompleteTestAsync(ProtoTestResult.Passed);
+```
+
+`ProtoTestResult` has `Passed`, `Skipped`, `Unknown`, `Failed(exception)`, `Failed(error)` and `Cancelled(exception)`.
+
+The host itself:
 
 ```csharp
 public sealed class ProtoHost : IAsyncDisposable
@@ -150,6 +134,7 @@ public sealed class ProtoHost : IAsyncDisposable
     static ProtoExecutionContext? CurrentContextOrNull { get; }
     static ProtoHost CurrentHost { get; }
     static IProtoTraceWriter? FindTraceWriter(ActivityTraceId traceId);
+    static IProtoTraceWriter? FindTraceWriter(Activity? activity);
 
     IConfiguration Configuration { get; }
     IProtoTraceSource Trace { get; }
@@ -172,18 +157,57 @@ public sealed class ProtoHost : IAsyncDisposable
 }
 ```
 
-Runner packages call these for you. You'd only call them yourself when building a runner integration, or when testing ProtoTest extensions — as the repository's own tests do:
+`Proto.Host` returns the host of the current test, or, outside a test, the only active host (with more than one active, it throws).
+
+### Test ids
+
+Every test gets a numeric id, and everything the test produces is keyed by it: trace entries, archived artifacts, and often the data your own attributes create (`$"test-{context.TestId}"`).
+
+An id is a **run prefix** followed by a **sequence**: with the defaults, `482913000001`, `482913000002`, and so on.
+
+| `ProtoTestIdOptions` | Default |
+| --- | --- |
+| `RunPrefix` | a random six-digit number per host |
+| `SequenceDigits` | `6` (1 to 9) |
+
+The random prefix keeps ids from colliding when several test processes create data in the same shared environment. Set a fixed `RunPrefix`, for example from a CI build number, when you want ids you can trace back to a pipeline run. Ids are at most 18 digits; running out of sequence numbers throws.
+
+To replace the scheme entirely, register your own `IProtoTestIdGenerator`:
 
 ```csharp
-var host = new ProtoHostBuilder().AddRest().Build();
-await using var ownedHost = host;
-await host.StartAsync();
-
-var context = await host.StartTestAsync("my test", testMethod);
-// ...
-await host.CompleteTestAsync(ProtoTestResult.Passed);
+public interface IProtoTestIdGenerator
+{
+    ProtoTestId Next(MethodInfo testMethod);
+}
 ```
 
-`ProtoTestResult` has `Passed`, `Skipped`, `Unknown`, `Failed(exception)`, `Failed(error)` and `Cancelled(exception)`.
+### Run gates and resources
 
-`Proto.Host` returns the host of the current test — or, outside a test, the only active host (with more than one active, it throws).
+`AddRunGate` registers a check that runs **once, after the last test and before the reports are written**, so it can see everything the run's collectors produced. `ProtoRunGateContext` exposes `Items`, `ItemsOfKind`, `InCategory`, `ForTarget` and `WithStatus`, plus coverage helpers such as `CoverageFor(target)`. A result is `Passed`, `Warning`, `Failed` or `Skipped`; a gate that returns no result is treated as failed, and a failed gate throws `ProtoRunGateException` out of `AfterRunAsync`. The delegate overload is the quick form:
+
+```csharp
+builder.AddRunGate("no error findings", context => context
+    .ItemsOfKind(ProtoReportItemKinds.Finding)
+    .Any(item => item.Status == ProtoReportStatus.Error)
+    ? ProtoRunGateResult.Failed("The run recorded error findings.")
+    : ProtoRunGateResult.Passed("No error findings were recorded."));
+```
+
+`AddResource(IProtoResource)` registers an already-created, run-scoped resource, such as a started container or a connection, that the host owns and releases with the run, without starting anything. `AddInfrastructure` is the variant that starts with the run and fills settings; see [Infrastructure](./infrastructure.md).
+
+## What the trace shows
+
+- Each test's record opens with a `test.setup` operation, carries one `hook.before` and `hook.after` per hook (with its type and order) and one `attribute.before` and `attribute.after` per attribute, then the test's own operations.
+- A failed setup shows a `Rollback` phase instead of `Teardown`, and only the components that completed appear.
+- Attachments land on the record of the operation that produced them. Resources appear as entities, and a failed release writes a `resource.release` operation.
+- Run-level pieces are entities: capabilities, infrastructure with its state, and readiness probes. Run gates evaluate report items after the last test and before the reports export.
+- The trace archive is written last, after the reports, so a report's coverage is inside the archive.
+- A teardown failure is recorded as an `Error` finding without changing the test's outcome.
+
+## Limits
+
+- **One context per async flow.** Starting a second test on the same flow before completing the first throws, and completing a test from a different host throws.
+- **One build per builder.** `Build()` can only run once, and once stopping has begun, starting a new test throws.
+- **A skipped test never reaches the lifecycle.** It has no context, no trace record and no teardown.
+- **A teardown failure does not replace the outcome.** It is recorded as an `Error` finding and still surfaces to the runner as an exception.
+- **Ids cannot grow past 18 digits.** Running out of sequence numbers throws. `Proto.Context` is flow-local: work that escapes the test's flow cannot read it. See [Execution context](./execution-context.md) and [Concurrency](./concurrency.md).

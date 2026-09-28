@@ -3,9 +3,9 @@
  *
  * eng/generate-lesson-traces.ps1 runs one filtered test per file against samples/Northstar.ProtoTest
  * and writes the result to docs/static/lessons/, so every entry below names a file the site serves and
- * a reader can download. The values in data/failureDrills.ts come from an earlier recording of the
- * same tests with the drills enabled; a duration may differ by a run, the statuses, names and messages
- * do not.
+ * a reader can download. The values in data/failureDrills.ts are read from those committed archives:
+ * names, statuses and messages come from the run, and the durations are the recording's own, so a
+ * rerun of the drill may differ in a duration and never in a name or a status.
  */
 
 export interface TraceSource {

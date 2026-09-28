@@ -197,7 +197,7 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
     // The identifier the protocol reported the call under is the subject a mismatch or a required read
     // names; a response asserted without one (an untraced assertion) keeps the message unchanged.
     private string PrefixIdentifier(string message)
-        => string.IsNullOrEmpty(Identifier) ? message : $"{Identifier} — {message}";
+        => string.IsNullOrEmpty(Identifier) ? message : $"{Identifier} - {message}";
 
     /// <summary>Asserts the response body's media type, without its parameters.</summary>
     internal RestResponse AssertContentType(string mediaType, bool negated)

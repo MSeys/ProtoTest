@@ -165,7 +165,7 @@ public sealed partial class SheetsTests
         await host.CompleteTestAsync(ProtoTestResult.Failed(mismatch!));
         Assert.Multiple(() =>
         {
-            Assert.That(mismatch!.Message, Does.StartWith("SalesRow — Shape mismatch failed with 1 error(s):"),
+            Assert.That(mismatch!.Message, Does.StartWith("SalesRow - Shape mismatch failed with 1 error(s):"),
                 "the model-row exception names the record type as its subject");
             Assert.That(mismatch.Message, Does.Contain("Region"));
             Assert.That(mismatch.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
@@ -277,7 +277,7 @@ public sealed partial class SheetsTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(returned, Is.SameAs(row));
-            Assert.That(mismatch!.Message, Does.StartWith("Keys!A2:B2 — Shape mismatch failed with 1 error(s):"),
+            Assert.That(mismatch!.Message, Does.StartWith("Keys!A2:B2 - Shape mismatch failed with 1 error(s):"),
                 "the failure names the row it was made against");
             Assert.That(mismatch.Message, Does.Contain("Name"));
             Assert.That(mismatch.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
@@ -306,7 +306,7 @@ public sealed partial class SheetsTests
         await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(exception!.Message, Does.StartWith("Keys!A2:B2 — Shape mismatch failed with 1 error(s):"));
+            Assert.That(exception!.Message, Does.StartWith("Keys!A2:B2 - Shape mismatch failed with 1 error(s):"));
             Assert.That(exception.Message, Does.Contain("$.Name"));
             Assert.That(exception.Message, Does.Contain("Property was not mentioned in the expected shape."));
             Assert.That(exception.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
@@ -369,7 +369,7 @@ public sealed partial class SheetsTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(returned, Is.SameAs(emea));
-            Assert.That(mismatch!.Message, Does.StartWith("SalesRow — Shape mismatch failed with 2 error(s):"));
+            Assert.That(mismatch!.Message, Does.StartWith("SalesRow - Shape mismatch failed with 2 error(s):"));
             Assert.That(mismatch.Message, Does.Contain("$.Amount"));
             Assert.That(mismatch.Message, Does.Contain("$.Count"));
             Assert.That(mismatch.InnerException, Is.TypeOf<JsonShapeMismatchException>());

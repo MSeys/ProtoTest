@@ -62,9 +62,9 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
 }
 ```
 
-Every `GraphQLResponse` you receive is yours to dispose. Only one `NextAsync` may be pending at a time — a concurrent call throws `InvalidOperationException`.
+Every `GraphQLResponse` you receive is yours to dispose. Only one `NextAsync` may be pending at a time; a concurrent call throws `InvalidOperationException`.
 
-Because it's `IAsyncEnumerable`, you can also iterate. The enumerator disposes the previous event as it advances, so `await foreach` without a per-element `using` does not leak; the event currently in the loop body — and the last event after the loop — stay yours:
+Because it's `IAsyncEnumerable`, you can also iterate. The enumerator disposes the previous event as it advances, so `await foreach` without a per-element `using` does not leak; the event currently in the loop body, and the last event after the loop, stay yours:
 
 ```csharp
 await foreach (var message in subscription.WithCancellation(timeout.Token))
@@ -77,7 +77,7 @@ await foreach (var message in subscription.WithCancellation(timeout.Token))
 }
 ```
 
-Always pass a cancellation token — a subscription that never receives an event will otherwise wait forever.
+Always pass a cancellation token; a subscription that never receives an event will otherwise wait forever.
 
 ## Connection payload
 
@@ -95,7 +95,7 @@ Without `ConnectionPayload`, `connection_init` is sent with a `null` payload.
 
 ## Protocol behaviour
 
-**WebSocket:** ProtoTest sends `connection_init` (with your payload), waits for `connection_ack` — answering server `ping`s with `pong`, echoing the ping payload when there is one — then sends `subscribe`. `next` messages become responses, `complete` ends the stream, and an `error` message is delivered as a final response with errors. `connection_error`, an unexpected message before the ack, or a non-text or oversized message throws `GraphQLProtocolException`.
+**WebSocket:** ProtoTest sends `connection_init` (with your payload), waits for `connection_ack` while answering server `ping`s with `pong`, echoing the ping payload when there is one, then sends `subscribe`. `next` messages become responses, `complete` ends the stream, and an `error` message is delivered as a final response with errors. `connection_error`, an unexpected message before the ack, or a non-text or oversized message throws `GraphQLProtocolException`.
 
 **SSE:** `event: next`, `event: complete` and `event: error` frames map the same way. A response that isn't `text/event-stream` is read to the end within the message limit and delivered as one response.
 

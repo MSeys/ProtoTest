@@ -1,7 +1,7 @@
 ---
 sidebar_position: 3
 title: xUnit v3
-description: "Set up ProtoTest with xUnit v3: the assembly fixture, [ProtoTestFact] tests, outcomes and native attachments."
+description: "Register ProtoTest with xUnit v3: the assembly fixture, [ProtoTestFact] and [ProtoTestTheory], what the adapter changes and its limits."
 ---
 
 # xUnit v3
@@ -16,16 +16,11 @@ dotnet add package ProtoTest.Xunit3
 
 ProtoTest targets **.NET 8, 9 and 10**. The `dotnet new prototest` template defaults to `net10.0`; pass `-f net8.0` or `-f net9.0` for an older runtime.
 
-## Enable it
+## Register
 
-Register the setup class with `[assembly: AssemblyFixture(...)]` — no collection needed, and it applies to every test in the assembly.
+Register the setup class with `[assembly: AssemblyFixture(...)]`. No collection is needed, and it applies to every test in the assembly.
 
 ```csharp
-using ProtoTest.Core;
-using ProtoTest.Rest;
-using ProtoTest.Xunit3;
-using Xunit;
-
 [assembly: AssemblyFixture(typeof(Setup))]
 
 public class Setup : ProtoTestAssembly
@@ -37,17 +32,9 @@ public class Setup : ProtoTestAssembly
 
 Without the assembly fixture the host is never initialized, and `ProtoTestAssembly.Host` throws `InvalidOperationException` telling you to register it.
 
-## Quick start
-
-`[ProtoTestFact]` and `[ProtoTestTheory]` derive from `FactAttribute` and `TheoryAttribute`, so they replace them outright. Both implement xUnit v3's `IBeforeAfterTestAttribute`, and their `Before`/`After` run around every test case.
+The test attributes are `[ProtoTestFact]` and `[ProtoTestTheory]`, and both implement xUnit v3's `IBeforeAfterTestAttribute`, so their `Before` and `After` run around every test case.
 
 ```csharp
-using System.Net;
-using ProtoTest.Core;
-using ProtoTest.Rest;
-using ProtoTest.Xunit3;
-using Xunit;
-
 [Application("Api")]
 public class OrderTests
 {
@@ -60,52 +47,38 @@ public class OrderTests
 }
 ```
 
-A `[ProtoTestTheory]` behaves the same way; each `[InlineData]` row is a test of its own and is recorded under xUnit's display name, with the arguments included, so the rows stay apart.
+A `[ProtoTestTheory]` behaves the same way, and each `[InlineData]` row is a test of its own.
 
-## Low-ceremony mode (opt-in)
+**Low-ceremony mode.** Add `[assembly: ProtoTestAutoWrap]` and every plain `[Fact]` and `[Theory]` runs through the same lifecycle. A test that carries `[ProtoTestFact]` or `[ProtoTestTheory]` keeps its own handler and is never wrapped twice.
 
-A suite can skip `[ProtoTestFact]`/`[ProtoTestTheory]` on every method: apply the assembly-level auto-wrap once, and every plain `[Fact]` and `[Theory]` runs through the same lifecycle.
+## What the adapter changes
 
-```csharp
-[assembly: ProtoTestAutoWrap]
-```
-
-A test that already carries `[ProtoTestFact]` or `[ProtoTestTheory]` keeps its own handler and is never wrapped twice. The skip conditions, outcome mapping and attachments are the ones above, unchanged.
-
-## Per-test lifecycle
-
-`Before` resolves the test's attributes and conditions, then calls `StartTestAsync`; `After` reads `TestContext.Current.TestState` and completes the context with the mapped result. The lifecycle handler calls the host synchronously (`.GetAwaiter().GetResult()`), so a synchronizing context is required - the same reason NUnit blocks.
-
-The context starts in the before-attribute, which xUnit v3 runs **after** class construction and `IAsyncLifetime.InitializeAsync` and **before** class disposal. `Proto.Context` is therefore unavailable in a test class's constructor and `InitializeAsync`, and class cleanup runs after the context completes. If a later `IBeforeAfterTestAttribute` throws, xUnit skips the after methods and the test's trace stays open; the run-level contract check reports it at teardown instead of letting it pass silently.
-
-## Outcomes
-
-| xUnit state | ProtoTest records | Why |
-| --- | --- | --- |
-| `Passed` | `Passed` | |
-| `Skipped`, `NotRun` | `Skipped` | a body-level `Assert.Skip` is a state, so it still lands on a started context |
-| `Failed` | `Failed` | with the exception type, message and stack trace |
-| `Failed` with an OCE/TaskCanceledException type | `Cancelled` | the test was interrupted, not broken |
-| anything else | `Unknown` | the state has no ProtoTest equivalent |
-
-## Skipping
-
-Before the lifecycle starts, `ProtoTestSkip.GetReason` resolves the test's attributes; a skip calls `Assert.Skip(reason)` and nothing is started, so no trace entry is written. A body-level `Assert.Skip` is different: the context already exists and maps to `Skipped` through the test state. See [Skip conditions](../foundation/skip-conditions.md).
-
-## Attachments
-
-Artifacts go through xUnit's own API — `TestContext.Current.AddAttachment(name, bytes, replaceExistingValue: false, mediaType)` — and appear with the test in xUnit's output.
+| Item | What the adapter does |
+| --- | --- |
+| The host | Starts once through the assembly fixture, which applies to every test in the assembly. |
+| The test attributes | `[ProtoTestFact]` and `[ProtoTestTheory]` replace `[Fact]` and `[Theory]` and carry the lifecycle themselves. Both are `AllowMultiple = false`. |
+| The lifecycle | `Before` resolves the attributes and conditions, then starts the context. `After` reads `TestContext.Current.TestState` and completes it with the mapped result. |
+| The context window | The context starts after class construction and `IAsyncLifetime.InitializeAsync`, and completes before class disposal. Class-level setup and cleanup stay outside it. |
+| Scheduling | The lifecycle handler calls the host synchronously (`GetAwaiter().GetResult()`), so xUnit v3 needs a synchronizing context. |
+| Cancellation | `IBeforeAfterTestAttribute` exposes no token, so the test starts with `CancellationToken.None`. |
+| Outcomes | `Passed` to `Passed`, `Skipped` and `NotRun` to `Skipped`, `Failed` to `Failed` with the exception type, message and stack. A failed `OperationCanceledException` or `TaskCanceledException` maps to `Cancelled`. Anything else is `Unknown`. |
+| Skips | A skip condition calls `Assert.Skip(reason)` before the lifecycle starts, so no trace entry is written and the reason is reported as given. A body-level `Assert.Skip` is a state on a started context and maps to `Skipped`. |
+| Attachments | `TestContext.Current.AddAttachment(name, bytes, replaceExistingValue: false, mediaType)`, so artifacts appear with the test in xUnit's output. |
+| Test names | xUnit's display name, with the row's arguments included. |
+| Auto-wrap | Optional. `[assembly: ProtoTestAutoWrap]` wraps every plain `[Fact]` and `[Theory]`, and steps aside for a method that carries a ProtoTest attribute. |
 
 ## Limits
 
-- The lifecycle handler is synchronous-over-async, so xUnit v3 needs a synchronizing context (xUnit v2, MSTest and TUnit do not).
+- The lifecycle handler is synchronous-over-async, so xUnit v3 needs a synchronizing context.
 - The attributes are `AllowMultiple = false`, like the `Fact` and `Theory` attributes they replace.
-- The context starts in the before-attribute: class construction, `IAsyncLifetime.InitializeAsync` and class disposal are outside it.
-- A throwing sibling `IBeforeAfterTestAttribute` prevents xUnit from running the after methods; the run's contract check reports the unfinished test at teardown.
-- The assembly fixture is mandatory; there is no collection-level variant.
+- The context starts in the before-attribute, so class construction, `IAsyncLifetime.InitializeAsync` and class disposal run outside it.
+- A sibling `IBeforeAfterTestAttribute` that throws prevents xUnit from running the after methods, so the context never completes and the test's trace stays open. Keep other before/after attributes from throwing.
+- The assembly fixture is mandatory. There is no collection-level variant.
 - Auto-wrap is assembly-wide: the attribute is declared on the assembly, and there is no per-class opt-in.
+- `Unknown` is the fallback for an unmapped result state, so extend the mapping deliberately if a new xUnit state appears.
 
-## Next
+## Learn more
 
-- [Test runners](./overview.md) — the same setup for the other four runners.
-- [Skip conditions](../foundation/skip-conditions.md) — the conditions every adapter evaluates.
+- [Test runners](./overview.md): the five adapters side by side.
+- [Skip conditions](../foundation/skip-conditions.md): the conditions every adapter evaluates.
+- [Lifecycle](../foundation/lifecycle.md): the hooks and attributes around a test.

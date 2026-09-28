@@ -54,7 +54,7 @@ public sealed class ProtoGrpcAssertionsTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exception.Message, Does.StartWith(
-                $"{typeof(EchoReply).FullName} — Shape mismatch failed with 1 error(s):"));
+                $"{typeof(EchoReply).FullName} - Shape mismatch failed with 1 error(s):"));
             Assert.That(mismatch, Is.Not.Null, "the shared mismatch data stays reachable");
             Assert.That(mismatch!.Mismatches, Has.Count.EqualTo(1));
         }

@@ -6,18 +6,18 @@ description: "Describe the JSON you expect with an anonymous object: partial, ne
 
 # Shape matching
 
-REST and GraphQL responses, gRPC replies, consumed messages and sheet rows all use the same matcher from `ProtoTest.Json`; only the spelling that reaches it differs:
+REST and GraphQL responses, gRPC replies, consumed messages and sheet rows all use the same matcher from `ProtoTest.Json`. Only the spelling that reaches it differs:
 
 | Subject | Call |
 | --- | --- |
-| REST response | `response.Should.MatchShape(shape)`; `PostAsync(…).ExpectAsync(shape)` asserts in the call |
-| GraphQL response | `response.Should.MatchShape(shape)`; `ExpectAsync`/`ExpectNextAsync` assert for you |
+| REST response | `response.Should.MatchShape(shape)`; `PostAsync(...).ExpectAsync(shape)` asserts in the call |
+| GraphQL response | `response.Should.MatchShape(shape)`; `ExpectAsync` / `ExpectNextAsync` assert for you |
 | gRPC reply | `ProtoGrpcAssertions.For(reply).Should.MatchShape(shape)` |
 | Consumed message | `message.Should.MatchShape(shape)` |
 | Sheets table row | `row.Should.MatchShape(shape)` |
-| Sheets model row | `row.ShouldMatchShape(shape)` — a record is a user type, so C# cannot give it a `Should` extension property |
+| Sheets model row | `row.ShouldMatchShape(shape)`; a record is a user type, so C# cannot give it a `Should` extension property |
 
-You describe the JSON you expect with an anonymous object, and the matcher compares.
+You describe the JSON you expect with an anonymous object, and the matcher compares:
 
 ```csharp
 response.Should.MatchShape(new
@@ -37,34 +37,34 @@ response.Should.MatchShape(new
 
 ### Objects are partial
 
-Only the properties you list are checked. Everything else in the JSON is ignored — so a shape only states what the test is about, and new fields in the API don't break it.
+Only the properties you list are checked. Everything else in the JSON is ignored, so a shape only states what the test is about, and new fields in the API do not break it.
 
-A listed property that's missing fails with *"Property was missing from the JSON response."* A non-object where you expected one fails with *"Expected an object."*
+A listed property that is missing fails with *"Property was missing from the JSON response."* A non-object where you expected one fails with *"Expected an object."*
 
 ### Exact matching
 
-`.Should.MatchShape(shape, exact: true)` — or `.ExpectAsync(shape, exact: true)` — demands the other direction too: every field present in the JSON must be mentioned by the shape. A field the shape does not mention fails with its path:
+`.Should.MatchShape(shape, exact: true)`, or `.ExpectAsync(shape, exact: true)`, demands the other direction too: every field present in the JSON must be mentioned by the shape. A field the shape does not mention fails with its path:
 
 ```
 GET /api/orders/42 — Shape mismatch failed with 1 error(s):
   • [$.extra]: Property was not mentioned in the expected shape. (Expected: "<not mentioned>", Actual: "true")
 ```
 
-An unmentioned branch reports its shallowest path once — `$.extra`, not every leaf below it — and the unmentioned fields are collected alongside ordinary mismatches, so one run shows everything. A value constraint mentions its whole subtree, so `customer = JsonValue.Any()` never fails an exact match on the fields inside `customer`.
+An unmentioned branch reports its shallowest path once, `$.extra`, not every leaf below it, and the unmentioned fields are collected alongside ordinary mismatches, so one run shows everything. A value constraint mentions its whole subtree, so `customer = JsonValue.Any()` never fails an exact match on the fields inside `customer`.
 
-Exact mode is the Verify-style exhaustive check: partial matching stays the default, and the two share one matcher.
+Exact mode is the Verify-style exhaustive check. Partial matching stays the default, and the two share one matcher.
 
 ### Arrays are exact
 
 An array must have **the same length** and each element is compared **by position**. A length difference is reported, and the elements that do line up are still compared, so you see every problem at once.
 
-If you only care that a list isn't empty, use a constraint instead of an array:
+If you only care that a list is not empty, use a constraint instead of an array:
 
 ```csharp
 users = JsonValue.NotNull()
 ```
 
-Anything enumerable counts as an array — `List<T>`, LINQ results, arrays — except strings and dictionaries. This makes expected lists easy to compute:
+Anything enumerable counts as an array (`List<T>`, LINQ results, arrays), except strings and dictionaries. This makes expected lists easy to compute:
 
 ```csharp
 users = createdUsers
@@ -87,7 +87,7 @@ String **values** are compared exactly and case-sensitively.
 
 | Expected | Matches |
 | --- | --- |
-| number | any JSON number with the same decimal value — `12` matches `12.0`; compared as `decimal` first, then `double` for values outside its range |
+| number | any JSON number with the same decimal value; `12` matches `12.0`, compared as `decimal` first, then `double` for values outside its range |
 | `string` | the same string, ordinal and case-sensitive |
 | `bool` | `true` / `false` |
 | enum | its name (case-insensitive) or its numeric value |
@@ -95,7 +95,7 @@ String **values** are compared exactly and case-sensitively.
 | `null` | JSON `null` |
 | dictionary with string keys | an object, like an anonymous type; non-string keys are compared through their invariant string form |
 
-A `null` expectation requires an actual JSON `null`; use `JsonValue.NotNull()` (or `JsonValue.Any()`) when you only need the property to be present.
+A `null` expectation requires an actual JSON `null`. Use `JsonValue.NotNull()` or `JsonValue.Any()` when you only need the property to be present.
 
 ### Every mismatch is reported
 
@@ -116,16 +116,16 @@ public sealed class JsonShapeMismatchException : ProtoAssertionException
 }
 ```
 
-Each protocol producer rethrows the matcher failure as its own assertion exception (`RestAssertionException`, `GraphQLAssertionException`, `GrpcAssertionException`, `MessagingAssertionException`, `SpreadsheetAssertionException`) whose message **starts with the subject it was asserted against** and keeps the matcher exception — and so the mismatch list — as `InnerException`:
+Each protocol producer rethrows the matcher failure as its own assertion exception (`RestAssertionException`, `GraphQLAssertionException`, `GrpcAssertionException`, `MessagingAssertionException`, `SpreadsheetAssertionException`) whose message **starts with the subject it was asserted against** and keeps the matcher exception, and so the mismatch list, as `InnerException`:
 
 ```
 GET /api/orders/42 — Shape mismatch failed with 1 error(s):
   • [$.status]: Values did not match. (Expected: "pending", Actual: "cancelled")
 ```
 
-The subject is the REST request identifier, the GraphQL operation, the gRPC message type, the messaging destination, or the sheet row's `Sheet!Range` (a model row names the record type).
+The subject is the REST request identifier, the GraphQL operation, the gRPC message type, the messaging destination, or the sheet row's `Sheet!Range`. A model row names the record type.
 
-Empty or invalid JSON throws `JsonDocumentAssertionException` instead, with the content in its `Content` property; the producer wraps it the same way.
+Empty or invalid JSON throws `JsonDocumentAssertionException` instead, with the content in its `Content` property. The producer wraps it the same way.
 
 ## Constraints
 
@@ -133,7 +133,7 @@ Empty or invalid JSON throws `JsonDocumentAssertionException` instead, with the 
 
 | Constraint | Matches |
 | --- | --- |
-| `JsonValue.Any()` | anything, including `null` — the property just has to exist |
+| `JsonValue.Any()` | anything, including `null`; the property only has to exist |
 | `JsonValue.NotNull()` | anything except `null` |
 | `JsonValue.Null()` | `null` |
 | `JsonValue.GreaterThan(x)` | `> x` |
@@ -141,7 +141,7 @@ Empty or invalid JSON throws `JsonDocumentAssertionException` instead, with the 
 | `JsonValue.LessThan(x)` | `< x` |
 | `JsonValue.LessThanOrEqualTo(x)` | `<= x` |
 | `JsonValue.Between(min, max)` | `min <= value <= max` |
-| `JsonValue.OneOf(a, b, …)` | equal to one of the values |
+| `JsonValue.OneOf(a, b, ...)` | equal to one of the values |
 | `JsonValue.StringContaining(s, comparison?)` | contains `s` |
 | `JsonValue.StringStartingWith(s, comparison?)` | starts with `s` |
 | `JsonValue.StringEndingWith(s, comparison?)` | ends with `s` |
@@ -149,11 +149,11 @@ Empty or invalid JSON throws `JsonDocumentAssertionException` instead, with the 
 | `JsonValue.StringMatching(predicate, description?)` | a string satisfying your predicate |
 | `JsonValue.Matching(predicate, description)` | any value satisfying your predicate |
 
-String comparisons default to `StringComparison.Ordinal`. The comparison constraints and `Between` take an `IComparable` threshold; `OneOf` compares scalars, allowing numeric types to differ (the JSON value is converted to `decimal`) while everything else must be **type-compatible**, so the string `"2"` never matches `2`.
+String comparisons default to `StringComparison.Ordinal`. The comparison constraints and `Between` take an `IComparable` threshold. `OneOf` compares scalars, allowing numeric types to differ (the JSON value is converted to `decimal`) while everything else must be **type-compatible**, so the string `"2"` never matches `2`.
 
-Comparison constraints convert the JSON value to the type you passed. A value that can't be converted **doesn't match** — `JsonValue.LessThan(10)` against `"not-a-number"` is a mismatch, not an exception. So use `200m` rather than `200` when the value is a decimal amount.
+Comparison constraints convert the JSON value to the type you passed. A value that cannot be converted **does not match**: `JsonValue.LessThan(10)` against `"not-a-number"` is a mismatch, not an exception. Use `200m` rather than `200` when the value is a decimal amount.
 
-`Matching` receives the raw value: a `string`, a **`decimal` or `double`** (JSON numbers never surface as a `.NET` `long`), a `bool`, `null`, or raw JSON text for objects and arrays. `StringMatching` receives the value as a `string`, or `null` when it isn't one.
+`Matching` receives the raw value: a `string`, a **`decimal` or `double`** (JSON numbers never surface as a .NET `long`), a `bool`, `null`, or raw JSON text for objects and arrays. `StringMatching` receives the value as a `string`, or `null` when it is not one.
 
 ```csharp
 createdAt = JsonValue.StringMatching(
@@ -207,27 +207,27 @@ IReadOnlyList<string> matched = JsonShapeMatcher.AssertMatch(json, expectedShape
 IReadOnlyList<string> matched = JsonShapeMatcher.AssertMatch(jsonElement, expectedShape, options);
 ```
 
-It returns the JSON paths that matched and throws the matcher exceptions (`JsonShapeMismatchException`, `JsonDocumentAssertionException`); the protocol assertions wrap those with the subject they were made against.
+It returns the JSON paths that matched and throws the matcher exceptions (`JsonShapeMismatchException`, `JsonDocumentAssertionException`). The protocol assertions wrap those with the subject they were made against.
 
 ## Evidence in the trace
 
 The protocol assertions and Sheets model rows run through the shared `ProtoShapeAssertion.Assert`, which records one `assert.json.shape` operation per assertion with:
 
-- `expected.type`, `shape.expected` and `shape.actual` — the described shape and the sanitized actual JSON;
+- `expected.type`, `shape.expected` and `shape.actual`: the described shape and the sanitized actual JSON;
 - `matched.property_count` and `matched.properties`, or `shape.mismatches` and `shape.mismatch_count` on failure;
 - `shape.matches` (the matched paths) and `shape.result` (`matched` or `mismatched`);
 - `shape.exact` (`true` only) when the assertion ran in exact mode.
 
-The expected-shape description is capped at depth 16 and 4096 expanded containers; deeper nodes become `<Type at depth limit>`, so a cyclic or pathologically large shape cannot hang the run. On success the protocol records an observation built from the matched paths — `http.contract.shape` for REST, `graphql.contract.shape` for GraphQL — which is what [OpenAPI](../observability/coverage.md) and GraphQL schema coverage consume.
+The expected-shape description is capped at depth 16 and 4096 expanded containers. Deeper nodes become `<Type at depth limit>`, so a cyclic or pathologically large shape cannot hang the run. On success the protocol records an observation built from the matched paths, `http.contract.shape` for REST or `graphql.contract.shape` for GraphQL, which is what [OpenAPI](../observability/coverage.md) and GraphQL schema coverage consume.
 
 ## Limits
 
-- Partial objects mean extra server fields never fail a shape — unless the assertion asks for `exact: true`, where a field no property mentioned fails.
+- Partial objects mean extra server fields never fail a shape, unless the assertion asks for `exact: true`, where a field no property mentioned fails.
 - Arrays are length- and position-sensitive; order matters.
 - Numbers surface as `decimal` or `double`, never `long`; strings are compared ordinally.
-- In exact mode a value constraint mentions its whole subtree; the fields inside a constrained value are not checked.
+- In exact mode a value constraint mentions its whole subtree. The fields inside a constrained value are not checked.
 
 ## Next
 
-- [ProtoTrace](../observability/prototrace.md) — where the assertion evidence lands.
-- [Coverage](../observability/coverage.md) — matched paths become contract coverage.
+- [ProtoTrace](../observability/prototrace.md): where the assertion evidence lands.
+- [Coverage](../observability/coverage.md): matched paths become contract coverage.

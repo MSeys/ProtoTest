@@ -1,16 +1,16 @@
 ---
 sidebar_position: 1
 title: Installation
-description: Start from the ProtoTest template, or add the runner and integration packages to a test project of your own.
+description: "Install ProtoTest from the template, or add the runner and integration packages to a test project of your own."
 ---
 
 # Installation
 
-ProtoTest targets **.NET 8, 9 and 10**, and every package is a stable release on NuGet: `dotnet add package <id>` installs it directly. The `prototest` template scaffolds `net10.0` unless you pass `--framework net8.0` or `net9.0`.
+ProtoTest ships as small NuGet packages: one package for your test runner, `ProtoTest.Core`, and one package per integration you use. Everything targets .NET 8, 9 and 10.
 
-## Quick start: the template
+## Start from the template
 
-The quickest way in is a solution that already works: a small ASP.NET Core API and a suite for it, composed, traced and reported. The suite is written for **NUnit** by default; pass `--runner xunit`, `--runner xunit3`, `--runner tunit` or `--runner mstest` to write it for another runner — the setup class and the test project's packages change with it.
+The template creates a small ASP.NET Core API and a suite for it, already composed, traced and reported:
 
 ```bash
 dotnet new install ProtoTest.Templates
@@ -19,11 +19,15 @@ cd Shop
 dotnet test
 ```
 
-The run leaves `TestResults/Shop.prototrace` and `TestResults/Shop.html` in the test project's output folder — `Shop.Tests/bin/Debug/net10.0/TestResults/`; the template renames them to whatever you pass to `-n`. Drop the trace onto [trace.prototest.dev](https://trace.prototest.dev), then read [Your first test](./first-test.md) to see how each part is built.
+What you should see: a green run. The test project leaves `Shop.Tests/bin/Debug/net10.0/TestResults/Shop.prototrace` and `Shop.html`. Open the report for the run's verdict and the routes it covered, or drop the trace on [trace.prototest.dev](https://trace.prototest.dev).
 
-## Going further: add ProtoTest to your own project
+The suite is written for NUnit. Pass `--runner xunit`, `--runner xunit3`, `--runner tunit` or `--runner mstest` to generate it for another runner, and `--framework net8.0` or `--framework net9.0` to target an older framework.
 
-ProtoTest is a set of small packages: **your test runner**, **`ProtoTest.Core`**, plus **one package per integration** you use. Every runner and integration depends on Core, so it arrives transitively — add it directly when you want to reference the host types from your own code.
+Next: [Your first test](./first-test.md) walks the same path one step at a time and ends at a failure and its trace.
+
+## Add ProtoTest to your own project
+
+A suite is **your runner**, **`ProtoTest.Core`**, plus **one package per integration** you use. Every runner and integration depends on Core, so it arrives transitively. Add it directly when you reference the host types from your own code.
 
 ### 1. Core and your runner
 
@@ -32,7 +36,7 @@ dotnet add package ProtoTest.Core   # host, context, hooks, attributes, trace
 dotnet add package ProtoTest.NUnit  # NUnit
 ```
 
-The runner packages are `ProtoTest.NUnit`, `ProtoTest.Xunit` (xUnit v2), `ProtoTest.Xunit3` (xUnit v3), `ProtoTest.MSTest` and `ProtoTest.TUnit`. Each one needs a small setup class — see [Test runners](../runners/overview.md).
+The runner packages are `ProtoTest.NUnit`, `ProtoTest.Xunit` (xUnit v2), `ProtoTest.Xunit3` (xUnit v3), `ProtoTest.MSTest` and `ProtoTest.TUnit`. Each one needs a small setup class; see [Test runners](../runners/overview.md).
 
 ### 2. Your integrations
 
@@ -49,6 +53,8 @@ dotnet add package ProtoTest.Messaging.RabbitMq # publish and await messages on 
 dotnet add package ProtoTest.Sheets             # assert on generated spreadsheets
 dotnet add package ProtoTest.OpenApi            # OpenAPI contract coverage
 ```
+
+The [integrations map](../integrations/overview.md) lists every package, including WireMock fakes, devices, Aspire and background workers.
 
 Infrastructure the run starts and owns comes as its own package, next to the integration it serves:
 
@@ -84,12 +90,13 @@ dotnet add package ProtoTest.Reporting      # JSON and HTML reports
 | `ProtoTest.Sql.Testcontainers`, `ProtoTest.Messaging.RabbitMq.Testcontainers` | `ProtoTest.Testcontainers` |
 | `ProtoTest.OpenApi` | `ProtoTest.Rest` |
 
-`ProtoTest.Http` is the shared HTTP client and authentication layer for REST, GraphQL and gRPC. It is primarily an extension point for integration authors; application suites normally reference Rest, GraphQL or Grpc instead of adding it themselves.
+`ProtoTest.Http` is the shared HTTP client and authentication layer behind REST, GraphQL and gRPC. It is primarily an extension point for integration authors; application suites normally reference Rest, GraphQL or Grpc instead of adding it themselves.
 
 ## Browsers for Playwright
 
-Set `InstallBrowsers` and Playwright downloads the browser it needs before the first launch, so a clean machine or CI runner needs no separate step. Alternatively, set `Channel = "msedge"` or `"chrome"` to drive a browser that's already installed. See [Web](../integrations/web/index.md).
+Set `InstallBrowsers` and Playwright downloads the browser it needs before the first launch, so a clean machine or CI runner needs no separate step. Alternatively, set `Channel = "msedge"` or `"chrome"` to drive a browser that is already installed. See [Web](../integrations/web/index.md).
 
-## Next
+## Where to next
 
-[Your first test](./first-test.md) walks through a complete suite, step by step.
+- [Your first test](./first-test.md): the first test, the first failure and the trace.
+- [The Learn track](/learn/one-test-one-journey/install-and-run): the same start with a real sample and recorded traces.

@@ -48,7 +48,7 @@ public sealed class RestShapeExpectationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exception!.Message, Does.StartWith(
-                "GET /orders/42 — Shape mismatch failed with 2 error(s):"));
+                "GET /orders/42 - Shape mismatch failed with 2 error(s):"));
             Assert.That(exception.Message, Does.Contain("$.name"));
             Assert.That(exception.Message, Does.Contain("$.customer"));
             Assert.That(exception.Message, Does.Contain("Property was not mentioned in the expected shape."));
@@ -173,7 +173,7 @@ public sealed class RestShapeExpectationTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(exception!.Message, Does.StartWith("GET /users — Shape mismatch failed with 1 error(s):"));
+            Assert.That(exception!.Message, Does.StartWith("GET /users - Shape mismatch failed with 1 error(s):"));
             Assert.That(exception.Message, Does.Contain("$.id"));
             Assert.ThrowsAsync<ObjectDisposedException>(async () => await raw.Content.ReadAsStringAsync());
         });

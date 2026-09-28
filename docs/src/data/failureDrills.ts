@@ -1,7 +1,8 @@
 /*
- * The Learning demo's four failure drills and the tests that fix them. Every name, status, duration and
- * message comes from a run of samples/Northstar.ProtoTest with the drills enabled, read back from its
- * .prototrace; nothing here is invented. The drill trace is the one the Learn track points at.
+ * The Learning demo's four failure drills and the tests that fix them. Every name, status and message
+ * comes from a run of samples/Northstar.ProtoTest with the drills enabled; the durations are read from
+ * the committed archives under docs/static/lessons, so the gallery shows what the reader downloads.
+ * Nothing here is invented. A rerun writes its own durations, never different names or statuses.
  */
 
 export interface DrillRecord {
@@ -36,19 +37,19 @@ export const failureDrills: DrillPair[] = [
     drill: {
       test: 'ARealWaitDoesNotCloseTheDueWindow',
       what: 'Waits one real second while the application runs on the test clock.',
-      elapsed: '1.27 s',
+      elapsed: '1.37 s',
       record: [
         {
           kind: 'data.create',
           name: 'Create · IssueInvoiceRequest',
           status: 'succeeded',
-          detail: '249.0 ms, provisioned in the test tenant',
+          detail: '230.3 ms, provisioned in the test tenant',
         },
         {
           kind: 'http.request',
           name: 'REST · GET /api/v1/organization',
           status: 'succeeded',
-          detail: '11.8 ms, HTTP 200',
+          detail: '98.1 ms, HTTP 200',
         },
         {
           kind: 'assert.json.shape',
@@ -61,7 +62,7 @@ export const failureDrills: DrillPair[] = [
     fix: {
       test: 'TheTestClockClosesTheDueWindow',
       what: 'Advances the test clock eight days, then reads the organization and pays the invoice.',
-      elapsed: '285.4 ms',
+      elapsed: '295.3 ms',
       record: [
         {
           kind: 'clock.advance',
@@ -73,13 +74,13 @@ export const failureDrills: DrillPair[] = [
           kind: 'data.create',
           name: 'Create · IssueInvoiceRequest',
           status: 'succeeded',
-          detail: '189.3 ms, provisioned in the test tenant',
+          detail: '170.8 ms, provisioned in the test tenant',
         },
         {
           kind: 'http.request',
           name: 'REST · GET /api/v1/organization',
           status: 'succeeded',
-          detail: '48.8 ms, HTTP 200',
+          detail: '66.1 ms, HTTP 200',
         },
         {
           kind: 'assert.json.shape',
@@ -91,7 +92,7 @@ export const failureDrills: DrillPair[] = [
           kind: 'http.request',
           name: 'REST · POST /api/v1/invoices/{invoiceId}/pay',
           status: 'succeeded',
-          detail: '43.6 ms, HTTP 200',
+          detail: '37.5 ms, HTTP 200',
         },
         {
           kind: 'assert.json.shape',
@@ -110,13 +111,13 @@ export const failureDrills: DrillPair[] = [
     drill: {
       test: 'AnUnknownProjectIdIsTreatedAsMine',
       what: 'Reads a project id no test in the run created.',
-      elapsed: '248.7 ms',
+      elapsed: '129.0 ms',
       record: [
         {
           kind: 'http.request',
           name: 'REST · GET /api/v1/projects/prj_1',
           status: 'succeeded',
-          detail: '246.1 ms, HTTP 404',
+          detail: '119.1 ms, HTTP 404',
         },
         {
           kind: 'assert.http.status',
@@ -130,19 +131,19 @@ export const failureDrills: DrillPair[] = [
     fix: {
       test: 'EachTenantSeesOnlyItsOwnProjects',
       what: 'Creates a project, then lists the projects its tenant can see.',
-      elapsed: '295.3 ms',
+      elapsed: '237.0 ms',
       record: [
         {
           kind: 'data.create',
           name: 'Create · CreateProjectRequest',
           status: 'succeeded',
-          detail: '265.7 ms, provisioned in the test tenant',
+          detail: '119.5 ms, provisioned in the test tenant',
         },
         {
           kind: 'http.request',
           name: 'REST · GET /api/v1/projects',
           status: 'succeeded',
-          detail: '25.0 ms, HTTP 200',
+          detail: '105.1 ms, HTTP 200',
         },
         {
           kind: 'assert.http.status',
@@ -161,25 +162,25 @@ export const failureDrills: DrillPair[] = [
     drill: {
       test: 'TheAddressWasHardcodedForOneMachine',
       what: 'Connects a raw HttpClient to a fixed address, 127.0.0.1:5099.',
-      elapsed: '2.05 s',
+      elapsed: '2.08 s',
       record: [
         {
           kind: 'test.execution',
           name: 'Test execution',
-          detail: '2.05 s, no operation recorded: the raw client is outside the composition',
+          detail: '2.08 s, no operation recorded: the raw client is outside the composition',
         },
       ],
     },
     fix: {
       test: 'TheAddressComesFromTheComposition',
       what: 'Calls the same endpoint through the REST client the run composed.',
-      elapsed: '190.1 ms',
+      elapsed: '157.6 ms',
       record: [
         {
           kind: 'http.request',
           name: 'REST · GET /api/v1/organization',
           status: 'succeeded',
-          detail: '188.8 ms through the composed client, HTTP 200',
+          detail: '139.9 ms through the composed client, HTTP 200',
         },
       ],
     },
@@ -192,13 +193,13 @@ export const failureDrills: DrillPair[] = [
     drill: {
       test: 'ABareStatusHidesWhatTheApplicationSaid',
       what: 'Sends an empty project name and asserts the status alone.',
-      elapsed: '201.8 ms',
+      elapsed: '140.1 ms',
       record: [
         {
           kind: 'http.request',
           name: 'REST · POST /api/v1/projects',
           status: 'succeeded',
-          detail: '196.0 ms, HTTP 400',
+          detail: '129.9 ms, HTTP 400',
         },
         {
           kind: 'assert.http.status',
@@ -212,13 +213,13 @@ export const failureDrills: DrillPair[] = [
     fix: {
       test: 'TheProblemBodyNamesTheCodeAndDetail',
       what: 'Sends the same request and asserts the problem body.',
-      elapsed: '131.6 ms',
+      elapsed: '140.8 ms',
       record: [
         {
           kind: 'http.request',
           name: 'REST · POST /api/v1/projects',
           status: 'succeeded',
-          detail: '118.4 ms, HTTP 400',
+          detail: '121.8 ms, HTTP 400',
         },
         {
           kind: 'assert.json.shape',

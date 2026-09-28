@@ -78,7 +78,7 @@ public sealed class ProtoDeviceClient
             address = ResolveAddress(deviceId);
         }
 
-        endpoint = endpoint with { Address = address };
+        endpoint = endpoint with { Address = address, Settings = ResolveSettings(deviceId) };
         var protocol = ResolveProtocol();
         var session = new DeviceSession(_context, Name, typeof(TDevice), transport, endpoint, protocol);
 
@@ -92,6 +92,23 @@ public sealed class ProtoDeviceClient
             $"{typeof(TDevice).Name} · {deviceId}",
             (release, _) => session.DisposeAsync()));
         return device;
+    }
+
+    private IReadOnlyDictionary<string, string?>? ResolveSettings(string deviceId)
+    {
+        if (_registration.Settings.Count == 0)
+        {
+            return null;
+        }
+
+        var escaped = Uri.EscapeDataString(deviceId);
+        var settings = new Dictionary<string, string?>(_registration.Settings.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in _registration.Settings)
+        {
+            settings[key] = value?.Replace("{deviceId}", escaped, StringComparison.Ordinal);
+        }
+
+        return settings;
     }
 
     private string ResolveAddress(string deviceId)

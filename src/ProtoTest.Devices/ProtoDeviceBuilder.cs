@@ -122,6 +122,20 @@ public sealed class ProtoDeviceClientBuilder
     /// <summary>The client's name, as the context accessor addresses it.</summary>
     public string Name => _registration.Name;
 
+    /// <summary>
+    /// Adds a transport setting every device of this client carries on its endpoint. The transport
+    /// names its own keys and reads them through <see cref="DeviceEndpoint.Setting"/>; <c>{deviceId}</c>
+    /// in a value is filled from the id passed to <c>For</c>, escaped like an address template, and a
+    /// repeated key replaces the earlier value. A credential belongs here rather than in the address,
+    /// which the trace records.
+    /// </summary>
+    public ProtoDeviceClientBuilder WithSetting(string key, string? value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        _registration.Settings[key] = value;
+        return this;
+    }
+
     /// <summary>Registers a typed device the client can create; no address or id is configured here.</summary>
     public ProtoDeviceClientBuilder AddDevice<TDevice>()
         where TDevice : ProtoDevice

@@ -9,6 +9,33 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ### Added
 
+- Device clients carry per-client transport settings: `devices.AddClient(...).WithSetting("model",
+  "AC-{deviceId}")` fills `DeviceEndpoint.Settings` for every device the client creates - `{deviceId}`
+  resolves in a value like an address template - and a transport reads its own keys through
+  `DeviceEndpoint.Setting`. A credential belongs in a setting rather than the address, which the trace
+  records.
+- `ProtoDeviceConnect` moved from `ProtoTest.Devices.WebSocket` into `ProtoTest.Devices`, so the socket,
+  in-process and MQTT transports share one connect bound; the old location stays as an obsolete
+  forwarding alias for existing callers.
+- The integrations overview lists the `ProtoTest.Devices*` packages with their one-line purposes:
+  `ProtoTest.Devices`, `ProtoTest.Devices.WebSocket`, `ProtoTest.Devices.WebSocket.AspNetCore`,
+  `ProtoTest.Devices.Mqtt` and `ProtoTest.Devices.Mqtt.Testcontainers`.
+- A second device transport: `ProtoTest.Devices.Mqtt` talks to devices over publish/subscribe against
+  a real broker. `AddMqttClient("Meters", "meters/{deviceId}/out", "meters/{deviceId}/in")` declares
+  the client's publish topic and subscribe filter - `{deviceId}` filled per device, `+`/`#` allowed in
+  the filter - and the registration carries both as endpoint settings beside the broker address. The
+  broker comes from the registration, a resolver, or `ProtoTest:Devices:Mqtt:Broker` with the one address
+  precedence (a published setting wins over configuration over code); `ConnectTimeout`,
+  `KeepAlivePeriod` and `MaxPacketBytes` are options under `ProtoTest:Devices:Mqtt` and validate when
+  a device is created. A client registered directly with `AddClient` may name the topics in the address
+  query instead (`publishTopic`/`subscribeTopic`), and a setting wins over the address parameter. The
+  transport speaks MQTT 5 over `mqtt://` and reuses the device model
+  unchanged: one conversation per instance, the `device.*` operations and entity, and
+  `IProtoDeviceProtocol` coverage for asserted kinds.
+- `ProtoTest.Devices.Mqtt.Testcontainers` owns a Mosquitto broker for the run: register
+  `MosquittoBroker.Container()` as the `UseContainer(...)` provider of the target that declares
+  `MqttDeviceOptions.BrokerSetting`, and MQTT clients registered without an address follow the broker
+  the run started.
 - A messaging destination can name a queue directly: `ProtoDestination.Queue(name)` builds the
   `queue:{name}` form, `Tap` accepts it and `AwaitAsync` consumes the named queue through an adapter
   that owns queues. RabbitMQ verifies the queue passively, reads it on the test's own channel and

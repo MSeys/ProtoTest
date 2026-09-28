@@ -3,14 +3,17 @@ namespace ProtoTest.Devices;
 using ProtoTest.Core;
 
 /// <summary>
-/// Where a device lives: its id, the address its transport connects to, and any protocol settings the
-/// registration carries (device model, credentials, timeouts).
+/// Where a device lives: its id, the address its transport connects to, and the per-client settings
+/// the registration filled for it (device model, credentials, transport keys). A transport reads the
+/// keys it owns through <see cref="Setting"/>; a value that must not reach the trace - a credential -
+/// belongs here rather than in the address.
 /// </summary>
 public sealed record DeviceEndpoint(
     string DeviceId,
     string Address,
     IReadOnlyDictionary<string, string?>? Settings = null)
 {
+    /// <summary>Gets a transport setting, or <see langword="null"/> when the registration did not fill it.</summary>
     public string? Setting(string key) => Settings is not null && Settings.TryGetValue(key, out var value) ? value : null;
 }
 

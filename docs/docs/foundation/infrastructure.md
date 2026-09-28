@@ -153,17 +153,7 @@ builder.AddInfrastructure(
 
 Both containers are started only when the suite opted in (`ProtoTest:Messaging:Broker=container`, `ProtoTest:Database=postgres`), which is what makes [one suite run in three environments](../getting-started/environments.md).
 
-The demo also registers a settings-only piece with no declared key:
-
-```csharp
-builder.AddInfrastructure(
-    "NorthstarStandalone",
-    chain => chain.Use(new ProtoTargetProvider(
-        "process",
-        new StandaloneSampleApp(fallbackDatabase, databaseProvider))));
-```
-
-It starts the sample application as a standalone process and fills `ProtoTest:Applications:{application}:BaseUrl` from its `Settings`, so the [web sessions](../integrations/web/index.md) have an address. A settings-only infrastructure fills its dictionary whether or not keys were passed.
+The browser journey's address comes from the application chain, not a container target: the sample registers its web application's loopback provider, which starts `NorthstarProgram.CreateApp` on a real listener and publishes the bound address as `ProtoTest:Applications:Northstar web:BaseUrl`, so the [web sessions](../integrations/web/index.md) follow it. `AddLoopbackApplication(name, createApp)` is the convenience form; [Hosting a browser journey](../integrations/aspnetcore.md#hosting-a-browser-journey) has the recipe, including `UseLoopback(createApp)` when the listener is one provider among others.
 
 An application image is the container counterpart: `ApplicationContainer` (`ProtoTest.Testcontainers`) starts the image as run infrastructure and fills `ProtoTest:Applications:{application}:BaseUrl` from the mapped address, so the application's clients, browser sessions and readiness probe resolve it:
 

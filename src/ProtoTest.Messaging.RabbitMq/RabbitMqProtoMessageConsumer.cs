@@ -275,7 +275,7 @@ internal sealed class RabbitMqProtoMessageConsumer : ProtoMessageConsumerBase, I
         var deliveries = Channel.CreateUnbounded<ProtoMessage>(new UnboundedChannelOptions
         {
             // Awaits serialize on the consumer's await queue, but the channel stays honest without it:
-            // a second reader must be possible, because a silent SingleReader violation is what let a
+            // a second reader must be possible, because a silent SingleReader violation would let a
             // racing await consume the delivery another await owned.
             SingleReader = false,
             SingleWriter = false

@@ -263,10 +263,10 @@ public sealed class ReportSinkTests
             Assert.That(html, Does.Contain("--pt-blue-bright: #1688bf"));
             Assert.That(html, Does.Contain("--phase-execution: var(--pt-cyan)"));
             Assert.That(html, Does.Contain("background-size: var(--grid-size) var(--grid-size)"));
-            // One brand mark, coloured by the surface like the viewer's, instead of navy on every theme.
+            // One brand mark, coloured by the surface like the viewer's.
             Assert.That(html, Does.Contain("fill: var(--brand-mark-body)"));
             Assert.That(html, Does.Contain("fill: var(--brand-mark-check)"));
-            // The viewer's expander rather than a rotating glyph.
+            // The expander matches the viewer's, not a rotating glyph.
             Assert.That(html, Does.Contain("<path class=\"stem\""));
             // Every section kind, resources included, gets the viewer's token-based tint.
             Assert.That(html, Does.Contain("[data-kind=coverage] .section-head i { background: var(--type-evidence); }"));

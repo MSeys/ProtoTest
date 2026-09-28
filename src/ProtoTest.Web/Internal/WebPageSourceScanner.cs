@@ -13,7 +13,7 @@ using ProtoTest.Web.Pages;
 /// <item>File-based routers: Next.js/Nuxt <c>pages/</c> and <c>src/pages/</c>, the Next.js <c>app/</c>
 /// router, and Remix <c>app/routes/</c> flat file names.</item>
 /// <item>Literal route scan: absolute <c>path:</c>/<c>path =</c> literals and JSX
-/// <c>&lt;Route path="/…"&gt;</c> usages in Vue Router and React Router sources — the fallback when
+/// <c>&lt;Route path="/…"&gt;</c> usages in Vue Router and React Router sources, the fallback when
 /// <c>auto</c> detects nothing file-based.</item>
 /// </list>
 /// Only absolute literals are collected; relative child routes and aliased imports are not resolved.

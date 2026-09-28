@@ -19,7 +19,7 @@ public class IntegrationTests
     [Test]
     public async Task AddAspNetCoreServer_Should_Initialize_InMemory_Server_And_HttpClient()
     {
-        // 1. Arrange & Build ProtoHost
+        // Arrange
         var host = new ProtoHostBuilder()
             .AddAspNetCoreServer<SampleApi.Program>("Default")
             .Build();
@@ -28,14 +28,13 @@ public class IntegrationTests
 
         try
         {
-            // 2. Act: Call in-memory endpoint via Proto.Context
+            // Act
             var client = Proto.Context.Client<HttpClient>("Default");
             var response = await client.GetAsync("/ping");
 
-            // 3. Assert
+            // Assert
             Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
-            // Validate direct Server Service resolution
             var service = Proto.Context.ServerService<SampleApi.Program, SampleApi.ITestMessageService>("Default");
             Assert.That(service.GetMessage(), Is.EqualTo("Hello from AspNetCore DI!"));
         }
@@ -280,8 +279,7 @@ public class IntegrationTests
     [Test]
     public async Task Rest_First_Should_Use_External_Client_When_BaseUrl_Is_Configured()
     {
-        // 1. Arrange: Provide Configuration override for the client BaseUrl
-        // Arrange
+        // Arrange: provide the configuration override for the client BaseUrl
         var inMemoryConfig = new Dictionary<string, string?>
         {
             { "ProtoTest:Applications:ExternalApi:BaseUrl", "https://api.example.com" }
@@ -297,10 +295,10 @@ public class IntegrationTests
 
         try
         {
-            // 2. Act
+            // Act
             var client = Proto.Context.Client<HttpClient>("ExternalApi");
 
-            // 3. Assert: REST handled the client before the ASP.NET Core fallback was reached.
+            // Assert: REST handled the client before the ASP.NET Core fallback was reached.
             Assert.That(client.BaseAddress, Is.EqualTo(new Uri("https://api.example.com")));
             Assert.That(
                 Proto.Context.TryClient<WebApplicationFactory<SampleApi.Program>>("ExternalApi:Factory"),

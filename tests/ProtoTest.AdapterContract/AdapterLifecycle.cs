@@ -49,7 +49,7 @@ public static class AdapterLifecycle
     /// <summary>
     /// Verifies the completed run once, before the host stops: every test the adapter wrapped recorded an
     /// outcome, the shared compliance test succeeded, and its body attachment is in the trace. This is the
-    /// real-run half of the adapter contract — an adapter that fails to map a result or complete a scope
+    /// real-run half of the adapter contract: an adapter that fails to map a result or complete a scope
     /// fails the run itself instead of silently recording <c>Unknown</c>. A run that never started (zero
     /// recorded tests) is skipped so a host start failure is not masked by this check.
     /// </summary>

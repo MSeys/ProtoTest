@@ -8,7 +8,7 @@ using ProtoTest.Core.Internal;
 public static class ProtoHostBuilderSinkExtensions
 {
     /// <summary>
-    /// Adds a report sink and ensures all registered sinks export at the end of the test run.
+    /// Adds a report sink; every registered sink exports at the end of the test run.
     /// The sink is constructed through dependency injection before the optional callback is applied; a
     /// callback supplied by a repeated call is applied too, when the sink is resolved. The same sink
     /// implementation type is registered once, however it was added - including a sink registered

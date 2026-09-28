@@ -7,7 +7,11 @@ description: "A per-test GraphQL client for queries, mutations and subscriptions
 
 # GraphQL
 
+## What it adds
+
 `ProtoTest.GraphQL` gives each test a GraphQL client for queries, mutations and subscriptions (WebSocket or SSE), with file uploads, shape assertions and schema coverage. It shares its HTTP plumbing, [authentication model](../rest/authentication.md) and capture options with REST.
+
+## Install
 
 ```bash
 dotnet add package ProtoTest.GraphQL
@@ -38,7 +42,7 @@ response.Should.HaveNoErrors();
 
 `ExpectAsync` turns the shape into `{ id product total status }`, sends the mutation with `$input` declared as `CreateOrderInput!`, and asserts the result against the same shape.
 
-## Registering
+## Compose
 
 Register GraphQL on the host, or under an application so its clients share the application's base URL:
 
@@ -94,7 +98,7 @@ graphQL.AddClient("GraphQL")
     .WithSchemaCoverage("northstar.graphql");
 ```
 
-## Options and keys {/* #builder-options */}
+### Options and keys {/* #builder-options */}
 
 | Section | Key | Default |
 | --- | --- | --- |
@@ -108,7 +112,7 @@ graphQL.AddClient("GraphQL")
 
 Tune the options in code with `ConfigureResponses(...)` and `CaptureAttachments(...)`; code callbacks compose in registration order and the known section binds over the result, so configuration wins over code. The transport can come from configuration too — an invalid value throws when the test first calls `GraphQL()`, naming `WebSocket` and `Sse`.
 
-## Context API
+### Context API
 
 ```csharp
 GraphQLRequestBuilder GraphQL(this ProtoExecutionContext context, string? clientName = null);
@@ -118,7 +122,7 @@ GraphQLRequestBuilder GraphQL(this ProtoExecutionContext context, string? client
 
 Creating the builder records a `graphql.builder.create` event with the client, application, resolved source client, whether auth is configured and which resolver supplied the endpoint.
 
-## Quick start
+## The tasks
 
 ```csharp
 [Application("Api")]
@@ -136,7 +140,7 @@ public sealed class ViewerTests
 }
 ```
 
-## Going further
+### Going further
 
 - **Authentication** — the same `[Auth<T>]`, `.Auth(...)` and `.WithoutAuth()` as [REST](../rest/authentication.md); narrow to GraphQL with `Protocols = ["GraphQL"]`. The [built-in test user](../rest/authentication.md#built-in-test-user) rides the same pipeline.
 - **Queries, mutations and uploads** — shape-driven, fluent and raw documents: [Queries and mutations](./operations.md).
@@ -145,7 +149,7 @@ public sealed class ViewerTests
 - **Multiple clients** — pass `.GraphQL("Reporting")`, or bind one with `[Application("Api", "GraphQL:Reporting")]`.
 - **In-process server** — a client with no URL reuses the application's transport automatically; a configured `BaseUrl` takes precedence.
 
-## Tracing and coverage
+## In the trace and coverage
 
 Queries and mutations record a `graphql.operation` operation (`GraphQL · {type} {name}`) under the protocol-scoped client entity (`client:HttpClient:GraphQL:{target}`), with a `graphql.endpoint.resolve` child, the operation type and name, header count, response status and error count; assertions record `assert.http.status`, `assert.graphql.*` and `assert.json.shape` as children. Deserialization records `graphql.response.deserialize`. Observations: `graphql.response` for every response, `graphql.failure` when sending fails, and `graphql.contract.shape` when a shape assertion matches. Subscriptions add `graphql.subscription.start|next|complete` events.
 

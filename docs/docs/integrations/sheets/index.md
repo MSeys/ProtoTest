@@ -6,6 +6,8 @@ description: "Open the .xlsx your application generated and assert on its sheets
 
 # Sheets
 
+## What it adds
+
 `ProtoTest.Sheets` opens the `.xlsx` your application generated and lets a test assert on its sheets, cells, ranges and typed rows. It reads the file as OpenXML — the format itself — so it does not matter whether the application produced it with SpreadsheetGear, ClosedXML, EPPlus, NPOI, Aspose or raw OpenXML.
 
 Reading is eager and complete: a missing sheet, a malformed reference or a reversed range fails immediately instead of surfacing later. A reference outside the used range is an empty cell, not an error.
@@ -27,7 +29,7 @@ dotnet add package ProtoTest.Sheets
 
 ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `-f` is passed. The package builds on OpenXML and brings `ProtoTest.Json` with it for row shape matching.
 
-## Registering
+## Compose
 
 ```csharp
 public static IProtoHostBuilder AddSheets(
@@ -37,7 +39,7 @@ public static IProtoHostBuilder AddSheets(
 
 `AddSheets` registers the `Sheets` capability (`ProtoCapabilityKinds.Document`), a singleton `SheetsOptions` built from the callback and then bound from `ProtoTest:Sheets`, and the `SheetsCoverageCollector`. Repeats are no-ops: the first options callback wins, the first collector instance wins, and the capability descriptor dedupes.
 
-## Options and keys
+### Options and keys
 
 | Key | Option | Type | Default |
 | --- | --- | --- | --- |
@@ -45,7 +47,7 @@ public static IProtoHostBuilder AddSheets(
 
 When false, hidden sheets are omitted from `ProtoWorkbook.Sheets` and from every count derived from it; each sheet still carries its original position in `ProtoSheet.Index`. Configuration layers over the code callback.
 
-## Context API
+### Context API
 
 ```csharp
 ProtoSheets sheets = Proto.Context.Sheets();
@@ -70,7 +72,7 @@ On the opened workbook:
 
 On a sheet: `Cell(reference)`, `Cell(row, column)` (1-based), `Range(reference)`, `Table(params int[] headerRows)` (defaults to row 1), plus `Name`, `Index`, `IsHidden`, `RowCount` and `ColumnCount`.
 
-## Quick start
+## The tasks
 
 ```csharp
 var summary = Proto.Context.Sheets().Open(response).Sheet("Summary");
@@ -90,9 +92,9 @@ summary.Range("A4:B5").Should.Match(
 
 Values are typed best-effort from the OpenXML cell type and number format. A cell's `Formula` text is kept alongside its cached value; formulas are never recalculated.
 
-## Going further
+### Going further
 
-### Cells
+#### Cells
 
 Every assertion object exposes `Should` (positive) and `ShouldNot` (negated) facades whose polarity is fixed by the property, so a negative failure reads "Expected … not to …" with the same evidence.
 
@@ -103,11 +105,11 @@ Every assertion object exposes `Should` (positive) and `ShouldNot` (negated) fac
 | `BeBlank()` | the cell is empty |
 | `HaveFormula(formula)` | the formula text matches exactly |
 
-### Ranges
+#### Ranges
 
 `Range(reference).Should.Match(expected)` compares rendered cell values row by row, ordinal, and checks the shape first: a dimension mismatch fails before any value comparison. `Should.HaveDimensions(rows, columns)` checks the shape without reading values. `ShouldNot.Match(...)` passes only when the range differs. Reversed ranges (`B5:A1`) and ranges over 1,000,000 cells are rejected outright.
 
-### Tables
+#### Tables
 
 A table is a header-aware view of a sheet area; header rows can be layered, with a merged group header over subheaders:
 
@@ -121,7 +123,7 @@ string amount = emea["FY26", "Amount"].Text;          // row indexer by header p
 
 A column is found by its full header path; a single segment may match by suffix when it is unambiguous. Zero matches and more than one full or suffix match throw `SpreadsheetAssertionException` naming the candidate paths, so ambiguity fails instead of guessing. Header matching is ordinal (case-sensitive), and a single-segment path has no case folding. `ContainRow` compares rendered values, so a numeric or date key cell matches its printed form. A row can also be matched against a shape keyed by leaf header names, for example `table.Rows[0].Should.MatchShape(new { Region = "EMEA", Amount = "1200" })`.
 
-### Typed models
+#### Typed models
 
 For a sheet that is really a table, describe the row once as a record and let header paths bind the columns:
 
@@ -154,7 +156,7 @@ sales.Row(row => row.Region == "EMEA")
 `table.Rows[0].Should.MatchShape(shape, exact: true)` — or `row.ShouldMatchShape(shape, exact: true)` for a model row — is the exhaustive form: a field present in the row that the shape does not mention is a mismatch naming that field. A value constraint mentions its whole subtree. The [shape matching page](../../foundation/shape-matching.md#exact-matching) has the rules.
 - Records are constructed through their primary constructor, so its guards and normalization run; every constructor parameter must map to a `[Column]`, or the model fails naming the parameter. A class with a parameterless constructor is constructed and its declared `[Column]` properties are set, and a class with only a mapped parameterized constructor is constructed through it. An optional empty cell binds as `null`.
 
-### Key-value sheets
+#### Key-value sheets
 
 A sheet that is really a label/value block — labels in the first column, values in the second — is modelled the same way, with the sheet's kind declared on the model:
 
@@ -178,11 +180,11 @@ summary.Column(s => s.Total).ShouldNot.Be(0m);
 
 `Model<TRow>()` and `KeyValueModel<TModel>()` follow the kind the model declares: reading a model with the other accessor fails naming the one to use.
 
-### Hidden sheets
+#### Hidden sheets
 
 Hidden sheets are skipped unless `ProtoTest:Sheets:IncludeHiddenSheets` (or the option callback) turns them on. `ProtoSheet.Index` always reflects the position in the workbook including hidden sheets; when they are included, the `sheets.open` trace section marks them with `hidden`.
 
-## Tracing and coverage
+## In the trace and coverage
 
 - `sheets.open` (source `ProtoTest.Sheets`) carries `sheets.name` and a Fields section listing every sheet read as `name · {rows}x{columns}[ hidden]`.
 - `sheets.model` carries `sheets.sheet` and `sheets.columns` when a table model is verified, or `sheets.labels` when a key-value model is verified; the operation records whether the sheet matched, and a negated `ShouldNot.MatchModel()` consumes a recorded violation.
@@ -225,7 +227,7 @@ The capability is name `"Sheets"`, kind `document` (`ProtoCapabilityKinds.Docume
 
 ## Links
 
-- [Integrations overview](../overview.md) — where the document package sits.
+- [Integrations map](../overview.md) - where the document package sits.
 - [Shape matching](../../foundation/shape-matching.md) — the rules behind `Should.MatchShape` on table rows and the model-row extension.
 - [Coverage](../../observability/coverage.md) — how collectors and report items work.
 - The demo's report journey: [`samples/Northstar.ProtoTest/SheetsJourney.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/SheetsJourney.cs).

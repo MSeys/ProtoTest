@@ -12,6 +12,7 @@ import ReleaseFeed from '@site/src/components/ReleaseFeed';
 import ViewerWalkthrough from '@site/src/components/ViewerWalkthrough';
 import CapabilityIndex from '@site/src/components/CapabilityIndex';
 import VisibilityPanel from '@site/src/components/VisibilityPanel';
+import FailureGallery from '@site/src/components/FailureGallery';
 import styles from './index.module.css';
 
 const heroTabs: CodeTab[] = [
@@ -184,7 +185,7 @@ public async Task Sign_in_shows_the_dashboard()
         "Signed in", TimeSpan.FromSeconds(2));
 }`,
     footnote:
-      'A named flow records as one web.flow operation with each step nested under it — and the same page objects run on Playwright or Selenium.',
+      'A named flow records as one web.flow operation with each step nested under it, and the same page objects run on Playwright or Selenium.',
   },
   {
     id: 'data',
@@ -206,7 +207,7 @@ response.Should.MatchShape(new
     memberCount = members.Count + 1   // the seven, and the admin
 });`,
     footnote:
-      'Defaults come from your data module, provisioning from your provisioner — and it shares the test context with every other client.',
+      'Defaults come from your data module, provisioning from your provisioner, and the test context is shared with every other client.',
   },
   {
     id: 'sql',
@@ -291,18 +292,18 @@ function Hero() {
             </Heading>
             <p className={styles.heroLead}>
               ProtoTest brings the setup around an integration test into one place. Choose the integrations a
-              suite needs; they share the same context, lifecycle, cleanup and trace. A test can call an API,
-              wait for an event, inspect a database, drive a browser or verify a generated file.
+              suite needs; they share one context, lifecycle, cleanup and trace. A test can call an API, wait
+              for an event, inspect a database, drive a browser or verify a generated file.
             </p>
             <div className={styles.heroButtons}>
-              <Link className={`${styles.btn} ${styles.btnPrimary}`} href="https://trace.prototest.dev/?demo=1">
-                See a failing test's trace
+              <Link className={`${styles.btn} ${styles.btnPrimary}`} to="/learn/">
+                Start learning
+              </Link>
+              <Link className={`${styles.btn} ${styles.btnSecondary}`} href="https://trace.prototest.dev/?demo=1">
+                See a failing trace
               </Link>
               <Link className={`${styles.btn} ${styles.btnSecondary}`} to="/docs/getting-started/installation">
                 Get started
-              </Link>
-              <Link className={`${styles.btn} ${styles.btnSecondary}`} to="https://github.com/MSeys/ProtoTest">
-                View on GitHub
               </Link>
             </div>
           </div>
@@ -313,23 +314,74 @@ function Hero() {
   );
 }
 
-function InHouseSection() {
+function PathsSection() {
   return (
     <section className={`${styles.section} ${styles.sectionAlt}`}>
       <div className="container">
-        <div className={`${styles.sectionHead} ${styles.originCopy}`}>
-          <Heading as="h2">Why I built ProtoTest</Heading>
-          <p>
-            ProtoTest comes from things I have struggled with while writing integration tests. Once a suite grows,
-            a lot of the work shifts to setup, infrastructure and figuring out failures that only happen sometimes.
-            I wanted the different integrations to work from the same context and lifecycle instead of each one
-            solving that again.
-          </p>
-          <p>
-            Application-specific setup still belongs to the test project. ProtoTest provides the host, context,
-            lifecycle, tracing and integration points underneath it.
-          </p>
+        <div className={styles.sectionHead}>
+          <Heading as="h2">Start where you are</Heading>
+          <p>Three ways in. Pick the one that matches what you bring.</p>
         </div>
+        <div className={styles.paths}>
+          <div className={styles.pathCard}>
+            <Heading as="h3">New to integration testing</Heading>
+            <p>
+              Start with the Learn track. It begins with why integration tests get hard and works up to
+              tests you can trust in CI.
+            </p>
+            <Link className={styles.pathLink} to="/learn/">
+              Start learning
+            </Link>
+          </div>
+          <div className={styles.pathCard}>
+            <Heading as="h3">Evaluating ProtoTest</Heading>
+            <p>
+              Where it wins, where the alternatives win, what a run costs, and the questions teams ask
+              before adopting it.
+            </p>
+            <div className={styles.pathLinks}>
+              <Link to="/docs/compare">Compared</Link>
+              <Link to="/docs/benchmarks">Benchmarks</Link>
+              <Link to="/docs/faq">FAQ</Link>
+            </div>
+          </div>
+          <div className={styles.pathCard}>
+            <Heading as="h3">Already have a suite</Heading>
+            <p>
+              Recipes for common journeys, and the pages to reach for when a run needs explaining.
+            </p>
+            <div className={styles.pathLinks}>
+              <Link to="/docs/recipes/overview">Recipes</Link>
+              <Link to="/docs/getting-started/troubleshooting">Troubleshooting</Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FailureSection() {
+  return (
+    <section className={styles.section}>
+      <div className="container">
+        <div className={styles.sectionHead}>
+          <Heading as="h2">Learn by failure</Heading>
+          <p>
+            A green suite teaches you little. The useful part is what happens when a test fails: a value
+            that changed, a service that was not ready, a cleanup that hid the cause. The lessons start
+            from failures like those, and the demo trace is a failed test with every layer recorded.
+          </p>
+          <div className={styles.featureLinks}>
+            <Link className={styles.featureLink} href="https://trace.prototest.dev/?demo=1">
+              Open the failing trace
+            </Link>
+            <Link className={styles.featureLink} to="/learn/">
+              Start the track
+            </Link>
+          </div>
+        </div>
+        <FailureGallery />
       </div>
     </section>
   );
@@ -343,9 +395,9 @@ function TraceSection() {
           <div className={styles.featureCopy}>
             <Heading as="h2">Following a failed test</Heading>
             <p>
-              Step through the three views of the bundled demo trace: the run first, then the failed test's
-              story, then the check itself - the values that differed, the exception and the line that made
-              the assertion.
+              Step through the three views of the demo trace: the run first, then the failed test's story,
+              then the check itself. The values that differed, the exception, and the line that made the
+              assertion.
             </p>
             <div className={styles.featureLinks}>
               <Link className={styles.featureLink} href="https://trace.prototest.dev/?demo=1">
@@ -415,8 +467,8 @@ function PayoffSection() {
             <Heading as="h3">Portable trace files</Heading>
             <p>
               A <code>.prototrace</code> file contains the hooks, clients, requests, checks and artifacts recorded
-              during the run. It can be opened locally or downloaded from CI and opened in the viewer; the viewer
-              does not upload it.
+              during the run. Open it locally, or download it from CI and open it in the viewer; the viewer does
+              not upload it.
             </p>
             <p>
               The trace also says what it could not see: whether the application ran in-process, which
@@ -454,6 +506,27 @@ function LayersSection() {
           </div>
         </div>
         <CapabilityIndex />
+      </div>
+    </section>
+  );
+}
+
+function WhySection() {
+  return (
+    <section className={`${styles.section} ${styles.sectionAlt}`}>
+      <div className="container">
+        <figure className={styles.why}>
+          <blockquote>
+            <p>
+              I wanted tests to focus on the scenario again. I wanted integrations to work together
+              instead of every one of them solving lifecycle and diagnostics again. I wanted failures to
+              leave enough information behind to investigate them afterwards.
+            </p>
+          </blockquote>
+          <figcaption>
+            <Link to="/docs/project/why-prototest">Why I built ProtoTest</Link>
+          </figcaption>
+        </figure>
       </div>
     </section>
   );
@@ -508,12 +581,14 @@ export default function Home(): ReactNode {
       </Head>
       <Hero />
       <main>
-        <InHouseSection />
+        <PathsSection />
+        <FailureSection />
         <TraceSection />
         <ComparisonSection />
         <PayoffSection />
         <LayersSection />
         <CtaSection />
+        <WhySection />
       </main>
       <ReleaseFeed />
     </Layout>

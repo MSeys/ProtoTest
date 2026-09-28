@@ -1,0 +1,158 @@
+/* Cards on the blueprint surface: the verdict colours are the trace's own. */
+
+.headMeta { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.card {
+  align-self: start;
+  min-width: 0;
+  overflow: clip;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.cardOpen { border-color: var(--border-strong); box-shadow: inset 2px 0 0 var(--blueprint); }
+
+.cardHead { margin: 0; font-size: inherit; font-weight: inherit; letter-spacing: normal; }
+
+.toggle {
+  position: relative;
+  width: 100%;
+  padding: var(--space-4) var(--space-6) var(--space-4) var(--space-4);
+  display: grid;
+  gap: var(--space-1);
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+}
+
+.toggle:hover { background: var(--hover); }
+
+.mode {
+  color: var(--blueprint);
+  font: var(--weight-semibold) var(--text-micro) var(--font-mono);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.ask { font: var(--weight-semibold) var(--text-title) var(--font-display); line-height: var(--leading-tight); }
+
+/* Two classes so the site's inline-code chip cannot win over this rule. */
+.toggle .test {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  background: none;
+  color: var(--muted);
+  font: var(--text-micro) var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  position: absolute;
+  top: 50%;
+  right: var(--space-4);
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: translateY(-50%) rotate(45deg);
+  transition: transform var(--motion-fast) var(--motion-ease);
+}
+
+.cardOpen .chevron { transform: translateY(-50%) rotate(-135deg); }
+
+.panel {
+  display: grid;
+  gap: var(--space-4);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.side {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius-chip);
+  background: var(--surface-2);
+}
+
+.sideFix { border-left-color: var(--success); }
+
+.sideHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+
+.sideLabel { font-size: var(--text-meta); font-weight: var(--weight-bold); }
+.elapsed { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+
+.what { margin: 0; color: var(--muted); font-size: var(--text-meta); line-height: var(--leading); }
+
+.records { margin: 0; padding: 0; display: grid; gap: var(--space-2); list-style: none; }
+
+.records li {
+  padding: var(--space-2) var(--space-3);
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+}
+
+.recordFailed { border-color: var(--danger-line); background: var(--danger-soft); }
+
+.recordHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); }
+
+.kind {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-chip);
+  background: var(--blueprint-soft);
+  color: var(--blueprint);
+  font: var(--weight-semibold) var(--text-micro) var(--font-mono);
+  line-height: 1.8;
+}
+
+.recordName { min-width: 0; font-size: var(--text-meta); font-weight: var(--weight-semibold); }
+
+.succeeded, .failed {
+  margin-left: auto;
+  font: var(--weight-semibold) var(--text-micro) var(--font-ui);
+}
+
+.succeeded { color: var(--success); }
+.failed { color: var(--danger); }
+
+.detail {
+  color: var(--muted);
+  font: var(--text-micro)/1.55 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.change {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  border-radius: var(--radius-chip);
+  background: var(--blueprint-soft);
+  color: var(--text);
+  font-size: var(--text-meta);
+}
+
+.change strong { color: var(--blueprint); }
+
+.open {
+  justify-self: start;
+  color: var(--blueprint);
+  font-size: var(--text-meta);
+  font-weight: var(--weight-semibold);
+}

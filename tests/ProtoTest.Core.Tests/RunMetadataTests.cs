@@ -166,9 +166,8 @@ public sealed class RunMetadataTests
     [Test]
     public async Task RunMetadata_WhenAbsent_ShouldLeaveTheWireAndReportUnchanged()
     {
-        // Characterization, run green before the feature landed: with no run metadata configured, the run
-        // records exactly the built-in environment facts and the report carries no item for it, so a
-        // local run is the same trace and report as before the option existed.
+        // With no run metadata configured, the run records exactly the built-in environment facts and
+        // the report carries no item for it, so the option is invisible when unused.
         using var trace = new TemporaryTrace("run-metadata-absent");
         var sink = new CapturingSink();
         var builder = new ProtoHostBuilder();

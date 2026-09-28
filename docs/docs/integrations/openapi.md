@@ -6,6 +6,8 @@ description: "Compare what your REST tests did against your OpenAPI document, an
 
 # OpenAPI
 
+## What it adds
+
 `ProtoTest.OpenApi` compares what your REST tests did against your OpenAPI document, and reports the endpoints, responses and properties no test has touched. It builds on [`ProtoTest.Rest`](./rest/index.md) — it listens to the requests and shape assertions REST records.
 
 :::note[Coverage, not validation]
@@ -20,7 +22,7 @@ dotnet add package ProtoTest.OpenApi
 
 ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `-f` is passed. The package resolves its document with `Microsoft.OpenApi.Readers` and depends on `ProtoTest.Rest`.
 
-## Registering
+## Compose
 
 Attach the collector to the REST client whose API the document describes:
 
@@ -65,7 +67,7 @@ rest.AddClient("Api")
     .AddCollector<OpenApiCoverageCollector>("https://api.example.test/swagger/v1/swagger.json");
 ```
 
-## Options and keys
+### Options and keys
 
 | Key | Type | Default / required |
 | --- | --- | --- |
@@ -75,11 +77,11 @@ rest.AddClient("Api")
 
 There is no options class and no dedicated options section.
 
-## Context API
+### Context API
 
 None. The collector is attached to a REST target and needs no execution-context accessor.
 
-## Quick start
+## The tasks
 
 ```csharp
 var response = await Proto.Context.Rest("Api").GetAsync("/api/orders/42");
@@ -93,9 +95,9 @@ response.Should.MatchShape(new
 
 The request counts an endpoint and a response hit; the shape assertion is what counts the property hits.
 
-## Going further
+### Going further
 
-### How a route matches
+#### How a route matches
 
 Route matching normalizes both sides before comparing: an absolute URI is reduced to its path, the query and fragment are stripped, a leading `/` is forced and one trailing `/` is trimmed. An exact route beats parameter matches; ties break by literal-segment count, then path, case-insensitively.
 
@@ -103,17 +105,17 @@ A route parameter accepts the request value unless the contract parameter carrie
 
 A route the document doesn't describe is ignored, and a method the document doesn't declare for a matched route is not counted — the report only enumerates spec operations.
 
-### How a response matches
+#### How a response matches
 
 The exact status code is looked up first, then a case-insensitive wildcard like `4XX`, then a case-insensitive `default`.
 
-### How a property matches
+#### How a property matches
 
 - Only shape assertions count. A property is covered when a `Should.MatchShape` assertion actually matched it; receiving a field in a response body is not coverage.
 - Array indices are normalized before comparison: `[\d+]` becomes `[]`, and matching is case-insensitive, so `$.lines[0].total` and `$.lines[3].total` both count toward `$.lines[].total`.
 - Schema extraction walks the whole document: every media type with a schema adds a `$` baseline row for the body itself; `allOf`, `oneOf` and `anyOf` are traversed at the same path; each property adds `{path}.{name}`; each array item adds `{path}[]`; `$ref`s resolve through the document's components. Recursion and diamond revisits are cut.
 
-### What the report contains
+#### What the report contains
 
 The collector walks the **entire** document — not just what was called — and reports three nested levels:
 
@@ -132,7 +134,7 @@ OpenAPI              GET /api/orders/{id}      12 hits
 
 All items are coverage items: covered ones are successful with a hit count, uncovered ones neutral. Register a [report sink](../observability/reporting.md) to see them, and read [Coverage](../observability/coverage.md) for how to use them.
 
-## Tracing and coverage
+## In the trace and coverage
 
 This package emits **no** trace operations, observations, values or entities of its own. It is a consumer: `CanCollect` matches its target and a `RestResponseData` or `RestShapeMatchData` observation, and it produces report items only. The observations it reads are recorded by the REST integration.
 

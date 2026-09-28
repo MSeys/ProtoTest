@@ -5,7 +5,7 @@ import Frame from '@site/src/components/Frame';
 import styles from './styles.module.css';
 
 /*
- * The system under test in cross-section, from what a user sees down to what the run itself brings, with every
+ * The system under test in cross-section, from what a user sees to what reads the evidence, with every
  * capability placed at the depth it reaches. The spine on the left is the one ProtoExecutionContext every depth
  * plugs into: a test that drives the browser and one that reads the database are written the same way.
  */
@@ -64,6 +64,21 @@ const depths: Depth[] = [
     capabilities: [
       {name: 'Test data', does: 'Provisioned, with defaults', packages: 'Data', to: '/docs/integrations/data'},
       {name: 'Infrastructure', does: 'Containers owned by the run', packages: 'Testcontainers', to: '/docs/foundation/infrastructure'},
+    ],
+  },
+  {
+    label: 'After the run',
+    note: 'What reads the evidence',
+    capabilities: [
+      {name: 'CLI', does: 'Summary, index, verify, feedback', packages: 'Cli', to: '/docs/integrations/overview'},
+      {name: 'Traces', does: 'The archive and its reader', packages: 'Traces', to: '/docs/observability/prototrace'},
+      {name: 'MCP server', does: 'Four read-only tools over the runs', packages: 'Mcp', to: '/docs/agent-workflows/setup'},
+      {name: 'Diagnosis', does: 'The summary and failure context', packages: 'Diagnosis', to: '/docs/agent-workflows/diagnosis'},
+      {name: 'Verification', does: 'Compares two reports for regressions', packages: 'Verification', to: '/docs/agent-workflows/verification'},
+      {name: 'Feedback', does: 'Uploads the trace, posts the digest', packages: 'Feedback', to: '/docs/continuous-integration'},
+      {name: 'Analyzers', does: 'Warnings for code outside the lifecycle', packages: 'Analyzers', to: '/docs/project/analyzers'},
+      {name: 'Templates', does: 'Scaffolds a suite, already composed', packages: 'Templates', to: '/docs/getting-started/installation'},
+      {name: 'Reporting', does: 'The JSON and HTML report sinks', packages: 'Reporting', to: '/docs/observability/reporting'},
     ],
   },
 ];

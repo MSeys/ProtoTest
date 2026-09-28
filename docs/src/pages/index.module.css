@@ -83,7 +83,42 @@
 }
 
 .sectionHead p { color: var(--muted); font-size: clamp(1rem, 1.1vw, 1.05rem); line-height: 1.62; }
-.originCopy { margin-bottom: 0; }
+
+/* The three entry paths: one panel per reader. Same border and surface, no shadow, no icon. */
+.paths {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: var(--space-5);
+}
+
+.pathCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.pathCard h3 { font-size: 1.1rem; letter-spacing: var(--tracking-display); }
+.pathCard p { margin: 0; color: var(--muted); line-height: 1.6; }
+
+.pathLink { margin-top: auto; font-weight: var(--weight-semibold); }
+.pathLinks { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-top: auto; font-weight: var(--weight-semibold); }
+
+/* The closing quote: one paragraph from the project page, read quietly. */
+.why { max-width: 64ch; margin: 0 auto; text-align: center; }
+
+.why blockquote {
+  margin: 0 0 var(--space-4);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: clamp(1.15rem, 1.7vw, 1.4rem);
+  line-height: 1.55;
+}
+
+.why figcaption { color: var(--muted); font-weight: var(--weight-semibold); }
 
 /* Feature rows: copy beside a live visual. The row is its own container, so the alternation flips on the
    row's width rather than the viewport's. */

@@ -6,7 +6,7 @@ Security fixes are made against the latest stable release. Users should reproduc
 
 ## Reporting a vulnerability
 
-Please do not open a public issue containing exploit details, credentials, private trace data or other sensitive material. Use GitHub's **Report a vulnerability** flow on the repository's Security tab to start a private report with the maintainer. If that control is unavailable, contact the maintainer privately through the contact route on the [project owner's GitHub profile](https://github.com/MSeys).
+Please do not open a public issue containing exploit details, credentials, private trace data or other sensitive material. Use GitHub's **Report a vulnerability** flow on the repository's Security tab to start a private report. If that control is unavailable, use the contact route on the [project owner's GitHub profile](https://github.com/MSeys).
 
 Include the affected package and version, impact, reproduction steps and any suggested mitigation. Share only the minimum artifact needed to demonstrate the issue; a `.prototrace` can contain application data and attachments.
 

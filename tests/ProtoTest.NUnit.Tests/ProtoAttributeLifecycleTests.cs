@@ -15,8 +15,7 @@ public class ProtoAttributeLifecycleTests
         Proto.Context.Resolve<ExecutionLogState>().Log.Add("TestExecution");
 
         // Assert
-        // Note: The AfterTest hooks execute after this test body completes,
-        // so we check the Before execution log here within the test body.
+        // The AfterTest hooks run after this body completes, so the Before log is asserted here.
         string[] expectedBeforeSequence = [.. AdapterLifecycle.ExpectedBeforeSequence, "TestExecution"];
         Assert.That(Proto.Context.Resolve<ExecutionLogState>().Log, Is.EqualTo(expectedBeforeSequence));
     }

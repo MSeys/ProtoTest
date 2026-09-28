@@ -6,7 +6,11 @@ description: "Run an Aspire AppHost with the suite: the run starts it, each reso
 
 # Aspire
 
-`ProtoTest.Aspire` runs an Aspire AppHost with the suite: the run starts the AppHost's own entry point after the infrastructure registered before it, each declared resource's endpoint is published as its application's `BaseUrl`, and the run stops the AppHost after the reports are written. Per-test contexts and the trace work on top, unchanged — a test resolves the address and calls it.
+## What it adds
+
+`ProtoTest.Aspire` runs an Aspire AppHost with the suite: the run starts the AppHost's own entry point after the infrastructure registered before it, each declared resource's endpoint is published as its application's `BaseUrl`, and the run stops the AppHost after the reports are written. Per-test contexts and the trace work on top, unchanged - a test resolves the address and calls it.
+
+## Install
 
 ```bash
 dotnet add package ProtoTest.Aspire
@@ -14,7 +18,7 @@ dotnet add package ProtoTest.Aspire
 
 The package targets `net8.0`, `net9.0` and `net10.0`, and the Aspire release is pinned once centrally: `Aspire.Hosting.Testing` in `Directory.Packages.props`, the `Aspire.AppHost.Sdk` version in `global.json`. The test AppHost itself is an Aspire AppHost SDK project, so restoring the suite needs NuGet access.
 
-## Registering
+## Compose
 
 ```csharp
 builder
@@ -37,7 +41,7 @@ public sealed class AppHostAnchor;
 
 `AddAspireAppHost` can be called more than once for different AppHosts; repeating the same entry point with the same composition is one AppHost, while the same entry point with different resources throws instead of silently dropping the second registration. Registering one resource under two AppHosts throws the same way.
 
-## Serving targets through the chain
+### Serving targets through the chain
 
 An AppHost can be one provider among others: register it, then reference its resources from the
 targets they serve. The AppHost serves a target when the integration-owned selection key
@@ -89,7 +93,7 @@ AppHost starts only when a selection key is set and at least one key it fills is
 skip record names the condition (`unselected`, or the missing keys for `configured`) like any other
 chain.
 
-## Reaching it from a test
+## The tasks
 
 ```csharp
 [ProtoTest]
@@ -103,7 +107,7 @@ public async Task Health_endpoint_answers()
 }
 ```
 
-`AspireResource` returns the base address the AppHost published for the resource — or the configured address when the run points at a deployed topology. The application's REST, GraphQL and gRPC clients resolve the same address, so the journey in [Registering](#registering) calls the resource through the normal client. The suite's composition for one AppHost, one probe and one client is in `tests/ProtoTest.Aspire.Tests/AspireAppHostTests.cs`.
+`AspireResource` returns the base address the AppHost published for the resource — or the configured address when the run points at a deployed topology. The application's REST, GraphQL and gRPC clients resolve the same address, so the journey in [Compose](#compose) calls the resource through the normal client. The suite's composition for one AppHost, one probe and one client is in `tests/ProtoTest.Aspire.Tests/AspireAppHostTests.cs`.
 
 ## Options and keys
 
@@ -132,7 +136,7 @@ string AspireResource(this ProtoExecutionContext context, string resource);
 
 An unknown resource throws naming `AddAspireAppHost` and the resources the run composed; a resource whose address is neither published nor configured throws naming its `BaseUrl` key.
 
-## What it records
+## In the trace and coverage
 
 The AppHost is run-scoped infrastructure: the trace records an `aspire` run entity named `Aspire AppHost · {assembly}`, the run overview lists an `aspire` capability named for the AppHost assembly, and the entity carries the published endpoints as evidence (`aspire.resource.{resource}.address`, with the endpoint name beside it; a resource whose key configuration already fills carries `aspire.resource.{resource}.address_source = configuration`, and one another provider serves carries `..._source = not selected`). A release failure follows the same path as any other run resource.
 

@@ -81,7 +81,7 @@ if (!hostedInProcess)
 }
 ```
 
-No ASP.NET Core server is registered and no standalone process is started: HTTP clients connect over the network to `BaseUrl`, and the browser journeys skip because the `"Northstar standalone"` capability is never registered. Connection strings come from configuration, and the test-side domain is composed when `ConnectionStrings:Northstar` is set:
+No ASP.NET Core server is registered and no loopback listener is started: HTTP clients connect over the network to `BaseUrl`, and the browser journey follows the same published address when Playwright is available (it skips when the browser is not installed). Connection strings come from configuration, and the test-side domain is composed when `ConnectionStrings:Northstar` is set:
 
 ```csharp
 var composeDomainInTests = hostedInProcess || configuredDatabase is not null || postgresStore;

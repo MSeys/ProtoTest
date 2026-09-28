@@ -6,7 +6,7 @@ using System.Text;
 /// The report's static assets. Every one is embedded, so a report is a single file that makes no requests:
 /// the shared token sheet, the report's own stylesheet, the tiny script that runs the filters and theme, and
 /// the brand mark. Newlines are normalised on read so the emitted script has the same bytes on every
-/// platform — which is what lets the viewer's content-security policy carry its hash.
+/// platform, which is what lets the viewer's content-security policy carry its hash.
 /// </summary>
 internal static class HtmlReportAssets
 {

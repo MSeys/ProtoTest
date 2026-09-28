@@ -7,13 +7,17 @@ description: "Run a background worker or generic host in-process with the suite:
 
 # Background workers
 
+## What it adds
+
 `ProtoTest.Hosting` runs a worker application - a generic host with `IHostedService`s, the kind `dotnet new worker` creates - inside the test process, the way [ASP.NET Core](./aspnetcore.md) runs an API. The suite starts the worker's real entry point once per run, after the infrastructure registered before it, and stops it when the run ends.
+
+## Install
 
 ```bash
 dotnet add package ProtoTest.Hosting
 ```
 
-## Registering
+## Compose
 
 ```csharp
 builder
@@ -36,7 +40,7 @@ The order is the start order: the worker reads what the infrastructure before it
 
 The suite runs the worker's own program (`Host.CreateApplicationBuilder` or `Host.CreateDefaultBuilder`), with the worker's assembly as its content root and application name - its `appsettings.json`, environment overloads and logging behave as they do in production. The worker's own `Run()` never executes; the suite starts and stops its host.
 
-## Reaching it from a test
+## The tasks
 
 ```csharp
 [ProtoTest]
@@ -93,7 +97,7 @@ builder.AddWorkerHost<BillingWorker.Program>("Billing", worker =>
     worker.Set("Billing:RetryLimit", "3"));
 ```
 
-## What it records
+## In the trace and coverage
 
 The worker is run-scoped infrastructure: the trace records a `worker` run entity with its name and program, the run overview lists a `worker` capability, and a release failure follows the same path as any other run resource.
 

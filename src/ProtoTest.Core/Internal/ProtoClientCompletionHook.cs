@@ -1,9 +1,9 @@
 namespace ProtoTest.Core.Internal;
 
 /// <summary>
-/// Completes the registered clients that finish work before attachments are published. Runs at the same
-/// point the web lifecycle used to occupy: after normal teardown hooks, before client disposal and sink
-/// publication.
+/// Completes the registered clients that finish work before attachments are published. Runs after normal
+/// teardown hooks and before client disposal and sink publication, so a client's final work is part of
+/// the published evidence.
 /// </summary>
 internal sealed class ProtoClientCompletionHook : IProtoTestHook
 {

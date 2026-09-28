@@ -65,7 +65,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
 
     /// <summary>
     /// Gets the origin for relative navigation, read from the application's base address (optionally
-    /// joined with the named endpoint) — the same setting the HTTP-based protocols target.
+    /// joined with the named endpoint), the same setting the HTTP-based protocols target.
     /// </summary>
     public Uri? BaseUrl { get; }
     public string BackendName => _backendTask is { IsCompletedSuccessfully: true }
@@ -289,7 +289,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
         => _assertions.WaitUntilAsync(condition, timeout, description, cancellationToken);
 
     /// <summary>
-    /// Runs <paramref name="trigger"/> — typically a click that starts a download — and captures the
+    /// Runs <paramref name="trigger"/>, typically a click that starts a download, and captures the
     /// file the browser downloads. The file is returned and registered as a test attachment; a backend
     /// without the download capability throws <see cref="WebBackendCapabilityException"/> before the
     /// trigger runs.
@@ -312,7 +312,7 @@ public sealed class WebSession : IAsyncDisposable, IProtoClientCompletion
 
     /// <summary>
     /// The coverage path of an observed address. When the session targets an application (it has a
-    /// <see cref="BaseUrl"/>), a page on another origin — an identity provider, a payment gateway — is
+    /// <see cref="BaseUrl"/>), a page on another origin (an identity provider, a payment gateway) is
     /// not this application's page, so it contributes nothing to its coverage.
     /// </summary>
     internal string? PagePathFrom(string? address)

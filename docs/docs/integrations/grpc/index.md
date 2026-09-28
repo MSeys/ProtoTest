@@ -6,6 +6,8 @@ description: "A named gRPC client per test for unary and streaming calls, with m
 
 # gRPC
 
+## What it adds
+
 `ProtoTest.Grpc` gives each test a named gRPC client for unary and streaming calls, with metadata authentication through the shared `[Auth]` pipeline, per-call tracing, and service/method coverage. It follows the same client lifecycle as REST and GraphQL: the client is created during setup and recorded as a client entity, its channel is created lazily on first use, and both are released with the test.
 
 ## Install
@@ -16,7 +18,7 @@ dotnet add package ProtoTest.Grpc
 
 The package targets .NET 8, 9 and 10 (the project template defaults to `net10.0`; pass `-f net8.0` or `net9.0` for an older runtime), and brings `ProtoTest.Http` and `ProtoTest.Json` with it.
 
-## Registering
+## Compose
 
 ```csharp
 builder.AddApplication("Api", app => app
@@ -47,7 +49,7 @@ The channel address comes from, in order: the explicit argument to `AddClient`, 
 
 A repeated `AddGrpc` is not a no-op: its `configure` callback always runs, so more clients compose, while the lifecycle hook and the capability stay registered once. A call whose `configure` throws leaves no guard behind. `CaptureAttachments` callbacks also compose: every callback runs in registration order and the known section binds over the result.
 
-## Options and keys
+### Options and keys
 
 | Key | Option | Type | Default |
 | --- | --- | --- | --- |
@@ -65,7 +67,7 @@ A repeated `AddGrpc` is not a no-op: its `configure` callback always runs, so mo
 
 One `ProtoTest:Grpc:Client` section serves every named client; each registration binds it over its code callback. A client's `configure` callback applies to that client only - metadata, deadline and sensitive keys never reach another client - while the transport-backed fallback client reads the shared section without any named client's callback. The pre-1.1 `ProtoTest:Grpc` section still binds as a deprecated fallback, so a suite on the old key keeps working; a value under `ProtoTest:Grpc:Client` wins. `GrpcAttachmentOptions` derives from the shared HTTP attachment options and binds `ProtoTest:Grpc:Attachments`, so there is one global attachment section per registration, not one per client. `GrpcClientOptions.ConfigureMetadata` is a delegate and is not bindable.
 
-## API
+### API
 
 ```csharp
 public static ProtoGrpcClient Grpc(this ProtoExecutionContext context, string? clientName = null);
@@ -108,7 +110,7 @@ Task<AsyncDuplexStreamingCall<TRequest, TResponse>> OpenDuplexStreamingAsync<TRe
 
 `ServerStreaming` and `DuplexStreaming` block the calling thread while authenticators and the channel are prepared; prefer the `Open*Async` variants on a synchronizing runner. The raw helpers apply the test's `[Auth]` metadata but are untraced and uncaptured.
 
-### Assertions
+#### Assertions
 
 A reply is a protobuf message, and `Should.MatchShape` matches it with the same [shapes](../../foundation/shape-matching.md) as REST and GraphQL. C# has no extension properties, so a message reaches its facade through the factory; `MatchShape` returns the reply:
 
@@ -147,7 +149,7 @@ catch (RpcException exception)
 
 The assertion records an `assert.grpc.status` operation on the ambient test context with expected and actual `rpc.grpc.status_code`/`rpc.grpc.status` and a `Result` Checks section; a mismatch throws `GrpcAssertionException`. gRPC deliberately exposes the facade through `For(...)` rather than a `Should` property, because C# has no extension properties; the old `ShouldHaveStatus`/`ShouldNotHaveStatus` extension methods remain as obsolete shims.
 
-## Quick start
+## The tasks
 
 ```csharp
 [Application("Api", "Grpc:Api")]
@@ -165,9 +167,9 @@ public sealed class OrderTests
 }
 ```
 
-## Going further
+### Going further
 
-### Authentication
+#### Authentication
 
 gRPC uses the same `[Auth]` attributes as the HTTP protocols - including the
 [built-in test user](../rest/authentication.md#built-in-test-user), whose header arrives as `prototest-user`
@@ -184,7 +186,7 @@ public sealed class OrderTests
 
 Authenticators write HTTP headers as usual; the gRPC applier translates them to lowercase metadata keys. Metadata is layered client `Metadata` first, then `ConfigureMetadata`, then per-call `metadata`, with authenticators last so they can override. Each call resolves its authenticator from the test's factory, so a stateful authenticator is created per call and never shared between calls. Sensitive metadata values are redacted in the trace; `SensitiveMetadataKeys` starts with the defaults above and entries under `ProtoTest:Grpc:Client:SensitiveMetadataKeys` extend them. Matching is case-insensitive and by substring, so `authorization` also covers `proxy-authorization`.
 
-### Attachments
+#### Attachments
 
 ```csharp
 builder.AddGrpc(grpc => grpc
@@ -194,7 +196,7 @@ builder.AddGrpc(grpc => grpc
 
 With capture enabled, each traced call attaches its request and response messages as JSON: `grpc-{client}-{service}-{method}-{request|response}-{n}`, where `{client}` is the sanitized client name and `n` is the call's position in the client's call sequence, so repeated calls to the same method — even from two clients in one test — stay distinct. Values run through the shared redaction rules — JSON properties such as `password` and `token`, and the sensitive metadata keys — and each attachment is capped at `MaxDiagnosticBodyLength` from `ProtoTest:Grpc:Attachments`. `ClientStreamingAsync` and `ServerStreamingAsync` capture up to the first 10 streamed messages and record the total count in the attachment description. A message that cannot be serialized is reported as a `grpc.attachment.failed` event and never fails the call.
 
-### Coverage
+#### Coverage
 
 The async call helpers record a `grpc.response` observation per successful call. Register the collector on the target returned by `AddClient` to aggregate service/method coverage:
 
@@ -205,7 +207,7 @@ The async call helpers record a `grpc.response` observation per successful call.
 
 `GrpcCoverageCollector` has category `gRPC` and counts one hit per `grpc.response` observation, identified by `{service}/{method}` (see [coverage](../../observability/coverage.md)).
 
-### Address resolution
+#### Address resolution
 
 A resolver runs per test with the test context, so an address that only exists at call time — a container started by the suite, a per-test tenant host — still works:
 
@@ -215,7 +217,7 @@ A resolver runs per test with the test context, so an address that only exists a
 
 The resolver overloads register the client with a deferred address, so initialization succeeds even before the address is known; a resolver returning null at call time is an error. A non-absolute address passed to `AddClient` throws `ArgumentException`.
 
-## Tracing and coverage
+## In the trace and coverage
 
 The async helpers record a `grpc.call` operation named `gRPC · {method.FullName}` with the client entity `client:ProtoTest.Grpc.ProtoGrpcClient:{name}` and attributes `rpc.system`, `rpc.service`, `rpc.method`, `client.name`, `rpc.deadline`, `rpc.metadata.{key}` (sensitive values `(redacted)`), `auth.outcome`/`auth.type`, `grpc.request.count` for client streaming and `grpc.response.count`. Request and response sections are protobuf code; a failure adds `rpc.grpc.status_code`/`rpc.grpc.status` and a `Status` Fields section with `code` and `detail`. Each call records a `grpc.response` observation with `rpc.system`, `rpc.service`, `rpc.method` and `rpc.grpc.status`; a failed call records `grpc.failure` instead, so a call that never succeeded does not count as covered.
 

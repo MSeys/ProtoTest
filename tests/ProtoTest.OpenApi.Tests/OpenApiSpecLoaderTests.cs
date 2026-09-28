@@ -21,7 +21,7 @@ public class OpenApiSpecLoaderTests
     public void Load_ShouldParseYamlContent()
     {
         // YAML is the other format OpenAPI documents are written in; the reader package must be
-        // registered for it, or a suite with a YAML spec fails where the 1.x reader succeeded.
+        // registered for it, or a suite with a YAML spec fails.
         const string yaml = """
         openapi: 3.0.1
         info:

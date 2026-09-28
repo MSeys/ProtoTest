@@ -33,7 +33,7 @@ A trace can contain sanitized requests, response bodies, state values and attach
 
 ## The feedback action
 
-The *ProtoTest Feedback* composite action runs the post-run half in one step: it installs the ProtoTest CLI, uploads the trace as an artifact, posts the digest where a pull request reads it, and optionally gates the pull request against a baseline report.
+The *ProtoTest Feedback* composite action runs the post-run half in one step: it installs the [ProtoTest CLI](../agent-workflows/cli.md), uploads the trace as an artifact, posts the digest where a pull request reads it, and optionally gates the pull request against a baseline report.
 
 The digest is the same run summary the CLI prints: the run, every test that did not pass with its cause and source location, and the artifact link. The action turns it into a pull request comment, one check annotation per failing test and per failed run gate, and one uploaded artifact. A green run posts no comment; the status check is its report.
 
@@ -90,7 +90,7 @@ The baseline is a report from the default branch. How it reaches the job is up t
 
 ### Pin the tool
 
-The action installs the ProtoTest CLI as a global tool. Set `version` to pin it (`version: 1.1.0`). Without it, the action updates the tool to the latest stable release. `dotnet-roll-forward` defaults to `LatestMajor`, so the net8 tool runs on a newer runtime. [Loop](../agent-workflows/loop.md) documents the remaining inputs, the local equivalents of every channel, and what each channel posts.
+The action installs the ProtoTest CLI as a global tool. Set `version` to pin it (`version: 1.1.0`). Without it, the action updates the tool to the latest stable release. `dotnet-roll-forward` defaults to `LatestMajor`, so the net8 tool runs on a newer runtime. [Loop](../agent-workflows/loop.md) documents the remaining inputs and what each channel posts; the [CLI reference](../agent-workflows/cli.md) lists every environment target and the exit codes.
 
 ## GitHub Actions
 
@@ -222,4 +222,5 @@ The action [above](#the-feedback-action) uploads the trace for you. Without it, 
 - [Reporting](../observability/reporting.md) configures the JSON and HTML sinks.
 - [Attachments](../foundation/attachments.md) explains what runners publish.
 - [Loop](../agent-workflows/loop.md) turns the same artifacts into a pull request verdict and comment.
+- [CLI reference](../agent-workflows/cli.md) documents the four verbs, the environment targets and the exit codes.
 - [Troubleshooting](../getting-started/troubleshooting.md#the-ci-artifact-is-empty) covers missing CI output.

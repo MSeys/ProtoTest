@@ -35,10 +35,10 @@ The levels are ordered. Each one names what you can do at the end and what it as
 | **2. Compose, don't glue** | [Capabilities and the host](./compose-dont-glue/capabilities-and-the-host.md), [Add and remove an integration](./compose-dont-glue/add-and-remove-an-integration.md), [When not to compose](./compose-dont-glue/when-not-to-compose.md) | Add and remove capabilities in the host, and know when a problem should not go in the host at all. | about 30 minutes | Level 1 |
 | **3. Determinism** | [Move the test clock](./determinism/the-test-clock.md), [Wait for readiness, not for time](./determinism/readiness-instead-of-sleeps.md), [Keep state per test and clean it up](./determinism/per-test-state-and-cleanup.md), [Parallel safety](./determinism/parallel-safety.md) | Move the clock, wait for readiness instead of sleeping, isolate per-test state and run tests in parallel. | about 1 hour | Level 2 |
 | **4. Evidence** | [Read a failing trace](./evidence/read-a-failing-trace.md), [Contract coverage, not code coverage](./evidence/contract-coverage.md), [The archive and the reports](./evidence/artifacts-and-reports.md), [Take the evidence to CI](./evidence/evidence-in-ci.md) | Read a failing trace, use contract coverage next to code coverage, and get the report back from CI. | about 1 hour | Level 3 |
-| **5. Real topology** (3 lessons) | Not yet published | Run the same suite against containers and a published application, and inject faults on purpose. | about 45 minutes | Level 4 |
-| **6. Make it yours** (4 lessons) | Not yet published | Write your own attributes and integrations, and run the evidence loop with a coding agent. | about 1 hour | Level 5 |
+| **5. Real topology** | [Run the suite on containers](./real-topology/containers.md), [Let Aspire start the topology](./real-topology/aspire-topology.md), [Point the suite at a real stack](./real-topology/published-mode.md), [Inject faults on purpose](./real-topology/fault-injection.md) | Run the same suite on containers, through an Aspire topology and against a real stack, and inject faults on purpose. | about 45 minutes | Level 4 |
+| **6. Make it yours** | [Write your own attribute](./make-it-yours/attributes.md), [Provisioners and page objects](./make-it-yours/provisioners-and-page-objects.md), [Write an integration](./make-it-yours/write-an-integration.md), [The evidence loop with an agent](./make-it-yours/evidence-loop-with-an-agent.md) | Write your own attributes and an integration, provision data through provisioners and page objects, and run the evidence loop with a coding agent. | about 1 hour | Level 5 |
 
-Levels 0 to 4 are live, and their lessons read top to bottom. The remaining levels follow.
+Levels 0 to 6 are live, and their lessons read top to bottom.
 
 ## How a lesson works
 
@@ -46,7 +46,7 @@ Each lesson has the same shape:
 
 - **Outcome.** What you will be able to do when you finish.
 - **Before you start.** The lesson it builds on, and anything you need installed.
-- **The situation.** The real failure or question the lesson starts from, from the Northstar demo.
+- **The situation.** The real failure or question the lesson starts from, from the demo the lesson runs.
 - **The walkthrough.** Numbered steps with real code and the real trace beside them.
 - **Checkpoint.** One question, the step that proves the answer, and the answer itself when you have tried.
 - **What you learned.** The two or three lines worth keeping.
@@ -55,3 +55,5 @@ Each lesson has the same shape:
 ## The demo behind the lessons
 
 The lessons run against [Northstar](https://github.com/MSeys/ProtoTest/tree/main/samples/Northstar.ProtoTest), the sample suite in the repository. It composes API, browser, database, messaging and document integrations in one host, and it ships deliberate failures: four tests that fail on purpose, one per question, next to the tests that do the same journey the right way. Run it with `dotnet test samples/Northstar.ProtoTest`, or read the traces without running anything. Every lesson names the archive it reads.
+
+Level 5 leaves the sample and runs OpenCSMS, an EV charging management system in its own repository and the reference suite for ProtoTest on real infrastructure. Its suite has one Setup and four modes, each green with the journeys its environment can serve, and the lessons use its commands, its run logs and its screenshots.

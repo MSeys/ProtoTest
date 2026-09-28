@@ -44,7 +44,7 @@ The GraphQL error assertions are the exception: they name the opposite state dir
 `Should.MatchShape(shape)` matches REST and GraphQL responses, gRPC replies, consumed messages and sheet rows with one [shape matcher](./shape-matching.md). It returns the subject, so it continues a chain, and a failure message **starts with the subject** it was made against:
 
 ```
-GET /api/orders/42 — Shape mismatch failed with 1 error(s):
+GET /api/orders/42 - Shape mismatch failed with 1 error(s):
   • [$.status]: Values did not match. (Expected: "pending", Actual: "cancelled")
 ```
 

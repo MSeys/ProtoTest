@@ -15,6 +15,8 @@ dotnet tool install --global ProtoTest.Cli
 prototest summary TestResults/run.prototrace
 ```
 
+The [CLI reference](./cli.md) lists the verb's arguments, the exit codes and the other three commands.
+
 Here is that output for the committed MCP test fixture, `tests/ProtoTest.Mcp.Tests/Fixtures/run-failed.prototrace`. It is abridged; every test that did not fully succeed gets a block like these.
 
 ```text

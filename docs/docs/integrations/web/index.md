@@ -2,19 +2,19 @@
 sidebar_position: 1
 title: Browser integration testing
 sidebar_label: Overview
-description: "A driver-independent browser-testing model — pages, components, flows and login — run by Playwright or Selenium underneath."
+description: "A driver-independent browser-testing model for pages, components, flows and login, run by Playwright or Selenium underneath."
 ---
 
 # Web
 
 ## What it adds
 
-`ProtoTest.Web` is a browser-testing model — pages, components, elements, tables, flows and login — that doesn't depend on any particular browser driver. A backend package plugs a real driver in underneath:
+`ProtoTest.Web` is a browser-testing model for pages, components, elements, tables, flows and login that doesn't depend on any particular browser driver. A backend package plugs a real driver in underneath:
 
-- `ProtoTest.Web.Playwright` — launches and manages browsers for you.
-- `ProtoTest.Web.Selenium` — drives any `IWebDriver` you create.
+- `ProtoTest.Web.Playwright` - launches and manages browsers for you.
+- `ProtoTest.Web.Selenium` - drives any `IWebDriver` you create.
 
-Your page objects and tests stay the same for both. The backends differ underneath — most visibly in [locator translation](./locators.md#how-each-backend-translates-a-locator) — but everything in this section is backend-neutral.
+Your page objects and tests stay the same for both. The backends differ underneath, most visibly in [locator translation](./locators.md#how-each-backend-translates-a-locator), but everything in this section is backend-neutral.
 
 ## Install
 
@@ -28,7 +28,7 @@ Either backend brings `ProtoTest.Web` with it. The packages target `net8.0`, `ne
 
 ## Browsers
 
-Playwright launches Chromium by default, which runs on Windows, Linux and macOS; set `Channel` (`"msedge"`, `"chrome"`) to use an installed system browser instead. `InstallBrowsers = true` downloads the selected browser through the Playwright driver before the first launch, so a clean machine or CI runner needs no separate step — it is ignored when `Channel` names a system browser:
+Playwright launches Chromium by default, which runs on Windows, Linux and macOS; set `Channel` (`"msedge"`, `"chrome"`) to use an installed system browser instead. `InstallBrowsers = true` downloads the selected browser through the Playwright driver before the first launch, so a clean machine or CI runner needs no separate step. It is ignored when `Channel` names a system browser:
 
 ```csharp
 builder.AddWeb(options =>
@@ -70,7 +70,7 @@ public static IProtoHostBuilder AddWeb(
     Action<SeleniumWebOptions>? configure = null);            // Selenium
 ```
 
-On an application builder — the form the sample suite uses, so the application's REST and GraphQL clients can share one address:
+On an application builder, the form the sample suite uses, so the application's REST and GraphQL clients can share one address:
 
 ```csharp
 public static IProtoApplicationBuilder AddWeb(
@@ -102,22 +102,22 @@ IProtoHostBuilder AddWebWait<TCondition>(
 
 A hand-written backend composes the same helpers the shipped backends use, so its behavior matches theirs:
 
-- `WebBackendOptions.Resolve<TOptions>(context, configure, validate)` — the options precedence (code callback → started infrastructure → `ProtoTest:Web:{backend}` section → validation).
-- `WebBackendErrors` — the resolution and actionability failures (`NotPresent`, `NotActionable`, `MultipleMatch`) with the documented wording.
-- `WebFailureArtifacts.CaptureAsync(…)` — the screenshot, DOM and location attachments with the documented naming rule; `TraceArtifactFailure` records a capture that itself failed.
-- `WebProbeLoop` with `WebProbe` — the retry loop whose observation form treats `WebElementResolutionException` and `WebActionabilityException` as "not yet", polling at the backend's `PollInterval`.
-- `WebBackendDefaults` — the 5 s action timeout and 50 ms poll interval defaults; `IWebBackend.PollInterval` returns `WebBackendDefaults.DefaultPollInterval` unless the backend has its own interval option.
-- `WebArtifactNames.SafeName` — the lowercased, dash-sanitized identifier rule for artifact file names.
-- `WebMediaTypes.Guess` — the best-effort media type for a downloaded file, with `WebMediaTypes.Default` as the fallback.
+- `WebBackendOptions.Resolve<TOptions>(context, configure, validate)` - the options precedence (code callback, started infrastructure, `ProtoTest:Web:{backend}` section, validation).
+- `WebBackendErrors` - the resolution and actionability failures (`NotPresent`, `NotActionable`, `MultipleMatch`) with the documented wording.
+- `WebFailureArtifacts.CaptureAsync(…)` - the screenshot, DOM and location attachments with the documented naming rule; `TraceArtifactFailure` records a capture that itself failed.
+- `WebProbeLoop` with `WebProbe` - the retry loop whose observation form treats `WebElementResolutionException` and `WebActionabilityException` as "not yet", polling at the backend's `PollInterval`.
+- `WebBackendDefaults` - the 5 s action timeout and 50 ms poll interval defaults; `IWebBackend.PollInterval` returns `WebBackendDefaults.DefaultPollInterval` unless the backend has its own interval option.
+- `WebArtifactNames.SafeName` - the lowercased, dash-sanitized identifier rule for artifact file names.
+- `WebMediaTypes.Guess` - the best-effort media type for a downloaded file, with `WebMediaTypes.Default` as the fallback.
 
-Sessions are not declared at registration: a test names the sessions it needs with `Proto.Context.Web(name)` ([below](#sessions)). `AddWebBackend` is first-wins (`TryAddSingleton`), and a host resolves exactly one `IWebBackendFactory` — zero or more than one throws `InvalidOperationException`. For Playwright, every `AddWeb(...)` call still runs its `configure` callback while only the first supplies the skip-probe defaults; the Selenium application overload guards the whole call so a repeat is a no-op.
+Sessions are not declared at registration: a test names the sessions it needs with `Proto.Context.Web(name)` ([below](#sessions)). `AddWebBackend` is first-wins (`TryAddSingleton`), and a host resolves exactly one `IWebBackendFactory`; zero or more than one throws `InvalidOperationException`. For Playwright, every `AddWeb(...)` call still runs its `configure` callback while only the first supplies the skip-probe defaults; the Selenium application overload guards the whole call so a repeat is a no-op.
 
 ### Options and keys
 
 Both backends also read their options from configuration, so CI can run headless on another browser without code changes. Values are applied in this order, later winning:
 
 1. your `AddWeb(...)` callback,
-2. `ProtoTest:Web:Playwright` or `ProtoTest:Web:Selenium` — the run's backend options.
+2. `ProtoTest:Web:Playwright` or `ProtoTest:Web:Selenium`, the run's backend options.
 
 Started infrastructure settings are merged over static configuration before binding, so they win over the same key in `appsettings.json`. Selenium's `ActionTimeout`/`PollInterval` and Playwright's `ActionTimeout` are validated after binding; a non-positive value throws `ArgumentOutOfRangeException`. `TimeSpan` values bind as `"hh:mm:ss(.fffffff)"` and enums bind by name.
 
@@ -226,7 +226,7 @@ public sealed class WebSession : IAsyncDisposable
 
 #### Several sessions in one test
 
-Sessions are per-test — the builder registers only the backend, and a test names the sessions it needs. Each named session is an isolated browser context (Playwright) or driver (Selenium), created lazily on first use and closed at teardown. Pages are cached per session, so `Web("Admin").Page<T>()` returns the same object each time.
+Sessions are per-test: the builder registers only the backend, and a test names the sessions it needs. Each named session is an isolated browser context (Playwright) or driver (Selenium), created lazily on first use and closed at teardown. Pages are cached per session, so `Web("Admin").Page<T>()` returns the same object each time.
 
 ```csharp
 builder.AddWeb();   // register the backend once
@@ -242,7 +242,7 @@ await admin.Orders.RowMatching(By.HasText("42")).Approve.ClickAsync();
 await customer.Orders.RowMatching(By.HasText("42")).Status.Should.HaveTextAsync("Approved");
 ```
 
-The `Should*` methods on an element poll until they pass, so they double as cross-session waits. For any other condition — including one that spans sessions — use `WaitUntilAsync`; its description defaults to the predicate's source text:
+The `Should*` methods on an element poll until they pass, so they double as cross-session waits. For any other condition, including one that spans sessions, use `WaitUntilAsync`; its description defaults to the predicate's source text:
 
 ```csharp
 await customer.WaitUntilAsync(async ct =>
@@ -262,7 +262,7 @@ Sessions can also be declared on the test, so setup creates (and optionally navi
 public async Task ...() { ... }
 ```
 
-`Application = "ControlPlane"` on the attribute names the application the session targets, defaulting to the test's application and then the session name. A relative `Open` resolves against the session's application address — `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with the named endpoint.
+`Application = "ControlPlane"` on the attribute names the application the session targets, defaulting to the test's application and then the session name. A relative `Open` resolves against the session's application address, `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with the named endpoint.
 
 #### Dropping down to the driver
 
@@ -277,7 +277,7 @@ await backend.Page.SetContentAsync(html);
 
 ## The tasks
 
-A page object describes the page; a test drives it. The smallest working example — the sample's full journey is in [WebJourney.cs](../../../../samples/Northstar.ProtoTest/WebJourney.cs):
+A page object describes the page; a test drives it. The smallest working example is below; the sample's full journey is in [WebJourney.cs](../../../../samples/Northstar.ProtoTest/WebJourney.cs):
 
 ```csharp
 public sealed class LoginPage : WebPage
@@ -313,14 +313,14 @@ public async Task Valid_credentials_sign_in()
 
 ### Going further
 
-- [Pages and components](./page-objects.md) — page objects, scoping, lazy collections and tables.
-- [Locators](./locators.md) — roles, labels, text, `And`, and how each backend translates them.
-- [Actions and assertions](./interactions.md) — `Should`/`ShouldNot`, polling, redaction.
-- [Flows](./flows.md) — name a sequence of steps so the trace reads as one operation.
-- [Logging in](./login.md) — an application-owned `IWebLoginStrategy` applied with `[LoginAs]`.
-- [Waits and middleware](./middleware.md) — your application's notion of ready, applied once.
-- [Diagnostics and artifacts](./diagnostics.md) — screenshots, console output, traces and the full trace reference.
-- [ASP.NET Core](../aspnetcore.md) — when the application is hosted in-process, its page inventory comes with it.
+- [Pages and components](./page-objects.md) - page objects, scoping, lazy collections and tables.
+- [Locators](./locators.md) - roles, labels, text, `And`, and how each backend translates them.
+- [Actions and assertions](./interactions.md) - `Should`/`ShouldNot`, polling, redaction.
+- [Flows](./flows.md) - name a sequence of steps so the trace reads as one operation.
+- [Logging in](./login.md) - an application-owned `IWebLoginStrategy` applied with `[LoginAs]`.
+- [Waits and middleware](./middleware.md) - your application's notion of ready, applied once.
+- [Diagnostics and artifacts](./diagnostics.md) - screenshots, console output, traces and the full trace reference.
+- [ASP.NET Core](../aspnetcore.md) - when the application is hosted in-process, its page inventory comes with it.
 
 ## In the trace and coverage
 
@@ -337,7 +337,7 @@ Every operation is a ProtoTest trace entry; a passing assertion is also what mak
 | Backend call | child `web.backend.execute`, linked by `web.correlation_id` |
 | Coverage | observations `web.page.visited`, `web.page.verified`, `web.page.available` |
 
-The complete tables — common attributes, backend events, artifacts and the Selenium diagnostics schema — live on [Diagnostics and artifacts](./diagnostics.md#what-the-trace-records-for-every-operation).
+The complete tables for common attributes, backend events, artifacts and the Selenium diagnostics schema live on [Diagnostics and artifacts](./diagnostics.md#what-the-trace-records-for-every-operation).
 
 ### Page coverage
 
@@ -345,15 +345,15 @@ Coverage for a browser journey is measured in **pages**, not lines. `AddWeb` reg
 
 | Observation | Recorded when | `web.page.source` |
 | --- | --- | --- |
-| `web.page.visited` | a navigation succeeds — the final address after redirects when the backend can report one | `navigate` |
+| `web.page.visited` | a navigation succeeds: the final address after redirects when the backend can report one | `navigate` |
 | `web.page.verified` | a `Should*` assertion passes on the page | `assert` |
-| `web.page.available` | a page is known to exist but was not visited — from the inventory, a discovered frontend route or the ASP.NET Core server | `vue-router` / `aspnetcore` |
+| `web.page.available` | a page is known to exist but was not visited, from the inventory, a discovered frontend route or the ASP.NET Core server | `vue-router` / `aspnetcore` |
 
-A page that was visited but never asserted is reported **uncovered**: reaching a page is not the same as checking it, and the report keeps the two apart. Only `web.page.verified` moves an item to covered (`Status = Success`) and increments its count; inventory-only pages stay neutral. When the session has a `BaseUrl`, coverage is attributed to that application's origin only: scheme, IDN host and port must all match, so a redirect to an identity provider or a payment gateway — and any assertion checked there — is not recorded as this application's coverage. A backend that cannot report its address contributes navigation coverage from the target address instead of failing.
+A page that was visited but never asserted is reported **uncovered**: reaching a page is not the same as checking it, and the report keeps the two apart. Only `web.page.verified` moves an item to covered (`Status = Success`) and increments its count; inventory-only pages stay neutral. When the session has a `BaseUrl`, coverage is attributed to that application's origin only: scheme, IDN host and port must all match, so a redirect to an identity provider or a payment gateway, and any assertion checked there, is not recorded as this application's coverage. A backend that cannot report its address contributes navigation coverage from the target address instead of failing.
 
 #### The explicit inventory
 
-List the pages a suite knows about under `ProtoTest:Web:Pages`; they appear as uncovered until a verification lands on them. The value may be a single scalar path, an array, or an object whose child values are entries — `Source` and `Framework` are configuration, never page entries:
+List the pages a suite knows about under `ProtoTest:Web:Pages`; they appear as uncovered until a verification lands on them. The value may be a single scalar path, an array, or an object whose child values are entries; `Source` and `Framework` are configuration, never page entries:
 
 ```json
 {
@@ -384,12 +384,12 @@ Instead of listing pages by hand, point ProtoTest at the frontend source folder 
 
 `Source` is absolute or relative to the test assembly's base directory (a relative path may not escape it); a missing, unreadable or empty folder contributes no pages and is never an error. `Framework` is `auto` (the default) or one of `next`, `nuxt`, `remix`, `vue`, `react`; an unknown value falls back to `auto`.
 
-In `auto`, ProtoTest reads the nearest `package.json` — walking at most three folders up and stopping at the first one found, so a parent repository's dependencies never decide how this folder is scanned — and falls back to the folder layout (`next.config.*`, `nuxt.config.*`, `app/routes`, `app/page.*`, `pages/`). The detected framework picks the discovery strategy:
+In `auto`, ProtoTest reads the nearest `package.json`, walking at most three folders up and stopping at the first one found, so a parent repository's dependencies never decide how this folder is scanned, and falls back to the folder layout (`next.config.*`, `nuxt.config.*`, `app/routes`, `app/page.*`, `pages/`). The detected framework picks the discovery strategy:
 
-- **Next.js / Nuxt file routes** — files under `pages/` or `src/pages/` with `.ts`, `.tsx`, `.js`, `.jsx` or `.vue`: subfolders become path segments, `index` becomes the folder's route, `[id]` becomes `{id}`, and catch-alls `[...slug]` and `[[...slug]]` become `{...}`. `_app`, `_document`, `_error`, `404`, `500` and `_middleware` are skipped, and Next's `pages/api/…` handlers are not pages. Test/spec files (`*.test.*`, `*.spec.*`) and TypeScript declarations (`*.d.ts`) are never routes. Nuxt 2's underscore dynamics (`_id.vue`, `_.vue`) are not mapped — use the explicit inventory for those.
-- **Next.js app router** — only `page.*` files under `app/` or `src/app/`, mapped the same way; route groups `(group)` drop out of the path, and `layout`, `template`, `loading`, `error` and `not-found` never produce a route.
-- **Remix** — flat file names under `app/routes/`: dots become `/`, `_index` becomes the folder's route, leading `_` segments are pathless and drop out, `$id` becomes `{id}`, and a bare `$` splat becomes `{...}`.
-- **Vue Router / React Router** — source files are walked (skipping `node_modules`, `dist`, `build`, `.next`, `coverage` and any symlinked or junctioned directory, capped at 10,000 files and 1 MB per file) for **absolute** route literals: `path: "..."`, `path: '...'`, `path = "..."` and JSX `<Route path="/…">`. Relative child routes and aliased imports are not resolved. This strategy is also the fallback when `auto` detects nothing file-based.
+- **Next.js / Nuxt file routes** - files under `pages/` or `src/pages/` with `.ts`, `.tsx`, `.js`, `.jsx` or `.vue`: subfolders become path segments, `index` becomes the folder's route, `[id]` becomes `{id}`, and catch-alls `[...slug]` and `[[...slug]]` become `{...}`. `_app`, `_document`, `_error`, `404`, `500` and `_middleware` are skipped, and Next's `pages/api/…` handlers are not pages. Test/spec files (`*.test.*`, `*.spec.*`) and TypeScript declarations (`*.d.ts`) are never routes. Nuxt 2's underscore dynamics (`_id.vue`, `_.vue`) are not mapped; use the explicit inventory for those.
+- **Next.js app router** - only `page.*` files under `app/` or `src/app/`, mapped the same way; route groups `(group)` drop out of the path, and `layout`, `template`, `loading`, `error` and `not-found` never produce a route.
+- **Remix** - flat file names under `app/routes/`: dots become `/`, `_index` becomes the folder's route, leading `_` segments are pathless and drop out, `$id` becomes `{id}`, and a bare `$` splat becomes `{...}`.
+- **Vue Router / React Router** - source files are walked (skipping `node_modules`, `dist`, `build`, `.next`, `coverage` and any symlinked or junctioned directory, capped at 10,000 files and 1 MB per file) for **absolute** route literals: `path: "..."`, `path: '...'`, `path = "..."` and JSX `<Route path="/…">`. Relative child routes and aliased imports are not resolved. This strategy is also the fallback when `auto` detects nothing file-based.
 
 Discovered paths join `ProtoTest:Web:Pages` in the same inventory and start out uncovered. React has no runtime route table that ProtoTest reads; see [React and Next.js](#react-and-nextjs).
 
@@ -451,7 +451,7 @@ The demo combines both: its Northstar Console is a real Vue 3 SPA, so page cover
 
 #### React and Next.js
 
-React has no generic runtime route table to read, and ProtoTest deliberately does not guess at one. Next.js, Nuxt and Remix are inventoried from the frontend source folder, and Vue Router / React Router route literals are read from their definitions. For everything the scanner cannot see — routes built at runtime, aliased imports, relative child paths — publish the route list instead: a small build step that emits the application's routes as a JSON array loaded into `ProtoTest:Web:Pages`. The pages then show as uncovered until a test visits and verifies them, exactly like the explicit inventory.
+React has no generic runtime route table to read, and ProtoTest deliberately does not guess at one. Next.js, Nuxt and Remix are inventoried from the frontend source folder, and Vue Router / React Router route literals are read from their definitions. For everything the scanner cannot see, such as routes built at runtime, aliased imports or relative child paths, publish the route list instead: a small build step that emits the application's routes as a JSON array loaded into `ProtoTest:Web:Pages`. The pages then show as uncovered until a test visits and verifies them, exactly like the explicit inventory.
 
 ## Skip
 
@@ -463,12 +463,12 @@ React has no generic runtime route table to read, and ProtoTest deliberately doe
 ## Limits
 
 - **One backend per host.** Resolving zero or more than one `IWebBackendFactory` throws `InvalidOperationException`, and `AddWebBackend` keeps the first registration.
-- **`HasText` cannot stand alone** — it is a filter and must be composed with `And`. Selenium additionally accepts only `HasText` as the right-hand side and rejects a `By.Css` left side; Playwright accepts more combinations. See [Locators](./locators.md#combining-with-and).
+- **`HasText` cannot stand alone**: it is a filter and must be composed with `And`. Selenium additionally accepts only `HasText` as the right-hand side and rejects a `By.Css` left side; Playwright accepts more combinations. See [Locators](./locators.md#combining-with-and).
 - **`WaitUntilAsync`** only absorbs `WebElementResolutionException` and `WebActionabilityException`; any other exception fails it immediately.
 - **Scanner:** a relative `Source` may not escape the test assembly's base directory; there is no Nuxt 2 underscore-dynamic support, only absolute route literals are collected, and there is no runtime React discovery.
 - **Vue discovery** latches after the first non-null route table, so a router that later adds routes in the same session is not re-read.
 - **Page origin:** an external redirect contributes no visited or verified coverage, and a backend that cannot report an address still passes the test.
-- **Playwright:** the browser pool is scoped to one test — identical launch options share a process only inside that test. Reads and actions use Playwright's own auto-waiting, bounded by `ActionTimeout` (5 s by default); a timeout becomes the same resolution or actionability exception Selenium raises. `InstallBrowsers` does nothing when `Channel` is set, trace groups are serialized by a semaphore and skipped when `TraceRetention = Off`, console/page-error/request-failure text is truncated at 4096 characters, and the skip probe starts the Playwright driver.
+- **Playwright:** the browser pool is scoped to one test; identical launch options share a process only inside that test. Reads and actions use Playwright's own auto-waiting, bounded by `ActionTimeout` (5 s by default); a timeout becomes the same resolution or actionability exception Selenium raises. `InstallBrowsers` does nothing when `Channel` is set, trace groups are serialized by a semaphore and skipped when `TraceRetention = Off`, console/page-error/request-failure text is truncated at 4096 characters, and the skip probe starts the Playwright driver.
 - **Selenium:** one driver per session, no pooling, so sessions do not share cookies or storage; native failures surface as `WebActionabilityException` after `ActionTimeout`; `CheckAsync` and `SelectOptionAsync` verify the selected state after the click, so a click the page ignored fails like Playwright's auto-wait instead of passing silently; `SelectOptionAsync` requires exactly one option carrying the requested `value`.
 
 ## Next

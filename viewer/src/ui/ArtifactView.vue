@@ -171,7 +171,7 @@ onBeforeUnmount(releaseArtifactUrl);
       </div>
       <small class="source">
         {{ embedViewer ? "Rendered by trace.playwright.dev inside this browser; the file is not uploaded."
-                       : "Showing it loads trace.playwright.dev — the only page this viewer fetches from elsewhere." }}
+                       : "Showing it loads trace.playwright.dev - the only page this viewer fetches from elsewhere." }}
       </small>
       <p v-if="handoff === 'blocked'" class="warn">The tab did not open. Allow pop-ups for this page, or use the embedded viewer above.</p>
       <p v-else-if="handoff === 'failed'" class="warn">

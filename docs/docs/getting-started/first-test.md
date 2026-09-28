@@ -116,7 +116,7 @@ response
 Change `status = "pending"` to `"cancelled"` and run the test again. What you should see: the test fails with the request, the JSON path and both values in the message:
 
 ```
-GET /api/orders — Shape mismatch failed with 1 error(s):
+GET /api/orders - Shape mismatch failed with 1 error(s):
   • [$.status]: Values did not match. (Expected: "cancelled", Actual: "pending")
 ```
 

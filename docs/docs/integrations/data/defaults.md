@@ -6,7 +6,7 @@ description: "Keep test-data defaults in small modules, one per feature area, ne
 
 # Defaults
 
-Defaults live in **modules** — small classes, ideally one per feature area, next to the tests that use them.
+Defaults live in **modules**: small classes, ideally one per feature area, next to the tests that use them.
 
 ```csharp
 public sealed class InvoiceDataDefaults : IProtoDataDefaultsModule
@@ -51,13 +51,13 @@ You can also configure inline in `AddData(data => …)`; the trace then reports 
 For each member, the first of these that applies wins:
 
 1. **`With(...)`** in the test.
-2. A **member default** — `data.For<T>().Default(x => x.Member, …)`, resolved by walking the target type and its base types.
-3. A **type provider** — `data.Values.Use<TValue>(…)`, matched on the exact type only.
-4. A **custom resolver** — `IProtoDataValueResolver`, in registration order; a throwing resolver is wrapped in `ProtoDataException`.
-5. The constructor parameter's **default value**, on the constructor route only. The declaration's default is the value the author asked for, so a generation never replaces it — including `null` for a nullable parameter.
+2. A **member default**: `data.For<T>().Default(x => x.Member, …)`, resolved by walking the target type and its base types.
+3. A **type provider**: `data.Values.Use<TValue>(…)`, matched on the exact type only.
+4. A **custom resolver**: `IProtoDataValueResolver`, in registration order; a throwing resolver is wrapped in `ProtoDataException`.
+5. The constructor parameter's **default value**, on the constructor route only. The declaration's default is the value the author asked for, so a generation never replaces it, including `null` for a nullable parameter.
 6. A **safe built-in**, for a member with no constructor default: `null` for a nullable member or a nullable-annotated reference, a generated string for `string`, a generated `Guid`, and an empty array or list for array, `IEnumerable<T>`, `IReadOnlyCollection<T>`, `IReadOnlyList<T>`, `ICollection<T>`, `IList<T>` and `List<T>`.
 
-If none apply, `ProtoDataException` names the member. Numbers, enums, booleans, dates and your own value objects are deliberately *not* on the built-in list — provide them explicitly or through a default.
+If none apply, `ProtoDataException` names the member. Numbers, enums, booleans, dates and your own value objects are deliberately *not* on the built-in list: provide them explicitly or through a default.
 
 ## Member defaults
 
@@ -67,7 +67,7 @@ data.For<InviteMemberRequest>()
         context => $"member-{context.TestId}-{context.ObjectSequence:D4}@example.test");
 ```
 
-Use the provider overload whenever the value must be unique — a constant email address breaks the moment two tests run in parallel.
+Use the provider overload whenever the value must be unique: a constant email address breaks the moment two tests run in parallel.
 
 ## Type providers
 
@@ -92,7 +92,7 @@ Both kinds of provider, and every member default, receive a `ProtoDataValueConte
 | `NextString()` | a deterministic string like `Invoice.Reference-0001-00` |
 | `Ref<T>(identity)` | a value provisioned earlier in this test, from the [identity map](./provisioners.md#refs-and-the-identity-map) |
 
-`NextGuid()` is the first 16 bytes of a SHA-256 over `"{TestId}|{ObjectSequence}|{TargetType.FullName}|{MemberName}|{counter}"`, and `NextString()` is `"{TargetType.Name}.{MemberName}-{ObjectSequence:D4}-{counter:D2}"`. Each member resolution gets a fresh context, so the counter starts at 0 per member: the same test produces the same values on every run, while different tests never collide. For a name outside a member default — a tenant, an operator — use `Proto.Context.UniqueName("tenant")`, which derives `tenant-{TestId}` from the same test id.
+`NextGuid()` is the first 16 bytes of a SHA-256 over `"{TestId}|{ObjectSequence}|{TargetType.FullName}|{MemberName}|{counter}"`, and `NextString()` is `"{TargetType.Name}.{MemberName}-{ObjectSequence:D4}-{counter:D2}"`. Each member resolution gets a fresh context, so the counter starts at 0 per member: the same test produces the same values on every run, while different tests never collide. For a name outside a member default, such as a tenant or an operator, use `Proto.Context.UniqueName("tenant")`, which derives `tenant-{TestId}` from the same test id.
 
 ## Domain factories
 
@@ -105,7 +105,7 @@ data.For<Invoice>()
         context.Value<Money>(nameof(Invoice.Total))));
 ```
 
-`context.Value<TValue>(memberName)` resolves that member through the normal pipeline — so `With(x => x.Total, …)` in a test still flows into the factory. `ProtoDataConstructionContext` exposes `Services` too.
+`context.Value<TValue>(memberName)` resolves that member through the normal pipeline, so `With(x => x.Total, …)` in a test still flows into the factory. `ProtoDataConstructionContext` exposes `Services` too.
 
 The factory rules:
 
@@ -116,7 +116,7 @@ The factory rules:
 
 ## Custom resolvers
 
-For conventions that span many types — "every property called `CreatedAt` is a fixed clock value", say:
+For conventions that span many types, say "every property called `CreatedAt` is a fixed clock value":
 
 ```csharp
 public sealed class FixedClockResolver : IProtoDataValueResolver
@@ -145,7 +145,7 @@ Resolvers run after member and type providers, in registration order, and the se
 
 ## Keeping values out of the trace
 
-Resolved values are recorded in ProtoTrace. Redact the sensitive ones — the trace still shows *where* the value came from, just not the value:
+Resolved values are recorded in ProtoTrace. Redact the sensitive ones: the trace still shows *where* the value came from, just not the value:
 
 ```csharp
 data.For<User>().Redact(x => x.AccessToken);   // one member
@@ -161,10 +161,10 @@ data.RedactValueType<Password>();              // every value of a type
 - **Redaction protects ProtoTrace only.** It is best effort and says nothing about application logs, HTTP bodies or reports.
 - **Factory inputs come from the same pipeline.** A factory cannot invent a value the pipeline would reject; unresolved members still fail.
 - **Module discovery is shape-based.** A module needs a public parameterless constructor and a public concrete type; nested or generic modules are skipped.
-- **Member defaults apply to the member's declaring type and its base types**, but a type provider matches the exact member type only — use a resolver for a family of types.
+- **Member defaults apply to the member's declaring type and its base types**, but a type provider matches the exact member type only; use a resolver for a family of types.
 
 ## Links
 
-- [Data overview](./index.md) — the package page and quick start.
-- [Provisioners](./provisioners.md) — `CreateAsync`, the identity map and cleanup.
-- [Execution context](../../foundation/execution-context.md) — `Proto.Context` and what a test can reach.
+- [Data overview](./index.md) - the package page and quick start.
+- [Provisioners](./provisioners.md) - `CreateAsync`, the identity map and cleanup.
+- [Execution context](../../foundation/execution-context.md) - `Proto.Context` and what a test can reach.

@@ -46,7 +46,7 @@ A listed property that is missing fails with *"Property was missing from the JSO
 `.Should.MatchShape(shape, exact: true)`, or `.ExpectAsync(shape, exact: true)`, demands the other direction too: every field present in the JSON must be mentioned by the shape. A field the shape does not mention fails with its path:
 
 ```
-GET /api/orders/42 — Shape mismatch failed with 1 error(s):
+GET /api/orders/42 - Shape mismatch failed with 1 error(s):
   • [$.extra]: Property was not mentioned in the expected shape. (Expected: "<not mentioned>", Actual: "true")
 ```
 
@@ -119,7 +119,7 @@ public sealed class JsonShapeMismatchException : ProtoAssertionException
 Each protocol producer rethrows the matcher failure as its own assertion exception (`RestAssertionException`, `GraphQLAssertionException`, `GrpcAssertionException`, `MessagingAssertionException`, `SpreadsheetAssertionException`) whose message **starts with the subject it was asserted against** and keeps the matcher exception, and so the mismatch list, as `InnerException`:
 
 ```
-GET /api/orders/42 — Shape mismatch failed with 1 error(s):
+GET /api/orders/42 - Shape mismatch failed with 1 error(s):
   • [$.status]: Values did not match. (Expected: "pending", Actual: "cancelled")
 ```
 

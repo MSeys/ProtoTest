@@ -8,7 +8,7 @@ description: "A provisioner creates a built object in the system under test, ret
 
 `Build()` gives you an object. `CreateAsync()` gives it to a **provisioner**, which creates it in the system under test and returns what the system gave back.
 
-ProtoTest does not decide *how* data gets created — through your public API, a test-support endpoint, a repository, raw SQL. That is the provisioner's job, and you write it once.
+ProtoTest does not decide *how* data gets created: through your public API, a test-support endpoint, a repository or raw SQL. That is the provisioner's job, and you write it once.
 
 ## The contract
 
@@ -77,7 +77,7 @@ AddDataProvisioner<T, TProvisioner>()                   // input and result are 
 AddDataProvisioner<TInput, TResult, TProvisioner>()     // different types
 ```
 
-Provisioners are resolved from dependency injection and are scoped, so their constructors can take services. A repeat with the same implementation type is a no-op; two *different* provisioners for one input/result pair both register and fail later, when the pair is used. At provisioning time exactly one provisioner must resolve for the pair — none, or more than one, throws `ProtoDataException`; so does a provisioner that returns `null` or a null `Value`.
+Provisioners are resolved from dependency injection and are scoped, so their constructors can take services. A repeat with the same implementation type is a no-op; two *different* provisioners for one input/result pair both register and fail later, when the pair is used. At provisioning time exactly one provisioner must resolve for the pair: none, or more than one, throws `ProtoDataException`; so does a provisioner that returns `null` or a null `Value`.
 
 ## Using it
 
@@ -141,11 +141,11 @@ sealed class DeleteOnDispose(Func<Task> delete) : IAsyncDisposable
 - Each release is a `data.cleanup` operation carrying `data.type`, `data.identity` and `data.provisioner`.
 - If several cleanups fail, they are all attempted and the failures are aggregated as an `AggregateException`.
 
-When cleanup happens at a coarser level — say, the whole tenant is deleted by an [attribute](../../foundation/attributes.md) — just leave `Cleanup` null, as the sample provisioner does.
+When cleanup happens at a coarser level, say the whole tenant is deleted by an [attribute](../../foundation/attributes.md), just leave `Cleanup` null, as the sample provisioner does.
 
 ## Tracing
 
-`data.provision` runs as a child of the `data.create` / `data.create_many` operation and carries `data.input_type`, `data.result_type`, `data.provisioner`, `data.identity`, `data.owned` and `data.value_id`. Each tracked value is also recorded as a `value` item with id `{type}:{identity}` — the user-facing form of `data.value_id` is `value:{type}:{id}`, for example `value:membership:42`. The type segment is snake-cased and has generic arity dropped (`Envelope<InvoiceLine>` becomes `envelope`); without an identity it ends in `#{n}`.
+`data.provision` runs as a child of the `data.create` / `data.create_many` operation and carries `data.input_type`, `data.result_type`, `data.provisioner`, `data.identity`, `data.owned` and `data.value_id`. Each tracked value is also recorded as a `value` item with id `{type}:{identity}`; the user-facing form of `data.value_id` is `value:{type}:{id}`, for example `value:membership:42`. The type segment is snake-cased and has generic arity dropped (`Envelope<InvoiceLine>` becomes `envelope`); without an identity it ends in `#{n}`.
 
 ## Limits
 
@@ -156,7 +156,7 @@ When cleanup happens at a coarser level — say, the whole tenant is deleted by 
 
 ## Links
 
-- [Data overview](./index.md) — install, registration and the builder surface.
-- [Defaults](./defaults.md) — what happens before a provisioner runs.
-- [Cleanup and resources](../../foundation/lifecycle.md) — how test resources are released.
+- [Data overview](./index.md) - install, registration and the builder surface.
+- [Defaults](./defaults.md) - what happens before a provisioner runs.
+- [Cleanup and resources](../../foundation/lifecycle.md) - how test resources are released.
 - The demo's registration and samples: [`samples/Northstar.ProtoTest/Setup.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs) and [`samples/Northstar.ProtoTest/NorthstarData.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/NorthstarData.cs).

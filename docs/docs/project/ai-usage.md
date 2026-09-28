@@ -37,3 +37,5 @@ It feels strange seeing how much it sped things up, but also how easy it is to l
 I maintain ProtoTest and decide what is included. If generated code is wrong, that is still my problem to understand and fix.
 
 ProtoTest is still what I wanted to build.
+
+For the tools ProtoTest builds for coding agents, see [Agent workflows](../agent-workflows/coding-agents.md). This page is about how the project itself uses AI.

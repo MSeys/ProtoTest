@@ -6,7 +6,7 @@ description: "Find elements by role, label and text rather than CSS; each backen
 
 # Locators
 
-`By` builds a `WebLocator` — a description of how to find something, translated by each backend into its native query. Prefer locators that describe what a user sees (roles, labels, text) over ones that describe markup (CSS); they survive redesigns and double as accessibility checks.
+`By` builds a `WebLocator`, a description of how to find something, translated by each backend into its native query. Prefer locators that describe what a user sees (roles, labels, text) over ones that describe markup (CSS); they survive redesigns and double as accessibility checks.
 
 ## The full list
 
@@ -18,7 +18,7 @@ By.Text(string value, bool exact = false, bool ignoreCase = false)
 By.TestId(string value)                     // data-testid
 By.Attribute(string name, string value)
 By.Css(string selector)
-By.HasText(string value, bool exact = false, bool ignoreCase = false)   // filter — see below
+By.HasText(string value, bool exact = false, bool ignoreCase = false)   // filter; see below
 By.At(WebLocator source, int index)         // zero-based
 By.TableCell(string header, bool exact = true, bool ignoreCase = false)
 By.TableCellNumber(int number)              // one-based
@@ -29,7 +29,7 @@ In order of preference:
 
 | Locator | Use it for |
 | --- | --- |
-| `Role` | buttons, links, headings, checkboxes, rows — anything with an ARIA role and an accessible name |
+| `Role` | buttons, links, headings, checkboxes, rows: anything with an ARIA role and an accessible name |
 | `Label` | form fields with a `<label>` |
 | `Placeholder` | fields without a label (consider adding one) |
 | `Text` | static text |
@@ -56,7 +56,7 @@ Element(By.Role(WebRole.Status))            // any element with role=status
 Component<InvoiceRow>(By.Role(WebRole.Row).And(By.HasText("INV-123")))
 ```
 
-`HasText` is **only valid as the right-hand side of `And`** — on its own, both backends throw `WebBackendCapabilityException`.
+`HasText` is **only valid as the right-hand side of `And`**; on its own, both backends throw `WebBackendCapabilityException`.
 
 :::caution[Selenium limitations]
 Selenium supports a narrower set of combinations: the right-hand side of `And` must be `HasText`, and the left-hand side can't be `By.Css`. Playwright is not limited to those two forms.
@@ -76,7 +76,7 @@ For repeated components, [`Components<T>()`](./page-objects.md#lists-of-componen
 
 ## Table cells
 
-Inside a `WebTableRow`, use the row's `Cell(...)`, `CellNumber(...)` and `CellAt(...)` methods rather than these locators directly — they're built on `By.TableCell*` and give the element a readable name.
+Inside a `WebTableRow`, use the row's `Cell(...)`, `CellNumber(...)` and `CellAt(...)` methods rather than these locators directly; they're built on `By.TableCell*` and give the element a readable name.
 
 ## Describing a locator
 
@@ -93,14 +93,14 @@ Both backends resolve the component scope first (outermost root to innermost) an
 
 | Locator | Playwright | Selenium | Selenium limits |
 | --- | --- | --- | --- |
-| `TestId` | `GetByTestId` | XPath `.//*[@data-testid='…']` | — |
+| `TestId` | `GetByTestId` | XPath `.//*[@data-testid='…']` | none |
 | `Role` | `GetByRole` with `AriaRole`, name and `Exact` | XPath role predicate with implicit HTML mappings (see below) | no separate `Name`/`Exact` handling beyond the predicate |
 | `Text` | a plain string only when exact and case-sensitive; otherwise a regex (`^…$` when exact) with `IgnoreCase` | deepest-match XPath on `normalize-space(.)`, optional `translate(...)` lowercasing | XPath 1.0 only |
-| `Label` | `GetByLabel` with `Exact` | union of `@aria-label`, a `label` wrapping an input/textarea/select, or a field matched by `label[@for]` | — |
-| `Placeholder` | `GetByPlaceholder` with `Exact` | exact `@placeholder='…'`, or `contains(@placeholder, '…')` when not exact | — |
+| `Label` | `GetByLabel` with `Exact` | union of `@aria-label`, a `label` wrapping an input/textarea/select, or a field matched by `label[@for]` | none |
+| `Placeholder` | `GetByPlaceholder` with `Exact` | exact `@placeholder='…'`, or `contains(@placeholder, '…')` when not exact | none |
 | `Css` | `Page.Locator` / scope `Locator` | `By.CssSelector` | cannot be the left side of `And` |
 | `Attribute` | CSS attribute selector with escaping | XPath; a namespaced name is matched by `@*[name()='ns:name']` | name validity enforced by `By.Attribute` |
-| `At(n)` | `.Nth(n)` | all matches resolved, then indexed in memory; out of range throws `NoSuchElementException` | — |
+| `At(n)` | `.Nth(n)` | all matches resolved, then indexed in memory; out of range throws `NoSuchElementException` | none |
 | `TableCellAt` | `th, td` nth from the page; `:scope > th, :scope > td` inside a component | document-scoped from the driver, element-scoped from a component | the axis depends on driver vs element scope |
 | `TableCell(header)` | shared XPath builder, document-scoped at page root | shared XPath builder, same axis rule | header lookup uses `ancestor::table[1]//tr[1]` |
 
@@ -118,11 +118,11 @@ Playwright maps `WebRole` to Playwright's own ARIA role resolution, which unders
 - `Grid` matches `role='grid'` only: a plain `table` is a `Table`, not a `Grid`, on both backends
 - anything else → `@role='<lowercased name>'`
 
-When a name is given, Selenium's predicate matches it against `aria-label`, `title`, `alt`, the normalized element text, or `value` — exact or `contains`, per the `exact` flag.
+When a name is given, Selenium's predicate matches it against `aria-label`, `title`, `alt`, the normalized element text, or `value`, exact or `contains`, per the `exact` flag.
 
 ### Deepest-match text
 
-Both backends match the deepest element carrying the text, not every ancestor. Playwright's `GetByText` does this natively; Selenium's XPath adds `and not(.//*[predicate])`, because `normalize-space(.)` includes descendant text and would otherwise make a banner's text match `body` and `html` too — and every single-element resolution would find several matches.
+Both backends match the deepest element carrying the text, not every ancestor. Playwright's `GetByText` does this natively; Selenium's XPath adds `and not(.//*[predicate])`, because `normalize-space(.)` includes descendant text and would otherwise make a banner's text match `body` and `html` too, and every single-element resolution would find several matches.
 
 ### Document versus element scope
 
@@ -138,5 +138,5 @@ Single-element operations are strict on both backends. Playwright translates its
 
 ## Next
 
-- [Actions and assertions](./interactions.md) — using the elements these locators resolve.
-- [Pages and components](./page-objects.md) — giving locators a readable component path.
+- [Actions and assertions](./interactions.md) - using the elements these locators resolve.
+- [Pages and components](./page-objects.md) - giving locators a readable component path.

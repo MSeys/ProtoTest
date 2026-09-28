@@ -3,8 +3,8 @@
 Two committed `.prototrace` archives written by the framework itself and read by the
 `ProtoTest.Mcp` tools in `RunToolsTests`:
 
-- `run-passed.prototrace` — one green test, no report artifact.
-- `run-failed.prototrace` — one green test and one failed test: the `assert.json.shape`
+- `run-passed.prototrace` - one green test, no report artifact.
+- `run-failed.prototrace` - one green test and one failed test: the `assert.json.shape`
   operation carries real `shape.mismatches` (`$.orderId`, expected 7, actual 42) and the test
   declares a response artifact plus the captured expected shape; the run embeds the JSON report
   a `JsonReportSink` wrote, with two covered and two uncovered units.

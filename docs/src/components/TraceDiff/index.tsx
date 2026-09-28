@@ -1,11 +1,22 @@
 import {useId, useRef, useState, type KeyboardEvent, type ReactNode} from 'react';
+import Link from '@docusaurus/Link';
 
 import Frame from '@site/src/components/Frame';
 import {failureDrills, type DrillSide} from '@site/src/data/failureDrills';
-import {drillRun, type TraceSource} from '@site/src/data/traceSources';
+import {drillPairs, drillRun, type TraceSource} from '@site/src/data/traceSources';
 import styles from './styles.module.css';
 
-function Pane({id, role, side}: {id: string; role: string; side: DrillSide}): ReactNode {
+function Pane({
+  id,
+  role,
+  side,
+  archive,
+}: {
+  id: string;
+  role: string;
+  side: DrillSide;
+  archive: TraceSource;
+}): ReactNode {
   const failed = side.record.some((entry) => entry.status === 'failed');
   return (
     <section className={styles.pane} aria-labelledby={id}>
@@ -31,6 +42,11 @@ function Pane({id, role, side}: {id: string; role: string; side: DrillSide}): Re
           </li>
         ))}
       </ul>
+      {archive.href && (
+        <Link className={styles.archive} href={archive.href}>
+          Download this run's archive
+        </Link>
+      )}
     </section>
   );
 }
@@ -95,14 +111,14 @@ export default function TraceDiff({source = drillRun}: TraceDiffProps): ReactNod
         <>
           Every name, duration and message is from {source.what}
           {source.file && <> in <code>{source.file}</code></>}. The drill failed on purpose; the test
-          beside it runs the same journey and passes.
+          beside it runs the same journey and passes. Each pane links that test's own archive.
         </>
       }>
       <div className={styles.panel} id={`${baseId}-panel`} role="tabpanel" aria-labelledby={`${baseId}-${active.id}`}>
         <p className={styles.ask}>{active.ask}</p>
         <div className={styles.panes}>
-          <Pane id={`${baseId}-drill`} role="The drill" side={active.drill} />
-          <Pane id={`${baseId}-fix`} role="The test that holds" side={active.fix} />
+          <Pane id={`${baseId}-drill`} role="The drill" side={active.drill} archive={drillPairs[active.id].drill} />
+          <Pane id={`${baseId}-fix`} role="The test that holds" side={active.fix} archive={drillPairs[active.id].fix} />
         </div>
         <p className={styles.change}>
           <strong>What changes</strong>

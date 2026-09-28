@@ -81,6 +81,19 @@ npm ci
 npm run build
 ```
 
+## Integration pages
+
+Every page under `docs/docs/integrations` follows one shape, and `eng/check-docs.ps1` fails when a page that should carry it does not. The six sections, in order:
+
+1. **What it adds.** The capability and what it can see.
+2. **Install.** The `dotnet add package` lines and the supported targets.
+3. **Compose.** The `Add...` registration, its options and the context accessor.
+4. **The tasks.** Three to five things a suite does with the integration; each links the deeper page that explains it.
+5. **In the trace and coverage.** The operations, observations and coverage items the integration records.
+6. **Limits.** What it does not do, and where it loses.
+
+`## Skip` and a link list after `Limits` are fine. The check covers the top-level pages in `docs/docs/integrations` and each protocol section's `index.md`; the deep task pages under a section are exempt, and the section index links them. `overview.md` is the map and is exempt; `wiremock.md` is the model page.
+
 ## Pull requests
 
 - Add or update tests for behavior changes.

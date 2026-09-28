@@ -1,4 +1,4 @@
-/* The lesson frame: one panel, five numbered blocks, no palette of its own. */
+/* The lesson frame: one panel, seven numbered blocks, no palette of its own. */
 
 .shell {
   margin: var(--space-6) 0;
@@ -49,7 +49,7 @@
   gap: var(--space-6);
 }
 
-.outcome, .before {
+.outcome, .before, .learned {
   margin: 0;
   padding: 0;
   display: grid;
@@ -57,13 +57,13 @@
   list-style: none;
 }
 
-.outcome li, .before li {
+.outcome li, .before li, .learned li {
   position: relative;
   padding-left: var(--space-5);
   line-height: 1.6;
 }
 
-.outcome li::before, .before li::before {
+.outcome li::before, .before li::before, .learned li::before {
   content: '';
   position: absolute;
   top: 0.42em;
@@ -75,6 +75,7 @@
 
 .outcome li::before { transform: rotate(45deg); }
 .before li::before { border-radius: 50%; background: var(--muted); }
+.learned li::before { transform: rotate(45deg); background: var(--success); }
 
 .body { line-height: 1.65; }
 .body > :first-child { margin-top: 0; }

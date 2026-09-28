@@ -105,7 +105,7 @@ A few of the kinds recorded automatically:
 | `data.build`, `data.build_many`, `data.create`, `data.create_many`, `data.explain` | [building test data](../integrations/data/index.md) |
 | `data.provision`, `data.cleanup`, `data.value.resolve` | [provisioning and cleanup](../integrations/data/provisioners.md) |
 | `assert.sheets` | [sheet, range and table assertions](../integrations/sheets/index.md) — expected and actual values |
-| `sql.connection.open`, `sql.transaction.begin`, `sql.transaction.rollback`, `sql.enlist` | the [SQL connection lifecycle](../integrations/sql/index.md#tracing) |
+| `sql.connection.open`, `sql.transaction.begin`, `sql.transaction.rollback`, `sql.enlist` | the [SQL connection lifecycle](../integrations/sql/index.md#in-the-trace-and-coverage) |
 | `aspnetcore.server.initialize` | the in-process server, carrying `aspnetcore.application.type`, `aspnetcore.server.lifetime`, `aspnetcore.server.reused`, `aspnetcore.web_host.customized` and `aspnetcore.client.customized` |
 
 The in-process server is also a state entity with id `server:{type}` — `{type}` is the entry point's full name, as in `server:Northstar.Api.Program` — and those `aspnetcore.*` attributes are its state.

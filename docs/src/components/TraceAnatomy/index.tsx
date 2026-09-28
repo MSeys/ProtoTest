@@ -2,7 +2,7 @@ import type {ReactNode} from 'react';
 import Link from '@docusaurus/Link';
 
 import Frame from '@site/src/components/Frame';
-import {drillRun, type TraceSource} from '@site/src/data/traceSources';
+import {lessonTraces, type TraceSource} from '@site/src/data/traceSources';
 import styles from './styles.module.css';
 
 interface Entry {
@@ -128,11 +128,11 @@ const blindSpots = [
 ];
 
 interface TraceAnatomyProps {
-  /** The run the walk reads. The default is the sample's drill run. */
+  /** The run the walk reads. The default is the clock journey's own archive. */
   source?: TraceSource;
 }
 
-export default function TraceAnatomy({source = drillRun}: TraceAnatomyProps): ReactNode {
+export default function TraceAnatomy({source = lessonTraces.timeFix}: TraceAnatomyProps): ReactNode {
   return (
     <Frame
       head={
@@ -144,9 +144,9 @@ export default function TraceAnatomy({source = drillRun}: TraceAnatomyProps): Re
       foot={
         <>
           Read from {source.what}
-          {source.file && <> in <code>{source.file}</code></>}. The viewer draws the same trace from the
-          same archive
-          {source.href && <> (<Link href={source.href}>open the same run</Link>)</>}.
+          {source.file && <> in <code>{source.file}</code></>}. The viewer draws the same trace from
+          that archive
+          {source.href && <> (<Link href={source.href}>download it</Link> and drop it on the viewer)</>}.
         </>
       }>
       <ol className={styles.layers}>

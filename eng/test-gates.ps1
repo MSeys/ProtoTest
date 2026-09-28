@@ -381,6 +381,66 @@ using System.Runtime.CompilerServices;
         Assert-Fixture ($text.Contains("samples/Missing.Project/File.cs")) "the failure must name the path: $text"
     }
 
+    # The integration pages carry the six template headings; the map and the deep task pages are
+    # exempt, and a section index missing one heading fails naming the page and the heading.
+    Invoke-Fixture "check-docs-integration-shape" {
+        if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return "skip" }
+
+        $root = Join-Path $fixtureRoot "check-docs-integration-shape"
+        New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs/integrations/rest"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "src") -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot "check-docs.ps1") -Destination (Join-Path $root "eng/check-docs.ps1")
+        Set-Content -LiteralPath (Join-Path $root "docs/scripts/generate-changelog.mjs") -Value "process.exit(0);" -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root "docs/configuration-keys.json") -Value '{"sections":[],"allowedKeys":[]}' -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root "docs/docs/integrations/overview.md") -Value "# Integrations map`n`nThe map." -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root "docs/docs/integrations/rest/requests.md") -Value "# Requests`n`nA deep task page." -Encoding utf8
+
+        $shape = @'
+# Fakes
+
+## What it adds
+
+A fake HTTP service for a test.
+
+## Install
+
+```bash
+dotnet add package ProtoTest.WireMock
+```
+
+## Compose
+
+Registered on the builder.
+
+## The tasks
+
+Stub a route, verify a call, reset between tests.
+
+## In the trace and coverage
+
+Every served request is recorded.
+
+## Limits
+
+HTTP only.
+'@
+        Set-Content -LiteralPath (Join-Path $root "docs/docs/integrations/fakes.md") -Value $shape -Encoding utf8
+
+        # A complete top-level page passes, and the map and the deep task page are not checked.
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+        $text = $output -join [Environment]::NewLine
+        Assert-Fixture ($LASTEXITCODE -eq 0) "a complete integration page and the exempt pages must pass: $text"
+        Assert-Fixture ($text.Contains("covered 1 page(s)")) "the check must cover the top-level page only: $text"
+
+        # A section index missing one required heading fails and names both.
+        $missing = $shape -replace '(?ms)^## Limits\r?\n\r?\nHTTP only\.\r?\n?$', ''
+        Set-Content -LiteralPath (Join-Path $root "docs/docs/integrations/rest/index.md") -Value $missing -Encoding utf8
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+        $text = $output -join [Environment]::NewLine
+        Assert-Fixture ($LASTEXITCODE -ne 0) "a section index missing a heading must fail: $text"
+        Assert-Fixture ($text.Contains("rest/index.md")) "the failure must name the page: $text"
+        Assert-Fixture ($text.Contains("## Limits")) "the failure must name the missing heading: $text"
+    }
+
     # Publishing from a branch ref fails before any push; dry runs stay allowed.
     Invoke-Fixture "release-branch-ref" {
         $root = New-FixtureRepository "release-branch-ref"

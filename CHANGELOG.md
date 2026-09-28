@@ -609,6 +609,9 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ### Fixed
 
+- An NUnit test whose body throws is recorded as `failed` with the exception, its message and its
+  source location. A fixture without `[SetUp]`/`[TearDown]` left NUnit's result at its initial
+  Inconclusive state until the work item recorded the exception, and the trace read `skipped`.
 - An HTTP protocol client (REST, GraphQL, or another integration over `ProtoHttpClientInitializer`)
   bound to a configured or published address is built over its own primary handler and cookie container
   for each test: parallel tests of one run no longer share the handler the factory pools per client

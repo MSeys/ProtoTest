@@ -63,34 +63,54 @@ public class ProtoTestAttribute : TestAttribute, IWrapSetUpTearDown
                     ProtoTestAssembly.Host,
                     NUnitAttachmentPublisher.Instance,
                     context.CancellationToken)));
+            Exception? failure = null;
             try
             {
                 return innerCommand.Execute(context);
             }
+            catch (Exception exception)
+            {
+                // A fixture without setup or teardown has no command that records a body exception, so
+                // the exception leaves before NUnit writes it to the result; the work item records it
+                // only after this scope completed. Keep it, unwrapped as NUnit would, so the trace maps
+                // the failure NUnit will report instead of the result's initial Inconclusive state.
+                failure = exception.Unwrap();
+                throw;
+            }
             finally
             {
-                scope.Result = MapResult(context);
+                scope.Result = MapResult(context, failure);
                 ProtoTestAsync.RunSync(() => scope.DisposeAsync());
             }
         }
     }
 
     /// <summary>
-    /// Maps the result NUnit recorded. NUnit exposes only its own result state - the exception object
-    /// never reaches the adapter - so the shared <see cref="ProtoTestResult.FromException"/> rule is
-    /// deliberately not applied here: a cancelled body reads as Failed because NUnit reports it as a
-    /// plain failure (pinned by <c>OutcomeTests.CancelledSubject_ShouldRecordFailedOutcomeBecauseNUnitExposesNoExceptionType</c>).
+    /// Maps the result NUnit recorded, or the exception that escaped before NUnit could record it.
+    /// NUnit's result carries no exception object, so for a recorded failure the shared
+    /// <see cref="ProtoTestResult.FromException"/> rule is deliberately not applied: a cancelled body
+    /// reads as Failed because NUnit reports it as a plain failure (pinned by
+    /// <c>OutcomeTests.CancelledSubject_ShouldRecordFailedOutcomeBecauseNUnitExposesNoExceptionType</c>).
     /// </summary>
-    private static ProtoTestResult MapResult(TestExecutionContext context)
+    private static ProtoTestResult MapResult(TestExecutionContext context, Exception? failure)
     {
         var nunitResult = context.CurrentResult;
-        var state = nunitResult.ResultState;
+        var state = failure switch
+        {
+            ResultStateException resultStateException => resultStateException.ResultState,
+            not null => ResultState.Error,
+            _ => nunitResult.ResultState
+        };
         return state.Status switch
         {
             TestStatus.Passed => ProtoTestResult.Passed,
+            TestStatus.Failed when failure is not null => ProtoTestResult.Failed(new ProtoTraceError(
+                failure.GetType().FullName ?? failure.GetType().Name,
+                failure.Message,
+                failure.StackTrace)),
             TestStatus.Failed => ProtoTestResult.Failed(
                 "NUnit",
-                state.Label ?? TestStatus.Failed.ToString(),
+                string.IsNullOrEmpty(state.Label) ? TestStatus.Failed.ToString() : state.Label,
                 string.IsNullOrWhiteSpace(nunitResult.Message)
                     ? "NUnit reported a failed test without a failure message."
                     : nunitResult.Message,

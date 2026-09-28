@@ -6,9 +6,13 @@ description: "Run your ASP.NET Core application in-process with WebApplicationFa
 
 # ASP.NET Core
 
+## What it adds
+
 `ProtoTest.AspNetCore` runs your ASP.NET Core application in-process with `WebApplicationFactory`, and hands its `HttpClient` to the REST and GraphQL clients. No deployed environment, no ports.
 
 The in-memory test host has no address a browser can open; [Hosting a browser journey](#hosting-a-browser-journey) puts the same application on a real loopback port or in its own container when a test needs one.
+
+## Install
 
 ```bash
 dotnet add package ProtoTest.AspNetCore
@@ -16,7 +20,7 @@ dotnet add package ProtoTest.AspNetCore
 
 The package targets `net8.0`, `net9.0` and `net10.0`; the project templates default to `net10.0`, so pass `-f net8.0` or `-f net9.0` when a suite targets an older baseline.
 
-## Registering
+## Compose
 
 Back an application with the in-process server. The application's REST and GraphQL clients reuse its transport, so no network connection is opened:
 
@@ -64,7 +68,7 @@ public static IProtoHostBuilder AddAspNetCoreServer<TProgram>(
 
 Both overloads register a `server` capability named `ASP.NET Core` and expose the application's client under the server name — `"{name}:Factory"` for the `WebApplicationFactory<TProgram>` and `{name}` for the `HttpClient`. Registration is per server name: the host overload keeps the first registration for a name — the same `TProgram` under one name is a no-op, a different one throws naming both programs — while the application overload has no whole-call guard and lets the client initializer pick the first server that initializes. The application overload also registers the application's default transport, so an HTTP client with no configured base URL reuses this server. When the environment configures the application's address, both the server and its capability step aside — see [Real server or in-process?](#real-server-or-in-process).
 
-## One application, or one per test
+### One application, or one per test
 
 Starting an ASP.NET Core application takes time, so by default **one instance serves the whole run**:
 
@@ -79,7 +83,7 @@ builder.AddApplication("Api", app => app.AddAspNetCoreServer<Program>(lifetime: 
 
 Choose `PerTest` when the application keeps state you can't partition — static caches, a single in-memory database without tenant separation — or when tests leave state behind in singleton services, such as a recording fake.
 
-## Options and keys
+### Options and keys
 
 `ProtoTest.AspNetCore` has no options type of its own. Configuration that affects it:
 
@@ -92,7 +96,7 @@ Choose `PerTest` when the application keeps state you can't partition — static
 
 The glob syntax is `*` for any run of characters and `?` for exactly one, case-insensitive. Include is applied first, then exclude.
 
-## Context API
+### Context API
 
 ```csharp
 WebApplicationFactory<TProgram> ServerFactory<TProgram>(this ProtoExecutionContext context, string? name = null)
@@ -122,7 +126,7 @@ var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
 `ServerFactory<TProgram>()` also gives you the underlying `TestServer` — the GraphQL [WebSocket factory](./graphql/subscriptions.md#supplying-your-own-websocket) uses it to open in-process WebSockets. The per-test scope itself is registered as a resource named `application:services:{name}` of kind `"application"`.
 
-## Quick start
+## The tasks
 
 ```csharp
 builder.AddApplication("Api", app => app
@@ -141,9 +145,9 @@ public async Task Health_endpoint_answers()
 
 The sample suite's full registration — an in-process application sharing its store with the tests — is in [Setup.cs](../../../samples/Northstar.ProtoTest/Setup.cs).
 
-## Going further
+### Going further
 
-### Customising the application
+#### Customising the application
 
 Replace services the same way you would with `WebApplicationFactory` directly:
 
@@ -162,7 +166,7 @@ The handler chain mirrors `WebApplicationFactoryClientOptions`: a redirect handl
 
 `configureWebHost` customizes the server for every test of the run. For a replacement that applies to one test and resets afterwards, see [Substituting services per test](#substituting-services-per-test).
 
-### Settings from infrastructure
+#### Settings from infrastructure
 
 When run-scoped [infrastructure](../foundation/infrastructure.md) started a dependency, its settings are applied to the web host before your callback, so the in-process application reads the same connection strings and choices the tests do:
 
@@ -171,7 +175,7 @@ When run-scoped [infrastructure](../foundation/infrastructure.md) started a depe
 
 The demo passes a connection string, the database provider and `ProtoTest:TestSupport` this way, so the application and the tests read one set of values.
 
-### Substituting services per test
+#### Substituting services per test
 
 Swap a service in the application under test for one test — a fake clock gateway, a recording mail sender — either in the test body or with an attribute:
 
@@ -200,7 +204,7 @@ Proto.Context.Override<IEmailSender>(new RecordingEmailSender(), "Api");
 
 Substitution needs the in-process server: with `Server` set the attribute skips unless that named server is in-process; without it, the attribute gates on the test's selected application (falling back to `"Default"`), so a mixed run that publishes one application and hosts another in-process skips instead of failing when the substitution resolves. A configured `BaseUrl` drops the capability they gate on, and `Override` throws naming the address. Apply the override before the test first resolves application services.
 
-### Test users
+#### Test users
 
 An application that should authorize the test user as its own principal opts in to the shipped app-side authentication:
 
@@ -211,7 +215,7 @@ app.AddAspNetCoreServer<Program>(webHost => webHost.AddTestUserAuthentication())
 
 The handler decodes the `ProtoTest-User` header a test's [`[SignedInAs]`](./rest/authentication.md#built-in-test-user) identity travels in and authenticates the request as that user: the name, a `ClaimTypes.Role` claim per role and the declared claims. It becomes the application's default authentication scheme, so the application's own `[Authorize]`, role checks and policies decide - a `[SignedInAs("alice", "admin")]` test reaches an admin endpoint, a `[SignedInAs("bob", "viewer")]` test gets the application's own `403`. No header means no result: anonymous requests stay anonymous and are challenged as usual.
 
-## Page coverage
+## In the trace and coverage
 
 When the server runs in-process, starting it also inventories its page-like GET routes: each becomes a `web.page.available` observation with metadata `web.application = {server name}` and `web.page.source = "aspnetcore"`, so the [web coverage report](./web/index.md#page-coverage) can show pages that exist but were never visited. The inventory is recorded once per run, by the first test that initializes the server, and coverage aggregates those observations for the whole run: later tests reuse the server without repeating them. A failed inventory resets the latch and traces `web.page.inventory.failed`; an **empty** discovery also does not latch, so a route added after the first test is still inventoried.
 
@@ -245,7 +249,7 @@ Refine the result with the Include/Exclude globs:
 
 A published application never starts in-process, so its inventory comes from the explicit `ProtoTest:Web:Pages` list, the frontend source folder or Vue discovery instead.
 
-## Tracing
+### Tracing
 
 The server is both an event and a state entity — or a single skipped event when it steps aside:
 

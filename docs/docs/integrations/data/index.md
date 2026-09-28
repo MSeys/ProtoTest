@@ -7,6 +7,8 @@ description: "Build test objects with deterministic defaults, so a test only sta
 
 # Data
 
+## What it adds
+
 `ProtoTest.Data` builds test objects with deterministic defaults, so the only values you write in a test are the ones the test is *about* — and it can hand those objects to your application to create them for real.
 
 Numbers, enums, dates and your own value objects are never invented: if nothing supplies a member, the build fails with a `ProtoDataException` naming it, rather than a silently wrong `0`.
@@ -28,7 +30,7 @@ dotnet add package ProtoTest.Data
 
 ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `-f` is passed. `ProtoTest.Data` depends only on `ProtoTest.Core`.
 
-## Registering
+## Compose
 
 ```csharp
 builder
@@ -50,7 +52,7 @@ public static IProtoHostBuilder AddDataProvisioner<TInput, TResult, TProvisioner
 
 `AddData` registers the `Data` capability (`ProtoCapabilityKinds.Data`) and a scoped `IProtoData` — one per test. Repeats compose onto one registry: each `AddData` callback runs while the capability and service registrations dedupe. Registering the same member, type or factory twice is **not** a repeat — it throws `ProtoDataException` naming both sources, so two modules cannot silently fight over a value. A second `AddDataProvisioner` with the same implementation type is a no-op; two *different* provisioners for one input/result pair both register and fail later, when that pair is used.
 
-## Options and keys
+### Options and keys
 
 `ProtoTest.Data` has no options type and no `ProtoTest:Data` configuration section. Everything is configured through the `AddData` callback:
 
@@ -65,7 +67,7 @@ public static IProtoHostBuilder AddDataProvisioner<TInput, TResult, TProvisioner
 
 [Defaults](./defaults.md) has the precedence order and the full surface, every signature included.
 
-## Context API
+### Context API
 
 ```csharp
 IProtoData data = Proto.Context.Data();
@@ -86,7 +88,7 @@ On the builder:
 | `CreateAsync()` / `CreateAsync<TResult>()` | builds, provisions through the registered provisioner, and returns the application's value |
 | `CreateManyAsync(count, configure)` / `CreateManyAsync<TResult>(...)` | the same for `count` independently resolved objects |
 
-## Quick start
+## The tasks
 
 ```csharp
 var project = Proto.Context.Data()
@@ -97,9 +99,9 @@ var project = Proto.Context.Data()
 
 `Build()` is enough when the test only needs an object; when the application must actually create it, use `CreateAsync` and a [provisioner](./provisioners.md).
 
-## Going further
+### Going further
 
-### Several at once
+#### Several at once
 
 The `configure` callback receives each item's builder and its zero-based index:
 
@@ -114,11 +116,11 @@ var members = await Proto.Context.Data()
 
 Values set with `With` before `BuildMany` apply to every item.
 
-### Constructors
+#### Constructors
 
 Objects are created through their single public constructor (parameters matched to properties by name, ignoring case) or their parameterless one; remaining writable properties are set afterwards. Records work naturally through their primary constructor. Multiple public constructors without a parameterless route, a `With` on a member the chosen route cannot assign, and a non-writable property that is named in `With` all throw `ProtoDataException`. For types that protect their invariants, register a [domain factory](./defaults.md#domain-factories) instead.
 
-### The identity map
+#### The identity map
 
 `CreateAsync` and `CreateManyAsync` results are tracked per test under the identity string the provisioner returned, and `Ref<T>` resolves them again — typically to wire a foreign key:
 
@@ -135,7 +137,7 @@ var first = Proto.Context.Data().Ref<ProjectResponse>(projects[0].Id);
 - Only `CreateAsync` / `CreateManyAsync` results are in the map; `Build()` and `BuildMany()` values are never referenceable.
 - `IProtoData` is scoped to one test, so the map cannot reach data provisioned by another test. `ProtoDataValueContext.Ref<T>(identity)` exposes the same lookup to defaults.
 
-### Explain
+#### Explain
 
 When a value surprises you, ask where it came from — before constructing anything:
 
@@ -150,7 +152,7 @@ foreach (var value in plan.Values)
 
 Each `ProtoDataValueExplanation` carries `MemberName`, `ValueType`, `Value`, `SourceKind` and `Source` — for defaults, the module that registered them. `SourceKind` is one of `Explicit`, `MemberDefault`, `TypeProvider`, `CustomResolver`, `BuiltIn` or `ConstructorDefault`. For a factory type, `Explain()` lists only the explicit `With(...)` values plus the construction source, because the factory resolves its inputs when `Build()` runs.
 
-## Tracing and coverage
+## In the trace and coverage
 
 Every builder operation is traced with source `ProtoTest.Data`:
 

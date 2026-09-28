@@ -7,7 +7,11 @@ description: "Talk to devices - a simulator or the real hardware - from the same
 
 # Devices
 
+## What it adds
+
 `ProtoTest.Devices` talks to devices the way other integrations talk to APIs: a typed device class per kind of device, one instance per test, and every exchange in the same trace. The transport is a separate package - `ProtoTest.Devices.WebSocket` for sockets, `ProtoTest.Devices.Mqtt` for publish/subscribe - so the same suite runs against a simulator in CI and lab hardware on a bench.
+
+## Install
 
 ```bash
 dotnet add package ProtoTest.Devices
@@ -37,7 +41,7 @@ public sealed class AcCharger : ProtoDevice
 
 `ExpectAsync` is the assertion: it waits for the frame the behaviour depends on, contributes device coverage, and a timeout fails with the description and the frames exchanged so far.
 
-## Registering
+## Compose
 
 ```csharp
 builder.AddDevices(devices => devices
@@ -85,7 +89,7 @@ The registration is keyed by `(TProgram, application)`: a second application, or
 
 A hand-written in-process transport applies `ProtoTestContextPropagation.ApplyTo(HttpRequest)` (from `ProtoTest.AspNetCore`) to the request it opens, so the handshake carries the test id and the application's clock bridge pushes the connecting test's clock, exactly like the in-process HTTP client. The shared connect bound lives in `ProtoTest.Devices`: `ProtoDeviceConnect.WithTimeoutAsync` bounds the connect with the registered `ConnectTimeout` and reports an elapsed attempt as a `TimeoutException` naming the endpoint; the socket, in-process and MQTT transports all use it.
 
-## MQTT
+### MQTT
 
 `ProtoTest.Devices.Mqtt` talks to devices over publish/subscribe: a client declares one publish topic and one subscribe filter, `{deviceId}` is filled from the id passed to `For`, and the broker is the simulator in CI or the real one behind the lab.
 
@@ -112,7 +116,7 @@ builder
 
 A configured `ProtoTest:Devices:Mqtt:Broker` (the environment's broker) steps the container aside like every provider chain, and the same registration follows it.
 
-## Using it
+## The tasks
 
 ```csharp
 [ProtoTest]
@@ -126,7 +130,7 @@ public async Task A_charger_boots_and_acknowledges()
 
 One instance per (client, type, id) and test, released with the test; a second `For` in the same test returns the same instance. `Devices()` without a name works when exactly one client is registered.
 
-## Simulator or hardware
+### Simulator or hardware
 
 No entry is registered per device id. `[RequiresDevice<TDevice>]` skips a test when the device type is not registered on any client, so a lab-only suite runs where the hardware is and skips elsewhere; point the application's address (or the client's resolver) at the simulator or the bench and the same tests run against either.
 
@@ -160,7 +164,7 @@ The MQTT backend takes the same shape - code defaults in `AddMqttClient(..., con
 | `ProtoTest:Devices:Mqtt:KeepAlivePeriod` | the keep-alive interval sent to the broker | library default |
 | `ProtoTest:Devices:Mqtt:MaxPacketBytes` | the largest MQTT packet the client accepts, offered to the broker as MQTT 5 `MaximumPacketSize`; 0 reads without a cap | 4 MiB |
 
-## What the trace shows
+## In the trace and coverage
 
 A `device` entity per device (client, type, transport, address, connection state) and `device.connect`,
 `device.send`, `device.receive` and `device.command` operations; a failed expectation is a failed

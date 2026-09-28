@@ -19,8 +19,12 @@ interface LearnShellProps {
   outcome: string[];
   /** The lesson it builds on and anything to install, in the reader's words. */
   before: ReactNode[];
+  /** The real failure or question the lesson starts from, from the Learning demo. */
+  situation: ReactNode;
   /** The question, the step that proves it, and the answer behind the reveal. */
   checkpoint: CheckpointContent;
+  /** Two or three lines the reader should take away. */
+  learned: string[];
   /** The next lesson or the reference page behind this one. */
   next: LearnNext[];
   /** The walkthrough: prose, snippets and trace components. */
@@ -28,15 +32,18 @@ interface LearnShellProps {
 }
 
 /*
- * The lesson frame every Learn page uses: outcome, prerequisites, walkthrough, checkpoint, next. The
- * shape is the one the hub promises in "How a lesson works", so a lesson never invents its own order.
+ * The lesson frame every Learn page uses: outcome, prerequisites, the situation, the walkthrough, the
+ * checkpoint, what the lesson taught and what to read next. The shape is the one the hub promises in
+ * "How a lesson works", so a lesson never invents its own order.
  */
 export default function LearnShell({
   level,
   minutes,
   outcome,
   before,
+  situation,
   checkpoint,
+  learned,
   next,
   children,
 }: LearnShellProps): ReactNode {
@@ -72,21 +79,39 @@ export default function LearnShell({
 
       <section>
         <h2 className={styles.label}>
-          <span className={styles.step}>03</span>The walkthrough
+          <span className={styles.step}>03</span>The situation
+        </h2>
+        <div className={styles.body}>{situation}</div>
+      </section>
+
+      <section>
+        <h2 className={styles.label}>
+          <span className={styles.step}>04</span>The walkthrough
         </h2>
         <div className={styles.body}>{children}</div>
       </section>
 
       <section>
         <h2 className={styles.label}>
-          <span className={styles.step}>04</span>Checkpoint
+          <span className={styles.step}>05</span>Checkpoint
         </h2>
         <Checkpoint {...checkpoint} />
       </section>
 
       <section>
         <h2 className={styles.label}>
-          <span className={styles.step}>05</span>Where to go next
+          <span className={styles.step}>06</span>What you learned
+        </h2>
+        <ul className={styles.learned}>
+          {learned.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </section>
+
+      <section>
+        <h2 className={styles.label}>
+          <span className={styles.step}>07</span>Where to go next
         </h2>
         <div className={styles.next}>
           {next.map((item) => (

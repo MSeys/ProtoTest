@@ -3,7 +3,7 @@ import Link from '@docusaurus/Link';
 
 import Frame from '@site/src/components/Frame';
 import {failureDrills, type DrillRecord} from '@site/src/data/failureDrills';
-import {drillRun, type TraceSource} from '@site/src/data/traceSources';
+import {drillPairs, drillRun, type TraceSource} from '@site/src/data/traceSources';
 import styles from './styles.module.css';
 
 function Records({record}: {record: DrillRecord[]}): ReactNode {
@@ -24,14 +24,14 @@ function Records({record}: {record: DrillRecord[]}): ReactNode {
 }
 
 interface FailureGalleryProps {
-  /** The run the card values come from. The default is the sample's drill run. */
+  /** The recording the card values come from. The default is the sample's drill run. */
   source?: TraceSource;
 }
 
 /*
  * L0's spine: one card per failure mode, each opening the recorded slice from the drill run and the
- * test that does the same journey the right way. The numbers are the trace's, so a reader can open
- * the same run and check them.
+ * test that does the same journey the right way. Each card links the drill's and the fix's own
+ * archive, so a reader can open the same test and check what it recorded.
  */
 export default function FailureGallery({source = drillRun}: FailureGalleryProps): ReactNode {
   const [open, setOpen] = useState<Set<string>>(() => new Set(['time']));
@@ -57,13 +57,14 @@ export default function FailureGallery({source = drillRun}: FailureGalleryProps)
         <>
           Every line is from {source.what}
           {source.file && <> in <code>{source.file}</code></>}. The drill failed on purpose, and the
-          paired test runs the same journey the right way. Set <code>ProtoTest__Sample__Drills=true</code>{' '}
-          to record the drills in your own run.
+          paired test runs the same journey the right way. Each card links its own archive. Set{' '}
+          <code>ProtoTest__Sample__Drills=true</code> to record the drills in your own run.
         </>
       }>
       <div className={styles.grid}>
         {failureDrills.map((pair) => {
           const expanded = open.has(pair.id);
+          const archives = drillPairs[pair.id];
           return (
             <article key={pair.id} className={`${styles.card} ${expanded ? styles.cardOpen : ''}`}>
               <h3 className={styles.cardHead}>
@@ -90,6 +91,11 @@ export default function FailureGallery({source = drillRun}: FailureGalleryProps)
                     </div>
                     <p className={styles.what}>{pair.drill.what}</p>
                     <Records record={pair.drill.record} />
+                    {archives.drill.href && (
+                      <Link className={styles.open} href={archives.drill.href}>
+                        Download the drill archive
+                      </Link>
+                    )}
                   </div>
 
                   <div className={`${styles.side} ${styles.sideFix}`}>
@@ -99,18 +105,17 @@ export default function FailureGallery({source = drillRun}: FailureGalleryProps)
                     </div>
                     <p className={styles.what}>{pair.fix.what}</p>
                     <Records record={pair.fix.record} />
+                    {archives.fix.href && (
+                      <Link className={styles.open} href={archives.fix.href}>
+                        Download the fix archive
+                      </Link>
+                    )}
                   </div>
 
                   <p className={styles.change}>
                     <strong>What changes</strong>
                     {pair.change}
                   </p>
-
-                  {source.href && (
-                    <Link className={styles.open} href={source.href}>
-                      Open this run in the viewer
-                    </Link>
-                  )}
                 </div>
               )}
             </article>

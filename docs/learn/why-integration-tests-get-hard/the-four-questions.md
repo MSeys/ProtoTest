@@ -3,93 +3,95 @@ id: the-four-questions
 title: The four questions
 sidebar_label: The four questions
 sidebar_position: 1
-description: "The four questions every integration test has to answer (time, state, environment, visibility), and where each one shows up in a trace."
+description: "Why integration tests get hard: time, state, environment and visibility, and where each one shows up in a trace."
 ---
 
 import LearnShell from '@site/src/components/LearnShell';
-import FailureGallery from '@site/src/components/FailureGallery';
-import AnnotatedCode from '@site/src/components/AnnotatedCode';
 
 # The four questions
 
-An integration test talks to the parts of a system that actually run: an API, a database, a broker, a browser, a clock you do not own. That is what makes it valuable, and it is also why it fails in ways a unit test never does.
+An integration test talks to the parts of a system that actually run: an API, a database, a broker, a browser, a clock you do not own. That is what makes it valuable, and it is why it fails in ways a unit test never does.
 
 Before you can trust a test like that, it has to answer four questions.
 
-1. **Time.** What moves the clock: the test, the application, or a real wait?
-2. **State.** What does the test share with other tests, and what does it leave behind?
-3. **Environment.** Where does the application run, and where does its address come from?
-4. **Visibility.** When the test fails, what can you see about what happened?
-
 <LearnShell
   level="Level 0, lesson 1"
-  minutes="About 15 minutes"
+  minutes="About 8 minutes"
   outcome={[
-    'Name the four failure modes and recognize them in a suite you already have.',
-    'Point at the part of a trace that answers each question.',
-    'Say what a passing test should leave behind.',
+    'Name the four questions an integration test has to answer.',
+    'Point at the part of a trace that answers each one.',
+    'Say what a passing test leaves behind.',
   ]}
   before={[
     'Nothing from this track.',
-    <>To run the demo yourself, <code>dotnet test samples/Northstar.ProtoTest</code> needs the .NET SDK and the repository. You can also follow the lesson by reading the traces in the <a href="https://trace.prototest.dev/?demo=1">viewer</a>.</>,
+    <>The archives this level reads are on this site, so no install is needed. To run the demo as well, <code>dotnet test samples/Northstar.ProtoTest</code> needs the .NET SDK and the repository.</>,
   ]}
+  situation={
+    <>
+      <p>An integration test fails once, passes on the retry, and the failure message says nothing you can act on. That is the shape of most integration problems: something outside the code under test changed between the two runs, and the test never said what it depended on.</p>
+      <p>The four questions name those somethings. The rest of this level answers each one with a test that fails on purpose and the test that fixes it.</p>
+    </>
+  }
   checkpoint={{
     question:
-      'The time drill waits one real second and the application still reports active. Why does the wait not close the due window?',
+      'The time drill waits one real second and the application still reports the organization as active. Why does the wait not close the due window?',
     verify: (
       <>
-        Open the <a href="https://trace.prototest.dev/?demo=1">demo trace</a> and follow one failing check down to
-        the values that differed. When you can explain why the test failed without running it again, you have the
-        habit the rest of this track builds on.
+        Download <a href="pathname:///lessons/l0-time-drill.prototrace">l0-time-drill.prototrace</a>, drop it on the{' '}
+        <a href="https://trace.prototest.dev">viewer</a>, and follow the failed check down to the values it printed. When you can explain the failure without running it again, you have the habit the rest of the track builds on.
       </>
     ),
     reveal: (
       <>
-        The application runs on the test clock, and real time does not move it. The billing window stays open
-        until something advances that clock. The fix moves it from the test side with{' '}
-        <code>Proto.Context.Clock.Advance</code>, so the application and the assertion read the same moment.
+        The application runs on the test clock, and real time does not move it. The due window stays open until something advances that clock. The fix moves it from the test side with <code>Proto.Context.Clock.Advance</code>, so the application and the assertion read the same moment.
       </>
     ),
   }}
+  learned={[
+    'Time, state, environment and visibility are the four things an integration test has to get right.',
+    'Each one has a concrete answer in the composition or in the trace.',
+    'A passing test answers all four at once; a failure is usually one missing answer.',
+  ]}
   next={[
-    {label: 'The reference', to: '/docs/', note: 'What each integration does and how to configure it.'},
-    {label: 'Level 0', to: '/learn/', note: 'The flakiness taxonomy continues the level: the same four questions, sorted into the failure modes that show up in CI.'},
+    {
+      label: 'A failure tour',
+      to: '/learn/why-integration-tests-get-hard/a-failure-tour',
+      note: 'Four deliberate failures, each next to the test that does the same journey the right way.',
+    },
+    {
+      label: 'The trace reference',
+      to: '/docs/observability/prototrace',
+      note: 'What a .prototrace records, and how to read it.',
+    },
   ]}>
 
-The lesson follows four pairs of tests from the Learning demo. Each pair runs the same journey twice: once the way that fails, once the way that holds. Open a card to see what the trace recorded in the drill, and what the test beside it does instead.
+## The four questions
 
-<FailureGallery />
+The sample suite answers each question twice: once the way that fails, once the way that holds. This is what the failing half recorded.
 
-Set `ProtoTest__Sample__Drills=true`, run the suite, and the four failures are recorded next to the tests that fix them. Each failure becomes the checkpoint for this lesson: open its trace, find the question it failed to answer, and name what the test that holds changed.
+| Question | The drill | What the trace recorded |
+| --- | --- | --- |
+| Time | `ARealWaitDoesNotCloseTheDueWindow` waits one real second | the shape check failed on `$.status`: expected `past_due`, read `active` |
+| State | `AnUnknownProjectIdIsTreatedAsMine` reads the project id `prj_1` | the request returned 404; no test in the run created that id |
+| Environment | `TheAddressWasHardcodedForOneMachine` opens a raw client on `127.0.0.1:5099` | the test ran about two seconds and recorded no request at all |
+| Visibility | `ABareStatusHidesWhatTheApplicationSaid` sends an empty project name | the status check saw 400; the body that named `validation_failed` stayed unread |
 
-### One of the fixes, line by line
+### Time: who moves the clock?
 
-The time drill waits a real second and the due window never closes. Its fix moves the test clock instead. This is the body of `TheTestClockClosesTheDueWindow`.
+The application computes every stamp and billing period from a time provider. The test host hands it the test's clock, so real time does not move anything the application can see. A wait therefore changes nothing. The fix, `TheTestClockClosesTheDueWindow`, calls `Proto.Context.Clock.Advance(TimeSpan.FromDays(8))` and then reads the same organization. One clock, moved from the test side.
 
-<AnnotatedCode
-  filename="FailureDrills.cs"
-  code={`var invoice = await Proto.Context.Data().IssueInvoiceAsync();
+### State: what does the test share?
 
-Proto.Context.Clock.Advance(TimeSpan.FromDays(8));
-using var organization = await Proto.Context.Rest().GetAsync("/api/v1/organization");
-organization
-    .Should.HaveHttpStatus(HttpStatusCode.OK)
-    .Should.MatchShape(new { status = SubscriptionStatuses.PastDue });
+A test that reads `prj_1` reads a record some other run created, or no record at all. The fix, `EachTenantSeesOnlyItsOwnProjects`, creates its own project, lists the projects its tenant can see, and finds exactly one. Data that belongs to one test stays in that test, and it is removed when the test ends.
 
-using var paid = await Proto.Context.Rest()
-    .Body(new PayInvoiceRequest(PaymentMethods.Visa))
-    .PostAsync("/api/v1/invoices/{invoiceId}/pay", new { invoiceId = invoice.Id });
-paid
-    .Should.HaveHttpStatus(HttpStatusCode.OK)
-    .Should.MatchShape(new { status = InvoiceStatuses.Paid });`}
-  callouts={[
-    {line: 1, title: 'Build and provision the invoice', note: 'Data() builds the request, the provisioner creates the invoice, and teardown removes it.'},
-    {line: 3, title: 'Move the test clock', note: 'Advance records a clock.advance event, and the in-process application reads the same clock.'},
-    {line: 4, title: 'Call through the composed client', note: 'Rest() takes the address from the run, so the same test works in-process or against a published environment.'},
-    {line: 7, title: 'Assert the property the behaviour depends on', note: 'MatchShape reports the JSON path and both values when it fails.'},
-    {line: 11, title: 'Pay, then check the result', note: 'The second call reuses the same client, the same context and the same trace.'},
-  ]}
-  foot={<>From <code>samples/Northstar.ProtoTest/FailureDrills.cs</code>. The drill next to it waits on real time and the due window never closes.</>}
-/>
+### Environment: where does the address come from?
+
+A raw `HttpClient` with a fixed address talks to one machine: the one where it was written. It is also outside the run, so the trace cannot see the call. The fix, `TheAddressComesFromTheComposition`, calls the same endpoint through `Proto.Context.Rest()`, which takes its address from the run. The same test then works in-process, in a container, or against a published environment.
+
+### Visibility: what can the test show when it fails?
+
+A test that asserts the status alone throws away what the application said. The drill sent an empty project name, expected `201 Created`, and the check reported `400`. The body named `validation_failed` and the empty parameter, and nothing read it. The fix, `TheProblemBodyNamesTheCodeAndDetail`, asserts the problem body, so the same failure would name the code and the message.
+
+A passing test answers all four: it moves the clock, creates and removes its own data, takes the address from the composition, and asserts something that names the difference when it fails. The rest of this level reads the four drill pairs in full.
 
 </LearnShell>

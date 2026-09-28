@@ -105,3 +105,10 @@
 }
 
 .change strong { color: var(--blueprint); }
+
+.archive {
+  justify-self: start;
+  color: var(--blueprint);
+  font-size: var(--text-meta);
+  font-weight: var(--weight-semibold);
+}

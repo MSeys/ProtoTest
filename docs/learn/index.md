@@ -28,17 +28,17 @@ No ProtoTest experience is needed to start. The lessons use the Northstar sample
 
 The levels are ordered. Each one names what you can do at the end and what it assumes.
 
-| Level | What you will be able to do | Time | Needs |
-| --- | --- | --- | --- |
-| **0. Why integration tests get hard** (4 lessons) | Name the four ways integration tests fail (time, state, environment, visibility), spot them in a real trace, and say what a passing test should leave behind. | about 1 hour | nothing |
-| **1. One test, one journey** (3 lessons) | Install ProtoTest, run a test against an in-process application, and read the trace it left. | about 45 minutes | Level 0 |
-| **2. Compose, don't glue** (3 lessons) | Add and remove capabilities in the host, and know when a problem should not go in the host at all. | about 45 minutes | Level 1 |
-| **3. Determinism** (4 lessons) | Move the clock, wait for readiness instead of sleeping, isolate per-test state and run tests in parallel. | about 1 hour | Level 2 |
-| **4. Evidence** (4 lessons) | Read a failing trace, use contract coverage next to code coverage, and get the report back from CI. | about 1 hour | Level 3 |
-| **5. Real topology** (3 lessons) | Run the same suite against containers and a published application, and inject faults on purpose. | about 45 minutes | Level 4 |
-| **6. Make it yours** (4 lessons) | Write your own attributes and integrations, and run the evidence loop with a coding agent. | about 1 hour | Level 5 |
+| Level | Lessons | What you will be able to do | Time | Needs |
+| --- | --- | --- | --- | --- |
+| **0. Why integration tests get hard** | [The four questions](./why-integration-tests-get-hard/the-four-questions.md), [A failure tour](./why-integration-tests-get-hard/a-failure-tour.md), [What a test leaves behind](./why-integration-tests-get-hard/what-a-test-leaves-behind.md), [The trace as a feedback loop](./why-integration-tests-get-hard/the-trace-as-the-feedback-loop.md) | Name the four ways integration tests fail (time, state, environment, visibility), spot them in a real trace, and say what a passing test should leave behind. | about 40 minutes | nothing |
+| **1. One test, one journey** | [Install and run](./one-test-one-journey/install-and-run.md), [Write your first test](./one-test-one-journey/write-your-first-test.md), [Read the trace](./one-test-one-journey/read-the-trace.md) | Install ProtoTest, run a test against an in-process application, and read the trace it left. | about 30 minutes | Level 0 |
+| **2. Compose, don't glue** | [Capabilities and the host](./compose-dont-glue/capabilities-and-the-host.md), [Add and remove an integration](./compose-dont-glue/add-and-remove-an-integration.md), [When not to compose](./compose-dont-glue/when-not-to-compose.md) | Add and remove capabilities in the host, and know when a problem should not go in the host at all. | about 30 minutes | Level 1 |
+| **3. Determinism** (4 lessons) | Not yet published | Move the clock, wait for readiness instead of sleeping, isolate per-test state and run tests in parallel. | about 1 hour | Level 2 |
+| **4. Evidence** (4 lessons) | Not yet published | Read a failing trace, use contract coverage next to code coverage, and get the report back from CI. | about 1 hour | Level 3 |
+| **5. Real topology** (3 lessons) | Not yet published | Run the same suite against containers and a published application, and inject faults on purpose. | about 45 minutes | Level 4 |
+| **6. Make it yours** (4 lessons) | Not yet published | Write your own attributes and integrations, and run the evidence loop with a coding agent. | about 1 hour | Level 5 |
 
-Lessons are published a level at a time. Level 0 opens with the first lesson; the rest of Level 0 to Level 4 follows, and Levels 5 and 6 will be written after the features they teach ship.
+Levels 0 to 2 are live, and their lessons read top to bottom. The remaining levels follow.
 
 ## How a lesson works
 
@@ -46,10 +46,12 @@ Each lesson has the same shape:
 
 - **Outcome.** What you will be able to do when you finish.
 - **Before you start.** The lesson it builds on, and anything you need installed.
-- **The walkthrough.** A situation from the Northstar demo, step by step, including the parts that go wrong.
+- **The situation.** The real failure or question the lesson starts from, from the Northstar demo.
+- **The walkthrough.** Numbered steps with real code and the real trace beside them.
 - **Checkpoint.** One question, the step that proves the answer, and the answer itself when you have tried.
+- **What you learned.** The two or three lines worth keeping.
 - **Where to go next.** The next lesson, or the reference page for the details behind it.
 
 ## The demo behind the lessons
 
-The lessons run against [Northstar](https://github.com/MSeys/ProtoTest/tree/main/samples/Northstar.ProtoTest), the sample suite in the repository. It composes API, browser, database, messaging and document integrations in one host, and it ships deliberate failures: four tests that fail on purpose, one per question, next to the tests that do the same journey the right way. Run it with `dotnet test samples/Northstar.ProtoTest`, or read the traces without running anything.
+The lessons run against [Northstar](https://github.com/MSeys/ProtoTest/tree/main/samples/Northstar.ProtoTest), the sample suite in the repository. It composes API, browser, database, messaging and document integrations in one host, and it ships deliberate failures: four tests that fail on purpose, one per question, next to the tests that do the same journey the right way. Run it with `dotnet test samples/Northstar.ProtoTest`, or read the traces without running anything. Every lesson names the archive it reads.

@@ -66,7 +66,7 @@ On the opened workbook:
 | `Name`, `Sheets` | the workbook name and the sheets that were read (visible ones by default) |
 | `Sheet(name)` | finds a sheet; a failure lists the available names |
 | `Model<TRow>()` | binds a `[Sheet]`/`[Column]` record to the workbook |
-| `KeyValueModel<TModel>()` | binds a `[Sheet(..., Kind = ProtoSheetKind.KeyValue)]` record to a label/value sheet |
+| `KeyValueModel<TModel>()` | binds a `[Sheet(..., Kind = ProtoSheetKind.KeyValue)]` record with `[Label]` properties to a label/value sheet |
 
 On a sheet: `Cell(reference)`, `Cell(row, column)` (1-based), `Range(reference)`, `Table(params int[] headerRows)` (defaults to row 1), plus `Name`, `Index`, `IsHidden`, `RowCount` and `ColumnCount`.
 
@@ -161,9 +161,9 @@ A sheet that is really a label/value block — labels in the first column, value
 ```csharp
 [Sheet("Summary", Kind = ProtoSheetKind.KeyValue)]
 public sealed record SummarySheet(
-    [property: Column("Month")] string Month,
-    [property: Column("Invoices")] int Count,
-    [property: Column("Total")] decimal Total);
+    [property: Label("Month")] string Month,
+    [property: Label("Invoices")] int Count,
+    [property: Label("Total")] decimal Total);
 
 var summary = Proto.Context.Sheets().Open(response).KeyValueModel<SummarySheet>();
 
@@ -172,7 +172,9 @@ summary.Column(s => s.Total).Should.Be(123.45m);              // the value under
 summary.Column(s => s.Total).ShouldNot.Be(0m);
 ```
 
-`[Column("Total")]` declares the label text, so the string appears once in the model. The value is converted to the property's type like a table column and `Should.Be` compares with the cell assertion's rules. A label the sheet does not carry fails the read naming the labels the sheet has; a label that appears more than once fails naming its rows; `Unique` is rejected because a label already names one value; a `[Column]` with more than one segment is rejected because a label is a single text. An empty value binds `null` for a nullable or `Optional` property and fails the read otherwise. `MatchModel()` reports every violation in one failure, like the table model.
+`[Label("Total")]` declares the label text, so the string appears once in the model. The value is converted to the property's type like a table column and `Should.Be` compares with the cell assertion's rules. A label the sheet does not carry fails the read naming the labels the sheet has; a label that appears more than once fails naming its rows. An empty value binds `null` for a nullable or `Optional` property and fails the read otherwise. `MatchModel()` reports every violation in one failure, like the table model.
+
+`[Column]` on a key-value property is the older spelling: it still reads the label, so an existing model keeps compiling, but it is deprecated there and the analyzer (`PT0003`) reports it - migrate the property to `[Label]`. The table-only knobs are rejected on a key-value model: `Unique` because a label already names one value, and a multi-segment path because a label is a single text; `Min`, `Max`, `Pattern` and `OneOf` apply to the value under the label on either spelling.
 
 `Model<TRow>()` and `KeyValueModel<TModel>()` follow the kind the model declares: reading a model with the other accessor fails naming the one to use.
 
@@ -206,7 +208,7 @@ The capability is name `"Sheets"`, kind `document` (`ProtoCapabilityKinds.Docume
 [RequiresCapability(ProtoCapabilityKinds.Document)]
 ```
 
-`[Sheet]` and `[Column]` are modeling attributes, not skip conditions. See [Skip conditions](../../foundation/skip-conditions.md).
+`[Sheet]` and `[Column]`/`[Label]` are modeling attributes, not skip conditions. See [Skip conditions](../../foundation/skip-conditions.md).
 
 ## Limits
 

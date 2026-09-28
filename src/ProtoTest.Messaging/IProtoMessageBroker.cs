@@ -14,6 +14,15 @@ public sealed record ProtoMessage(
     IReadOnlyDictionary<string, string?>? Headers = null,
     string? ContentType = null)
 {
+    /// <summary>
+    /// The routing key the transport carried the message under, when it has one: the RabbitMQ adapter
+    /// fills it from the delivery and publishes with it, and the in-memory broker keeps it on the
+    /// message it stores. Null when the transport addresses by destination alone - the framework's
+    /// RabbitMQ publish default is the destination itself, and a MassTransit destination is a message
+    /// contract type with no routing key.
+    /// </summary>
+    public string? RoutingKey { get; init; }
+
     /// <summary>The assertions of this message, for example <c>Should.MatchShape(shape)</c>.</summary>
     [JsonIgnore]
     public ProtoMessageAssertions Should => new(this);

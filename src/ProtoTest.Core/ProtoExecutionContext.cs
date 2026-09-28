@@ -98,10 +98,11 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     public MethodInfo TestMethod { get; }
 
     /// <summary>
-    /// Gets the token for this test's lifecycle. The caller that started the test supplies it
-    /// (<c>StartTestAsync(..., cancellationToken)</c>); no runner adapter supplies one yet, so a
-    /// runner-driven test sees <see cref="CancellationToken.None"/>. Setup I/O that can observe it -
-    /// the SQL connection open and transaction begin - passes it to the provider.
+    /// Gets the token for this test's lifecycle: the token a caller passed to
+    /// <c>StartTestAsync(..., cancellationToken)</c>, or the runner's own token where its adapter has
+    /// one (NUnit's test context, the xUnit v2 runner). MSTest, xUnit v3 and TUnit expose no token,
+    /// so those adapters start with <see cref="CancellationToken.None"/>. Setup I/O that can observe
+    /// it - the SQL connection open and transaction begin - passes it to the provider.
     /// </summary>
     public CancellationToken CancellationToken { get; }
 

@@ -207,9 +207,25 @@ public sealed class ProtoSheetModel<TRow> where TRow : notnull
                      .GetProperties(BindingFlags.Public | BindingFlags.Instance)
                      .OrderBy(property => property.MetadataToken))
         {
+            var label = property.GetCustomAttribute<LabelAttribute>();
             if (property.GetCustomAttribute<ColumnAttribute>() is not { } column)
             {
+                if (label is not null)
+                {
+                    throw new SpreadsheetAssertionException(
+                        $"'{property.Name}' on {typeof(TRow).Name} declares [Label(\"{label.Label}\")]; a label " +
+                        $"maps a key-value sheet. Read the model with KeyValueModel<{typeof(TRow).Name}>() and " +
+                        "declare [Sheet(\"...\", Kind = ProtoSheetKind.KeyValue)].");
+                }
+
                 continue;
+            }
+
+            if (label is not null)
+            {
+                throw new SpreadsheetAssertionException(
+                    $"'{property.Name}' on {typeof(TRow).Name} declares both [Column] and " +
+                    $"[Label(\"{label.Label}\")]; a table property carries the [Column] mapping. Remove the [Label].");
             }
 
             var binding = new SheetColumnBinding(property, table.ColumnNumber(column.Path), column);

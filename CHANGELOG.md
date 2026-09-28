@@ -9,6 +9,20 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ### Added
 
+- A messaging destination can name a queue directly: `ProtoDestination.Queue(name)` builds the
+  `queue:{name}` form, `Tap` accepts it and `AwaitAsync` consumes the named queue through an adapter
+  that owns queues. RabbitMQ verifies the queue passively, reads it on the test's own channel and
+  leaves it in place, so a dead-letter queue fed by the product's own bindings is awaited as the queue
+  it is; the consumed delivery carries the queue destination and the transport's routing key. A queue
+  destination is consumed, never declared (`Declare` refuses it and publishing to it fails naming the
+  exchange to publish to instead), and an adapter with no queue model - the in-memory broker, the
+  MassTransit bridge - refuses it with an error naming the transport and the exchange to await instead.
+- `MassTransitEnvelope` carries the request/response fields: `Wrap` takes
+  `MassTransitEnvelopeAddresses` (source, destination and response addresses and the request id) on
+  both the contract and the raw-payload overloads, so a consumer that replies through `RespondAsync`
+  has the response address and request id it needs, and `Unwrap` returns them on
+  `MassTransitEnvelopeContent` (`SourceAddress`, `DestinationAddress`, `ResponseAddress`,
+  `RequestId`).
 - Composite attributes group declarations: a `ProtoCompositeAttribute` declares the attributes it
   composes through `Compose()`, and the framework expands them where attributes are resolved (the
   lifecycle's attribute resolution and the HTTP auth hook's metadata resolution), recursively, with a
@@ -22,8 +36,7 @@ All ProtoTest packages share one version; breaking API changes are called out be
   resolves the application's derived `ProtoTest:Applications:{name}:BaseUrl`, with the in-process server
   declaring honest `server` and `clock` capabilities and the loopback publishing its bound address.
   `AddWorkerHost` nests under an application (`UseEnvironment()` leaves the worker to the environment
-  that runs the application, `UseHost()` hosts it and bridges the test clock; `UseContainer` starts a
-  container image), `AddInProcessWebSocketDevices` follows the application's winner, and
+  that runs the application, `UseHost()` hosts it and bridges the test clock), `AddInProcessWebSocketDevices` follows the application's winner, and
   `UseContainer(PostgresDatabase.Container())` adds a container behind the Docker probe. The new
   `[RequiresTestClock]` gate skips tests that need the test clock while the application runs in its own
   process; `ProtoCapabilityKinds.Clock` is its capability. `IProtoTargetProvider` gained
@@ -36,9 +49,14 @@ All ProtoTest packages share one version; breaking API changes are called out be
   `UseAspireResource<TAppHost>(resource)` on an application publishes the resource's endpoint under its
   `BaseUrl` and on an infrastructure chain publishes the resource's connection string under the
   target's declared keys; `MapConnectionString(resource, key)` (options or builder) fills a key no
-  target declares. The AppHost's chain providers serve when `ProtoTest:Aspire:Enabled` is set and start
-  once when they win any target; a configured provider earlier in the chain wins over it. The plain
-  `AddAspireAppHost` registration keeps the older "starts unless every key is configured" behavior.
+  target declares. The AppHost's providers serve when `ProtoTest:Aspire:Enabled` is set - every
+  resource - or when a resource's own `ProtoTest:Aspire:Resources:{resource}:Enabled` is set, which
+  resolves only that resource's targets, so "AppHost infrastructure with an in-process application"
+  and its reverse are expressible; the providers start once when they win any target, and a configured
+  provider earlier in the chain wins over them. `AddAspireAppHost` is one target with the same
+  selection semantics (see Changed). The run hands the AppHost its configuration, the settings earlier
+  infrastructure published and the options' values as command-line arguments (in that order, options
+  last), so the AppHost's own graph reads the same addresses the suite resolved.
 - `ProtoTest.Testcontainers` adds `UseContainer(container)` and `DockerProbe.IsAvailable()`: a container
   provider holds on the same Docker endpoint Testcontainers uses, so a machine without a runtime skips
   it with a named reason instead of failing the start.
@@ -50,7 +68,9 @@ All ProtoTest packages share one version; breaking API changes are called out be
   `ProtoProviderConditions.Configured`, `.Selected(key)`, `.Available(requirement, probe)` and
   `.Always`; the keys live on the target, and a provider is written against the public
   `IProtoTargetProvider` (name, condition, piece, capabilities) or built with `ProtoTargetProvider`.
-  The run trace records `environment.resolved` per target with the winner and the skipped reasons, and
+  `Selected(key, moreKeys...)` holds when any of the integration-owned selection keys is set, so a
+  provider with a broad switch and a per-target switch serves when either is set. The run trace
+  records `environment.resolved` per target with the winner and the skipped reasons, and
   `environment.provider.skipped` per loser; a skipped provider's piece is never started, owned or
   released.
 - Low-ceremony mode is opt-in per adapter: `[assembly: ProtoTestAutoWrap]` in `ProtoTest.NUnit` runs
@@ -198,6 +218,15 @@ All ProtoTest packages share one version; breaking API changes are called out be
   return `T`, throwing `MessagingAssertionException` naming the destination when the payload is empty,
   JSON `null`, or the path is missing (the shared `JsonPathResolver` subset). `Payload` stays for raw
   inspection.
+- Messaging speaks routing keys: `ProtoMessage.RoutingKey` carries the key a transport delivered the
+  message under, `PublishAsync(exchange, routingKey, payload, …)` sends one, and
+  `AwaitAsync(exchange, routingKey, predicate, …)` matches only a message delivered under it (a
+  timeout names the destination and the key, and the operations record `messaging.routing_key`). The
+  RabbitMQ adapter publishes under the message's key (the destination when none is given), fills
+  `RoutingKey` from the delivery, and binds an awaited key on the destination's tap so a direct
+  exchange delivers it; the in-memory broker keeps the key and filters the same way, and an unmatched
+  message stays for the await that names its key. MassTransit addresses message contract types, so its
+  adapter rejects a routing key with an error naming the destination rather than dropping it.
 - Suite-level skip reasons: `builder.AddCapabilityReason(kind, reason, name?)` states a capability
   gate's reason once, so a suite with many gated tests does not repeat one sentence. A gate's own
   `Reason` still wins, then the suite reason for its name, then the suite reason for its kind, then the
@@ -212,8 +241,8 @@ All ProtoTest packages share one version; breaking API changes are called out be
   taken during a blocked release no longer reads as `Registered`.
 - `StartTestAsync` accepts a `CancellationToken`; it is carried as
   `ProtoExecutionContext.CancellationToken` and `ProtoTest.Sql` passes it to the connection open and
-  transaction begin. No runner adapter supplies one yet; a caller that starts a test explicitly can
-  pass one.
+  transaction begin. A caller that starts a test explicitly can pass one, and the adapter packages pass
+  the runner's own token where the runner exposes one (see Changed).
 - `ProtoTestResult.FromException(Exception)` and `ProtoTestResult.IsCancellation(string)` are the
   shared outcome classifier the runner adapters use; `ProtoTestName.ForRow` composes the row name MSTest
   and TUnit record (`…MethodName[1, admin]`).
@@ -367,18 +396,54 @@ All ProtoTest packages share one version; breaking API changes are called out be
   `summary.Should.MatchModel()` checks every declared label. `ProtoSheetKind`, `ShouldNot` on the model
   facades and the `sheets.label`/`sheets.labels` evidence are additive.
 
+- The runner adapters pass their own cancellation token into the test lifecycle where the runner
+  exposes one, so setup I/O that can observe `ProtoExecutionContext.CancellationToken` — the SQL
+  connection open and transaction begin — is cancelled with the runner: NUnit's test context token
+  (cancelled by `[CancelAfter]`) and the xUnit v2 case runner's `CancellationTokenSource`. MSTest's
+  attribute API, xUnit v3's before/after attribute and TUnit's test executor expose no token, so those
+  tests keep the previous uncancellable behavior. `ProtoTestScope.StartAsync` and
+  `ProtoTestPreparation.StartAsync` gained a token overload for an adapter that has one, and
+  `ProtoHost.StartTestAsync` gained the overload that carries the prepared attribute set, the
+  attachment publisher and the token together.
+- Key-value sheets declare their labels with `[Label("Total")]`: the new mapping attribute on
+  `ProtoTest.Sheets` reads the same label/value block as the older spelling, with `Optional`, `Min`,
+  `Max`, `Pattern` and `OneOf` applying to the value under the label. `[Column]` on a key-value
+  property is deprecated there (see Deprecated), and `ProtoTest.Analyzers` reports it as `PT0003` with
+  a message naming `[Label]`.
+
 ### Deprecated
 
+- `[Column]` on a property of a key-value sheet model
+  (`[Sheet("Summary", Kind = ProtoSheetKind.KeyValue)]`) is deprecated in favor of `[Label("...")]`.
+  The mapping still compiles and still reads the label - obsoletion is per symbol and `ColumnAttribute`
+  is the table mapping - so an existing model keeps working until it migrates; the analyzer rule
+  `PT0003` and the model's own failures name `[Label]`. A key-value model still rejects the table-only
+  knobs (`Unique`, a multi-segment path). The table `[Column]` mapping is unchanged.
 - The skip-key registration is obsolete: `AddInfrastructure(piece, keys)` keeps its all-configured skip
   rule for 1.x and `AddInfrastructureAlways` keeps the always-start opt-out, while
   `AddInfrastructure(name, chain, keys)` with `UseConfigured()` and `Use(provider)`/`UseContainer(...)`
   providers is the replacement. The samples, tests and docs moved to the chain; the framework's own
-  retained legacy registrations (the top-level worker host, the loopback application and the Aspire
-  AppHost registration) keep the old surface behind a scoped `CS0618` suppression that names the
-  replacement.
+  retained legacy registrations (the top-level worker host and the loopback application) keep the old
+  surface behind a scoped `CS0618` suppression that names the replacement - the top-level worker host,
+  the loopback application and the Aspire AppHost registration are the retained sites.
 
 ### Changed
 
+- `AddAspireAppHost` follows one AppHost selection semantics with the `UseAspireResource` providers:
+  the AppHost starts only when `ProtoTest:Aspire:Enabled` or one of its resources' own
+  `ProtoTest:Aspire:Resources:{resource}:Enabled` is set, and only when at least one key it fills is
+  not already configured - a fully configured environment still steps it aside without starting it. A
+  suite that registers the AppHost without a selection key no longer starts it and keeps resolving its
+  targets through its other providers. The AppHost publishes only the selected resources' keys, and
+  its `aspire` capability is declared only while it serves, so a capability-gated test skips instead
+  of starting a topology it did not ask for.
+- `AddAspNetCoreServer<TProgram>(name)` compares the program on a repeated name: the same `TProgram`
+  under one name stays a no-op, and a different one throws naming both programs and the name instead of
+  silently serving the first. The application overload's documented repeat semantics are unchanged, and
+  `AddWorkerHost` already behaved this way.
+- The Devices README and docs Limits no longer mention `device.replay`: frame-script replay is a
+  separate feature design, not part of the shipped device slice (recorded decision), and a Limits
+  bullet about it advertised work that does not exist.
 - The new-in-1.1 `ProtoTest.MassTransit` package is `ProtoTest.Messaging.MassTransit`, the messaging
   family's nesting (`ProtoTest.Messaging`, `ProtoTest.Messaging.RabbitMq`). The package was never
   released, so no compatibility shim ships; the public type names (`MassTransitEnvelope`,
@@ -439,6 +504,9 @@ All ProtoTest packages share one version; breaking API changes are called out be
 - An Aspire AppHost that starts for a partly configured multi-resource topology no longer masks the
   configured addresses: it publishes only the keys configuration does not already fill, and its
   evidence marks `aspire.resource.{resource}.address_source = configuration` for the rest.
+- A suite using `ProtoTest.Aspire` and `ProtoTest.WireMock` together restores one Humanizer line:
+  `ProtoTest.WireMock` pins the Humanizer metapackage at 3.0.10 - the line Aspire.Hosting resolves for
+  `Humanizer.Core` - so its Handlebars helpers' 2.14.1 satellite set no longer raises `NU1608`.
 
 - A browser download is named binary content: `WebDownload` implements `IProtoBinaryContent`, so a
   downloaded file feeds anything consuming named bytes (for example `ProtoSheets.Open`) in one line

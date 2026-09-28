@@ -25,7 +25,7 @@ public sealed class ProtoKeyValueEntry<TValue>
         _context = context;
     }
 
-    /// <summary>The label the sheet carries, as declared by the property's <c>[Column("...")]</c>.</summary>
+    /// <summary>The label the sheet carries, as declared by the property's <c>[Label("...")]</c>.</summary>
     public string Label { get; }
 
     /// <summary>The cell's value converted to the model's property type; null for an empty cell.</summary>

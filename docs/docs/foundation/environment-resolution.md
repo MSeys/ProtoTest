@@ -30,7 +30,7 @@ resolved. The canonical four live in `ProtoProviderConditions`:
 | Condition | Holds when | Example |
 | --- | --- | --- |
 | `Configured` | every key the **target** declares has a configured value | `.UseConfigured()` |
-| `Selected(key)` | the integration-owned selection key is set | `.Use(new ProtoTargetProvider("grid", gridPiece, ProtoProviderConditions.Selected("Grid:Enabled")))` |
+| `Selected(key)` / `Selected(key, moreKeys...)` | any of the integration-owned selection keys is set | `.Use(new ProtoTargetProvider("grid", gridPiece, ProtoProviderConditions.Selected("Grid:Enabled")))` |
 | `Available(requirement, probe)` | the runtime probe returns true | `ProtoProviderConditions.Available("Docker is available", DockerIsRunning)` |
 | `Always` | no condition; the fallback | `new ProtoTargetProvider("in-process", piece)` |
 
@@ -138,7 +138,7 @@ capability as it always did.
 | ProtoTest.AspNetCore | `UseInProcess<TProgram>()` | always; the fallback of an application chain |
 | ProtoTest.AspNetCore | `UseLoopback(createApp)` | always; publishes the loopback address |
 | ProtoTest.Testcontainers | `UseContainer(container)` | `DockerProbe.IsAvailable()` (the same endpoint Testcontainers uses) |
-| ProtoTest.Aspire | `UseAspireResource<TAppHost>(resource)` | `ProtoTest:Aspire:Enabled` is set - the integration-owned selection key |
+| ProtoTest.Aspire | `UseAspireResource<TAppHost>(resource)` | `ProtoTest:Aspire:Enabled`, or the resource's own `ProtoTest:Aspire:Resources:{resource}:Enabled`, is set - the integration-owned selection keys |
 | ProtoTest.Aspire | `MapConnectionString(resource, key)` | a registered AppHost publishes the resource's connection string under `key` |
 | ProtoTest.Hosting | `UseEnvironment()` / `UseHost()` | the application is served elsewhere / always |
 
@@ -146,7 +146,9 @@ capability as it always did.
 derived `BaseUrl`; on an infrastructure chain it publishes the resource's connection string under every
 key the target declares. `MapConnectionString(resource, key)` is the explicit form for a key no target
 declares. A configured provider earlier in the chain always wins, so the same composition runs against
-an existing environment without starting anything.
+an existing environment without starting anything. The global selection key selects every AppHost
+provider; a resource's own key selects only its targets, which is how "AppHost infrastructure with an
+in-process application" and its reverse are expressed.
 
 ## The resolution record
 
@@ -183,9 +185,13 @@ the probe did not meet.
   configured value does.
 - **The old skip-key registration is obsolete.** `AddInfrastructure(piece, keys)` keeps its
   all-configured skip rule for 1.x and `AddInfrastructureAlways` keeps its always-start opt-out; the
-  chain overload on this page is the replacement. `AddAspNetCoreServer`, `AddLoopbackApplication`,
-  `AddInProcessWebSocketDevices` and `AddAspireAppHost` keep working unchanged; the providers on this
-  page are the chain-shaped replacements and additive. `AddAspireAppHost` registers the AppHost for the
-  whole run as before; its chain providers serve when `ProtoTest:Aspire:Enabled` selects them, so a
-  non-chain suite that wants the AppHost still starts it by registering it, and a chain suite sets the
-  selection key.
+  chain overload on this page is the replacement. `AddAspNetCoreServer`, `AddLoopbackApplication` and
+  `AddInProcessWebSocketDevices` keep working unchanged; the providers on this page are the
+  chain-shaped replacements and additive. `AddAspireAppHost` registers the AppHost as a target with
+  the same selection semantics as `UseAspireResource`: the configured step-aside first, the AppHost
+  provider when `ProtoTest:Aspire:Enabled` or a resource's own
+  `ProtoTest:Aspire:Resources:{resource}:Enabled` is set, and a fallback otherwise, so a suite that
+  registers the AppHost without a selection key never starts it. The AppHost publishes only the
+  selected resources the environment does not already configure. The run hands the AppHost its
+  configuration and the settings earlier infrastructure published, so a mixed composition's addresses
+  reach the AppHost's own graph.

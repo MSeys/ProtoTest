@@ -129,7 +129,7 @@ Remember that **all test hooks run before any [attribute](./attributes.md)**. Se
 ## Limits
 
 - Test hooks are registered as singletons and resolved from the root container; per-test state must come from `context.Services` or the context itself.
-- Test hooks receive no token parameter: a caller that passed one to `StartTestAsync` sees it as `context.CancellationToken`, while a runner-driven test runs without one, matching `IProtoClientInitializer`'s "setup is not cancellable by a runner" contract.
+- Test hooks receive no token parameter: they read `context.CancellationToken`, which carries the caller's token or the runner's own where its adapter has one (NUnit's test context, the xUnit v2 runner). MSTest, xUnit v3 and TUnit expose no token through their extension points, so those hooks see `CancellationToken.None`.
 - `AddTestHook` and `AddRunHook` do **not** dedupe: every call adds another registration. Register each hook once.
 - Run hooks get no context — there is no test yet — and `BeforeRunAsync` failures roll back only the hooks that already started, in reverse.
 - A teardown failure in a test hook is recorded as an `Error` finding and does not replace the test's outcome, but it still surfaces to the runner.

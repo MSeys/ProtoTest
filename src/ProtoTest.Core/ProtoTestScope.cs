@@ -37,10 +37,23 @@ public sealed class ProtoTestScope : IAsyncDisposable
         ProtoTestPreparation preparation,
         ProtoHost host,
         IProtoTestAttachmentPublisher? attachmentPublisher = null)
+        => StartAsync(preparation, host, attachmentPublisher, CancellationToken.None);
+
+    /// <summary>
+    /// Starts the test lifecycle with the runner's cancellation token, so setup I/O that can observe
+    /// cancellation - the SQL connection open and transaction begin - does. A runner whose extension
+    /// point exposes no token passes <see cref="CancellationToken.None"/> and keeps the previous
+    /// behavior.
+    /// </summary>
+    public static Task<ProtoTestScope> StartAsync(
+        ProtoTestPreparation preparation,
+        ProtoHost host,
+        IProtoTestAttachmentPublisher? attachmentPublisher,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(preparation);
         ArgumentNullException.ThrowIfNull(host);
-        return CompleteStartAsync(host, preparation.StartAsync(host, attachmentPublisher));
+        return CompleteStartAsync(host, preparation.StartAsync(host, attachmentPublisher, cancellationToken));
     }
 
     private static async Task<ProtoTestScope> CompleteStartAsync(

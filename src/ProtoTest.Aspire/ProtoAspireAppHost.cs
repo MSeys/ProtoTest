@@ -11,9 +11,12 @@ using ProtoTest.Core;
 /// One Aspire AppHost the run owns: the host starts it after the infrastructure registered before
 /// it, each declared publish mapping fills the key it was registered under - an application's
 /// <c>BaseUrl</c> for an endpoint, the target's declared key for a connection string - and the run
-/// stops it after the reports are written. Register it with <c>AddAspireAppHost</c> or reference it
-/// from a target's providers with <c>UseAspireResource</c>; a configured key is never masked, so a
-/// run pointed at an existing environment keeps that environment's values.
+/// stops it after the reports are written. Only the resources the run selected are published: the
+/// global key selects every resource, a resource's own key selects it, and a key configuration
+/// already fills is never masked. The run's configuration and the settings earlier infrastructure
+/// published travel to the AppHost as command-line arguments, so its own graph can read the same
+/// addresses the suite resolved. Register it with <c>AddAspireAppHost</c> or reference it from a
+/// target's providers with <c>UseAspireResource</c>.
 /// </summary>
 /// <typeparam name="TEntryPoint">A public type in the AppHost assembly; the testing host runs the
 /// assembly's entry point in-process.</typeparam>
@@ -186,6 +189,8 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
 
     IReadOnlyList<string> IProtoAspireAppHost.Resources => Resources;
 
+    IReadOnlyList<string> IProtoAspireAppHost.PublishKeys => PublishKeys;
+
     void IProtoAspireAppHost.AddPublish(string resource, string key, ProtoAspirePublishKind kind, bool replaceEndpoints)
         => AddPublish(resource, key, kind, replaceEndpoints);
 
@@ -299,7 +304,7 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
         try
         {
             var testing = await DistributedApplicationTestingBuilder
-                .CreateAsync<TEntryPoint>(ComposeArgs(), cancellationToken)
+                .CreateAsync<TEntryPoint>(ComposeArgs(context), cancellationToken)
                 .ConfigureAwait(false);
             application = await testing.BuildAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -344,7 +349,7 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
             {
                 _application = application;
                 _settings = settings;
-                _startupEvidence = BuildEvidence(settings);
+                _startupEvidence = BuildEvidence(settings, context.Configuration);
                 Volatile.Write(ref _started, 1);
                 return;
             }
@@ -355,9 +360,10 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
     }
 
     /// <summary>
-    /// Resolves every publish mapping whose key the environment does not already fill: a configured key
-    /// wins over the AppHost's value (published settings take precedence at use time), so publishing it
-    /// would mask the environment's value. The AppHost still starts for the mappings that need a value.
+    /// Resolves every publish mapping the run selected and the environment does not already fill: a
+    /// configured key wins over the AppHost's value (published settings take precedence at use time),
+    /// and an unselected resource is another provider's target, so publishing it would mask that
+    /// provider. The AppHost still starts for the mappings that need a value.
     /// </summary>
     private async Task<Dictionary<string, string>> ResolveSettingsAsync(
         DistributedApplication application,
@@ -368,7 +374,8 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
         var settings = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var publish in _publishes)
         {
-            if (!string.IsNullOrWhiteSpace(configuration[publish.Key]))
+            if (!ProtoAspireOptions.IsSelected(configuration, publish.Resource)
+                || !string.IsNullOrWhiteSpace(configuration[publish.Key]))
             {
                 continue;
             }
@@ -424,7 +431,7 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
         return connectionString;
     }
 
-    private Dictionary<string, string?> BuildEvidence(Dictionary<string, string> settings)
+    private Dictionary<string, string?> BuildEvidence(Dictionary<string, string> settings, IConfiguration configuration)
     {
         var evidence = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
@@ -441,6 +448,11 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
             {
                 evidence[$"aspire.resource.{publish.Resource}.{publish.KindTag}"] = value;
             }
+            else if (!ProtoAspireOptions.IsSelected(configuration, publish.Resource))
+            {
+                // The resource belongs to another provider in this run, so the AppHost did not fill it.
+                evidence[$"aspire.resource.{publish.Resource}.{publish.KindTag}_source"] = "not selected";
+            }
             else
             {
                 // A configured key wins over the AppHost's value, so this run published none.
@@ -451,11 +463,46 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
         return evidence;
     }
 
-    private string[] ComposeArgs()
-        => _options.Values
+    private string[] ComposeArgs(ProtoInfrastructureContext context)
+        => [.. Merge(context.Configuration, context.Settings.Values, _options.Values)
             .Where(pair => pair.Value is not null)
-            .Select(pair => $"--{pair.Key}={pair.Value}")
-            .ToArray();
+            .Select(pair => $"--{pair.Key}={pair.Value}")];
+
+    /// <summary>
+    /// Builds the overlay the run hands the AppHost's entry point: the suite's configuration first,
+    /// the settings earlier infrastructure published second, and this AppHost's own option values
+    /// last, so each layer wins over the one before it - the worker host's order. The AppHost reads
+    /// the overlay as command-line configuration, and a mapping whose key configuration already fills
+    /// still loses to that configured value at use time. A key with a null value carries no argument,
+    /// so the AppHost's own sources answer for it.
+    /// </summary>
+    internal static Dictionary<string, string?> Merge(
+        IConfiguration configuration,
+        IReadOnlyDictionary<string, string> settings,
+        IReadOnlyDictionary<string, string?> options)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var merged = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var (key, value) in configuration.AsEnumerable())
+        {
+            merged[key] = value;
+        }
+
+        foreach (var (key, value) in settings)
+        {
+            merged[key] = value;
+        }
+
+        foreach (var (key, value) in options)
+        {
+            merged[key] = value;
+        }
+
+        return merged;
+    }
 
     private static Exception MapStartFailure(string entryPoint, Exception exception)
     {

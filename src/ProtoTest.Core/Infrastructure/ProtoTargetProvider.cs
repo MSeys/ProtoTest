@@ -159,7 +159,33 @@ public static class ProtoProviderConditions
     public static IProtoProviderCondition Selected(string key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        return new ProtoSelectedCondition(key);
+        return new ProtoSelectedCondition([key]);
+    }
+
+    /// <summary>
+    /// Holds when any of the integration-owned selection keys has a value, so a provider with a broad
+    /// switch and a per-target switch serves when either is set. Every key is a convention the run
+    /// script sets as an environment variable, never a parameter of the provider itself.
+    /// </summary>
+    public static IProtoProviderCondition Selected(string key, params string[] moreKeys)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        if (moreKeys is null || moreKeys.Length == 0)
+        {
+            return new ProtoSelectedCondition([key]);
+        }
+
+        var keys = new List<string>(moreKeys.Length + 1) { key };
+        foreach (var moreKey in moreKeys)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(moreKey);
+            if (!keys.Contains(moreKey, StringComparer.Ordinal))
+            {
+                keys.Add(moreKey);
+            }
+        }
+
+        return new ProtoSelectedCondition(keys);
     }
 
     /// <summary>
@@ -203,13 +229,15 @@ public static class ProtoProviderConditions
         }
     }
 
-    private sealed class ProtoSelectedCondition(string key) : IProtoProviderCondition
+    private sealed class ProtoSelectedCondition(IReadOnlyList<string> keys) : IProtoProviderCondition
     {
         public bool IsSatisfied(ProtoProviderConditionContext context)
-            => ProtoEnvironment.HasValue(context.Configuration, key);
+            => keys.Any(key => ProtoEnvironment.HasValue(context.Configuration, key));
 
         public string Describe(ProtoProviderConditionContext context)
-            => $"The selection key '{key}' must be set";
+            => keys.Count == 1
+                ? $"The selection key '{keys[0]}' must be set"
+                : $"One of the selection keys must be set: {string.Join(", ", keys.Select(key => $"'{key}'"))}";
     }
 
     private sealed class ProtoAvailableCondition(string requirement, Func<bool> probe) : IProtoProviderCondition

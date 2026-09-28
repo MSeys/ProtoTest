@@ -49,4 +49,20 @@ public sealed class VocabularyTests
             Assert.That(ProtoTestVocabulary.PlainTestAttributes, Does.Not.Contain("TUnit.Core.TestAttribute"));
         }
     }
+
+    [Test]
+    public void SheetVocabulary_ShouldPinTheShippedAttributeNames()
+    {
+        var sheetAttribute = ProtoTestVocabulary.SheetAttribute;
+        var columnAttribute = ProtoTestVocabulary.ColumnAttribute;
+        var sheetKindType = ProtoTestVocabulary.SheetKindType;
+        var sheetKindKeyValue = ProtoTestVocabulary.SheetKindKeyValue;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(sheetAttribute, Is.EqualTo(typeof(ProtoTest.Sheets.SheetAttribute).FullName));
+            Assert.That(columnAttribute, Is.EqualTo(typeof(ProtoTest.Sheets.ColumnAttribute).FullName));
+            Assert.That(sheetKindType, Is.EqualTo(typeof(ProtoTest.Sheets.ProtoSheetKind).FullName));
+            Assert.That(sheetKindKeyValue, Is.EqualTo(nameof(ProtoTest.Sheets.ProtoSheetKind.KeyValue)));
+        }
+    }
 }

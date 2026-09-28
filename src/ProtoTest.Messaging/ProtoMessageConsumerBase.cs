@@ -76,6 +76,19 @@ public abstract class ProtoMessageConsumerBase : IProtoMessageConsumer
     }
 
     /// <summary>
+    /// Composes <paramref name="predicate"/> with an ordinal match of
+    /// <see cref="ProtoMessage.RoutingKey"/> against <paramref name="routingKey"/>; a null routing key
+    /// returns the predicate unchanged. An adapter whose transport has no routing-key binding supplies
+    /// the composed predicate through the base's await, so routing-key matching is one rule beside the
+    /// await machinery rather than one per adapter.
+    /// </summary>
+    protected static Func<ProtoMessage, bool> MatchRoutingKey(Func<ProtoMessage, bool> predicate, string? routingKey)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        return ProtoMessageRoutingKeys.Filter(predicate, routingKey);
+    }
+
+    /// <summary>
     /// Re-baselines the queue: <paramref name="position"/> replaces the current position and the
     /// consumed set is dropped. A consumer whose source is replaced mid-run resets before it scans the
     /// new source, whose positions are unrelated to the old one's.

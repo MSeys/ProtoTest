@@ -1,20 +1,50 @@
 namespace ProtoTest.Aspire;
 
+using Microsoft.Extensions.Configuration;
+
 /// <summary>
 /// Choices for one Aspire AppHost a suite composes: which endpoint of each resource becomes its
 /// application target, which application name a resource is published under, and extra settings the
-/// AppHost reads. Values set here travel to the AppHost as command-line arguments; the AppHost
-/// otherwise reads its own sources.
+/// AppHost reads. Values set here travel to the AppHost as command-line arguments on top of the run's
+/// configuration and the settings earlier infrastructure published, so they win over both; the
+/// AppHost otherwise reads its own sources.
 /// </summary>
 public sealed class ProtoAspireOptions
 {
     /// <summary>
-    /// The selection key that starts the chain's AppHost providers: a suite sets
-    /// <c>ProtoTest:Aspire:Enabled=true</c> (an environment variable in a run script) to resolve its
-    /// application and infrastructure targets through the AppHost. A configured provider earlier in a
-    /// chain wins regardless; nothing but the AppHost reads this key.
+    /// The selection key that starts the AppHost: a suite sets <c>ProtoTest:Aspire:Enabled=true</c>
+    /// (an environment variable in a run script) to resolve its application and infrastructure targets
+    /// through the AppHost. A configured provider earlier in a chain wins regardless; nothing but the
+    /// AppHost reads this key. To select only one resource - and start the AppHost only for it - set
+    /// its key from <see cref="ResourceSelectionKey"/> instead.
     /// </summary>
     public const string SelectionKey = "ProtoTest:Aspire:Enabled";
+
+    /// <summary>
+    /// Gets the selection key that starts the AppHost for one resource, for example
+    /// <c>ProtoTest:Aspire:Resources:postgres:Enabled</c> (the environment form is
+    /// <c>ProtoTest__Aspire__Resources__postgres__Enabled=true</c>). Set it to resolve exactly the
+    /// targets that resource serves through the AppHost while the run's other targets stay on their
+    /// other providers, and the AppHost publishes only that resource's keys - an in-process
+    /// application with AppHost infrastructure, or the reverse. The resource name is the identity the
+    /// AppHost registered it under; <see cref="SelectionKey"/> still selects every resource at once.
+    /// </summary>
+    public static string ResourceSelectionKey(string resource)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(resource);
+        return $"ProtoTest:Aspire:Resources:{resource}:Enabled";
+    }
+
+    /// <summary>
+    /// Whether the run selected the AppHost for one resource: the global key or the resource's own
+    /// key has a value. The AppHost piece reads the same two keys its providers' selection condition
+    /// holds on, so what it publishes cannot disagree with what the chain resolved.
+    /// </summary>
+    internal static bool IsSelected(IConfiguration configuration, string resource)
+        => HasValue(configuration, SelectionKey) || HasValue(configuration, ResourceSelectionKey(resource));
+
+    private static bool HasValue(IConfiguration configuration, string key)
+        => !string.IsNullOrWhiteSpace(configuration[key]);
 
     private readonly Dictionary<string, string?> _values = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _applications = new(StringComparer.Ordinal);

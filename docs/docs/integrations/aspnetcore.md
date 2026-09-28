@@ -62,7 +62,7 @@ public static IProtoHostBuilder AddAspNetCoreServer<TProgram>(
     where TProgram : class;
 ```
 
-Both overloads register a `server` capability named `ASP.NET Core` and expose the application's client under the server name — `"{name}:Factory"` for the `WebApplicationFactory<TProgram>` and `{name}` for the `HttpClient`. Registration is per server name: the host overload keeps the first registration for a name and ignores a repeat, while the application overload has no whole-call guard and lets the client initializer pick the first server that initializes. The application overload also registers the application's default transport, so an HTTP client with no configured base URL reuses this server. When the environment configures the application's address, both the server and its capability step aside — see [Real server or in-process?](#real-server-or-in-process).
+Both overloads register a `server` capability named `ASP.NET Core` and expose the application's client under the server name — `"{name}:Factory"` for the `WebApplicationFactory<TProgram>` and `{name}` for the `HttpClient`. Registration is per server name: the host overload keeps the first registration for a name — the same `TProgram` under one name is a no-op, a different one throws naming both programs — while the application overload has no whole-call guard and lets the client initializer pick the first server that initializes. The application overload also registers the application's default transport, so an HTTP client with no configured base URL reuses this server. When the environment configures the application's address, both the server and its capability step aside — see [Real server or in-process?](#real-server-or-in-process).
 
 ## One application, or one per test
 
@@ -366,7 +366,7 @@ asserting a time the application never saw.
   declares no `server` and no `clock`, and `[RequiresTestClock]`/`[ReplaceService]` skip for it.
 - `PerRun` shares application state across tests; isolate at the data level (the sample uses a tenant per test id). `PerTest` pays the startup cost per test.
 - With `BaseUrl` configured there is no in-process server, service container, page inventory or `configureWebHost` callback in play — `configureWebHost` customizes a server that never starts. Tests that need them skip through `[RequiresInProcess]` or a capability condition. A containerized or loopback application is likewise not the test host.
-- The host overload allows one registration per server name per builder; the application overload has no whole-call guard, and repeated calls can register several initializers, with the first successful one winning.
+- The host overload allows one registration per server name per builder: repeating a name with the same `TProgram` is a no-op, and registering a different one under it throws instead of silently serving the first program; the application overload has no whole-call guard, and repeated calls can register several initializers, with the first successful one winning.
 - `ServerFactory`/`ApplicationServices` require a registration under the resolved name; `ApplicationServices` throws naming the expected call when none is found.
 - In-process page inventory is limited to concrete, explicitly-GET, page-like endpoints; parameterized and catch-all routes and API-shaped JSON routes are excluded.
 - The inventory is run-level and not repeated after it produces results; a published application never contributes it.

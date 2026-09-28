@@ -30,6 +30,15 @@ internal sealed class MassTransitMessageBroker<TProgram>(string application) : I
     public async ValueTask PublishAsync(ProtoMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
+        if (message.RoutingKey is not null)
+        {
+            throw new InvalidOperationException(
+                $"Cannot publish to '{message.Destination}' with routing key '{message.RoutingKey}' through " +
+                "MassTransit: a MassTransit destination is a message contract type, and the bus owns its " +
+                "transport's routing. Publish without a routing key, or use a broker adapter whose transport " +
+                "carries one (the RabbitMQ adapter).");
+        }
+
         var harness = Harness();
         var contractType = MassTransitMessages.Resolve(message.Destination, typeof(TProgram).Assembly);
         if (contractType.IsAbstract || contractType.IsInterface || contractType.IsGenericTypeDefinition)

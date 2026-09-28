@@ -7,11 +7,14 @@ using ProtoTest.Core;
 using ProtoTest.Messaging;
 
 /// <summary>
-/// The RabbitMQ adapter. Publishing sends to the exchange named like the destination, so the app's
-/// topology decides routing. Each test owns a consumer with its own channel and per-test tap queues,
-/// deleted when the test ends, so parallel tests may share a destination without stealing each other's
-/// messages. The connection is shared by the run and is thread-safe; channels are not, so each side
-/// serializes its own. Every broker call is asynchronous: the client's 7.x API has no synchronous one.
+/// The RabbitMQ adapter. Publishing sends to the exchange named like the destination and under the
+/// message's routing key (the destination itself when none is given), so the app's topology decides
+/// routing. Each test owns a consumer with its own channel: an exchange destination gets a per-test
+/// tap queue deleted when the test ends, and a queue destination
+/// (<see cref="ProtoDestination.Queue"/>) is consumed as it exists and left as it is, so parallel
+/// tests may share an exchange destination without stealing each other's messages. The connection is
+/// shared by the run and is thread-safe; channels are not, so each side serializes its own. Every
+/// broker call is asynchronous: the client's 7.x API has no synchronous one.
 /// </summary>
 internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IAsyncDisposable
 {
@@ -63,6 +66,14 @@ internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IAsyncDisposa
             await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             foreach (var destination in pending)
             {
+                if (ProtoDestination.IsQueue(destination))
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot declare '{destination}': a queue destination is consumed, not declared. " +
+                        "The component that owns the queue creates it; remove it from the declared " +
+                        "destinations and await it with a queue destination instead.");
+                }
+
                 try
                 {
                     await channel.ExchangeDeclareAsync(
@@ -93,6 +104,14 @@ internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IAsyncDisposa
     public async ValueTask PublishAsync(ProtoMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
+        if (ProtoDestination.IsQueue(message.Destination))
+        {
+            throw new InvalidOperationException(
+                $"Cannot publish to '{message.Destination}': the destination addresses a queue, and " +
+                "messaging publishes to exchanges. Publish to the exchange that feeds the queue, or " +
+                "consume the queue with AwaitAsync.");
+        }
+
         var body = Encoding.UTF8.GetBytes(message.Payload ?? string.Empty);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -122,7 +141,7 @@ internal sealed class RabbitMqMessageBroker : IProtoMessageBroker, IAsyncDisposa
 
             await channel.BasicPublishAsync(
                 exchange: message.Destination,
-                routingKey: message.Destination,
+                routingKey: message.RoutingKey ?? message.Destination,
                 mandatory: false,
                 basicProperties: properties,
                 body: body,

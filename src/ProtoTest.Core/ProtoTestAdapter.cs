@@ -22,6 +22,17 @@ public sealed record ProtoTestPreparation(
         ProtoHost host,
         IProtoTestAttachmentPublisher? attachmentPublisher = null)
         => host.StartTestAsync(TestName, Method, Attributes, attachmentPublisher);
+
+    /// <summary>
+    /// Starts the test lifecycle with the runner's cancellation token, so setup I/O that can observe
+    /// cancellation does; a runner whose extension point exposes no token passes
+    /// <see cref="CancellationToken.None"/>.
+    /// </summary>
+    public Task<ProtoExecutionContext> StartAsync(
+        ProtoHost host,
+        IProtoTestAttachmentPublisher? attachmentPublisher,
+        CancellationToken cancellationToken)
+        => host.StartTestAsync(TestName, Method, Attributes, attachmentPublisher, cancellationToken);
 }
 
 /// <summary>

@@ -31,6 +31,7 @@ public sealed class AspireProviderChainTests
         var entries = host.Trace.Snapshot().Entries!;
         var resolved = entries.Single(entry => entry.Kind == ProtoTargetTrace.Resolved);
         var skipped = entries.Where(entry => entry.Kind == ProtoTargetTrace.ProviderSkipped).ToArray();
+        var appHostSkip = skipped.Single(entry => entry.Attributes["environment.provider"] == "aspire:api");
         using (Assert.EnterMultipleScope())
         {
             Assert.That(resolved.Attributes["environment.provider"], Is.EqualTo("fallback"));
@@ -38,10 +39,13 @@ public sealed class AspireProviderChainTests
                 skipped.Select(entry => entry.Attributes["environment.provider"]),
                 Is.EquivalentTo(new[] { "configured", "aspire:api" }));
             Assert.That(
-                skipped.Single(entry => entry.Attributes["environment.provider"] == "aspire:api")
-                    .Attributes["environment.reason"],
-                Does.Contain($"selection key '{ProtoAspireOptions.SelectionKey}'"),
-                "the AppHost names the selection key it needs");
+                appHostSkip.Attributes["environment.reason"],
+                Does.Contain("One of the selection keys must be set"),
+                "the AppHost names the selection keys it needs");
+            Assert.That(appHostSkip.Attributes["environment.reason"], Does.Contain(ProtoAspireOptions.SelectionKey));
+            Assert.That(
+                appHostSkip.Attributes["environment.reason"],
+                Does.Contain(ProtoAspireOptions.ResourceSelectionKey("api")));
             Assert.That(
                 host.HasCapability(ProtoCapabilityKinds.Aspire, AppHostAssembly),
                 Is.False,
@@ -100,6 +104,140 @@ public sealed class AspireProviderChainTests
     }
 
     [Test]
+    public async Task GlobalSelection_ShouldSelectEveryAppHostProvider()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                [ProtoAspireOptions.SelectionKey] = "true"
+            }));
+        builder.AddAspireAppHost<TestAppHostAnchor>(
+            options => options
+                .Set("Aspire:Test:ConnectionString", "true")
+                .MapConnectionString("db", "ConnectionStrings:Store"),
+            "api",
+            "db");
+        builder.AddApplication("Api", app =>
+        {
+            app.UseConfigured();
+            app.UseAspireResource<TestAppHostAnchor>("api");
+        });
+        builder.AddInfrastructure(
+            "Store",
+            chain => chain
+                .UseConfigured()
+                .UseAspireResource<TestAppHostAnchor>("db"),
+            "ConnectionStrings:Store");
+        await using var host = builder.Build();
+
+        try
+        {
+            await host.StartAsync();
+        }
+        catch (ProtoAspireUnavailableException exception)
+        {
+            Assert.Ignore($"The Aspire orchestration runtime is unavailable: {exception.Message}");
+            return;
+        }
+
+        await host.StartTestAsync("global selection", "00001", TestMethods.Placeholder);
+        var address = Proto.Context.AspireResource("api");
+        var store = Proto.Context.AspireResource("db");
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        var resolved = host.Trace.Snapshot().Entries!
+            .Where(entry => entry.Kind == ProtoTargetTrace.Resolved)
+            .ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                resolved.Single(entry => entry.Attributes["environment.target"] == "Api")
+                    .Attributes["environment.provider"],
+                Is.EqualTo("aspire:api"),
+                "the global key selects the application's AppHost provider");
+            Assert.That(
+                resolved.Single(entry => entry.Attributes["environment.target"] == "Store")
+                    .Attributes["environment.provider"],
+                Is.EqualTo("aspire:db"),
+                "the global key selects the infrastructure target's AppHost provider");
+            Assert.That(address, Does.StartWith("http://"));
+            Assert.That(store, Is.EqualTo("Host=apphost"));
+        }
+    }
+
+    [Test]
+    public async Task ResourceSelection_ShouldServeOnlyThatResourcesTargets()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                [ProtoAspireOptions.ResourceSelectionKey("db")] = "true"
+            }));
+        builder.AddAspireAppHost<TestAppHostAnchor>(
+            options => options
+                .Set("Aspire:Test:ConnectionString", "true")
+                .MapConnectionString("db", "ConnectionStrings:Store"),
+            "api",
+            "db");
+        builder.AddApplication("Api", app =>
+        {
+            app.UseConfigured();
+            app.UseAspireResource<TestAppHostAnchor>("api");
+            app.Providers.Use(new ProtoTargetProvider("fallback"));
+        });
+        builder.AddInfrastructure(
+            "Store",
+            chain => chain
+                .UseConfigured()
+                .UseAspireResource<TestAppHostAnchor>("db"),
+            "ConnectionStrings:Store");
+        await using var host = builder.Build();
+
+        try
+        {
+            await host.StartAsync();
+        }
+        catch (ProtoAspireUnavailableException exception)
+        {
+            Assert.Ignore($"The Aspire orchestration runtime is unavailable: {exception.Message}");
+            return;
+        }
+
+        await host.StartTestAsync("resource selection", "00001", TestMethods.Placeholder);
+        var store = Proto.Context.AspireResource("db");
+        var settings = Proto.Context.TryService<ProtoInfrastructureSettings>()!.Values;
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        var resolved = host.Trace.Snapshot().Entries!
+            .Where(entry => entry.Kind == ProtoTargetTrace.Resolved)
+            .ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                resolved.Single(entry => entry.Attributes["environment.target"] == "Api")
+                    .Attributes["environment.provider"],
+                Is.EqualTo("fallback"),
+                "the application target stays on its fallback while only the resource's key is set");
+            Assert.That(
+                resolved.Single(entry => entry.Attributes["environment.target"] == "Store")
+                    .Attributes["environment.provider"],
+                Is.EqualTo("aspire:db"),
+                "the resource's own key selects its infrastructure target");
+            Assert.That(store, Is.EqualTo("Host=apphost"));
+            Assert.That(
+                settings.ContainsKey("ProtoTest:Applications:api:BaseUrl"),
+                Is.False,
+                "the AppHost publishes only the selected resource's keys");
+        }
+    }
+
+    [Test]
     public async Task UseAspireResource_WhenSelected_ShouldPublishTheAddressAndServeThroughTheChain()
     {
         var builder = new ProtoHostBuilder();
@@ -149,6 +287,11 @@ public sealed class AspireProviderChainTests
     {
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                [ProtoAspireOptions.SelectionKey] = "true"
+            }));
         builder.AddAspireAppHost<TestAppHostAnchor>(
             options => options.Set("Aspire:Test:ConnectionString", "true"),
             "api",

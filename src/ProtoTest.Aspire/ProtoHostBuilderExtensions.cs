@@ -15,9 +15,15 @@ public static class ProtoHostBuilderExtensions
     /// application's clients and the readiness probe resolve that one address.
     /// </summary>
     /// <remarks>
-    /// Register the AppHost before the targets whose providers reference it with
-    /// <c>UseAspireResource</c>; those providers serve when <c>ProtoTest:Aspire:Enabled</c> is set, and
-    /// a configured provider earlier in their chain wins over the AppHost.
+    /// The AppHost serves only when selected: <c>ProtoTest:Aspire:Enabled</c> selects every
+    /// resource, a resource's own key from <see cref="ProtoAspireOptions.ResourceSelectionKey"/>
+    /// selects that resource, and neither means the AppHost never starts and every target resolves
+    /// elsewhere. A key configuration already fills is never masked: every key configured steps the
+    /// AppHost aside entirely, and with only some configured it starts for the rest and publishes
+    /// only the selected keys configuration does not fill. Register the AppHost before the targets
+    /// whose providers reference it with <c>UseAspireResource</c>. The AppHost receives the run's
+    /// configuration and the settings earlier infrastructure published as command-line arguments, so
+    /// its own graph can read the addresses the suite resolved.
     /// </remarks>
     /// <typeparam name="TEntryPoint">A public type in the AppHost assembly.</typeparam>
     /// <param name="builder">The <see cref="IProtoHostBuilder"/> instance.</param>
@@ -78,11 +84,17 @@ public static class ProtoHostBuilderExtensions
             }
         }
 
-        // The plain AppHost registration keeps its all-configured skip rule until a suite adopts a
-        // chain; still the only way to host the AppHost the chain providers reference.
-#pragma warning disable CS0618
-        builder.AddInfrastructure(candidate, candidate.PublishKeys.ToArray());
-#pragma warning restore CS0618
+        // The AppHost is one target: a configured environment steps it aside without starting it,
+        // the selection keys decide whether it serves, and the run keeps going on the other
+        // providers when neither holds. The step-aside reads the piece's own mappings, so a
+        // MapConnectionString mapping added after this call still counts.
+        builder.AddInfrastructure(
+            candidate.Id,
+            chain => chain
+                .Use(new ProtoTargetProvider("configured", Condition: new ProtoAspireConfiguredCondition(candidate)))
+                .Use(AppHostProvider<TEntryPoint>(candidate, resources))
+                .Use(new ProtoTargetProvider("unselected")),
+            candidate.PublishKeys.ToArray());
         composition.RegisterRegistry(builder);
         foreach (var published in resources)
         {
@@ -90,17 +102,15 @@ public static class ProtoHostBuilderExtensions
         }
 
         composition.Pieces.Add(typeof(TEntryPoint), candidate);
-        return builder.AddCapability(new ProtoCapabilityDescriptor(
-            typeof(TEntryPoint).Assembly.GetName().Name ?? typeof(TEntryPoint).FullName!,
-            ProtoCapabilityKinds.Aspire,
-            "ProtoTest.Aspire"));
+        return builder;
     }
 
     /// <summary>
     /// Adds an AppHost provider to the application's chain: the mapped resource's endpoint fills the
     /// application's derived <c>ProtoTest:Applications:{name}:BaseUrl</c> key when the provider wins.
-    /// The provider serves when <c>ProtoTest:Aspire:Enabled</c> is set; put a configured provider
-    /// first and the in-process fallback last, so the same composition runs in every mode.
+    /// The provider serves when <c>ProtoTest:Aspire:Enabled</c> or the resource's own key from
+    /// <see cref="ProtoAspireOptions.ResourceSelectionKey"/> is set; put a configured provider first
+    /// and the in-process fallback last, so the same composition runs in every mode.
     /// </summary>
     /// <param name="application">The application target.</param>
     /// <param name="resource">The AppHost resource whose endpoint serves the application.</param>
@@ -125,8 +135,9 @@ public static class ProtoHostBuilderExtensions
     /// <summary>
     /// Adds an AppHost provider to a target's chain: the mapped resource's connection string fills
     /// every key the target declares when the provider wins, so the run's test-side readers resolve
-    /// the AppHost's database or broker. The provider serves when <c>ProtoTest:Aspire:Enabled</c> is
-    /// set; a configured provider earlier in the chain wins over it.
+    /// the AppHost's database or broker. The provider serves when <c>ProtoTest:Aspire:Enabled</c> or
+    /// the resource's own key from <see cref="ProtoAspireOptions.ResourceSelectionKey"/> is set; a
+    /// configured provider earlier in the chain wins over it.
     /// </summary>
     /// <param name="chain">The target's provider chain.</param>
     /// <param name="resource">The AppHost resource whose connection string fills the target's keys.</param>
@@ -157,7 +168,7 @@ public static class ProtoHostBuilderExtensions
     /// Records that the AppHost registered on this builder publishes <paramref name="resource"/>'s
     /// connection string under <paramref name="key"/>, so the run's readers resolve the AppHost's
     /// database or broker under a key no target declares. Register the AppHost first; a configured key
-    /// is never overwritten, and the AppHost only starts when its providers win a target.
+    /// is never overwritten, and the AppHost only starts when the selection keys start it.
     /// </summary>
     /// <param name="builder">The host builder with a registered AppHost.</param>
     /// <param name="resource">The AppHost resource, for example <c>postgres</c>.</param>
@@ -181,8 +192,8 @@ public static class ProtoHostBuilderExtensions
 
         piece.AddPublish(resource, key, ProtoAspirePublishKind.ConnectionString, replaceEndpoints: true);
         composition.Registry.Add(owner, resource, key);
-        // The mapped key joins the AppHost piece's plain registration, so its all-configured skip
-        // rule and the provided-key decisions see it; UseAspireResource is the chain replacement.
+        // The mapped key joins the AppHost piece's registration, so the run's declared keys and
+        // provided-key decisions see it; the piece's publish mappings decide the configured step-aside.
 #pragma warning disable CS0618
         builder.AddInfrastructure(piece, key);
 #pragma warning restore CS0618
@@ -202,14 +213,39 @@ public static class ProtoHostBuilderExtensions
 
     private static ProtoTargetProvider AspireProvider<TEntryPoint>(string resource, IProtoAspireAppHost piece)
         where TEntryPoint : class
-        => new($"aspire:{resource}", piece, ProtoProviderConditions.Selected(ProtoAspireOptions.SelectionKey))
+        => new(
+            $"aspire:{resource}",
+            piece,
+            ProtoProviderConditions.Selected(
+                ProtoAspireOptions.SelectionKey,
+                ProtoAspireOptions.ResourceSelectionKey(resource)))
         {
-            Capabilities =
-            [
-                new ProtoCapabilityDescriptor(
-                    typeof(TEntryPoint).Assembly.GetName().Name ?? typeof(TEntryPoint).FullName!,
-                    ProtoCapabilityKinds.Aspire,
-                    "ProtoTest.Aspire")
-            ]
+            Capabilities = [AspireCapability<TEntryPoint>()]
         };
+
+    /// <summary>
+    /// The provider that serves an application-or-resource target through the AppHost: it holds when
+    /// the global selection key or any of the AppHost's resources' own keys is set, and starts the
+    /// piece once when it wins any target.
+    /// </summary>
+    private static ProtoTargetProvider AppHostProvider<TEntryPoint>(
+        IProtoAspireAppHost piece,
+        IReadOnlyList<string> resources)
+        where TEntryPoint : class
+        => new(
+            $"aspire:{typeof(TEntryPoint).Assembly.GetName().Name}",
+            piece,
+            ProtoProviderConditions.Selected(
+                ProtoAspireOptions.SelectionKey,
+                [.. resources.Select(ProtoAspireOptions.ResourceSelectionKey)]))
+        {
+            Capabilities = [AspireCapability<TEntryPoint>()]
+        };
+
+    private static ProtoCapabilityDescriptor AspireCapability<TEntryPoint>()
+        where TEntryPoint : class
+        => new(
+            typeof(TEntryPoint).Assembly.GetName().Name ?? typeof(TEntryPoint).FullName!,
+            ProtoCapabilityKinds.Aspire,
+            "ProtoTest.Aspire");
 }

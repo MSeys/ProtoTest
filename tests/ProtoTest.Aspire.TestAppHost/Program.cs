@@ -24,4 +24,17 @@ if (builder.Configuration.GetValue<bool>("Aspire:Test:ConnectionString"))
     builder.AddConnectionString("db", reference => reference.Append($"Host=apphost"));
 }
 
+// The settings-bridge journeys: the run forwards its configuration and the settings earlier
+// infrastructure published to the AppHost, which reads them back into the graph. A suite sets the
+// echo key in its configuration or publishes it from a settings piece.
+if (builder.Configuration.GetValue<string>("Aspire:Test:Echo") is { Length: > 0 } echo)
+{
+    builder.AddConnectionString("echo", reference => reference.Append($"{echo}"));
+}
+
+if (builder.Configuration.GetValue<string>("Aspire:Test:SettingsEcho") is { Length: > 0 } settingsEcho)
+{
+    builder.AddConnectionString("settings-echo", reference => reference.Append($"{settingsEcho}"));
+}
+
 builder.Build().Run();

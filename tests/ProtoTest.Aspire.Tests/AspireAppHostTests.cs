@@ -18,6 +18,7 @@ public sealed class AspireAppHostTests
     {
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
+        SelectTheAppHost(builder);
         builder.AddAspireAppHost<TestAppHostAnchor>("api");
         builder.AddAspireAppHost<TestAppHostAnchor>("api");
         builder.AddHttpReadiness("api", "/");
@@ -82,6 +83,7 @@ public sealed class AspireAppHostTests
     {
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
+        SelectTheAppHost(builder);
         builder.AddAspireAppHost<TestAppHostAnchor>(
             options => options.Set("Aspire:Test:FailStart", "true"),
             "api");
@@ -116,6 +118,7 @@ public sealed class AspireAppHostTests
     {
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
+        SelectTheAppHost(builder);
         builder.AddAspireAppHost<TestAppHostAnchor>(
             options => options.UseEndpoint("api", "metrics"),
             "api");
@@ -150,6 +153,7 @@ public sealed class AspireAppHostTests
         var piece = new ProtoAspireAppHost<TestAppHostAnchor>(["api"]);
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
+        SelectTheAppHost(builder);
         builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>
             {
@@ -159,7 +163,12 @@ public sealed class AspireAppHostTests
             "AppHost",
             chain => chain
                 .UseConfigured()
-                .Use(new ProtoTargetProvider("apphost", piece)),
+                .Use(new ProtoTargetProvider(
+                    "apphost",
+                    piece,
+                    ProtoProviderConditions.Selected(
+                        ProtoAspireOptions.SelectionKey,
+                        ProtoAspireOptions.ResourceSelectionKey("api")))),
             piece.BaseUrlKeys.ToArray());
         await using var host = builder.Build();
         await host.StartAsync();
@@ -186,6 +195,7 @@ public sealed class AspireAppHostTests
             options => options.Set("Aspire:Test:TwoResources", "true"));
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
+        SelectTheAppHost(builder);
         builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>
             {
@@ -228,6 +238,107 @@ public sealed class AspireAppHostTests
             Assert.That(published, Does.StartWith("http://"), "the missing key resolves the AppHost's address");
         }
     }
+
+    [Test]
+    public async Task AspireResources_WhenOnlyOneIsSelected_ShouldPublishOnlyThatResource()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                [ProtoAspireOptions.ResourceSelectionKey("api2")] = "true"
+            }));
+        builder.AddAspireAppHost<TestAppHostAnchor>(
+            options => options.Set("Aspire:Test:TwoResources", "true"),
+            "api",
+            "api2");
+        await using var host = builder.Build();
+
+        try
+        {
+            await host.StartAsync();
+        }
+        catch (ProtoAspireUnavailableException exception)
+        {
+            Assert.Ignore($"The Aspire orchestration runtime is unavailable: {exception.Message}");
+            return;
+        }
+
+        await host.StartTestAsync("resource selection", "00001", TestMethods.Placeholder);
+        var published = Proto.Context.AspireResource("api2");
+        var settings = Proto.Context.TryService<ProtoInfrastructureSettings>()!.Values;
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(published, Does.StartWith("http://"), "the selected resource resolves the AppHost's address");
+            Assert.That(
+                settings.ContainsKey("ProtoTest:Applications:api:BaseUrl"),
+                Is.False,
+                "the unselected resource stays on its other providers");
+        }
+    }
+
+    [Test]
+    public async Task AspireStart_ShouldForwardTheSuitesConfigurationAndTheSettingsEarlierInfrastructurePublished()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        SelectTheAppHost(builder);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["Aspire:Test:Echo"] = "from-configuration"
+            }));
+        builder.AddInfrastructure(
+            "SuiteSettings",
+            chain => chain.Use(new ProtoTargetProvider(
+                "suite-settings",
+                new DeclaredSettingsInfrastructure("suite-settings", "Aspire:Test:SettingsEcho", "from-settings"))),
+            "Aspire:Test:SettingsEcho");
+        builder.AddAspireAppHost<TestAppHostAnchor>("api", "echo", "settings-echo");
+        builder.MapConnectionString("echo", "ConnectionStrings:Echo");
+        builder.MapConnectionString("settings-echo", "ConnectionStrings:SettingsEcho");
+        await using var host = builder.Build();
+
+        try
+        {
+            await host.StartAsync();
+        }
+        catch (ProtoAspireUnavailableException exception)
+        {
+            Assert.Ignore($"The Aspire orchestration runtime is unavailable: {exception.Message}");
+            return;
+        }
+
+        await host.StartTestAsync("apphost settings bridge", "00001", TestMethods.Placeholder);
+        var echoed = Proto.Context.AspireResource("echo");
+        var settingsEchoed = Proto.Context.AspireResource("settings-echo");
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                echoed,
+                Is.EqualTo("from-configuration"),
+                "the suite's configuration reaches the AppHost's own graph");
+            Assert.That(
+                settingsEchoed,
+                Is.EqualTo("from-settings"),
+                "the settings earlier infrastructure published reach the AppHost's own graph");
+        }
+    }
+
+    /// <summary>Sets the global AppHost selection key; the AppHost serves only when selected.</summary>
+    private static void SelectTheAppHost(ProtoHostBuilder builder)
+        => builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                [ProtoAspireOptions.SelectionKey] = "true"
+            }));
 
     private static string Flatten(Exception exception)
     {

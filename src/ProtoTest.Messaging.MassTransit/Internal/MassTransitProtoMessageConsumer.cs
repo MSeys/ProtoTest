@@ -12,7 +12,7 @@ using ProtoTest.Messaging;
 /// a later await.
 /// </summary>
 internal sealed class MassTransitProtoMessageConsumer<TProgram>(MassTransitMessageBroker<TProgram> broker)
-    : ProtoMessageConsumerBase(0)
+    : ProtoMessageConsumerBase(0), IProtoMessageConsumer
     where TProgram : class
 {
     private readonly MassTransitMessageBroker<TProgram> _broker = broker;
@@ -24,6 +24,14 @@ internal sealed class MassTransitProtoMessageConsumer<TProgram>(MassTransitMessa
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(destinations);
+        foreach (var destination in destinations)
+        {
+            if (ProtoDestination.IsQueue(destination))
+            {
+                throw QueueUnsupported(destination);
+            }
+        }
+
         var harness = _broker.Harness();
         EnsurePosition(harness);
 
@@ -49,6 +57,10 @@ internal sealed class MassTransitProtoMessageConsumer<TProgram>(MassTransitMessa
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(destination);
         ArgumentNullException.ThrowIfNull(predicate);
+        if (ProtoDestination.IsQueue(destination))
+        {
+            throw QueueUnsupported(destination);
+        }
 
         // The harness is resolved inside the await gate, so a substitution that changed it since the
         // last await re-baselines the consumer without racing an await that is already in flight.
@@ -58,6 +70,40 @@ internal sealed class MassTransitProtoMessageConsumer<TProgram>(MassTransitMessa
             EnsurePosition(harness);
             return new Source(harness);
         }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The bridge's refusal of a queue destination: a MassTransit destination is a message contract
+    /// type, and the bus owns its transport's topology, so a queue is not addressable here.
+    /// </summary>
+    private InvalidOperationException QueueUnsupported(string destination)
+        => ProtoDestination.QueueUnsupported(
+            destination,
+            _broker.Name,
+            "A MassTransit destination is a message contract type: await the contract type the application " +
+            "publishes (the bus's exchange), or use the RabbitMQ adapter to await a queue.");
+
+    /// <summary>
+    /// A routing-key await has no meaning on a bus whose destination is a message contract type: the
+    /// bus owns its transport's routing and every message it publishes carries no routing key. Failing
+    /// here names the mismatch instead of filtering the history by a key that can never match.
+    /// </summary>
+    public ValueTask<ProtoMessage> AwaitAsync(
+        string destination,
+        string? routingKey,
+        Func<ProtoMessage, bool> predicate,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(destination);
+        ArgumentNullException.ThrowIfNull(predicate);
+        return routingKey is null
+            ? AwaitAsync(destination, predicate, timeout, cancellationToken)
+            : throw new InvalidOperationException(
+                $"Cannot await '{destination}' by routing key '{routingKey}' through MassTransit: a MassTransit " +
+                "destination is a message contract type, and the bus owns its transport's routing. Await the " +
+                "destination without a routing key, or use a broker adapter whose transport carries one " +
+                "(the RabbitMQ adapter).");
     }
 
     /// <summary>

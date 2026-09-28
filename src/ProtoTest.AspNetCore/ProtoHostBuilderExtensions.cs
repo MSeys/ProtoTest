@@ -15,8 +15,9 @@ using ProtoTest.Core;
 public static class ProtoHostBuilderExtensions
 {
     // First registration wins per server name: a helper invoked twice cannot start the same server twice,
-    // while a different name still composes. The marker is added only after the registration succeeded.
-    private static readonly ConditionalWeakTable<IProtoHostBuilder, HashSet<string>> RegisteredServers = new();
+    // while a different name still composes. A repeated name for a different program is a conflict, not
+    // a duplicate; the entry is added only after the registration succeeded.
+    private static readonly ConditionalWeakTable<IProtoHostBuilder, Dictionary<string, Type>> RegisteredServers = new();
 
     /// <summary>
     /// Registers an ASP.NET Core application under test into the ProtoTest execution pipeline.
@@ -41,10 +42,19 @@ public static class ProtoHostBuilderExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (!Enum.IsDefined(lifetime)) throw new ArgumentOutOfRangeException(nameof(lifetime));
 
-        var serverNames = RegisteredServers.GetValue(builder, static _ => new HashSet<string>(StringComparer.Ordinal));
-        if (serverNames.Contains(name))
+        var serverPrograms = RegisteredServers.GetValue(builder, static _ => new Dictionary<string, Type>(StringComparer.Ordinal));
+        if (serverPrograms.TryGetValue(name, out var registeredProgram))
         {
-            return builder;
+            if (registeredProgram == typeof(TProgram))
+            {
+                // A repeated registration of the same server under one name is the same lifecycle.
+                return builder;
+            }
+
+            // A dropped duplicate that is a different program is a silent wrong state, not a no-op.
+            throw new InvalidOperationException(
+                $"A server named '{name}' is already registered for {registeredProgram.FullName}; " +
+                $"register {typeof(TProgram).FullName} under a different name instead.");
         }
 
         // Registered through a factory so the host's service provider disposes the shared server with the run.
@@ -55,7 +65,7 @@ public static class ProtoHostBuilderExtensions
             RegisterApplicationServices<TProgram>(services, name);
         });
         // The name is claimed only once the registration succeeded, so a failed call leaves no guard.
-        serverNames.Add(name);
+        serverPrograms.Add(name, typeof(TProgram));
         // When the environment configures the application's address, the server steps aside at test
         // time; the capability must step aside with it instead of advertising an in-process server.
         // The server's name is the capability's instance: configuring A must not drop B's capability.

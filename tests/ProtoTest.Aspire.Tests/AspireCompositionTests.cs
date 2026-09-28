@@ -1,5 +1,6 @@
 namespace ProtoTest.Aspire.Tests;
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using ProtoTest.Aspire.TestAppHost;
 using ProtoTest.Core;
@@ -10,6 +11,8 @@ using ProtoTest.Core;
 /// </summary>
 public sealed class AspireCompositionTests
 {
+    private static readonly string AppHostAssembly = typeof(TestAppHostAnchor).Assembly.GetName().Name!;
+
     private sealed class OtherAppHostAnchor;
 
     [Test]
@@ -26,6 +29,85 @@ public sealed class AspireCompositionTests
             Assert.That(exception!.Message, Does.Contain("'api'"), "the failure names the resource");
             Assert.That(exception.Message, Does.Contain(typeof(TestAppHostAnchor).FullName!));
             Assert.That(exception.Message, Does.Contain(typeof(OtherAppHostAnchor).FullName!));
+        }
+    }
+
+    [Test]
+    public async Task AddAspireAppHost_WhenNotSelected_ShouldNotStartTheAppHost()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddAspireAppHost<TestAppHostAnchor>("api");
+        await using var host = builder.Build();
+        await host.StartAsync();
+
+        await host.StartTestAsync("apphost not selected", "00001", TestMethods.Placeholder);
+        var exception = Assert.Throws<InvalidOperationException>(() => Proto.Context.AspireResource("api"));
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        var snapshot = host.Trace.Snapshot();
+        var resolved = snapshot.Entries!.Single(entry => entry.Kind == ProtoTargetTrace.Resolved);
+        var appHostSkip = snapshot.Entries!
+            .Where(entry => entry.Kind == ProtoTargetTrace.ProviderSkipped)
+            .Single(entry => entry.Attributes["environment.provider"] == $"aspire:{AppHostAssembly}");
+        var entity = snapshot.Entities!.Single(entity => entity.Kind == "aspire");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(resolved.Attributes["environment.provider"], Is.EqualTo("unselected"));
+            Assert.That(
+                appHostSkip.Attributes["environment.reason"],
+                Does.Contain(ProtoAspireOptions.SelectionKey),
+                "the skip names the global selection key");
+            Assert.That(
+                appHostSkip.Attributes["environment.reason"],
+                Does.Contain(ProtoAspireOptions.ResourceSelectionKey("api")),
+                "the skip names the resource's own selection key");
+            Assert.That(
+                host.HasCapability(ProtoCapabilityKinds.Aspire, AppHostAssembly),
+                Is.False,
+                "an AppHost that never starts declares no capability");
+            Assert.That(entity.State["infrastructure.state"], Is.EqualTo("skipped"));
+            Assert.That(
+                exception!.Message,
+                Does.Contain(ProtoAspireOptions.SelectionKey),
+                "the resource lookup names the selection keys");
+        }
+    }
+
+    [Test]
+    public async Task AddAspireAppHost_WhenSelectedButEveryResourceIsConfigured_ShouldStepAside()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:Applications:api:BaseUrl"] = "http://127.0.0.1:9",
+                [ProtoAspireOptions.SelectionKey] = "true"
+            }));
+        builder.AddAspireAppHost<TestAppHostAnchor>("api");
+        await using var host = builder.Build();
+        await host.StartAsync();
+
+        await host.StartTestAsync("apphost configured", "00001", TestMethods.Placeholder);
+        var address = ProtoApplication.BaseUrl(Proto.Context, "api");
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        var snapshot = host.Trace.Snapshot();
+        var resolved = snapshot.Entries!.Single(entry => entry.Kind == ProtoTargetTrace.Resolved);
+        var entity = snapshot.Entities!.Single(entity => entity.Kind == "aspire");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(resolved.Attributes["environment.provider"], Is.EqualTo("configured"));
+            Assert.That(entity.State["infrastructure.state"], Is.EqualTo("skipped"));
+            Assert.That(entity.State["infrastructure.reason"], Does.Contain("configured"));
+            Assert.That(
+                host.HasCapability(ProtoCapabilityKinds.Aspire, AppHostAssembly),
+                Is.False,
+                "a configured environment steps the AppHost aside without a capability");
+            Assert.That(address, Is.EqualTo("http://127.0.0.1:9"), "the configured address serves the resource");
         }
     }
 
@@ -144,6 +226,55 @@ public sealed class AspireCompositionTests
         {
             Assert.That(exception!.Message, Does.Contain("'worker'"));
             Assert.That(exception.Message, Does.Contain("'api'"));
+        }
+    }
+
+    [Test]
+    public void Merge_ShouldLayerConfigurationThenSettingsThenOptions()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Config:Only"] = "configuration",
+                ["Layered:Value"] = "configuration",
+                ["Config:Blank"] = null
+            })
+            .Build();
+        var settings = new Dictionary<string, string>
+        {
+            ["Settings:Only"] = "settings",
+            ["Layered:Value"] = "settings"
+        };
+        var options = new Dictionary<string, string?>
+        {
+            ["Options:Only"] = "options",
+            ["Layered:Value"] = "options"
+        };
+
+        var merged = ProtoAspireAppHost<TestAppHostAnchor>.Merge(configuration, settings, options);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                merged["Config:Only"],
+                Is.EqualTo("configuration"),
+                "the suite's configuration reaches the AppHost");
+            Assert.That(
+                merged["Settings:Only"],
+                Is.EqualTo("settings"),
+                "the settings earlier infrastructure published reach the AppHost");
+            Assert.That(
+                merged["Options:Only"],
+                Is.EqualTo("options"),
+                "the AppHost's own option values reach it last");
+            Assert.That(
+                merged["Layered:Value"],
+                Is.EqualTo("options"),
+                "each layer wins over the one before it: options over settings over configuration");
+            Assert.That(
+                merged["Config:Blank"],
+                Is.Null,
+                "a key with no value stays valueless for the AppHost's own sources");
         }
     }
 

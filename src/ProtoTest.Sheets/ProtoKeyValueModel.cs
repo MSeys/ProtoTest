@@ -8,7 +8,7 @@ using ProtoTest.Sheets.Internal;
 
 /// <summary>
 /// A sheet modelled as label/value pairs: <c>[Sheet("Summary", Kind = ProtoSheetKind.KeyValue)]</c>
-/// names the sheet and <c>[Column("Total")]</c> declares one label per property. Labels are read from
+/// names the sheet and <c>[Label("Total")]</c> declares one label per property. Labels are read from
 /// the sheet's first column and values from the second; a missing or duplicated label fails the read
 /// naming the labels the sheet carries, so tests read typed values without repeating label strings.
 /// </summary>
@@ -81,7 +81,7 @@ public sealed class ProtoKeyValueModel<TModel> where TModel : notnull
                 continue;
             }
 
-            SheetColumnRules.Check(binding.Attribute, binding.Property.PropertyType, binding.Label, cell, failures);
+            SheetColumnRules.Check(binding.Rules, binding.Property.PropertyType, binding.Label, cell, failures);
         }
 
         var matches = failures.Count == 0;
@@ -138,45 +138,75 @@ public sealed class ProtoKeyValueModel<TModel> where TModel : notnull
                      .GetProperties(BindingFlags.Public | BindingFlags.Instance)
                      .OrderBy(property => property.MetadataToken))
         {
-            if (property.GetCustomAttribute<ColumnAttribute>() is not { } column)
+            var label = property.GetCustomAttribute<LabelAttribute>();
+            var column = property.GetCustomAttribute<ColumnAttribute>();
+            if (label is null && column is null)
             {
                 continue;
             }
 
-            if (column.Path.Count != 1 || string.IsNullOrWhiteSpace(column.Path[0]))
+            if (label is not null && column is not null)
             {
                 throw new SpreadsheetAssertionException(
-                    $"'{property.Name}' on {typeof(TModel).Name} declares the label path " +
-                    $"'{string.Join(" / ", column.Path)}'; a key-value label is a single text, " +
-                    "for example [Column(\"Total\")].");
+                    $"'{property.Name}' on {typeof(TModel).Name} declares both [Label(\"{label.Label}\")] and " +
+                    $"[Column(\"{string.Join("\" / \"", column.Path)}\")]; a key-value property carries one " +
+                    "mapping. Keep the [Label].");
             }
 
-            if (column.Unique)
+            var text = label?.Label ?? string.Empty;
+            ISheetValueRules rules;
+            if (label is not null)
+            {
+                rules = label;
+            }
+            else
+            {
+                // A key-value label is a single text; the column path and Unique knobs are table mappings.
+                if (column!.Path.Count != 1 || string.IsNullOrWhiteSpace(column.Path[0]))
+                {
+                    throw new SpreadsheetAssertionException(
+                        $"'{property.Name}' on {typeof(TModel).Name} declares the label path " +
+                        $"'{string.Join(" / ", column.Path)}'; a key-value label is a single text, " +
+                        $"for example [Label(\"Total\")].");
+                }
+
+                if (column.Unique)
+                {
+                    throw new SpreadsheetAssertionException(
+                        $"'{property.Name}' on {typeof(TModel).Name} is marked Unique, but a key-value label " +
+                        "already names one value; remove Unique.");
+                }
+
+                text = column.Path[0];
+                rules = column;
+            }
+
+            if (string.IsNullOrWhiteSpace(text))
             {
                 throw new SpreadsheetAssertionException(
-                    $"'{property.Name}' on {typeof(TModel).Name} is marked Unique, but a key-value label " +
-                    "already names one value; remove Unique.");
+                    $"'{property.Name}' on {typeof(TModel).Name} declares an empty label; a key-value label " +
+                    "is a non-empty text, for example [Label(\"Total\")].");
             }
 
             var matches = labels
-                .Where(label => string.Equals(label.Label, column.Path[0], StringComparison.Ordinal))
+                .Where(label => string.Equals(label.Label, text, StringComparison.Ordinal))
                 .ToArray();
             if (matches.Length == 0)
             {
                 throw new SpreadsheetAssertionException(
-                    $"The sheet '{sheet.Name}' has no label '{column.Path[0]}'. It has: " +
+                    $"The sheet '{sheet.Name}' has no label '{text}'. It has: " +
                     (labels.Count == 0 ? "<none>" : string.Join(", ", labels.Select(label => label.Label))) + ".");
             }
 
             if (matches.Length > 1)
             {
                 throw new SpreadsheetAssertionException(
-                    $"The sheet '{sheet.Name}' carries the label '{column.Path[0]}' more than once " +
+                    $"The sheet '{sheet.Name}' carries the label '{text}' more than once " +
                     $"(rows {string.Join(" and ", matches.Select(match => match.Row))}); a key-value label " +
                     "names one value.");
             }
 
-            if (column.Optional && !SheetCellValue.IsNullable(property.PropertyType))
+            if (rules.Optional && !SheetCellValue.IsNullable(property.PropertyType))
             {
                 throw new SpreadsheetAssertionException(
                     $"'{property.Name}' on {typeof(TModel).Name} is marked Optional, but " +
@@ -184,13 +214,13 @@ public sealed class ProtoKeyValueModel<TModel> where TModel : notnull
                     $"such as {property.PropertyType.Name}?.");
             }
 
-            bindings.Add(new SheetLabelBinding(property, matches[0].Row, column));
+            bindings.Add(new SheetLabelBinding(property, matches[0].Row, text, rules));
         }
 
         if (bindings.Count == 0)
         {
             throw new SpreadsheetAssertionException(
-                $"{typeof(TModel).Name} declares no [Column] properties.");
+                $"{typeof(TModel).Name} declares no [Label] properties.");
         }
 
         return new ProtoKeyValueModel<TModel>(
@@ -220,7 +250,7 @@ public sealed class ProtoKeyValueModel<TModel> where TModel : notnull
         => _bindings.FirstOrDefault(binding => binding.Property == property)
             ?? throw new SpreadsheetAssertionException(
                 $"'{typeof(TModel).Name}.{property.Name}' is not mapped to a label; mark it with a " +
-                "[Column(\"...\")] attribute.");
+                "[Label(\"...\")] attribute.");
 
     private void GuardEmpty(SheetLabelBinding binding, ProtoCell cell)
     {

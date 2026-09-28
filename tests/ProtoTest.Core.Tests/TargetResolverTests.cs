@@ -130,6 +130,33 @@ public sealed class TargetResolverTests
     }
 
     [Test]
+    public void Selected_ShouldHoldWhenAnyOfSeveralKeysIsSet()
+    {
+        var condition = ProtoProviderConditions.Selected("Aspire:Enabled", "Aspire:Resources:db:Enabled");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                condition.IsSatisfied(Context(Configuration(("Aspire:Enabled", "true")))),
+                Is.True,
+                "the broad selection key selects the provider");
+            Assert.That(
+                condition.IsSatisfied(Context(Configuration(("Aspire:Resources:db:Enabled", "true")))),
+                Is.True,
+                "the per-target selection key selects the provider on its own");
+            Assert.That(
+                condition.IsSatisfied(Context(Configuration(("Aspire:Enabled", "  ")))),
+                Is.False,
+                "a blank value is not a selection");
+            Assert.That(
+                condition.IsSatisfied(Context(Configuration())),
+                Is.False);
+            Assert.That(
+                condition.Describe(Context(Configuration())),
+                Is.EqualTo("One of the selection keys must be set: 'Aspire:Enabled', 'Aspire:Resources:db:Enabled'"));
+        }
+    }
+
+    [Test]
     public void Available_ShouldFollowTheProbeAndNameItsRequirement()
     {
         var available = ProtoProviderConditions.Available("Docker is available", () => true);

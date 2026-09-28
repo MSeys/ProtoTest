@@ -41,9 +41,9 @@ public sealed class ProtoSqlSession
             .Begin();
         try
         {
-            // The token is the test's own: a caller that passed one to StartTestAsync cancels a
-            // connection the provider would otherwise hold to its own connect timeout. No runner
-            // adapter supplies one yet, so a runner-driven setup passes CancellationToken.None.
+            // The token is the test's own: a caller that passed one to StartTestAsync - the runner
+            // adapters with a cancellation token do - cancels a connection the provider would
+            // otherwise hold to its own connect timeout.
             await Connection.OpenAsync(context.CancellationToken);
             if (_options.Isolation == SqlIsolation.Transaction)
             {

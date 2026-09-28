@@ -16,9 +16,40 @@ public sealed class SheetAttribute(string name) : Attribute
     public int[] HeaderRows { get; init; } = [1];
 }
 
-/// <summary>Binds one record property to a header path, for example <c>[Column("FY26", "Amount")]</c>.</summary>
+/// <summary>
+/// Binds one key-value model property to a label, for example <c>[Label("Total")]</c>. The label must
+/// appear exactly once in the sheet's first column; the value under it is read from the second column.
+/// A table model declares its columns with <see cref="ColumnAttribute"/> instead.
+/// </summary>
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Parameter)]
-public sealed class ColumnAttribute(params string[] path) : Attribute
+public sealed class LabelAttribute(string label) : Attribute, ISheetValueRules
+{
+    /// <summary>The label text the sheet carries.</summary>
+    public string Label { get; } = label;
+
+    /// <summary>When true an empty value is fine; the property then needs a nullable type.</summary>
+    public bool Optional { get; init; }
+
+    /// <summary>Smallest allowed number; the default means no minimum.</summary>
+    public double Min { get; init; } = double.NaN;
+
+    /// <summary>Largest allowed number; the default means no maximum.</summary>
+    public double Max { get; init; } = double.NaN;
+
+    /// <summary>Regular expression the value's rendered text must match.</summary>
+    public string? Pattern { get; init; }
+
+    /// <summary>The only rendered values allowed.</summary>
+    public string[]? OneOf { get; init; }
+}
+
+/// <summary>
+/// Binds one record property to a header path, for example <c>[Column("FY26", "Amount")]</c>. A
+/// key-value model declares its labels with <see cref="LabelAttribute"/>; a <c>[Column]</c> on a
+/// key-value property is still accepted, but it is the table mapping and is deprecated there.
+/// </summary>
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Parameter)]
+public sealed class ColumnAttribute(params string[] path) : Attribute, ISheetValueRules
 {
     public IReadOnlyList<string> Path { get; } = path;
 
@@ -39,4 +70,27 @@ public sealed class ColumnAttribute(params string[] path) : Attribute
 
     /// <summary>Every value in the column must be distinct.</summary>
     public bool Unique { get; init; }
+}
+
+/// <summary>
+/// The value rules a mapping attribute carries: the rules a non-empty cell is checked against,
+/// whatever the sheet's shape. Both <see cref="LabelAttribute"/> and <see cref="ColumnAttribute"/>
+/// implement it, so the key-value model runs the same checks as the table model.
+/// </summary>
+internal interface ISheetValueRules
+{
+    /// <summary>When true an empty cell is fine.</summary>
+    bool Optional { get; }
+
+    /// <summary>Smallest allowed number; <see cref="double.NaN"/> means no minimum.</summary>
+    double Min { get; }
+
+    /// <summary>Largest allowed number; <see cref="double.NaN"/> means no maximum.</summary>
+    double Max { get; }
+
+    /// <summary>Regular expression every text value must match; null means no pattern.</summary>
+    string? Pattern { get; }
+
+    /// <summary>The only text values allowed; null or empty means no restriction.</summary>
+    string[]? OneOf { get; }
 }

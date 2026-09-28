@@ -59,6 +59,59 @@ public sealed partial class SheetsTests
     }
 
     [Test]
+    public async Task KeyValueModel_WhenTheLegacyColumnMappingIsUsed_ShouldStillReadTheValue()
+    {
+        // Pins the accepted [Column] mapping on a key-value model: it stays source-compatible while
+        // the [Label] spelling is the documented one. The analyzer reports the deprecated spelling.
+        var (host, context) = Start("sheets key value legacy column");
+        var model = context.Sheets().Open(_path).KeyValueModel<LegacyColumnKeyValueRow>();
+
+        var total = model.Column(row => row.Total);
+        var returned = model.Should.MatchModel();
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(total.Value, Is.EqualTo(123.45m), "the legacy [Column] label reads the value");
+            Assert.That(total.Label, Is.EqualTo("Total"));
+            Assert.That(returned, Is.SameAs(model));
+        }
+    }
+
+    [Test]
+    public async Task KeyValueModel_WhenBothMappingsAreDeclared_ShouldFailNamingThem()
+    {
+        var (host, context) = Start("sheets key value both mappings");
+        var workbook = context.Sheets().Open(_path);
+
+        var exception = Assert.Throws<SpreadsheetAssertionException>(() => workbook.KeyValueModel<BothMappingsRow>());
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.Message, Does.Contain("[Label(\"Total\")]"));
+            Assert.That(exception.Message, Does.Contain("[Column"));
+            Assert.That(exception.Message, Does.Contain("Keep the [Label]"));
+        }
+    }
+
+    [Test]
+    public async Task Model_WhenATableModelDeclaresALabel_ShouldNameTheKeyValueAccessor()
+    {
+        var (host, context) = Start("sheets table label");
+        var workbook = context.Sheets().Open(_path);
+
+        var exception = Assert.Throws<SpreadsheetAssertionException>(() => workbook.Model<LabelOnTableRow>());
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.Message, Does.Contain("[Label(\"Region\")]"));
+            Assert.That(exception.Message, Does.Contain("KeyValueModel<LabelOnTableRow>()"));
+        }
+    }
+
+    [Test]
     public async Task KeyValueModel_ShouldFailNamingTheLabelsTheSheetCarries()
     {
         var (host, context) = Start("sheets key value missing label");
@@ -135,7 +188,11 @@ public sealed partial class SheetsTests
         var exception = Assert.Throws<SpreadsheetAssertionException>(() => workbook.KeyValueModel<LabelPathRow>());
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
-        Assert.That(exception!.Message, Does.Contain("a key-value label is a single text"));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.Message, Does.Contain("a key-value label is a single text"));
+            Assert.That(exception.Message, Does.Contain("[Label(\"Total\")]"), "the failure names the key-value mapping");
+        }
     }
 
     [Test]
@@ -169,26 +226,26 @@ public sealed partial class SheetsTests
 
     [Sheet("KeyValues", Kind = ProtoSheetKind.KeyValue)]
     public sealed record KeyValueRow(
-        [property: Column("Total")] decimal Total,
-        [property: Column("Count")] int Count,
-        [property: Column("Currency")] string Currency,
-        [property: Column("Note", Optional = true)] string? Note);
+        [property: Label("Total")] decimal Total,
+        [property: Label("Count")] int Count,
+        [property: Label("Currency")] string Currency,
+        [property: Label("Note", Optional = true)] string? Note);
 
     [Sheet("KeyValues", Kind = ProtoSheetKind.KeyValue)]
     public sealed record MissingLabelRow(
-        [property: Column("Nope")] string Nope);
+        [property: Label("Nope")] string Nope);
 
     [Sheet("DuplicateLabels", Kind = ProtoSheetKind.KeyValue)]
     public sealed record DuplicateLabelRow(
-        [property: Column("Total")] decimal Total);
+        [property: Label("Total")] decimal Total);
 
     [Sheet("KeyValues", Kind = ProtoSheetKind.KeyValue)]
     public sealed record WrongValueTypeRow(
-        [property: Column("Total")] int Total);
+        [property: Label("Total")] int Total);
 
     [Sheet("KeyValues", Kind = ProtoSheetKind.KeyValue)]
     public sealed record ConstrainedKeyValueRow(
-        [property: Column("Total", Min = 1000)] decimal Total);
+        [property: Label("Total", Min = 1000)] decimal Total);
 
     [Sheet("KeyValues", Kind = ProtoSheetKind.KeyValue)]
     public sealed record LabelPathRow(
@@ -200,5 +257,17 @@ public sealed partial class SheetsTests
 
     [Sheet("KeyValues", Kind = ProtoSheetKind.KeyValue)]
     public sealed record EmptyValueRow(
-        [property: Column("Note")] decimal Note);
+        [property: Label("Note")] decimal Note);
+
+    [Sheet("KeyValues", Kind = ProtoSheetKind.KeyValue)]
+    public sealed record LegacyColumnKeyValueRow(
+        [property: Column("Total")] decimal Total);
+
+    [Sheet("KeyValues", Kind = ProtoSheetKind.KeyValue)]
+    public sealed record BothMappingsRow(
+        [property: Label("Total"), Column("Total")] decimal Total);
+
+    [Sheet("Sales", HeaderRows = [1, 2])]
+    public sealed record LabelOnTableRow(
+        [property: Label("Region")] string Region);
 }

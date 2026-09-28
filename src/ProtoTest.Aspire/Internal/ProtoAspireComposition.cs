@@ -65,12 +65,16 @@ internal sealed class ProtoAspireComposition
 }
 
 /// <summary>
-/// The non-generic view of an AppHost piece a host-level call needs: its identity, its resources and
-/// the publish mappings a <c>MapConnectionString</c> adds after the piece was created.
+/// The non-generic view of an AppHost piece a host-level call needs: its identity, its resources,
+/// the keys its publish mappings fill and the mappings a <c>MapConnectionString</c> adds after the
+/// piece was created.
 /// </summary>
 internal interface IProtoAspireAppHost : IProtoInfrastructure
 {
     IReadOnlyList<string> Resources { get; }
+
+    /// <summary>Gets every key the AppHost's publish mappings fill.</summary>
+    IReadOnlyList<string> PublishKeys { get; }
 
     void AddPublish(string resource, string key, ProtoAspirePublishKind kind, bool replaceEndpoints = false);
 }

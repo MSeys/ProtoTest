@@ -54,7 +54,7 @@ public sealed class ProtoWorkbook
     /// <summary>
     /// Binds a record with <c>[Sheet("Summary", Kind = ProtoSheetKind.KeyValue)]</c> to a label/value
     /// sheet: labels in the first column, values in the second, declared once with
-    /// <c>[Column("Label")]</c>.
+    /// <c>[Label("Label")]</c>.
     /// </summary>
     public ProtoKeyValueModel<TModel> KeyValueModel<TModel>() where TModel : notnull
         => ProtoKeyValueModel<TModel>.Read(this, _context);

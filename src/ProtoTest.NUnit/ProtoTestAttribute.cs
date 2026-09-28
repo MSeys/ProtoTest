@@ -58,7 +58,11 @@ public class ProtoTestAttribute : TestAttribute, IWrapSetUpTearDown
             }
 
             var scope = ProtoTestAsync.RunSync(() => new ValueTask<ProtoTestScope>(
-                ProtoTestScope.StartAsync(preparation, ProtoTestAssembly.Host, NUnitAttachmentPublisher.Instance)));
+                ProtoTestScope.StartAsync(
+                    preparation,
+                    ProtoTestAssembly.Host,
+                    NUnitAttachmentPublisher.Instance,
+                    context.CancellationToken)));
             try
             {
                 return innerCommand.Execute(context);

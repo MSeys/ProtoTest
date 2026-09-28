@@ -238,6 +238,51 @@ public sealed class MassTransitRoundTripTests
     }
 
     [Test]
+    public async Task PublishingByRoutingKeyFailsNamingTheTransportLimit()
+    {
+        await using var host = MassTransitSuite.Builder().Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("masstransit routing key publish", TestMethods.Placeholder);
+
+        var error = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await context.Messaging().PublishAsync(
+                nameof(InvoicePaid),
+                "invoice.paid",
+                """{"invoiceId":1,"amount":1}"""));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(error!));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(error!.Message, Does.Contain(nameof(InvoicePaid)));
+            Assert.That(error.Message, Does.Contain("routing key"));
+            Assert.That(error.Message, Does.Contain("MassTransit"));
+        }
+    }
+
+    [Test]
+    public async Task AwaitingByRoutingKeyFailsNamingTheTransportLimit()
+    {
+        await using var host = MassTransitSuite.Builder().Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("masstransit routing key await", TestMethods.Placeholder);
+
+        var error = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await context.Messaging().AwaitAsync(
+                nameof(InvoicePaid),
+                "invoice.paid",
+                _ => true,
+                TimeSpan.FromMilliseconds(100)));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(error!));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(error!.Message, Does.Contain(nameof(InvoicePaid)));
+            Assert.That(error.Message, Does.Contain("routing key"));
+            Assert.That(error.Message, Does.Contain("MassTransit"));
+        }
+    }
+
+    [Test]
     public async Task AnInterfaceContractTheApplicationPublishesIsAwaitable()
     {
         await using var host = MassTransitSuite.Builder().Build();

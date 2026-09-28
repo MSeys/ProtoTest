@@ -29,6 +29,6 @@ public static class ProtoExecutionContextExtensions
             ?? throw new InvalidOperationException(
                 $"Aspire resource '{resource}' has no value yet: the AppHost publishes '{key}' when the run starts. " +
                 "Set the key to point the suite at a deployed topology instead, or select the AppHost with " +
-                $"'{ProtoAspireOptions.SelectionKey}=true'.");
+                $"'{ProtoAspireOptions.SelectionKey}=true' or '{ProtoAspireOptions.ResourceSelectionKey(resource)}=true'.");
     }
 }

@@ -200,12 +200,14 @@ public sealed partial class SheetsTests
 
         var cell = summary.Cell("A1");
         var range = summary.Range("A4:B5");
+        var tableColumn = table.Column("Amount");
         var column = model.Column(row => row.Amount);
 
         var returnedCell = cell.Should.Be("Total").Should.BeText();
         var returnedRange = range.Should.HaveDimensions(2, 2)
             .Should.Match([["Region", "Amount"], ["EMEA", "1200"]]);
         var returnedTable = table.Should.ContainRow("Region", "EMEA").ShouldNot.ContainRow("Region", "NOPE");
+        var returnedTableColumn = tableColumn.Should.Be(["1200", "900"]).ShouldNot.Be(["1"]);
         var returnedColumn = column.Should.Be([1200m, 900m]).Should.All(value => value > 0);
         var returnedModel = model.Should.MatchModel();
 
@@ -215,6 +217,7 @@ public sealed partial class SheetsTests
             Assert.That(returnedCell, Is.SameAs(cell));
             Assert.That(returnedRange, Is.SameAs(range));
             Assert.That(returnedTable, Is.SameAs(table));
+            Assert.That(returnedTableColumn, Is.SameAs(tableColumn));
             Assert.That(returnedColumn, Is.SameAs(column));
             Assert.That(returnedModel, Is.SameAs(model));
         }

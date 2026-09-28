@@ -1,6 +1,11 @@
 import type { ChangeSource, Failure, Item, SectionItem, ShapeMismatch, Span, TestTrace, Visibility } from "./model";
 
-const callKinds = new Set(["http.request", "graphql.operation"]);
+/** Kinds whose span a failure belongs to, the same set the diagnosis names as call ancestors. */
+const callKinds = new Set(["http.request", "graphql.operation", "grpc.call"]);
+
+function isCall(span: Span) {
+  return callKinds.has(span.kind) || span.kind.startsWith("messaging.");
+}
 
 /** The verdict items of a span's Checks sections, in order. */
 export function checkItems(span: Span) {
@@ -16,7 +21,7 @@ export function findFailure(test: TestTrace): Failure | null {
   const span = failing.reduce((best, candidate) => score(candidate) > score(best) ? candidate : best);
   const check = checkItems(span).find(item => item.tone === "error") ?? null;
   let call: Span | null = span;
-  while (call && !callKinds.has(call.kind)) call = call.parent;
+  while (call && !isCall(call)) call = call.parent;
   return { span, check, mismatches: shapeMismatches(span), call };
 }
 

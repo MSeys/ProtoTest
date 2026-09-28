@@ -38,15 +38,22 @@ This file is the operating contract for contributors and coding agents working i
    hook in isolation.
 5. **Evidence or it did not happen.** A stage ends with `eng/verify.ps1` green (test + lint +
    check-docs, plus pack when packaging changed) and its evidence line recorded in the plan.
-6. **Public surface is additive in 1.x.** Accidental-public plumbing may change with a changelog
-   entry. A breaking consumer API change needs a plan decision first.
+6. **The published surface is additive in 1.x.** Additive and obsolete shims protect what consumers
+   already have - the released packages. An API that only exists on the current branch is fixed
+   cleanly before its first release: no facades, no obsolete aliases, no deprecation theatre for
+   unreleased surface, with a changelog entry recording the change. Accidental-public plumbing may
+   change with a changelog entry. A breaking change to the *published* surface needs a plan decision
+   first.
 7. **Update the facts with the code.** A lifecycle, registration, capability, address, vocabulary or
    ownership change updates the owning `facts/` file in the records checkout, in the same commit.
    `CHANGELOG.md` and the docs Limits sections move with the behavior.
 8. **Stop at the stage boundary.** If a stage grows past its checklist, stop, write the handoff, and
    let the next session pick it up. Do not absorb a second stage into one session.
-9. **Comments explain the code as it stands.** No audit IDs, plan items or record-file references in
-   source comments; the `facts/` files in the private records checkout carry the history.
+9. **Comments are short, direct, and explain the code as it stands.** No audit IDs, plan items or
+   record-file references in source comments; the `facts/` files in the private records checkout carry
+   the history. One or two sentences of why, not a walkthrough; no em-dashes; no essay tone. READMEs
+   follow the same voice: short, direct sentences that say what the package does and link to the docs
+   for depth. The docs and the learning track carry the detail.
 
 ## Workflow
 

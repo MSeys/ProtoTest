@@ -89,7 +89,8 @@ public class OpenApiCoverageCollectorTests
                 RouteTemplate = "/lines"
             }));
 
-        var properties = collector.GetReportItems().Single().Children!
+        var properties = collector.GetReportItems()
+            .Single(item => item.Identifier == "GET /lines").Children!
             .Single(child => child.Identifier == "200").Children!;
         var line = properties.Single(item => item.Identifier == "$.lines[]");
         var sku = properties.Single(item => item.Identifier == "$.lines[].sku");
@@ -113,10 +114,10 @@ public class OpenApiCoverageCollectorTests
         var items = collector.GetReportItems().ToList();
 
         // Assert
-        Assert.That(items, Has.Count.EqualTo(1));
+        Assert.That(items, Has.Count.EqualTo(2), "The specification identity item and the endpoint.");
+        Assert.That(items.Any(item => item.Metadata?.ContainsKey("spec.hash") == true), Is.True);
 
-        var root = items.Single();
-        Assert.That(root.Identifier, Is.EqualTo("GET /users/{id}"));
+        var root = items.Single(item => item.Identifier == "GET /users/{id}");
         Assert.That(root.IsCovered, Is.False);
         Assert.That(root.Count, Is.Zero);
 
@@ -126,6 +127,41 @@ public class OpenApiCoverageCollectorTests
         Assert.That(children.Any(c => c.Identifier == "404" && c.IsCovered is false), Is.True);
         Assert.That(response200.Children!.Any(c => c.Identifier == "$.id" && c.IsCovered is false), Is.True);
         Assert.That(root.Metadata, Is.Null);
+    }
+
+    [Test]
+    public void SpecIdentity_ShouldRecordTheSourceAndContentHashAsAnAggregate()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "ProtoTest.OpenApi.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var specPath = Path.Combine(directory, "openapi.json");
+        File.WriteAllText(specPath, OpenApiTestHelper.SampleJsonSpec);
+        try
+        {
+            var collector = new OpenApiCoverageCollector("TestApi", specPath);
+
+            var identity = collector.GetReportItems().Single(item => item.Identifier == ProtoSpecIdentity.ReportIdentifier);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(identity.IsCovered, Is.Null, "The identity row is an aggregate, not a coverage unit.");
+                Assert.That(identity.Category, Is.EqualTo("OpenAPI"));
+                Assert.That(identity.Metadata![ProtoSpecIdentity.SourceMetadataKey], Is.EqualTo(specPath));
+                Assert.That(identity.Metadata![ProtoSpecIdentity.HashMetadataKey],
+                    Is.EqualTo(ProtoSpecIdentity.Hash(OpenApiTestHelper.SampleJsonSpec)));
+            }
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public void SpecIdentity_ShouldNotBeEmittedForAPrebuiltDocument()
+    {
+        var document = OpenApiDocument.Parse(OpenApiTestHelper.SampleJsonSpec).Document!;
+
+        var collector = new OpenApiCoverageCollector("TestApi", document);
+
+        Assert.That(collector.GetReportItems().Any(item => item.Identifier == ProtoSpecIdentity.ReportIdentifier), Is.False,
+            "A prebuilt document records no source to identify.");
     }
 
     [Test]
@@ -209,7 +245,7 @@ public class OpenApiCoverageCollectorTests
                 "{}",
                 new Dictionary<string, string>())));
 
-        var endpoint = collector.GetReportItems().Single();
+        var endpoint = collector.GetReportItems().Single(item => item.Identifier == "GET /users/{id}");
         Assert.That(endpoint.IsCovered, Is.True);
         Assert.That(endpoint.Children!.Single(child => child.Identifier == "200").IsCovered, Is.True);
     }
@@ -233,7 +269,8 @@ public class OpenApiCoverageCollectorTests
                 RouteTemplate = "/users/{id}"
             }));
 
-        var successResponse = collector.GetReportItems().Single().Children!
+        var successResponse = collector.GetReportItems()
+            .Single(item => item.Identifier == "GET /users/{id}").Children!
             .Single(child => child.Identifier == "200");
         Assert.That(successResponse.Children!.Single(child => child.Identifier == "$.id").IsCovered, Is.False);
     }
@@ -267,7 +304,8 @@ public class OpenApiCoverageCollectorTests
             "Jobs", "http.response", "POST /jobs",
             new RestResponseData("POST", "/jobs", 503, "", headers)));
 
-        var responses = collector.GetReportItems().Single().Children!;
+        var responses = collector.GetReportItems()
+            .Single(item => item.Identifier == "POST /jobs").Children!;
         Assert.That(responses.Single(item => item.Identifier == "2XX").Count, Is.EqualTo(1));
         Assert.That(responses.Single(item => item.Identifier == "default").Count, Is.EqualTo(1));
     }
@@ -294,7 +332,9 @@ public class OpenApiCoverageCollectorTests
 
         // Assert
         Assert.That(collector, Is.TypeOf<OpenApiCoverageCollector>());
-        Assert.That(((IProtoReportSource)collector).GetReportItems().Single().Identifier, Is.EqualTo("GET /users/{id}"));
+        Assert.That(
+            ((IProtoReportSource)collector).GetReportItems().Single(item => item.Identifier == "GET /users/{id}").Identifier,
+            Is.EqualTo("GET /users/{id}"));
     }
 
     [Test]
@@ -375,7 +415,7 @@ public class OpenApiCoverageCollectorTests
             "Users", "http.response", "GET /users/42",
             new RestResponseData("GET", "/users/42", 200, "{}", headers)));
 
-        var endpoint = collector.GetReportItems().Single();
+        var endpoint = collector.GetReportItems().Single(item => item.Identifier == "GET /users/{id:int}");
         Assert.Multiple(() =>
         {
             Assert.That(endpoint.Identifier, Is.EqualTo("GET /users/{id:int}"));
@@ -416,7 +456,8 @@ public class OpenApiCoverageCollectorTests
                 RouteTemplate = "/health"
             }));
 
-        var root = collector.GetReportItems().Single().Children!
+        var root = collector.GetReportItems()
+            .Single(item => item.Identifier == "GET /health").Children!
             .Single(child => child.Identifier == "200").Children!
             .Single(child => child.Identifier == "$");
         using (Assert.EnterMultipleScope())
@@ -446,7 +487,8 @@ public class OpenApiCoverageCollectorTests
                 RouteTemplate = "/users/{id}"
             }));
 
-        var id = collector.GetReportItems().Single().Children!
+        var id = collector.GetReportItems()
+            .Single(item => item.Identifier == "GET /users/{id}").Children!
             .Single(child => child.Identifier == "200").Children!
             .Single(child => child.Identifier == "$.id");
         Assert.That(id.IsCovered, Is.True,
@@ -472,7 +514,8 @@ public class OpenApiCoverageCollectorTests
                 RouteTemplate = "/users/{id}"
             }));
 
-        var id = collector.GetReportItems().Single().Children!
+        var id = collector.GetReportItems()
+            .Single(item => item.Identifier == "GET /users/{id}").Children!
             .Single(child => child.Identifier == "200").Children!
             .Single(child => child.Identifier == "$.id");
         Assert.That(id.IsCovered, Is.True,
@@ -494,7 +537,8 @@ public class OpenApiCoverageCollectorTests
                 typeof(DummyPayload),
                 StatusCode: 200)));
 
-        var id = collector.GetReportItems().Single().Children!
+        var id = collector.GetReportItems()
+            .Single(item => item.Identifier == "GET /users/{id}").Children!
             .Single(child => child.Identifier == "200").Children!
             .Single(child => child.Identifier == "$.id");
         Assert.That(id.IsCovered, Is.False,
@@ -531,7 +575,7 @@ public class OpenApiCoverageCollectorTests
 
         Assert.That(collector.EndpointHits, Has.Count.EqualTo(1),
             "Only the method the spec describes becomes an endpoint hit.");
-        var endpoint = collector.GetReportItems().Single();
+        var endpoint = collector.GetReportItems().Single(item => item.Identifier == "GET /users/{id}");
         Assert.That(endpoint.Count, Is.EqualTo(1));
     }
     private sealed class TestTargetBuilder(string targetName, IServiceCollection services)

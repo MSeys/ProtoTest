@@ -187,12 +187,7 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
     /// <inheritdoc />
     public string Id => $"aspire:{typeof(TEntryPoint).FullName}";
 
-    IReadOnlyList<string> IProtoAspireAppHost.Resources => Resources;
-
     IReadOnlyList<string> IProtoAspireAppHost.PublishKeys => PublishKeys;
-
-    void IProtoAspireAppHost.AddPublish(string resource, string key, ProtoAspirePublishKind kind, bool replaceEndpoints)
-        => AddPublish(resource, key, kind, replaceEndpoints);
 
     /// <inheritdoc />
     public string Kind => ProtoCapabilityKinds.Aspire;

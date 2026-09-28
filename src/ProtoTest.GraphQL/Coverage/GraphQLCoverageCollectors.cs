@@ -24,6 +24,7 @@ public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector
         ["type ", "schema ", "extend ", "directive ", "scalar ", "enum ", "interface ", "union ", "input ", "#"];
 
     private readonly GraphQLSchemaIndex _schema;
+    private readonly IReadOnlyDictionary<string, object> _specIdentity;
     private readonly Dictionary<string, int> _fieldHits = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _argumentHits = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _inputFieldHits = new(StringComparer.Ordinal);
@@ -39,13 +40,17 @@ public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector
         var source = application["GraphQL:Schema"];
         if (string.IsNullOrWhiteSpace(source))
             throw new InvalidOperationException(ProtoApplication.MissingSettingMessage(applicationName, "GraphQL:Schema"));
-        _schema = GraphQLSchemaIndex.Parse(
-            ProtoDocumentSource.LoadText(source, application["BaseUrl"], inlinePrefixes: InlineSchemaPrefixes));
+        var content = ProtoDocumentSource.LoadText(source, application["BaseUrl"], inlinePrefixes: InlineSchemaPrefixes);
+        _specIdentity = ProtoSpecIdentity.Metadata(source, content);
+        _schema = GraphQLSchemaIndex.Parse(content);
     }
 
     public GraphQLSchemaCoverageCollector(string targetName, string schemaSource) : base(targetName)
-        => _schema = GraphQLSchemaIndex.Parse(
-            ProtoDocumentSource.LoadText(schemaSource, inlinePrefixes: InlineSchemaPrefixes));
+    {
+        var content = ProtoDocumentSource.LoadText(schemaSource, inlinePrefixes: InlineSchemaPrefixes);
+        _specIdentity = ProtoSpecIdentity.Metadata(schemaSource, content);
+        _schema = GraphQLSchemaIndex.Parse(content);
+    }
 
     public override string Category => "GraphQL schema";
 
@@ -84,7 +89,7 @@ public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector
     {
         lock (_lock)
         {
-            return _schema.Types.Values
+            return [SpecIdentityItem(), .. _schema.Types.Values
                 .Where(type => !type.Name.StartsWith("__", StringComparison.Ordinal))
                 .OrderBy(type => type.Name, StringComparer.Ordinal)
                 .Select(type => new ProtoReportItem(
@@ -153,9 +158,21 @@ public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector
                                 IsCovered: hits > 0,
                                 Metadata: new Dictionary<string, object> { ["type"] = field.Type });
                         }).ToArray())))
-                .ToArray();
+                ];
         }
     }
+
+    /// <summary>The aggregate item carrying the loaded schema's identity. It has no verdict, so the
+    /// coverage arithmetic and every existing report row stay untouched.</summary>
+    private ProtoReportItem SpecIdentityItem() => new(
+        TargetName,
+        Category,
+        ProtoSpecIdentity.ReportIdentifier,
+        Kind: ProtoReportItemKinds.Coverage,
+        Status: ProtoReportStatus.Neutral,
+        IsCovered: null,
+        Metadata: _specIdentity,
+        DisplayName: "Schema");
 
     private void VisitSelections(string typeName, SelectionSetNode selections,
         IReadOnlyDictionary<string, FragmentDefinitionNode> fragments,

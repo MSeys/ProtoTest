@@ -298,9 +298,13 @@ public sealed class AspireAppHostTests
                 "suite-settings",
                 new DeclaredSettingsInfrastructure("suite-settings", "Aspire:Test:SettingsEcho", "from-settings"))),
             "Aspire:Test:SettingsEcho");
-        builder.AddAspireAppHost<TestAppHostAnchor>("api", "echo", "settings-echo");
-        builder.MapConnectionString("echo", "ConnectionStrings:Echo");
-        builder.MapConnectionString("settings-echo", "ConnectionStrings:SettingsEcho");
+        builder.AddAspireAppHost<TestAppHostAnchor>(
+            options => options
+                .MapConnectionString("echo", "ConnectionStrings:Echo")
+                .MapConnectionString("settings-echo", "ConnectionStrings:SettingsEcho"),
+            "api",
+            "echo",
+            "settings-echo");
         await using var host = builder.Build();
 
         try

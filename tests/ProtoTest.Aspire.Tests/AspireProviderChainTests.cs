@@ -293,10 +293,11 @@ public sealed class AspireProviderChainTests
                 [ProtoAspireOptions.SelectionKey] = "true"
             }));
         builder.AddAspireAppHost<TestAppHostAnchor>(
-            options => options.Set("Aspire:Test:ConnectionString", "true"),
+            options => options
+                .Set("Aspire:Test:ConnectionString", "true")
+                .MapConnectionString("db", "ConnectionStrings:AppHost"),
             "api",
             "db");
-        builder.MapConnectionString("db", "ConnectionStrings:AppHost");
         await using var host = builder.Build();
 
         try

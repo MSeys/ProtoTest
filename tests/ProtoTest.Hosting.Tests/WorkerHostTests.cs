@@ -29,12 +29,18 @@ public sealed class WorkerHostTests
         var entities = host.Trace.Snapshot().Entities!
             .Where(entity => entity.Kind == ProtoCapabilityKinds.Worker)
             .ToArray();
+        var resolution = host.Trace.Snapshot().Entries!
+            .Single(entry => entry.Kind == ProtoTargetTrace.Resolved
+                && entry.Attributes["environment.target"] == "worker:Billing");
         Assert.Multiple(() =>
         {
             Assert.That(probe.Started, Is.True, "the worker's hosted service started with the run");
             Assert.That(probe.Stopped, Is.True, "the worker's hosted service stopped with the run");
             Assert.That(resolvedProbe, Is.SameAs(probe));
             Assert.That(host.HasCapability(ProtoCapabilityKinds.Worker, WorkerAssembly), Is.True);
+            Assert.That(host.HasCapability(ProtoCapabilityKinds.Clock), Is.True,
+                "the shorthand registers the hosted worker through its chain, so it bridges the test clock");
+            Assert.That(resolution.Attributes["environment.provider"], Is.EqualTo("host"));
             Assert.That(entities, Has.Length.EqualTo(1), "one worker entity is recorded");
             Assert.That(entities[0].Id, Is.EqualTo("Billing"));
         });

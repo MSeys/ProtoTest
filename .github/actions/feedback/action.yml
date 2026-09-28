@@ -1,0 +1,87 @@
+name: ProtoTest Feedback
+description: >-
+  Posts a ProtoTest run's digest where a pull request reads it, gates the pull request against a
+  baseline report and uploads the trace. The comment needs `issues: write` permission in the calling
+  workflow; the other channels need nothing.
+author: ProtoTest
+
+inputs:
+  trace:
+    description: Path to the .prototrace file the run produced.
+    required: true
+  baseline-report:
+    description: Path to the baseline JSON report (from the default branch) for `prototest verify`. Empty skips the verdict step.
+    required: false
+    default: ''
+  current-report:
+    description: Path to the current run's JSON report. Required with baseline-report.
+    required: false
+    default: ''
+  webhook-url:
+    description: Post the digest JSON to this URL.
+    required: false
+    default: ''
+  webhook-secret:
+    description: Value of the shared-secret header sent with the webhook post.
+    required: false
+    default: ''
+  webhook-secret-header:
+    description: Name of the shared-secret header.
+    required: false
+    default: X-ProtoTest-Secret
+  artifact-name:
+    description: Name of the uploaded trace artifact.
+    required: false
+    default: prototest-trace
+  version:
+    description: Version of the ProtoTest.Cli tool to install, for example 1.1.0.
+    required: false
+    default: ''
+  dotnet-roll-forward:
+    description: DOTNET_ROLL_FORWARD for the CLI, so the net8 tool runs on a newer runtime.
+    required: false
+    default: LatestMajor
+
+outputs:
+  artifact-url:
+    description: The uploaded trace artifact's URL, the link the comment carries.
+    value: ${{ steps.trace.outputs.artifact-url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install the ProtoTest CLI
+      shell: pwsh
+      run: |
+        if ("${{ inputs.version }}" -eq '') {
+          dotnet tool update --global ProtoTest.Cli
+        }
+        else {
+          dotnet tool update --global ProtoTest.Cli --version "${{ inputs.version }}"
+        }
+
+    - name: Upload the trace
+      id: trace
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ inputs.trace }}
+        if-no-files-found: error
+
+    - name: Post the feedback digest
+      shell: pwsh
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        PROTOTEST_FEEDBACK_TRACE_URL: ${{ steps.trace.outputs.artifact-url }}
+        PROTOTEST_FEEDBACK_WEBHOOK_URL: ${{ inputs.webhook-url }}
+        PROTOTEST_FEEDBACK_WEBHOOK_SECRET: ${{ inputs.webhook-secret }}
+        PROTOTEST_FEEDBACK_WEBHOOK_SECRET_HEADER: ${{ inputs.webhook-secret-header }}
+        DOTNET_ROLL_FORWARD: ${{ inputs.dotnet-roll-forward }}
+      run: prototest feedback "${{ inputs.trace }}"
+
+    - name: Verify against the baseline report
+      if: always() && inputs.baseline-report != '' && inputs.current-report != ''
+      shell: pwsh
+      env:
+        DOTNET_ROLL_FORWARD: ${{ inputs.dotnet-roll-forward }}
+      run: prototest verify "${{ inputs.baseline-report }}" "${{ inputs.current-report }}"

@@ -203,7 +203,16 @@ Assert.That(click.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
 
 To add your own entries, see [Extending ProtoTest](../advanced/extending.md#adding-to-the-trace). To forward operations to an observability backend, see [OpenTelemetry](./opentelemetry.md).
 
+`ProtoTraceDiscovery.Discover(folder)` lists the readable runs a folder holds, newest first, and names the archives it had to skip; it is the scan the `prototest` CLI and the MCP server share.
+
 Without a browser, `ProtoTest.Traces` reads the archive and the `prototest` CLI prints the failure digest:
-`prototest trace summary TestResults/Shop.prototrace` lists the run, the outcome counts, and every test that did
+`prototest summary TestResults/Shop.prototrace` lists the run, the outcome counts, and every test that did
 not fully succeed with its error, source location and failing operation. It is the same compact story a CI log
 or an agent can use.
+
+`prototest index TestResults` writes a static `index.html` over the folder of runs: each run's outcome counts,
+the tests that did not pass and links to its trace and its `<trace>.digest.json` digest, plus any archive that
+could not be read and the reason. The page is one file beside the traces, so a folder of evidence can be shared
+without a server.
+
+A coding agent reads the same story through the MCP server; see [Agent workflows](../agent-workflows/coding-agents.md).

@@ -28,9 +28,22 @@ internal static class TraceFixtures
         var failing = await host.StartTestAsync("reader fail", "00071", TestMethods.Placeholder);
         using (var check = failing.Trace.Operation("reader.check", "Check", "ProtoTest.Traces.Tests").Begin())
         {
+            check.AddSection(new ProtoTraceSection(
+                "Result",
+                ProtoTraceSectionKind.Checks,
+                [new ProtoTraceSectionItem("check", "1 failure", "The check failed.", ProtoTraceSectionTone.Error)]));
+            failing.Trace.Value(
+                "value",
+                "reader:value-1",
+                "Reader value",
+                "changed",
+                new Dictionary<string, string?> { ["reader.state"] = "checked" });
             check.Fail(new InvalidOperationException("The check failed."));
         }
 
+        failing.Trace.Observation("Reader", "reader.observation", "reader/one");
+        failing.Trace.Finding("A reader finding.", "Warning", "Reader");
+        failing.AddAttachment("reader-failure.json", """{"reason":"check"}""", "application/json", "The failure payload.");
         await host.CompleteTestAsync(ProtoTestResult.Failed(new InvalidOperationException("The check failed.")));
         await host.StopAsync();
     }
@@ -51,5 +64,64 @@ internal static class TraceFixtures
                 File.Delete(path);
             }
         }
+    }
+
+    /// <summary>Writes a trace with one passing test to the given path.</summary>
+    public static async Task WritePassingAsync(string path)
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options =>
+        {
+            options.OutputPath = path;
+            options.EmbedSources = false;
+        });
+        await using var host = builder.Build();
+        await host.StartAsync();
+
+        var passing = await host.StartTestAsync("index pass", "00080", TestMethods.Placeholder);
+        using (var work = passing.Trace.Operation("index.work", "Work", "ProtoTest.Traces.Tests").Begin())
+        {
+            work.Succeed();
+        }
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+    }
+
+    /// <summary>Writes a trace with a passing, a skipped and a failing test to the given path.</summary>
+    public static async Task WriteMixedAsync(string path)
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options =>
+        {
+            options.OutputPath = path;
+            options.EmbedSources = false;
+        });
+        await using var host = builder.Build();
+        await host.StartAsync();
+
+        var passing = await host.StartTestAsync("index pass", "00080", TestMethods.Placeholder);
+        using (var work = passing.Trace.Operation("index.work", "Work", "ProtoTest.Traces.Tests").Begin())
+        {
+            work.Succeed();
+        }
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+
+        await host.StartTestAsync("index skip", "00081", TestMethods.Placeholder);
+        await host.CompleteTestAsync(ProtoTestResult.Skipped);
+
+        var failing = await host.StartTestAsync("index fail", "00082", TestMethods.Placeholder);
+        using (var check = failing.Trace.Operation("index.check", "Check", "ProtoTest.Traces.Tests").Begin())
+        {
+            check.AddSection(new ProtoTraceSection(
+                "Result",
+                ProtoTraceSectionKind.Checks,
+                [new ProtoTraceSectionItem("check", "1 failure", "The check failed.", ProtoTraceSectionTone.Error)]));
+            check.Fail(new InvalidOperationException("The check failed."));
+        }
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(new InvalidOperationException("The check failed.")));
+        await host.StopAsync();
     }
 }

@@ -50,23 +50,6 @@ public static class SheetModelAssertions
     }
 
     /// <summary>
-    /// Matches one table row against an expected shape and traces the assertion. A table row has no
-    /// record to serialize, so the shape is keyed by each column's leaf header name and each value is
-    /// the cell's rendered value (an empty cell is null); a table whose columns share a leaf name
-    /// fails instead of guessing. Returns the row.
-    /// </summary>
-    /// <remarks>Obsolete: use <c>row.Should.MatchShape(shape)</c>.</remarks>
-    [Obsolete("Use row.Should.MatchShape(shape) instead.")]
-    public static ProtoTableRow ShouldMatchShape(
-        this ProtoTableRow row,
-        object expectedShape,
-        JsonSerializerOptions? options = null)
-    {
-        ArgumentNullException.ThrowIfNull(row);
-        return row.Should.MatchShape(expectedShape, options);
-    }
-
-    /// <summary>
     /// The one traced shape assertion behind the model-row extension and
     /// <see cref="ProtoTableRowAssertions.MatchShape"/>. The caller supplies the context the
     /// assertion belongs to: the ambient one for a model row, the owning table's for a table row. A

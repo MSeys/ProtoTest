@@ -83,7 +83,7 @@ builder
 
 The registration is keyed by `(TProgram, application)`: a second application, or a second program, gets its own transport, and a client is only routed through the transport of the application it was registered under - two applications exposing the same path each serve their own clients. A client that has only a path (no address resolver) and no matching in-process transport fails naming the application instead of falling back to another transport.
 
-A hand-written in-process transport applies `ProtoTestContextPropagation.ApplyTo(HttpRequest)` (from `ProtoTest.AspNetCore`) to the request it opens, so the handshake carries the test id and the application's clock bridge pushes the connecting test's clock, exactly like the in-process HTTP client. The shared connect bound lives in `ProtoTest.Devices`: `ProtoDeviceConnect.WithTimeoutAsync` bounds the connect with the registered `ConnectTimeout` and reports an elapsed attempt as a `TimeoutException` naming the endpoint; the socket, in-process and MQTT transports all use it. `ProtoTest.Devices.WebSocket.ProtoDeviceConnect` stays as an obsolete alias for the old location.
+A hand-written in-process transport applies `ProtoTestContextPropagation.ApplyTo(HttpRequest)` (from `ProtoTest.AspNetCore`) to the request it opens, so the handshake carries the test id and the application's clock bridge pushes the connecting test's clock, exactly like the in-process HTTP client. The shared connect bound lives in `ProtoTest.Devices`: `ProtoDeviceConnect.WithTimeoutAsync` bounds the connect with the registered `ConnectTimeout` and reports an elapsed attempt as a `TimeoutException` naming the endpoint; the socket, in-process and MQTT transports all use it.
 
 ## MQTT
 

@@ -18,7 +18,7 @@ public static class ProtoAssertion
 
     /// <summary>
     /// Describes an expectation the way a reader should see it, prefixing "not " for a negated
-    /// assertion — for example "be visible" or "not be visible".
+    /// assertion, as in "be visible" or "not be visible".
     /// </summary>
     /// <param name="expectation">The expectation in its positive form, such as "be visible".</param>
     /// <param name="negated">Whether the assertion asks for the opposite of the check.</param>

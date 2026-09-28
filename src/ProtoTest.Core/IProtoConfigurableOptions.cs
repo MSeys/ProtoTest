@@ -12,11 +12,10 @@ public interface IProtoConfigurableOptions
     string ConfigurationSectionName { get; }
 
     /// <summary>
-    /// An optional section that still binds when <see cref="ConfigurationSectionName"/> was renamed, so a
-    /// suite written against the old key keeps working. The fallback binds first and
-    /// <see cref="ConfigurationSectionName"/> binds over it, so a value under the current section wins.
-    /// Defaults to <see langword="null"/> (no fallback). An integration documents a renamed key as
-    /// deprecated and removes the fallback at the next major.
+    /// An optional older section name a suite may still configure, so a key the type has since renamed
+    /// keeps working. The fallback binds first and <see cref="ConfigurationSectionName"/> binds over it,
+    /// so a value under the current section wins. Defaults to <see langword="null"/> (no fallback). An
+    /// integration documents a renamed key as deprecated and removes the fallback at the next major.
     /// </summary>
     string? FallbackConfigurationSectionName => null;
 

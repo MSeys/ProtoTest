@@ -146,8 +146,8 @@ public sealed class InProcessDeviceCharacterizationTests
         var device = Proto.Context.Devices("Chargers").For<EchoDevice>("CP-001");
         string ack;
         // The task starts with no captured flow, so the ambient Proto.Context is absent; the session's
-        // own context must open the connection (before the fix this threw "outside one"). The
-        // suppression is undone on this same thread because the block never awaits.
+        // own context must open the connection. The suppression is undone on this same thread because
+        // the block never awaits.
         using (ExecutionContext.SuppressFlow())
         {
             ack = Task.Run(() => device.BootAsync().AsTask()).GetAwaiter().GetResult();

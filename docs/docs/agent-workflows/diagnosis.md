@@ -15,27 +15,19 @@ dotnet tool install --global ProtoTest.Cli
 prototest summary TestResults/run.prototrace
 ```
 
-Here is that output from the repository's demo trace. It is abridged; every test that did not fully succeed gets a block like these.
+Here is that output for the committed MCP test fixture, `tests/ProtoTest.Mcp.Tests/Fixtures/run-failed.prototrace`. It is abridged; every test that did not fully succeed gets a block like these.
 
 ```text
-ProtoTest trace 2.0 · run f5b45975fad043ef894fe67988e231b6 · 2026-09-20 10:32:18Z - 2026-09-20 10:32:25Z
-44 tests · 2 failed · 2 partial · 40 succeeded
+ProtoTest trace 2.0 · run 29e344f9cf54431ca7d8bad3f87a1749 · 2026-09-28 09:55:33Z - 2026-09-28 09:55:33Z
+2 tests · 1 failed · 1 succeeded
 
-PARTIAL ProtoTest.Demo.DiagnosticsShowcase.AFailedOperationRecordsItsDiagnosticsAndTheRunContinues (56 ms)
-  The billing ledger did not acknowledge the webhook within 2 seconds.
-  at samples/ProtoTest.Demo/DiagnosticsShowcase.cs:64 (ProtoTest.Demo.DiagnosticsShowcase.AFailedOperationRecordsItsDiagnosticsAndTheRunContinues)
-  northstar.webhook.deliver Deliver subscription webhook · failed
-  cause: operation error
-
-FAILED ProtoTest.Demo.DiagnosticsShowcase.TheOrganizationReportsItsPlanAndProjectCount (47 ms)
-  Shape mismatch failed with 2 error(s):
-    [$.projectCount]: Values did not match. (Expected: '99', Actual: '0')
-    [$.planId]: Values did not match. (Expected: "nonexistent-plan", Actual: "free")
-  at samples/ProtoTest.Demo/DiagnosticsShowcase.cs:121 (ProtoTest.Demo.DiagnosticsShowcase.TheOrganizationReportsItsPlanAndProjectCount)
-  assert.json.shape Assert response shape · failed
-  cause: assertion (2 mismatches)
-  mismatch: $.projectCount: expected 99, actual 0
-  mismatch: $.planId: expected nonexistent-plan, actual free
+FAILED orders match their shape (16 ms)
+  Shape mismatch failed with 1 error(s):
+    • [$.orderId]: Values did not match. (Expected: '7', Actual: '42')
+  at artifacts/fixture-gen/Program.cs:65 (Program.<<Main)
+  assert.json.shape assert.json.shape · failed
+  cause: assertion (1 mismatch)
+  mismatch: $.orderId: expected 7, actual 42
 ```
 
 The summary reads top to bottom:
@@ -61,30 +53,30 @@ The summary reads top to bottom:
 | `gates`, `findings` | the run's own verdicts and the evidence tests recorded |
 | `coverage` or `coverageAbsentReason` | the totals the embedded report published, or why there is no report |
 
-`get_failure` returns one test's failure entry when the agent wants the short version. A trimmed result from the demo trace:
+`get_failure` returns one test's failure entry when the agent wants the short version. A trimmed result from the same fixture:
 
 ```json
 {
-  "runId": "f5b45975fad043ef894fe67988e231b6",
+  "runId": "29e344f9cf54431ca7d8bad3f87a1749",
   "test": {
-    "testId": "908098000013",
-    "name": "ProtoTest.Demo.DiagnosticsShowcase.AFailedOperationRecordsItsDiagnosticsAndTheRunContinues",
-    "outcome": "partial",
-    "durationMs": 56.4434
+    "testId": "00002",
+    "name": "orders match their shape",
+    "outcome": "failed",
+    "durationMs": 16.4395
   },
   "failure": {
-    "kind": "northstar.webhook.deliver",
-    "name": "Deliver subscription webhook",
+    "kind": "assert.json.shape",
+    "name": "assert.json.shape",
     "phase": "execution",
     "status": "failed",
-    "errorType": "System.TimeoutException",
-    "errorMessage": "The billing ledger did not acknowledge the webhook within 2 seconds.",
-    "sourceFile": "samples/ProtoTest.Demo/DiagnosticsShowcase.cs",
-    "sourceLine": 64
+    "errorType": "ProtoTest.Json.JsonShapeMismatchException",
+    "errorMessage": "Shape mismatch failed with 1 error(s):\r\n  • [$.orderId]: Values did not match. (Expected: '7', Actual: '42')",
+    "sourceFile": "artifacts/fixture-gen/Program.cs",
+    "sourceLine": 65
   },
   "artifacts": [
-    { "name": "908098000013-rest-01-response", "mediaType": "application/json", "sizeBytes": 415 },
-    { "name": "908098000013-scenario-summary.json", "mediaType": "application/json", "sizeBytes": 243 }
+    { "name": "00002-rest-01-expected-shape", "mediaType": "application/json", "sizeBytes": 29 },
+    { "name": "00002-rest-01-response.json", "mediaType": "application/json", "sizeBytes": 30 }
   ]
 }
 ```

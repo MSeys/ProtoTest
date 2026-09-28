@@ -3,8 +3,8 @@ namespace ProtoTest.Core.Tests;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Characterization for <see cref="ProtoTestHostLifetime"/>. These tests pin its observable behavior —
-/// including the check-then-act window — and observe per-host behavior instead of the process-wide
+/// Characterization for <see cref="ProtoTestHostLifetime"/>. These tests pin its observable behavior,
+/// including the check-then-act window, and observe per-host behavior instead of the process-wide
 /// host registry, because the suite runs fixtures in parallel and the registry is shared.
 /// </summary>
 [TestFixture]

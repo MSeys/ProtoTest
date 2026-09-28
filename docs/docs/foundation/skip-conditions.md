@@ -42,7 +42,7 @@ The test runs when `ProtoHost.HasCapability(kind, CapabilityName, CapabilityInst
 Integrations register a capability when they are configured, so the condition answers what the host *can actually do* rather than what it was asked to do. `ProtoCapabilityKinds` lists the built-in kinds — `server`, `protocol`, `browser`, `store`, `broker`, `data`, `document` — and an integration may use its own. Use `CapabilityName` to require one specific capability of that kind:
 
 ```csharp
-[RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "Northstar standalone")]
+[RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "ASP.NET Core")]
 ```
 
 An integration whose capability depends on an address can declare it conditionally: `AddCapabilityUnlessConfigured(capability, "ProtoTest:Applications:Api:BaseUrl")` drops the declaration when every listed key is already configured — the environment provides the address, so the capability stays honest and the tests that require it skip. `AddAspNetCoreServer` uses this: with `BaseUrl` configured its `ASP.NET Core` capability is absent and `[RequiresInProcess]` skips. A declaration is evaluated on its own: a descriptor drops only when *every* conditional declaration for it drops and no unconditional declaration promises it, and a capability that describes one instance (a named server or application) carries that instance in `ProtoCapabilityDescriptor.Instance`, so satisfying one instance's keys drops only that instance while another live instance keeps its capability.
@@ -90,8 +90,8 @@ builder.AddCapabilityReason(
 ```csharp
 builder.AddCapabilityReason(
     ProtoCapabilityKinds.Server,
-    "The standalone console is only started when the suite owns the store.",
-    "Northstar standalone");
+    "The Api server is only hosted in-process.",
+    "Api");
 ```
 
 A gate whose `(kind, name)` has no declared reason falls back to its default message, so a suite can state the common reasons and leave the rest. `[RequiresApplication]` checks that an application was declared rather than a capability, so it keeps its own `Reason`/default.
@@ -188,12 +188,12 @@ Because nothing starts, a skipped test has no context, no trace record and no re
 
 ## In the sample suite
 
-The demo gates each environment-dependent journey with a condition:
+The Learning demo gates each environment-dependent journey with a condition:
 
 - `DomainAccessJourney` requires `ProtoCapabilityKinds.Store`, because composing the test-side domain needs a store the suite can connect to;
-- the console journeys — `WebJourney`, `ApiThenBrowserJourney` and `BrowserThenApiJourney` — require the named `"Northstar standalone"` server, because only the standalone instance gives browser tests an address, and the demo's `RequiresConsoleBuild` skips them when the Vue SPA has not been built;
-- `MessagingJourney` requires `ProtoCapabilityKinds.Broker`, and the broker capability only exists when a real broker adapter is configured.
+- `WebJourney` requires the Playwright browser (`[RequiresPlaywrightBrowser]`), so it skips when no browser is installed; its address comes from the loopback listener the run starts, or from the configured `ProtoTest:Applications:Northstar web:BaseUrl` in a published run;
+- `BrokerJourney` requires `ProtoCapabilityKinds.Broker`, and the broker capability only exists when a real broker adapter is configured.
 
-The broker reason and the `"Northstar standalone"` server reason are each declared once in the demo's `Setup` with `AddCapabilityReason`; the console messaging journey keeps its own `Reason` for the server gate, which is the per-test override.
+The broker reason is declared once in the demo's `Setup` with `AddCapabilityReason`.
 
 `[RequiresInProcess]` itself is exercised by the repository's own NUnit tests (`tests/ProtoTest.NUnit.Tests/SkipConditionTests.cs`).

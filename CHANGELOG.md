@@ -533,6 +533,11 @@ All ProtoTest packages share one version; breaking API changes are called out be
   after another: the taps are independent, every tap is still attempted and a failure in one never stops
   the others. Three tapped destinations drop from about 17 ms to about 13 ms of per-test teardown
   (`PerTestTapLifecycle_ShouldStayWithinTheSanityBound` in `tests/ProtoTest.Messaging.RabbitMq.Tests`).
+- A RabbitMQ test consumer prepares its taps concurrently: one channel per tap, every destination
+  attempted, and a failed preparation recorded per destination instead of stopping the rest. The
+  `PrepareAsync` contract states that preparation may run destinations in parallel, and three tapped
+  destinations drop from about 16 ms to about 11-12 ms of per-test preparation (the OpenCSMS benchmark
+  moves from 44.4 ms to about 35-36 ms per test).
 - The ProtoTrace docs now state what `Enabled = false` does: no archive, no activity listener, and no
   in-memory operations or records; the run snapshot still lists each test with its outcome, and reports
   and run gates (which read report items) are unaffected.

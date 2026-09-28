@@ -46,7 +46,7 @@ public sealed class RegistrationIdempotencyTests
         await host.StartAsync();
         var context = await host.StartTestAsync("sheets compose", TestMethods.Placeholder);
 
-        // Both callbacks run in registration order; the old first-wins behavior would leave this false.
+        // Both callbacks run in registration order; a first-wins registration would leave this false.
         Assert.That(context.Service<SheetsOptions>().IncludeHiddenSheets, Is.True);
         await host.CompleteTestAsync(ProtoTestResult.Passed);
         await host.StopAsync();

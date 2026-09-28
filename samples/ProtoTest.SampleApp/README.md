@@ -1,6 +1,6 @@
 # ProtoTest.SampleApp
 
-**Northstar** — a multi-tenant release/deployment control-plane SaaS and the application under
+**Northstar**: a multi-tenant release/deployment control-plane SaaS and the application under
 test in the [Learning demo suite](../Northstar.ProtoTest/README.md). It is a real runnable
 ASP.NET Core application rather than a mock server.
 
@@ -25,15 +25,15 @@ Errors are `application/problem+json` with a stable `code`. `POST` requests hono
 
 These routes exist only so tests can create an isolated tenant and control time. They are a development
 affordance: the surface is mapped only when `ProtoTest:TestSupport` is `1` or `true`, so a published
-deployment that does not opt in returns 404 — and the testing layer then fails with a message naming the
+deployment that does not opt in returns 404, and the testing layer then fails with a message naming the
 flag instead of a bare status assertion. `GET /test-support` answers 200 while the surface is enabled.
 
-- `POST /test-support/tenants` — provision an organization with an owner and token
-- `DELETE /test-support/tenants/{slug}` — remove the organization and everything in it
-- `POST /test-support/tenants/{slug}/members` — create a member with a specific role
-- `POST /test-support/tenants/{slug}/clock/advance` — move the tenant's virtual clock
-- `POST /test-support/webhook-sinks` — a configurable webhook receiver for tests
-- `GET /test-support/webhook-sinks/{sinkId}/receipts` — what the receiver was sent
+- `POST /test-support/tenants`: provision an organization with an owner and token
+- `DELETE /test-support/tenants/{slug}`: remove the organization and everything in it
+- `POST /test-support/tenants/{slug}/members`: create a member with a specific role
+- `POST /test-support/tenants/{slug}/clock/advance`: move the tenant's virtual clock
+- `POST /test-support/webhook-sinks`: a configurable webhook receiver for tests
+- `GET /test-support/webhook-sinks/{sinkId}/receipts`: what the receiver was sent
 
 ## Behaviour you can rely on
 

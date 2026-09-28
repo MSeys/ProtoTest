@@ -277,7 +277,11 @@ if (-not $keyCrossCheckSkipped) {
     }
 }
 
-# 4. Sample links ---------------------------------------------------------------
+# 4. Repository paths -----------------------------------------------------------
+
+# Two views of one rule: a markdown link into the repository must resolve, and so must a repository
+# path a page or component names in prose. The prose half catches a retired path the link check
+# cannot see, because no link markup is there to follow.
 
 $linkPattern = [regex]'\]\(([^()\s]+)\)'
 foreach ($file in $docsContentFiles) {
@@ -292,7 +296,7 @@ foreach ($file in $docsContentFiles) {
             $path = ($path -split '\?')[0]
             if ($path -eq '') { continue }
 
-            if ($path -match '^(samples|tests)/') {
+            if ($path -match '^(samples|src|tests)/') {
                 # A target already rooted at the repository.
                 $resolved = [System.IO.Path]::GetFullPath((Join-Path $repository $path))
                 $repoRelative = $path
@@ -305,9 +309,28 @@ foreach ($file in $docsContentFiles) {
                 $repoRelative = Get-RelativePath $resolved
             }
 
-            if ($repoRelative -notmatch '^(samples|tests)/') { continue }
+            if ($repoRelative -notmatch '^(samples|src|tests)/') { continue }
             if (-not (Test-Path -LiteralPath $resolved)) {
                 $linkFailures.Add(("{0}:{1}: '{2}' does not resolve to '{3}'" -f $relative, ($lineNumber + 1), $target, $repoRelative))
+            }
+        }
+    }
+}
+
+# A rooted `samples/` or `src/` reference is a path into this repository unless it belongs to another
+# layout (Next.js's `src/pages`): this repository names its projects in PascalCase, so a lowercase
+# first segment is prose about another tree and is left alone. Relative links were resolved above.
+$repoPathPattern = [regex]'(?<![\w./\\-])(samples|src)/([A-Za-z0-9_.\-]+(?:/[A-Za-z0-9_.\-]+)*)'
+foreach ($file in @($docsContentFiles + $docsSourceFiles)) {
+    $relative = Get-RelativePath $file.FullName
+    $lines = @(Get-Content -LiteralPath $file.FullName)
+    for ($lineNumber = 0; $lineNumber -lt $lines.Count; $lineNumber++) {
+        foreach ($match in $repoPathPattern.Matches($lines[$lineNumber])) {
+            $firstSegment = $match.Groups[2].Value.Split('/')[0]
+            if ($firstSegment -cnotmatch '[A-Z]') { continue }
+            $path = $match.Value.TrimEnd('.', ',', ';', ':')
+            if (-not (Test-Path -LiteralPath (Join-Path $repository $path))) {
+                $linkFailures.Add(("{0}:{1}: '{2}' names no file in the repository" -f $relative, ($lineNumber + 1), $path))
             }
         }
     }
@@ -351,7 +374,7 @@ if ($totalFailures -gt 0) {
         foreach ($failure in $keyFailures) { Write-Host "    $failure" }
     }
     if ($linkFailures.Count -gt 0) {
-        Write-Host ("  Sample links ({0}):" -f $linkFailures.Count)
+        Write-Host ("  Repository paths ({0}):" -f $linkFailures.Count)
         foreach ($failure in $linkFailures) { Write-Host "    $failure" }
     }
     if ($releaseFailures.Count -gt 0) {

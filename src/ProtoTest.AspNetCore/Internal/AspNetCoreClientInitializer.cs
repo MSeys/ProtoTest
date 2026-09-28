@@ -179,9 +179,8 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
 
         // A configured address means the application runs elsewhere - published, container-backed, or
         // started by infrastructure. The in-process server steps aside and the address serves the
-        // application's HTTP clients instead; this is the same registration a suite makes for every
-        // environment, with no mode conditional in Setup. HTTP clients read static configuration only:
-        // an address a started piece published belongs to the sessions that drive that process.
+        // application's HTTP clients instead. HTTP clients read static configuration only: an address a
+        // started piece published belongs to the sessions that drive that process.
         var address = ProtoApplication.BaseUrl(context.Configuration, Name);
         if (!string.IsNullOrWhiteSpace(address))
         {

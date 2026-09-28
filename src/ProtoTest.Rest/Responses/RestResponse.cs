@@ -84,7 +84,7 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
 
     /// <summary>
     /// Reads the value at <paramref name="jsonPath"/> as <typeparamref name="T"/> and fails when the
-    /// body is empty or the path holds JSON <c>null</c> — for every <typeparamref name="T"/>, including
+    /// body is empty or the path holds JSON <c>null</c>, for every <typeparamref name="T"/> including
     /// value types, because the null check runs before the deserializer. A path that does not resolve
     /// fails with the same subject and path as
     /// <see cref="ReadAsJson{T}(string, JsonSerializerOptions?)"/>.

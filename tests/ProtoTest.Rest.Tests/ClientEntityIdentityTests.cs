@@ -7,8 +7,8 @@ using ProtoTest.Core;
 using ProtoTest.TestSupport;
 
 /// <summary>
-/// The request operation and the client's configuration link to one entity — the registry key the
-/// resolver actually hit — so a REST request's trace carries one client entity, not a logical name and
+/// The request operation and the client's configuration link to one entity (the registry key the
+/// resolver actually hit), so a REST request's trace carries one client entity, not a logical name and
 /// a protocol-scoped name pointing at separate entities.
 /// </summary>
 [TestFixture]

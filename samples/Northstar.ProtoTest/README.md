@@ -27,6 +27,89 @@ skips when Playwright's Chromium is not installed.
 - `FailureDrills` holds four deliberate failures, one per failure mode (time, state, environment,
   visibility), each paired with the green test that does the journey the right way.
 
+## What the lessons embed
+
+`eng/generate-lesson-traces.ps1` runs each test below and writes the trace to `docs/static/lessons/`.
+A lesson embeds the file it names, so the evidence is the run's own and a lesson never invents a
+failure.
+
+| Trace | Test | What the run proves | Used by |
+| --- | --- | --- | --- |
+| `l0-time-drill.prototrace` | `FailureDrills.ARealWaitDoesNotCloseTheDueWindow` | The drill fails: a real second does not close the test clock's due window. | L0, `FailureGallery`, L4 `TraceDiff` |
+| `l0-time-fix.prototrace` | `FailureDrills.TheTestClockClosesTheDueWindow` | The fix passes: `Clock.Advance` closes the window and paying the invoice succeeds. | L0, L1 `TraceAnatomy`, L4 `TraceDiff` |
+| `l0-state-drill.prototrace` | `FailureDrills.AnUnknownProjectIdIsTreatedAsMine` | The drill fails: the fixed id `prj_1` belongs to no test in the run. | L0, `FailureGallery`, L4 `TraceDiff` |
+| `l0-state-fix.prototrace` | `FailureDrills.EachTenantSeesOnlyItsOwnProjects` | The fix passes: the test lists only the project it created in its own tenant. | L0, L4 `TraceDiff` |
+| `l0-environment-drill.prototrace` | `FailureDrills.TheAddressWasHardcodedForOneMachine` | The drill fails outside the composition; the trace records no operation for the raw client. | L0, `FailureGallery`, L4 `TraceDiff` |
+| `l0-environment-fix.prototrace` | `FailureDrills.TheAddressComesFromTheComposition` | The fix passes: the same call through the composed client, address and all. | L0, L4 `TraceDiff` |
+| `l0-visibility-drill.prototrace` | `FailureDrills.ABareStatusHidesWhatTheApplicationSaid` | The drill fails on the status alone; the body that named the problem goes unread. | L0, `FailureGallery`, L4 `TraceDiff` |
+| `l0-visibility-fix.prototrace` | `FailureDrills.TheProblemBodyNamesTheCodeAndDetail` | The fix passes: the problem body is asserted, so the failure message names the code. | L0, L4 `TraceDiff` |
+| `l1-first-journey.prototrace` | `ProjectsJourney.CreatingAProjectReturnsIt` | One REST call with its request and response artifacts and the shape check. | L1, `AnnotatedCode`, `TraceAnatomy` |
+| `l2-broker-skip.prototrace` | `BrokerJourney.PayingAnInvoicePublishesAnInvoicePaidEvent` | The `Broker` capability is absent without a broker; the gated journey never starts. | L2 |
+| `l3-clock-window.prototrace` | `ClockJourney.ClosingTheBillingPeriodIssuesTheInvoiceOnTheTestClock` | The test clock closes the billing period; the run also carries the `/health` readiness entity. | L3 |
+| `l4-coverage.prototrace` | `PlatformJourney.RestWritesAreVisibleThroughGraphQL` | One REST write and one GraphQL read; the embedded report carries the contract coverage row the run recorded. | L4 |
+| `l4-artifacts.prototrace` | `SheetsJourney.TheMonthlyReport_ShouldMatchItsModel` | A downloaded workbook with its response artifact and the model assertions. | L4 |
+
+## Start from a clean file
+
+The first lesson writes its own test, runs it and reads the trace. The path is:
+
+1. Add `samples/Northstar.ProtoTest/MyFirstJourney.cs`:
+
+```csharp
+namespace Northstar.ProtoTest;
+
+using System.Net;
+using global::ProtoTest.Core;
+using global::ProtoTest.Http;
+using global::ProtoTest.NUnit;
+using global::ProtoTest.Rest;
+using global::ProtoTest.SampleApp.Contracts;
+
+[Application(NorthstarTargets.Api)]
+[NorthstarMember]
+public sealed class MyFirstJourney
+{
+    [ProtoTest]
+    [SignedInAs]
+    public async Task CreatingAProjectReturnsIt()
+    {
+        var name = $"first-{Proto.Context.TestId}";
+        using var created = await Proto.Context.Rest()
+            .Body(new CreateProjectRequest(name))
+            .PostAsync("/api/v1/projects");
+
+        created
+            .Should.HaveHttpStatus(HttpStatusCode.Created)
+            .Should.MatchShape(new { name, status = ProjectStatuses.Active });
+    }
+}
+```
+
+2. Run it from the repository root:
+
+```bash
+dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~MyFirstJourney"
+```
+
+3. Open `samples/Northstar.ProtoTest/bin/Debug/net8.0/TestResults/Northstar.ProtoTest/northstar.prototrace`
+   in the [trace viewer](https://trace.prototest.dev). It is the same journey as
+   `l1-first-journey.prototrace`, so the lesson's annotated trace and your own run line up.
+
+4. Delete `MyFirstJourney.cs`. The suite is unchanged and `git status` is clean.
+
+## Determinism in this suite
+
+The determinism lessons read these from the suite itself:
+
+- Readiness: `Setup.cs` registers `AddHttpReadiness` on `/health` for the loopback application, after
+  the application it probes. No test sleeps waiting for the application to come up.
+- The clock: the in-process server hands the application the test's `TimeProvider`, and `Setup.cs`
+  removes the domain's own provider so the bridge wins. `ClockJourney` and the time pair in
+  `FailureDrills` move that clock instead of waiting.
+- Parallel safety: `AssemblyInfo.cs` runs the suite with `ParallelScope.All` and eight workers. Each
+  test provisions its own tenant through `context.UniqueName`, and members are named from
+  `context.TestId`, so no two tests share an identifier. The traces show the per-test tenant cleanup.
+
 ## Container mode
 
 The suite owns the containers when asked, so the same tests run against PostgreSQL and RabbitMQ:

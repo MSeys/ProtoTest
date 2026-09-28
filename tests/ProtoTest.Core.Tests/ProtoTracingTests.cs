@@ -154,7 +154,7 @@ public sealed class ProtoTracingTests
         using var reader = new StreamReader(artifactStream);
         Assert.That(await reader.ReadToEndAsync(), Is.EqualTo("{\"status\":\"ready\"}"));
 
-        // spans.json carries everything the old run.json did: each artifact once on its resource group, attachment
+        // spans.json carries each artifact once on its resource group, the attachment
         // events that refer to it, and the run's timing and environment as resource attributes.
         using var spansReader = new StreamReader(archive.GetEntry("spans.json")!.Open());
         using var spans = JsonDocument.Parse(await spansReader.ReadToEndAsync());

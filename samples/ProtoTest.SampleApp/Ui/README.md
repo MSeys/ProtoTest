@@ -1,7 +1,7 @@
 # Northstar Console
 
 A Vue 3 + TypeScript + Vite single-page console for the Northstar sample application. It talks to the
-real `/api/v1` API and `/graphql` endpoint — there is no mock layer — and the .NET build never runs Node.
+real `/api/v1` API and `/graphql` endpoint (there is no mock layer), and the .NET build never runs Node.
 
 ## Run it
 

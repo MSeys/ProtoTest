@@ -1,0 +1,107 @@
+/* Two panes on the blueprint surface: the failing run keeps the danger edge, the passing one the success edge. */
+
+.tabs { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+
+.tab {
+  padding: var(--space-2) 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font: var(--weight-semibold) var(--text-meta) var(--font-ui);
+}
+
+.tab:hover { color: var(--text); }
+.tabActive { color: var(--text); border-bottom-color: var(--blueprint); }
+
+.panel { padding: var(--space-4); display: grid; gap: var(--space-4); }
+
+.ask { margin: 0; color: var(--muted); font-size: var(--text-meta); }
+
+.panes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-3);
+}
+
+.pane {
+  min-width: 0;
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--danger);
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+}
+
+.pane:last-child { border-top-color: var(--success); }
+
+.paneHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+
+.role { font-size: var(--text-meta); font-weight: var(--weight-bold); }
+
+.succeeded { color: var(--success); font: var(--weight-semibold) var(--text-micro) var(--font-ui); }
+.failed { color: var(--danger); font: var(--weight-semibold) var(--text-micro) var(--font-ui); }
+
+.who { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3); }
+
+/* Two classes so the site's inline-code chip cannot win over this rule. */
+.who .test {
+  min-width: 0;
+  padding: 0;
+  background: none;
+  color: var(--text);
+  font: var(--weight-semibold) var(--text-micro) var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.elapsed { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+
+.records { margin: 0; padding: 0; display: grid; gap: var(--space-1); list-style: none; }
+
+.records li {
+  padding: var(--space-2);
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: var(--surface-2);
+}
+
+.recordFailed { border-color: var(--danger-line); background: var(--danger-soft); }
+
+.recordHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); }
+
+.kind {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-chip);
+  background: var(--blueprint-soft);
+  color: var(--blueprint);
+  font: var(--weight-semibold) var(--text-micro) var(--font-mono);
+  line-height: 1.8;
+}
+
+.recordName { min-width: 0; font-size: var(--text-micro); font-weight: var(--weight-semibold); }
+
+.records .succeeded, .records .failed { margin-left: auto; }
+
+.detail {
+  color: var(--muted);
+  font: var(--text-micro)/1.55 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.change {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  border-radius: var(--radius-chip);
+  background: var(--blueprint-soft);
+  font-size: var(--text-meta);
+}
+
+.change strong { color: var(--blueprint); }

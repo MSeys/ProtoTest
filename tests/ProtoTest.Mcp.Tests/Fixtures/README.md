@@ -11,5 +11,7 @@ Two committed `.prototrace` archives written by the framework itself and read by
 
 They were produced by a throwaway console app that composes `ProtoHostBuilder`, records the
 shape assertion through `ProtoShapeAssertion`, and adds the report source and `JsonReportSink`;
-nothing is hand-written into the archives. `NoisyTrace` writes a third, uncommitted trace at test
-time when a test needs an oversized run (the token-budget test).
+nothing is hand-written into the archives. Their recorded source locations name that generator app
+(`artifacts/fixture-gen/Program.cs`), so the archives stay readable when the repository's sample
+suites change. `NoisyTrace` writes a third, uncommitted trace at test time when a test needs an
+oversized run (the token-budget test).

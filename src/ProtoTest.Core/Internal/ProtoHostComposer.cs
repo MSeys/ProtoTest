@@ -263,8 +263,7 @@ internal sealed class ProtoHostComposer(
         services.AddSingleton(resourceReportStore);
         services.AddSingleton<IProtoReportSource>(resourceReportStore);
         services.AddSingleton<IProtoReportSource>(runResources);
-        // The run's metadata is a report source itself: no key configured means no item, so a run
-        // without CI metadata reports exactly what it did before the option existed.
+        // The run's metadata is a report source itself: no key configured means no item.
         services.AddSingleton<IProtoReportSource>(serviceProvider =>
             serviceProvider.GetRequiredService<ProtoRunMetadata>());
     }

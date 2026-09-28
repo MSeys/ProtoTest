@@ -67,8 +67,8 @@ public sealed partial class WebModelTests
     [Test]
     public async Task SeleniumRelease_ShouldTraceWorkAbandonedOnThePump()
     {
-        // A pump stuck in a driver call no longer makes release silent - the bound
-        // expires, the in-flight work is named, and release does not hang.
+        // A pump stuck in a driver call is named: the bound expires, the in-flight work is
+        // reported, and release does not hang.
         using var entered = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
         var driver = new StubWebDriver

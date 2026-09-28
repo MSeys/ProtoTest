@@ -4,6 +4,9 @@ title: ProtoTrace
 description: "ProtoTrace records every hook, client, request, check and state change of a run into one portable file, readable in the browser-based viewer."
 ---
 
+import TraceAnatomy from '@site/src/components/TraceAnatomy';
+import TraceDiff from '@site/src/components/TraceDiff';
+
 # ProtoTrace
 
 ProtoTrace is ProtoTest's execution trace. Because ProtoTest coordinates the lifecycle and understands its integrations, it can record what happened in every test — hooks, attributes, clients, state, requests, browser actions, assertions, attachments, cleanup — **without a single logging line in your tests**. At the end of the run, everything is written to one portable `.prototrace` file.
@@ -109,6 +112,12 @@ The in-process server is also a state entity with id `server:{type}` — `{type}
 
 Sensitive values stay out: form fills are recorded by length, headers and JSON properties are redacted using the [same rules as attachments](../integrations/rest/attachments.md#redaction), and sensitive query parameter values are redacted in HTTP request URLs and web navigation addresses.
 
+### A walk through one test
+
+The sample's `TheTestClockClosesTheDueWindow` was recorded with one of each layer in it. The walk below reads that trace layer by layer, including the parts the same file cannot show.
+
+<TraceAnatomy />
+
 ## Trace vs. observations
 
 They look similar and answer different questions:
@@ -128,6 +137,12 @@ The [ProtoTrace viewer](https://trace.prototest.dev) is a static web app. Trace 
 - **State** shows every tracked item with its lifeline and changes; select a change to jump to the operation that made it.
 - **Spans** is the complete, searchable tree.
 - **The inspector** shows everything one operation recorded — where in your code it started, request and response, JSON as a collapsible tree, the shape a check validated, what it changed — and every item's change trail. The address holds the selection, so a link opens the same place.
+
+### The same journey, two ways
+
+The Learning demo runs four deliberate failures next to the tests that do the same journey the right way. Pick a pair to compare what the trace recorded in each run.
+
+<TraceDiff />
 
 The viewer's source is in the repository under [`viewer/`](https://github.com/MSeys/ProtoTest/tree/main/viewer) if you'd rather host it yourself.
 

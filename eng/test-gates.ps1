@@ -354,6 +354,33 @@ using System.Runtime.CompilerServices;
         Assert-Fixture ($drift.Text.Contains("stale")) "the drift failure must say so: $($drift.Text)"
     }
 
+    # A repository path named in docs prose must resolve: the check that catches a retired path after
+    # its files were deleted, without waiting for the site build to fail on a bundled file.
+    Invoke-Fixture "check-docs-repository-paths" {
+        if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return "skip" }
+
+        $root = Join-Path $fixtureRoot "check-docs-repo-paths"
+        New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "samples/Real.Project"), (Join-Path $root "src/Real.Package") -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot "check-docs.ps1") -Destination (Join-Path $root "eng/check-docs.ps1")
+        Set-Content -LiteralPath (Join-Path $root "docs/scripts/generate-changelog.mjs") -Value "process.exit(0);" -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root "docs/configuration-keys.json") -Value '{"sections":[],"allowedKeys":[]}' -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root "samples/Real.Project/File.cs") -Value "// real" -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root "src/Real.Package/Options.cs") -Value "// real" -Encoding utf8
+
+        # Existing repository paths pass, and another layout's `src/pages` is not a repository path.
+        Set-Content -LiteralPath (Join-Path $root "docs/docs/page.md") -Value 'See `samples/Real.Project/File.cs` and `src/Real.Package/Options.cs`; a Next.js app keeps pages under `src/pages/`.' -Encoding utf8
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+        $text = $output -join [Environment]::NewLine
+        Assert-Fixture ($LASTEXITCODE -eq 0) "existing repository paths and a framework path must pass: $text"
+
+        # A prose path with nothing behind it fails and names the path.
+        Set-Content -LiteralPath (Join-Path $root "docs/docs/page.md") -Value 'The retired suite lived at `samples/Missing.Project/File.cs`.' -Encoding utf8
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+        $text = $output -join [Environment]::NewLine
+        Assert-Fixture ($LASTEXITCODE -ne 0) "a repository path with no file must fail: $text"
+        Assert-Fixture ($text.Contains("samples/Missing.Project/File.cs")) "the failure must name the path: $text"
+    }
+
     # Publishing from a branch ref fails before any push; dry runs stay allowed.
     Invoke-Fixture "release-branch-ref" {
         $root = New-FixtureRepository "release-branch-ref"

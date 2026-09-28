@@ -62,7 +62,7 @@ export default async function createConfig(): Promise<Config> {
       {
         hashed: true,
         indexBlog: false,
-        docsRouteBasePath: '/docs',
+        docsRouteBasePath: ['/docs', '/learn'],
         highlightSearchTermsOnTargetPage: true,
         explicitSearchResultPath: true,
       },
@@ -84,13 +84,8 @@ export default async function createConfig(): Promise<Config> {
           editUrl: 'https://github.com/MSeys/ProtoTest/tree/main/docs/',
           // Read from git: a page says when it last changed, which matters while the docs move with the code.
           showLastUpdateTime: true,
-          // The released documentation is frozen per version; docs/ follows the next one under /docs/next,
-          // so merging 1.1 work never moves a 1.0 page. At a release, cut the released version with
-          // `npm run docusaurus docs:version <version>` and move `lastVersion` forward.
-          lastVersion: '1.0',
-          versions: {
-            current: {label: '1.1 (in progress)', path: 'next'},
-          },
+          // One set of pages: the site documents the current release only, so `docs/docs` serves `/docs`
+          // directly and a release cuts no versioned snapshot.
         },
         blog: false,
         sitemap: {
@@ -100,6 +95,23 @@ export default async function createConfig(): Promise<Config> {
           customCss: './src/css/custom.css',
         },
       } satisfies Preset.Options,
+    ],
+  ],
+
+  // The Learn track is a second docs instance: its own content folder, URL and sidebar, so lessons read
+  // top to bottom instead of sitting inside the reference tree. The reference stays the only instance
+  // under `docs/docs`, so a doc belongs to exactly one sidebar.
+  plugins: [
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'learn',
+        path: 'learn',
+        routeBasePath: 'learn',
+        sidebarPath: './sidebars-learn.ts',
+        editUrl: 'https://github.com/MSeys/ProtoTest/tree/main/docs/',
+        showLastUpdateTime: true,
+      },
     ],
   ],
 
@@ -117,7 +129,7 @@ export default async function createConfig(): Promise<Config> {
     announcementBar: {
       id: 'release-1.0',
       content:
-        '<span class="announcement-preview">1.0</span> ProtoTest 1.0 is released - these pages are the 1.0 documentation. <a href="/docs/next/roadmap">What 1.1 will add</a> &nbsp; <a target="_blank" rel="noopener noreferrer" href="https://www.nuget.org/packages?q=ProtoTest">Install from NuGet</a>',
+        '<span class="announcement-preview">1.0</span> ProtoTest 1.0 is released. <a target="_blank" rel="noopener noreferrer" href="https://www.nuget.org/packages?q=ProtoTest">Install from NuGet</a>',
       isCloseable: true,
     },
     navbar: {
@@ -131,11 +143,17 @@ export default async function createConfig(): Promise<Config> {
         // The navbar holds what a reader reaches for most; the footer repeats every one of these, grouped.
         {
           type: 'docSidebar',
+          sidebarId: 'learnSidebar',
+          docsPluginId: 'learn',
+          position: 'left',
+          label: 'Learn',
+        },
+        {
+          type: 'docSidebar',
           sidebarId: 'docsSidebar',
           position: 'left',
           label: 'Docs',
         },
-        {type: 'docsVersionDropdown', position: 'left'},
         {to: '/docs/recipes/overview', label: 'Recipes', position: 'left'},
         {href: 'https://prototest.dev/api/', label: 'API reference', position: 'left'},
         {href: 'https://trace.prototest.dev', label: 'Trace viewer', position: 'left'},
@@ -164,6 +182,7 @@ export default async function createConfig(): Promise<Config> {
         {
           title: 'Learn',
           items: [
+            {label: 'Learn integration testing', to: '/learn/'},
             {label: 'Installation', to: '/docs/getting-started/installation'},
             {label: 'Your first test', to: '/docs/getting-started/first-test'},
             {label: 'Recipes', to: '/docs/recipes/overview'},

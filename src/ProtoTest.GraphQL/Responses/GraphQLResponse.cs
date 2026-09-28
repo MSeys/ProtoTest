@@ -270,7 +270,7 @@ public sealed class GraphQLResponse : ProtoHttpResponse
 
     /// <summary>
     /// Reads the value at <paramref name="jsonPath"/> as <typeparamref name="T"/> and fails when the
-    /// response has no data or the path holds JSON <c>null</c> — for every <typeparamref name="T"/>,
+    /// response has no data or the path holds JSON <c>null</c>, for every <typeparamref name="T"/>
     /// including value types, because the null check runs before the deserializer. A path that does not
     /// resolve fails through <see cref="ReadDataAs{T}(string, JsonSerializerOptions?)"/> with the
     /// operation and the path.
@@ -345,8 +345,7 @@ public sealed class GraphQLResponse : ProtoHttpResponse
             .With(attributes);
         if (negated)
         {
-            // The positive evidence is unchanged from the pre-facade assertions; the polarity is only
-            // recorded when there is one.
+            // The positive evidence stays the same; only a negated assertion records its polarity.
             scope = scope?.With("assertion.negated", "true");
         }
 

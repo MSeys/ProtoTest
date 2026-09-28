@@ -37,7 +37,7 @@ public class RestUriBuilderTests
     public void BuildUrl_Should_Reject_Unmatched_Tokens()
     {
         var template = "/api/v1/users/{userId}/posts/{postId}";
-        var paramsObj = new { userId = 42 }; // postId ontbreekt
+        var paramsObj = new { userId = 42 }; // postId is missing on purpose
 
         var exception = Assert.Throws<ArgumentException>(() =>
             RestUriBuilder.BuildTarget(template, paramsObj));

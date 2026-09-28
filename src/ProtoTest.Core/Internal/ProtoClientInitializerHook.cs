@@ -1,13 +1,13 @@
 namespace ProtoTest.Core.Internal;
 
 /// <summary>
-/// Global lifecycle hook responsible for selecting and executing a registered
-/// <see cref="IProtoClientInitializer"/> for each named client prior to test execution.
+/// Runs the registered <see cref="IProtoClientInitializer"/>s before each test, so every named client
+/// exists in the test's context before the body runs.
 /// </summary>
 internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitializer> initializers) : IProtoTestHook
 {
     /// <summary>
-    /// Set to <see cref="int.MinValue"/> to ensure clients are initialized before all other hooks.
+    /// Set to <see cref="int.MinValue"/> so clients initialize before every other hook.
     /// </summary>
     public int Order => ProtoHookOrder.First;
 

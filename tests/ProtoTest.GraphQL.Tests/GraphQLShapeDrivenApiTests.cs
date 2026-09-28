@@ -365,8 +365,8 @@ public sealed class GraphQLShapeDrivenApiTests
             Assert.Multiple(() =>
             {
                 Assert.That(document, Does.Contain("nodes"));
-                // The old IEnumerable-first path scanned KeyValuePair and selected its Key/Value
-                // members; the dictionary entries themselves are the selection now.
+                // A dictionary shape selects the entries themselves, never the KeyValuePair's
+                // Key/Value members.
                 Assert.That(document, Does.Not.Contain("key"));
                 Assert.That(document, Does.Not.Contain("value"));
             });

@@ -139,7 +139,7 @@ public async Task Health_endpoint_answers()
 }
 ```
 
-The sample suite's full registration — an in-process application sharing its store with the tests — is in [Setup.cs](../../../samples/ProtoTest.Demo/Setup.cs).
+The sample suite's full registration — an in-process application sharing its store with the tests — is in [Setup.cs](../../../samples/Northstar.ProtoTest/Setup.cs).
 
 ## Going further
 
@@ -376,4 +376,4 @@ asserting a time the application never saw.
 - [Web overview](./web/index.md) — sessions, options and page coverage.
 - [REST clients](./rest/index.md) and [GraphQL clients](./graphql/index.md) — the clients that reuse the in-process transport.
 - [Infrastructure](../foundation/infrastructure.md) — how run-scoped settings reach the application.
-- [Sample setup](../../../samples/ProtoTest.Demo/Setup.cs) — the demo's real registration.
+- [Sample setup](../../../samples/Northstar.ProtoTest/Setup.cs) — the demo's real registration.

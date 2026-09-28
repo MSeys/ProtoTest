@@ -8,11 +8,11 @@ public static class NorthstarTargets
     public const string Api = "Northstar";
 
     /// <summary>
-    /// The standalone console process the suite starts when it owns the store. It is its own
-    /// application, so one address authority per application holds: browser journeys target the
-    /// published process, API journeys target the in-process one.
+    /// The loopback instance that serves the application's pages for the browser journey. It is its
+    /// own application, so one address authority per application holds: the page journey follows the
+    /// listener's published address while API journeys use the in-process instance.
     /// </summary>
-    public const string Console = "Northstar console";
+    public const string Web = "Northstar web";
 }
 
 /// <summary>The organization provisioned for the current test, plus its owner token.</summary>

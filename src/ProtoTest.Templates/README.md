@@ -2,7 +2,7 @@
 
 This package contains a small starter project that you can generate, run and experiment with.
 
-For a larger (more complicated) example, see [ProtoTest.Demo](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.Demo).
+For a larger (more complicated) example, see [Learning demo](https://github.com/MSeys/ProtoTest/tree/main/samples/Northstar.ProtoTest).
 
 ## Quick start
 

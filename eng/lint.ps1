@@ -78,7 +78,7 @@ $allowedFriendEdgeNames = @('^DynamicProxyGenProxies')
 # support and the demo suite grant each other internals like one product would. They are allowed only
 # under samples/ and stay listed until the sample models the public-contract pattern; nothing under
 # src/ may ever join them.
-$allowedSampleFriendEdgeNames = @('^ProtoTest\.SampleApp$', '^Northstar\.ProtoTest$', '^ProtoTest\.Demo$')
+$allowedSampleFriendEdgeNames = @('^ProtoTest\.SampleApp$', '^Northstar\.ProtoTest$')
 $friendEdgeViolations = New-Object System.Collections.Generic.List[string]
 $friendEdgeFiles = Get-ChildItem -LiteralPath $repository -Recurse -File -Include *.cs,*.csproj |
     Where-Object { $_.FullName -notmatch $ignoredFriendEdgePaths }

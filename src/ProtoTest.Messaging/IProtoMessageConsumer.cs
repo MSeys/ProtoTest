@@ -13,7 +13,11 @@ public interface IProtoMessageConsumer : IAsyncDisposable
     /// <summary>
     /// Prepares the destinations this test intends to await before the system under test publishes, so a
     /// message published after this call is not missed. Adapters that keep history may treat it as a
-    /// no-op.
+    /// no-op. Prepares may run concurrently: a prepare for several destinations may prepare them at the
+    /// same time, and separate prepares may overlap, so every destination must own the resources it
+    /// declares (the RabbitMQ adapter gives each tap its own channel). Every requested destination is
+    /// attempted even when one of them fails; a failed destination is reported to the caller and does
+    /// not stop the others from being prepared.
     /// </summary>
     ValueTask PrepareAsync(
         IReadOnlyCollection<string> destinations,

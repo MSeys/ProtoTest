@@ -20,4 +20,4 @@ Requests, responses and status checks are recorded in the test trace. Streaming 
 
 - [gRPC integration](https://prototest.dev/docs/integrations/grpc/)
 - [Shape matching](https://prototest.dev/docs/foundation/shape-matching)
-- [gRPC demo](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/GrpcJourney.cs)
+- [gRPC round trips](https://github.com/MSeys/ProtoTest/tree/main/tests/ProtoTest.Grpc.Tests)

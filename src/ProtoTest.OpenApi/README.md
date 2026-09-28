@@ -14,4 +14,4 @@ This package reports coverage. It does not validate requests or responses agains
 
 - [OpenAPI integration](https://prototest.dev/docs/integrations/openapi)
 - [Coverage](https://prototest.dev/docs/observability/coverage)
-- [Demo setup](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs)
+- [Demo setup](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs)

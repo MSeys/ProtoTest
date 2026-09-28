@@ -44,7 +44,7 @@ Run this with any [runner](../runners/overview.md), then add `AddGraphQL`, `AddW
 
 ## Going further: several integrations in one test
 
-Adapted from `samples/ProtoTest.Demo/SheetsJourney.cs` — data through one package, an HTTP download through another, and a spreadsheet assertion through a third, all in one test:
+Adapted from `samples/Northstar.ProtoTest/SheetsJourney.cs` — data through one package, an HTTP download through another, and a spreadsheet assertion through a third, all in one test:
 
 ```csharp
 [ProtoTest]

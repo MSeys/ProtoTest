@@ -26,4 +26,4 @@ that declares no chain keeps the `AddAspNetCoreServer` step-aside behavior uncha
 ## Learn more
 
 - [ASP.NET Core integration](https://prototest.dev/docs/integrations/aspnetcore)
-- [Demo setup](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs)
+- [Demo setup](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs)

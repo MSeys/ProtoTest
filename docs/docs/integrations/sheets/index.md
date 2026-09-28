@@ -228,4 +228,4 @@ The capability is name `"Sheets"`, kind `document` (`ProtoCapabilityKinds.Docume
 - [Integrations overview](../overview.md) — where the document package sits.
 - [Shape matching](../../foundation/shape-matching.md) — the rules behind `Should.MatchShape` on table rows and the model-row extension.
 - [Coverage](../../observability/coverage.md) — how collectors and report items work.
-- The demo's report journey: [`samples/ProtoTest.Demo/SheetsJourney.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/SheetsJourney.cs).
+- The demo's report journey: [`samples/Northstar.ProtoTest/SheetsJourney.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/SheetsJourney.cs).

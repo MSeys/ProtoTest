@@ -123,3 +123,11 @@ internal sealed class RabbitMqEventPublisher(string connectionString) : IEventPu
         return _channel;
     }
 }
+
+/// <summary>Declares the application's event topology at startup, before a consumer can bind a tap.</summary>
+internal sealed class EventPublisherTopology(RabbitMqEventPublisher publisher) : IHostedService
+{
+    public Task StartAsync(CancellationToken cancellationToken) => publisher.EnsureTopologyAsync(cancellationToken);
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+}

@@ -78,6 +78,31 @@ public sealed class ProtoMessageAwaitQueueTests
     }
 
     [Test]
+    public async Task Destinations_ShouldNumberTheirDeliveriesIndependently()
+    {
+        var queue = new ProtoMessageAwaitQueue(0);
+        // Two sources, each numbering its first delivery at position 1: the RabbitMQ shape, where
+        // every destination's tap log starts at zero. A position alone does not identify a delivery
+        // across sources, so the first await must not hide the second destination's first delivery.
+        var invoices = new Source();
+        var shipments = new Source();
+        invoices.Add("first invoice", "invoices");
+        shipments.Add("first shipment", "shipments");
+
+        var invoice = await queue.AwaitAsync("invoices", _ => true, TimeSpan.FromSeconds(1), default, () => invoices);
+        var shipment = await queue.AwaitAsync("shipments", _ => true, TimeSpan.FromSeconds(1), default, () => shipments);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(invoice.Payload, Is.EqualTo("first invoice"));
+            Assert.That(
+                shipment.Payload,
+                Is.EqualTo("first shipment"),
+                "one destination's consumed position never hides another destination's delivery");
+        }
+    }
+
+    [Test]
     public async Task Deadline_ShouldRescanOnceBeforeTimingOut()
     {
         var queue = new ProtoMessageAwaitQueue(0);
@@ -152,12 +177,12 @@ public sealed class ProtoMessageAwaitQueueTests
 
         public string? PayloadAtDeadline { get; set; }
 
-        public void Add(string payload)
+        public void Add(string payload, string destination = Destination)
         {
             TaskCompletionSource changed;
             lock (_entries)
             {
-                _entries.Add(new ProtoMessageAwaitEntry(_next++, new ProtoMessage(Destination, payload)));
+                _entries.Add(new ProtoMessageAwaitEntry(_next++, new ProtoMessage(destination, payload)));
                 changed = _changed;
                 _changed = NewSignal();
             }

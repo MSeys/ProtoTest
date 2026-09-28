@@ -95,14 +95,13 @@
     <Project Path="tests/ProtoTest.WireMock.Tests/ProtoTest.WireMock.Tests.csproj" />
   </Folder>
   <Folder Name="/5. Demo/">
-    <Project Path="samples/ProtoTest.Demo/ProtoTest.Demo.csproj" />
     <Project Path="samples/ProtoTest.Mcp.DemoEndpoint/ProtoTest.Mcp.DemoEndpoint.csproj" />
   </Folder>
-  <Folder Name="/5. Demo/Supporting projects/">
+  <Folder Name="/5. Sample/">
     <Project Path="samples/ProtoTest.SampleApp.Contracts/ProtoTest.SampleApp.Contracts.csproj" />
     <Project Path="samples/ProtoTest.SampleApp.Domain/ProtoTest.SampleApp.Domain.csproj" />
-    <Project Path="samples/Northstar.ProtoTest/Northstar.ProtoTest.csproj" />
     <Project Path="samples/ProtoTest.SampleApp/ProtoTest.SampleApp.csproj" />
+    <Project Path="samples/Northstar.ProtoTest/Northstar.ProtoTest.csproj" />
   </Folder>
   <Folder Name="/6. Templates/">
     <Project Path="src/ProtoTest.Templates/ProtoTest.Templates.csproj" />

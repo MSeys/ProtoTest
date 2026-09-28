@@ -275,7 +275,7 @@ await backend.Page.SetContentAsync(html);
 
 ## Quick start
 
-A page object describes the page; a test drives it. The smallest working example — the demo's full journey is in [WebJourney.cs](../../../../samples/ProtoTest.Demo/WebJourney.cs):
+A page object describes the page; a test drives it. The smallest working example — the sample's full journey is in [WebJourney.cs](../../../../samples/Northstar.ProtoTest/WebJourney.cs):
 
 ```csharp
 public sealed class LoginPage : WebPage

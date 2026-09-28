@@ -23,4 +23,4 @@ The package is read-only and supports OpenXML `.xlsx` files, not `.xls` or CSV.
 
 - [Sheets integration](https://prototest.dev/docs/integrations/sheets/)
 - [Download a report](https://prototest.dev/docs/recipes/download-a-report)
-- [Sheets demo](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/SheetsJourney.cs)
+- [Sheets demo](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/SheetsJourney.cs)

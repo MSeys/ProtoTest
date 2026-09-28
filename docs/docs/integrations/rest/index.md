@@ -130,4 +130,4 @@ Each request records an `http.request` operation (`REST · {METHOD} {route}`) un
 - [Authentication](./authentication.md) — per-request, per-class and composed authenticators, and the built-in test user.
 - [Attachments and coverage](./attachments.md) — what gets captured, redacted and reported.
 
-The full flows live in the demo: [DeliveryJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/DeliveryJourney.cs) and [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs).
+The same flows live in the sample: [ProjectsJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/ProjectsJourney.cs) and [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs).

@@ -227,6 +227,8 @@ button.issue:hover { background: var(--hover); }
   border-radius: var(--radius-chip);
   background: transparent;
   text-align: left;
+  /* Rows are uniform and independent, so one row's change never re-lays-out the list. */
+  contain: layout paint;
 }
 .test-row:hover { background: var(--hover); }
 .test-row b { color: var(--dim); font: var(--text-micro) var(--font-mono); }

@@ -8,7 +8,7 @@ description: Pay an invoice over REST, then await the invoice.paid event the app
 
 Paying an invoice should publish `invoice.paid`. The test pays over the API and then waits for that event — not with a sleep, but with a predicate and a timeout. This is what a single API assertion cannot prove: that the write side and the broker actually meet.
 
-The same journey runs in the demo — [MessagingJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/MessagingJourney.cs) (test) and [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/ProtoTest.Demo/Setup.cs) (host). The full API surface is in [Messaging](../integrations/messaging/index.md).
+The same journey runs in the demo — [BrokerJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/BrokerJourney.cs) (test) and [Setup.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs) (host). The full API surface is in [Messaging](../integrations/messaging/index.md).
 
 ## Compose
 

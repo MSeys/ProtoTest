@@ -2,19 +2,8 @@ namespace Northstar.ProtoTest;
 
 using global::ProtoTest.Core;
 using global::ProtoTest.Data;
-using global::ProtoTest.GraphQL;
 using global::ProtoTest.SampleApp.Contracts;
 using Microsoft.Extensions.DependencyInjection;
-
-/// <summary>Options for the Northstar test-support surface: the scenario hook and its clients.</summary>
-public sealed class NorthstarTestSupportOptions
-{
-    /// <summary>
-    /// Whether GraphQL subscriptions ride the in-process test server's WebSocket. Leave false against a
-    /// published environment, where the client's own transport must be used.
-    /// </summary>
-    public bool UseInProcessGraphQLWebSockets { get; set; }
-}
 
 /// <summary>Options for Northstar data provisioning.</summary>
 public sealed class NorthstarDataOptions
@@ -29,30 +18,18 @@ public sealed class NorthstarDataOptions
 }
 
 /// <summary>
-/// Registers everything Northstar's journeys need beyond the protocol integrations: the scenario hook,
-/// the tenant/member attributes' backing contexts, and the data provisioners.
+/// Registers everything Northstar's journeys need beyond the protocol integrations: the scenario hook
+/// and the tenant/member attributes' backing contexts, and the data provisioners.
 /// </summary>
 public static class NorthstarTestHost
 {
     /// <summary>
-    /// Adds the Northstar scenario layer: the correlation hook, its custom-client probe, and - when
-    /// asked - the GraphQL WebSocket factory that connects through the in-process test server.
+    /// Adds the Northstar scenario layer: the correlation hook and its custom-client probe.
     /// </summary>
-    public static IProtoHostBuilder AddNorthstarTestSupport(
-        this IProtoHostBuilder builder,
-        Action<NorthstarTestSupportOptions>? configure = null)
+    public static IProtoHostBuilder AddNorthstarTestSupport(this IProtoHostBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        var options = new NorthstarTestSupportOptions();
-        configure?.Invoke(options);
-        builder.ConfigureServices(services =>
-        {
-            services.AddSingleton<IProtoClientInitializer, ScenarioProbeInitializer>();
-            if (options.UseInProcessGraphQLWebSockets)
-            {
-                services.AddSingleton<IGraphQLWebSocketFactory, NorthstarGraphQLWebSocketFactory>();
-            }
-        });
+        builder.ConfigureServices(services => services.AddSingleton<IProtoClientInitializer, ScenarioProbeInitializer>());
         return builder.AddTestHook<NorthstarScenarioHook>();
     }
 

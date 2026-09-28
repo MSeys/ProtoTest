@@ -15,6 +15,9 @@ dotnet add package ProtoTest.Devices.WebSocket.AspNetCore
   the application's `TestServer` when it is hosted in-process, and over the configured address (socket)
   when it is published - one registration, every mode. A client is only routed through the transport of
   the application it was registered under, so multi-application suites with the same path stay apart.
+- The transport follows the application's provider chain: `UseConfigured()`, `UseLoopback(...)` and
+  `UseAspireResource(...)` winners drop the transport's capability and route the same client over the
+  socket at the winner's published address.
 - The registered `WebSocketDeviceOptions` (from either in-process or socket registration) are resolved
   and validated with the transport, and `ConnectTimeout` bounds the in-process connect too.
 - Same frames, trace and coverage as the socket transport.
@@ -22,8 +25,9 @@ dotnet add package ProtoTest.Devices.WebSocket.AspNetCore
 ## Limits
 
 - It only applies when the application is hosted in-process by the same suite
-  (`AddAspNetCoreServer<TProgram>`); otherwise the client's address resolver runs, so a deployed
-  environment needs no change here.
+  (`AddAspNetCoreServer<TProgram>` without a chain, or `UseInProcess<TProgram>()` as the chain's
+  winner); otherwise the client's address resolver runs, so a deployed environment needs no change
+  here.
 - One connection per device instance; an explicit `DisconnectAsync` releases it and the next send
   reconnects, while the test's end disconnects it either way.
 

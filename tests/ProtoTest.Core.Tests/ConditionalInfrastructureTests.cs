@@ -2,6 +2,12 @@ namespace ProtoTest.Core.Tests;
 
 using Microsoft.Extensions.Configuration;
 
+// Intentional: this fixture pins the legacy skip-key surface - the obsolete
+// AddInfrastructure(piece, keys) registration and its AddInfrastructureAlways opt-out - which stays
+// the 1.x compatibility path; the chain replacement is covered by TargetProviderChainTests. CS0618
+// is expected here.
+#pragma warning disable CS0618
+
 [TestFixture]
 public sealed class ConditionalInfrastructureTests
 {
@@ -234,3 +240,5 @@ public sealed class ConditionalInfrastructureTests
         public ValueTask ReleaseAsync(ProtoResourceReleaseContext context) => ValueTask.CompletedTask;
     }
 }
+
+#pragma warning restore CS0618

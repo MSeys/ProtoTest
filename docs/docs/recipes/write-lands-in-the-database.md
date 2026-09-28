@@ -24,7 +24,12 @@ The same journey runs in the demo — [DomainAccessJourney.cs](https://github.co
 protected override void Configure(IProtoHostBuilder builder) =>
     builder
         // One PostgreSQL for the run; the application reads its connection string from this key.
-        .AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Orders")
+        .AddInfrastructure(
+            "OrdersDatabase",
+            chain => chain
+                .UseConfigured()
+                .UseContainer(PostgresDatabase.Container()),
+            "ConnectionStrings:Orders")
         .AddApplication("Api", app => app
             .AddAspNetCoreServer<Program>()
             .AddRest(rest => rest.AddClient("Api")))

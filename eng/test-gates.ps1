@@ -131,7 +131,8 @@ try {
         Assert-Fixture (@($record.skippedCodeGates).Count -eq 0) "a docs-only stage skipped no applicable code gate"
     }
 
-    # One changed project runs the tests and scopes format to that project.
+    # One changed project runs its tests; lint always runs over the solution because a scoped format
+    # check is a false green.
     Invoke-Fixture "verify-one-project" {
         $root = New-FixtureRepository "verify-one-project"
         Add-FixtureFile -Root $root -RelativePath "src/Foo/Foo.csproj" -Content "<Project />" | Out-Null
@@ -142,8 +143,7 @@ try {
         $record = Get-FixtureRecord -Root $root -Stage "t-project"
         Assert-Fixture ($record.classification -eq "code") "expected classification code, got '$($record.classification)'"
         Assert-Fixture ([bool]$record.green) "expected green"
-        $lintMarker = Get-FixtureMarker -Root $root -Gate "lint"
-        Assert-Fixture ($lintMarker -match 'Include=.*src/Foo') "lint must be scoped to the changed project, marker: '$lintMarker'"
+        Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "lint") -ne "") "lint did not run for a code stage"
         Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "test") -ne "") "the tests did not run for a code stage"
         Assert-Fixture (@($record.skippedCodeGates).Count -eq 0) "a code stage that ran its gates is not incomplete"
     }
@@ -257,6 +257,59 @@ internal sealed class LazyTemporaryTrace
         Assert-Fixture ($LASTEXITCODE -ne 0) "the renamed helpers must fail the lint gate: $text"
         Assert-Fixture ($text.Contains("GetFreePort")) "the failure must name GetFreePort: $text"
         Assert-Fixture ($text.Contains("LazyTemporaryTrace")) "the failure must name LazyTemporaryTrace: $text"
+    }
+
+    # InternalsVisibleTo is a test-only edge: a grant to an integration package fails the lint gate in
+    # both the attribute and csproj forms, while a *.Tests target passes the rule.
+    Invoke-Fixture "lint-friend-edges" {
+        $root = New-FixtureRepository "lint-friend-edges"
+        Add-FixtureFile -Root $root -RelativePath "src/Fixture/Properties/AssemblyInfo.cs" -Content @'
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("ProtoTest.Rest")]
+[assembly: InternalsVisibleToAttribute("ProtoTest.GraphQL")]
+[assembly: InternalsVisibleTo(@"ProtoTest.Grpc")]
+'@ | Out-Null
+        Add-FixtureFile -Root $root -RelativePath "src/Fixture/Fixture.csproj" -Content @'
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="ProtoTest.Http" />
+    <InternalsVisibleTo Condition="'$(Configuration)' == 'Release'" Include="ProtoTest.Messaging" />
+  </ItemGroup>
+</Project>
+'@ | Out-Null
+        Add-FixtureFile -Root $root -RelativePath "tests/Fixture.Tests/Placeholder.cs" -Content "namespace Fixture.Tests; internal static class Placeholder; " | Out-Null
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot "lint.ps1") -Destination (Join-Path $root "eng/lint.ps1")
+
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/lint.ps1") -NoRestore 2>&1
+        $text = $output -join [Environment]::NewLine
+        Assert-Fixture ($LASTEXITCODE -ne 0) "an integration friend edge must fail the lint gate: $text"
+        Assert-Fixture ($text.Contains("ProtoTest.Rest")) "the failure must name the attribute-form target: $text"
+        Assert-Fixture ($text.Contains("ProtoTest.Http")) "the failure must name the csproj-form target: $text"
+        Assert-Fixture ($text.Contains("ProtoTest.GraphQL")) "the failure must name the Attribute-suffixed target: $text"
+        Assert-Fixture ($text.Contains("ProtoTest.Grpc")) "the failure must name the verbatim-string target: $text"
+        Assert-Fixture ($text.Contains("ProtoTest.Messaging")) "the failure must name the conditional csproj target: $text"
+
+        # The same edges aimed at test assemblies pass the rule; an empty solution lets the rest of the
+        # gate - the duplication scan and the format check - run and stay green too.
+        Add-FixtureFile -Root $root -RelativePath "src/Fixture/Properties/AssemblyInfo.cs" -Content @'
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("ProtoTest.Rest.Tests")]
+'@ | Out-Null
+        Add-FixtureFile -Root $root -RelativePath "src/Fixture/Fixture.csproj" -Content @'
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="ProtoTest.Http.Tests" />
+  </ItemGroup>
+</Project>
+'@ | Out-Null
+        Set-Content -LiteralPath (Join-Path $root "ProtoTest.slnx") -Value '<Solution></Solution>' -Encoding utf8
+
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/lint.ps1") -NoRestore 2>&1
+        $text = $output -join [Environment]::NewLine
+        Assert-Fixture ($LASTEXITCODE -eq 0) "a test-only target must pass the lint gate: $text"
+        Assert-Fixture (-not $text.Contains("must not receive internals")) "the guard must not report a test target: $text"
     }
 
     # The docs key cross-check runs without the private facts checkout, against the tracked public key

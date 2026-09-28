@@ -31,12 +31,113 @@ public static class ProtoHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
+        var options = new ProtoWorkerOptions();
+        configure?.Invoke(options);
+        var registrations = ClaimWorker<TProgram>(builder, name);
+        if (registrations is null)
+        {
+            // The same worker is already registered under this name: one lifecycle, no-op.
+            return builder;
+        }
+
+        var worker = ProtoWorkerHost<TProgram>.Create(name, options, registrations.Registry);
+        // This compatibility overload keeps the plain worker registration; the chain overload with
+        // UseHost is the replacement for a caller.
+#pragma warning disable CS0618
+        builder.AddInfrastructure(worker);
+#pragma warning restore CS0618
+        RegisterRegistry(builder, registrations);
+        return builder.AddCapability(new ProtoCapabilityDescriptor(
+            typeof(TProgram).Assembly.GetName().Name ?? typeof(TProgram).FullName!,
+            ProtoCapabilityKinds.Worker,
+            "ProtoTest.Hosting"));
+    }
+
+    /// <summary>
+    /// Registers a worker not attached to an application as a provider chain: the chain decides where
+    /// the worker runs - <c>UseHost()</c> hosts its entry point in this process (the default for a
+    /// top-level worker), and a provider a future release ships runs the real image instead.
+    /// </summary>
+    /// <typeparam name="TProgram">The entry point class of the worker application.</typeparam>
+    /// <param name="builder">The <see cref="IProtoHostBuilder"/> instance.</param>
+    /// <param name="name">The worker's name, in configuration and diagnostic messages.</param>
+    /// <param name="configure">Adds the worker's providers in priority order; with none, the worker defaults to <c>UseHost()</c>.</param>
+    public static IProtoHostBuilder AddWorkerHost<TProgram>(
+        this IProtoHostBuilder builder,
+        string name,
+        Action<IProtoWorkerBuilder> configure) where TProgram : class
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var registrations = ClaimWorker<TProgram>(builder, name);
+        if (registrations is null)
+        {
+            return builder;
+        }
+
+        var worker = new ProtoWorkerChainBuilder<TProgram>(name, new ProtoWorkerOptions(), registrations.Registry);
+        configure(worker);
+        worker.Register(builder);
+        RegisterRegistry(builder, registrations);
+        return builder;
+    }
+
+    /// <summary>
+    /// Nests a background worker under an application: it follows the application's provider chain -
+    /// hosted in this process when the application runs in-process, run by the environment when a
+    /// configured, loopback or AppHost provider serves it (the default chain), and the explicit
+    /// providers a future release adds (a container image) in between.
+    /// </summary>
+    /// <typeparam name="TProgram">The entry point class of the worker application.</typeparam>
+    /// <param name="application">The application the worker belongs to.</param>
+    /// <param name="name">The worker's name, in configuration and diagnostic messages. Defaults to "Default".</param>
+    /// <param name="configure">
+    /// Adds the worker's providers in priority order. Omitted, the worker resolves
+    /// <c>UseEnvironment().UseHost()</c>: the environment that runs the application runs its worker,
+    /// and an application the run hosts in-process hosts its worker too.
+    /// </param>
+    public static IProtoApplicationBuilder AddWorkerHost<TProgram>(
+        this IProtoApplicationBuilder application,
+        string name = "Default",
+        Action<IProtoWorkerBuilder>? configure = null) where TProgram : class
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        var registrations = ClaimWorker<TProgram>(application.Host, name);
+        if (registrations is null)
+        {
+            return application;
+        }
+
+        var worker = new ProtoWorkerChainBuilder<TProgram>(
+            name, new ProtoWorkerOptions(), registrations.Registry, application.ApplicationName);
+        if (configure is null)
+        {
+            worker.UseEnvironment();
+            worker.UseHost();
+        }
+        else
+        {
+            configure(worker);
+        }
+
+        worker.Register(application.Host);
+        RegisterRegistry(application.Host, registrations);
+        return application;
+    }
+
+    private static Registrations? ClaimWorker<TProgram>(IProtoHostBuilder builder, string name)
+    {
         var registrations = RegisteredWorkers.GetValue(builder, static _ => new Registrations());
         if (registrations.Programs.TryGetValue(name, out var registeredProgram))
         {
             if (registeredProgram == typeof(TProgram))
             {
-                return builder;
+                // A repeated registration of the same worker under one name is the same lifecycle.
+                return null;
             }
 
             // A dropped duplicate that is a different program is a silent wrong state, not a no-op.
@@ -45,30 +146,19 @@ public static class ProtoHostBuilderExtensions
                 $"register {typeof(TProgram).FullName} under a different name instead.");
         }
 
-        var options = new ProtoWorkerOptions();
-        configure?.Invoke(options);
+        registrations.Programs.Add(name, typeof(TProgram));
+        return registrations;
+    }
 
-        var worker = new ProtoWorkerHost<TProgram>(name, options, registrations.Registry);
-        var factory = HostFactoryResolver.ResolveHostFactory(
-            typeof(TProgram).Assembly,
-            configureHostBuilder: worker.ConfigureBuilder)
-            ?? throw new InvalidOperationException(
-                $"No host factory could be resolved for {typeof(TProgram).FullName}. The worker assembly needs an " +
-                "entry point that builds an IHost (Host.CreateApplicationBuilder or Host.CreateDefaultBuilder).");
-        worker.UseFactory(factory);
-
-        builder.AddInfrastructure(worker);
-        if (!registrations.RegistryRegistered)
+    private static void RegisterRegistry(IProtoHostBuilder builder, Registrations registrations)
+    {
+        if (registrations.RegistryRegistered)
         {
-            builder.ConfigureServices(services => services.AddSingleton(registrations.Registry));
-            registrations.RegistryRegistered = true;
+            return;
         }
 
-        registrations.Programs.Add(name, typeof(TProgram));
-        return builder.AddCapability(new ProtoCapabilityDescriptor(
-            typeof(TProgram).Assembly.GetName().Name ?? typeof(TProgram).FullName!,
-            ProtoCapabilityKinds.Worker,
-            "ProtoTest.Hosting"));
+        builder.ConfigureServices(services => services.AddSingleton(registrations.Registry));
+        registrations.RegistryRegistered = true;
     }
 
     private sealed class Registrations

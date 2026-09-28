@@ -33,10 +33,10 @@ The GraphQL error assertions are the exception: they name the opposite state dir
 | gRPC reply | `ProtoGrpcAssertions.For(reply).Should.MatchShape(shape)`, returning the reply |
 | gRPC failed call | `ProtoGrpcAssertions.For(exception).Should.HaveStatus(status)` / `.ShouldNot.HaveStatus(status)` |
 | Consumed message | `message.Should.MatchShape(shape)`, returning the message |
-| Sheets cell, column, range, table, model column | `Should` / `ShouldNot` (`Be`, `BeText`, `Match`, `ContainRow`, `All`, …), returning the subject |
+| Sheets cell, column, range, table, model column, key-value entry/model | `Should` / `ShouldNot` (`Be`, `BeText`, `Match`, `ContainRow`, `All`, `MatchModel`, …), returning the subject |
 | Sheets table row | `row.Should.MatchShape(shape)`, returning the row |
 | Sheets model row | `row.ShouldMatchShape(shape)`, returning the row (a record is a user type, so C# cannot give it a `Should` extension property) |
-| Sheets model | `model.Should.MatchModel()`, returning the model |
+| Sheets model | `model.Should.MatchHeaders()` / `model.Should.MatchModel()`, returning the model |
 | Web element | `element.Should.BeVisibleAsync(…)` and friends; async, so no chaining |
 
 ## Shape matching and its subject

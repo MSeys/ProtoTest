@@ -156,19 +156,12 @@ $expectsCodeGates = $Full -or $codeChanges.Count -gt 0
 $canRunCodeGates = $Full -or ($dirty -and $codeChanges.Count -gt 0)
 $codeSkipReason = if ($codeChanges.Count -gt 0) { "committed code changes; re-run with -Full to verify them" } else { "no code changes" }
 
-# Scope format to the projects the change touched; a wide or unrecognisable change falls back to the
-# full solution (empty include list).
 $changedProjectDirectories = Get-ChangedProjectDirectories -Paths $changed
 
-# Format checking follows the change like the tests do; the full-solution lint runs in CI's own step,
-# so a local -Full does not repeat it. A wide or unmappable change still falls back to the solution.
-$lintInclude = @()
-if (-not $SkipLint -and $canRunCodeGates -and
-    $changedProjectDirectories.Count -gt 0 -and $changedProjectDirectories.Count -le 12) {
-    $lintInclude = @($changedProjectDirectories)
-}
-
-# The test stage scopes the same way: the touched projects plus everything that references them. A wide
+# Format checking always runs over the whole solution: `dotnet format --include` silently checks
+# nothing for code-style/analyzer diagnostics (measured twice), so a scoped format check was a false
+# green. The include scoping that remains is the test-project filter below and the duplication scan.
+# The test stage scopes to the touched projects plus everything that references them. A wide
 # or unmappable change falls back to the full suite, and -Full always runs every discovered project.
 $testInclude = ""
 if (-not $SkipTests -and $canRunCodeGates -and -not $Full) {
@@ -261,10 +254,6 @@ if ($testInclude) {
     $testArguments += @("-Include", $testInclude)
 }
 
-if ($lintInclude.Count -gt 0) {
-    $lintArguments += @("-Include", ($lintInclude -join ";"))
-}
-
 $runLint = -not ($SkipLint -or -not $canRunCodeGates)
 $runDocs = -not $SkipDocs
 $runTests = -not ($SkipTests -or -not $canRunCodeGates)
@@ -352,9 +341,6 @@ $summaryParts = @($gates | ForEach-Object {
 $summaryParts += @($skipped | ForEach-Object { "{0}=SKIP({1})" -f $_.name, $_.reason })
 $summary = $summaryParts -join " "
 $flags = @("scope=$scope", "class=$classification")
-if ($lintInclude.Count -gt 0) {
-    $flags += "lint=scoped"
-}
 if ($testInclude) {
     $flags += "tests=scoped"
 }

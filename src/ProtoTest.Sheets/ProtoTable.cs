@@ -163,6 +163,12 @@ public sealed class ProtoTable
             ? _sheet.Name
             : $"{_sheet.Name}!A{DataStartRow}:{Internal.SheetReferences.Format(_columns.Count, DataStartRow + RowCount - 1)}";
 
+    /// <summary>The header rows, used to record a read of the headers.</summary>
+    internal string HeaderRange
+        => _columns.Count == 0 || HeaderRows.Count == 0
+            ? _sheet.Name
+            : $"{_sheet.Name}!A{HeaderRows[0]}:{Internal.SheetReferences.Format(_columns.Count, HeaderRows[^1])}";
+
     /// <summary>The data range of one column, used to record a read of that column.</summary>
     internal string ColumnRange(int columnNumber)
         => _columns.Count == 0 || RowCount == 0

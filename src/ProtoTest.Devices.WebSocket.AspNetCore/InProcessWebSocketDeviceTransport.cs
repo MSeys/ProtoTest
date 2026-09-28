@@ -1,10 +1,7 @@
 namespace ProtoTest.Devices.WebSocket.AspNetCore;
 
-using System.Globalization;
-using System.Net.WebSockets;
 using Microsoft.AspNetCore.TestHost;
 using ProtoTest.AspNetCore;
-using ProtoTest.AspNetCore.Internal;
 using ProtoTest.Core;
 using ProtoTest.Devices;
 using ProtoTest.Devices.WebSocket;
@@ -70,28 +67,21 @@ public sealed class InProcessWebSocketDeviceTransport<TProgram>(
             : endpoint.Address;
         // TestServer needs an absolute URI and ignores the authority; the path is what routes.
         var uri = new Uri($"ws://localhost{path}");
-        using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        attempt.CancelAfter(_options.ConnectTimeout);
-        WebSocket socket;
-        try
-        {
-            var client = factory.Server.CreateWebSocketClient();
-            // The handshake is an HTTP request the application handles without this flow's test
-            // context, so it carries the same identity the in-process HTTP client sends; the
-            // application's clock filter then pushes this test's clock while it serves the socket.
-            client.ConfigureRequest = ProtoTraceContextHandler.ApplyTo;
-            socket = await client
-                .ConnectAsync(uri, attempt.Token)
-                .ConfigureAwait(false);
-        }
-        catch (Exception exception) when (attempt.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
-        {
-            // TestServer can surface an aborted handshake as an incomplete-handshake response instead
-            // of an OperationCanceledException; the attempt token is the timeout authority either way.
-            throw new TimeoutException(
-                $"Connecting to '{path}' in-process timed out after {_options.ConnectTimeout.TotalSeconds.ToString("0.#", CultureInfo.InvariantCulture)}s.",
-                exception);
-        }
+        var client = factory.Server.CreateWebSocketClient();
+        // The handshake is an HTTP request the application handles without this flow's test context, so
+        // it carries the same identity the in-process HTTP client sends; the application's clock filter
+        // then pushes this test's clock while it serves the socket.
+        client.ConfigureRequest = ProtoTestContextPropagation.ApplyTo;
+        // TestServer can surface an aborted handshake as an incomplete-handshake response instead of an
+        // OperationCanceledException; ProtoDeviceConnect treats the attempt token as the timeout
+        // authority either way.
+        var socket = await ProtoDeviceConnect
+            .WithTimeoutAsync(
+                path,
+                _options.ConnectTimeout,
+                token => client.ConnectAsync(uri, token),
+                cancellationToken)
+            .ConfigureAwait(false);
 
         return new WebSocketDeviceConnection(socket, $"in-process:{path}", _options);
     }

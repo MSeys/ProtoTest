@@ -3,7 +3,6 @@ namespace ProtoTest.Sql.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using ProtoTest.Core;
 using ProtoTest.Sql;
-using ProtoTest.Sql.Internal;
 
 public static class ProtoExecutionContextExtensions
 {

@@ -102,7 +102,11 @@ public sealed class PublishedApplicationTests
     {
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
-        builder.AddInfrastructure(new PublishedAddressInfrastructure("Api", "http://127.0.0.1:1"));
+        builder.AddInfrastructure(
+            "Api address",
+            chain => chain.Use(new ProtoTargetProvider(
+                "published",
+                new PublishedAddressInfrastructure("Api", "http://127.0.0.1:1"))));
         builder.AddApplication("Api", app => app
             .AddAspNetCoreServer<SampleApi.Program>()
             .AddRest(rest => rest.AddClient("Api")));

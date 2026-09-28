@@ -8,7 +8,8 @@ This is an example of what your setup using ProtoTest could look like.
 
 ## Includes
 
-- `[NorthstarTenant]` plus the shipped `[SignedInAs]`, whose identity `NorthstarMember` turns into the tenant's owner (no role declared) or an invited member for the first declared role.
+- `[NorthstarMember]`, a composite attribute grouping `[NorthstarTenant]` and the authenticator that carries the member's bearer token through REST, GraphQL and gRPC.
+- The shipped `[SignedInAs]`, whose identity `NorthstarMember` turns into the tenant's owner (no role declared) or an invited member for the first declared role.
 - Typed contexts that pass the created tenant, member and token to other integrations.
 - `NorthstarAuthenticator` for authenticated HTTP and gRPC calls; it resolves the member lazily, so the shipped identity is all a test declares.
 - Page objects and a login strategy for the Northstar console.

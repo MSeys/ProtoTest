@@ -16,7 +16,7 @@ internal sealed class ProtoClockStartupFilter(ProtoClockRegistry clockRegistry) 
     {
         application.Use(async (context, nextMiddleware) =>
         {
-            var testId = context.Request.Headers[ProtoTraceContextHandler.TestIdHeader].ToString();
+            var testId = context.Request.Headers[ProtoTestContextPropagation.TestIdHeader].ToString();
             var clock = string.IsNullOrEmpty(testId) ? null : clockRegistry.Find(testId);
             if (clock is null)
             {

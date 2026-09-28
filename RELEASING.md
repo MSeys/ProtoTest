@@ -37,6 +37,17 @@ node docs/scripts/generate-changelog.mjs
 section for the GitHub Release notes and fails when it is missing; it never falls back to generated
 notes, because a release nobody wrote down is the failure this step prevents.
 
+### Changelog conventions
+
+A release section uses `### Features`, `### Fixes` and - only when the release has any -
+`### Breaking changes`. Entries are one line, `- <Area>: <short title>.`, mirroring the commit title
+(`Feature - <Part> - <short>` / `Bug - <Part> - <short>`); `<Area>` is the package family or topic
+(`Core`, `REST`, `GraphQL`, `Messaging`, `Web`, `Docs`). A change that needs a migration note gets at
+most one sub-bullet; everything else links the docs page. Never-public churn (alpha-only fixes,
+internal refactors, gate tooling) does not get its own entry - fold it into the public feature or fix
+that needed it. The 1.1 section is rewritten to these rules before its tag; every later release is
+written this way from the start.
+
 ## 3. Verify and validate
 
 ```powershell

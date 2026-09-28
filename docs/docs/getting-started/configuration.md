@@ -81,7 +81,8 @@ The rule of thumb: **infrastructure registers once, clients compose, config call
 | `AddTestHook`, `AddRunHook`, `AddRunGate` | adds another hook or gate; there is **no dedupe** |
 | `AddCapability` | an equal descriptor registers once |
 | `AddSink<TSink>` | the first registration of the sink type wins; a repeated generic call appends its `configure` callback |
-| `AddInfrastructure`, `AddResource` | the same instance is a no-op (`AddInfrastructure` also merges the repeated call's settings keys, and `AddInfrastructureAlways` still forces a start); a different instance under the same id throws *"already owned by the run"* |
+| `AddInfrastructure(piece, keys)`, `AddResource` | the same instance is a no-op (`AddInfrastructure` also merges the repeated call's settings keys, and `AddInfrastructureAlways` still forces a start); a different instance under the same id throws *"already owned by the run"* |
+| `AddInfrastructure(name, chain, keys)` | a repeated target name throws; add providers to the existing chain instead |
 | `AddClient` | clients compose and the first registration that initializes for a type and name wins |
 | `ConfigureResponses`, `CaptureAttachments` (all protocols) | callbacks compose; the known configuration section is bound over the result |
 | `AddSql`, `AddSheets`, `AddEntityFrameworkCore` | the first call wins; later calls are no-ops |

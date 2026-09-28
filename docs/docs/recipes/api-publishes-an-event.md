@@ -17,7 +17,10 @@ protected override void Configure(IProtoHostBuilder builder) =>
     builder
         // One broker for the run, its address handed to the tests and to the application.
         .AddInfrastructure(
-            RabbitMqBroker.Container(),
+            "MessagingBroker",
+            chain => chain
+                .UseConfigured()
+                .UseContainer(RabbitMqBroker.Container()),
             RabbitMqOptions.ConnectionStringSetting,
             "Messaging:RabbitMq:ConnectionString")
         .AddApplication("Api", app => app
@@ -40,7 +43,10 @@ The composition above lets the application declare its exchanges at startup. A r
 ```csharp
 builder
     .AddInfrastructure(
-        RabbitMqBroker.Container(),
+        "MessagingBroker",
+        chain => chain
+            .UseConfigured()
+            .UseContainer(RabbitMqBroker.Container()),
         RabbitMqOptions.ConnectionStringSetting,
         "Messaging:RabbitMq:ConnectionString")
     .AddMessaging(messaging => messaging

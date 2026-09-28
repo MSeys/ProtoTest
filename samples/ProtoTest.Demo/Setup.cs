@@ -24,6 +24,7 @@ using ProtoTest.SampleApp.Domain;
 using ProtoTest.Sheets;
 using ProtoTest.Sql;
 using ProtoTest.Sql.Testcontainers;
+using ProtoTest.Testcontainers;
 using ProtoTest.Web;
 
 [SetUpFixture]
@@ -57,16 +58,25 @@ public sealed class Setup : ProtoTestAssembly
         if (environment.OwnsMessagingBroker)
         {
             // The standalone application and the messaging adapter share the broker owned by this run.
-            messagingBroker = RabbitMqBroker.Container();
+            var broker = RabbitMqBroker.Container();
+            messagingBroker = broker;
             builder.AddInfrastructure(
-                messagingBroker,
+                "MessagingBroker",
+                chain => chain
+                    .UseConfigured()
+                    .UseContainer(broker),
                 RabbitMqOptions.ConnectionStringSetting,
                 "Messaging:RabbitMq:ConnectionString");
         }
 
         if (environment.OwnsPostgres)
         {
-            builder.AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar");
+            builder.AddInfrastructure(
+                "NorthstarDatabase",
+                chain => chain
+                    .UseConfigured()
+                    .UseContainer(PostgresDatabase.Container()),
+                "ConnectionStrings:Northstar");
         }
 
         return messagingBroker;
@@ -80,17 +90,23 @@ public sealed class Setup : ProtoTestAssembly
         if (environment.RunsStandaloneConsole)
         {
             // Browser journeys use a real process. Published runs point at their configured target instead.
-            builder.AddInfrastructure(new StandaloneSampleApp(
-                environment.DatabaseConnection,
-                environment.DatabaseProvider,
-                () => messagingBroker?.ConnectionString ?? environment.ConfiguredMessaging));
+            builder.AddInfrastructure(
+                "NorthstarStandalone",
+                chain => chain.Use(new ProtoTargetProvider(
+                    "process",
+                    new StandaloneSampleApp(
+                        environment.DatabaseConnection,
+                        environment.DatabaseProvider,
+                        () => messagingBroker?.ConnectionString ?? environment.ConfiguredMessaging))));
             builder.AddCapability(new ProtoCapabilityDescriptor(
                 "Northstar standalone", ProtoCapabilityKinds.Server, "Demo"));
         }
 
         if (environment.UsesLocalApplications)
         {
-            builder.AddInfrastructure(new NorthstarConsoleBuild());
+            builder.AddInfrastructure(
+                "NorthstarConsoleBuild",
+                chain => chain.Use(new ProtoTargetProvider("settings", new NorthstarConsoleBuild())));
         }
     }
 

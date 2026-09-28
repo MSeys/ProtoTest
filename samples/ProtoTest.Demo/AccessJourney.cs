@@ -11,9 +11,8 @@ using ProtoTest.SampleApp.Contracts;
 
 /// <summary>Who may do what: the role matrix, token scopes, tenant isolation and rate limits.</summary>
 [Application(NorthstarTargets.Api)]
-[NorthstarTenant(PlanIds.Growth)]
+[NorthstarMember(PlanIds.Growth)]
 [SignedInAs]
-[Auth<NorthstarAuthenticator>]
 public sealed class AccessJourney
 {
     [ProtoTest]

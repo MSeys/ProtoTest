@@ -7,6 +7,10 @@ namespace ProtoTest.Sheets.Internal;
 /// </summary>
 internal static class SheetCellValue
 {
+    /// <summary>Whether a type can hold an empty cell: a reference type or a nullable value type.</summary>
+    public static bool IsNullable(Type type)
+        => !type.IsValueType || Nullable.GetUnderlyingType(type) is not null;
+
     /// <summary>Converts a cell to <paramref name="type"/>; a value that cannot convert fails the read.</summary>
     public static object? Convert(Type type, ProtoCell cell)
     {

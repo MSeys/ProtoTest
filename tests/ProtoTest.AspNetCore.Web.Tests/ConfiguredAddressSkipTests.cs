@@ -36,7 +36,12 @@ public sealed class ConfiguredAddressSkipTests
             Setup.ContainerApplicationName, Setup.ContainerImage, Setup.ContainerPort);
 
         var builder = BuilderWithConfigured(container.BaseUrlKey);
-        builder.AddInfrastructure(container, container.BaseUrlKey);
+        builder.AddInfrastructure(
+            Setup.ContainerApplicationName,
+            chain => chain
+                .UseConfigured()
+                .UseContainer(container),
+            container.BaseUrlKey);
         await using var host = builder.Build();
         await host.StartAsync();
         await host.StopAsync();

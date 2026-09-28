@@ -62,7 +62,7 @@ public static IProtoHostBuilder AddAspNetCoreServer<TProgram>(
     where TProgram : class;
 ```
 
-Both overloads register a `server` capability named `ASP.NET Core` and expose the application's client under the server name — `"{name}:Factory"` for the `WebApplicationFactory<TProgram>` and `{name}` for the `HttpClient`. Registration is per server name: the host overload keeps the first registration for a name and ignores a repeat, while the application overload has no whole-call guard and lets the client initializer pick the first server that initializes. The application overload also registers the application's default transport, so an HTTP client with no configured base URL reuses this server. When the environment configures the application's address, both the server and its capability step aside — see [Real server or in-process?](#real-server-or-in-process).
+Both overloads register a `server` capability named `ASP.NET Core` and expose the application's client under the server name — `"{name}:Factory"` for the `WebApplicationFactory<TProgram>` and `{name}` for the `HttpClient`. Registration is per server name: the host overload keeps the first registration for a name — the same `TProgram` under one name is a no-op, a different one throws naming both programs — while the application overload has no whole-call guard and lets the client initializer pick the first server that initializes. The application overload also registers the application's default transport, so an HTTP client with no configured base URL reuses this server. When the environment configures the application's address, both the server and its capability step aside — see [Real server or in-process?](#real-server-or-in-process).
 
 ## One application, or one per test
 
@@ -158,7 +158,7 @@ builder.AddAspNetCoreServer<Program>(
     configureClientOptions: options => options.AllowAutoRedirect = false);
 ```
 
-The handler chain mirrors `WebApplicationFactoryClientOptions`: a redirect handler when `AllowAutoRedirect` is set and a cookie container when `HandleCookies` is set, with ProtoTest's `ProtoTraceContextHandler` appended after them. In published mode the same chain wraps a real socket, and an explicitly set `options.BaseAddress` overrides the configured address.
+The handler chain mirrors `WebApplicationFactoryClientOptions`: a redirect handler when `AllowAutoRedirect` is set and a cookie container when `HandleCookies` is set, with ProtoTest's context-propagating handler appended after them (see [Tracing](#tracing)). In published mode the same chain wraps a real socket, and an explicitly set `options.BaseAddress` overrides the configured address.
 
 `configureWebHost` customizes the server for every test of the run. For a replacement that applies to one test and resets afterwards, see [Substituting services per test](#substituting-services-per-test).
 
@@ -255,7 +255,7 @@ The server is both an event and a state entity — or a single skipped event whe
 
 A substitution records one operation per replaced service — `service.substitute` for an `Override` or `[ReplaceService]`, `service.fail` for a `[FailDependency]` — carrying `service.type`, `service.server` and `service.replacement`, linked to the server entity. The test's dedicated server re-records the initialize event and merges `aspnetcore.server.substituted = true` with `aspnetcore.server.substitutions` (the substituted service types) into the server entity state.
 
-The `HttpClient` is a regular ProtoTest client, so its REST and GraphQL calls are traced by those packages. In addition, `ProtoTraceContextHandler` propagates the current trace context: when an `Activity.Current` exists and the outgoing request has no `traceparent`, the handler adds `00-{TraceId}-{SpanId}-{01|00}`; an existing `traceparent` is left untouched.
+The `HttpClient` is a regular ProtoTest client, so its REST and GraphQL calls are traced by those packages. In addition, `ProtoTestContextPropagation.ApplyTo` propagates the current context: when an `Activity.Current` exists and the request has no `traceparent`, it adds `00-{TraceId}-{SpanId}-{01|00}`, and while a test is active on the flow it adds the test's id under `ProtoTestContextPropagation.TestIdHeader` (`x-prototest-test`); existing headers are left untouched. The in-process HTTP client's handler applies it to every request, and a transport that opens a raw in-process request — a WebSocket handshake, for example — applies `ApplyTo(HttpRequest)` itself, so the application's clock filter pushes the connecting test's clock. The helper is the entry point for any in-process transport that wants the same clock parity.
 
 ## The /test-support convention
 
@@ -297,7 +297,12 @@ Or start the application's image as a container with `ApplicationContainer` from
 ```csharp
 var api = ApplicationContainer.Container("Api", "my-registry.example.test/orders-api:1.4", port: 8080);
 builder
-    .AddInfrastructure(api, api.BaseUrlKey)             // a configured key skips the container
+    .AddInfrastructure(
+        "OrdersApi",
+        chain => chain
+            .UseConfigured()      // a configured key skips the container
+            .UseContainer(api),
+        api.BaseUrlKey)
     .AddHttpReadiness(api.Application, "/health")       // register the probe after the piece that publishes the address
     .AddApplication("Api", app => app
         .AddRest(rest => rest.AddClient("Api"))
@@ -307,6 +312,36 @@ builder
 The piece assumes only the image and the port it listens on: it maps that port to a random host port, publishes `http://{hostname}:{mapped port}` as the application's `BaseUrl`, and its default readiness check waits for the port to accept a connection. The image, the health path and any container build options (an environment, a command, a Testcontainers wait strategy) belong to the suite; `TryStart` reports why the container could not start so a machine without a container runtime can skip before registering it.
 
 Either way the published instance is a real application, not the test host, so it is registered **instead of** `AddAspNetCoreServer` for that application: `ServerFactory`, `ApplicationServices` and `[RequiresInProcess]` need the test host, and the in-process page inventory and the run's clock bridge run only with it. A run that configures `ProtoTest:Applications:Api:BaseUrl` skips both pieces — the key each one fills is satisfied — and the same journey runs against that environment. When a suite needs both the test host and a browser, give the published instance its own application name; the demo registers its standalone console that way.
+
+### Choosing how the application runs
+
+`AddApplication` accepts its providers in priority order, so one composition runs against every mode
+without a conditional in `Setup` (see [Environment resolution](../foundation/environment-resolution.md)):
+
+```csharp
+builder.AddApplication("Api", app => app
+    .UseConfigured()           // ProtoTest:Applications:Api:BaseUrl is set: point at that environment
+    .UseInProcess<Program>()   // otherwise: the in-process test server
+    .AddRest(rest => rest.AddClient("Api")));
+```
+
+`UseInProcess<TProgram>()` is `AddAspNetCoreServer` as a provider: when it wins it declares the
+`server` capability - so `[RequiresInProcess]` passes - and the `clock` capability, because the test
+clock bridge runs with the server. Put `UseLoopback(App.Create)` in the chain instead of
+`AddLoopbackApplication` when the listener is one provider among others: the winner publishes the bound
+address, declares no `server` and no `clock` (it is a real process boundary), and a configured provider
+earlier in the chain skips the listener entirely. `[RequiresTestClock]` gates tests that advance the
+clock against an application the run hosts.
+
+An application that declares no provider registers no chain: `AddAspNetCoreServer` keeps its
+step-aside behavior exactly, including the capability drop when `BaseUrl` is configured.
+
+### Clock-dependent tests
+
+`[RequiresTestClock]` skips unless the winner bridges the test clock into the process serving the
+application. The in-process server and a hosted worker do; a published, container, AppHost or loopback
+application does not, so a journey that boots a device at `2030-01-01` must carry the gate instead of
+asserting a time the application never saw.
 
 ## Skip
 
@@ -326,9 +361,12 @@ Either way the published instance is a real application, not the test host, so i
   exception reaches the test unwrapped, the failed start is rolled back (the test's ambient context is
   cleared and no server or client survives it), and the next test starts the application again - the
   fault is retried, not cached. Nothing of the half-started server keeps running.
+- **A loopback provider bridges no clock and no substitution.** The hand-built application runs its own
+  container, so the run's `TimeProvider` and service replacements cannot reach it: the provider
+  declares no `server` and no `clock`, and `[RequiresTestClock]`/`[ReplaceService]` skip for it.
 - `PerRun` shares application state across tests; isolate at the data level (the sample uses a tenant per test id). `PerTest` pays the startup cost per test.
 - With `BaseUrl` configured there is no in-process server, service container, page inventory or `configureWebHost` callback in play — `configureWebHost` customizes a server that never starts. Tests that need them skip through `[RequiresInProcess]` or a capability condition. A containerized or loopback application is likewise not the test host.
-- The host overload allows one registration per server name per builder; the application overload has no whole-call guard, and repeated calls can register several initializers, with the first successful one winning.
+- The host overload allows one registration per server name per builder: repeating a name with the same `TProgram` is a no-op, and registering a different one under it throws instead of silently serving the first program; the application overload has no whole-call guard, and repeated calls can register several initializers, with the first successful one winning.
 - `ServerFactory`/`ApplicationServices` require a registration under the resolved name; `ApplicationServices` throws naming the expected call when none is found.
 - In-process page inventory is limited to concrete, explicitly-GET, page-like endpoints; parameterized and catch-all routes and API-shaped JSON routes are excluded.
 - The inventory is run-level and not repeated after it produces results; a published application never contributes it.

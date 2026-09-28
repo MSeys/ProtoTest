@@ -22,8 +22,7 @@ using ProtoTest.Web;
 /// coverage shows a page that was visited but never verified.
 /// </summary>
 [Application(NorthstarTargets.Console)]
-[NorthstarTenant(PlanIds.Growth)]
-[Auth<NorthstarAuthenticator>]
+[NorthstarMember(PlanIds.Growth)]
 [WebSession("Default", DiscoverRoutes = true)]
 [LoginAs<NorthstarConsoleLogin>("owner")]
 [RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "Northstar standalone")]

@@ -84,6 +84,101 @@ public sealed class MassTransitEnvelopeTests
     }
 
     [Test]
+    public void Wrap_ShouldCarryTheRequestResponseFieldsAndUnwrapShouldReadThem()
+    {
+        var requestId = Guid.NewGuid();
+        var source = new Uri("rabbitmq://localhost/source");
+        var destinationAddress = new Uri("rabbitmq://localhost/destination");
+        var response = new Uri("rabbitmq://localhost/replies");
+
+        var frame = MassTransitEnvelope.Wrap(
+            "ProtoTest.Messaging.MassTransit.Tests:EnvelopeProbeCommand",
+            new EnvelopeProbeCommand(Guid.NewGuid(), 1, 2),
+            new MassTransitEnvelopeAddresses(
+                SourceAddress: source,
+                DestinationAddress: destinationAddress,
+                ResponseAddress: response,
+                RequestId: requestId));
+
+        using var document = JsonDocument.Parse(frame.Payload!);
+        var root = document.RootElement;
+        var content = MassTransitEnvelope.Unwrap(frame);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(root.GetProperty("sourceAddress").GetString(), Is.EqualTo(source.ToString()));
+            Assert.That(root.GetProperty("destinationAddress").GetString(), Is.EqualTo(destinationAddress.ToString()));
+            Assert.That(root.GetProperty("responseAddress").GetString(), Is.EqualTo(response.ToString()),
+                "a responder reads the response address from the envelope this frame carries");
+            Assert.That(root.GetProperty("requestId").GetString(), Is.EqualTo(requestId.ToString("D")));
+            Assert.That(content.SourceAddress, Is.EqualTo(source));
+            Assert.That(content.DestinationAddress, Is.EqualTo(destinationAddress));
+            Assert.That(content.ResponseAddress, Is.EqualTo(response));
+            Assert.That(content.RequestId, Is.EqualTo(requestId));
+        }
+    }
+
+    [Test]
+    public void Wrap_WithoutAddresses_ShouldLeaveTheRequestResponseFieldsUnset()
+    {
+        var frame = MassTransitEnvelope.Wrap(
+            "ProtoTest.Messaging.MassTransit.Tests:EnvelopeProbeCommand",
+            new EnvelopeProbeCommand(Guid.NewGuid(), 1, 2),
+            new MassTransitEnvelopeAddresses());
+
+        var content = MassTransitEnvelope.Unwrap(frame);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(content.SourceAddress, Is.Null);
+            Assert.That(content.DestinationAddress, Is.Null);
+            Assert.That(content.ResponseAddress, Is.Null);
+            Assert.That(content.RequestId, Is.Null);
+        }
+    }
+
+    [Test]
+    public void Wrap_WithAddresses_ShouldReadARawPayloadAsItsContract()
+    {
+        const string payload =
+            """{"runId":"00000000-0000-0000-0000-000000000000","invoiceId":7,"amount":"1.5"}""";
+        var requestId = Guid.NewGuid();
+        var frame = MassTransitEnvelope.Wrap(
+            "ProtoTest.Messaging.MassTransit.Tests:EnvelopeProbeCommand",
+            payload,
+            typeof(EnvelopeProbeCommand),
+            new MassTransitEnvelopeAddresses(
+                ResponseAddress: new Uri("rabbitmq://localhost/replies"),
+                RequestId: requestId));
+
+        var content = MassTransitEnvelope.Unwrap(frame);
+        var command = MassTransitEnvelope.Unwrap<EnvelopeProbeCommand>(frame);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(command.InvoiceId, Is.EqualTo(7));
+            Assert.That(content.ResponseAddress, Is.EqualTo(new Uri("rabbitmq://localhost/replies")));
+            Assert.That(content.RequestId, Is.EqualTo(requestId));
+        }
+    }
+
+    [Test]
+    public void Unwrap_WhenAnAddressIsNotAbsolute_ShouldFailNamingIt()
+    {
+        var frame = MassTransitEnvelope.Wrap(
+            "ProtoTest.Messaging.MassTransit.Tests:EnvelopeProbeCommand",
+            new EnvelopeProbeCommand(Guid.NewGuid(), 1, 2));
+        var envelope = JsonNode.Parse(frame.Payload!)!.AsObject();
+        envelope["responseAddress"] = "not an address";
+        var corrupted = frame with { Payload = envelope.ToJsonString() };
+
+        var error = Assert.Throws<MessagingAssertionException>(() => MassTransitEnvelope.Unwrap(corrupted));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(error!.Message, Does.Contain("not a MassTransit envelope"));
+            Assert.That(error.Message, Does.Contain("'responseAddress' is not an absolute address"));
+        }
+    }
+
+    [Test]
     public void Wrap_ShouldReadARawPayloadAsItsContract()
     {
         const string payload =
@@ -150,6 +245,92 @@ public sealed class MassTransitEnvelopeTests
             () => MassTransitEnvelope.Unwrap<EnvelopeProbeEvent>(frame));
 
         Assert.That(error!.Message, Does.Contain(nameof(EnvelopeProbeEvent)));
+    }
+
+    [Test]
+    public void Unwrap_ShouldReadTheContractsInterface()
+    {
+        var frame = MassTransitEnvelope.Wrap(
+            "ProtoTest.Messaging.MassTransit.TestApi:InvoiceNotified",
+            new InvoiceNotified(42));
+
+        var notified = MassTransitEnvelope.Unwrap<IInvoiceNotified>(frame);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(notified.InvoiceId, Is.EqualTo(42), "an interface contract reads like the bus consumer would read it");
+            Assert.That(
+                MassTransitEnvelope.Unwrap(frame).MessageTypes,
+                Does.Contain(UrnOf<IInvoiceNotified>()),
+                "the envelope declares the interface URN beside the implementation's");
+        }
+    }
+
+    [Test]
+    public void Unwrap_WhenTheMessageIsNotValidJsonForTheContract_ShouldFailNamingTheDestination()
+    {
+        var frame = MassTransitEnvelope.Wrap(
+            "ProtoTest.Messaging.MassTransit.Tests:EnvelopeProbeCommand",
+            """{"invoiceId":"not-a-number"}""",
+            typeof(EnvelopeProbeCommand));
+
+        var error = Assert.Throws<MessagingAssertionException>(
+            () => MassTransitEnvelope.Unwrap<EnvelopeProbeCommand>(frame));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(error!.Message, Does.Contain("ProtoTest.Messaging.MassTransit.Tests:EnvelopeProbeCommand"));
+            Assert.That(error.Message, Does.Contain("not a MassTransit envelope"));
+            Assert.That(error.Message, Does.Contain("not valid JSON for EnvelopeProbeCommand"));
+        }
+    }
+
+    [TestCase("messageId")]
+    [TestCase("correlationId")]
+    [TestCase("conversationId")]
+    public void Unwrap_WhenAnIdIsNotAGuid_ShouldFailNamingIt(string idName)
+    {
+        var frame = MassTransitEnvelope.Wrap(
+            "ProtoTest.Messaging.MassTransit.Tests:EnvelopeProbeCommand",
+            new EnvelopeProbeCommand(Guid.NewGuid(), 1, 2));
+        var envelope = JsonNode.Parse(frame.Payload!)!.AsObject();
+        envelope[idName] = "not-a-guid";
+        var corrupted = frame with { Payload = envelope.ToJsonString() };
+
+        var error = Assert.Throws<MessagingAssertionException>(() => MassTransitEnvelope.Unwrap(corrupted));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(error!.Message, Does.Contain("not a MassTransit envelope"));
+            Assert.That(error.Message, Does.Contain($"'{idName}' is not a GUID"));
+        }
+    }
+
+    [Test]
+    public void Wrap_WhenTheRawPayloadIsJsonNull_ShouldProduceAnEnvelopeWithoutAMessage()
+    {
+        var frame = MassTransitEnvelope.Wrap(
+            "ProtoTest.Messaging.MassTransit.Tests:EnvelopeProbeCommand",
+            "null",
+            typeof(EnvelopeProbeCommand));
+
+        using var document = JsonDocument.Parse(frame.Payload!);
+        var error = Assert.Throws<MessagingAssertionException>(() => MassTransitEnvelope.Unwrap(frame));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(document.RootElement.GetProperty("message").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            Assert.That(error!.Message, Does.Contain("carries no 'message'"));
+        }
+    }
+
+    [Test]
+    public void Wrap_WhenTheRawPayloadTypeIsNotAMessageContract_ShouldFailNamingIt()
+    {
+        var error = Assert.Throws<ArgumentException>(
+            () => MassTransitEnvelope.Wrap("invoice.paid", "{}", typeof(string)));
+
+        Assert.That(error!.Message, Does.Contain(nameof(String)));
     }
 
     [Test]

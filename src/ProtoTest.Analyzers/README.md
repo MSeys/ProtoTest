@@ -1,7 +1,7 @@
 # ProtoTest.Analyzers
 
-Roslyn analyzers for ProtoTest suites: the intent-dependent mistakes the framework cannot see at
-runtime. Two warnings, deliberately narrow - a noisy analyzer is worse than none.
+Roslyn analyzers for ProtoTest suites: the context-scoped mistakes the framework cannot see at
+runtime. Three warnings, deliberately narrow - a noisy analyzer is worse than none.
 
 ```
 dotnet add package ProtoTest.Analyzers
@@ -16,6 +16,7 @@ package should not flow to projects that reference your test project.
 | --- | --- | --- | --- |
 | `PT0001` | ProtoTest test attribute combined with the runner's own test attribute | Warning | one method carrying both a ProtoTest attribute and the runner's plain test attribute |
 | `PT0002` | ProtoTest context used in a test without the ProtoTest attribute | Warning | `Proto.Context` read in a method the runner registers with a plain test attribute |
+| `PT0003` | Column attribute on a key-value sheet model | Warning | `[Column]` on a property of a model whose `[Sheet]` declares `Kind = ProtoSheetKind.KeyValue` |
 
 ### PT0001 - a method with both registrations
 
@@ -55,6 +56,24 @@ are not reported on purpose - they run inside a ProtoTest test's flow and are re
 is excluded on purpose: `ProtoTestExecutor` runs every TUnit `[Test]` inside the lifecycle, so its
 `[Test]` is not a plain registration. Suppress with `#pragma warning disable PT0002` or
 `dotnet_diagnostic.PT0002.severity = none`.
+
+### PT0003 - `[Column]` on a key-value sheet model
+
+**Pattern.** A property carries `ProtoTest.Sheets.ColumnAttribute`, and its containing type carries
+`ProtoTest.Sheets.SheetAttribute` with the named argument `Kind` naming the `KeyValue` member of
+`ProtoTest.Sheets.ProtoSheetKind`.
+
+**Why it is context-dependent.** A key-value sheet declares its labels with `[Label("...")]`; `[Column]`
+on the same property still compiles and still reads the label, because C# obsoletion is per symbol and
+`ColumnAttribute` is the table mapping every table model depends on. Only the model's `[Sheet]` kind
+tells the two apart, so the analyzer is the deprecation, and its message names `[Label]`. The runtime
+still accepts the mapping, so an existing model keeps compiling and reading; `Unique` and a
+multi-segment path stay rejected there, because they are table-only knobs.
+
+**False-positive analysis.** The rule fires only when the containing type declares the key-value kind
+explicitly; a table model, a class without `[Sheet]`, and a `[Label]` property are clean. It is silent
+when the enum member cannot be resolved by name. Suppress with `#pragma warning disable PT0003` or
+`dotnet_diagnostic.PT0003.severity = none`.
 
 ## The rejected rule: registration inference
 

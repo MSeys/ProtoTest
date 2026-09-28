@@ -4,7 +4,6 @@ using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using ProtoTest.Core;
-using ProtoTest.Web.Internal;
 
 public sealed partial class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics, IWebBackendDownloads
 {

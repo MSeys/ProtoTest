@@ -27,6 +27,27 @@ public sealed class ProtoTestScopeTests
     }
 
     [Test]
+    public async Task StartAsync_WhenATokenIsSupplied_ShouldCarryItToTheContext()
+    {
+        await using var host = new ProtoHostBuilder().Build();
+        await host.StartAsync();
+        var preparation = ProtoTestAdapter.Prepare(TestMethods.Placeholder, host);
+        using var cancellation = new CancellationTokenSource();
+
+        var scope = await ProtoTestScope.StartAsync(preparation, host, null, cancellation.Token);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(scope.Context.CancellationToken, Is.EqualTo(cancellation.Token),
+                "the adapter's entry point carries the runner's token into the lifecycle");
+            Assert.That(scope.Context.CancellationToken.CanBeCanceled, Is.True);
+        }
+
+        scope.Result = ProtoTestResult.Passed;
+        await scope.DisposeAsync();
+    }
+
+    [Test]
     public async Task DisposeAsync_WhenCalledTwice_ShouldCompleteOnce()
     {
         await using var host = new ProtoHostBuilder().Build();

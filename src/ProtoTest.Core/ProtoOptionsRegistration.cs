@@ -44,6 +44,46 @@ public static class ProtoOptionsRegistration
         });
     }
 
+    /// <summary>
+    /// Registers one keyed instance of <typeparamref name="TOptions"/> under <paramref name="key"/>:
+    /// every call's <paramref name="configure"/> callback runs in registration order, then the section
+    /// named by <see cref="IProtoConfigurableOptions.ConfigurationSectionName"/> binds over the result.
+    /// This is the per-named-client shape; with <paramref name="registerDefault"/>, the unkeyed
+    /// instance a transport-backed fallback client reads is registered too, with the same factory and
+    /// section binding but no keyed callback.
+    /// </summary>
+    public static void ConfigureKeyed<TOptions>(
+        IServiceCollection services,
+        string key,
+        Func<TOptions> factory,
+        Action<TOptions>? configure = null,
+        bool registerDefault = false)
+        where TOptions : class, IProtoConfigurableOptions
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        ArgumentNullException.ThrowIfNull(factory);
+
+        if (configure is not null)
+        {
+            services.AddKeyedSingleton(key, new ConfigureCallback<TOptions>(configure));
+        }
+
+        services.TryAddKeyedSingleton<TOptions>(key, (serviceProvider, _) =>
+            Resolve(serviceProvider, factory, options =>
+            {
+                foreach (var callback in serviceProvider.GetKeyedServices<ConfigureCallback<TOptions>>(key))
+                {
+                    callback.Callback(options);
+                }
+            }));
+
+        if (registerDefault)
+        {
+            services.TryAddSingleton(serviceProvider => Resolve(serviceProvider, factory));
+        }
+    }
+
     private sealed record ConfigureCallback<TOptions>(Action<TOptions> Callback);
 
     /// <summary>

@@ -27,7 +27,12 @@ public sealed class RunSetupTests
             return ValueTask.CompletedTask;
         });
         builder.AddInfrastructure(
-            new DeclaredSettingsInfrastructure("database:orders", AddressKey, "Host=container"),
+            "OrdersDatabase",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider(
+                    "settings",
+                    new DeclaredSettingsInfrastructure("database:orders", AddressKey, "Host=container"))),
             AddressKey);
         builder.AddRunSetup("after", setup =>
         {
@@ -77,7 +82,12 @@ public sealed class RunSetupTests
         builder.ConfigureTracing(options => options.Enabled = false);
         builder.ConfigureServices(services => services.AddSingleton<IProtoRunHook>(hook));
         builder.AddInfrastructure(
-            new DeclaredSettingsInfrastructure("database:orders", AddressKey, "Host=container"),
+            "OrdersDatabase",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider(
+                    "settings",
+                    new DeclaredSettingsInfrastructure("database:orders", AddressKey, "Host=container"))),
             AddressKey);
         builder.AddRunSetup("schema", setup =>
         {

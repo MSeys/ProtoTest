@@ -12,8 +12,7 @@ using ProtoTest.SampleApp.Contracts;
 
 /// <summary>A team ships a release through preview, promotes it, then rolls it back.</summary>
 [Application(NorthstarTargets.Api)]
-[NorthstarTenant(PlanIds.Growth)]
-[Auth<NorthstarAuthenticator>]
+[NorthstarMember(PlanIds.Growth)]
 public sealed class DeliveryJourney
 {
     [ProtoTest]

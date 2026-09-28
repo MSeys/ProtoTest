@@ -3,7 +3,6 @@ namespace ProtoTest.Sql.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore;
 using ProtoTest.Core;
 using ProtoTest.Sql;
-using ProtoTest.Sql.Internal;
 
 /// <summary>
 /// Enlists the test's <see cref="DbContext"/> in the transaction ProtoTest.Sql opened. Without this the

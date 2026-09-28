@@ -1,5 +1,7 @@
 namespace ProtoTest.Messaging;
 
+using ProtoTest.Messaging.Internal;
+
 /// <summary>
 /// One test's view of a broker, created by <see cref="IProtoMessageBroker.CreateConsumerAsync"/> during
 /// setup and disposed with the test's teardown. A consumer belongs to exactly one test: it must never be
@@ -30,4 +32,28 @@ public interface IProtoMessageConsumer : IAsyncDisposable
         Func<ProtoMessage, bool> predicate,
         TimeSpan timeout,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Waits like <see cref="AwaitAsync(string, Func{ProtoMessage, bool}, TimeSpan, CancellationToken)"/>
+    /// but matches only a delivery the transport carried under <paramref name="routingKey"/>; null
+    /// matches any routing key and behaves exactly like the plain overload. The default implementation
+    /// filters the predicate by <see cref="ProtoMessage.RoutingKey"/>, which a consumer over a broker
+    /// that keeps history gets for free; a tap adapter overrides it to bind the routing key on its tap as
+    /// well, so a direct exchange delivers the key this await matches.
+    /// </summary>
+    ValueTask<ProtoMessage> AwaitAsync(
+        string destination,
+        string? routingKey,
+        Func<ProtoMessage, bool> predicate,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(destination);
+        ArgumentNullException.ThrowIfNull(predicate);
+        return AwaitAsync(
+            destination,
+            ProtoMessageRoutingKeys.Filter(predicate, routingKey),
+            timeout,
+            cancellationToken);
+    }
 }

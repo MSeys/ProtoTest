@@ -24,7 +24,7 @@ public sealed class ProtoTargetBuilder(string targetName, IServiceCollection ser
     {
         ArgumentNullException.ThrowIfNull(additionalArguments);
         var marker = new ProtoCollectorRegistration(TargetName, typeof(TCollector));
-        if (!ProtoRegistration.TryAdd(Services, marker, existing => existing == marker))
+        if (!ProtoRegistrationGuard.TryRegisterOnce(Services, marker, existing => existing == marker))
         {
             return this;
         }

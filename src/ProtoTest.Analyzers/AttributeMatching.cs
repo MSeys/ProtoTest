@@ -12,9 +12,9 @@ internal static class AttributeMatching
         => method.GetAttributes().FirstOrDefault(attribute =>
             attribute.AttributeClass is { } attributeClass && attributeNames.Contains(attributeClass.ToDisplayString()));
 
-    /// <summary>The attribute's own location when the source is present, otherwise the method's.</summary>
-    public static Location LocationOf(AttributeData attribute, IMethodSymbol method)
+    /// <summary>The attribute's own location when the source is present, otherwise the symbol's.</summary>
+    public static Location LocationOf(AttributeData attribute, ISymbol symbol)
         => attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
-            ?? method.Locations.FirstOrDefault()
+            ?? symbol.Locations.FirstOrDefault()
             ?? Location.None;
 }

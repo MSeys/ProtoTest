@@ -64,12 +64,14 @@ Three shipped conditions remove the stringly-typed gates for the most common cas
 [RequiresWorker<BillingWorker>]        // the worker AddWorkerHost<BillingWorker>() starts
 [RequiresServer("Api")]                // the named AddAspNetCoreServer<Program>(name: "Api") instance
 [RequiresApplication("Api")]           // the application AddApplication("Api", ...) declares
+[RequiresTestClock]                    // the run's clock is authoritative for the application
 public async Task ...() { ... }
 ```
 
 - `[RequiresWorker<TProgram>]` checks the `worker` capability by the program assembly's name — the identity `AddWorkerHost<TProgram>()` registers — so a typo cannot turn a missing worker into a plausible skip. Its default reason names `AddWorkerHost<TProgram>()`.
 - `[RequiresServer(name)]` checks the `server` capability's instance (the server name), not the descriptor name `ASP.NET Core`, so configuring one named server's `BaseUrl` drops only that server. Its default reason names `AddAspNetCoreServer<TProgram>(name: "…")`.
 - `[RequiresApplication(name)]` checks that the suite declared the application with `AddApplication`, regardless of which protocols it registered. Its default reason names `AddApplication("…", app => ...)`.
+- `[RequiresTestClock]` checks the `clock` capability: the winning in-process application provider and a hosted worker declare it, because they bridge the test clock into the process they serve. A published, container, AppHost or loopback application declares none, so a journey that advances the clock skips instead of asserting a time the application never saw.
 
 Each accepts `Reason` like `[RequiresCapability]`, and `[RequiresCapability(kind)]` stays for open kinds and integration-specific names.
 

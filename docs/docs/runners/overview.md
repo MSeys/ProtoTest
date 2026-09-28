@@ -42,6 +42,18 @@ Before the body the adapter calls `StartTestAsync`: the context is created, the 
 
 xUnit v2, MSTest and TUnit run this lifecycle asynchronously. NUnit and xUnit v3 call the host synchronously (`GetAwaiter().GetResult()`), so they need a synchronizing context.
 
+## Cancellation
+
+The runner's cancellation token rides the lifecycle: the adapter passes it to `StartTestAsync`, hooks and attributes read it as `ProtoExecutionContext.CancellationToken`, and setup I/O that can observe it — the SQL connection open and transaction begin — is cancelled with it. Where the runner exposes no token, the test starts with `CancellationToken.None` and setup runs to the integration's own timeout.
+
+| Runner | Token the adapter supplies |
+| --- | --- |
+| NUnit | `TestExecutionContext.CancellationToken`, cancelled by `[CancelAfter]` |
+| xUnit v2 | the runner's `CancellationTokenSource` |
+| MSTest | none — `TestMethodAttribute.ExecuteAsync(ITestMethod)` exposes no token |
+| xUnit v3 | none — `IBeforeAfterTestAttribute` exposes no token |
+| TUnit | none — `ITestExecutor` exposes no token |
+
 ## Outcomes
 
 | Runner | Outcomes ProtoTest records | Why |

@@ -362,7 +362,12 @@ public sealed class ProtoContainerResourceTests
             options.Timeout = TimeSpan.FromMilliseconds(200);
             options.Interval = TimeSpan.FromMilliseconds(20);
         });
-        builder.AddInfrastructure(resource, "ConnectionStrings:NeverReady");
+        builder.AddInfrastructure(
+            "NeverReady",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider("container", resource)),
+            "ConnectionStrings:NeverReady");
         await using var host = builder.Build();
 
         var stopwatch = Stopwatch.StartNew();

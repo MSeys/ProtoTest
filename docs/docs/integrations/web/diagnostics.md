@@ -20,6 +20,8 @@ When an action or assertion fails, the backend captures the page at that moment:
 
 The name parts are lowercased and sanitized (non-letters/digits become `-`), `{element}` falls back to the operation name when the failure is not element-bound, and `{n}` is a per-test sequence so a failure repeated on the same element keeps both sets of artifacts. Captures run in order screenshot, DOM, location.
 
+A hand-written backend produces the same artifacts by calling `WebFailureArtifacts.CaptureAsync(…)` in `ProtoTest.Web`, and reports the same resolution and actionability wording through `WebBackendErrors`; both are part of the [backend-neutral building blocks](./index.md#registering).
+
 Capturing never replaces the original error. Each artifact registers on its own, so one failing attachment does not drop the rest. If capture itself fails, you'll see a `web.diagnostics.artifact_failed` entry — or `web.diagnostics.failed` when the backend produced no attachments at all — and still get the real exception.
 
 ## Captured downloads

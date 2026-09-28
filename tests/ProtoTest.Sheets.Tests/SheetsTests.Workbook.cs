@@ -383,5 +383,38 @@ public sealed partial class SheetsTests
         SingleValueSheet("StrictHuge", 17, Single("A2", 1e20));
         SingleValueSheet("StrictNan", 18, Single("A2", double.NaN));
         SingleValueSheet("Guarded", 19, Single("A2", -1));
+
+        // A label/value block: labels in column A, values in column B, with one label whose value
+        // cell is empty.
+        var keyValuesPart = workbookPart.AddNewPart<WorksheetPart>();
+        var keyValuesData = new SheetData();
+        keyValuesPart.Worksheet = new Worksheet(keyValuesData);
+        sheets.Append(new Sheet
+        {
+            Id = workbookPart.GetIdOfPart(keyValuesPart),
+            SheetId = 20,
+            Name = "KeyValues"
+        });
+        keyValuesData.Append(
+            new Row(Text("A1", "Total"), Number("B1", 123.45)),
+            new Row(Text("A2", "Count"), Number("B2", 3)),
+            new Row(Text("A3", "Currency"), Text("B3", "EUR")),
+            new Row(Text("A4", "Note")));
+        keyValuesPart.Worksheet.Save();
+
+        // A label repeated on two rows: a key-value model cannot tell them apart.
+        var duplicateLabelPart = workbookPart.AddNewPart<WorksheetPart>();
+        var duplicateLabelData = new SheetData();
+        duplicateLabelPart.Worksheet = new Worksheet(duplicateLabelData);
+        sheets.Append(new Sheet
+        {
+            Id = workbookPart.GetIdOfPart(duplicateLabelPart),
+            SheetId = 21,
+            Name = "DuplicateLabels"
+        });
+        duplicateLabelData.Append(
+            new Row(Text("A1", "Total"), Number("B1", 1)),
+            new Row(Text("A2", "Total"), Number("B2", 2)));
+        duplicateLabelPart.Worksheet.Save();
     }
 }

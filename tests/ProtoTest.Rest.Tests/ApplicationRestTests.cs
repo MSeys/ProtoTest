@@ -306,7 +306,12 @@ public sealed class ApplicationRestTests
         };
         var builder = new ProtoHostBuilder();
         builder.AddInfrastructure(
-            new PublishedAddressInfrastructure("ControlPlane", "http://published.test:5080/"),
+            "ControlPlane address",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider(
+                    "published",
+                    new PublishedAddressInfrastructure("ControlPlane", "http://published.test:5080/"))),
             "ProtoTest:Applications:ControlPlane:BaseUrl");
         builder.AddApplication("ControlPlane", app => app.AddRest(rest => rest.AddClient(
             "Orders",

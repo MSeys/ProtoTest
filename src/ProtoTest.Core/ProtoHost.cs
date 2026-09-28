@@ -258,6 +258,23 @@ public sealed class ProtoHost : IAsyncDisposable
     }
 
     /// <summary>
+    /// Starts a test lifecycle with a caller-supplied attribute set, an attachment publisher and a
+    /// cancellation token for the test. Setup I/O that can observe cancellation - the SQL connection
+    /// open and transaction begin - does; the token reaches hooks and attributes through
+    /// <see cref="ProtoExecutionContext.CancellationToken"/>.
+    /// </summary>
+    public Task<ProtoExecutionContext> StartTestAsync(
+        string testName,
+        MethodInfo testMethod,
+        IEnumerable<ProtoAttribute>? attributes,
+        IProtoTestAttachmentPublisher? attachmentPublisher,
+        CancellationToken cancellationToken)
+    {
+        EnsureTestCanStart();
+        return _testLifecycle.StartAsync(testName, testMethod, attributes, attachmentPublisher, cancellationToken);
+    }
+
+    /// <summary>
     /// Starts a test lifecycle with an explicit numeric ID and a cancellation token for the test.
     /// Setup I/O that can observe cancellation - the SQL connection open and transaction begin - does;
     /// the token reaches hooks and attributes through <see cref="ProtoExecutionContext.CancellationToken"/>.

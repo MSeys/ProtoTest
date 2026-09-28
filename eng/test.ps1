@@ -114,6 +114,7 @@ $parallelProjectNames = @(
     "ProtoTest.Devices.Tests",
     "ProtoTest.Devices.WebSocket.AspNetCore.Tests",
     "ProtoTest.Devices.WebSocket.Tests",
+    "ProtoTest.Extensibility.Tests",
     "ProtoTest.GraphQL.Tests",
     "ProtoTest.Grpc.Tests",
     "ProtoTest.Hosting.Tests",

@@ -17,8 +17,7 @@ using ProtoTest.Web;
 /// intentional failure used to keep the trace viewer demo complete.
 /// </summary>
 [Application(NorthstarTargets.Api)]
-[NorthstarTenant]
-[Auth<NorthstarAuthenticator>]
+[NorthstarMember]
 [WebSession("Default", DiscoverRoutes = true)]
 public sealed class DiagnosticsShowcase
 {
@@ -134,8 +133,7 @@ public sealed class DiagnosticsShowcase
 /// standalone console application, whose published address the browser sessions follow.
 /// </summary>
 [Application(NorthstarTargets.Console)]
-[NorthstarTenant]
-[Auth<NorthstarAuthenticator>]
+[NorthstarMember]
 [WebSession("Default", DiscoverRoutes = true)]
 [RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "Northstar standalone")]
 [RequiresConsoleBuild]

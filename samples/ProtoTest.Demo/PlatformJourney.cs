@@ -13,8 +13,7 @@ using ProtoTest.SampleApp.Contracts;
 
 /// <summary>REST, GraphQL and webhooks describing the same platform.</summary>
 [Application(NorthstarTargets.Api)]
-[NorthstarTenant(PlanIds.Growth)]
-[Auth<NorthstarAuthenticator>]
+[NorthstarMember(PlanIds.Growth)]
 public sealed class PlatformJourney
 {
     [ProtoTest]

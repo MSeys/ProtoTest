@@ -1,14 +1,15 @@
 ---
 sidebar_position: 4
 title: Analyzers
-description: "ProtoTest.Analyzers: the two intent-dependent warnings the framework cannot catch at runtime, and what the package deliberately does not check."
+description: "ProtoTest.Analyzers: the three context-scoped warnings the framework cannot catch at runtime, and what the package deliberately does not check."
 ---
 
 # Analyzers
 
 `ProtoTest.Analyzers` is a small Roslyn package for the mistakes that compile and look right but run
-outside the lifecycle. It ships two warnings, and a rule only ships when a false positive is
-impossible or trivially suppressed - a noisy analyzer is worse than none.
+outside the lifecycle or against the deprecated spelling. It ships three warnings, and a rule only
+ships when a false positive is impossible or trivially suppressed - a noisy analyzer is worse than
+none.
 
 ```bash
 dotnet add package ProtoTest.Analyzers
@@ -23,6 +24,7 @@ should not flow to projects that reference your test project.
 | --- | --- | --- |
 | `PT0001` | Warning | one method carrying both a ProtoTest test attribute and the runner's own test attribute (`[Test]`, `[Fact]`, `[Theory]`, `[TestMethod]`) |
 | `PT0002` | Warning | `Proto.Context` read in a method the runner registers with its own test attribute, without a ProtoTest attribute |
+| `PT0003` | Warning | `[Column]` on a property of a key-value sheet model (`[Sheet(..., Kind = ProtoSheetKind.KeyValue)]`) |
 
 `PT0001` is the attribute-doubling trap: the ProtoTest attributes derive from the runner's plain
 attribute, so one registration is enough, and what the pair does depends on the runner - NUnit merges
@@ -31,10 +33,14 @@ is the plain-test trap: `Proto.Context` only resolves inside the lifecycle, so a
 `[Test]`/`[Fact]`/`[TestMethod]` method that reads it - directly or through an accessor such as
 `context.Rest()` or `context.Web()` - is guaranteed to throw. The runner pages show the right
 attribute for each runner: [NUnit](../runners/nunit.md), [xUnit v2](../runners/xunit.md),
-[xUnit v3](../runners/xunit3.md), [MSTest](../runners/mstest.md).
+[xUnit v3](../runners/xunit3.md), [MSTest](../runners/mstest.md). `PT0003` is the sheet-mapping trap:
+a key-value sheet declares its labels with `[Label("...")]`, and `[Column]` on the same property still
+compiles and still reads the label, so only the model's `[Sheet]` kind tells the spelling apart - the
+rule fires only on a model that declares `Kind = ProtoSheetKind.KeyValue` and names `[Label]` in its
+message. See [Sheets](../integrations/sheets/index.md#key-value-sheets).
 
-Both warnings are suppressible the standard way: `#pragma warning disable PT0001` or
-`dotnet_diagnostic.PT0002.severity = none` in `.editorconfig`.
+The warnings are suppressible the standard way: `#pragma warning disable PT0001` or
+`dotnet_diagnostic.PT0002.severity = none` in `.editorconfig` (PT0003 likewise).
 
 ## What it deliberately does not check
 

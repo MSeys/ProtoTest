@@ -6,9 +6,11 @@ using ProtoTest.Core;
 
 /// <summary>
 /// Resolves the response and attachment options a protocol registered under its own key, so REST and
-/// GraphQL never share configuration even though they use the same base option types.
+/// GraphQL never share configuration even though they use the same base option types. A protocol
+/// integration resolves its own options through these methods, matching the key it registered with
+/// <see cref="ProtoHttpOptionsRegistration"/>.
 /// </summary>
-internal static class ProtoHttpOptionsResolver
+public static class ProtoHttpOptionsResolver
 {
     /// <summary>
     /// Resolves the response options registered for <paramref name="protocolName"/>, or the shared

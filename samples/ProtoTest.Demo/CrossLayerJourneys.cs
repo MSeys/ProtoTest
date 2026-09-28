@@ -18,8 +18,7 @@ using ProtoTest.Web;
 /// console until it refreshes, then the screen renders what the API wrote.
 /// </summary>
 [Application(NorthstarTargets.Console)]
-[NorthstarTenant(PlanIds.Growth)]
-[Auth<NorthstarAuthenticator>]
+[NorthstarMember(PlanIds.Growth)]
 [WebSession("Default", DiscoverRoutes = true)]
 [LoginAs<NorthstarConsoleLogin>("owner")]
 [RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "Northstar standalone")]
@@ -57,8 +56,7 @@ public sealed class ApiThenBrowserJourney
 /// asserted back through REST and GraphQL, so the UI write is proven on the protocol side.
 /// </summary>
 [Application(NorthstarTargets.Console)]
-[NorthstarTenant(PlanIds.Growth)]
-[Auth<NorthstarAuthenticator>]
+[NorthstarMember(PlanIds.Growth)]
 [WebSession("Default", DiscoverRoutes = true)]
 [LoginAs<NorthstarConsoleLogin>("owner")]
 [RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "Northstar standalone")]

@@ -38,7 +38,9 @@ public sealed class TargetedVerificationProbeTests
         var infrastructure = new BlockingInfrastructure("blocking");
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
-        builder.AddInfrastructure(infrastructure);
+        builder.AddInfrastructure(
+            "blocking",
+            chain => chain.Use(new ProtoTargetProvider("blocking", infrastructure)));
         var host = builder.Build();
 
         var start = host.StartAsync();
@@ -61,7 +63,9 @@ public sealed class TargetedVerificationProbeTests
         var infrastructure = new BlockingInfrastructure("blocking");
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
-        builder.AddInfrastructure(infrastructure);
+        builder.AddInfrastructure(
+            "blocking",
+            chain => chain.Use(new ProtoTargetProvider("blocking", infrastructure)));
         var host = builder.Build();
 
         var start = host.StartAsync();

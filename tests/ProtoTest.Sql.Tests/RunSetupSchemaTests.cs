@@ -7,6 +7,7 @@ using Npgsql;
 using ProtoTest.Core;
 using ProtoTest.Sql.EntityFrameworkCore;
 using ProtoTest.Sql.Testcontainers;
+using ProtoTest.Testcontainers;
 
 /// <summary>
 /// The run-owned schema recipe. The schema step is registered after the PostgreSQL
@@ -46,7 +47,12 @@ public sealed class RunSetupSchemaTests
         var setups = 0;
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
-        builder.AddInfrastructure(database, AddressKey);
+        builder.AddInfrastructure(
+            "OrdersDatabase",
+            chain => chain
+                .UseConfigured()
+                .UseContainer(database),
+            AddressKey);
         builder.AddSql(
             provider => new NpgsqlConnection(ResolveConnectionString(
                 provider.GetRequiredService<ProtoInfrastructureSettings>(),

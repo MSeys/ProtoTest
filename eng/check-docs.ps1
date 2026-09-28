@@ -120,6 +120,7 @@ foreach ($file in @($docsContentFiles + $docsSourceFiles)) {
 
 $apiAllowlist = @(
     'AddBus',                  # a reader-written extension example (advanced/extending.md)
+    'AddConnectionString',     # Aspire.Hosting's AppHost connection-string resource (integrations/aspire.md)
     'AddConsumer',             # MassTransit's registration configurator (integrations/messaging/masstransit.md)
     'AddEnvironmentVariables', # Microsoft.Extensions.Configuration
     'AddJsonFile',             # Microsoft.Extensions.Configuration

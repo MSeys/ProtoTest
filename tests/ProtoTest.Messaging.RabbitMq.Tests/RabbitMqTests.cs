@@ -1,6 +1,7 @@
 namespace ProtoTest.Messaging.RabbitMq.Tests;
 
 using System.Reflection;
+using System.Text;
 using global::RabbitMQ.Client;
 using Microsoft.Extensions.Configuration;
 using ProtoTest.Core;
@@ -329,6 +330,96 @@ public sealed class RabbitMqTests
     }
 
     [Test]
+    public async Task PublishAndAwait_ShouldRoundTripByRoutingKeyOnATopicExchange()
+    {
+        var connectionString = RequireBroker();
+
+        var exchange = $"prototest.tests.{Guid.NewGuid():N}";
+        await DeclareExchangeAsync(connectionString, exchange, ExchangeType.Topic);
+
+        try
+        {
+            // The tap's "#" binding catches every routing key on a topic exchange, so the act-then-await
+            // flow works and the routing key selects the delivery the await matches.
+            var builder = new ProtoHostBuilder();
+            builder.AddMessaging(messaging => messaging
+                .UseRabbitMq(options => options.ConnectionString = connectionString)
+                .Tap(exchange));
+            await using var host = builder.Build();
+            await host.StartAsync();
+            var context = await host.StartTestAsync("rabbit routing key topic", TestMethods.Placeholder);
+            var messages = context.Messaging();
+
+            await messages.PublishAsync(exchange, "invoice.paid", "{\"id\":1}", contentType: "application/json");
+            await messages.PublishAsync(exchange, "invoice.shipped", "{\"id\":2}", contentType: "application/json");
+            var received = await messages.AwaitAsync(
+                exchange,
+                "invoice.paid",
+                message => message.Payload == "{\"id\":1}",
+                TimeSpan.FromSeconds(15));
+
+            await host.CompleteTestAsync(ProtoTestResult.Passed);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(received.Destination, Is.EqualTo(exchange));
+                Assert.That(
+                    received.RoutingKey,
+                    Is.EqualTo("invoice.paid"),
+                    "the delivery carries the routing key it was published under");
+                Assert.That(received.Payload, Is.EqualTo("{\"id\":1}"));
+            }
+        }
+        finally
+        {
+            await DeleteExchangeAsync(connectionString, exchange);
+        }
+    }
+
+    [Test]
+    public async Task AwaitByRoutingKey_OnADirectExchange_ShouldBindTheKeyAndNameATimeout()
+    {
+        var connectionString = RequireBroker();
+
+        var exchange = $"prototest.tests.{Guid.NewGuid():N}";
+        await DeclareExchangeAsync(connectionString, exchange, ExchangeType.Direct);
+
+        try
+        {
+            var builder = new ProtoHostBuilder();
+            builder.AddMessaging(messaging => messaging.UseRabbitMq(options =>
+                options.ConnectionString = connectionString));
+            await using var host = builder.Build();
+            await host.StartAsync();
+            var context = await host.StartTestAsync("rabbit routing key direct", TestMethods.Placeholder);
+            var messages = context.Messaging();
+
+            // A direct exchange matches the routing key exactly, so the timeout below proves the
+            // negative path and binds the key on the tap; the same await then receives the message.
+            var missing = Assert.ThrowsAsync<TimeoutException>(async () =>
+                await messages.AwaitAsync(exchange, "session.ended", _ => true, TimeSpan.FromMilliseconds(200)));
+            await messages.PublishAsync(exchange, "session.ended", "{\"id\":1}");
+            var received = await messages.AwaitAsync(
+                exchange,
+                "session.ended",
+                message => message.Payload == "{\"id\":1}",
+                TimeSpan.FromSeconds(15));
+
+            await host.CompleteTestAsync(ProtoTestResult.Failed(missing!));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(missing!.Message, Does.Contain(exchange));
+                Assert.That(missing.Message, Does.Contain("session.ended"), "the timeout names the routing key it asked for");
+                Assert.That(received.RoutingKey, Is.EqualTo("session.ended"));
+                Assert.That(received.Payload, Is.EqualTo("{\"id\":1}"));
+            }
+        }
+        finally
+        {
+            await DeleteExchangeAsync(connectionString, exchange);
+        }
+    }
+
+    [Test]
     public async Task PublishAndAwait_ShouldRoundTripOnAHeadersExchange()
     {
         var connectionString = RequireBroker();
@@ -648,6 +739,108 @@ public sealed class RabbitMqTests
         Assert.That(exception!.ObjectName, Does.Contain("RabbitMqProtoMessageConsumer"));
     }
 
+    [Test]
+    public async Task Await_OnAQueueADeadLetterExchangeFeeds_ShouldReadTheQueueBacklog()
+    {
+        var connectionString = RequireBroker();
+
+        var suffix = Guid.NewGuid().ToString("N");
+        var deadLetterExchange = $"prototest.tests.{suffix}.dlx";
+        var deadLetterQueue = $"prototest.tests.{suffix}.dlq";
+        var sourceQueue = $"prototest.tests.{suffix}.source";
+        var token = Guid.NewGuid().ToString("N");
+
+        try
+        {
+            // Arrange the product-shaped dead-letter path on a raw client: a source queue whose
+            // x-dead-letter-exchange dead-letters a rejected delivery into the dead-letter exchange,
+            // whose binding routes it to the named queue.
+            await using (var connection = await ConnectAsync(connectionString))
+            {
+                await using var channel = await connection.CreateChannelAsync();
+                await channel.ExchangeDeclareAsync(deadLetterExchange, ExchangeType.Fanout);
+                await channel.QueueDeclareAsync(deadLetterQueue, durable: false, exclusive: false, autoDelete: false);
+                await channel.QueueBindAsync(deadLetterQueue, deadLetterExchange, routingKey: string.Empty);
+                await channel.QueueDeclareAsync(
+                    sourceQueue,
+                    durable: false,
+                    exclusive: false,
+                    autoDelete: false,
+                    arguments: new Dictionary<string, object?> { ["x-dead-letter-exchange"] = deadLetterExchange });
+                await channel.BasicPublishAsync(
+                    exchange: string.Empty,
+                    routingKey: sourceQueue,
+                    body: Encoding.UTF8.GetBytes($$"""{"token":"{{token}}"}"""));
+                var delivery = await channel.BasicGetAsync(sourceQueue, autoAck: false);
+                Assert.That(delivery, Is.Not.Null, "the poison was published to the source queue");
+                await channel.BasicNackAsync(delivery!.DeliveryTag, multiple: false, requeue: false);
+            }
+
+            // The dead letter reaches the queue before the test starts: a queue await reads what the
+            // queue already holds, where an exchange tap only sees messages published after it binds.
+            var builder = new ProtoHostBuilder();
+            builder.AddMessaging(messaging => messaging
+                .Tap(ProtoDestination.Queue(deadLetterQueue))
+                .UseRabbitMq(options => options.ConnectionString = connectionString));
+            await using var host = builder.Build();
+            await host.StartAsync();
+            var context = await host.StartTestAsync("rabbit queue dead letter", TestMethods.Placeholder);
+            var messages = context.Messaging();
+
+            var received = await messages.AwaitAsync(
+                ProtoDestination.Queue(deadLetterQueue),
+                message => message.Payload!.Contains(token),
+                TimeSpan.FromSeconds(15));
+
+            await host.CompleteTestAsync(ProtoTestResult.Passed);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    received.Destination,
+                    Is.EqualTo(ProtoDestination.Queue(deadLetterQueue)),
+                    "the delivery carries the queue destination the await named");
+                Assert.That(
+                    received.RoutingKey,
+                    Is.EqualTo(sourceQueue),
+                    "the dead-lettered copy keeps the routing key it was published under");
+                Assert.That(received.Payload, Does.Contain(token));
+            }
+        }
+        finally
+        {
+            await DeleteQueueAsync(connectionString, deadLetterQueue, sourceQueue);
+            await DeleteExchangeAsync(connectionString, deadLetterExchange);
+        }
+    }
+
+    [Test]
+    public async Task Await_OnAQueueThatDoesNotExist_ShouldFailNamingTheQueue()
+    {
+        var connectionString = RequireBroker();
+
+        var queue = $"prototest.tests.{Guid.NewGuid():N}.missing";
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddMessaging(messaging => messaging.UseRabbitMq(options =>
+            options.ConnectionString = connectionString));
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("rabbit missing queue", TestMethods.Placeholder);
+
+        var error = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await context.Messaging().AwaitAsync(
+                ProtoDestination.Queue(queue),
+                _ => true,
+                TimeSpan.FromSeconds(1)));
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(error!));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(error!.Message, Does.Contain(queue));
+            Assert.That(error.Message, Does.Contain("does not exist"));
+        }
+    }
+
     private static string RequireBroker()
     {
         var connectionString = ResolveBroker();
@@ -700,6 +893,17 @@ public sealed class RabbitMqTests
         await using var connection = await ConnectAsync(connectionString);
         await using var channel = await connection.CreateChannelAsync();
         await channel.ExchangeDeleteAsync(exchange);
+    }
+
+    /// <summary>Deletes throwaway queues, including their messages, so a rerun starts clean.</summary>
+    private static async Task DeleteQueueAsync(string connectionString, params string[] queues)
+    {
+        await using var connection = await ConnectAsync(connectionString);
+        await using var channel = await connection.CreateChannelAsync();
+        foreach (var queue in queues)
+        {
+            await channel.QueueDeleteAsync(queue, ifUnused: false, ifEmpty: false);
+        }
     }
 
     private static async Task<IConnection> ConnectAsync(string connectionString)

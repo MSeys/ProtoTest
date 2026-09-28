@@ -83,5 +83,34 @@ public sealed class ProtoRegistrationTests
         }
     }
 
+    [Test]
+    public void TryRegisterOnce_MarkerFacade_ShouldUseTheCallersIdentityRuleAndFindTheWinner()
+    {
+        var services = new ServiceCollection();
+        var first = new Marker("named");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                ProtoRegistrationGuard.TryRegisterOnce(services, first, marker => marker.Name == "named"),
+                Is.True);
+            Assert.That(
+                ProtoRegistrationGuard.TryRegisterOnce(services, new Marker("named"), marker => marker.Name == "named"),
+                Is.False,
+                "a marker the caller's identity rule matches cannot register again");
+            Assert.That(
+                ProtoRegistrationGuard.TryRegisterOnce(services, new Marker("other"), marker => marker.Name == "other"),
+                Is.True,
+                "a marker the identity rule does not match is a new registration");
+            Assert.That(
+                ProtoRegistrationGuard.Find(services, (Marker marker) => marker.Name == "named"),
+                Is.SameAs(first),
+                "the guard finds the winner by the same identity rule");
+            Assert.That(
+                ProtoRegistrationGuard.Find(services, (Marker marker) => marker.Name == "missing"),
+                Is.Null);
+        }
+    }
+
     private sealed record Marker(string Name);
 }

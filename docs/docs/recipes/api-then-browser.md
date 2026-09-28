@@ -63,7 +63,12 @@ using ProtoTest.Testcontainers;
 
 var api = ApplicationContainer.Container("Api", "my-registry.example.test/orders-api:1.4", port: 8080);
 builder
-    .AddInfrastructure(api, api.BaseUrlKey)          // a configured key skips the container
+    .AddInfrastructure(
+        "OrdersApi",
+        chain => chain
+            .UseConfigured()    // a configured key skips the container
+            .UseContainer(api),
+        api.BaseUrlKey)
     .AddHttpReadiness(api.Application, "/health")    // register the probe after the piece that publishes the address
     .AddApplication("Api", app => app
         .AddRest(rest => rest.AddClient("Api"))

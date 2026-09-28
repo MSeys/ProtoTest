@@ -69,6 +69,7 @@
     <Project Path="tests/ProtoTest.Devices.Tests/ProtoTest.Devices.Tests.csproj" />
     <Project Path="tests/ProtoTest.Devices.WebSocket.Tests/ProtoTest.Devices.WebSocket.Tests.csproj" />
     <Project Path="tests/ProtoTest.Devices.WebSocket.AspNetCore.Tests/ProtoTest.Devices.WebSocket.AspNetCore.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Extensibility.Tests/ProtoTest.Extensibility.Tests.csproj" />
     <Project Path="tests/ProtoTest.GraphQL.Tests/ProtoTest.GraphQL.Tests.csproj" />
     <Project Path="tests/ProtoTest.Grpc.Tests/ProtoTest.Grpc.Tests.csproj" />
     <Project Path="tests/ProtoTest.Hosting.TestWorker/ProtoTest.Hosting.TestWorker.csproj" />

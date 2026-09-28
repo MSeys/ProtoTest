@@ -1,7 +1,6 @@
 namespace ProtoTest.Http;
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProtoTest.Core;
 
 /// <summary>
@@ -23,11 +22,10 @@ public static class ProtoHttpOptionsRegistration
         ArgumentNullException.ThrowIfNull(services);
         ArgumentException.ThrowIfNullOrWhiteSpace(protocolName);
         ArgumentException.ThrowIfNullOrWhiteSpace(configurationSectionName);
-        services.TryAddKeyedSingleton<ProtoHttpResponseOptions>(protocolName, (serviceProvider, _) =>
-            ProtoOptionsRegistration.Resolve(
-                serviceProvider,
-                () => new ProtoHttpResponseOptions(configurationSectionName),
-                options => ApplyCodeConfiguration(serviceProvider, protocolName, options)));
+        ProtoOptionsRegistration.ConfigureKeyed(
+            services,
+            protocolName,
+            () => new ProtoHttpResponseOptions(configurationSectionName));
     }
 
     /// <summary>
@@ -44,9 +42,11 @@ public static class ProtoHttpOptionsRegistration
         ArgumentNullException.ThrowIfNull(services);
         ArgumentException.ThrowIfNullOrWhiteSpace(protocolName);
         ArgumentException.ThrowIfNullOrWhiteSpace(configurationSectionName);
-        if (configure is not null)
-            services.AddKeyedSingleton(protocolName, new ConfigureCallback<ProtoHttpResponseOptions>(configure));
-        TryAddResponseOptions(services, protocolName, configurationSectionName);
+        ProtoOptionsRegistration.ConfigureKeyed(
+            services,
+            protocolName,
+            () => new ProtoHttpResponseOptions(configurationSectionName),
+            configure);
     }
 
     /// <summary>
@@ -63,31 +63,10 @@ public static class ProtoHttpOptionsRegistration
         ArgumentNullException.ThrowIfNull(services);
         ArgumentException.ThrowIfNullOrWhiteSpace(protocolName);
         ArgumentException.ThrowIfNullOrWhiteSpace(configurationSectionName);
-        if (configure is not null)
-            services.AddKeyedSingleton(protocolName, new ConfigureCallback<ProtoHttpAttachmentOptions>(configure));
-        TryAddAttachmentOptions(services, protocolName, configurationSectionName);
+        ProtoOptionsRegistration.ConfigureKeyed(
+            services,
+            protocolName,
+            () => new ProtoHttpAttachmentOptions(configurationSectionName),
+            configure);
     }
-
-    private static void TryAddAttachmentOptions(
-        IServiceCollection services,
-        string protocolName,
-        string configurationSectionName)
-    {
-        services.TryAddKeyedSingleton<ProtoHttpAttachmentOptions>(protocolName, (serviceProvider, _) =>
-            ProtoOptionsRegistration.Resolve(
-                serviceProvider,
-                () => new ProtoHttpAttachmentOptions(configurationSectionName),
-                options => ApplyCodeConfiguration(serviceProvider, protocolName, options)));
-    }
-
-    private static void ApplyCodeConfiguration<TOptions>(
-        IServiceProvider serviceProvider,
-        string protocolName,
-        TOptions options)
-    {
-        foreach (var callback in serviceProvider.GetKeyedServices<ConfigureCallback<TOptions>>(protocolName))
-            callback.Callback(options);
-    }
-
-    private sealed record ConfigureCallback<TOptions>(Action<TOptions> Callback);
 }

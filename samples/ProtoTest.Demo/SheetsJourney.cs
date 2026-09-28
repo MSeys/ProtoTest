@@ -17,8 +17,7 @@ using ProtoTest.Sheets;
 /// and asserts it through the record model - no spreadsheet library involved on either side.
 /// </summary>
 [Application(NorthstarTargets.Api)]
-[NorthstarTenant(PlanIds.Growth)]
-[Auth<NorthstarAuthenticator>]
+[NorthstarMember(PlanIds.Growth)]
 public sealed class SheetsJourney
 {
     [Sheet("Summary", HeaderRows = [1])]

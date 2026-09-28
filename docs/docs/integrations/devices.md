@@ -70,6 +70,8 @@ builder
 
 The registration is keyed by `(TProgram, application)`: a second application, or a second program, gets its own transport, and a client is only routed through the transport of the application it was registered under - two applications exposing the same path each serve their own clients. A client that has only a path (no address resolver) and no matching in-process transport fails naming the application instead of falling back to another transport.
 
+A hand-written in-process transport applies `ProtoTestContextPropagation.ApplyTo(HttpRequest)` (from `ProtoTest.AspNetCore`) to the request it opens, so the handshake carries the test id and the application's clock bridge pushes the connecting test's clock, exactly like the in-process HTTP client. `ProtoDeviceConnect.WithTimeoutAsync` bounds the connect with the registered `ConnectTimeout` and reports an elapsed attempt as a `TimeoutException` naming the endpoint; both shipped WebSocket transports use it.
+
 ## Using it
 
 ```csharp
@@ -123,8 +125,7 @@ the test never called `DisconnectAsync`.
 - **One instance per (client, type, id) per test.** Devices are not shared across tests; state that must persist belongs to the product.
 - **One conversation per device instance.** Connection creation is single-flight and sends are serialized; one receive may be in flight at a time - a second concurrent receive fails fast naming the device instead of stealing frames. A send that races a disconnect fails with a device error naming the device. Send and receive may run concurrently.
 - **No per-device configuration.** The client's address template or resolver plus the device id is the whole story; a client is where environment differences live.
-- **In-process endpoints are preferred automatically.** When `AddInProcessWebSocketDevices<TProgram>(application)` is registered and that application is hosted in-process (`AddAspNetCoreServer`), the client uses its `TestServer`; otherwise the address resolver runs. The transport belongs to one `(TProgram, application)` pair, so multi-application suites route each client to its own application.
+- **In-process endpoints follow the application's winner.** When `AddInProcessWebSocketDevices<TProgram>(application)` is registered, the client uses the application's `TestServer` while the application's provider chain is served in-process (`UseInProcess<TProgram>()`, or `AddAspNetCoreServer` without a chain); when a configured, loopback or AppHost provider wins, the same registration declines and the socket at the winner's address serves it. The transport belongs to one `(TProgram, application)` pair, so multi-application suites route each client to its own application, and its `device` capability is declared only while the in-process winner can actually serve it.
 - **`ExpectAsync` consumes frames.** The bounded exchange log is for failure messages, not for matching a frame twice.
-- **Replay is not shipped.** The `device.replay` operation is designed; recording and replaying a frame script against another transport is future work.
 - **Transports ship one at a time.** WebSocket today; MQTT when a user needs it, TCP/serial after that.
 - **The transport moves frames.** Protocol semantics - message kinds, sessions, OCPP operations - are the suite's code, and coverage only names what the catalog declares.

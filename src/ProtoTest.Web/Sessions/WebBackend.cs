@@ -57,10 +57,10 @@ public interface IWebBackend : IAsyncDisposable
     /// <summary>
     /// The interval this backend's retries and the session's assertions poll at. A backend with a
     /// configurable interval (Selenium's <c>PollInterval</c>) returns it, so one setting governs both;
-    /// the shared <see cref="Internal.WebTiming.DefaultPollInterval"/> is the fallback, and a backend
-    /// without an interval option (Playwright) keeps it.
+    /// <see cref="WebBackendDefaults.DefaultPollInterval"/> is the fallback, and a backend without an
+    /// interval option (Playwright) keeps it.
     /// </summary>
-    TimeSpan PollInterval => Internal.WebTiming.DefaultPollInterval;
+    TimeSpan PollInterval => WebBackendDefaults.DefaultPollInterval;
 
     /// <summary>Closes native diagnostic correlation started for a semantic operation.</summary>
     ValueTask EndOperationAsync(

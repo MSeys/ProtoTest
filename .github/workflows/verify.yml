@@ -82,6 +82,13 @@ jobs:
         shell: pwsh
         run: ./eng/generate-recipe-traces.ps1 -NoBuild
 
+      # The lesson traces are the evidence the Learn lessons embed. Same contract as the recipe
+      # traces: the filters, the expected outcomes and the file set are checked, while the run id and
+      # timestamps make byte equality impossible.
+      - name: Regenerate the lesson traces
+        shell: pwsh
+        run: ./eng/generate-lesson-traces.ps1 -NoBuild
+
       # The gate fixtures, now with the Release test binaries the MTP zero-test guards need.
       - name: Test the gate scripts
         shell: pwsh

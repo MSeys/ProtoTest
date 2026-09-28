@@ -7,8 +7,7 @@ using ProtoTest.Core;
 /// <summary>
 /// Characterization for MSTest data rows. MSTest invokes the test method
 /// attribute once per data row, so every row gets its own ProtoTest lifecycle under the same method-level
-/// name — the multi-row aggregation in <c>ToProtoTestResult</c> is unreachable. This test replaces the
-/// dead multi-row unit tests that used a fake single-result method.
+/// name. The multi-row aggregation in <c>ToProtoTestResult</c> is unreachable.
 /// </summary>
 [TestClass]
 public sealed class DataRowLifecycleTests

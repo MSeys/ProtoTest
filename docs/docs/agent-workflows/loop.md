@@ -42,11 +42,11 @@ Post the digest without a pull request:
 prototest feedback TestResults/ProtoTest/run.prototrace --digest digest.json
 ```
 
-The annotations go to stdout, the per-channel outcomes go to stderr, and `--digest` writes the digest JSON beside the trace. With no target configured, the network channels skip with their reason, so a local run is safe:
+The annotations go to stdout, the per-channel outcomes go to stderr, and `--digest` writes the digest JSON beside the trace. With no target configured, the network channels skip with their reason, so a local run is safe. The committed MCP fixture prints:
 
 ```text
-::error file=samples/ProtoTest.Demo/DiagnosticsShowcase.cs,line=64::ProtoTest.Demo.DiagnosticsShowcase.AFailedOperationRecordsItsDiagnosticsAndTheRunContinues: The billing ledger did not acknowledge the webhook within 2 seconds.
-prototest feedback: github-annotations posted (4 annotations.)
+::error file=artifacts/fixture-gen/Program.cs,line=65::orders match their shape: Shape mismatch failed with 1 error(s):%0D%0A  • [$.orderId]: Values did not match. (Expected: '7', Actual: '42')
+prototest feedback: github-annotations posted (1 annotation.)
 prototest feedback: github-pr-comment skipped (No GitHub token: set GITHUB_TOKEN.)
 prototest feedback: webhook skipped (No webhook URL: set PROTOTEST_FEEDBACK_WEBHOOK_URL.)
 ```

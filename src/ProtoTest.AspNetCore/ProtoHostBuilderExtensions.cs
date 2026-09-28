@@ -228,8 +228,8 @@ public static class ProtoHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(createApp);
 
         var loopback = new LoopbackApplicationInfrastructure(applicationName, createApp);
-        // This compatibility registration keeps the all-configured skip rule; the replacement for a
-        // caller is the application chain's UseLoopback, and the stage pins this method's behavior.
+        // This compatibility registration keeps the all-configured skip rule; a new composition uses
+        // the application chain's UseLoopback instead.
 #pragma warning disable CS0618
         return builder.AddInfrastructure(loopback, loopback.BaseUrlKey);
 #pragma warning restore CS0618

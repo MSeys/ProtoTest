@@ -65,7 +65,7 @@ internal sealed class ProtoWorkerChainBuilder<TProgram>(
 
     /// <summary>
     /// Registers the worker's target on the host builder. A worker with no provider falls back to
-    /// <see cref="UseHost"/>, so the top-level registration keeps today's behavior.
+    /// <see cref="UseHost"/>, the same registration a top-level worker uses.
     /// </summary>
     public void Register(IProtoHostBuilder builder)
     {

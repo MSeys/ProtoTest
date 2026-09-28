@@ -23,7 +23,7 @@ The current line is in progress. Everything below is committed to 1.1, in this o
 - **Topology under test:** container topology, deployed mode, fault injection, and a nightly reference run.
 - **A second device protocol:** MQTT, after OCPP proves the transport model.
 - **Agent and sharing layer:** the `ProtoTest.Mcp` tool over traces and reports, a GitHub Action that posts the failure digest and trace link, the static trace index, and the docs and skills page.
-- **Showcase:** the seeded benchmark republished on the reference demo, the trace showpiece, and the Northstar demo retired once the nightly run covers its journeys.
+- **Showcase:** the seeded benchmark republished on the reference demo, the trace showpiece, and the rewritten Northstar suite as the repository's Learning demo (the reference demo is the full product demo).
 - **Docs, then history:** the documentation rewrite — a five-minute path plus an extended path per topic, with interactive pieces — the history restructure, then the 1.1 tag.
 
 The reference demo is the proof: an independent open-source EV-charging platform (CSMS) in its own repository — REST API, PostgreSQL, a billing worker with retry and dead-letter semantics, browser journeys, device protocols and containers — running suites this framework did not write for itself.

@@ -33,15 +33,15 @@ public async Task PayingAnInvoicePublishesTheEvent()
 }
 ```
 
-A destination names a message contract type — its full name, its short name, or its
-`urn:message:` URN — because that is what a MassTransit bus addresses; the payload is JSON for that
+A destination names a message contract type (its full name, its short name, or its
+`urn:message:` URN), because that is what a MassTransit bus addresses; the payload is JSON for that
 contract. The `Broker` capability is declared only while the application's `BaseUrl` is not
 configured, so a published application drops it and gated tests skip.
 
 ## Published applications: the wire envelope
 
 When the application runs as a real process with a real transport, register the RabbitMQ adapter and
-speak the wire format with `MassTransitEnvelope` — the frame is MassTransit's own JSON envelope
+speak the wire format with `MassTransitEnvelope`: the frame is MassTransit's own JSON envelope
 (`application/vnd.masstransit+json`, the contract's `urn:message:` URNs, ids, sent time, headers), and
 the destination is the exchange MassTransit names after the contract (`Namespace:Type`):
 
@@ -62,7 +62,7 @@ var envelope = MassTransitEnvelope.Unwrap(published);   // URNs, ids, sent time,
 `Wrap` takes the contract instance or a raw JSON payload plus its type; `Unwrap`/`Unwrap<T>` fail with
 `MessagingAssertionException` naming the destination when the frame is not a MassTransit envelope, or
 when its `messageType` does not declare `T`. Both conversions are pure and work with any
-`IProtoMessageBroker` — the in-memory broker round-trips a frame too. The JSON envelope path needs no
+`IProtoMessageBroker`; the in-memory broker round-trips a frame too. The JSON envelope path needs no
 `MT-*` transport headers; the caller's headers ride the frame and the envelope's `headers` object.
 Pass `MassTransitEnvelopeAddresses` to set the request/response fields: a consumer that replies through
 `RespondAsync` reads `responseAddress` and `requestId` from the frame, and `Unwrap` returns the

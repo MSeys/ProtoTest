@@ -10,6 +10,6 @@ Be respectful, specific and constructive. Assume good intent, critique ideas rat
 
 This standard applies in the repository and in public spaces where someone represents ProtoTest. Maintainers may edit or remove inappropriate content and may temporarily or permanently restrict participation when behavior harms the community.
 
-Report conduct concerns privately through the maintainer contact shown on the [project owner's GitHub profile](https://github.com/MSeys). Reports will be handled as confidentially as practical. Retaliation against someone making a good-faith report is not acceptable.
+Report conduct concerns privately through the contact shown on the [project owner's GitHub profile](https://github.com/MSeys). Reports will be handled as confidentially as practical. Retaliation against someone making a good-faith report is not acceptable.
 
 This policy is adapted from the principles of the [Contributor Covenant](https://www.contributor-covenant.org/version/2/1/code_of_conduct/).

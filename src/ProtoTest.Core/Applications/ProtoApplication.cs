@@ -3,8 +3,8 @@ namespace ProtoTest.Core;
 using Microsoft.Extensions.Configuration;
 
 /// <summary>
-/// Resolves the named application — a system under test with a base address and protocol descriptors —
-/// that a client or web session targets, and reads values from its <c>ProtoTest:Applications:{app}</c>
+/// Resolves the named application that a client or web session targets: a system under test with a
+/// base address and protocol descriptors. Reads values from its <c>ProtoTest:Applications:{app}</c>
 /// section. A scope selects an application with its own <c>Application</c> setting, defaulting to the
 /// scope's own name, so a REST client, GraphQL client, and browser session can share one application.
 /// </summary>

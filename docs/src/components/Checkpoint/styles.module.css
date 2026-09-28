@@ -1,0 +1,66 @@
+/* The lesson checkpoint: a question, the step that proves it, and the answer behind a reveal. It sits
+   on the paper surface, so the tint and the left rule are the page's own blueprint accents. */
+
+.checkpoint {
+  padding: var(--space-5);
+  display: grid;
+  gap: var(--space-4);
+  border: 1px solid var(--blueprint-line);
+  border-left: 3px solid var(--blueprint);
+  border-radius: var(--radius-control);
+  background: var(--blueprint-soft);
+}
+
+.question {
+  margin: 0;
+  font: var(--weight-semibold) var(--text-title) var(--font-display);
+  line-height: var(--leading-tight);
+}
+
+.verify {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: baseline;
+}
+
+/* A label that reads on its own tint in both themes: pulled toward the text colour, as the
+   admonition labels are. */
+.verifyLabel {
+  color: color-mix(in srgb, var(--blueprint) 55%, var(--text));
+  font-size: var(--text-meta);
+  font-weight: var(--weight-semibold);
+}
+
+.verifyBody { min-width: 0; font-size: var(--text-strong); line-height: 1.6; }
+.verifyBody > :first-child { margin-top: 0; }
+.verifyBody > :last-child { margin-bottom: 0; }
+
+.answer { display: grid; gap: var(--space-3); justify-items: start; }
+
+.reveal {
+  min-height: var(--control-height);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-meta);
+  font-weight: var(--weight-semibold);
+  transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease);
+}
+
+.reveal:hover { border-color: var(--blueprint); background: var(--hover); }
+
+.answerBody {
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: var(--text-strong);
+  line-height: 1.65;
+}
+
+.answerBody > :first-child { margin-top: 0; }
+.answerBody > :last-child { margin-bottom: 0; }

@@ -171,7 +171,7 @@ public class OpenApiCoverageCollectorTests
         var collector = new OpenApiCoverageCollector("TestApi", OpenApiTestHelper.SampleJsonSpec);
         var emptyHeaders = new Dictionary<string, string>();
 
-        // Act - 1. Record HTTP Hits (verstuurd via RestRequestBuilder)
+        // Act: two HTTP hits, as RestRequestBuilder records them.
         collector.Collect(new ProtoObservation(
             TargetName: "TestApi",
             Kind: "http.response",
@@ -186,8 +186,8 @@ public class OpenApiCoverageCollectorTests
             Data: new RestResponseData("GET", "/users/{id}", 200, "{}", emptyHeaders)
         ));
 
-        // Act - 2. Record ShapeMatch Hit (verstuurd via RestResponse.ShouldMatchShape)
-        // RequestIdentifier is the full request identifier ("GET /users/{id}").
+        // Act: a shape match, as RestResponse.ShouldMatchShape records it. The identifier is the
+        // full request identifier ("GET /users/{id}").
         collector.Collect(new ProtoObservation(
             TargetName: "TestApi",
             Kind: "http.contract.shape",
@@ -206,24 +206,24 @@ public class OpenApiCoverageCollectorTests
 
         var items = collector.GetReportItems().ToList();
 
-        // Assert - Root Item Checks
+        // Assert: the root covers both hits.
         var root = items.Single(i => i.Identifier == "GET /users/{id}");
         Assert.That(root.IsCovered, Is.True);
         Assert.That(root.Count, Is.EqualTo(2));
 
         var children = root.Children!;
 
-        // Assert - Status Code Child
+        // Assert: the status code child.
         var status200 = children.Single(c => c.Identifier == "200");
         Assert.That(status200.IsCovered, Is.True);
         Assert.That(status200.Count, Is.EqualTo(2));
 
-        // Assert - Matched Shape Property Child
+        // Assert: the matched shape property.
         var propId = status200.Children!.Single(c => c.Identifier == "$.id");
         Assert.That(propId.IsCovered, Is.True);
         Assert.That(propId.Count, Is.EqualTo(1));
 
-        // Assert - Unmatched Shape Property Child (from OpenAPI spec baseline)
+        // Assert: an unmatched property, carried from the spec baseline.
         var propCity = status200.Children!.Single(c => c.Identifier == "$.address.city");
         Assert.That(propCity.IsCovered, Is.False);
         Assert.That(propCity.Count, Is.Zero);

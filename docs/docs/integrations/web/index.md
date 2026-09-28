@@ -7,6 +7,8 @@ description: "A driver-independent browser-testing model — pages, components, 
 
 # Web
 
+## What it adds
+
 `ProtoTest.Web` is a browser-testing model — pages, components, elements, tables, flows and login — that doesn't depend on any particular browser driver. A backend package plugs a real driver in underneath:
 
 - `ProtoTest.Web.Playwright` — launches and manages browsers for you.
@@ -53,7 +55,7 @@ It probes the installed browser before the lifecycle starts, without launching o
 
 A session follows its application's address: `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with `ProtoTest:Applications:{application}:Endpoints:{endpoint}`. Infrastructure that started an application with the run advertises that same setting, so a browser journey can run against a standalone instance, an application image in its own container or an in-process loopback listener without fixture code ([ASP.NET Core](../aspnetcore.md#hosting-a-browser-journey) has both recipes).
 
-## Registering
+## Compose
 
 Registration is the same `AddWeb(...)` call regardless of backend; the reference you install selects the backend. On a host builder:
 
@@ -110,7 +112,7 @@ A hand-written backend composes the same helpers the shipped backends use, so it
 
 Sessions are not declared at registration: a test names the sessions it needs with `Proto.Context.Web(name)` ([below](#sessions)). `AddWebBackend` is first-wins (`TryAddSingleton`), and a host resolves exactly one `IWebBackendFactory` — zero or more than one throws `InvalidOperationException`. For Playwright, every `AddWeb(...)` call still runs its `configure` callback while only the first supplies the skip-probe defaults; the Selenium application overload guards the whole call so a repeat is a no-op.
 
-## Options and keys
+### Options and keys
 
 Both backends also read their options from configuration, so CI can run headless on another browser without code changes. Values are applied in this order, later winning:
 
@@ -119,7 +121,7 @@ Both backends also read their options from configuration, so CI can run headless
 
 Started infrastructure settings are merged over static configuration before binding, so they win over the same key in `appsettings.json`. Selenium's `ActionTimeout`/`PollInterval` and Playwright's `ActionTimeout` are validated after binding; a non-positive value throws `ArgumentOutOfRangeException`. `TimeSpan` values bind as `"hh:mm:ss(.fffffff)"` and enums bind by name.
 
-### Playwright options
+#### Playwright options
 
 Key names below are relative to `ProtoTest:Web:Playwright` (`src/ProtoTest.Web.Playwright/PlaywrightWebOptions.cs`):
 
@@ -138,7 +140,7 @@ Key names below are relative to `ProtoTest:Web:Playwright` (`src/ProtoTest.Web.P
 | `CapturePageErrors` | bool | `true` | uncaught page exceptions |
 | `CaptureRequestFailures` | bool | `true` | failed network requests |
 
-### Selenium options
+#### Selenium options
 
 Key names below are relative to `ProtoTest:Web:Selenium` (`src/ProtoTest.Web.Selenium/SeleniumWebOptions.cs`):
 
@@ -150,7 +152,7 @@ Key names below are relative to `ProtoTest:Web:Selenium` (`src/ProtoTest.Web.Sel
 | `CheckClickObstruction` | bool | `true` | fail if something covers the element |
 | `DiagnosticTraceRetention` | `SeleniumDiagnosticTraceRetention` | `OnWebFailure` | `Off`, `OnWebFailure`, `Always` |
 
-### Demanding a session
+#### Demanding a session
 
 A session exists because a test asks for it, not because configuration declares it. Demand it in code with the attribute:
 
@@ -175,7 +177,7 @@ var session = Proto.Context.Web("Admin", application: "BackOffice", endpoint: "A
 
 Configuration holds the environment, never the session: addresses under `ProtoTest:Applications:{application}`, backend options under `ProtoTest:Web:{backend}`.
 
-### From configuration
+#### From configuration
 
 ```json
 {
@@ -197,7 +199,7 @@ Configuration holds the environment, never the session: addresses under `ProtoTe
 
 Nested Playwright context options such as `Context:Locale` bind too. Options are bound once, the first time a session opens a browser.
 
-## Sessions
+### Sessions
 
 `Proto.Context.Web(sessionName = null, application = null, endpoint = null, discoverRoutes = false)` returns the test's `WebSession`. The browser is created **lazily** on the first operation, so a test that never touches the browser never starts one, and the session is completed and disposed at teardown. `application` defaults to the application selected for the test; `sessionName` defaults to the application's `Web` client name, then `"Default"`.
 
@@ -222,7 +224,7 @@ public sealed class WebSession : IAsyncDisposable
 
 `WaitUntilAsync` polls until the condition holds or the timeout passes, throwing `WebAssertionException` with the expectation when it doesn't. Inside the predicate, "element not found yet" and "not actionable yet" (`WebElementResolutionException`, `WebActionabilityException`) are treated as "not yet"; every other exception fails the wait immediately.
 
-### Several sessions in one test
+#### Several sessions in one test
 
 Sessions are per-test — the builder registers only the backend, and a test names the sessions it needs. Each named session is an isolated browser context (Playwright) or driver (Selenium), created lazily on first use and closed at teardown. Pages are cached per session, so `Web("Admin").Page<T>()` returns the same object each time.
 
@@ -262,7 +264,7 @@ public async Task ...() { ... }
 
 `Application = "ControlPlane"` on the attribute names the application the session targets, defaulting to the test's application and then the session name. A relative `Open` resolves against the session's application address — `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with the named endpoint.
 
-### Dropping down to the driver
+#### Dropping down to the driver
 
 When you need something the model doesn't offer, get the native backend:
 
@@ -273,7 +275,7 @@ await backend.Page.SetContentAsync(html);
 
 `GetBackendAsync` creates the browser if needed; the synchronous `GetBackend` throws until the backend exists, and asking for the wrong type throws `WebBackendCapabilityException`.
 
-## Quick start
+## The tasks
 
 A page object describes the page; a test drives it. The smallest working example — the sample's full journey is in [WebJourney.cs](../../../../samples/Northstar.ProtoTest/WebJourney.cs):
 
@@ -309,7 +311,7 @@ public async Task Valid_credentials_sign_in()
 }
 ```
 
-## Going further
+### Going further
 
 - [Pages and components](./page-objects.md) — page objects, scoping, lazy collections and tables.
 - [Locators](./locators.md) — roles, labels, text, `And`, and how each backend translates them.
@@ -320,7 +322,7 @@ public async Task Valid_credentials_sign_in()
 - [Diagnostics and artifacts](./diagnostics.md) — screenshots, console output, traces and the full trace reference.
 - [ASP.NET Core](../aspnetcore.md) — when the application is hosted in-process, its page inventory comes with it.
 
-## Tracing
+## In the trace and coverage
 
 Every operation is a ProtoTest trace entry; a passing assertion is also what makes a page count as covered:
 
@@ -337,7 +339,7 @@ Every operation is a ProtoTest trace entry; a passing assertion is also what mak
 
 The complete tables — common attributes, backend events, artifacts and the Selenium diagnostics schema — live on [Diagnostics and artifacts](./diagnostics.md#what-the-trace-records-for-every-operation).
 
-## Page coverage
+### Page coverage
 
 Coverage for a browser journey is measured in **pages**, not lines. `AddWeb` registers a `WebCoverageCollector` that reports one item per page path, covered only when a test **verified** something on it. Three observations feed it, all recorded under the `Web` target:
 
@@ -349,7 +351,7 @@ Coverage for a browser journey is measured in **pages**, not lines. `AddWeb` reg
 
 A page that was visited but never asserted is reported **uncovered**: reaching a page is not the same as checking it, and the report keeps the two apart. Only `web.page.verified` moves an item to covered (`Status = Success`) and increments its count; inventory-only pages stay neutral. When the session has a `BaseUrl`, coverage is attributed to that application's origin only: scheme, IDN host and port must all match, so a redirect to an identity provider or a payment gateway — and any assertion checked there — is not recorded as this application's coverage. A backend that cannot report its address contributes navigation coverage from the target address instead of failing.
 
-### The explicit inventory
+#### The explicit inventory
 
 List the pages a suite knows about under `ProtoTest:Web:Pages`; they appear as uncovered until a verification lands on them. The value may be a single scalar path, an array, or an object whose child values are entries — `Source` and `Framework` are configuration, never page entries:
 
@@ -363,7 +365,7 @@ List the pages a suite knows about under `ProtoTest:Web:Pages`; they appear as u
 }
 ```
 
-### Frontend source folder
+#### Frontend source folder
 
 Instead of listing pages by hand, point ProtoTest at the frontend source folder and let it inventory the routes that exist there:
 
@@ -391,7 +393,7 @@ In `auto`, ProtoTest reads the nearest `package.json` — walking at most three 
 
 Discovered paths join `ProtoTest:Web:Pages` in the same inventory and start out uncovered. React has no runtime route table that ProtoTest reads; see [React and Next.js](#react-and-nextjs).
 
-### Dynamic page matching
+#### Dynamic page matching
 
 A verification on a concrete path covers the inventory pattern it matches: `/users/42` marks `/users/{id}` covered and increments its count, so a detail page verified once is done, not one per id. Page identity is the absolute HTTP/HTTPS path, with query and fragment dropped, a leading slash and no trailing slash except `/`. Percent-encoding is decoded per segment, so `/a%20b` and `/a b` are one page; an encoded slash (`%2F`) stays inside its segment, so one segment never becomes two.
 
@@ -404,9 +406,9 @@ The collector resolves an observed path to its item in this order:
 3. a catch-all (`{...}`) is used only when no non-catch-all pattern matched;
 4. with no match, the concrete path keeps its own item.
 
-### ASP.NET Core inventory
+#### ASP.NET Core inventory
 
-When the application runs **in-process** (`AddAspNetCoreServer<Program>()`), starting it also inventories its page-like GET routes and records a `web.page.available` for each. It is documented in full on [ASP.NET Core](../aspnetcore.md#page-coverage); the short version: only concrete, explicitly-GET, page-like endpoints count, API-shaped routes are excluded unless they declare HTML, and `ProtoTest:Applications:{app}:Web:Pages:Include` / `:Exclude` globs refine the result:
+When the application runs **in-process** (`AddAspNetCoreServer<Program>()`), starting it also inventories its page-like GET routes and records a `web.page.available` for each. It is documented in full on [ASP.NET Core](../aspnetcore.md#in-the-trace-and-coverage); the short version: only concrete, explicitly-GET, page-like endpoints count, API-shaped routes are excluded unless they declare HTML, and `ProtoTest:Applications:{app}:Web:Pages:Include` / `:Exclude` globs refine the result:
 
 ```json
 {
@@ -427,7 +429,7 @@ When the application runs **in-process** (`AddAspNetCoreServer<Program>()`), sta
 
 The inventory is run-level: it is recorded once, by the first test that initializes the server, and a failed or empty discovery does not latch, so a later test still contributes it. A published application never starts in-process, so its inventory comes from the explicit list, the frontend source folder or Vue discovery instead.
 
-### Vue discovery
+#### Vue discovery
 
 For Vue 3 and Vue 2 applications, opt in per session and ProtoTest reads the router's route table in the page after the first navigation:
 
@@ -447,7 +449,7 @@ It evaluates Vue 3's `[data-v-app].__vue_app__.config.globalProperties.$router.g
 
 The demo combines both: its Northstar Console is a real Vue 3 SPA, so page coverage comes from the console's source folder (`samples/ProtoTest.SampleApp/Ui`) plus Vue Router discovery from the running router.
 
-### React and Next.js
+#### React and Next.js
 
 React has no generic runtime route table to read, and ProtoTest deliberately does not guess at one. Next.js, Nuxt and Remix are inventoried from the frontend source folder, and Vue Router / React Router route literals are read from their definitions. For everything the scanner cannot see — routes built at runtime, aliased imports, relative child paths — publish the route list instead: a small build step that emits the application's routes as a JSON array loaded into `ProtoTest:Web:Pages`. The pages then show as uncovered until a test visits and verifies them, exactly like the explicit inventory.
 

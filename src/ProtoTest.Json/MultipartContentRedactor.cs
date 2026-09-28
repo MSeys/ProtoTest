@@ -5,8 +5,8 @@ using ProtoTest.Core;
 
 /// <summary>
 /// Redacts the values of sensitive parts in multipart bodies. The scanner is deliberately not a regex:
-/// a hostile body full of unmatched quotes made the previous pattern backtrack exponentially, and a
-/// value line that merely starts with "--" cut a redacted value short. Lines are scanned once, a
+/// a regex on hostile input can backtrack exponentially, and a value line that merely starts with "--"
+/// would cut a redacted value short. Lines are scanned once, a
 /// boundary is only believed when the line is a terminator or the next line starts a part, and the
 /// value is replaced whole.
 /// </summary>

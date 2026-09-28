@@ -7,7 +7,11 @@ description: "A per-test HTTP client on IHttpClientFactory, with JSON shape asse
 
 # REST
 
+## What it adds
+
 `ProtoTest.Rest` gives each test a named HTTP client built on `IHttpClientFactory`, with JSON shape assertions, the shared [authentication model](./authentication.md), optional request/response capture and endpoint coverage. It brings `ProtoTest.Http` and `ProtoTest.Json` with it.
+
+## Install
 
 ```bash
 dotnet add package ProtoTest.Rest
@@ -15,7 +19,7 @@ dotnet add package ProtoTest.Rest
 
 ProtoTest targets **.NET 8, 9 and 10**. The template defaults to `net10.0` unless you pass `-f net8.0` (or `net9.0`) to `dotnet new`.
 
-## Registering
+## Compose
 
 Register REST on the host, or under an application so its clients share the application's base URL:
 
@@ -56,7 +60,7 @@ There is **no endpoint default**: `endpoint` names the key under `ProtoTest:Appl
 }
 ```
 
-## Options and keys
+### Options and keys
 
 | Section | Key | Default |
 | --- | --- | --- |
@@ -71,7 +75,7 @@ There is **no endpoint default**: `endpoint` names the key under `ProtoTest:Appl
 
 Set them in code with `ConfigureResponses(...)` and `CaptureAttachments(...)`, or in configuration. Code callbacks run in registration order and repeated calls compose; the known section is then bound over the result, so **configuration wins over code**. Both option types are shared with GraphQL — each protocol owns its own keyed instance and section. The types themselves default to the shared `ProtoTest:Http:Responses` and `ProtoTest:Http:Attachments` sections when a protocol does not name its own; every protocol that ships here names one.
 
-## Context API
+### Context API
 
 ```csharp
 RestRequestBuilder Rest(this ProtoExecutionContext context, string? clientName = null);
@@ -79,7 +83,7 @@ RestRequestBuilder Rest(this ProtoExecutionContext context, string? clientName =
 
 `Proto.Context.Rest(name)` resolves the client in this order: the requested name, the client bound by `[Application(…)]` for REST, the application's first registered REST client, then `"Default"`. A requested name first tries its application-qualified form, then the name as given, then — when exactly one client of the protocol has that unqualified name — the client another application registered under that name: `Rest("Api")` under a Dashboard-selected test reaches `Csms:Api` when Dashboard has no `Api` client. Two applications sharing the name fail naming both qualified candidates, so qualify the call (`Rest("Csms:Api")`); an already qualified name is exact. The client's base address is the application's, resolved with the shared precedence (an address a started piece published wins over configuration). A client with no base address and no owner for its address falls back to the application's in-process transport, rooted at the endpoint the client registered, then the requested name — looking up `ProtoTest:Applications:{application}:Endpoints:{name}`. A per-test resolver beats `HttpClient.BaseAddress` at request time. A client whose address resolves is built over a test-owned handler, so its cookie jar carries only that test's session and parallel tests never share sign-in state. If nothing resolves, the call throws `InvalidOperationException` listing the protocol's registered client names.
 
-## Quick start
+## The tasks
 
 ```csharp
 [Application("Api")]
@@ -97,7 +101,7 @@ public sealed class OrderTests
 }
 ```
 
-## Going further
+### Going further
 
 - **Authentication** — `.Auth<T>(...)`, `.WithoutAuth()`, and `[Auth<T>]` on the class or method: [Authentication](./authentication.md).
 - **Attachments** — `.CaptureAttachments()` records sanitized request, response and expected-shape attachments: [Attachments and coverage](./attachments.md).
@@ -105,7 +109,7 @@ public sealed class OrderTests
 - **Multiple clients** — pass `.Rest("Billing")`, or bind one for the whole test with `[Application("Api", "Rest:Billing")]`.
 - **In-process server** — `AddAspNetCoreServer<Program>()` plus a client with no URL reuses its transport automatically; a configured `BaseUrl` takes precedence and leaves the server unstarted.
 
-## Tracing and coverage
+## In the trace and coverage
 
 Each request records an `http.request` operation (`REST · {METHOD} {route}`) under the protocol-scoped client entity (`client:HttpClient:Rest:{target}`), with the method, route, sanitized URL, header count and response status. Assertions record `assert.http.status`, `assert.http.content_type`, `assert.http.header`, `assert.http.cookie`, `assert.http.redirect_location` and `assert.json.shape` as children of that request. Observations: `http.response` for every response (method, route template, status, sanitized body and headers, duration), `http.failure` when sending or URI building fails, and `http.contract.shape` when a shape assertion matches. `RestCoverageCollector` turns `http.response` observations into `REST` coverage items; `RestTrafficCoverageCollector` consumes `http.response` and `http.contract.shape` for its observed-but-unasserted section. See [ProtoTrace](../../observability/prototrace.md) and [Coverage](../../observability/coverage.md).
 

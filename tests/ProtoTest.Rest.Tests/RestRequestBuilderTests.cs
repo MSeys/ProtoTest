@@ -50,14 +50,14 @@ public class RestRequestBuilderTests
         // Act
         var response = await builder.GetAsync("/users/{id}", new { id = 42, active = true });
 
-        // Assert - Request Verification
+        // Assert: the request was built as configured.
         Assert.That(_handler.LastRequest, Is.Not.Null);
         Assert.That(_handler.LastRequest!.Method, Is.EqualTo(HttpMethod.Get));
         Assert.That(_handler.LastRequest.RequestUri?.ToString(), Is.EqualTo("https://api.prototest.dev/users/42?active=true"));
         Assert.That(_handler.LastRequest.Headers.GetValues("X-Custom-Header").Single(), Is.EqualTo("TestValue"));
         Assert.That(_handler.LastRequest.Headers.GetValues("User-Agent").Single(), Is.EqualTo("ProtoTest-Runner"));
 
-        // Assert - Response Verification via RestResponse Helpers
+        // Assert: the response helpers read the same answer.
         response.Should.HaveHttpStatus(HttpStatusCode.OK);
 
         var body = response.ReadAsAnonymous(new { status = "" });
@@ -79,7 +79,7 @@ public class RestRequestBuilderTests
         // Act
         await builder.GetAsync("/users/{id}", new { id = 1 });
 
-        // Assert - Context Recorded Hits
+        // Assert: the observation was recorded.
         var hit = _context.RecordedObservations.FirstOrDefault(h => h.Data is RestResponseData);
         Assert.That(hit, Is.Not.Null);
         Assert.That(hit!.TargetName, Is.EqualTo("TestTarget"));
@@ -143,14 +143,14 @@ public class RestRequestBuilderTests
         // Act
         var response = await builder.PostAsync("/users");
 
-        // Assert - Request Verification
+        // Assert: the request was built as configured.
         Assert.That(_handler.LastRequest?.Content, Is.Not.Null);
         Assert.That(_handler.LastRequest!.Content!.Headers.ContentType?.MediaType, Is.EqualTo("application/json"));
 
         Assert.That(_handler.LastRequestBody, Is.Not.Null);
         Assert.That(_handler.LastRequestBody, Contains.Substring("Matthias"));
 
-        // Assert - Response Verification & Shape Hit Recording
+        // Assert: the response status and shape, and the shape observation they recorded.
         response
             .Should.HaveHttpStatus(HttpStatusCode.Created)
             .Should.MatchShape(new { id = JsonValue.GreaterThan(0), created = true });
@@ -226,7 +226,7 @@ public class RestRequestBuilderTests
         // Act
         var response = await builder.PostAsync("/xml-endpoint");
 
-        // Assert - Request & Response Verification
+        // Assert: both the request and the response carry the custom media type.
         Assert.That(_handler.LastRequest!.Content!.Headers.ContentType?.MediaType, Is.EqualTo("application/xml"));
         Assert.That(_handler.LastRequestBody, Is.EqualTo("<xml><user>Matthias</user></xml>"));
 

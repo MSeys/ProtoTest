@@ -32,6 +32,7 @@ $forbiddenFailures = New-Object System.Collections.Generic.List[string]
 $apiFailures = New-Object System.Collections.Generic.List[string]
 $keyFailures = New-Object System.Collections.Generic.List[string]
 $linkFailures = New-Object System.Collections.Generic.List[string]
+$shapeFailures = New-Object System.Collections.Generic.List[string]
 $releaseFailures = New-Object System.Collections.Generic.List[string]
 
 function Get-RelativePath {
@@ -277,7 +278,11 @@ if (-not $keyCrossCheckSkipped) {
     }
 }
 
-# 4. Sample links ---------------------------------------------------------------
+# 4. Repository paths -----------------------------------------------------------
+
+# Two views of one rule: a markdown link into the repository must resolve, and so must a repository
+# path a page or component names in prose. The prose half catches a retired path the link check
+# cannot see, because no link markup is there to follow.
 
 $linkPattern = [regex]'\]\(([^()\s]+)\)'
 foreach ($file in $docsContentFiles) {
@@ -292,7 +297,7 @@ foreach ($file in $docsContentFiles) {
             $path = ($path -split '\?')[0]
             if ($path -eq '') { continue }
 
-            if ($path -match '^(samples|tests)/') {
+            if ($path -match '^(samples|src|tests)/') {
                 # A target already rooted at the repository.
                 $resolved = [System.IO.Path]::GetFullPath((Join-Path $repository $path))
                 $repoRelative = $path
@@ -305,7 +310,7 @@ foreach ($file in $docsContentFiles) {
                 $repoRelative = Get-RelativePath $resolved
             }
 
-            if ($repoRelative -notmatch '^(samples|tests)/') { continue }
+            if ($repoRelative -notmatch '^(samples|src|tests)/') { continue }
             if (-not (Test-Path -LiteralPath $resolved)) {
                 $linkFailures.Add(("{0}:{1}: '{2}' does not resolve to '{3}'" -f $relative, ($lineNumber + 1), $target, $repoRelative))
             }
@@ -313,7 +318,59 @@ foreach ($file in $docsContentFiles) {
     }
 }
 
-# 5. Generated changelog --------------------------------------------------------
+# A rooted `samples/` or `src/` reference is a path into this repository unless it belongs to another
+# layout (Next.js's `src/pages`): this repository names its projects in PascalCase, so a lowercase
+# first segment is prose about another tree and is left alone. Relative links were resolved above.
+$repoPathPattern = [regex]'(?<![\w./\\-])(samples|src)/([A-Za-z0-9_.\-]+(?:/[A-Za-z0-9_.\-]+)*)'
+foreach ($file in @($docsContentFiles + $docsSourceFiles)) {
+    $relative = Get-RelativePath $file.FullName
+    $lines = @(Get-Content -LiteralPath $file.FullName)
+    for ($lineNumber = 0; $lineNumber -lt $lines.Count; $lineNumber++) {
+        foreach ($match in $repoPathPattern.Matches($lines[$lineNumber])) {
+            $firstSegment = $match.Groups[2].Value.Split('/')[0]
+            if ($firstSegment -cnotmatch '[A-Z]') { continue }
+            $path = $match.Value.TrimEnd('.', ',', ';', ':')
+            if (-not (Test-Path -LiteralPath (Join-Path $repository $path))) {
+                $linkFailures.Add(("{0}:{1}: '{2}' names no file in the repository" -f $relative, ($lineNumber + 1), $path))
+            }
+        }
+    }
+}
+
+# 5. Integration page shape ------------------------------------------------------
+
+# Every page a suite reads to compose an integration carries the same six sections, so a reader finds
+# the same things on every page and the parallel writers cannot drift. The map page and the deep task
+# pages under a protocol section are exempt; each section index carries the shape and links its tasks.
+
+$integrationRoot = Join-Path $docsContentRoot "integrations"
+$integrationShapeHeadings = @(
+    '## What it adds',
+    '## Install',
+    '## Compose',
+    '## The tasks',
+    '## In the trace and coverage',
+    '## Limits'
+)
+$integrationShapePages = @()
+if (Test-Path -LiteralPath $integrationRoot) {
+    $integrationShapePages = @(Get-ChildItem -LiteralPath $integrationRoot -File -Filter *.md |
+        Where-Object { $_.Name -ne 'overview.md' })
+    $integrationShapePages += @(Get-ChildItem -LiteralPath $integrationRoot -Directory |
+        ForEach-Object { Join-Path $_.FullName 'index.md' } |
+        Where-Object { Test-Path -LiteralPath $_ } |
+        ForEach-Object { Get-Item -LiteralPath $_ })
+}
+foreach ($page in $integrationShapePages) {
+    $relative = Get-RelativePath $page.FullName
+    $lines = @(Get-Content -LiteralPath $page.FullName)
+    $missing = @($integrationShapeHeadings | Where-Object { -not ($lines -ccontains $_) })
+    if ($missing.Count -gt 0) {
+        $shapeFailures.Add(("{0}: missing {1}" -f $relative, ($missing -join ', ')))
+    }
+}
+
+# 6. Generated changelog --------------------------------------------------------
 
 # One source: the repository CHANGELOG.md. docs/scripts/generate-changelog.mjs writes the documentation
 # page and the homepage release feed from it; check mode fails when either output is stale, so a release
@@ -334,7 +391,7 @@ else {
 # Summary -----------------------------------------------------------------------
 
 $checkedFiles = $docsContentFiles.Count + $docsSourceFiles.Count + $factFiles.Count
-$totalFailures = $forbiddenFailures.Count + $apiFailures.Count + $keyFailures.Count + $linkFailures.Count + $releaseFailures.Count
+$totalFailures = $forbiddenFailures.Count + $apiFailures.Count + $keyFailures.Count + $linkFailures.Count + $shapeFailures.Count + $releaseFailures.Count
 
 if ($totalFailures -gt 0) {
     Write-Host "Documentation checks failed:"
@@ -351,8 +408,12 @@ if ($totalFailures -gt 0) {
         foreach ($failure in $keyFailures) { Write-Host "    $failure" }
     }
     if ($linkFailures.Count -gt 0) {
-        Write-Host ("  Sample links ({0}):" -f $linkFailures.Count)
+        Write-Host ("  Repository paths ({0}):" -f $linkFailures.Count)
         foreach ($failure in $linkFailures) { Write-Host "    $failure" }
+    }
+    if ($shapeFailures.Count -gt 0) {
+        Write-Host ("  Integration page shape ({0}):" -f $shapeFailures.Count)
+        foreach ($failure in $shapeFailures) { Write-Host "    $failure" }
     }
     if ($releaseFailures.Count -gt 0) {
         Write-Host ("  Generated changelog ({0}):" -f $releaseFailures.Count)
@@ -362,6 +423,7 @@ if ($totalFailures -gt 0) {
 
 $summary = "check-docs: checked {0} files ({1} docs pages, {2} source files, {3} fact sheets); {4} failure(s)." -f
     $checkedFiles, $docsContentFiles.Count, $docsSourceFiles.Count, $factFiles.Count, $totalFailures
+$summary += " The integration shape check covered {0} page(s)." -f $integrationShapePages.Count
 if ($keyCrossCheckSkipped) {
     $summary += " The private fact sheets are absent; the key cross-check ran against docs/configuration-keys.json (source section constants and documented exceptions), so a docs key no source section backs still fails. The fact-sheet-to-docs half needs the private records checkout."
 }

@@ -4,8 +4,7 @@ using System.Reflection;
 
 /// <summary>
 /// The method identity a test passes to <c>StartTestAsync</c> when only the display name matters.
-/// One placeholder replaces the private <c>TestMethod()</c> reflection helpers the suites used to
-/// each define.
+/// One placeholder replaces the per-suite private <c>TestMethod()</c> reflection helpers.
 /// </summary>
 public static class TestMethods
 {

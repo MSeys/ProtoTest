@@ -1,19 +1,16 @@
 ---
 sidebar_position: 1
-title: ProtoTest integrations
-sidebar_label: Overview
-description: "Every ProtoTest integration joins the same execution context and lifecycle, so several in one test share one trace, one set of attributes and one set of outcomes."
+title: Integrations map
+sidebar_label: Map
+description: "Every ProtoTest integration on one page: protocols, browsers, messaging, devices, data and files, applications, runners and the tooling around the run."
 ---
 
 import StackBuilder from '@site/src/components/StackBuilder';
+import CapabilityIndex from '@site/src/components/CapabilityIndex';
 
-# Integrations overview
+# Integrations map
 
-Each integration is a NuGet package that joins the foundation: most bring a client to `ProtoExecutionContext`, others contribute collectors, resources or host capabilities. They all share the [foundation](../foundation/overview.md) - lifecycle, attributes, attachments, tracing, coverage - so using several in one test doesn't mean learning several models. Every library and runner package targets .NET 8, 9 and 10 and is stable on NuGet, so `dotnet add package` lines install directly.
-
-## Quick start
-
-Compose one application and give it a protocol:
+Every integration is a NuGet package that joins the same host, execution context and trace, so a suite composes several without learning several models. They all share the [foundation](../foundation/overview.md): one lifecycle, one set of attributes and one report.
 
 ```csharp
 builder.AddApplication("Api", app => app
@@ -21,109 +18,71 @@ builder.AddApplication("Api", app => app
     .AddRest(rest => rest.AddClient("Api")));
 ```
 
-```csharp
-[Application("Api")]
-public sealed class ApiTests
-{
-    [ProtoTest]
-    public async Task Orders_are_created()
-    {
-        using var response = await Proto.Context.Rest()
-            .Body(new { product = "notebook", quantity = 2 })
-            .PostAsync("/api/orders");
-
-        response.Should.HaveHttpStatus(HttpStatusCode.Created)
-            .Should.MatchShape(new { id = JsonValue.GreaterThan(0), product = "notebook" });
-    }
-}
-```
-
-Run this with any [runner](../runners/overview.md), then add `AddGraphQL`, `AddWeb`, `AddMessaging`, … to the same application: the same context hands each protocol its client, and everything lands in one trace and one report.
+The groups below are the map. Each line names the packages and links the page that explains the integration, with its deeper pages after it. [Installation](../getting-started/installation.md) starts a project; a [runner](../runners/overview.md) runs the suite.
 
 <StackBuilder />
 
-## Going further: several integrations in one test
+## Protocols
 
-Adapted from `samples/Northstar.ProtoTest/SheetsJourney.cs` — data through one package, an HTTP download through another, and a spreadsheet assertion through a third, all in one test:
+- **REST** (`ProtoTest.Rest`) - one HTTP client per test on `IHttpClientFactory`, JSON shape assertions, shared authentication, request and response capture, and endpoint coverage. [Overview](./rest/index.md), [requests](./rest/requests.md), [responses](./rest/responses.md), [authentication](./rest/authentication.md), [attachments](./rest/attachments.md).
+- **GraphQL** (`ProtoTest.GraphQL`) - queries, mutations and subscriptions over WebSocket or SSE, file uploads, shape assertions and schema coverage. [Overview](./graphql/index.md), [operations](./graphql/operations.md), [responses](./graphql/responses.md), [subscriptions](./graphql/subscriptions.md), [coverage](./graphql/coverage.md).
+- **gRPC** (`ProtoTest.Grpc`) - unary and streaming calls, metadata authentication through the shared `[Auth<T>]` pipeline, shape and status assertions, and method coverage. [Overview](./grpc/index.md).
+- **OpenAPI** (`ProtoTest.OpenApi`) - compares REST traffic and shape assertions against your OpenAPI document and reports the endpoints, responses and properties no test has checked. [OpenAPI](./openapi.md).
 
-```csharp
-[ProtoTest]
-[SignedInAs]
-public async Task TheMonthlyReport_ShouldMatchItsModel()
-{
-    var project = await Proto.Context.Data()
-        .For<CreateProjectRequest>()
-        .With(request => request.Name, "report-atlas")
-        .CreateAsync<ProjectResponse>();
+## Browsers
 
-    using var response = await Proto.Context.Rest().GetAsync("/api/v1/reports/monthly.xlsx");
-    response.Should.HaveHttpStatus(HttpStatusCode.OK);
-    var report = Proto.Context.Sheets().Open(response).Model<ProjectReportRow>();
+- **Web** (`ProtoTest.Web`, with `ProtoTest.Web.Playwright` or `ProtoTest.Web.Selenium` underneath) - a driver-independent model of pages, components, elements, tables, flows and login, with page coverage and failure artifacts. [Overview](./web/index.md), [page objects](./web/page-objects.md), [locators](./web/locators.md), [interactions](./web/interactions.md), [flows](./web/flows.md), [login](./web/login.md), [middleware](./web/middleware.md), [diagnostics](./web/diagnostics.md).
 
-    report.Should.MatchModel();
-    report.Column(row => row.Environments).Should.All(count => count >= 0);
-}
-```
+## Messaging
 
-The same pattern works across protocols: change something through REST and check it through GraphQL in the same test, with one `[Auth<T>]` authenticator serving both. The [recipes](../recipes/overview.md) walk through scenarios like these end to end.
+- **Messaging** (`ProtoTest.Messaging`) - publish to a destination, then await the message that matters with a predicate and a timeout; an in-memory broker by default. [Messaging](./messaging/index.md).
+- **RabbitMQ** (`ProtoTest.Messaging.RabbitMq`, `ProtoTest.Messaging.RabbitMq.Testcontainers`) - a real broker adapter, with a broker owned by the run when it should start one. [Messaging](./messaging/index.md).
+- **MassTransit** (`ProtoTest.Messaging.MassTransit`) - bridges the messaging surface to an in-process application's MassTransit test harness, and the envelope helper speaks the wire format over any adapter. [MassTransit bridge](./messaging/masstransit.md).
 
-## Complete package reference
+## Devices
 
-The composer above gives a suite its direct starting packages. This reference includes the adapters, infrastructure helpers and supporting packages you may add as the suite grows.
+- **Devices** (`ProtoTest.Devices`) - typed device clients, one instance per test, frame exchange and device-protocol coverage. [Devices](./devices.md).
+- **WebSocket transport** (`ProtoTest.Devices.WebSocket`, `ProtoTest.Devices.WebSocket.AspNetCore`) - `ws://` and `wss://` endpoints, or in-process sockets through the application's test server. [Devices](./devices.md).
+- **MQTT transport** (`ProtoTest.Devices.Mqtt`, `ProtoTest.Devices.Mqtt.Testcontainers`) - publish and subscribe against a real broker, with a Mosquitto broker owned by the run. [Devices](./devices.md).
 
-### Integration packages
+## Data and files
 
-| Package | Install | What it adds | Reach it with |
-| --- | --- | --- | --- |
-| `ProtoTest.Rest` | `dotnet add package ProtoTest.Rest` | HTTP/REST client, status and shape assertions, `[Auth<T>]`, REST coverage | `Proto.Context.Rest()` |
-| `ProtoTest.GraphQL` | `dotnet add package ProtoTest.GraphQL` | queries, mutations, WebSocket/SSE subscriptions, uploads, schema coverage | `Proto.Context.GraphQL()` |
-| `ProtoTest.Grpc` | `dotnet add package ProtoTest.Grpc` | unary and streaming gRPC clients, metadata auth, shape/status assertions, method coverage | `Proto.Context.Grpc()` |
-| `ProtoTest.Messaging` | `dotnet add package ProtoTest.Messaging` | publish and await messages, with an in-memory default broker | `Proto.Context.Messaging()` |
-| `ProtoTest.Messaging.RabbitMq` | `dotnet add package ProtoTest.Messaging.RabbitMq` | RabbitMQ adapter for the messaging client | `messaging.UseRabbitMq()` |
-| `ProtoTest.Messaging.MassTransit` | `dotnet add package ProtoTest.Messaging.MassTransit` | bridge the messaging client to an in-process application's MassTransit test harness | `messaging.UseMassTransit<Program>()` |
-| `ProtoTest.Sheets` | `dotnet add package ProtoTest.Sheets` | `.xlsx` cell, column, range, table and typed-model assertions, range coverage | `Proto.Context.Sheets()` |
-| `ProtoTest.Data` | `dotnet add package ProtoTest.Data` | deterministic data, member defaults, provisioners and the `Ref<T>` identity map | `Proto.Context.Data()` |
-| `ProtoTest.Sql` | `dotnet add package ProtoTest.Sql` | one database connection per test, optional transaction isolation | `Proto.Context.SqlConnection()` |
-| `ProtoTest.Sql.EntityFrameworkCore` | `dotnet add package ProtoTest.Sql.EntityFrameworkCore` | EF Core context over the per-test connection, enlisted in its transaction | `Proto.Context.Sql<TContext>()` |
-| `ProtoTest.Web` | `dotnet add package ProtoTest.Web` | backend-neutral sessions, page objects, flows, login and page coverage | `Proto.Context.Web()` |
-| `ProtoTest.Web.Playwright` | `dotnet add package ProtoTest.Web.Playwright` | Playwright backend, browser pool and `[RequiresPlaywrightBrowser]` probe | `builder.AddWeb()` |
-| `ProtoTest.Web.Selenium` | `dotnet add package ProtoTest.Web.Selenium` | Selenium backend with its own actionability loop | `builder.AddWeb(createDriver)` |
-| `ProtoTest.AspNetCore` | `dotnet add package ProtoTest.AspNetCore` | in-process ASP.NET Core application, server DI access, page inventory, app-side test-user authentication | `Proto.Context.ServerFactory<TProgram>()`, `webHost.AddTestUserAuthentication()` |
-| `ProtoTest.Aspire` | `dotnet add package ProtoTest.Aspire` | run-scoped Aspire AppHost, resources as application targets | `builder.AddAspireAppHost<TEntryPoint>("api")` |
-| `ProtoTest.OpenApi` | `dotnet add package ProtoTest.OpenApi` | OpenAPI contract coverage over REST response and shape observations | `.AddCollector<OpenApiCoverageCollector>()` |
-| `ProtoTest.WireMock` | `dotnet add package ProtoTest.WireMock` | per-test fake HTTP services with scenario-like stubs, REST-shaped trace evidence and stub coverage | `Proto.Context.WireMock()` |
-| `ProtoTest.Devices` | `dotnet add package ProtoTest.Devices` | typed device clients, one instance per test, frame exchange and device-protocol coverage | `Proto.Context.Devices()` |
-| `ProtoTest.Devices.WebSocket` | `dotnet add package ProtoTest.Devices.WebSocket` | `ws://`/`wss://` device transport for simulators, gateways and lab hardware | `devices.AddWebSocketClient(...)` |
-| `ProtoTest.Devices.WebSocket.AspNetCore` | `dotnet add package ProtoTest.Devices.WebSocket.AspNetCore` | in-process device WebSockets through an application's `TestServer`, no listening socket | `builder.AddInProcessWebSocketDevices<Program>("Api")` |
-| `ProtoTest.Devices.Mqtt` | `dotnet add package ProtoTest.Devices.Mqtt` | MQTT publish/subscribe device transport against a real broker | `devices.AddMqttClient(...)` |
-| `ProtoTest.Devices.Mqtt.Testcontainers` | `dotnet add package ProtoTest.Devices.Mqtt.Testcontainers` | a Mosquitto broker owned by the run | `builder.AddInfrastructure("Mqtt", chain => chain.UseContainer(MosquittoBroker.Container()), MqttDeviceOptions.BrokerSetting)` |
-| `ProtoTest.Sql.Testcontainers` | `dotnet add package ProtoTest.Sql.Testcontainers` | a PostgreSQL container owned by the run | `builder.AddInfrastructure("Store", chain => chain.UseContainer(PostgresDatabase.Container()), "ConnectionStrings:Northstar")` |
-| `ProtoTest.Messaging.RabbitMq.Testcontainers` | `dotnet add package ProtoTest.Messaging.RabbitMq.Testcontainers` | a RabbitMQ container owned by the run | `builder.AddInfrastructure("Broker", chain => chain.UseContainer(RabbitMqBroker.Container()), RabbitMqOptions.ConnectionStringSetting, …)` |
+- **Test data** (`ProtoTest.Data`) - deterministic builders with member defaults, factories and provisioners, so a test writes only the values it is about. [Overview](./data/index.md), [defaults](./data/defaults.md), [provisioners](./data/provisioners.md).
+- **SQL** (`ProtoTest.Sql`, `ProtoTest.Sql.EntityFrameworkCore`, `ProtoTest.Sql.Testcontainers`) - a database connection each test owns, optional transaction rollback, EF Core contexts on the same connection, and a PostgreSQL server owned by the run. [SQL](./sql/index.md).
+- **Sheets** (`ProtoTest.Sheets`) - opens the `.xlsx` your application generated and asserts on cells, ranges, tables and typed rows, with range coverage. [Sheets](./sheets/index.md).
 
-### Foundation and supporting packages
+## Applications and runs
 
-| Package | Install | What it adds | Reach it with |
-| --- | --- | --- | --- |
-| `ProtoTest.Core` | `dotnet add package ProtoTest.Core` | host, execution context, hooks, attributes, test ids, tracing, run gates and resources | `Proto.Context`, `Proto.Host` |
-| `ProtoTest.Http` | `dotnet add package ProtoTest.Http` | shared HTTP client plumbing and the `[Auth<T>]` model behind REST, GraphQL and gRPC; an extension point, normally transitive | `Proto.Context.Client<HttpClient>(name)` |
-| `ProtoTest.Json` | `dotnet add package ProtoTest.Json` | partial JSON shape matching and `JsonValue` constraints; normally transitive | `JsonShapeMatcher.AssertMatch`, `JsonValue` |
-| `ProtoTest.Testcontainers` | `dotnet add package ProtoTest.Testcontainers` | `ProtoContainerResource<TContainer>` base for run-scoped containers: start-once, release-once, `TryStart` | `builder.AddInfrastructure("Store", chain => chain.UseContainer(…))` |
-| `ProtoTest.Reporting` | `dotnet add package ProtoTest.Reporting` | JSON and HTML report sinks | `builder.AddSink<JsonReportSink>()`, `AddSink<HtmlReportSink>()` |
-ProtoTest's operations are also `Activity`s on the `ProtoTest` source; subscribe OpenTelemetry with `AddSource("ProtoTest")` — see [OpenTelemetry](../observability/opentelemetry.md). No bridge package is needed.
+- **ASP.NET Core** (`ProtoTest.AspNetCore`) - runs the application in-process with `WebApplicationFactory` and hands its `HttpClient` to the REST and GraphQL clients. [ASP.NET Core](./aspnetcore.md).
+- **Background workers** (`ProtoTest.Hosting`) - runs a generic host with its `IHostedService`s inside the test process, the way ASP.NET Core runs an API. [Background workers](./hosting.md).
+- **Aspire** (`ProtoTest.Aspire`) - starts an Aspire AppHost with the run and publishes each resource's endpoint as its application's address. [Aspire](./aspire.md).
 
-### Runners and templates
+## Fakes
 
-| Package | Install | What it adds | Reach it with |
-| --- | --- | --- | --- |
-| `ProtoTest.NUnit` | `dotnet add package ProtoTest.NUnit` | NUnit lifecycle adapter and attachment publisher | `[ProtoTest]`, `ProtoTestAssembly` |
-| `ProtoTest.Xunit` | `dotnet add package ProtoTest.Xunit` | xUnit v2 adapter (one collection for the suite) | `[ProtoTestFact]`, `[ProtoTestTheory]` |
-| `ProtoTest.Xunit3` | `dotnet add package ProtoTest.Xunit3` | xUnit v3 adapter | `[ProtoTestFact]`, `[ProtoTestTheory]`, assembly fixture |
-| `ProtoTest.MSTest` | `dotnet add package ProtoTest.MSTest` | MSTest lifecycle adapter and attachment publisher | `[ProtoTest]` |
-| `ProtoTest.TUnit` | `dotnet add package ProtoTest.TUnit` | TUnit executor and attachment publisher | `[assembly: TestExecutor<ProtoTestExecutor>()]` |
-| `ProtoTest.Templates` | `dotnet new install ProtoTest.Templates` | the `prototest` starter solution: an API and a suite for it, already composed | `dotnet new prototest -n Shop` |
+- **WireMock** (`ProtoTest.WireMock`) - a fake HTTP service per test or per run, with stubs, call verification, trace evidence and stub coverage. [WireMock](./wiremock.md).
 
-## Container-backed dependencies
+## Foundation and support
 
-When a suite should run against a real server instead of an in-memory one, a container package owns it for the run: `ProtoTest.Sql.Testcontainers` starts PostgreSQL, `ProtoTest.Messaging.RabbitMq.Testcontainers` starts RabbitMQ, and `ProtoTest.Devices.Mqtt.Testcontainers` starts a Mosquitto broker. Register the container as a `UseContainer(...)` provider of the target it serves, so the host starts it before the run, fills its connection string into configuration for the application and the tests, and releases it after the reports are written. They build on `ProtoTest.Testcontainers`, whose `TryStart` lets a fixture fall back when no container runtime is available — see [Infrastructure](../foundation/infrastructure.md).
+- **Foundation** (`ProtoTest.Core`) - the host, execution context, hooks, attributes, test ids, tracing and resources every integration plugs into. [Overview](../foundation/overview.md).
+- **HTTP plumbing** (`ProtoTest.Http`) - the shared client pipeline and the `[Auth<T>]` model behind REST, GraphQL and gRPC; normally transitive. [Clients](../foundation/clients.md).
+- **JSON shapes** (`ProtoTest.Json`) - partial shape matching and `JsonValue` constraints; normally transitive. [Shape matching](../foundation/shape-matching.md).
+- **Containers** (`ProtoTest.Testcontainers`) - the run-scoped container base: start once, release once, with `TryStart` for a run that has no container runtime. [Infrastructure](../foundation/infrastructure.md).
 
-The same suite can then run in-process, container-backed or against a published environment without a code change; [Environments](../getting-started/environments.md) explains what changes in each, including why environment-specific journeys skip rather than fail.
+## Runners
+
+- **Test runners** (`ProtoTest.NUnit`, `ProtoTest.Xunit`, `ProtoTest.Xunit3`, `ProtoTest.MSTest`, `ProtoTest.TUnit`) - the same runtime in every runner, with one assertion and attachment model. [Overview](../runners/overview.md), [NUnit](../runners/nunit.md), [xUnit v2](../runners/xunit.md), [xUnit v3](../runners/xunit3.md), [MSTest](../runners/mstest.md), [TUnit](../runners/tunit.md).
+
+## Tooling and agent
+
+- **The CLI** (`ProtoTest.Cli`) - the `prototest` tool: `summary`, `index`, `verify` and `feedback` over a trace, a folder of runs or two reports, with no agent in the loop. [Loop](../agent-workflows/loop.md).
+- **Traces** (`ProtoTest.Traces`) - the `.prototrace` archive and the reader that opens it: the run's operations, checks and artifacts in one file. [ProtoTrace](../observability/prototrace.md).
+- **MCP server** (`ProtoTest.Mcp`) - a local stdio server that answers questions about the runs in a repository through four read-only tools. [Setup](../agent-workflows/setup.md).
+- **Diagnosis** (`ProtoTest.Diagnosis`) - the run summary and the failing test's context package, behind the CLI and the MCP tools. [Diagnosis](../agent-workflows/diagnosis.md).
+- **Verification** (`ProtoTest.Verification`) - compares two reports and records whether a fix regressed a covered unit or changed the specification. [Verification](../agent-workflows/verification.md).
+- **Feedback** (`ProtoTest.Feedback`) - the composite action: installs the CLI, uploads the trace, posts the digest and runs the verdict. [Continuous integration](../continuous-integration/index.md).
+- **Analyzers** (`ProtoTest.Analyzers`) - two Roslyn warnings for test code that compiles but runs outside the lifecycle. [Analyzers](../project/analyzers.md).
+- **Templates** (`ProtoTest.Templates`) - `dotnet new prototest` scaffolds an API and a suite for it, already composed. [Installation](../getting-started/installation.md).
+- **Reporting** (`ProtoTest.Reporting`) - the JSON and HTML report sinks. [Reporting](../observability/reporting.md).
+- **OpenTelemetry** - ProtoTest operations are `Activity`s on the `ProtoTest` source; subscribe with `AddSource`. [OpenTelemetry](../observability/opentelemetry.md).
+
+<CapabilityIndex />

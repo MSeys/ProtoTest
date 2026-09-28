@@ -22,7 +22,7 @@ public sealed class ParallelParameterizedTests
     [OneTimeTearDown]
     public static void BothCases_ShouldHaveRecordedTheirOwnTrace()
     {
-        // Each case now traces under its NUnit full name, so the rows are distinguishable.
+        // Each case traces under its NUnit full name, so the rows are distinguishable.
         var traces = ProtoTestAssembly.Host.Trace.Snapshot().Tests
             .Where(test => test.Name.Contains(nameof(Case_ShouldKeepItsOwnLifecycle), StringComparison.Ordinal))
             .ToArray();

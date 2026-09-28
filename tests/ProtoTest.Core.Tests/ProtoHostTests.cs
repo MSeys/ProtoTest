@@ -20,13 +20,11 @@ public class ProtoHostTests
         await using var host = new ProtoHost(serviceCollection.BuildServiceProvider());
 
         // Act
-        // 1. Create the test execution scope
         await host.StartTestAsync("TestSequence", "00123", TestMethods.Placeholder, [testAttribute]);
 
-        // 3. Test execution body
+        // The test body.
         executionLog.Add("TestBody");
 
-        // 4. Complete the test lifecycle and dispose its scope
         await host.CompleteTestAsync();
 
         // Assert
@@ -110,7 +108,6 @@ public class ProtoHostTests
         // Act
         await host.StartTestAsync("TestDisposal", "00456", TestMethods.Placeholder);
 
-        // Resolve dependency while context is active on the current thread
         var dependency = ProtoHost.CurrentContext.Services.GetRequiredService<DisposableDependency>();
 
         await host.CompleteTestAsync();

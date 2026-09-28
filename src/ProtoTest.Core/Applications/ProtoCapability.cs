@@ -295,8 +295,8 @@ public static class ProtoCapabilityExtensions
     /// </summary>
     /// <remarks>
     /// A host whose application declares no chain keeps the configured-keys rule over
-    /// <paramref name="configuredKeys"/>, so today's registrations are unchanged: the capability drops
-    /// when every key is configured and the environment provides the address elsewhere.
+    /// <paramref name="configuredKeys"/>, so the capability drops when every key is configured and the
+    /// environment provides the address elsewhere.
     /// </remarks>
     public static IProtoHostBuilder AddCapabilityWhenInProcess(
         this IProtoHostBuilder builder,

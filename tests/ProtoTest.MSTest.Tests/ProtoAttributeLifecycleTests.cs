@@ -12,7 +12,6 @@ public class ProtoAttributeLifecycleTests
     [Tracking("Method", Order = 3)]
     public void ProtoTestMethod_ShouldExecuteHooksAndAttributesInOrder()
     {
-        // Fetch test-scoped log state
         var logState = Proto.Context.Resolve<ExecutionLogState>();
 
         // Act

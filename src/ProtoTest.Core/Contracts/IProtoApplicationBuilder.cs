@@ -3,8 +3,8 @@ namespace ProtoTest.Core;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Configures one named application under test. Integrations extend it — for example
-/// <c>app.AddRest(rest =&gt; rest.AddClient("Orders"))</c> — to expose the protocols and clients the
+/// Configures one named application under test. Integrations extend it, for example with
+/// <c>app.AddRest(rest =&gt; rest.AddClient("Orders"))</c>, to expose the protocols and clients the
 /// application supports. The first client registered for a protocol becomes that protocol's default.
 /// </summary>
 public interface IProtoApplicationBuilder

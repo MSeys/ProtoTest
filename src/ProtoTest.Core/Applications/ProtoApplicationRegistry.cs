@@ -2,7 +2,7 @@ namespace ProtoTest.Core;
 
 /// <summary>
 /// Resolves the clients registered for each application. Integrations use it to pick a protocol's
-/// default client — the first registered — when a test does not name one explicitly.
+/// default client (the first registered) when a test does not name one explicitly.
 /// </summary>
 public sealed class ProtoApplicationRegistry
 {

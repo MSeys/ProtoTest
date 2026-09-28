@@ -72,7 +72,7 @@ internal static partial class RestUriBuilder
 
         var usedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // 1. Replace route tokens {id}
+        // Replace route tokens {id} first; every value left over becomes a query parameter.
         var resolvedUrl = RouteTokenRegex().Replace(template, match =>
         {
             var key = match.Groups[1].Value;

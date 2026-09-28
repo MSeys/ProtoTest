@@ -98,16 +98,10 @@ had no baseline now have one. After `x.y.z` is on nuget.org:
 
 ## 6. Documentation at release
 
-From `docs/`:
-
-```powershell
-npm run docusaurus docs:version <version>
-```
-
-This snapshots the current pages as `versioned_docs/version-<version>` and updates `versions.json`.
-The announcement bar in `docs/docusaurus.config.ts` points readers at the current release and the
-next-version roadmap, so update its `content` for the new release, then run `npm run build` and let
-the docs workflow publish the site. The API reference workflow builds from the same source.
+The site documents the current release only: no versioned snapshot is cut, so there is no
+`docs:version` step and no `versions.json` to update. Update the announcement bar's `content` in
+`docs/docusaurus.config.ts` for the new release, run `npm run build` from `docs/`, and let the docs
+workflow publish the site. The API reference workflow builds from the same source.
 
 ## Checklist
 
@@ -119,4 +113,4 @@ the docs workflow publish the site. The API reference workflow builds from the s
 - [ ] `eng/release.ps1 -DryRun` prints the package plan without errors.
 - [ ] Tag `v<version>` pushed; `release.yml` published the packages and the GitHub Release.
 - [ ] Baseline rollover done; opt-out reasons gone; next branch version bumped.
-- [ ] Docs version snapshot and announcement bar updated.
+- [ ] Announcement bar updated for the release; `npm run build` in `docs/` green.

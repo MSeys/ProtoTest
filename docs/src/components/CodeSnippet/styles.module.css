@@ -64,6 +64,29 @@
   opacity: 0.72;
 }
 
+/* A callout line and its number. The number matches the note list beside the snippet; it is the
+   annotation, so it must stay legible on the sunken surface in both page themes. */
+.annotated { background: color-mix(in srgb, var(--pt-cyan) 10%, transparent); }
+
+.callout {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  min-width: 16px;
+  height: 16px;
+  margin-left: var(--space-2);
+  padding: 0 var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--pt-cyan);
+  color: var(--pt-code);
+  font: var(--weight-bold) var(--text-micro)/1 var(--font-mono);
+  user-select: none;
+}
+
+.scroll .callout { margin-left: var(--space-4); }
+
 @media (max-width: 600px) {
   .pre { padding: var(--space-4); font-size: var(--text-body); }
 }

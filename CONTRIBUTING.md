@@ -12,15 +12,15 @@ Thanks for helping make integration tests easier to build and explain. Bug repor
 
 ProtoTest has three scopes, and each has exactly one way to reach it:
 
-- **Inside a test, on the test's flow** — use `Proto.Context`. This covers test bodies,
+- **Inside a test, on the test's flow**: use `Proto.Context`. This covers test bodies,
   test-author entries (`context.Data().For<T>()`, `row.ShouldMatchShape(...)`,
   `ProtoGrpcAssertions.For(exception).Should.HaveStatus(...)`) and the plumbing they call. Prefer
   passing the context down from an entry when the callee is easy to construct directly in a test; do
   not thread it through purely for style.
-- **Run scope** — use the host: the reference a hook receives at registration, or
+- **Run scope**: use the host, the reference a hook receives at registration, or
   `ProtoHost.CurrentHost`. There is no ambient run context: run hooks and report building run
   outside any test.
-- **Off the test's flow** — telemetry callbacks and library threads (a message consumer's delivery
+- **Off the test's flow**: telemetry callbacks and library threads (a message consumer's delivery
   callbacks, a span processor's worker) use `ProtoHost.FindTraceWriter(activity)` and correlate by
   W3C trace id. `Proto.Context` cannot answer there, because there is no flow-local test.
 
@@ -80,6 +80,19 @@ cd viewer
 npm ci
 npm run build
 ```
+
+## Integration pages
+
+Every page under `docs/docs/integrations` follows one shape, and `eng/check-docs.ps1` fails when a page that should carry it does not. The six sections, in order:
+
+1. **What it adds.** The capability and what it can see.
+2. **Install.** The `dotnet add package` lines and the supported targets.
+3. **Compose.** The `Add...` registration, its options and the context accessor.
+4. **The tasks.** Three to five things a suite does with the integration; each links the deeper page that explains it.
+5. **In the trace and coverage.** The operations, observations and coverage items the integration records.
+6. **Limits.** What it does not do, and where it loses.
+
+`## Skip` and a link list after `Limits` are fine. The check covers the top-level pages in `docs/docs/integrations` and each protocol section's `index.md`; the deep task pages under a section are exempt, and the section index links them. `overview.md` is the map and is exempt; `wiremock.md` is the model page.
 
 ## Pull requests
 

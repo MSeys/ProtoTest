@@ -61,4 +61,4 @@ Every tool is read-only and returns a compact JSON document.
 - One external dependency: the official `ModelContextProtocol` SDK (Apache-2.0).
 - The demo-only endpoint lives in `samples/ProtoTest.Mcp.DemoEndpoint`: built in this repository and
   **not hosted** - read-only over the bundled demo trace, rate-limited, no accounts, no retention.
-  The local session is the recorded evidence today; the local server stays the product surface.
+  The local stdio server stays the product surface.

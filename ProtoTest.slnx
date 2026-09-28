@@ -8,6 +8,8 @@
     <Project Path="src/ProtoTest.AspNetCore/ProtoTest.AspNetCore.csproj" Id="dafd8b60-e20d-44cc-a746-68ec3136e256" />
     <Project Path="src/ProtoTest.Data/ProtoTest.Data.csproj" />
     <Project Path="src/ProtoTest.Devices/ProtoTest.Devices.csproj" />
+    <Project Path="src/ProtoTest.Devices.Mqtt/ProtoTest.Devices.Mqtt.csproj" />
+    <Project Path="src/ProtoTest.Devices.Mqtt.Testcontainers/ProtoTest.Devices.Mqtt.Testcontainers.csproj" />
     <Project Path="src/ProtoTest.Devices.WebSocket/ProtoTest.Devices.WebSocket.csproj" />
     <Project Path="src/ProtoTest.Devices.WebSocket.AspNetCore/ProtoTest.Devices.WebSocket.AspNetCore.csproj" />
     <Project Path="src/ProtoTest.GraphQL/ProtoTest.GraphQL.csproj" Id="81af1d3a-d24c-465e-b1a0-ee742ca6bf6e" />
@@ -67,6 +69,7 @@
     <Project Path="tests/ProtoTest.AspNetCore.Web.Tests/ProtoTest.AspNetCore.Web.Tests.csproj" />
     <Project Path="tests/ProtoTest.Data.Tests/ProtoTest.Data.Tests.csproj" />
     <Project Path="tests/ProtoTest.Devices.Tests/ProtoTest.Devices.Tests.csproj" />
+    <Project Path="tests/ProtoTest.Devices.Mqtt.Tests/ProtoTest.Devices.Mqtt.Tests.csproj" />
     <Project Path="tests/ProtoTest.Devices.WebSocket.Tests/ProtoTest.Devices.WebSocket.Tests.csproj" />
     <Project Path="tests/ProtoTest.Devices.WebSocket.AspNetCore.Tests/ProtoTest.Devices.WebSocket.AspNetCore.Tests.csproj" />
     <Project Path="tests/ProtoTest.Extensibility.Tests/ProtoTest.Extensibility.Tests.csproj" />

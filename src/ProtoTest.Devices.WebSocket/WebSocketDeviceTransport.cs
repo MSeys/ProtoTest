@@ -50,7 +50,7 @@ public sealed class WebSocketDeviceTransport : IProtoDeviceTransport
 
         try
         {
-            await ProtoDeviceConnect
+            await ProtoTest.Devices.ProtoDeviceConnect
                 .WithTimeoutAsync(
                     uri.ToString(),
                     _options.ConnectTimeout,

@@ -229,6 +229,39 @@ public sealed class DeviceTests
     }
 
     [Test]
+    public async Task Client_ShouldFillTheEndpointSettingsFromTheRegistration()
+    {
+        var server = new FakeDeviceServer();
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddDevices(devices => devices
+            .AddClient("Chargers", server.Transport, resolveAddress: ProtoDeviceAddress.Template("memory://{deviceId}"))
+                .WithSetting("model", "AC-{deviceId}")
+                .WithSetting("token", "s3cret")
+                .AddDevice<FakeCharger>());
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("settings", "00001", TestMethods.Placeholder);
+
+        var charger = Proto.Context.Devices("Chargers").For<FakeCharger>("CP-007");
+        await charger.SendTextAsync("BOOT");
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        var endpoint = server.Transport.LastEndpoint!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                endpoint.Setting("model"),
+                Is.EqualTo("AC-CP-007"),
+                "a setting resolves {deviceId} like an address template");
+            Assert.That(endpoint.Setting("token"), Is.EqualTo("s3cret"), "a value without a placeholder passes through");
+            Assert.That(endpoint.Setting("missing"), Is.Null, "a key the registration did not fill stays absent");
+        }
+    }
+
+    [Test]
     public async Task Client_ShouldResolveTheApplicationsAddress()
     {
         var server = new FakeDeviceServer();

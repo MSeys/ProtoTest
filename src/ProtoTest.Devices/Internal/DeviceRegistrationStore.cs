@@ -3,9 +3,9 @@ namespace ProtoTest.Devices.Internal;
 using ProtoTest.Core;
 
 /// <summary>
-/// One named device client: where its devices connect (resolved per test) and which typed devices and
-/// protocols hang off it. There is no per-device configuration; the address is a function of the
-/// context and the device id.
+/// One named device client: where its devices connect (resolved per test), the transport settings it
+/// carries (resolved per device) and which typed devices and protocols hang off it. There is no
+/// per-device configuration; the address and the settings are functions of the context and the device id.
 /// </summary>
 internal sealed class DeviceClientRegistration(string name)
 {
@@ -22,6 +22,9 @@ internal sealed class DeviceClientRegistration(string name)
 
     /// <summary>The transport's name, as registered with <c>AddTransport</c>.</summary>
     public string TransportName { get; set; } = string.Empty;
+
+    /// <summary>The client's transport settings, keyed by the transport's own names, filled per device.</summary>
+    public Dictionary<string, string?> Settings { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public List<Type> DeviceTypes { get; } = [];
 

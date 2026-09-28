@@ -1,9 +1,7 @@
-namespace ProtoTest.Devices.WebSocket.Tests;
-
-using ProtoTest.Devices.WebSocket;
+namespace ProtoTest.Devices.Tests;
 
 /// <summary>
-/// Pins the shared connect bound both device transports use: the attempt token is the timeout
+/// Pins the shared connect bound every device transport uses: the attempt token is the timeout
 /// authority, a failure that surfaces after it is reported as a <see cref="TimeoutException"/> naming
 /// the target, and a caller's own cancellation is never reclassified.
 /// </summary>

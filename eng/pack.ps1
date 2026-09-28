@@ -55,6 +55,8 @@ $packages = @(
     "src/ProtoTest.Sheets/ProtoTest.Sheets.csproj",
     "src/ProtoTest.AspNetCore/ProtoTest.AspNetCore.csproj",
     "src/ProtoTest.Devices/ProtoTest.Devices.csproj",
+    "src/ProtoTest.Devices.Mqtt/ProtoTest.Devices.Mqtt.csproj",
+    "src/ProtoTest.Devices.Mqtt.Testcontainers/ProtoTest.Devices.Mqtt.Testcontainers.csproj",
     "src/ProtoTest.Devices.WebSocket/ProtoTest.Devices.WebSocket.csproj",
     "src/ProtoTest.Devices.WebSocket.AspNetCore/ProtoTest.Devices.WebSocket.AspNetCore.csproj",
     "src/ProtoTest.Hosting/ProtoTest.Hosting.csproj",

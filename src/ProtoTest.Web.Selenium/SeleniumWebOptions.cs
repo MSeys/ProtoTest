@@ -1,7 +1,6 @@
 namespace ProtoTest.Web.Selenium;
 
 using ProtoTest.Core;
-using ProtoTest.Web.Internal;
 
 public enum SeleniumDiagnosticTraceRetention
 {
@@ -21,14 +20,14 @@ public sealed class SeleniumWebOptions : IProtoConfigurableOptions
 
     string IProtoConfigurableOptions.ConfigurationSectionName => ConfigurationSectionName;
 
-    public TimeSpan ActionTimeout { get; set; } = WebTiming.DefaultTimeout;
+    public TimeSpan ActionTimeout { get; set; } = WebBackendDefaults.DefaultTimeout;
 
     /// <summary>
     /// How often an action retry and a session element assertion probe. One setting: the backend's
     /// action probes and the session's assertions both read it, so a session cannot wait faster or
     /// slower than the backend retries.
     /// </summary>
-    public TimeSpan PollInterval { get; set; } = WebTiming.DefaultPollInterval;
+    public TimeSpan PollInterval { get; set; } = WebBackendDefaults.DefaultPollInterval;
     public bool WaitForStableBounds { get; set; } = true;
     public bool CheckClickObstruction { get; set; } = true;
     public SeleniumDiagnosticTraceRetention DiagnosticTraceRetention { get; set; } = SeleniumDiagnosticTraceRetention.OnWebFailure;

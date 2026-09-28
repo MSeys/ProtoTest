@@ -85,9 +85,10 @@ public sealed class ProtoMessagingBuilder
 
     /// <summary>
     /// Declares the destinations this suite taps, in code, so the adapter can bind each test's tap
-    /// during setup rather than at the first await. Repeated calls compose; configuration under
-    /// <c>ProtoTest:Messaging:Destinations</c> still applies over these values, so an environment can
-    /// add its own.
+    /// during setup rather than at the first await. A destination is an exchange name or a queue
+    /// destination (<see cref="ProtoDestination.Queue"/>, consumed directly by an adapter that owns
+    /// queues). Repeated calls compose; configuration under <c>ProtoTest:Messaging:Destinations</c>
+    /// still applies over these values, so an environment can add its own.
     /// </summary>
     /// <remarks>
     /// <c>Tap</c> is a reliability declaration, not just a convenience: pre-bind every destination the
@@ -139,10 +140,12 @@ public sealed class ProtoMessagingBuilder
     /// The declaration is configuration, not a runtime call: the builder is consumed when
     /// <c>AddMessaging</c> runs, so a destination cannot be declared after a test has prepared. An
     /// adapter whose broker has no topology - the in-memory broker, where every destination already
-    /// exists - treats <c>Declare</c> as a no-op.
+    /// exists - treats <c>Declare</c> as a no-op. A queue destination is consumed, not declared: the
+    /// component that owns the queue creates it, so <c>Declare</c> refuses the queue form.
     /// </remarks>
     /// <exception cref="ArgumentException">
-    /// <paramref name="destinations"/> is empty, or contains a null, empty or whitespace destination.
+    /// <paramref name="destinations"/> is empty, or contains a null, empty or whitespace destination,
+    /// or a queue destination.
     /// </exception>
     public ProtoMessagingBuilder Declare(params string[] destinations)
     {
@@ -155,6 +158,14 @@ public sealed class ProtoMessagingBuilder
         foreach (var destination in destinations)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(destination);
+            if (ProtoDestination.IsQueue(destination))
+            {
+                throw new ArgumentException(
+                    $"'{destination}' addresses a queue, and Declare creates the suite's exchanges. The " +
+                    "component that owns the queue (the application's topology, or the dead-letter " +
+                    "bindings that feed it) creates it; await it with a queue destination instead.",
+                    nameof(destinations));
+            }
         }
 
         // The same options callback shape as Tap: repeated calls compose in order and the configuration

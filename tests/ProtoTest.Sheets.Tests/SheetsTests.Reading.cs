@@ -144,6 +144,15 @@ public sealed partial class SheetsTests
         [property: Column("Region")] string Region,
         [property: Column("Nope")] string Missing);
 
+    [Sheet("Keys")]
+    public sealed record ReorderedRow(
+        [property: Column("Name")] string Name,
+        [property: Column("Id")] decimal Id);
+
+    [Sheet("Keys")]
+    public sealed record IdOnlyRow(
+        [property: Column("Id")] decimal Id);
+
     [Sheet("Ledger")]
     public sealed record LedgerRow(
         [property: Column("Amount", Unique = true)] decimal Amount,

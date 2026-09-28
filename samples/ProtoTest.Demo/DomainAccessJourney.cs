@@ -13,8 +13,7 @@ using ProtoTest.Sql;
 
 /// <summary>Arranging through the domain instead of the API, over the same database.</summary>
 [Application(NorthstarTargets.Api)]
-[NorthstarTenant(PlanIds.Growth)]
-[Auth<NorthstarAuthenticator>]
+[NorthstarMember(PlanIds.Growth)]
 public sealed class DomainAccessJourney
 {
     [ProtoTest]

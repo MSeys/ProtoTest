@@ -78,6 +78,36 @@ public sealed class SqlConnectionFailureTests
     }
 
     [Test]
+    public async Task CancelledScopeStart_ShouldAbortAStalledConnectionOpen()
+    {
+        // The SQL entry point for every runner adapter is ProtoTestScope.StartAsync: the token must
+        // reach the connection open through it, not only through a hand-written StartTestAsync call.
+        var connection = new FailingDbConnection { StallOpen = true };
+        await using var host = new ProtoHostBuilder().AddSql(_ => connection).Build();
+        await host.StartAsync();
+        var preparation = ProtoTestAdapter.Prepare(TestMethods.Placeholder, host);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
+        var stopwatch = Stopwatch.StartNew();
+
+        Assert.CatchAsync<OperationCanceledException>(
+            async () => await ProtoTestScope.StartAsync(preparation, host, null, cancellation.Token));
+        stopwatch.Stop();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(3)),
+                "the stalled open ends when the adapter's token fires");
+            Assert.That(connection.IsDisposed, Is.True,
+                "a connection whose open was cancelled is still owned and must be released during teardown");
+            Assert.That(host.Trace.Snapshot().Tests.Single().Entries,
+                Has.Some.Matches<ProtoTraceEntry>(entry =>
+                    entry.Kind == "sql.connection.open" && entry.Outcome == ProtoTraceOutcome.Cancelled),
+                "the cancelled open is recorded as a cancelled operation");
+        }
+        await host.StopAsync();
+    }
+
+    [Test]
     public async Task CancelledSetup_ShouldAbortAStalledTransactionBegin()
     {
         var connection = new FailingDbConnection { StallBegin = true };

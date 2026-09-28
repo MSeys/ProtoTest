@@ -84,6 +84,47 @@ internal sealed class ProtoRunLifecycle
             }
         }
 
+        // The target resolutions decided while the host was built: the trace states each target's
+        // winner, its keys and why every other provider lost, before any piece starts. A target with
+        // no provider available never reached this run; the build failed naming its candidates.
+        if (_services.GetService<ProtoTargetResolutions>() is { Targets.Count: > 0 } targetResolutions)
+        {
+            foreach (var resolution in targetResolutions.Targets)
+            {
+                _trace.RunWriter.WriteEvent(
+                    ProtoTargetTrace.Resolved,
+                    $"Resolved · {resolution.TargetName}",
+                    "ProtoTest.Core",
+                    phase: ProtoTracePhase.Run,
+                    outcome: ProtoTraceOutcome.Succeeded,
+                    attributes: new Dictionary<string, string?>
+                    {
+                        ["environment.target"] = resolution.TargetName,
+                        ["environment.keys"] = string.Join(", ", resolution.Keys),
+                        ["environment.provider"] = resolution.Winner.Name,
+                        ["environment.skipped"] = string.Join(
+                            "; ",
+                            resolution.Skipped.Select(skip => $"{skip.Provider.Name}: {skip.Reason}"))
+                    });
+
+                foreach (var skip in resolution.Skipped)
+                {
+                    _trace.RunWriter.WriteEvent(
+                        ProtoTargetTrace.ProviderSkipped,
+                        $"Skipped · {resolution.TargetName} · {skip.Provider.Name}",
+                        "ProtoTest.Core",
+                        phase: ProtoTracePhase.Run,
+                        outcome: ProtoTraceOutcome.Skipped,
+                        attributes: new Dictionary<string, string?>
+                        {
+                            ["environment.target"] = resolution.TargetName,
+                            ["environment.provider"] = skip.Provider.Name,
+                            ["environment.reason"] = skip.Reason
+                        });
+                }
+            }
+        }
+
         // Infrastructure starts before any test: the run owns it, records it, and lets an in-process
         // application receive the connection strings as host settings. Hosts built without the builder
         // (tests, embedded use) simply have none.
@@ -91,7 +132,7 @@ internal sealed class ProtoRunLifecycle
         var configuration = _services.GetService<IConfiguration>() ?? new ConfigurationBuilder().Build();
         var timeProvider = _services.GetService<TimeProvider>() ?? new ProtoTestTimeProvider(_clock);
         var readinessOptions = _services.GetService<ProtoReadinessOptions>();
-        var skippedInfrastructure = _services.GetService<ProtoSkippedInfrastructure>()?.Ids;
+        var skippedInfrastructure = _services.GetService<ProtoSkippedInfrastructure>()?.Reasons;
         var registrations = _services.GetServices<ProtoInfrastructureRegistration>().ToArray();
         var inProcessServers = _services.GetServices<ProtoCapabilityDescriptor>()
             .Where(capability => string.Equals(capability.Kind, ProtoCapabilityKinds.Server, StringComparison.Ordinal)
@@ -103,10 +144,11 @@ internal sealed class ProtoRunLifecycle
             var registration = registrations[index];
             var infrastructure = registration.Infrastructure;
 
-            if (skippedInfrastructure is not null && skippedInfrastructure.Contains(infrastructure.Id))
+            if (skippedInfrastructure is not null
+                && skippedInfrastructure.TryGetValue(infrastructure.Id, out var skipReason))
             {
-                // Every address this piece would fill is already configured; starting it would
-                // shadow the environment's values, so the run records it as skipped, not owned.
+                // The piece is not needed: every address it would fill is already configured, or an
+                // earlier provider serves its target. It is recorded as skipped, never owned.
                 _trace.RunWriter.SetEntityState(
                     infrastructure.Kind,
                     infrastructure.Id,
@@ -116,7 +158,7 @@ internal sealed class ProtoRunLifecycle
                         ["infrastructure.kind"] = infrastructure.Kind,
                         ["infrastructure.settings"] = string.Join(", ", registration.Settings),
                         ["infrastructure.state"] = "skipped",
-                        ["infrastructure.reason"] = "already configured"
+                        ["infrastructure.reason"] = skipReason
                     },
                     scope: "run",
                     change: "skipped");
@@ -130,7 +172,7 @@ internal sealed class ProtoRunLifecycle
             for (var later = index + 1; later < registrations.Length; later++)
             {
                 if (skippedInfrastructure is not null
-                    && skippedInfrastructure.Contains(registrations[later].Infrastructure.Id))
+                    && skippedInfrastructure.ContainsKey(registrations[later].Infrastructure.Id))
                 {
                     continue;
                 }

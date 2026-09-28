@@ -12,7 +12,9 @@ public sealed class WebSessionConfigurationTests
     {
         var builder = new ProtoHostBuilder();
         builder.AddWeb(options => options.InstallBrowsers = true);
-        builder.AddInfrastructure(new FakeSettingsInfrastructure());
+        builder.AddInfrastructure(
+            "application",
+            chain => chain.Use(new ProtoTargetProvider("settings", new FakeSettingsInfrastructure())));
         await using var host = builder.Build();
         await host.StartAsync();
         var context = await host.StartTestAsync("web base url", TestMethods.Placeholder);

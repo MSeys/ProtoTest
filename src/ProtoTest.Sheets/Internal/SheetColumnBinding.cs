@@ -14,6 +14,5 @@ internal sealed record SheetColumnBinding(PropertyInfo Property, int Number, Col
     public bool Optional => Attribute.Optional;
 
     /// <summary>Whether the property can hold an empty cell: a reference type or a nullable value type.</summary>
-    public bool IsNullable
-        => !Property.PropertyType.IsValueType || Nullable.GetUnderlyingType(Property.PropertyType) is not null;
+    public bool IsNullable => SheetCellValue.IsNullable(Property.PropertyType);
 }

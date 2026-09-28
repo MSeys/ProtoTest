@@ -51,8 +51,15 @@ public sealed class WorkerHostTests
                 ["Worker:Value"] = "from-config",
                 ["Worker:FromConfig"] = "config-only"
             }));
-        builder.AddInfrastructure(new FakeBroker(), "ConnectionStrings:WorkerProbe");
-        builder.AddInfrastructure(new FakeSettings());
+        builder.AddInfrastructure(
+            "WorkerBroker",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider("fake", new FakeBroker())),
+            "ConnectionStrings:WorkerProbe");
+        builder.AddInfrastructure(
+            "WorkerSettings",
+            chain => chain.Use(new ProtoTargetProvider("fake", new FakeSettings())));
         builder.AddWorkerHost<Program>("Configured", options => options.Set("Worker:Value", "from-suite"));
         await using var host = builder.Build();
         await host.StartAsync();
@@ -90,8 +97,15 @@ public sealed class WorkerHostTests
                 ["Worker:FromRun"] = "from-config",
                 ["Worker:Probe"] = "from-suite"
             }));
-        builder.AddInfrastructure(new FakeBroker(), "ConnectionStrings:WorkerProbe");
-        builder.AddInfrastructure(new FakeSettings());
+        builder.AddInfrastructure(
+            "WorkerBroker",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider("fake", new FakeBroker())),
+            "ConnectionStrings:WorkerProbe");
+        builder.AddInfrastructure(
+            "WorkerSettings",
+            chain => chain.Use(new ProtoTargetProvider("fake", new FakeSettings())));
         builder.AddWorkerHost<Program>("MainCapture", options => options.Set("Worker:Value", "a b=c;d"));
         await using var host = builder.Build();
 

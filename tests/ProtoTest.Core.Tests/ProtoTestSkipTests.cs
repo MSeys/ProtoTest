@@ -41,6 +41,30 @@ public sealed class ProtoTestSkipTests
     }
 
     [Test]
+    public async Task RequiresTestClock_ShouldCheckTheClockCapability()
+    {
+        var withClock = new ProtoHostBuilder();
+        withClock.AddCapability(new ProtoCapabilityDescriptor("Test clock", ProtoCapabilityKinds.Clock, "tests")
+        {
+            Instance = "Api"
+        });
+        await using var clocked = withClock.Build();
+        await using var unclocked = new ProtoHostBuilder().Build();
+
+        var attribute = new RequiresTestClockAttribute();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(attribute.GetSkipReason(clocked), Is.Null);
+            Assert.That(
+                attribute.GetSkipReason(unclocked),
+                Does.Contain("test clock"),
+                "the gate names what is missing and why the environment cannot serve it");
+            Assert.That(attribute.GetSkipReason(unclocked), Does.Contain("published"));
+        }
+    }
+
+    [Test]
     public async Task RequiresWorker_ShouldCheckTheProgramAssemblyCapability()
     {
         var builder = new ProtoHostBuilder();

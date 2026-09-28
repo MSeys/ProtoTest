@@ -15,8 +15,9 @@ using ProtoTest.Core;
 public static class ProtoHostBuilderExtensions
 {
     // First registration wins per server name: a helper invoked twice cannot start the same server twice,
-    // while a different name still composes. The marker is added only after the registration succeeded.
-    private static readonly ConditionalWeakTable<IProtoHostBuilder, HashSet<string>> RegisteredServers = new();
+    // while a different name still composes. A repeated name for a different program is a conflict, not
+    // a duplicate; the entry is added only after the registration succeeded.
+    private static readonly ConditionalWeakTable<IProtoHostBuilder, Dictionary<string, Type>> RegisteredServers = new();
 
     /// <summary>
     /// Registers an ASP.NET Core application under test into the ProtoTest execution pipeline.
@@ -41,10 +42,19 @@ public static class ProtoHostBuilderExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (!Enum.IsDefined(lifetime)) throw new ArgumentOutOfRangeException(nameof(lifetime));
 
-        var serverNames = RegisteredServers.GetValue(builder, static _ => new HashSet<string>(StringComparer.Ordinal));
-        if (serverNames.Contains(name))
+        var serverPrograms = RegisteredServers.GetValue(builder, static _ => new Dictionary<string, Type>(StringComparer.Ordinal));
+        if (serverPrograms.TryGetValue(name, out var registeredProgram))
         {
-            return builder;
+            if (registeredProgram == typeof(TProgram))
+            {
+                // A repeated registration of the same server under one name is the same lifecycle.
+                return builder;
+            }
+
+            // A dropped duplicate that is a different program is a silent wrong state, not a no-op.
+            throw new InvalidOperationException(
+                $"A server named '{name}' is already registered for {registeredProgram.FullName}; " +
+                $"register {typeof(TProgram).FullName} under a different name instead.");
         }
 
         // Registered through a factory so the host's service provider disposes the shared server with the run.
@@ -55,7 +65,7 @@ public static class ProtoHostBuilderExtensions
             RegisterApplicationServices<TProgram>(services, name);
         });
         // The name is claimed only once the registration succeeded, so a failed call leaves no guard.
-        serverNames.Add(name);
+        serverPrograms.Add(name, typeof(TProgram));
         // When the environment configures the application's address, the server steps aside at test
         // time; the capability must step aside with it instead of advertising an in-process server.
         // The server's name is the capability's instance: configuring A must not drop B's capability.
@@ -88,11 +98,7 @@ public static class ProtoHostBuilderExtensions
         if (!Enum.IsDefined(lifetime)) throw new ArgumentOutOfRangeException(nameof(lifetime));
 
         var name = application.ApplicationName;
-        application.Services.AddSingleton<IProtoClientInitializer>(_ =>
-            new AspNetCoreClientInitializer<TProgram>(name, configureWebHost, configureClientOptions, lifetime));
-        // The application's HTTP clients with no configured base reuse this transport.
-        application.Services.TryAddSingleton(new ProtoApplicationTransport(name, name));
-        RegisterApplicationServices<TProgram>(application.Services, name);
+        RegisterInProcessApplication<TProgram>(application.Services, name, configureWebHost, configureClientOptions, lifetime);
         return application.AddCapabilityUnlessConfigured(
             new ProtoCapabilityDescriptor("ASP.NET Core", ProtoCapabilityKinds.Server, "ProtoTest.AspNetCore")
             {
@@ -100,6 +106,83 @@ public static class ProtoHostBuilderExtensions
             },
             $"ProtoTest:Applications:{name}:BaseUrl");
     }
+
+    /// <summary>
+    /// Adds the in-process provider to the application's chain: when it wins, the application runs on
+    /// an in-process ASP.NET Core test server and declares the honest <c>server</c> and <c>clock</c>
+    /// capabilities, so <c>[RequiresInProcess]</c> and <c>[RequiresTestClock]</c> gate exactly the runs
+    /// it serves. Put it last in a chain whose earlier providers serve the environment.
+    /// </summary>
+    /// <remarks>
+    /// The server, its transport and the keyed application services register while the host is built,
+    /// for the winning provider only: an application served by a configured address, a loopback
+    /// listener or an AppHost resource runs no test server and no second client.
+    /// </remarks>
+    public static IProtoApplicationBuilder UseInProcess<TProgram>(
+        this IProtoApplicationBuilder application,
+        Action<IWebHostBuilder>? configureWebHost = null,
+        Action<WebApplicationFactoryClientOptions>? configureClientOptions = null,
+        AspNetCoreServerLifetime lifetime = AspNetCoreServerLifetime.PerRun) where TProgram : class
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        if (!Enum.IsDefined(lifetime)) throw new ArgumentOutOfRangeException(nameof(lifetime));
+
+        var name = application.ApplicationName;
+        application.Providers.Use(new ProtoTargetProvider(InProcessProviderName)
+        {
+            Capabilities =
+            [
+                new ProtoCapabilityDescriptor("ASP.NET Core", ProtoCapabilityKinds.Server, "ProtoTest.AspNetCore")
+                {
+                    Instance = name
+                },
+                new ProtoCapabilityDescriptor("Test clock", ProtoCapabilityKinds.Clock, "ProtoTest.AspNetCore")
+                {
+                    Instance = name
+                }
+            ],
+            WinnerServices = services => RegisterInProcessApplication<TProgram>(
+                services, name, configureWebHost, configureClientOptions, lifetime)
+        });
+        return application;
+    }
+
+    /// <summary>
+    /// Adds the loopback provider to the application's chain: when it wins, the run starts the
+    /// hand-built application on its own loopback listener and publishes the bound address as the
+    /// application's <c>BaseUrl</c>. The application is a real process boundary, so the winner
+    /// declares no <c>server</c> and no <c>clock</c>: <c>[RequiresInProcess]</c> and
+    /// <c>[RequiresTestClock]</c> skip, and the readiness probe waits for the published address.
+    /// </summary>
+    public static IProtoApplicationBuilder UseLoopback(
+        this IProtoApplicationBuilder application,
+        Func<string[], WebApplication> createApp)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(createApp);
+
+        var name = application.ApplicationName;
+        application.Providers.Use(new ProtoTargetProvider(
+            "loopback",
+            new LoopbackApplicationInfrastructure(name, createApp)));
+        return application;
+    }
+
+    private static void RegisterInProcessApplication<TProgram>(
+        IServiceCollection services,
+        string name,
+        Action<IWebHostBuilder>? configureWebHost,
+        Action<WebApplicationFactoryClientOptions>? configureClientOptions,
+        AspNetCoreServerLifetime lifetime) where TProgram : class
+    {
+        services.AddSingleton<IProtoClientInitializer>(_ =>
+            new AspNetCoreClientInitializer<TProgram>(name, configureWebHost, configureClientOptions, lifetime));
+        // The application's HTTP clients with no configured base reuse this transport.
+        services.TryAddSingleton(new ProtoApplicationTransport(name, name));
+        RegisterApplicationServices<TProgram>(services, name);
+    }
+
+    private const string InProcessProviderName = "in-process";
 
     /// <summary>
     /// Registers the per-test scope over the application's container under the server's name, so
@@ -145,6 +228,10 @@ public static class ProtoHostBuilderExtensions
         ArgumentNullException.ThrowIfNull(createApp);
 
         var loopback = new LoopbackApplicationInfrastructure(applicationName, createApp);
+        // This compatibility registration keeps the all-configured skip rule; the replacement for a
+        // caller is the application chain's UseLoopback, and the stage pins this method's behavior.
+#pragma warning disable CS0618
         return builder.AddInfrastructure(loopback, loopback.BaseUrlKey);
+#pragma warning restore CS0618
     }
 }

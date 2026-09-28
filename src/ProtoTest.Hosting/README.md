@@ -10,6 +10,7 @@ dotnet add package ProtoTest.Hosting
 ## Includes
 
 - Registration through `AddWorkerHost<TProgram>()`; the suite runs the worker's own entry point.
+- Nested workers: `AddApplication(...).AddWorkerHost<TProgram>("Billing")` follows the application's provider chain - `UseEnvironment()` leaves the worker to the environment that runs the application, `UseHost()` hosts it in this process and bridges the test clock.
 - Run-scoped lifetime: started after the infrastructure registered before it, stopped with the run.
 - The suite's configuration, the run's settings - container connection strings and settings
   infrastructure values - and `AddWorkerHost` options reach the worker's normal configuration, in that
@@ -21,8 +22,11 @@ dotnet add package ProtoTest.Hosting
 ## Limits
 
 - In-process only: a suite running against a published environment has no worker to start. Skip those
-  tests with `[RequiresCapability(ProtoCapabilityKinds.Worker)]`.
+  tests with `[RequiresCapability(ProtoCapabilityKinds.Worker)]` - or nest the worker under its
+  application, where `UseEnvironment()` decides from the application's winner and starts nothing.
 - One worker instance per run; the run's state is shared between tests.
+- Only a hosted worker (`UseHost()`) declares the `clock` capability and resolves
+  `Proto.Context.Host<TProgram>()`; a worker the environment runs declares `worker` only.
 - The worker's `Run()` never runs; the suite starts and stops its host.
 - A parameterless `Main`, or one that builds its host without passing `args`, reads the overlay only
   when the host is built; options factories and hosted services still see it.

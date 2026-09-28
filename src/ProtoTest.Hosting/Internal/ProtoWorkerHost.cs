@@ -46,6 +46,26 @@ internal sealed class ProtoWorkerHost<TProgram> : IProtoConfiguredInfrastructure
     /// <summary>Completes the constructor with the resolver-built host factory.</summary>
     public void UseFactory(Func<string[], object> factory) => _factory = factory;
 
+    /// <summary>
+    /// Creates the piece and resolves the host factory its entry point needs; a worker assembly
+    /// without a host-building entry point fails here, naming the requirement.
+    /// </summary>
+    internal static ProtoWorkerHost<TProgram> Create(
+        string name,
+        ProtoWorkerOptions options,
+        ProtoWorkerRegistry registry)
+    {
+        var worker = new ProtoWorkerHost<TProgram>(name, options, registry);
+        var factory = HostFactoryResolver.ResolveHostFactory(
+            typeof(TProgram).Assembly,
+            configureHostBuilder: worker.ConfigureBuilder)
+            ?? throw new InvalidOperationException(
+                $"No host factory could be resolved for {typeof(TProgram).FullName}. The worker assembly needs an " +
+                "entry point that builds an IHost (Host.CreateApplicationBuilder or Host.CreateDefaultBuilder).");
+        worker.UseFactory(factory);
+        return worker;
+    }
+
     /// <inheritdoc />
     public ValueTask StartAsync(ProtoInfrastructureContext context, CancellationToken cancellationToken = default)
         => StartCoreAsync(context, cancellationToken);

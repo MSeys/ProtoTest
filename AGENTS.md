@@ -12,9 +12,9 @@ This file is the operating contract for contributors and coding agents working i
    item. The process records — plans, audits, handoffs, reviews — live in the private `records`
    checkout at `assets/internal/records/` (a separate git repository); a contributor without that
    checkout uses the public docs and `CONTRIBUTING.md`.
-2. `eng/facts/architecture.md`, `recipes.md`, `gotchas.md` — the model, the way to add things, the
-   known traps; `assets/internal/records/dx-review.md` — the API/DX consistency register (public
-   surface follows it, or the register is updated with the reason).
+2. `assets/internal/records/facts/architecture.md`, `recipes.md`, `gotchas.md` — the model, the way to
+   add things, the known traps; `assets/internal/records/dx-review.md` — the API/DX consistency
+   register (public surface follows it, or the register is updated with the reason).
 3. `assets/internal/records/audit-plan-4.md` — the closed audit; `audit-plan-5.md` — the open one when
    it exists; `plan-5.md`/`plan-4.md` — scope and binding decisions; `feature-plan.md` — feature scope.
 4. `assets/internal/records/handoff-template.md` — the handoff you write before stopping.
@@ -29,7 +29,7 @@ This file is the operating contract for contributors and coding agents working i
    `ProtoFlow`/`ProtoReadiness` for waits, `ProtoInfrastructureRegistration` for run pieces,
    `ProtoCapabilityDescriptor` for capabilities, `ProtoTraceEntityKinds`/protocol descriptors for
    vocabulary, `ProtoMetadataRedaction`/`JsonDiagnosticSanitizer` for redaction, `AdapterContract` for
-   adapter compliance. `recipes.md` names the canonical example for each kind of change.
+   adapter compliance. `facts/recipes.md` names the canonical example for each kind of change.
 3. **Honest capabilities and honest docs.** A capability is declared only by something that can serve
    it; an integration whose address is missing becomes inert and its capability is absent. Never
    advertise what does not exist — not in docs, READMEs, the site or the roadmap.
@@ -41,22 +41,25 @@ This file is the operating contract for contributors and coding agents working i
 6. **Public surface is additive in 1.x.** Accidental-public plumbing may change with a changelog
    entry. A breaking consumer API change needs a plan decision first.
 7. **Update the facts with the code.** A lifecycle, registration, capability, address, vocabulary or
-   ownership change updates the owning `eng/facts/` file in the same commit. `CHANGELOG.md` and the
-   docs Limits sections move with the behavior.
+   ownership change updates the owning `facts/` file in the records checkout, in the same commit.
+   `CHANGELOG.md` and the docs Limits sections move with the behavior.
 8. **Stop at the stage boundary.** If a stage grows past its checklist, stop, write the handoff, and
    let the next session pick it up. Do not absorb a second stage into one session.
 9. **Comments explain the code as it stands.** No audit IDs, plan items or record-file references in
-   source comments; the tracked `eng/facts/` files carry the history.
+   source comments; the `facts/` files in the private records checkout carry the history.
 
 ## Workflow
 
 1. Pick the next unchecked item in the records plan of record (`assets/internal/records/plan-6.md`;
    after C4, `plan-5.md` Phase 4).
-2. Check `gotchas.md` for the area; read the canonical example for the recipe.
+2. Check `facts/gotchas.md` for the area; read the canonical example for the recipe.
 3. For a deliberate behavior change: pin the current behavior with a test, then change it, then flip
    the test.
 4. Run the gates; fix everything before claiming the stage.
-5. Commit one stage: code + tests + docs + changelog + facts together, message naming the plan item.
+5. Commit one stage: code + tests + docs + changelog + facts together. The title is
+   `Feature - <Part> - <short description>` or `Bug - <Part> - <short description>` (a docs-only or
+   tooling stage uses `Docs` or `Tooling`); a 1-3 line body names the plan item and the evidence.
+   Changelog entries follow the same shape (`RELEASING.md`).
 6. Update the plan row with the evidence line. If stopping, write the handoff.
 
 ## Orchestrated sessions (worker cycle)
@@ -68,7 +71,7 @@ When a controller session runs workers:
 2. A worker never commits and never starts a second stage; a worker that cannot finish writes the
    handoff from `assets/internal/records/handoff-template.md` and stops.
 3. The controller verifies the worker's gate line and diff, then runs the consistency pass: naming and
-   API shape against `eng/facts/recipes.md` and `assets/internal/records/dx-review.md` (a public surface
+   API shape against `facts/recipes.md` and `assets/internal/records/dx-review.md` (a public surface
    follows the recorded idiom, or the register is updated with the reason), and facts/plan/changelog
    updates in the same commit.
 4. A stage that changes the public surface also gets an independent review worker before the controller
@@ -109,11 +112,11 @@ Do not commit with a red gate, and do not describe a gate as green without the c
 - Consumers resolve ProtoTest packages from the local feed produced by `eng/pack.ps1` with
   package-source mapping, and clear `~/.nuget/packages/prototest.*` after a repack.
 - `assets/internal/` is gitignored scratch; its `records/` subdirectory is a private git repository
-  holding the process records (plan of record, audits, handoffs, reviews). Engineering facts that the
-  code evolves with live in the tracked `eng/facts/`.
+  holding the process records (plan of record, audits, handoffs, reviews) and the engineering facts
+  the code evolves with (`facts/`).
 
 ## If you are unsure
 
-Search the canonical example first (`recipes.md`), then the audit and plans. If the answer is not in
+Search the canonical example first (`facts/recipes.md`), then the audit and plans. If the answer is not in
 the repo, ask the user rather than inventing a parallel mechanism — the audits exist because that
 invented mechanism is the most expensive failure mode this codebase has.

@@ -51,6 +51,8 @@ builder.AddSql(
 
 With at least one key declared, `AddSql` declares the `SQL` store capability only while one of them can provide a connection — a configured value, or a key a registered container declares and fills. When none can, the integration is inert: the connection is not opened during setup, and `Proto.Context.Sql()`, `SqlConnection()` and `SqlTransaction()` throw naming the missing keys and the `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate. `AddressKeys` is a code API — a `SqlAddressKeys` set that only `Add` (or a `SqlOptions` instance registered before `AddSql`) fills. No configuration section binds it, because the capability decision is made when the host is built and a key that only configuration knows could not have promised the connection the decision was made against. It is empty by default, which keeps the capability unconditional and the factory owning the address.
 
+A sibling access technology that wants the same honest capability shares the rule instead of re-deriving it: `SqlAddressRule.DeclaredKeys(services)` returns the keys the first `AddSql` recorded, so a package registers its own store capability with `AddCapabilityWhenProvided` over them, and `SqlAddressRule.IsInert(context, options)` (or `ThrowIfInert`) applies the same decision at use time. `AddEntityFrameworkCore` is the shipped example; a Dapper or raw ADO.NET package follows the same shape.
+
 ## Isolation
 
 `SqlIsolation` has two modes:
@@ -122,7 +124,10 @@ After the connection hook has opened the connection and begun the transaction, t
 ## PostgreSQL container
 
 ```csharp
-builder.AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar");
+builder.AddInfrastructure(
+    "NorthstarDatabase",
+    chain => chain.UseContainer(PostgresDatabase.Container()),
+    "ConnectionStrings:Northstar");
 ```
 
 [Infrastructure](../../foundation/infrastructure.md) is started by the host before the run and released after it stops; the container's started connection string fills every key you list. Tests read the value from `ProtoInfrastructureSettings`:
@@ -142,7 +147,10 @@ A container database starts empty, and the schema must exist before the first te
 
 ```csharp
 builder
-    .AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Orders")
+    .AddInfrastructure(
+        "OrdersDatabase",
+        chain => chain.UseContainer(PostgresDatabase.Container()),
+        "ConnectionStrings:Orders")
     .AddSql(
         provider => new NpgsqlConnection(ResolveDatabase(provider, "ConnectionStrings:Orders")),
         sql => sql.AddressKeys.Add("ConnectionStrings:Orders"))
@@ -179,7 +187,12 @@ The sample suite composes its own domain over the connection ProtoTest owns, exc
 ```csharp
 if (usePostgres)
 {
-    builder.AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar");
+    builder.AddInfrastructure(
+        "NorthstarDatabase",
+        chain => chain
+            .UseConfigured()
+            .UseContainer(PostgresDatabase.Container()),
+        "ConnectionStrings:Northstar");
 }
 
 builder
@@ -216,7 +229,7 @@ With `AddressKeys` declared and none of them provided, the `SQL` capability is a
 - **The guard only sees registered applications.** An application hosted without `AddApplication` cannot be detected, so nothing fails the run if it writes outside the transaction.
 - **`AddSql` is once per host.** A second call is a no-op rather than layering a second connection: the first registration's factory and options win, matching [repeated registration](../../getting-started/configuration.md#repeated-registration).
 - **A rollback failure still disposes everything.** The transaction and the connection are disposed in their own `finally` blocks even when rollback throws; the release failure is aggregated like any other teardown failure.
-- **The connect timeout is provider-owned.** The connection open and transaction begin observe `ProtoExecutionContext.CancellationToken` when the caller supplied one to `StartTestAsync`; no runner adapter supplies one yet, so runner-driven setup runs until the provider's own connect timeout (Npgsql's default, or `Connect Timeout` in the connection string) ends it.
+- **The connect timeout is provider-owned.** The connection open and transaction begin observe `ProtoExecutionContext.CancellationToken`: a caller that passed one to `StartTestAsync`, or the runner's own token where its adapter has one (NUnit's test context token via `[CancelAfter]`, the xUnit v2 runner's `CancellationTokenSource`). MSTest, xUnit v3 and TUnit expose no token, so those runner-driven tests fall back to the provider's own connect timeout (Npgsql's default, or `Connect Timeout` in the connection string) ending the wait.
 - **No automatic migration or database creation.** ProtoTest never creates or migrates a schema by itself. When the run owns the database, create the schema once with [`AddRunSetup`](#run-owned-schema): a test body or hook runs inside the rolled-back transaction, so `EnsureCreated`/`Migrate` there disappears with the test. A deployed environment keeps its own schema.
 
 ## Links

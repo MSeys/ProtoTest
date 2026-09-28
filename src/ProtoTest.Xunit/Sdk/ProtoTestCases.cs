@@ -284,7 +284,8 @@ internal sealed class ProtoXunitTestRunner : XunitTestRunner
         ProtoTestScope scope;
         try
         {
-            scope = await ProtoTestScope.StartAsync(_preparation, host, Xunit2AttachmentPublisher.Instance);
+            scope = await ProtoTestScope.StartAsync(
+                _preparation, host, Xunit2AttachmentPublisher.Instance, CancellationTokenSource.Token);
         }
         catch (Exception exception)
         {

@@ -162,11 +162,7 @@ internal sealed class ProtoTestLifecycle
                     state.Context!,
                     "attribute.before",
                     $"Before · {attribute.GetType().Name}",
-                    new Dictionary<string, string?>
-                    {
-                        ["attribute.type"] = attribute.GetType().FullName,
-                        ["attribute.order"] = attribute.Order.ToString()
-                    },
+                    Describe(attribute),
                     () => attribute.BeforeTestAsync(state.Context!),
                     () => state.CompletedAttributes.Add(attribute));
             }
@@ -218,6 +214,27 @@ internal sealed class ProtoTestLifecycle
                 onCompleted();
             });
 
+    /// <summary>
+    /// The trace facts every attribute step carries; a composite also names what it expanded to, so
+    /// the run shows the declarations behind it.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string?> Describe(ProtoAttribute attribute)
+    {
+        var description = new Dictionary<string, string?>
+        {
+            ["attribute.type"] = attribute.GetType().FullName,
+            ["attribute.order"] = attribute.Order.ToString()
+        };
+        if (attribute is ProtoCompositeAttribute composite)
+        {
+            description["attribute.composed"] = string.Join(
+                ", ",
+                composite.ComposedAttributes.Select(composed => composed.GetType().Name));
+        }
+
+        return description;
+    }
+
     private static async Task TeardownAsync(
         ProtoTestLifecycleState state,
         List<Exception> exceptions,
@@ -260,11 +277,7 @@ internal sealed class ProtoTestLifecycle
                     $"After · {current.GetType().Name}",
                     "ProtoTest.Core",
                     phase,
-                    new Dictionary<string, string?>
-                    {
-                        ["attribute.type"] = current.GetType().FullName,
-                        ["attribute.order"] = current.Order.ToString()
-                    }),
+                    Describe(current)),
                 _ => new ValueTask(current.AfterTestAsync(context)));
         }
 

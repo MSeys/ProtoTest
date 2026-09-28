@@ -98,10 +98,11 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     public MethodInfo TestMethod { get; }
 
     /// <summary>
-    /// Gets the token for this test's lifecycle. The caller that started the test supplies it
-    /// (<c>StartTestAsync(..., cancellationToken)</c>); no runner adapter supplies one yet, so a
-    /// runner-driven test sees <see cref="CancellationToken.None"/>. Setup I/O that can observe it -
-    /// the SQL connection open and transaction begin - passes it to the provider.
+    /// Gets the token for this test's lifecycle: the token a caller passed to
+    /// <c>StartTestAsync(..., cancellationToken)</c>, or the runner's own token where its adapter has
+    /// one (NUnit's test context, the xUnit v2 runner). MSTest, xUnit v3 and TUnit expose no token,
+    /// so those adapters start with <see cref="CancellationToken.None"/>. Setup I/O that can observe
+    /// it - the SQL connection open and transaction begin - passes it to the provider.
     /// </summary>
     public CancellationToken CancellationToken { get; }
 
@@ -383,6 +384,12 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     /// client entity the configuration was recorded on.
     /// </summary>
     internal string? TryClientName(object client) => _clients.FindName(client);
+
+    /// <summary>
+    /// The names clients of the type are registered under for this test, in registration order; used by
+    /// name resolution to complete a bare name from a uniquely named client.
+    /// </summary>
+    internal IReadOnlyList<string> RegisteredClientNames(Type clientType) => _clients.Names(clientType);
 
     /// <summary>The registered clients in registration order; used by the completion phase.</summary>
     internal IReadOnlyList<object> RegisteredClients => _clients.Snapshot();

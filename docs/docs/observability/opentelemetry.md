@@ -81,7 +81,7 @@ Because operations are real `Activity` instances, `HttpClient`'s standard W3C tr
 - **No exporter included.** Subscribing is one `AddSource` call; install the exporter you want, as above.
 - **Large values stay out of spans.** Values longer than 2,048 characters and the structured keys `context.value`, `observation.data`, `observation.metadata`, `shape.expected`, `shape.actual`, `shape.matches` and `shape.mismatches` exist only in `.prototrace`. The same cap applies to spans captured from your application.
 - **The `.prototrace` archive is unaffected.** Tracing stays on by default and remains the complete record; OpenTelemetry is a second consumer of the same operations.
-- **Propagation into the application is expected, not proven.** The end-to-end W3C path is not covered by the repository's tests.
+- **Propagation reaches an in-process application; an out-of-process one is the environment's.** The HTTP client handler and the raw-request transport inject `traceparent` from the current test's W3C context (pinned by `ClientHandlerTests`), and the configured activity sources capture the application's own spans into the same trace. An application running as its own process joins the trace only when that environment propagates OpenTelemetry context.
 
 ## Links
 

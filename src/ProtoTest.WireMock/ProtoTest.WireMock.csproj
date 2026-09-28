@@ -20,6 +20,11 @@
     <ProjectReference Include="..\ProtoTest.Http\ProtoTest.Http.csproj" />
     <ProjectReference Include="..\ProtoTest.Rest\ProtoTest.Rest.csproj" />
     <PackageReference Include="WireMock.Net" />
+    <!-- WireMock.Net's Handlebars helpers ask for the Humanizer metapackage from 2.14.1 up; pinning
+         the resolved line to 3.0.10 aligns its satellite set with the Humanizer.Core 3.0.10 that
+         Aspire.Hosting restores, so a suite using ProtoTest.Aspire and ProtoTest.WireMock together
+         restores one Humanizer line. -->
+    <PackageReference Include="Humanizer" />
   </ItemGroup>
 
 </Project>

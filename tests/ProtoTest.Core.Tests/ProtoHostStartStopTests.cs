@@ -15,7 +15,7 @@ public sealed class ProtoHostStartStopTests
         builder.ConfigureTracing(options => options.Enabled = false);
         builder.ConfigureServices(services => services.AddSingleton<IProtoRunHook>(hook));
         builder.AddCapability(new ProtoCapabilityDescriptor("Stub", "protocol", "Tests"));
-        builder.AddInfrastructure(infrastructure);
+        builder.AddInfrastructure("once", chain => chain.Use(new ProtoTargetProvider(infrastructure.Id, infrastructure)));
         await using var host = builder.Build();
 
         await host.StartAsync();
@@ -98,8 +98,8 @@ public sealed class ProtoHostStartStopTests
         var second = new TrackingInfrastructure("second", failuresBeforeStart: 1);
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
-        builder.AddInfrastructure(first);
-        builder.AddInfrastructure(second);
+        builder.AddInfrastructure("first", chain => chain.Use(new ProtoTargetProvider(first.Id, first)));
+        builder.AddInfrastructure("second", chain => chain.Use(new ProtoTargetProvider(second.Id, second)));
         await using var host = builder.Build();
 
         var exception = Assert.ThrowsAsync<InvalidOperationException>(async () => await host.StartAsync());
@@ -132,7 +132,7 @@ public sealed class ProtoHostStartStopTests
         var failing = new TrackingInfrastructure("failing", failuresBeforeStart: 1, failuresBeforeRelease: 1);
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.Enabled = false);
-        builder.AddInfrastructure(failing);
+        builder.AddInfrastructure("failing", chain => chain.Use(new ProtoTargetProvider(failing.Id, failing)));
         await using var host = builder.Build();
 
         Assert.CatchAsync(async () => await host.StartAsync());
@@ -163,7 +163,11 @@ public sealed class ProtoHostStartStopTests
             var builder = new ProtoHostBuilder();
             builder.AddSink(sink);
             builder.ConfigureTracing(options => options.OutputPath = output);
-            builder.AddInfrastructure(new TrackingInfrastructure("failing", failuresBeforeStart: 1));
+            builder.AddInfrastructure(
+                "failing",
+                chain => chain.Use(new ProtoTargetProvider(
+                    "failing",
+                    new TrackingInfrastructure("failing", failuresBeforeStart: 1))));
             await using var host = builder.Build();
 
             // Act
@@ -210,7 +214,11 @@ public sealed class ProtoHostStartStopTests
                 services.AddSingleton<IProtoRunHook>(first);
                 services.AddSingleton<IProtoRunHook>(second);
             });
-            builder.AddInfrastructure(new TrackingInfrastructure("failing", failuresBeforeStart: 1));
+            builder.AddInfrastructure(
+                "failing",
+                chain => chain.Use(new ProtoTargetProvider(
+                    "failing",
+                    new TrackingInfrastructure("failing", failuresBeforeStart: 1))));
             await using var host = builder.Build();
 
             // Act

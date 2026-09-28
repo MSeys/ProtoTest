@@ -39,7 +39,9 @@ public sealed class PostBuildRegistrationTests
                 () => builder.AddCapabilityUnlessConfigured(capability, "Late:Key")),
             Assert.Throws<InvalidOperationException>(() => builder.ConfigureClock(new ProtoClock())),
             Assert.Throws<InvalidOperationException>(() => builder.AddSink(new CountingSink())),
-            Assert.Throws<InvalidOperationException>(() => builder.AddInfrastructure(new LateInfrastructure())),
+            Assert.Throws<InvalidOperationException>(() => builder.AddInfrastructure(
+                "late",
+                chain => chain.Use(new ProtoTargetProvider("late", new LateInfrastructure())))),
             Assert.Throws<InvalidOperationException>(() => builder.AddResource(new ProtoResource(
                 "late-resource", "probe", "Late resource", _ => ValueTask.CompletedTask, ProtoResourceScope.Run))),
             Assert.Throws<InvalidOperationException>(() => builder.AddApplication("Late", _ => { })),

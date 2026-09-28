@@ -45,6 +45,25 @@ public sealed class RegistrationIdempotencyTests
     }
 
     [Test]
+    public void AddAspNetCoreServer_WhenTheSameNameIsRegisteredForADifferentProgram_ShouldThrow()
+    {
+        // A dropped duplicate that is a different program would be a silent wrong state: the first
+        // server would silently serve every client of that name.
+        var builder = new ProtoHostBuilder();
+        builder.AddAspNetCoreServer<SampleApi.Program>("Api");
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => builder.AddAspNetCoreServer<SecondTestApi.Program>("Api"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.Message, Does.Contain("'Api'"));
+            Assert.That(exception.Message, Does.Contain(typeof(SampleApi.Program).FullName!));
+            Assert.That(exception.Message, Does.Contain(typeof(SecondTestApi.Program).FullName!));
+        }
+    }
+
+    [Test]
     public async Task AddAspNetCoreServer_UnderAnApplicationCalledTwice_ShouldKeepOneTransportAndComposeServers()
     {
         // Arrange

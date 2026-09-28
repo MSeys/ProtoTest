@@ -64,6 +64,10 @@ var envelope = MassTransitEnvelope.Unwrap(published);   // URNs, ids, sent time,
 when its `messageType` does not declare `T`. Both conversions are pure and work with any
 `IProtoMessageBroker` — the in-memory broker round-trips a frame too. The JSON envelope path needs no
 `MT-*` transport headers; the caller's headers ride the frame and the envelope's `headers` object.
+Pass `MassTransitEnvelopeAddresses` to set the request/response fields: a consumer that replies through
+`RespondAsync` reads `responseAddress` and `requestId` from the frame, and `Unwrap` returns the
+addresses and request id beside the ids it already reads. Awaiting the reply is the test's own broker
+await on the response address.
 
 ## Includes
 
@@ -76,6 +80,8 @@ when its `messageType` does not declare `T`. Both conversions are pure and work 
   `messaging.published`, `messaging.receive`, `messaging.contract.shape` and `messaging.failure`
   trace vocabulary (`messaging.system` is `MassTransit`).
 - Headers ride the publish context; the awaited message carries the headers the message has.
+- Routing keys do not apply: a destination is a message contract type, so `PublishAsync`/`AwaitAsync`
+  with one fail with an error naming the destination instead of dropping it.
 - `Tap` snapshots the harness during setup, so a message the act published is never missed.
 - `MassTransitEnvelope.Wrap`/`Unwrap` speak the MassTransit wire envelope through any broker adapter,
   so a published application - or any suite without a harness - publishes what a MassTransit consumer
@@ -97,7 +103,12 @@ when its `messageType` does not declare `T`. Both conversions are pure and work 
   transport in the test process. The bridge tests the application's bus behaviour, not a broker.
 - `MassTransitEnvelope` converts the frame; it does not resolve a broker address. Pass the destination
   the bus publishes to - on RabbitMQ the exchange named by its entity name formatter
-  (`Namespace:Type`) - and `Tap` or `Declare` it like any other destination.
+  (`Namespace:Type`) - and `Tap` or `Declare` it like any other destination. `Wrap` writes the
+  request/response fields only when the caller passes `MassTransitEnvelopeAddresses`; awaiting the
+  reply is the suite's own broker await on the response address.
+- A queue destination is refused: a MassTransit destination is a message contract type, so
+  `AwaitAsync("queue:…")` fails naming the contract type to await instead. Use the RabbitMQ adapter to
+  read a queue.
 - `Declare` is a no-op: MassTransit owns message topology, and every message contract already exists
   on the bus or is created on first use.
 - `AwaitAsync` observes what the bus **published**; the application's consumption is not part of the

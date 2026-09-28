@@ -92,8 +92,8 @@ The composer above gives a suite its direct starting packages. This reference in
 | `ProtoTest.Aspire` | `dotnet add package ProtoTest.Aspire` | run-scoped Aspire AppHost, resources as application targets | `builder.AddAspireAppHost<TEntryPoint>("api")` |
 | `ProtoTest.OpenApi` | `dotnet add package ProtoTest.OpenApi` | OpenAPI contract coverage over REST response and shape observations | `.AddCollector<OpenApiCoverageCollector>()` |
 | `ProtoTest.WireMock` | `dotnet add package ProtoTest.WireMock` | per-test fake HTTP services with scenario-like stubs, REST-shaped trace evidence and stub coverage | `Proto.Context.WireMock()` |
-| `ProtoTest.Sql.Testcontainers` | `dotnet add package ProtoTest.Sql.Testcontainers` | a PostgreSQL container owned by the run | `builder.AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar")` |
-| `ProtoTest.Messaging.RabbitMq.Testcontainers` | `dotnet add package ProtoTest.Messaging.RabbitMq.Testcontainers` | a RabbitMQ container owned by the run | `builder.AddInfrastructure(RabbitMqBroker.Container(), RabbitMqOptions.ConnectionStringSetting, …)` |
+| `ProtoTest.Sql.Testcontainers` | `dotnet add package ProtoTest.Sql.Testcontainers` | a PostgreSQL container owned by the run | `builder.AddInfrastructure("Store", chain => chain.UseContainer(PostgresDatabase.Container()), "ConnectionStrings:Northstar")` |
+| `ProtoTest.Messaging.RabbitMq.Testcontainers` | `dotnet add package ProtoTest.Messaging.RabbitMq.Testcontainers` | a RabbitMQ container owned by the run | `builder.AddInfrastructure("Broker", chain => chain.UseContainer(RabbitMqBroker.Container()), RabbitMqOptions.ConnectionStringSetting, …)` |
 
 ### Foundation and supporting packages
 
@@ -102,7 +102,7 @@ The composer above gives a suite its direct starting packages. This reference in
 | `ProtoTest.Core` | `dotnet add package ProtoTest.Core` | host, execution context, hooks, attributes, test ids, tracing, run gates and resources | `Proto.Context`, `Proto.Host` |
 | `ProtoTest.Http` | `dotnet add package ProtoTest.Http` | shared HTTP client plumbing and the `[Auth<T>]` model behind REST, GraphQL and gRPC; an extension point, normally transitive | `Proto.Context.Client<HttpClient>(name)` |
 | `ProtoTest.Json` | `dotnet add package ProtoTest.Json` | partial JSON shape matching and `JsonValue` constraints; normally transitive | `JsonShapeMatcher.AssertMatch`, `JsonValue` |
-| `ProtoTest.Testcontainers` | `dotnet add package ProtoTest.Testcontainers` | `ProtoContainerResource<TContainer>` base for run-scoped containers: start-once, release-once, `TryStart` | `builder.AddInfrastructure(…)` |
+| `ProtoTest.Testcontainers` | `dotnet add package ProtoTest.Testcontainers` | `ProtoContainerResource<TContainer>` base for run-scoped containers: start-once, release-once, `TryStart` | `builder.AddInfrastructure("Store", chain => chain.UseContainer(…))` |
 | `ProtoTest.Reporting` | `dotnet add package ProtoTest.Reporting` | JSON and HTML report sinks | `builder.AddSink<JsonReportSink>()`, `AddSink<HtmlReportSink>()` |
 ProtoTest's operations are also `Activity`s on the `ProtoTest` source; subscribe OpenTelemetry with `AddSource("ProtoTest")` — see [OpenTelemetry](../observability/opentelemetry.md). No bridge package is needed.
 
@@ -119,6 +119,6 @@ ProtoTest's operations are also `Activity`s on the `ProtoTest` source; subscribe
 
 ## Container-backed dependencies
 
-When a suite should run against a real server instead of an in-memory one, a container package owns it for the run: `ProtoTest.Sql.Testcontainers` starts PostgreSQL, and `ProtoTest.Messaging.RabbitMq.Testcontainers` starts RabbitMQ. Register the container with `AddInfrastructure(...)` so the host starts it before the run, fills its connection string into configuration for the application and the tests, and releases it after the reports are written. Both build on `ProtoTest.Testcontainers`, whose `TryStart` lets a fixture fall back when no container runtime is available — see [Infrastructure](../foundation/infrastructure.md).
+When a suite should run against a real server instead of an in-memory one, a container package owns it for the run: `ProtoTest.Sql.Testcontainers` starts PostgreSQL, and `ProtoTest.Messaging.RabbitMq.Testcontainers` starts RabbitMQ. Register the container as a `UseContainer(...)` provider of the target it serves, so the host starts it before the run, fills its connection string into configuration for the application and the tests, and releases it after the reports are written. Both build on `ProtoTest.Testcontainers`, whose `TryStart` lets a fixture fall back when no container runtime is available — see [Infrastructure](../foundation/infrastructure.md).
 
 The same suite can then run in-process, container-backed or against a published environment without a code change; [Environments](../getting-started/environments.md) explains what changes in each, including why environment-specific journeys skip rather than fail.

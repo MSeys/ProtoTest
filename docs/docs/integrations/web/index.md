@@ -98,6 +98,16 @@ IProtoHostBuilder AddWebWait<TCondition>(
     where TCondition : class, IWebWaitCondition;
 ```
 
+A hand-written backend composes the same helpers the shipped backends use, so its behavior matches theirs:
+
+- `WebBackendOptions.Resolve<TOptions>(context, configure, validate)` — the options precedence (code callback → started infrastructure → `ProtoTest:Web:{backend}` section → validation).
+- `WebBackendErrors` — the resolution and actionability failures (`NotPresent`, `NotActionable`, `MultipleMatch`) with the documented wording.
+- `WebFailureArtifacts.CaptureAsync(…)` — the screenshot, DOM and location attachments with the documented naming rule; `TraceArtifactFailure` records a capture that itself failed.
+- `WebProbeLoop` with `WebProbe` — the retry loop whose observation form treats `WebElementResolutionException` and `WebActionabilityException` as "not yet", polling at the backend's `PollInterval`.
+- `WebBackendDefaults` — the 5 s action timeout and 50 ms poll interval defaults; `IWebBackend.PollInterval` returns `WebBackendDefaults.DefaultPollInterval` unless the backend has its own interval option.
+- `WebArtifactNames.SafeName` — the lowercased, dash-sanitized identifier rule for artifact file names.
+- `WebMediaTypes.Guess` — the best-effort media type for a downloaded file, with `WebMediaTypes.Default` as the fallback.
+
 Sessions are not declared at registration: a test names the sessions it needs with `Proto.Context.Web(name)` ([below](#sessions)). `AddWebBackend` is first-wins (`TryAddSingleton`), and a host resolves exactly one `IWebBackendFactory` — zero or more than one throws `InvalidOperationException`. For Playwright, every `AddWeb(...)` call still runs its `configure` callback while only the first supplies the skip-probe defaults; the Selenium application overload guards the whole call so a repeat is a no-op.
 
 ## Options and keys

@@ -34,7 +34,6 @@ dotnet add package ProtoTest.Devices.WebSocket.AspNetCore   # in-process endpoin
 - An in-process endpoint needs `ProtoTest.Devices.WebSocket.AspNetCore`; the socket transport reaches
   published addresses. A client is only routed through its own application's in-process transport.
 - `ExpectAsync` consumes frames; the bounded exchange log is for failure messages.
-- Replay (`device.replay`) is designed but not shipped.
 
 ## Learn more
 

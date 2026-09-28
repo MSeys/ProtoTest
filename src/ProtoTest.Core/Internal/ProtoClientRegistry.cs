@@ -108,6 +108,21 @@ internal sealed class ProtoClientRegistry
         }
     }
 
+    /// <summary>
+    /// Snapshots the names clients of the type are registered under, in registration order - aliases
+    /// included, because a caller resolving by name may see either form.
+    /// </summary>
+    public IReadOnlyList<string> Names(Type clientType)
+    {
+        ArgumentNullException.ThrowIfNull(clientType);
+        lock (_gate)
+        {
+            return [.. _registrationOrder
+                .Where(key => key.ClientType == clientType)
+                .Select(key => key.Name)];
+        }
+    }
+
     public object? TryGet(Type clientType, string name)
     {
         ArgumentNullException.ThrowIfNull(clientType);

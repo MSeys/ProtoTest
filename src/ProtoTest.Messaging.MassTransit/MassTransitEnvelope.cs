@@ -79,7 +79,52 @@ public static class MassTransitEnvelope
             messageId,
             correlationId,
             conversationId,
-            headers);
+            headers,
+            addresses: null);
+    }
+
+    /// <summary>
+    /// Wraps a contract instance like <see cref="Wrap{T}(string, T, Guid?, Guid?, Guid?, IReadOnlyDictionary{string, string?}?)"/>
+    /// and sets the request/response fields <paramref name="addresses"/> carries, so a consumer that
+    /// replies through MassTransit's <c>RespondAsync</c> has the response address and request id it
+    /// needs. A field left null stays unset, exactly as the command/event overload leaves them.
+    /// </summary>
+    /// <param name="destination">The broker destination; the contract's MassTransit entity name on RabbitMQ.</param>
+    /// <param name="message">The contract instance to publish; its runtime type is serialized.</param>
+    /// <param name="addresses">The source, destination and response addresses and the request id; null fields stay unset.</param>
+    /// <param name="messageId">The envelope's message id; a new one when omitted.</param>
+    /// <param name="correlationId">The envelope's correlation id; none when omitted.</param>
+    /// <param name="conversationId">The envelope's conversation id; a new one when omitted.</param>
+    /// <param name="headers">The caller's headers; null values are dropped.</param>
+    public static ProtoMessage Wrap<T>(
+        string destination,
+        T message,
+        MassTransitEnvelopeAddresses addresses,
+        Guid? messageId = null,
+        Guid? correlationId = null,
+        Guid? conversationId = null,
+        IReadOnlyDictionary<string, string?>? headers = null)
+        where T : class
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(destination);
+        ArgumentNullException.ThrowIfNull(message);
+        ArgumentNullException.ThrowIfNull(addresses);
+        if (!MessageTypeCache<T>.IsValidMessageType)
+        {
+            throw new ArgumentException(
+                $"'{typeof(T)}' is not a valid MassTransit message type: {MessageTypeCache<T>.InvalidMessageTypeReason}",
+                nameof(message));
+        }
+
+        return ToProtoMessage(
+            destination,
+            message,
+            MessageTypeCache<T>.MessageTypeNames,
+            messageId,
+            correlationId,
+            conversationId,
+            headers,
+            addresses);
     }
 
     /// <summary>
@@ -135,7 +180,68 @@ public static class MassTransitEnvelope
             messageId,
             correlationId,
             conversationId,
-            headers);
+            headers,
+            addresses: null);
+    }
+
+    /// <summary>
+    /// Wraps an already-serialized contract payload like
+    /// <see cref="Wrap(string, string, Type, Guid?, Guid?, Guid?, IReadOnlyDictionary{string, string?}?)"/>
+    /// and sets the request/response fields <paramref name="addresses"/> carries, so a consumer that
+    /// replies through MassTransit's <c>RespondAsync</c> has the response address and request id it
+    /// needs. A field left null stays unset.
+    /// </summary>
+    /// <param name="destination">The broker destination; the contract's MassTransit entity name on RabbitMQ.</param>
+    /// <param name="payload">The contract payload as JSON.</param>
+    /// <param name="messageType">The contract type the payload represents.</param>
+    /// <param name="addresses">The source, destination and response addresses and the request id; null fields stay unset.</param>
+    /// <param name="messageId">The envelope's message id; a new one when omitted.</param>
+    /// <param name="correlationId">The envelope's correlation id; none when omitted.</param>
+    /// <param name="conversationId">The envelope's conversation id; a new one when omitted.</param>
+    /// <param name="headers">The caller's headers; null values are dropped.</param>
+    public static ProtoMessage Wrap(
+        string destination,
+        string payload,
+        Type messageType,
+        MassTransitEnvelopeAddresses addresses,
+        Guid? messageId = null,
+        Guid? correlationId = null,
+        Guid? conversationId = null,
+        IReadOnlyDictionary<string, string?>? headers = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(destination);
+        ArgumentException.ThrowIfNullOrWhiteSpace(payload);
+        ArgumentNullException.ThrowIfNull(messageType);
+        ArgumentNullException.ThrowIfNull(addresses);
+        if (!MessageTypeCache.IsValidMessageType(messageType))
+        {
+            throw new ArgumentException(
+                $"'{messageType}' is not a valid MassTransit message type: {MessageTypeCache.InvalidMessageTypeReason(messageType)}",
+                nameof(messageType));
+        }
+
+        JsonElement element;
+        try
+        {
+            using var document = JsonDocument.Parse(payload);
+            element = document.RootElement.Clone();
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidOperationException(
+                $"The payload for '{destination}' is not valid JSON for {messageType.Name}: {exception.Message}",
+                exception);
+        }
+
+        return ToProtoMessage(
+            destination,
+            element,
+            MessageTypeCache.GetMessageTypeNames(messageType),
+            messageId,
+            correlationId,
+            conversationId,
+            headers,
+            addresses);
     }
 
     /// <summary>
@@ -163,7 +269,13 @@ public static class MassTransitEnvelope
             ParseId(message, "correlationId", envelope.CorrelationId),
             ParseId(message, "conversationId", envelope.ConversationId),
             envelope.SentTime,
-            payload);
+            payload)
+        {
+            SourceAddress = ParseAddress(message, "sourceAddress", envelope.SourceAddress),
+            DestinationAddress = ParseAddress(message, "destinationAddress", envelope.DestinationAddress),
+            ResponseAddress = ParseAddress(message, "responseAddress", envelope.ResponseAddress),
+            RequestId = ParseId(message, "requestId", envelope.RequestId)
+        };
     }
 
     /// <summary>
@@ -223,7 +335,8 @@ public static class MassTransitEnvelope
         Guid? messageId,
         Guid? correlationId,
         Guid? conversationId,
-        IReadOnlyDictionary<string, string?>? headers)
+        IReadOnlyDictionary<string, string?>? headers,
+        MassTransitEnvelopeAddresses? addresses)
     {
         // The bus derives the sent time from the same NewId as a generated message id; mirror that, so
         // a wrapped frame's metadata matches a published one. A caller-provided id keeps its own time.
@@ -234,8 +347,12 @@ public static class MassTransitEnvelope
         var envelope = new JsonMessageEnvelope
         {
             MessageId = (messageId ?? newId.ToGuid()).ToString("D"),
+            RequestId = addresses?.RequestId?.ToString("D"),
             CorrelationId = correlationId?.ToString("D"),
             ConversationId = (conversationId ?? NewId.NextGuid()).ToString("D"),
+            SourceAddress = addresses?.SourceAddress?.ToString(),
+            DestinationAddress = addresses?.DestinationAddress?.ToString(),
+            ResponseAddress = addresses?.ResponseAddress?.ToString(),
             MessageType = messageTypes,
             Message = message,
             SentTime = newId.Timestamp,
@@ -311,6 +428,20 @@ public static class MassTransitEnvelope
             : throw NotAnEnvelope(message, $"its '{name}' is not a GUID: {value}");
     }
 
+    // An address the bus wrote is absolute (<c>rabbitmq://host/vhost/queue</c>); one that is not is a
+    // frame a responder could not use, named here instead of surfacing when a reply is attempted.
+    private static Uri? ParseAddress(ProtoMessage message, string name, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return Uri.TryCreate(value, UriKind.Absolute, out var address)
+            ? address
+            : throw NotAnEnvelope(message, $"its '{name}' is not an absolute address: {value}");
+    }
+
     private static MessagingAssertionException NotAnEnvelope(ProtoMessage message, string reason)
         => new($"{message.Destination} — not a MassTransit envelope: {reason}.");
 
@@ -321,7 +452,9 @@ public static class MassTransitEnvelope
 /// <summary>
 /// A frame read as a MassTransit envelope by <see cref="MassTransitEnvelope.Unwrap(ProtoMessage)"/>:
 /// the frame's destination, the declared <c>urn:message:</c> types, the ids and sent time the
-/// envelope carries, and the raw <c>message</c> JSON for a contract read the caller does itself.
+/// envelope carries, and the raw <c>message</c> JSON for a contract read the caller does itself. The
+/// request/response fields (<see cref="SourceAddress"/>, <see cref="DestinationAddress"/>,
+/// <see cref="ResponseAddress"/>, <see cref="RequestId"/>) are null when the frame carries none.
 /// </summary>
 public sealed record MassTransitEnvelopeContent(
     string Destination,
@@ -330,4 +463,34 @@ public sealed record MassTransitEnvelopeContent(
     Guid? CorrelationId,
     Guid? ConversationId,
     DateTime? SentTime,
-    string Payload);
+    string Payload)
+{
+    /// <summary>The address the frame was sent from, when it carries one.</summary>
+    public Uri? SourceAddress { get; init; }
+
+    /// <summary>The address the frame was sent to, when it carries one.</summary>
+    public Uri? DestinationAddress { get; init; }
+
+    /// <summary>The address a response goes to, when the frame carries one.</summary>
+    public Uri? ResponseAddress { get; init; }
+
+    /// <summary>The request the frame belongs to, when the frame carries one.</summary>
+    public Guid? RequestId { get; init; }
+}
+
+/// <summary>
+/// The request/response fields a wrapped MassTransit frame can carry: the broker addresses the
+/// transport used and the request id a responder replies under. Pass it to
+/// <see cref="MassTransitEnvelope.Wrap{T}(string, T, MassTransitEnvelopeAddresses, Guid?, Guid?, Guid?, IReadOnlyDictionary{string, string?}?)"/>
+/// for a consumer that replies through MassTransit's <c>RespondAsync</c>; a field left null stays
+/// unset, exactly as a command/event frame leaves it.
+/// </summary>
+/// <param name="SourceAddress">The sending endpoint's address; none when omitted.</param>
+/// <param name="DestinationAddress">The receiving endpoint's address; none when omitted.</param>
+/// <param name="ResponseAddress">Where a response goes; a responder without one cannot reply.</param>
+/// <param name="RequestId">The request the message belongs to, usually the request's message id.</param>
+public sealed record MassTransitEnvelopeAddresses(
+    Uri? SourceAddress = null,
+    Uri? DestinationAddress = null,
+    Uri? ResponseAddress = null,
+    Guid? RequestId = null);

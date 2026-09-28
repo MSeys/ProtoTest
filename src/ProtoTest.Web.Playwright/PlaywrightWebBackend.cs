@@ -4,7 +4,6 @@ using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using ProtoTest.Core;
-using ProtoTest.Web.Internal;
 
 public sealed partial class PlaywrightWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics, IWebBackendDownloads
 {
@@ -387,7 +386,7 @@ public sealed partial class PlaywrightWebBackend : IWebBackend, IWebBackendJavaS
                         else
                         {
                             _context.AddAttachment(ProtoTestAttachment.FromBytes(
-                                $"playwright-{WebNames.SafeName(_sessionName)}-trace.zip",
+                                $"playwright-{WebArtifactNames.SafeName(_sessionName)}-trace.zip",
                                 bytes,
                                 "application/vnd.microsoft.playwright.trace+zip",
                                 $"Native Playwright trace for Web session '{_sessionName}'."));

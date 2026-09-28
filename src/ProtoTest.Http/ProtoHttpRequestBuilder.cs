@@ -85,8 +85,13 @@ public abstract class ProtoHttpRequestBuilder<TResponse, TBuilder>
         return (TBuilder)this;
     }
 
-    /// <summary>Adopts the authenticator factory resolved for the test by the lifecycle hook.</summary>
-    internal TBuilder UseAuthenticatorFactory(
+    /// <summary>
+    /// Adopts the authenticator factory a protocol's lifecycle hook resolved for the test, so the
+    /// builder resolves the same authenticators for its named client. A protocol integration calls this
+    /// when it composes its request builder.
+    /// </summary>
+    /// <param name="authenticatorFactory">The factory the protocol resolved, or null for none.</param>
+    public TBuilder UseAuthenticatorFactory(
         Func<ProtoExecutionContext, IProtoHttpAuthenticator>? authenticatorFactory)
     {
         ResolvedAuthenticator = null;
@@ -94,7 +99,12 @@ public abstract class ProtoHttpRequestBuilder<TResponse, TBuilder>
         return (TBuilder)this;
     }
 
-    internal TBuilder UseBaseAddressResolver(
+    /// <summary>
+    /// Adopts the per-test base-address resolver the resolved client registered, when it has one; a
+    /// request builder without one uses the client's own <see cref="HttpClient.BaseAddress"/>.
+    /// </summary>
+    /// <param name="baseAddressResolver">The resolver the client resolution carries, or null for none.</param>
+    public TBuilder UseBaseAddressResolver(
         Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>>? baseAddressResolver)
     {
         BaseAddressResolver = baseAddressResolver;

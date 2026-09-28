@@ -43,6 +43,7 @@ public sealed partial class GraphQLRequestBuilder
             attributes);
     }
 
+    /// <summary>Adopts the authenticator factory resolved for the test by the lifecycle hook.</summary>
     protected override void OnHeaderConfigured(string name, bool isNewHeader)
     {
         if (!isNewHeader)

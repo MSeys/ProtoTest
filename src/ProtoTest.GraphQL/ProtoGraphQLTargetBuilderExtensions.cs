@@ -15,7 +15,7 @@ public static class ProtoGraphQLTargetBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(target);
         var marker = new GraphQLSubscriptionTransportRegistration(target.TargetName, transport);
-        ProtoRegistration.TryAdd(
+        ProtoRegistrationGuard.TryRegisterOnce(
             target.Services,
             marker,
             existing => string.Equals(existing.TargetName, marker.TargetName, StringComparison.OrdinalIgnoreCase));

@@ -6,7 +6,7 @@ A PostgreSQL container that can be owned by a ProtoTest run.
 dotnet add package ProtoTest.Sql.Testcontainers
 ```
 
-`PostgresDatabase.Container()` creates the resource. Register it with `AddInfrastructure(...)` to start it with the host and publish its connection string to configuration.
+`PostgresDatabase.Container()` creates the resource. Register it as a target's `UseContainer(...)` provider to start it with the host and publish its connection string to configuration; the legacy `AddInfrastructure(piece, keys)` overload keeps the all-configured skip rule for one piece.
 
 The container is shared for the run and does not reset the database between tests. A missing container runtime fails host startup unless the suite checks availability before registration.
 

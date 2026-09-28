@@ -89,7 +89,14 @@ Task PublishAsync(string destination, string? payload = null,
     IReadOnlyDictionary<string, string?>? headers = null, string? contentType = null,
     CancellationToken cancellationToken = default);
 
+Task PublishAsync(string destination, string routingKey, string? payload,
+    IReadOnlyDictionary<string, string?>? headers = null, string? contentType = null,
+    CancellationToken cancellationToken = default);
+
 Task<ProtoMessage> AwaitAsync(string destination, Func<ProtoMessage, bool> predicate,
+    TimeSpan? timeout = null, CancellationToken cancellationToken = default);
+
+Task<ProtoMessage> AwaitAsync(string destination, string routingKey, Func<ProtoMessage, bool> predicate,
     TimeSpan? timeout = null, CancellationToken cancellationToken = default);
 ```
 
@@ -97,10 +104,32 @@ Task<ProtoMessage> AwaitAsync(string destination, Func<ProtoMessage, bool> predi
 
 ```csharp
 public sealed record ProtoMessage(string Destination, string? Payload = null,
-    IReadOnlyDictionary<string, string?>? Headers = null, string? ContentType = null);
+    IReadOnlyDictionary<string, string?>? Headers = null, string? ContentType = null)
+{
+    public string? RoutingKey { get; init; }
+}
 ```
 
 The payload reads are typed: `message.ReadAsJson<T>()` deserializes with `ProtoJsonDefaults.Reader` (case-insensitive property names) and returns `default` for an empty payload; `message.ReadRequired<T>()` and `message.ReadRequired<T>(jsonPath)` return `T` and throw `MessagingAssertionException` naming the destination when the payload is empty, JSON `null`, or the path is missing. The path subset is the shared one (`$`, dot members, `[n]` indices) from [REST responses](../rest/responses.md#reading-one-value-by-path). `Payload` stays available for raw inspection.
+
+### Routing keys
+
+A routing key names the address a publish takes inside the exchange, and the address a message was delivered under:
+
+```csharp
+// The payload is a required argument on this overload, so it cannot be mistaken for the payload-only one.
+await messages.PublishAsync(CsmsEvents.Exchange, "session.ended", """{"sessionId":"…"}""");
+
+var ended = await messages.AwaitAsync(
+    CsmsEvents.Exchange,
+    "session.ended",
+    message => message.ReadRequired<SessionEnded>().SessionId == sessionId);
+Assert.That(ended.RoutingKey, Is.EqualTo("session.ended"));
+```
+
+`message.RoutingKey` carries what the transport delivered: the RabbitMQ adapter fills it from the delivery and the in-memory broker keeps it, so a predicate can select by it like any other message fact. `AwaitAsync(exchange, routingKey, predicate, …)` matches only that key: the RabbitMQ tap binds the key on the destination's queue, so a direct exchange delivers a publish under it, and the in-memory broker filters the history the same way; a message under another key is not consumed and stays for the await that names it. A timeout names both the destination and the routing key, and the `messaging.publish`/`messaging.await` operations record `messaging.routing_key`. Without a routing key the plain overloads behave as before, and RabbitMQ publishes under the destination itself.
+
+The key is bound when the keyed await starts, so a direct exchange only delivers a message published after that; a topic exchange's `#` binding catches every key, so pre-binding the destination with `Tap` keeps the act-then-await flow reliable there. MassTransit addresses message contract types rather than broker routing, so its adapter rejects a routing key with an error naming the destination instead of dropping it.
 
 `message.Should.MatchShape(shape)` matches the payload with the same [shape matcher](../rest/responses.md#matchshape) as REST, GraphQL and gRPC. It records an `assert.json.shape` operation with a `messaging.contract.shape` observation on the ambient test context; a mismatch throws `MessagingAssertionException` whose message starts with the destination, keeping the shared `JsonShapeMismatchException` as `InnerException`, and a payload that is empty or not JSON fails the same way naming the destination.
 
@@ -124,12 +153,40 @@ public interface IProtoMessageConsumer : IAsyncDisposable
     ValueTask PrepareAsync(IReadOnlyCollection<string> destinations, CancellationToken cancellationToken = default);
     ValueTask<ProtoMessage> AwaitAsync(string destination, Func<ProtoMessage, bool> predicate,
         TimeSpan timeout, CancellationToken cancellationToken = default);
+    // Matches the routing key the transport recorded; a default implementation filters the predicate.
+    ValueTask<ProtoMessage> AwaitAsync(string destination, string? routingKey,
+        Func<ProtoMessage, bool> predicate, TimeSpan timeout, CancellationToken cancellationToken = default);
 }
 ```
 
 One broker is shared by the whole run and may publish concurrently; `CreateConsumerAsync` returns a consumer that belongs to exactly one test. `PrepareAsync` declares the destinations that test will await *before* it acts; `DisposeAsync` removes whatever the adapter declared for it. That is the isolation contract: parallel tests on one destination cannot steal each other's messages. The in-memory broker keeps history instead and treats `PrepareAsync` as a no-op.
 
 `DeclareAsync` creates the destinations this suite owns — those declared with `Declare` — before the first tap is prepared. Declaration is idempotent: an existing destination is left as it is and a repeated declaration is a no-op. A broker whose destinations always exist (the in-memory broker) implements it as a no-op, and an adapter that cannot create a destination refuses instead of pretending: the default interface implementation throws `NotSupportedException` naming the adapter, so a `Declare` against it fails setup loudly.
+
+#### Writing an adapter
+
+An adapter's consumer derives from `ProtoMessageConsumerBase` and supplies only a source; the base owns the await queue the contract above describes:
+
+```csharp
+public abstract class ProtoMessageConsumerBase : IProtoMessageConsumer
+{
+    protected ProtoMessageConsumerBase(long position);
+    protected ValueTask<ProtoMessage> AwaitAsync(string destination, Func<ProtoMessage, bool> predicate,
+        TimeSpan timeout, CancellationToken cancellationToken, Func<IProtoMessageAwaitSource> sourceFactory);
+    protected static Func<ProtoMessage, bool> MatchRoutingKey(Func<ProtoMessage, bool> predicate, string? routingKey);
+    protected void Reset(long position);
+    // PrepareAsync/DisposeAsync are virtual no-ops; a tap-based adapter overrides them.
+}
+
+public interface IProtoMessageAwaitSource
+{
+    ValueTask<ProtoMessageAwaitSnapshot> SnapshotAsync(string destination, long position,
+        CancellationToken cancellationToken);
+    ValueTask WaitAsync(ProtoMessageAwaitSnapshot snapshot, TimeSpan remaining, CancellationToken cancellationToken);
+}
+```
+
+An adapter's public `AwaitAsync` does whatever per-destination work it needs — declaring a tap, resolving the harness — and then calls the protected overload, which resolves the source factory inside the base's await gate. `ProtoMessageAwaitSnapshot` carries the candidates (`ProtoMessageAwaitEntry`: one delivery with its position) plus the wake-up that ends the next wait, when the source has one; the position is the first delivery the consumer may consume, so the in-memory broker starts after the shared history's creation position (`Reset` re-baselines a replaced source) while an empty tap starts at zero. An adapter never implements its own await gate, position, consumed set or deadline rescan.
 
 ## Quick start
 
@@ -155,9 +212,9 @@ public async Task PayingAnInvoicePublishesAnEvent()
 
 ### RabbitMQ topology
 
-`UseRabbitMq` publishes to the exchange named like the destination, with the destination as the routing key, `ContentType` defaulting to `application/json` and messages marked non-persistent; null headers are dropped.
+`UseRabbitMq` publishes to the exchange named like the destination and under the message's routing key — the destination itself when none is given — with `ContentType` defaulting to `application/json` and messages marked non-persistent; null headers are dropped. The delivery's routing key fills `ProtoMessage.RoutingKey`, and a keyed await binds its key on the destination's tap.
 
-The broker owns one connection and one publish channel, created lazily on first use and kept for the run. Every test's consumer owns one channel per tap queue on that connection — channels are not thread-safe, so each side serializes its own. The consumer declares one exclusive, auto-delete tap queue per destination, named `prototest-{guid}`: during setup for a declared destination, just in time at the first await otherwise. Each queue is bound with the destination as routing key and with `#`, which covers every exchange type — direct exchanges match the routing key, topic exchanges match the `#` catch-all, and fanout and headers exchanges ignore the routing key, so their argument-less bindings match every message. Every queue is deleted when the test's consumer is disposed, and an exclusive queue never competes with the application's own consumers.
+The broker owns one connection and one publish channel, created lazily on first use and kept for the run. Every test's consumer owns one channel per destination on that connection — channels are not thread-safe, so each side serializes its own. For an exchange destination the consumer declares one exclusive, auto-delete tap queue per destination, named `prototest-{guid}`: during setup for a declared destination, just in time at the first await otherwise. Each tap queue is bound with the destination as routing key and with `#`, which covers every exchange type — direct exchanges match the routing key, topic exchanges match the `#` catch-all, and fanout and headers exchanges ignore the routing key, so their argument-less bindings match every message. An await that names a routing key binds that key on the destination's tap as well, so a direct exchange delivers it; the tap stays one per destination, so a destination pre-bound with `Tap` still holds what was published before the keyed await. Each tap queue is deleted when the test's consumer is disposed, and an exclusive tap never competes with the application's own consumers. A queue destination is consumed as it exists — checked passively and left untouched — so disposal releases only the consumer's channel.
 
 A tap binds only to an exchange that exists; the adapter never guesses. The application declares its topology before messaging prepares — the demo declares its event exchanges at application startup and registers `AddMessaging` last on purpose, so the messaging initializer binds after the in-process application's initializer has created them:
 
@@ -185,9 +242,27 @@ builder.AddMessaging(messaging => messaging
 
 A destination whose exchange the application and the suite both leave undeclared fails only the tests that await it, not the whole class: preparing that tap cannot bind, and the first `AwaitAsync` on the destination throws the named error while the other tests run normally.
 
+### Queue destinations
+
+An exchange destination is awaited through a test-owned tap queue bound to it. A destination that names a **queue** instead - `queue:{name}`, built with `ProtoDestination.Queue(name)` - is consumed directly, which is what a dead-letter queue needs: the DLQ is a queue, not an exchange, and the product's own dead-letter bindings are what feed it.
+
+```csharp
+// The product's dead-letter bindings carry the poison into billing.session-ended.dlq;
+// the test awaits the queue itself.
+var dead = await Proto.Context.Messaging().AwaitAsync(
+    ProtoDestination.Queue("billing.session-ended.dlq"),
+    message => message.ReadRequired<SessionEnded>().SessionId == sessionId);
+```
+
+A queue destination is consumed, never declared: the adapter verifies the queue exists - a missing queue fails naming it, like a missing exchange - consumes it on the test's own channel, and leaves the queue as it is when the test ends. `Tap` accepts a queue destination too, so the consume starts during setup instead of at the first await; `Declare` refuses the queue form, because the component that owns the queue creates it. A consumed delivery carries the queue destination on `ProtoMessage.Destination` and the transport's routing key on `ProtoMessage.RoutingKey`.
+
+Consuming a shared queue has two consequences. A queue await reads what the queue already holds, unlike an exchange tap that only sees what arrives after it binds - and it removes what it reads, so a second test (or a live consumer) awaiting the same queue no longer sees it. Await the queue directly when the test owns it (a dead-letter queue no one else reads, a serial suite); prefer the exchange that feeds it when the suite runs in parallel. A broker whose model has no queues - the in-memory broker, the MassTransit harness - refuses a queue destination with an error naming the transport and the exchange to await instead.
+
 ### Repeats and consumption
 
-Each await consumes the message it matches. Awaits on one consumer are serialized in call order, and a delivery that matches no awaited predicate is not consumed: it stays available to a later await on the same consumer, so concurrent awaits on one destination neither lose nor steal each other's messages and every matched message is consumed exactly once. The in-memory broker behaves the same way: messages live for the run and are ordered, each consumer snapshots the broker position when it is created — so only messages published after its test started can match — and each matched message is consumed once. A predicate that throws fails only the await that owns it. A timeout is a `TimeoutException`; awaiting on a tap whose exchange is missing is an `InvalidOperationException` naming the destination, and a `Declare` the broker refuses fails setup with the destination named; an unreachable broker is an `InvalidOperationException` naming the sanitized address and `ProtoTest:Messaging:RabbitMq:ConnectionString`.
+A queue await has no exchange to bind, so a keyed await on a queue destination filters the deliveries the queue hands over by the routing key the transport recorded.
+
+Each await consumes the message it matches. Awaits on one consumer are serialized in call order, and a delivery that matches no awaited predicate is not consumed: it stays available to a later await on the same consumer, so concurrent awaits on one destination neither lose nor steal each other's messages and every matched message is consumed exactly once. The in-memory broker behaves the same way: messages live for the run and are ordered, each consumer snapshots the broker position when it is created — so only messages published after its test started can match — and each matched message is consumed once. A predicate that throws fails only the await that owns it. A timeout is a `TimeoutException`; awaiting on a tap whose exchange is missing (or a queue that does not exist) is an `InvalidOperationException` naming the destination, and a `Declare` the broker refuses fails setup with the destination named; an unreachable broker is an `InvalidOperationException` naming the sanitized address and `ProtoTest:Messaging:RabbitMq:ConnectionString`.
 
 ### Owning a broker
 
@@ -195,7 +270,10 @@ When the run should start RabbitMQ itself, register the container as [infrastruc
 
 ```csharp
 builder.AddInfrastructure(
-    RabbitMqBroker.Container(),
+    "MessagingBroker",
+    chain => chain
+        .UseConfigured()
+        .UseContainer(RabbitMqBroker.Container()),
     RabbitMqOptions.ConnectionStringSetting,   // ProtoTest:Messaging:RabbitMq:ConnectionString
     "Messaging:RabbitMq:ConnectionString");    // what the application reads
 
@@ -206,7 +284,10 @@ builder.AddMessaging(messaging => messaging
     .UseRabbitMq());
 ```
 
-`AddInfrastructure` starts the container with the host and fills every key with the started connection string, so the adapter and the application under test reach the same broker. It starts before any test-level skip condition is evaluated, so a machine without a container runtime fails the run at start. `RabbitMqBroker.Container()` creates the resource without starting it; `Start()` starts now or throws with the reason; `TryStart(configure)` reports the reason in its result instead, for a fixture that decides before registering infrastructure. The default image is `rabbitmq:3`, configurable through the builder passed to `Container`. Registering with `AddResource` only owns the release — it neither starts the container nor fills settings. With no application initializer to declare the event exchanges, the suite declares its own with `Declare` (see [Suite-owned topology](#suite-owned-topology)) — no raw broker client in the suite.
+The target's `UseContainer` provider starts the container with the host and fills every key with the
+started connection string, so the adapter and the application under test reach the same broker. The
+provider starts before any test-level skip condition is evaluated, so a machine without a container
+runtime fails the run at start. `RabbitMqBroker.Container()` creates the resource without starting it; `Start()` starts now or throws with the reason; `TryStart(configure)` reports the reason in its result instead, for a fixture that decides before registering infrastructure. The default image is `rabbitmq:3`, configurable through the builder passed to `Container`. Registering with `AddResource` only owns the release — it neither starts the container nor fills settings. With no application initializer to declare the event exchanges, the suite declares its own with `Declare` (see [Suite-owned topology](#suite-owned-topology)) — no raw broker client in the suite.
 
 ### MassTransit bridge
 
@@ -266,7 +347,7 @@ builder.AddMessaging(messaging => messaging
 
 Every publish and await is recorded:
 
-- Operations `messaging.publish` and `messaging.await` with `messaging.system` (the broker name), `messaging.destination`, and `messaging.timeout_ms` on the await. The payload is recorded as a redacted `Message` code section.
+- Operations `messaging.publish` and `messaging.await` with `messaging.system` (the broker name), `messaging.destination`, `messaging.routing_key` when the call named one, and `messaging.timeout_ms` on the await. The payload is recorded as a redacted `Message` code section.
 - Observations `messaging.published` for a successful publish and `messaging.receive` for a matched await — target is the broker name (`InMemory` or `RabbitMQ`), identifier is the destination, metadata carries `messaging.system`. `Should.MatchShape` adds a `messaging.contract.shape` observation carrying `MessagingShapeMatchData(Destination, MatchedProperties)`.
 - Resources: the run-scoped `messaging:broker` resource with kind `broker`, and the per-test `messaging:consumer:Default` resource with kind `consumer`. The container adds `broker:rabbitmq`.
 - The event `messaging.attachment.failed` with `attachment.name` when a capture cannot be registered.
@@ -287,16 +368,17 @@ The observations are trace evidence, not a coverage promise: `ProtoTest.Messagin
 
 ## Limits
 
-- **The in-memory broker is a test double.** It registers no `Broker` capability; its `PrepareAsync` and its `DeclareAsync` do nothing, because every destination already exists there.
-- **No history on RabbitMQ.** A tap holds only what arrived after it was declared; a destination declared just in time at the await sees only later messages.
+- **The in-memory broker is a test double.** It registers no `Broker` capability; exchange destinations already exist there, so its `PrepareAsync` and `DeclareAsync` do nothing, and a queue destination is refused because it has no queues.
+- **No history on RabbitMQ.** An exchange tap holds only what arrived after it was declared; a destination declared just in time at the await sees only later messages. A queue destination reads the queue's backlog as well, but removes what it reads.
 - **An unmatched delivery stays for a later await.** A delivery that matched no awaited predicate is kept for a later await on the same consumer rather than consumed, so concurrent awaits on one destination cannot steal each other's messages; disposing the consumer drops whatever it never matched. Match on the destination and the start of the payload rather than re-awaiting a message another await already consumed.
 - **UTF-8 strings only.** `ProtoMessage.Payload` is a `string?`; there is no binary payload API.
-- **`Tap` and `Declare` are run-scoped.** They declare destinations for every test in the run; there is no per-test destination declaration on `ProtoMessageClient`.
-- **`Declare` covers the destination, not a binding.** On RabbitMQ it creates the exchange the adapter publishes to; the per-test tap queue and its bindings stay the adapter's. A queue or an `(exchange, routingKey)` pair still cannot be addressed through the API.
+- **`Tap` and `Declare` are run-scoped.** They declare destinations for every test in the run; there is no per-test destination declaration on `ProtoMessageClient`. A queue destination is tapped, never declared: `Declare` creates exchanges and refuses the queue form.
+- **`Declare` covers the destination, not a binding.** On RabbitMQ it creates the exchange the adapter publishes to; the per-test tap queue and its bindings stay the adapter's. An `(exchange, routingKey)` pair is addressed per publish (`PublishAsync(exchange, routingKey, payload)`) and per await (`AwaitAsync(exchange, routingKey, predicate, …)`), and a routing key is bound when the keyed await starts. A routing key on a queue await filters the consumed deliveries instead of binding anything.
+- **A queue destination is consumed, not tapped.** The adapter consumes the named queue and leaves it as it is, so the await reads the queue's backlog and removes what it reads: a second test (or a live consumer) awaiting the same queue competes for its deliveries. Await the queue directly when the test owns it; prefer the exchange that feeds it where the suite runs in parallel or a consumer is live.
 - **Configuration adds to `Tap` and `Declare`, it does not replace them.** Because `Destinations` and `DeclaredDestinations` are lists, an environment that exports `ProtoTest__Messaging__Destinations__0` adds a destination; it cannot withdraw a code-declared one.
 - **Capture is opt-in.** Payload attachments exist only after `CaptureAttachments`.
 - **Destinations are evidence, not coverage.** No Messaging collector ships (a decision, not a gap); the `messaging.published`, `messaging.receive` and `messaging.contract.shape` observations reach a report only through a collector a suite registers.
-- **One run connection, serialized consumers.** RabbitMQ uses a single connection and one publish channel; every consumer owns a channel per tap queue and awaits on one consumer serialize in call order. A tap's exchange must exist — the application declares its topology, or the suite declares its own with `Declare` — and there is no retry or backoff.
+- **One run connection, serialized consumers.** RabbitMQ uses a single connection and one publish channel; every consumer owns a channel per destination and awaits on one consumer serialize in call order. An exchange tap's exchange must exist — the application declares its topology, or the suite declares its own with `Declare` — and there is no retry or backoff.
 
 ## Links
 

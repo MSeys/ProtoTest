@@ -8,7 +8,8 @@ using ProtoTest.Core;
 /// An application under test running in its own container image: the host starts it as run
 /// infrastructure, and the mapped address it serves on is published as the application's
 /// <c>BaseUrl</c>, so the application's REST clients, browser sessions and the readiness probe all
-/// resolve that one container. Register it with <c>AddInfrastructure(container, container.BaseUrlKey)</c>.
+/// resolve that one container. Register it as the target's <c>UseContainer(container)</c> provider with
+/// <c>UseConfigured()</c> first, so a configured address serves the target instead.
 /// </summary>
 /// <remarks>
 /// The helper assumes nothing about the image beyond the port it listens on; the published address is
@@ -16,8 +17,8 @@ using ProtoTest.Core;
 /// accept a connection. The <c>configure</c> callback can add container build options (an environment,
 /// a command, a Testcontainers wait strategy), and <c>AddHttpReadiness(application, path)</c> adds an
 /// HTTP-level wait against the published address. A run that configures
-/// <c>ProtoTest:Applications:{application}:BaseUrl</c> satisfies the declared key, so
-/// <c>AddInfrastructure</c> skips the container and points at that environment instead.
+/// <c>ProtoTest:Applications:{application}:BaseUrl</c> satisfies the declared key, so the configured
+/// provider wins and the container is never started.
 /// </remarks>
 public sealed class ApplicationContainer : ProtoContainerResource<IContainer>
 {

@@ -66,29 +66,48 @@ internal sealed class InMemoryProtoMessageBroker : IProtoMessageBroker
 
     private readonly record struct Entry(long Position, ProtoMessage Message);
 
+    /// <summary>
+    /// One test's consumer over the broker's shared history: the base owns the await queue, the source
+    /// is the broker's history, so the consumer itself carries no await state. A queue destination is
+    /// refused: the in-memory broker has no queues, so awaiting one names the transport and the remedy
+    /// instead of matching against a destination that only looks like a queue.
+    /// </summary>
     private sealed class InMemoryProtoMessageConsumer(InMemoryProtoMessageBroker broker, long position)
-        : IProtoMessageConsumer
+        : ProtoMessageConsumerBase(position)
     {
-        // The queue owns the await gate, the position and the consumed set; the source is the broker's
-        // shared history, so the consumer itself carries no await state.
-        private readonly ProtoMessageAwaitQueue _queue = new(position);
+        private const string QueueRemedy =
+            "A queue destination is served by a broker that owns queues (the RabbitMQ adapter); " +
+            "await the exchange that feeds the queue instead.";
 
-        public ValueTask PrepareAsync(
+        public override ValueTask PrepareAsync(
             IReadOnlyCollection<string> destinations,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(destinations);
+            foreach (var destination in destinations)
+            {
+                if (ProtoDestination.IsQueue(destination))
+                {
+                    throw ProtoDestination.QueueUnsupported(destination, broker.Name, QueueRemedy);
+                }
+            }
+
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask<ProtoMessage> AwaitAsync(
+        public override ValueTask<ProtoMessage> AwaitAsync(
             string destination,
             Func<ProtoMessage, bool> predicate,
             TimeSpan timeout,
             CancellationToken cancellationToken = default)
-            => _queue.AwaitAsync(destination, predicate, timeout, cancellationToken, () => new Source(broker));
+        {
+            if (ProtoDestination.IsQueue(destination))
+            {
+                throw ProtoDestination.QueueUnsupported(destination, broker.Name, QueueRemedy);
+            }
 
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+            return AwaitAsync(destination, predicate, timeout, cancellationToken, () => new Source(broker));
+        }
 
         /// <summary>
         /// The broker's history as an await source: a snapshot copies the messages at or after the

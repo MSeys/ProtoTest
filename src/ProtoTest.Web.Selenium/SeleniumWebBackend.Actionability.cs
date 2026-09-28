@@ -2,7 +2,6 @@ namespace ProtoTest.Web.Selenium;
 
 using System.Diagnostics;
 using OpenQA.Selenium;
-using ProtoTest.Web.Internal;
 
 public sealed partial class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics
 {

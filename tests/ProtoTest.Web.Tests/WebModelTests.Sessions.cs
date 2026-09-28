@@ -109,10 +109,14 @@ public sealed partial class WebModelTests
                     ["ProtoTest:Web:Selenium:ActionTimeout"] = "00:00:07",
                     ["ProtoTest:Web:Selenium:PollInterval"] = "00:00:00.250"
                 }))
-            .AddInfrastructure(new FakeSettingsInfrastructure(new Dictionary<string, string>
-            {
-                ["ProtoTest:Web:Selenium:ActionTimeout"] = "00:00:09"
-            }))
+            .AddInfrastructure(
+                "web-options",
+                chain => chain.Use(new ProtoTargetProvider(
+                    "settings",
+                    new FakeSettingsInfrastructure(new Dictionary<string, string>
+                    {
+                        ["ProtoTest:Web:Selenium:ActionTimeout"] = "00:00:09"
+                    }))))
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();

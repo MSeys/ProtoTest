@@ -54,11 +54,19 @@ Setting `ProtoTest:Database=postgres` or `ProtoTest:Messaging:Broker=container` 
 
 ```csharp
 builder.AddInfrastructure(
-    RabbitMqBroker.Container(),
+    "MessagingBroker",
+    chain => chain
+        .UseConfigured()
+        .UseContainer(RabbitMqBroker.Container()),
     RabbitMqOptions.ConnectionStringSetting,
     "Messaging:RabbitMq:ConnectionString");
 
-builder.AddInfrastructure(PostgresDatabase.Container(), "ConnectionStrings:Northstar");
+builder.AddInfrastructure(
+    "NorthstarDatabase",
+    chain => chain
+        .UseConfigured()
+        .UseContainer(PostgresDatabase.Container()),
+    "ConnectionStrings:Northstar");
 ```
 
 The started connection strings reach the tests through `ProtoInfrastructureSettings` and the in-process application through its web host settings, so both work against the same database or broker. With PostgreSQL owned by the run, no standalone application is started, so the console journeys skip (their `[RequiresCapability("server", CapabilityName = "Northstar standalone")]` is not met); a broker container alone does not stop the standalone app from starting. A web session gets its published address from `ProtoTest:Applications:{application}:BaseUrl`, but the demo registers its `"Northstar standalone"` capability only when it starts that process itself, so a published run skips the browser journey too.

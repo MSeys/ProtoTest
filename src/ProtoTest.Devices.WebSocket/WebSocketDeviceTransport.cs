@@ -42,8 +42,6 @@ public sealed class WebSocketDeviceTransport : IProtoDeviceTransport
                 $"'{endpoint.Address}' is not a WebSocket address; use ws:// or wss://.");
         }
 
-        using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        attempt.CancelAfter(_options.ConnectTimeout);
         var socket = new System.Net.WebSockets.ClientWebSocket();
         if (_options.KeepAliveInterval is { } keepAlive)
         {
@@ -52,13 +50,17 @@ public sealed class WebSocketDeviceTransport : IProtoDeviceTransport
 
         try
         {
-            await socket.ConnectAsync(uri, attempt.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            socket.Dispose();
-            throw new TimeoutException(
-                $"Connecting to '{uri}' timed out after {_options.ConnectTimeout.TotalSeconds:0.#}s.");
+            await ProtoDeviceConnect
+                .WithTimeoutAsync(
+                    uri.ToString(),
+                    _options.ConnectTimeout,
+                    async token =>
+                    {
+                        await socket.ConnectAsync(uri, token).ConfigureAwait(false);
+                        return socket;
+                    },
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
         catch
         {

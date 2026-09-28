@@ -28,6 +28,33 @@ public sealed class RequiresWorkerAttribute<TProgram> : RequiresCapabilityAttrib
 }
 
 /// <summary>
+/// Skips the test unless the run's clock is authoritative for the application under test: the winning
+/// in-process application server and a hosted worker bridge the test clock into the process they serve.
+/// A test that advances the clock against an application running in its own process - published,
+/// container, AppHost or loopback - must carry the gate instead of asserting a time the application
+/// never saw.
+/// </summary>
+/// <example>
+/// <code>
+/// [RequiresTestClock]
+/// public async Task AChargePointBootsWithTheSuitesClock() { ... }
+/// </code>
+/// </example>
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = true, Inherited = true)]
+public sealed class RequiresTestClockAttribute : RequiresCapabilityAttribute
+{
+    public RequiresTestClockAttribute()
+        : base(ProtoCapabilityKinds.Clock)
+    {
+    }
+
+    protected override string DefaultReason
+        => "This test requires the test clock to be authoritative for the application under test, " +
+           "which the environment does not host: it is served by a published, container, AppHost or " +
+           "loopback provider instead of the in-process test server.";
+}
+
+/// <summary>
 /// Skips the test unless the host is composed with the named ASP.NET Core server, for example the
 /// instance registered by <c>AddAspNetCoreServer&lt;TProgram&gt;(name)</c>. The check addresses the
 /// capability's <see cref="ProtoCapabilityDescriptor.Instance"/> - the server name - so a configured

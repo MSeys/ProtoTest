@@ -1,6 +1,6 @@
 namespace ProtoTest.Messaging.Tests;
 
-using ProtoTest.Messaging.Internal;
+using ProtoTest.Messaging;
 
 /// <summary>
 /// The shared await machinery's own semantics, pinned without a broker: awaits on one consumer

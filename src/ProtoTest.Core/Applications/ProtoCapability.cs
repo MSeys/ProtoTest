@@ -36,6 +36,14 @@ public static class ProtoCapabilityKinds
     public const string Data = "data";
     public const string Document = "document";
     public const string Aspire = "aspire";
+
+    /// <summary>
+    /// The test clock is authoritative for the application under test: the winning provider bridges the
+    /// run's clock into the process it hosts (the in-process application server and a hosted worker).
+    /// A provider that serves the application in its own process declares no clock, so
+    /// <c>[RequiresTestClock]</c> skips instead of asserting a time the application never saw.
+    /// </summary>
+    public const string Clock = "clock";
 }
 
 /// <summary>
@@ -134,6 +142,40 @@ internal sealed record ProtoConditionalCapability(
 /// keys that decided the skip and <paramref name="Reason"/> why.
 /// </summary>
 internal sealed record ProtoSkippedCapability(ProtoCapabilityDescriptor Capability, ProtoKeySet Keys, string Reason);
+
+/// <summary>
+/// A capability declared while a named application's provider chain is served in-process - the winner
+/// declares the <c>server</c> capability. An application whose host declares no chain keeps the
+/// configured-keys rule over <see cref="ConfiguredKeys"/>, so a registration that adds no chain
+/// behaves as before. Used by an adapter that exists only behind the in-process test host.
+/// </summary>
+internal sealed record ProtoChainCapability(
+    string ApplicationName,
+    ProtoCapabilityDescriptor Capability,
+    ProtoKeySet ConfiguredKeys)
+{
+    /// <summary>Whether the run's environment drops this declaration.</summary>
+    public bool IsDropped(
+        IReadOnlyDictionary<string, ProtoResolvedTarget> resolutions,
+        IConfiguration configuration,
+        IReadOnlySet<string> declaredKeys)
+    {
+        if (resolutions.TryGetValue(ApplicationName, out var resolution))
+        {
+            return !resolution.HasCapability(ProtoCapabilityKinds.Server);
+        }
+
+        return ConfiguredKeys.Count > 0
+            && ProtoEnvironment.IsSatisfied(
+                configuration, ConfiguredKeys, ProtoEnvironmentMode.AllConfigured, declaredKeys);
+    }
+
+    /// <summary>The reason recorded when this declaration decides a drop.</summary>
+    public string DropReason(IReadOnlyDictionary<string, ProtoResolvedTarget> resolutions)
+        => resolutions.TryGetValue(ApplicationName, out var resolution)
+            ? $"application '{ApplicationName}' is served by '{resolution.ProviderName}', which does not run it in-process"
+            : "already configured";
+}
 
 /// <summary>The capabilities the run dropped because no declaration for them is needed.</summary>
 internal sealed record ProtoSkippedCapabilities(IReadOnlyList<ProtoSkippedCapability> Capabilities);
@@ -245,6 +287,35 @@ public static class ProtoCapabilityExtensions
         return builder;
     }
 
+    /// <summary>
+    /// Declares a capability while the named application is served in-process: the application's
+    /// provider chain winner declares the <c>server</c> capability. An adapter that exists only behind
+    /// the in-process test host (the in-process WebSocket device transport) declares itself this way,
+    /// so a configured, loopback or AppHost-served application drops it and the gate skips.
+    /// </summary>
+    /// <remarks>
+    /// A host whose application declares no chain keeps the configured-keys rule over
+    /// <paramref name="configuredKeys"/>, so today's registrations are unchanged: the capability drops
+    /// when every key is configured and the environment provides the address elsewhere.
+    /// </remarks>
+    public static IProtoHostBuilder AddCapabilityWhenInProcess(
+        this IProtoHostBuilder builder,
+        string applicationName,
+        ProtoCapabilityDescriptor capability,
+        params string[] configuredKeys)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(applicationName);
+        ArgumentNullException.ThrowIfNull(capability);
+        return builder.ConfigureServices(services =>
+        {
+            AddDescriptor(services, capability);
+            var declaration = new ProtoChainCapability(
+                applicationName, capability, new ProtoKeySet(configuredKeys ?? []));
+            ProtoRegistration.TryAdd(services, declaration, existing => existing == declaration);
+        });
+    }
+
     private static void ValidateProvidedKeys(string[]? keys)
     {
         if (keys is null || !keys.Any(key => !string.IsNullOrWhiteSpace(key)))
@@ -281,15 +352,24 @@ public static class ProtoCapabilityExtensions
             services => services.AddSingleton(new ProtoCapabilityReason(kind, name, reason)));
     }
 
-    // Descriptors are metadata by value: registering the same one twice - a helper called twice, two
-    // integrations declaring the same adapter - must report one capability, while distinct descriptors
-    // of the same CLR type still each register.
-    internal static void AddCapability(IServiceCollection services, ProtoCapabilityDescriptor capability)
+    /// <summary>
+    /// Records a capability or adapter into a service collection. This is the service-collection form
+    /// of <see cref="AddCapability(IProtoHostBuilder, ProtoCapabilityDescriptor)"/> for an integration
+    /// whose registration helper serves both the host and application builders and therefore only has
+    /// the collection at hand; the builder overloads are the usual entry point. Registering here and on
+    /// a builder is the same declaration, so a helper can switch between the two forms freely.
+    /// </summary>
+    public static void AddCapability(IServiceCollection services, ProtoCapabilityDescriptor capability)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(capability);
         AddDescriptor(services, capability);
         AddUnconditionalDeclaration(services, capability);
     }
 
+    // Descriptors are metadata by value: registering the same one twice - a helper called twice, two
+    // integrations declaring the same adapter - must report one capability, while distinct descriptors
+    // of the same CLR type still each register.
     private static void AddDescriptor(IServiceCollection services, ProtoCapabilityDescriptor capability)
         => ProtoRegistration.TryAdd(services, capability, existing => existing == capability);
 

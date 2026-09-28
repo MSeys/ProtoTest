@@ -25,6 +25,7 @@
     <ProjectReference Include="..\..\src\ProtoTest.Http\ProtoTest.Http.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.NUnit\ProtoTest.NUnit.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Rest\ProtoTest.Rest.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Sheets\ProtoTest.Sheets.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Xunit3\ProtoTest.Xunit3.csproj" />
   </ItemGroup>
 

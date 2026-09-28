@@ -4,7 +4,6 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using OpenQA.Selenium;
 using ProtoTest.Core;
-using ProtoTest.Web.Internal;
 
 public sealed partial class SeleniumWebBackend : IWebBackend, IWebBackendJavaScript, IWebBackendDiagnostics
 {

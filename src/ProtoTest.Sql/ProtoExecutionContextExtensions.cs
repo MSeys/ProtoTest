@@ -2,7 +2,6 @@ namespace ProtoTest.Sql;
 
 using System.Data.Common;
 using ProtoTest.Core;
-using ProtoTest.Sql.Internal;
 
 public static class ProtoExecutionContextExtensions
 {

@@ -20,6 +20,9 @@ internal enum ProtoEnvironmentMode
 /// </summary>
 internal static class ProtoEnvironment
 {
+    /// <summary>The shared empty declared-key set for a caller that has no declarations to answer for.</summary>
+    public static readonly IReadOnlySet<string> NoDeclaredKeys = new HashSet<string>(StringComparer.Ordinal);
+
     /// <summary>
     /// Whether the environment satisfies <paramref name="keys"/> under <paramref name="mode"/>: under
     /// <see cref="ProtoEnvironmentMode.AllConfigured"/> every key has a configured value, under
@@ -60,6 +63,7 @@ internal static class ProtoEnvironment
         return HasValue(configuration, key) || declaredKeys.Contains(key);
     }
 
-    private static bool HasValue(IConfiguration configuration, string key)
+    /// <summary>Whether the key has a configured value; the one blank-value rule every condition reads.</summary>
+    public static bool HasValue(IConfiguration configuration, string key)
         => !string.IsNullOrWhiteSpace(configuration[key]);
 }

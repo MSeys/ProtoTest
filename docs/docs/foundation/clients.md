@@ -93,6 +93,26 @@ If a client implements `IDisposable` or `IAsyncDisposable`, it's disposed when t
 
 A client that implements `IProtoClientCompletion` also gets `CompleteAsync()` after normal teardown hooks, before disposal and report publication. A bare-name alias does not cause completion to run twice.
 
+## Resolving a named client
+
+The integration accessors — `Rest(name)`, `GraphQL(name)`, `Grpc(name)`, `Devices(name)` — resolve a client name in one order:
+
+1. The name the call asked for, qualified with the selected application: `Rest("Api")` under
+   `[Application("Csms")]` looks for `Csms:Api` first, so the ambient application wins.
+2. The requested name as given, which keeps a host- or user-registered client reachable by its own name.
+3. Across the host's registered clients of that protocol: when **exactly one** client has that
+   unqualified name, it resolves, whichever application registered it. A test under one application
+   therefore reaches another application's uniquely named client.
+
+A name that is already qualified (`App:Client`, containing `:`) is exact: it is not re-qualified with
+the selected application and does not fall back to the unique-name lookup.
+
+When two applications register the same client name (`Csms:Api` and `Dashboard:Api`), the bare name is
+ambiguous: the lookup fails naming both qualified candidates. Qualify the call — `Rest("Csms:Api")` —
+or bind it for the test with `[Application("Csms", "Rest:Api")]`. The unnamed accessor (`Rest()`)
+always keeps the selected application's binding, then its first registered client for the protocol,
+then `"Default"`; a collision never changes that choice.
+
 ## Sharing one client across tests
 
 Some clients are expensive to create — a started application, a connection pool, a container. Create them once, keep them in the initializer (or a singleton service), and register them per test **without** handing over ownership:
@@ -138,6 +158,12 @@ public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
     return Task.FromResult(true);
 }
 ```
+
+A client whose address resolves is built over **its own primary handler for that test**, with the named
+client's configured handlers still in the chain. The handler owns the cookie container, so a sign-in one
+test performs never reaches a parallel test through a shared handler pool: every test starts with an
+empty jar. A client with no address keeps the pooled client the application's in-process transport
+replaces.
 
 ## Limits
 

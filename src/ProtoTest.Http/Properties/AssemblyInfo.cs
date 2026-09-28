@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("ProtoTest.Rest")]
-[assembly: InternalsVisibleTo("ProtoTest.GraphQL")]
+// Protocol integrations wire their builders up through the public builder surface; only the focused
+// tests reach the internals directly.
 [assembly: InternalsVisibleTo("ProtoTest.Http.Tests")]
 [assembly: InternalsVisibleTo("ProtoTest.Rest.Tests")]
 [assembly: InternalsVisibleTo("ProtoTest.GraphQL.Tests")]

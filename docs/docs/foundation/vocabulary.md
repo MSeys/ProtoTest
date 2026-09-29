@@ -96,7 +96,7 @@ Entities are state, not history: each appears once in the archive with its lates
 | `auth` | `auth:user` | `auth:user` | the test user and how it signed in |
 | `server` | `server:{entryPointFullName}` | `server:ProtoTest.SampleApp.Program:Northstar` | the in-process application server |
 | `capability` | `{kind}:{name}`, with `:{instance}` when the descriptor carries one | `server:ASP.NET Core:Northstar` | what the run can serve |
-| `clock` | `clock:run` for the run, and a clock per test | `clock:683368000001` | the clocks a test can advance |
+| `clock` | `clock:run` for the run, and a clock per test | `clock:725654000001` | the clocks a test can advance |
 | `device` | `device:{client}:{deviceType}:{id}` | a pattern; no lesson archive records one | a device session |
 
 Tracked values are state items with kind `value` and an id of the form `{type}:{identity}`. Infrastructure and resources use their own ids. The entry kinds themselves, from `test.setup` to the last assertion, are listed in [ProtoTrace](../observability/prototrace.md#what-a-trace-contains).

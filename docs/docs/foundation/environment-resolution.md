@@ -11,7 +11,7 @@ export const compositionLayers = [
   {
     id: 'setup',
     label: 'Setup',
-    when: '477.7 ms',
+    when: '511.4 ms',
     lead: 'The same six hooks and four attributes as any journey. The address decision happened earlier, at chain resolution.',
     entries: [
       {kind: 'test.setup', name: 'Setup', meta: '6 hooks, 4 attributes'},
@@ -21,18 +21,18 @@ export const compositionLayers = [
   {
     id: 'execution',
     label: 'Execution',
-    when: '138.1 ms',
+    when: '149.8 ms',
     lead: 'The test reads the composed address. One request, two checks, both green.',
     entries: [
-      {kind: 'http.request', name: 'REST GET /api/v1/organization', meta: '120.4 ms, 200 OK'},
+      {kind: 'http.request', name: 'REST GET /api/v1/organization', meta: '131.7 ms, 200 OK'},
       {kind: 'assert.http.status', name: 'Assert status 200 OK', meta: 'expected and actual agree'},
-      {kind: 'assert.json.shape', name: 'Assert response shape', meta: '7.4 ms'},
+      {kind: 'assert.json.shape', name: 'Assert response shape', meta: '7.7 ms'},
     ],
   },
   {
     id: 'teardown',
     label: 'Teardown',
-    when: '27.7 ms',
+    when: '35.2 ms',
     lead: 'Attributes and hooks reverse, three attachments publish, resources release.',
     entries: [
       {kind: 'attachment.publish', name: 'Response, expected shape, scenario summary', meta: '3 files into the archive'},
@@ -159,7 +159,7 @@ The chain figure is in [Infrastructure](./infrastructure.md#what-it-is): one tar
 
 ```text
 FailureDrills.TheAddressWasHardcodedForOneMachine
-  test.execution failed in 2058.6 ms, no child operation
+  test.execution failed in 2046.1 ms, no child operation
   HttpRequestException: ConnectionError reaching http://127.0.0.1:5099: connection refused.
 ```
 

@@ -42,7 +42,7 @@ One file from CI must explain the run to a reader who was not there. That file i
     ),
     reveal: (
       <>
-        The response bytes are an attachment inside the archive, under <code>resources/&lt;test id&gt;/artifact-1/&lt;test id&gt;-rest-01-response</code>, 2,009 bytes of workbook. The execution layer holds the <code>sheets.open</code>, <code>sheets.model</code> and <code>assert.sheets</code> entries, and the embedded report carries the sheet coverage rows the model and the column check recorded, <code>Summary!A2:C2</code> and <code>Summary!C2:C2</code>.
+        The response bytes are an attachment inside the archive, under <code>resources/&lt;test id&gt;/artifact-1/&lt;test id&gt;-rest-01-response</code>, 2,010 bytes of workbook. The execution layer holds the <code>sheets.open</code>, <code>sheets.model</code> and <code>assert.sheets</code> entries, and the embedded report carries the sheet coverage rows the model and the column check recorded, <code>Summary!A2:C2</code> and <code>Summary!C2:C2</code>.
       </>
     ),
   }}

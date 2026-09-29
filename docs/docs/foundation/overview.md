@@ -12,7 +12,7 @@ export const lifecycleLayers = [
   {
     id: 'setup',
     label: '1-2 Setup',
-    when: '522.9 ms',
+    when: '500.5 ms',
     lead: 'Steps 1 and 2 of the lifecycle: hooks create the clients, attributes provision the tenant.',
     entries: [
       {kind: 'hook.before', name: 'Client initializer, SQL, scenario, auth hooks', meta: '6 hooks, lowest order first'},
@@ -23,10 +23,10 @@ export const lifecycleLayers = [
   {
     id: 'execution',
     label: '3 Execution',
-    when: '161.1 ms',
+    when: '178.0 ms',
     lead: 'Step 3: the body runs. One request and the two checks that decided the test.',
     entries: [
-      {kind: 'http.request', name: 'REST POST /api/v1/projects', meta: '142.2 ms, 201 Created'},
+      {kind: 'http.request', name: 'REST POST /api/v1/projects', meta: '158.5 ms, 201 Created'},
       {kind: 'assert.http.status', name: 'Assert status 201 Created', meta: 'the check that decided the request'},
       {kind: 'assert.json.shape', name: 'Assert response shape', meta: '5 properties matched at once'},
     ],
@@ -34,7 +34,7 @@ export const lifecycleLayers = [
   {
     id: 'teardown',
     label: '4-5 Teardown',
-    when: '30.0 ms',
+    when: '36.7 ms',
     lead: 'Steps 4 and 5: attributes and hooks reverse, attachments publish, resources release.',
     entries: [
       {kind: 'attribute.after', name: 'NorthstarMember down to Application', meta: 'reverse of setup'},

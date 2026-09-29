@@ -22,7 +22,7 @@ export const firstJourneyLayers = [
       {
         kind: 'application',
         name: 'Northstar web on a loopback listener',
-        meta: 'readiness /health, 1 attempt, waited 89 ms',
+        meta: 'readiness /health, 1 attempt, waited 92 ms',
       },
       {
         kind: 'broker',
@@ -34,7 +34,7 @@ export const firstJourneyLayers = [
   {
     id: 'setup',
     label: 'Setup',
-    when: '522.9 ms',
+    when: '500.5 ms',
     lead: 'Six hooks and four attributes run before the body: clients, the database connection, and the tenant the test asked for.',
     entries: [
       {kind: 'test.setup', name: 'Setup', meta: '6 hooks, 4 attributes'},
@@ -47,17 +47,17 @@ export const firstJourneyLayers = [
       {
         kind: 'attribute.before',
         name: 'Application, NorthstarTenant, SignedInAs, NorthstarMember',
-        meta: 'the tenant attribute provisions a TenantResponse in 138.1 ms',
+        meta: 'the tenant attribute provisions a TenantResponse in 139.9 ms',
       },
     ],
   },
   {
     id: 'execution',
     label: 'Execution',
-    when: '161.1 ms',
+    when: '178.0 ms',
     lead: 'One request, the application event it caused, and the two checks that decided the test.',
     entries: [
-      {kind: 'http.request', name: 'REST POST /api/v1/projects', meta: '142.2 ms, 201 Created'},
+      {kind: 'http.request', name: 'REST POST /api/v1/projects', meta: '158.5 ms, 201 Created'},
       {kind: 'Northstar.Domain', name: 'project.create', meta: 'reported by the application itself'},
       {kind: 'assert.http.status', name: 'Assert status 201 Created', meta: 'expected and actual agree'},
       {kind: 'assert.json.shape', name: 'Assert response shape', meta: '5 properties matched at once'},
@@ -66,7 +66,7 @@ export const firstJourneyLayers = [
   {
     id: 'teardown',
     label: 'Teardown',
-    when: '30.0 ms',
+    when: '36.7 ms',
     lead: 'Attributes and hooks reverse, four attachments publish, and owned resources release in order.',
     entries: [
       {kind: 'attachment.publish', name: 'Request, response, expected shape, scenario summary', meta: '4 files into the archive'},

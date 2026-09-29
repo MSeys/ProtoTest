@@ -11,7 +11,7 @@ export const orderLayers = [
   {
     id: 'setup',
     label: 'Setup',
-    when: '522.9 ms',
+    when: '500.5 ms',
     lead: 'Hooks first in ascending Order, then attributes in ascending Order. The client hook runs before everything else.',
     entries: [
       {kind: 'hook.before', name: 'ProtoClientInitializerHook', meta: 'Order First: clients exist before any other hook'},
@@ -23,7 +23,7 @@ export const orderLayers = [
   {
     id: 'teardown',
     label: 'Teardown',
-    when: '30.0 ms',
+    when: '36.7 ms',
     lead: 'The same components walk back: attributes in reverse, then hooks in reverse, then publish and release.',
     entries: [
       {kind: 'attribute.after', name: 'NorthstarMember, SignedInAs, NorthstarTenant, Application', meta: 'reverse of setup'},

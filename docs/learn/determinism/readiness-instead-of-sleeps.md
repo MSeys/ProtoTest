@@ -94,11 +94,11 @@ The run layer holds one readiness entity for the loopback instance. From the arc
 
 | Attribute | Value |
 | --- | --- |
-| `readiness.url` | `http://127.0.0.1:64464/health`, the port this run bound |
+| `readiness.url` | `http://127.0.0.1:54120/health`, the port this run bound |
 | `readiness.attempts` | `1` |
-| `readiness.waitedMs` | `113` |
+| `readiness.waitedMs` | `85` |
 
-The address is the run's own, so it changes between runs. The two numbers are the answer a sleep cannot give: the address answered on the first probe, and the wait cost 113 milliseconds. A run that needs several probes adds attempts, and a slow address shows up as a larger number instead of a mystery failure in the first test that used it.
+The address is the run's own, so it changes between runs. The two numbers are the answer a sleep cannot give: the address answered on the first probe, and the wait cost 85 milliseconds. A run that needs several probes adds attempts, and a slow address shows up as a larger number instead of a mystery failure in the first test that used it.
 
 The entity is released with the run, at the same position the listener is released. That release is a `resource.release` entry in the run layer of the same archive.
 
@@ -109,7 +109,7 @@ No test in the sample waits for the application. A test starts, takes its client
 <Checkpoint
   question="What would a sleep for the same wait leave in the trace instead of the readiness entity?"
   verify={<>Read the test execution spans in <a href="pathname:///lessons/l3-clock-window.prototrace">l3-clock-window.prototrace</a>. No test span waits for the address.</>}
-  reveal={<>Nothing but a slower span. A sleep records no URL, no attempts and no waited time. The readiness entity reads 1 attempt and 113 ms; the sleep would leave only a slower entry in one test's execution span.</>}
+  reveal={<>Nothing but a slower span. A sleep records no URL, no attempts and no waited time. The readiness entity reads 1 attempt and 85 ms; the sleep would leave only a slower entry in one test's execution span.</>}
 />
 
 </LearnShell>

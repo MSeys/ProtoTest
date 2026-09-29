@@ -218,7 +218,7 @@ The winner in run state, the learning sample's project journey:
 application:loopback:Northstar web
   settings ProtoTest:Applications:Northstar web:BaseUrl, released
 readiness:application:Northstar web
-  1 attempt, waited 89 ms, released
+  1 attempt, waited 92 ms, released
 ```
 
 The per-target `environment.resolved` events live in the run phase of a full run archive. The single-test lesson archives carry the winner as run state above, so read the decision there.

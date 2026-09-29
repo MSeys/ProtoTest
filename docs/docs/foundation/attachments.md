@@ -66,7 +66,7 @@ One journey's archive, the learning sample's project journey:
 
 ```text
 l1-first-journey.prototrace
-  resources/416387000001/artifact-1..4    request, response, expected shape, scenario summary
+  resources/117492000001/artifact-1..4    request, response, expected shape, scenario summary
   resources/run/JsonReportSink, HtmlReportSink    report.json, report.html
   sources/1..2, manifest.json, spans.json, state.json
 ```

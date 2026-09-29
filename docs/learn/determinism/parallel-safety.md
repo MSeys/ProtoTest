@@ -113,8 +113,8 @@ Each archive in this track is one test's trace, with its own tenant identity in 
 
 | Archive | Tenant | Test |
 | --- | --- | --- |
-| <a href="pathname:///lessons/l0-state-fix.prototrace">l0-state-fix.prototrace</a> | `northstar-651014000001` | `EachTenantSeesOnlyItsOwnProjects` |
-| <a href="pathname:///lessons/l3-clock-window.prototrace">l3-clock-window.prototrace</a> | `northstar-683368000001` | `ClosingTheBillingPeriodIssuesTheInvoiceOnTheTestClock` |
+| <a href="pathname:///lessons/l0-state-fix.prototrace">l0-state-fix.prototrace</a> | `northstar-553135000001` | `EachTenantSeesOnlyItsOwnProjects` |
+| <a href="pathname:///lessons/l3-clock-window.prototrace">l3-clock-window.prototrace</a> | `northstar-725654000001` | `ClosingTheBillingPeriodIssuesTheInvoiceOnTheTestClock` |
 
 Open the two archives side by side in the [viewer](https://trace.prototest.dev). Each setup layer provisions its tenant under a name carrying its own test id, each value list records that tenant with `owned: true`, and each teardown releases it. The fixed names inside the tenants (`atlas` in the coverage journey, `report-atlas` in the sheets journey) repeat across tests without meeting, because no two tests share the tenant. The [concurrency page](/docs/foundation/concurrency) covers the mechanics: what flows with the context, what loses it, and how a suite opts in.
 

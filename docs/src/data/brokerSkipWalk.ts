@@ -29,7 +29,7 @@ export const brokerSkipLayers = [
       {
         kind: 'application',
         name: 'Northstar web on a loopback listener',
-        meta: 'readiness /health, 1 attempt, waited 92 ms',
+        meta: 'readiness /health, 1 attempt, waited 83 ms',
       },
       {
         kind: 'broker',

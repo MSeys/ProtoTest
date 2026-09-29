@@ -4,6 +4,8 @@ title: Continuous integration
 description: Run ProtoTest in CI and keep the trace, reports and runner output together as build artifacts on GitHub Actions, Azure Pipelines or GitLab CI.
 ---
 
+import TabbedCode from '@site/src/components/TabbedCode';
+
 # Continuous integration
 
 Keep the runner result, the HTML report and the `.prototrace` together. The runner names the failed test. The report shows coverage and findings. The trace shows the failing operation.
@@ -138,6 +140,17 @@ jobs:
 
 Give the action both reports to gate the pull request. A nightly job runs the suite on the default branch and keeps its `report.json`. The pull request job fetches it.
 
+```mermaid
+flowchart LR
+    nightly["nightly on main · 02:30"] --> baseline["baseline report.json"]
+    pr["pull request job"] --> current["current report.json"]
+    pr --> fetch["fetch the newest nightly artifact"]
+    fetch --> baseline
+    baseline --> gate["feedback with baseline + current"]
+    current --> gate
+    gate --> verdict["pass or fail the gate"]
+```
+
 ```yaml
 # nightly.yml
 name: Nightly baseline
@@ -199,12 +212,25 @@ The other inputs are optional. `webhook-url` and `webhook-secret` post the diges
 
 [The evidence loop](../agent-workflows/loop.md#what-the-reviewer-sees) shows what the reviewer sees. The [CLI reference](../agent-workflows/cli.md#environment-targets) lists every environment target.
 
-## GitHub Actions
+## Provider configurations
 
-If you prefer to keep only the raw artifacts, this job runs the suite and uploads the results folder:
+If you prefer to keep only the raw artifacts, each provider runs the suite and uploads the results folder. The three differ in two lines: the results variable and the publish condition.
 
-```yaml
-name: Integration tests
+| Provider | Results variable | Publish even on failure | Containers |
+| --- | --- | --- | --- |
+| GitHub Actions | `github.workspace` + `/TestResults/ProtoTest` | `if: always()` | Docker available on hosted Linux runners |
+| Azure Pipelines | `$(Build.ArtifactStagingDirectory)/ProtoTest` | `succeededOrFailed()` | Microsoft-hosted Linux agents |
+| GitLab CI | `$CI_PROJECT_DIR/TestResults/ProtoTest` | `when: always` | needs a Docker-capable runner |
+
+<TabbedCode
+  label="Raw artifact upload by provider"
+  tabs={[
+    {
+      id: 'gha',
+      label: 'GitHub Actions',
+      filename: '.github/workflows/integration-tests.yml',
+      language: 'yaml',
+      code: `name: Integration tests
 
 on:
   push:
@@ -217,7 +243,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      PROTOTEST_RESULTS: ${{ github.workspace }}/TestResults/ProtoTest
+      PROTOTEST_RESULTS: \${{ github.workspace }}/TestResults/ProtoTest
 
     steps:
       - uses: actions/checkout@v4
@@ -234,36 +260,14 @@ jobs:
         with:
           name: prototest-results
           path: TestResults/ProtoTest
-          if-no-files-found: error
-```
-
-`if: always()` matters here too: the trace is most useful when the test step failed. GitHub-hosted Linux runners have Docker available for Testcontainers-based infrastructure.
-
-### Playwright on Linux
-
-When the suite uses the bundled Playwright browsers, build once, install the browser and its Linux dependencies, then test without rebuilding:
-
-```yaml
-- run: dotnet build --configuration Release --no-restore
-
-- name: Install Chromium
-  shell: pwsh
-  run: |
-    $installer = Get-ChildItem -Recurse -Filter playwright.ps1 |
-      Where-Object FullName -Match 'bin/Release' |
-      Select-Object -First 1
-    if (-not $installer) { throw "playwright.ps1 was not generated." }
-    pwsh $installer.FullName install --with-deps chromium
-
-- run: dotnet test --configuration Release --no-build --no-restore
-```
-
-If `InstallBrowsers` is true, ProtoTest downloads a missing browser binary. Keep the explicit CI step on Linux. Playwright also installs the OS libraries the browser needs.
-
-## Azure Pipelines
-
-```yaml
-trigger:
+          if-no-files-found: error`,
+    },
+    {
+      id: 'azure',
+      label: 'Azure Pipelines',
+      filename: 'azure-pipelines.yml',
+      language: 'yaml',
+      code: `trigger:
   - main
 
 pool:
@@ -287,15 +291,14 @@ steps:
     condition: succeededOrFailed()
     inputs:
       targetPath: $(PROTOTEST_RESULTS)
-      artifact: prototest-results
-```
-
-Use `succeededOrFailed()` for the same reason as GitHub's `always()`: publish the evidence even when a test fails.
-
-## GitLab CI
-
-```yaml
-integration-tests:
+      artifact: prototest-results`,
+    },
+    {
+      id: 'gitlab',
+      label: 'GitLab CI',
+      filename: '.gitlab-ci.yml',
+      language: 'yaml',
+      code: `integration-tests:
   image: mcr.microsoft.com/dotnet/sdk:10.0
   variables:
     PROTOTEST_RESULTS: "$CI_PROJECT_DIR/TestResults/ProtoTest"
@@ -306,10 +309,33 @@ integration-tests:
     when: always
     paths:
       - TestResults/ProtoTest/
-    expire_in: 14 days
+    expire_in: 14 days`,
+    },
+  ]}
+/>
+
+`if: always()` matters: the trace is most useful when the test step failed. Use `succeededOrFailed()` on Azure and `when: always` on GitLab for the same reason. A container-backed suite on GitLab also needs a Docker-capable runner. Your runner setup decides if Docker-in-Docker is allowed and which service config it needs. ProtoTest only needs a reachable Docker endpoint.
+
+### Playwright on Linux
+
+When the suite uses the bundled Playwright browsers, build once, install the browser and its Linux dependencies, then test without rebuilding:
+
+```yaml
+- run: dotnet build --configuration Release --no-restore
+
+- name: Install Chromium
+  shell: pwsh
+  run: |
+    $installer = Get-ChildItem -Recurse -Filter playwright.ps1 |
+      Where-Object FullName -Match 'bin/Release' |
+      Select-Object -First 1
+    if (-not $installer) { throw "playwright.ps1 was not generated." }
+    pwsh $installer.FullName install --with-deps chromium
+
+- run: dotnet test --configuration Release --no-build --no-restore
 ```
 
-A container-backed suite also needs a Docker-capable GitLab runner. Your runner setup decides if Docker-in-Docker is allowed and which service config it needs. ProtoTest only needs a reachable Docker endpoint.
+If `InstallBrowsers` is true, ProtoTest downloads a missing browser binary. Keep the explicit CI step on Linux. Playwright also installs the OS libraries the browser needs.
 
 ## One suite, three jobs
 

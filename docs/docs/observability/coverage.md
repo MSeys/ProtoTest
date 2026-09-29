@@ -26,6 +26,8 @@ flowchart LR
     Sinks --> Archive[".prototrace"]
 ```
 
+Each edge carries a concrete payload. A REST response produces `http.response` (method, route, status, body); a matched shape assertion produces `http.contract.shape` (the paths it matched). The collector turns those into report items (endpoint, response, property with covered or uncovered). The sink writes the items into `report.json` and `report.html`. The archive embeds both files under `resources/run/`.
+
 1. Integrations record **observations** as tests run. REST records `http.response` for every response and `http.contract.shape` for every successful shape assertion. GraphQL records `graphql.response` and `graphql.contract.shape`; gRPC records `grpc.response` per call and `grpc.contract.shape`; messaging records `messaging.published` and `messaging.receive`, plus `messaging.contract.shape` from a message shape assertion.
 2. Each observation is offered to every registered **collector** whose `CanCollect` accepts it. Collectors live for the whole run, so they aggregate across all tests.
 3. When the run stops, every collector's **report items** are gathered, sorted by target, category and identifier, and passed to every **sink**.
@@ -112,7 +114,19 @@ Property coverage comes from the paths `Should.MatchShape` matched. A test that 
 
 ### Traffic coverage (observed but unasserted)
 
-`RestCoverageCollector` counts the routes your suite called; traffic coverage looks inside the responses. It reports the fields that arrived in a response and that no shape assertion mentioned, in its own report section. It is opt-in:
+`RestCoverageCollector` counts the routes your suite called; traffic coverage looks inside the responses. It reports the fields that arrived in a response and that no shape assertion mentioned, in its own report section. The two count different things:
+
+```text
+REST coverage (asserted)                    Traffic (observed, never covered)
+counts toward the percentage               never counts toward the percentage,
+                                           the gates, or the property table
+per method + route + status                Any() and NotNull() do not claim
+                                           the fields inside the value
+a property counts when a shape             a field here is still uncovered there;
+matched it                                 the section names the gap
+```
+
+It is opt-in:
 
 ```csharp
 builder.AddRest(rest => rest

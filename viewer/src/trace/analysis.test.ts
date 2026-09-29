@@ -92,6 +92,22 @@ describe("findFailure", () => {
     expect(failure?.call?.id).toBe("call");
   });
 
+  it("does not let a deeper cancelled child outrank the failed operation", () => {
+    const failed = span({
+      id: "failed", kind: "http.request", status: "failed", depth: 1,
+      error: { type: "TimeoutException", message: "the request timed out" }
+    });
+    const cancelled = span({
+      id: "cancelled", kind: "http.request", status: "cancelled", depth: 2, parent: failed,
+      error: { type: "OperationCanceledException", message: "the retry was cancelled" }
+    });
+    failed.children = [cancelled];
+
+    const failure = findFailure(testTrace([span({ id: "phase", kind: "test.execution", status: "failed" }), failed, cancelled]));
+
+    expect(failure?.span.id).toBe("failed");
+  });
+
   it("returns null when nothing failed", () => {
     expect(findFailure(testTrace([span({})]))).toBeNull();
   });
@@ -136,14 +152,14 @@ describe("findFailure over the committed demo trace", () => {
     const run = buildRun(archive.spans, archive.state);
     const failureOf = (name: string) => run.tests.find(test => test.name.endsWith(name))?.failure;
 
-    expect(failureOf("AFailedOperationRecordsItsDiagnosticsAndTheRunContinues")?.span.kind).toBe("northstar.webhook.deliver");
-    expect(failureOf("ShapeMismatchesAreCapturedWithoutFailingTheRun")?.span.kind).toBe("assert.json.shape");
-    expect(failureOf("TheDashboardNeverShowsAnotherTenantsPlan")?.span.kind).toBe("assert.web");
-    expect(failureOf("TheOrganizationReportsItsPlanAndProjectCount")?.span.kind).toBe("assert.json.shape");
+    expect(failureOf("ARealWaitDoesNotCloseTheDueWindow")?.span.kind).toBe("assert.json.shape");
+    expect(failureOf("ABareStatusHidesWhatTheApplicationSaid")?.span.kind).toBe("assert.http.status");
+    expect(failureOf("AnUnknownProjectIdIsTreatedAsMine")?.span.kind).toBe("assert.http.status");
+    expect(failureOf("TheAddressWasHardcodedForOneMachine")?.span.kind).toBe("test.execution");
 
-    // The shape checks were judged on a protocol call, so the failure names that call.
-    expect(failureOf("ShapeMismatchesAreCapturedWithoutFailingTheRun")?.call?.kind).toBe("http.request");
-    expect(failureOf("TheOrganizationReportsItsPlanAndProjectCount")?.call?.kind).toBe("http.request");
-    expect(failureOf("TheDashboardNeverShowsAnotherTenantsPlan")?.call).toBeNull();
+    // The shape check was judged on a protocol call, so the failure names that call; the address drill
+    // threw before any call was recorded.
+    expect(failureOf("ARealWaitDoesNotCloseTheDueWindow")?.call?.kind).toBe("http.request");
+    expect(failureOf("TheAddressWasHardcodedForOneMachine")?.call).toBeNull();
   });
 });

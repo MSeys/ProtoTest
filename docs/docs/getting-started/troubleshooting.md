@@ -8,18 +8,30 @@ description: "The first problems a new suite runs into, and what fixes them: the
 
 The problems below are the ones a new suite meets first. Each one starts with the message you see.
 
-| What you see | Start here |
-| --- | --- |
-| `ProtoHost is not initialized` | [The host is not there](#the-host-is-not-there) |
-| `No active ProtoExecutionContext` | [There is no test context](#there-is-no-test-context) |
-| `No application is selected` or `has no Rest client registered` | [A client cannot be resolved](#a-client-cannot-be-resolved) |
-| `Program` is inaccessible or the in-process host fails | [The application does not start in-process](#the-application-does-not-start-in-process) |
-| Docker endpoint or container startup failure | [Containers do not start](#containers-do-not-start) |
-| Playwright cannot find a browser executable | [The browser does not launch](#the-browser-does-not-launch) |
-| Tests pass separately but fail in a full run | [Tests pass alone and fail together](#tests-pass-alone-and-fail-together) |
-| No `.prototrace`, report or CI artifact | [Where is the trace?](#where-is-the-trace) and [The CI artifact is empty](#the-ci-artifact-is-empty) |
+## Messages to fix
 
-## The host is not there
+Copy the quoted message and find it below. Each row names the meaning, the fix and the section that walks it in full.
+
+| What you see | What it means | Fix | Deep dive |
+| --- | --- | --- | --- |
+| `CS0616: 'ProtoTest' is not an attribute class` | `[ProtoTest]` resolved to the `ProtoTest` namespace because the adapter's attribute is not in scope | add `using ProtoTest.NUnit;`, or the adapter package for your runner. The runner pages list the usings. | [I see `ProtoHost is not initialized`](#i-see-protohost-is-not-initialized) |
+| `NU1605: Detected package downgrade: NUnit from 4.6.1 to 4.3.2` | `dotnet new nunit` pins NUnit 4.3.2 while `ProtoTest.NUnit` needs 4.6.1 or newer | bump NUnit first: `dotnet add package NUnit --version 4.6.1`. See [Installation](./installation.md). | [I see `ProtoHost is not initialized`](#i-see-protohost-is-not-initialized) |
+| `Aspire resource 'api' has no 'http' endpoint` | the AppHost project resource declares no `http` endpoint: no `WithHttpEndpoint`, and no `applicationUrl` in its launch profile | declare the endpoint in the AppHost, or point `UseEndpoint("api", "https")` at one the resource exposes. See [Aspire](../integrations/aspire.md). | [The application does not start in-process](#the-application-does-not-start-in-process) |
+| `Aspire resource 'api' has no value yet: the AppHost publishes 'ProtoTest:Applications:api:BaseUrl' when the run starts` | the AppHost was never selected, usually because `ProtoTest__Aspire__Enabled=true` set in the shell never reached the host | add `.AddEnvironmentVariables()` to the suite's configuration sources. See [Configuration](./configuration.md#adding-configuration-sources). | [I see `No application is selected`](#i-see-no-application-is-selected) |
+| `No password has been provided` | the code read the connection string from the opened connection, and opening strips credentials | read the value the run started from `ProtoInfrastructureSettings.Values`, password included. See [SQL](../integrations/sql/index.md). | [Containers do not start](#containers-do-not-start) |
+| `prototest summary` shows `?` where a trace name uses `·` | the terminal is not reading the CLI's UTF-8 output as UTF-8 | the CLI sets UTF-8 output when it starts; if the console still substitutes glyphs, switch it to a UTF-8 code page (`chcp 65001` on Windows) or use a UTF-8 terminal. See [CLI reference](../agent-workflows/cli.md). | [The CI artifact is empty](#the-ci-artifact-is-empty) |
+| `ProtoHost is not initialized` | the runner never ran the setup class | check the setup for your runner below | [I see `ProtoHost is not initialized`](#i-see-protohost-is-not-initialized) |
+| `No active ProtoExecutionContext` | `Proto.Context` was read outside a ProtoTest test | use the ProtoTest attribute, or pass the context along | [I see `No active ProtoExecutionContext`](#i-see-no-active-protoexecutioncontext) |
+| `No application is selected` or `has no Rest client registered` | the test names no client | select the application or name the client | [I see `No application is selected`](#i-see-no-application-is-selected) |
+| `Program` is inaccessible or the in-process host fails | the application's entry point is internal, or its configuration is missing | add `public partial class Program;`, or feed the configuration from the test run | [The application does not start in-process](#the-application-does-not-start-in-process) |
+| Docker endpoint or container startup failure | Docker is not running or not reachable | start Docker, or give the suite a connection string instead | [Containers do not start](#containers-do-not-start) |
+| Playwright cannot find a browser executable | the browser was never installed on the machine | set `InstallBrowsers = true`, or drive an installed browser by channel | [The browser does not launch](#the-browser-does-not-launch) |
+| Tests pass separately but fail in a full run | parallel tests share names or state | derive names from the test id | [Tests pass alone and fail together](#tests-pass-alone-and-fail-together) |
+| No `.prototrace`, report or CI artifact | the trace lands where the test process runs, not where CI looks | set an absolute `PROTOTEST_RESULTS` directory | [Where is the trace?](#where-is-the-trace) and [The CI artifact is empty](#the-ci-artifact-is-empty) |
+
+The sections below walk each problem in full. ProtoTrace records every hook, request and check in order; [open the trace](../observability/prototrace.md) when a message below does not explain what you see.
+
+## I see `ProtoHost is not initialized`
 
 > **No active ProtoHost is available. The runner setup creates it: derive the suite's [SetUpFixture] from ProtoTestAssembly ...**
 
@@ -32,13 +44,13 @@ The runner never ran your setup class, so no host was built. The rest of the mes
 
 Each runner's page under [Test runners](../runners/overview.md) shows the complete setup.
 
-## There is no test context
+## I see `No active ProtoExecutionContext`
 
 > **No active ProtoExecutionContext is available on this flow. Proto.Context only works inside a test body ...**
 
 `Proto.Context` was read outside a ProtoTest test. Usually the test uses the runner's own attribute (`[Test]`, `[Fact]`, `[TestMethod]`) instead of the ProtoTest attribute that opens the context (`[ProtoTest]`, or `[ProtoTestFact]` / `[ProtoTestTheory]` for xUnit). It also happens in code that runs outside the test's async flow, such as a static initializer or a thread started by hand. Pass the `ProtoExecutionContext` along, or, for telemetry that cannot take it, reach the owning test's trace with `ProtoHost.FindTraceWriter(Activity?)`. Off test flows the message also names the alternatives.
 
-## A client cannot be resolved
+## I see `No application is selected`
 
 > **No application is selected for this test. Apply [Application(name)] or pass a Rest client name to the accessor.**
 
@@ -63,7 +75,20 @@ Infrastructure such as `PostgresDatabase.Container()` runs on Docker through Tes
 
 - Start Docker Desktop, or on Linux make sure the current user can reach the Docker socket.
 - On CI, use a runner image with Docker available.
-- To run the suite where Docker is not available, give it a connection string through configuration instead of a container. A test-level skip cannot get in front of it: `AddInfrastructure` starts the container with the host, before any skip condition is evaluated, so a missing runtime fails the run at start. Start the container in the suite fixture instead, before registering anything: `PostgresDatabase.TryStart(...)` and `RabbitMqBroker.TryStart(...)` report the failure instead of throwing, so the fixture can fall back, replace the connection string, or skip the suite. When the fixture starts the container itself, register it with `AddResource` so the host still releases it; `AddInfrastructure` is for containers the host starts. `TryStart` blocks the calling thread while the container starts and has no timeout. See [Skip conditions](../foundation/skip-conditions.md).
+
+### Running where Docker is not available
+
+Give the suite a connection string through configuration instead of a container. A test-level skip cannot get in front of it: `AddInfrastructure` starts the container with the host, before any skip condition is evaluated, so a missing runtime fails the run at start. Start the container in the suite fixture instead, before registering anything:
+
+```csharp
+var started = PostgresDatabase.TryStart();
+if (!started.Started)
+{
+    // Fall back to a configured connection string, or skip the suite.
+}
+```
+
+`PostgresDatabase.TryStart(...)` and `RabbitMqBroker.TryStart(...)` report the failure instead of throwing, so the fixture can fall back, replace the connection string, or skip the suite. When the fixture starts the container itself, register it with `AddResource` so the host still releases it; `AddInfrastructure` is for containers the host starts. `TryStart` blocks the calling thread while the container starts and has no timeout. See [Skip conditions](../foundation/skip-conditions.md).
 
 ## The browser does not launch
 
@@ -73,7 +98,7 @@ Playwright reports that the browser executable does not exist when it was never 
 
 Parallel tests share the application and its data. When two tests create the same customer, order number or email address, one of them fails, but only when they happen to run at the same time.
 
-Make every value a test creates unique to that test. `Proto.Context.UniqueName("customer")` derives a deterministic name from the test id that is safe for a persistent store, so a rerun against a database that outlives the process never collides. Fix `RunPrefix` if the same record should be reused:
+Make every value a test creates unique to that test. `Proto.Context.UniqueName("customer")` derives a deterministic name from the test id. See [Execution context](../foundation/execution-context.md#unique-names) for the rerun rule:
 
 ```csharp
 new { name = Proto.Context.UniqueName("customer") }   // "customer-0042317"
@@ -91,7 +116,7 @@ Tests that genuinely cannot run side by side need the runner's own tool: `[NonPa
 
 Without `ConfigureTracing`, the trace goes to `TestResults/prototest-{runId}.prototrace`. Relative paths, that one and your own, resolve against the directory the tests run in, which for `dotnet test` is the test project's output folder: `bin/Debug/net10.0/TestResults/`. Set an absolute path, or one built from an environment variable, to collect it from CI.
 
-If [trace.prototest.dev](https://trace.prototest.dev) says the trace is **from an older ProtoTest**, the file was written before trace snapshot format 1.9. Run the tests again with a current ProtoTest. The archive itself is manifest format 2.0: `spans.json` plus `state.json`, whose state documents are format 1.1.
+If [trace.prototest.dev](https://trace.prototest.dev) says the trace is **from an older ProtoTest**, the file was written by a version whose archive the viewer does not open: it reads spans format 2.x and state format 1.x or 2.x. Run the tests again with a current ProtoTest. The archive itself keeps its shape: manifest format 2.0, `spans.json` plus `state.json`, whose state documents are format 1.1.
 
 ## The CI artifact is empty
 

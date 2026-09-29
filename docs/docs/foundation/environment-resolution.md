@@ -1,5 +1,5 @@
 ---
-sidebar_position: 12
+sidebar_position: 14
 title: Environment resolution
 description: "Declare what the run needs as a target with an ordered provider chain: the first provider whose condition holds serves it, and the trace records the decision."
 ---
@@ -8,7 +8,7 @@ description: "Declare what the run needs as a target with an ordered provider ch
 
 ## What it is
 
-A **target** is something the run needs: a database, a broker, a worker, or an application's address. A **provider** is a run piece that can serve that target, such as a container, an AppHost resource, a process, or the configuration itself. Register the target once with its providers in priority order, and the host resolves the chain while it is built: the first provider whose condition holds serves the target, only its piece starts, and every other provider is recorded skipped with the reason.
+A **target** is something the run needs: a database, a broker, a worker, or an application's address. A **provider** is a run piece that can serve that target. Register the target once with its providers in priority order. The first provider whose condition holds serves the target, only its piece starts, and every other provider is recorded skipped with the reason.
 
 ```csharp
 builder.AddInfrastructure("NorthstarDatabase", chain => chain
@@ -25,10 +25,10 @@ No provider available fails the build, naming the target and every provider's un
 
 A condition answers "can this provider serve the target here?" against the configuration the host resolved. The canonical four live in `ProtoProviderConditions`:
 
-| Condition | Holds when | Example |
+| Condition | Holds when | Chain spelling |
 | --- | --- | --- |
 | `Configured` | every key the **target** declares has a configured value | `.UseConfigured()` |
-| `Selected(key)` / `Selected(key, moreKeys...)` | any of the integration-owned selection keys is set | `.Use(new ProtoTargetProvider("grid", gridPiece, ProtoProviderConditions.Selected("Grid:Enabled")))` |
+| `Selected(key, ...)` | any of the integration-owned selection keys is set | `.Use(new ProtoTargetProvider("grid", gridPiece, ProtoProviderConditions.Selected("Grid:Enabled")))` |
 | `Available(requirement, probe)` | the runtime probe returns true | `ProtoProviderConditions.Available("Docker is available", DockerIsRunning)` |
 | `Always` | no condition, the fallback | `new ProtoTargetProvider("in-process", piece)` |
 
@@ -36,7 +36,7 @@ A provider may combine kinds by implementing `IProtoProviderCondition` itself. A
 
 ### Keys live on the target
 
-The target declares its configuration keys once, as its identity, and every provider checks or fills those keys. An application target derives its address key from its name; a store target passes the key its readers use:
+The target declares its configuration keys once, as its identity, and every provider checks or fills those keys:
 
 ```csharp
 // The database target owns the key the test-side domain and the application both read.
@@ -67,11 +67,13 @@ public sealed class GridProvider : IProtoTargetProvider
 }
 ```
 
-- **`Name`** identifies the provider in the resolution record and in every skip reason.
-- **`Condition`** is evaluated against `ProtoProviderConditionContext`: the resolved `Configuration`, the target's `Keys`, and the winners of the targets resolved before this chain (`Target("Api")`). A dependent chain declares `ResolveAfter("Api")` so it is resolved after the target it reads, whatever the registration order. A worker nested under an application uses it.
-- **`Infrastructure`** is the piece the run starts and releases when this provider wins. `null` means configuration itself serves the target and there is nothing to start.
-- **`Capabilities`** are declared only by the winner: a losing provider's capability stays absent, so `[RequiresCapability]` skips exactly when the environment cannot serve it.
-- **`ConfigureServices`** contributes the services that exist only while this provider serves its target, such as a client initializer, a transport or a factory. It runs while the host is built, for the winner only, so a losing provider cannot leave a second client or server behind. `ProtoTargetProvider` spells it `WinnerServices`.
+| Member | Job |
+| --- | --- |
+| **`Name`** | identifies the provider in the resolution record and in every skip reason |
+| **`Condition`** | evaluated against `ProtoProviderConditionContext`: the resolved `Configuration`, the target's `Keys`, and the winners of the targets resolved before this chain (`Target("Api")`). A dependent chain declares `ResolveAfter("Api")` so it is resolved after the target it reads, whatever the registration order. |
+| **`Infrastructure`** | the piece the run starts and releases when this provider wins. `null` means configuration itself serves the target and there is nothing to start. |
+| **`Capabilities`** | declared only by the winner: a losing provider's capability stays absent, so `[RequiresCapability]` skips exactly when the environment cannot serve it |
+| **`ConfigureServices`** | contributes the services that exist only while this provider serves its target. It runs while the host is built, for the winner only, so a losing provider cannot leave a second client or server behind. `ProtoTargetProvider` spells it `WinnerServices`. |
 
 `ProtoTargetProvider` builds the common shape, a name, a piece, a condition and capabilities, in one line. Implement the interface when the provider itself has behavior.
 
@@ -110,7 +112,7 @@ An application that declares no provider registers no chain: `AddAspNetCoreServe
 | ProtoTest.Aspire | `ProtoAspireOptions.MapConnectionString(resource, key)` | a registered AppHost publishes the resource's connection string under `key` |
 | ProtoTest.Hosting | `UseEnvironment()` / `UseHost()` | the application is served elsewhere / always |
 
-`UseAspireResource` on an application chain publishes the resource's endpoint under the application's derived `BaseUrl`. On an infrastructure chain it publishes the resource's connection string under every key the target declares. `ProtoAspireOptions.MapConnectionString(resource, key)` is the explicit form for a key no target declares, declared with the AppHost's other mappings. A configured provider earlier in the chain always wins, so the same composition runs against an existing environment without starting anything. The global selection key selects every AppHost provider; a resource's own key selects only its targets, which is how "AppHost infrastructure with an in-process application" and its reverse are expressed.
+`UseAspireResource` on an application chain publishes the resource's endpoint under the application's derived `BaseUrl`. On an infrastructure chain it publishes the resource's connection string under every key the target declares. A configured provider earlier in the chain always wins, so the same composition runs against an existing environment without starting anything. See [Aspire](../integrations/aspire.md) for the selection keys and the AppHost composition.
 
 ## What the trace shows
 
@@ -126,5 +128,6 @@ A provider that lost to an earlier one records the earlier provider as the reaso
 - **The winner starts at its registration position.** A provider piece starts where it was registered, like any infrastructure piece, and readiness still belongs to the pieces that publish an address.
 - **A worker's chain resolves after its application's.** `ResolveAfter` orders the resolution, not the registration. A worker nested under an application reads its winner, so the hosted-then-environment decision cannot race the application's own chain.
 - **The winner's services are registered once.** `ConfigureServices` runs for the winning provider while the host is built. A loser contributes nothing, and a host with no chain keeps the registrations its `Add...` calls made.
-- **`AddCapabilityWhenInProcess` keeps the configured-keys rule without a chain.** An adapter that exists only behind the in-process test host declares itself with the application's name and its fallback key: with a chain the winner's `server` capability decides, without one the key's configured value does.
-- **The old skip-key registration is obsolete.** `AddInfrastructure(piece, keys)` keeps its all-configured skip rule for 1.x and `AddInfrastructureAlways` keeps its always-start opt-out; the chain overload on this page is the replacement. `AddAspNetCoreServer`, `AddLoopbackApplication` and `AddInProcessWebSocketDevices` keep working unchanged; the providers on this page are the chain-shaped replacements and additive. `AddAspireAppHost` registers the AppHost as a target with the same selection semantics as `UseAspireResource`: the configured step-aside first, the AppHost provider when `ProtoTest:Aspire:Enabled` or a resource's own `ProtoTest:Aspire:Resources:{resource}:Enabled` is set, and a fallback otherwise, so a suite that registers the AppHost without a selection key never starts it. The AppHost publishes only the selected resources the environment does not already configure. The run hands the AppHost its configuration and the settings earlier infrastructure published, so a mixed composition's addresses reach the AppHost's own graph.
+- **Adapters without a chain use `AddCapabilityWhenInProcess`.** It declares the capability with the application's name and its fallback key, so the key's configured value decides.
+- **The old skip-key registration is obsolete.** `AddInfrastructure(piece, keys)` keeps its all-configured skip rule for 1.x; the chain overload on this page is the replacement. See [Infrastructure](./infrastructure.md).
+- **The AppHost composes like any target.** `AddAspireAppHost` registers the AppHost with the configured provider first and the AppHost provider on the selection keys. See [Aspire](../integrations/aspire.md).

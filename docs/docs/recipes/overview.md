@@ -7,11 +7,11 @@ description: "Scenarios that combine several ProtoTest capabilities in one test:
 
 # Recipes
 
-An integration page explains one capability. Real scenarios cross several. The API call is only half of the story when what matters is the event it publishes, the row it writes or the page that shows the result.
+An integration page explains one capability. Real scenarios cross several. The API call is half the check. What matters is the event it publishes, the row it writes or the page that shows it.
 
 These recipes show the capabilities composed in one test: what the host needs, what the test looks like, what the trace shows, what else the pieces can do, and what the test still does not prove.
 
-Every recipe is the journey as the demo suite runs it in `samples/Northstar.ProtoTest`, with the test file one link away. Where a recipe links the viewer, the trace is the demo's own generated run. The tests use NUnit's `[ProtoTest]`; the bodies work unchanged with any runner when you swap the attribute as [Test runners](../runners/overview.md) describes.
+Each recipe follows a run from the demo suite in `samples/Northstar.ProtoTest`. Each page links to its test file. Where a recipe links the viewer, the trace is the demo's own generated run. The tests use the NUnit `[ProtoTest]` attribute. Swap the attribute for another runner, as [Test runners](../runners/overview.md) describes. The test bodies stay the same.
 
 | Recipe | Composes |
 | --- | --- |
@@ -35,7 +35,7 @@ Every recipe ends with **what it does not prove**: the assumptions a passing tes
 ## What they have in common
 
 - **One test, one context.** Every client comes from `Proto.Context`, created for the test and released after it. None of them needs a fixture of its own.
-- **Arranging is an attribute or a builder, not a helper.** State goes through [Data](../integrations/data/index.md) or an [attribute](../foundation/attributes.md), so the next test that needs the same state reuses it by name.
+- **Arrange with an attribute or a builder, not a helper.** State goes through [Data](../integrations/data/index.md) or an [attribute](../foundation/attributes.md), so the next test that needs the same state reuses it by name.
 - **One trace.** The request, the event, the query and the browser steps land in the same test's story, in the order they happened. When a recipe fails, the [trace](../observability/prototrace.md) shows which half broke.
 
-The report-download recipe also opens directly on its matching test in the bundled [ProtoTrace demo](https://trace.prototest.dev/?demo=1). The archive stays in the browser; the link only selects the story.
+The report-download recipe also opens directly on its matching test in the bundled [ProtoTrace demo](https://trace.prototest.dev/?demo=1). The trace file stays local. The link opens the matching test in the demo viewer.

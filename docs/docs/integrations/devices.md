@@ -50,7 +50,7 @@ builder.AddDevices(devices => devices
         .AddProtocol<OcppProtocol>());
 ```
 
-A client is declared once - its transport, how its addresses resolve, the settings its transport reads, and the typed devices and protocol catalog that hang off it. The device id is passed to `For`, and `{deviceId}` is filled from it in the address, the path and a setting value. For anything more dynamic, pass a resolver instead of an address (`ProtoDeviceAddress.Template` and `.FromApplication` build the common ones).
+Declare each client once: its transport, its address rules, its transport settings, and its typed devices and protocol catalog. The device id is passed to `For`, and `{deviceId}` is filled from it in the address, the path and a setting value. For anything more dynamic, pass a resolver instead of an address (`ProtoDeviceAddress.Template` and `.FromApplication` build the common ones).
 
 A client can carry transport settings the transport reads off the endpoint; a hand-written transport names its own keys:
 
@@ -87,7 +87,7 @@ builder
 
 The registration is keyed by `(TProgram, application)`: a second application, or a second program, gets its own transport, and a client is only routed through the transport of the application it was registered under - two applications exposing the same path each serve their own clients. A client that has only a path (no address resolver) and no matching in-process transport fails naming the application instead of falling back to another transport.
 
-A hand-written in-process transport applies `ProtoTestContextPropagation.ApplyTo(HttpRequest)` (from `ProtoTest.AspNetCore`) to the request it opens, so the handshake carries the test id and the application's clock bridge pushes the connecting test's clock, exactly like the in-process HTTP client. The shared connect bound lives in `ProtoTest.Devices`: `ProtoDeviceConnect.WithTimeoutAsync` bounds the connect with the registered `ConnectTimeout` and reports an elapsed attempt as a `TimeoutException` naming the endpoint; the socket, in-process and MQTT transports all use it.
+The shared connect bound lives in `ProtoTest.Devices`: `ProtoDeviceConnect.WithTimeoutAsync` bounds the connect with the registered `ConnectTimeout` and reports an elapsed attempt as a `TimeoutException` naming the endpoint; the socket, in-process and MQTT transports all use it.
 
 ### MQTT
 
@@ -101,6 +101,8 @@ builder.AddDevices(devices => devices
 ```
 
 A send publishes to the publish topic; a receive yields the next message the subscribe filter matched, wildcards included. Text and binary frames stay themselves - the frame's media type rides the MQTT 5 content type. The registration carries both topics as endpoint settings (`publishTopic` and `subscribeTopic`, `{deviceId}` filled per device), so the trace records the broker address and the topics stay out of it. A client registered directly with `AddClient` may instead name both in the address query (`mqtt://host:port?publishTopic=…&subscribeTopic=…`); the transport reads the settings first and falls back to the address parameter, so a setting always wins.
+
+A client without an address or a resolver resolves `ProtoTest:Devices:Mqtt:Broker`, so it needs a configured value or a registered piece that declares the key. `[RequiresDevice<TDevice>]` follows that: with no address, resolver or key the device capabilities are absent and gated tests skip instead of failing at device creation. An explicit `address:` or a resolver comes from code, so the capabilities stay unconditional.
 
 The broker address comes from the registration (`address:`), from a resolver, or from `ProtoTest:Devices:Mqtt:Broker`. The container package starts a Mosquitto broker for the run and publishes its address under that key, so a client registered without an address follows the run's broker:
 
@@ -129,6 +131,64 @@ public async Task A_charger_boots_and_acknowledges()
 ```
 
 One instance per (client, type, id) and test, released with the test; a second `For` in the same test returns the same instance. `Devices()` without a name works when exactly one client is registered.
+
+### A conversation with a test-side peer
+
+A second client whose topics are swapped is the test-side peer for an MQTT device: it publishes what the device receives and receives what the device publishes, so the whole conversation stays in the suite. Both clients use the same `{deviceId}`, and both resolve the run's broker:
+
+```mermaid
+sequenceDiagram
+    participant Meter as Meter (meters/M-001/out)
+    participant Broker as Broker
+    participant Peer as Peer (subscribes meters/M-001/out)
+    Meter->>Broker: publish "120" to meters/M-001/out
+    Broker->>Peer: deliver "120" on meters/M-001/out
+    Peer->>Broker: publish reply to meters/M-001/in
+    Broker->>Meter: deliver reply on meters/M-001/in
+```
+
+```csharp
+public sealed class FlowMeter : ProtoDevice
+{
+    public ValueTask PublishReadingAsync(string reading) => SendTextAsync(reading);
+
+    public async ValueTask<string> AwaitReadingAsync()
+    {
+        var frame = await ExpectAsync(
+            "the peer reads a flow reading",
+            candidate => candidate.TryGetText(out _),
+            TimeSpan.FromSeconds(5));
+        return frame.AsText();
+    }
+}
+```
+
+```csharp
+builder
+    .AddInfrastructure("Mqtt", chain => chain
+        .UseConfigured()
+        .UseContainer(MosquittoBroker.Container()), MqttDeviceOptions.BrokerSetting)
+    .AddDevices(devices => devices
+        .AddMqttClient("Meters", "meters/{deviceId}/out", "meters/{deviceId}/in")
+            .AddDevice<FlowMeter>()
+        .AddMqttClient("Peer", "meters/{deviceId}/in", "meters/{deviceId}/out")
+            .AddDevice<FlowMeter>());
+```
+
+```csharp
+[ProtoTest]
+[RequiresDevice<FlowMeter>]
+public async Task A_meter_converses_with_a_test_side_peer()
+{
+    var meter = Proto.Context.Devices("Meters").For<FlowMeter>("M-001");
+    var peer = Proto.Context.Devices("Peer").For<FlowMeter>("M-001");
+
+    await meter.PublishReadingAsync("120");            // meters/M-001/out
+    var reading = await peer.AwaitReadingAsync();      // Peer subscribes to meters/M-001/out
+
+    Assert.That(reading, Is.EqualTo("120"));
+}
+```
 
 ### Simulator or hardware
 
@@ -180,10 +240,14 @@ the test never called `DisconnectAsync`.
 - **Per-client configuration, resolved per device.** The client's address template or resolver, its settings and the device id are the whole story; `{deviceId}` resolves in the address, the path and a setting value alike, and the shared transport options stay per run.
 - **In-process endpoints follow the application's winner.** When `AddInProcessWebSocketDevices<TProgram>(application)` is registered, the client uses the application's `TestServer` while the application's provider chain is served in-process (`UseInProcess<TProgram>()`, or `AddAspNetCoreServer` without a chain); when a configured, loopback or AppHost provider wins, the same registration declines and the socket at the winner's address serves it. The transport belongs to one `(TProgram, application)` pair, so multi-application suites route each client to its own application, and its `device` capability is declared only while the in-process winner can actually serve it.
 - **`ExpectAsync` consumes frames.** The bounded exchange log is for failure messages, not for matching a frame twice.
-- **Transports ship one at a time.** WebSocket and MQTT today; TCP/serial after a real user needs them.
-- **MQTT speaks MQTT 5 over plain TCP.** `mqtt://` only: an MQTT 3.1.1-only broker and `mqtts://` come later.
+- **Two transports ship.** WebSocket and MQTT are available; there is no TCP/serial transport.
+- **MQTT speaks MQTT 5 over plain TCP.** `mqtt://` only. An MQTT 3.1.1-only broker and `mqtts://` fail the connect.
 - **An MQTT client carries one publish topic and one subscribe filter.** `{deviceId}` is the only placeholder, so one client covers one topic convention; two device families are two clients. The filter may use the `+` and `#` wildcards, the publish topic may not.
 - **MQTT transport options are one set per run.** Connect timeout, keep-alive, the packet cap and a broker set through `configure` are shared by every MQTT client; a client that needs its own broker passes a resolver, because a configured or container broker wins over the registration's `address:`.
-- **A missing MQTT broker fails the device, naming the key.** A device capability or a skip cannot see a broker that configuration or a container supplies later, so a client without an address, a resolver or `ProtoTest:Devices:Mqtt:Broker` fails when the device is created instead of skipping.
+- **A missing MQTT broker drops the device capabilities.** A client registered without an address or a resolver declares `ProtoTest:Devices:Mqtt:Broker` as its address key, so `[RequiresDevice<TDevice>]` skips while no configured value and no registered piece (a Mosquitto container) can provide it. An ungated test still fails when the device is created, naming the key; an explicit `address:` or a resolver is code-provided and keeps the capabilities unconditional.
 - **The MQTT broker is shared state.** One broker serves the run (and a parallel suite), so tests publish and subscribe in their own topic namespace; ProtoTest leaves no topics behind and cleans up none.
 - **The transport moves frames.** Protocol semantics - message kinds, sessions, OCPP operations - are the suite's code, and coverage only names what the catalog declares.
+
+## Writing a transport
+
+A hand-written in-process transport applies `ProtoTestContextPropagation.ApplyTo(HttpRequest)` (from `ProtoTest.AspNetCore`) to the request it opens, so the handshake carries the test id and the application's clock bridge pushes the connecting test's clock, exactly like the in-process HTTP client.

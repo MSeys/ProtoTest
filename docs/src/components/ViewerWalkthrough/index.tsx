@@ -1,4 +1,5 @@
 import {useId, useState, type KeyboardEvent, type ReactNode} from 'react';
+import Link from '@docusaurus/Link';
 
 import Frame from '@site/src/components/Frame';
 import CheckView from './CheckView';
@@ -42,9 +43,19 @@ export default function ViewerWalkthrough(): ReactNode {
       }
       foot={
         <>
+          <Link href="https://trace.prototest.dev/?demo=1">Open this exact run in the viewer →</Link>{' '}
           Drawn from <span className={styles.archive}>prototest-demo.prototrace</span>, as the viewer shows it.
         </>
       }>
+      <p className={styles.pointer}>
+        4 failed. Start with test 01, then 02.
+        <button type="button" className={styles.jump} onClick={() => setView('story')}>
+          See test 01&rsquo;s story
+        </button>
+        <button type="button" className={styles.jump} onClick={() => setView('check')}>
+          See the failing check
+        </button>
+      </p>
       <div className={styles.tabs} role="tablist" aria-label="Views of the demo trace" onKeyDown={move}>
         {views.map((item) => (
           <button

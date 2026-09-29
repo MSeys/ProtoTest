@@ -119,7 +119,7 @@ Gql.Variable(GqlType.Id.NonNull().List(), ids)        // [ID!]
 
 For enum literals in arguments, use `Gql.Enum("DESC")`.
 
-A shape contributes the variables it declares (as `Gql.Variable` or `Gql.Upload`) to the ones set with `.Variables(...)`: both are merged and **the shape wins on a name collision**. A shape that contributes no variables leaves `.Variables(...)` untouched.
+Shape variables merge with `.Variables`. On a name clash the shape value applies. A shape that contributes no variables leaves `.Variables(...)` untouched.
 
 ## Fluent operations
 
@@ -232,7 +232,7 @@ GraphQLRequestBuilder Variables(object variables);
 GraphQLRequestBuilder ConnectionPayload(object payload);
 ```
 
-Header values are never traced; the trace records the count and each header's name. `ConnectionPayload` sets the optional `connection_init` payload subscriptions send. See [Subscriptions](./subscriptions.md#connection-payload).
+The trace records header names and the count, not header values. `ConnectionPayload` sets the optional `connection_init` payload subscriptions send. See [Subscriptions](./subscriptions.md#connection-payload).
 
 ## File uploads
 

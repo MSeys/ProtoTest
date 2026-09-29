@@ -15,22 +15,22 @@ public sealed class FailureSelectorTests
         var archive = ProtoTraceArchive.Open(DiagnosisFixtures.RepositoryFile("viewer", "public", "demos", "prototest-demo.prototrace"));
         var tests = archive.Tests.ToDictionary(test => test.Name, StringComparer.Ordinal);
 
-        var webhook = tests["ProtoTest.Demo.DiagnosticsShowcase.AFailedOperationRecordsItsDiagnosticsAndTheRunContinues"];
-        var captured = tests["ProtoTest.Demo.DiagnosticsShowcase.ShapeMismatchesAreCapturedWithoutFailingTheRun"];
-        var dashboard = tests["ProtoTest.Demo.DiagnosticsShowcase.TheDashboardNeverShowsAnotherTenantsPlan"];
-        var organization = tests["ProtoTest.Demo.DiagnosticsShowcase.TheOrganizationReportsItsPlanAndProjectCount"];
+        var time = tests["Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow"];
+        var visibility = tests["Northstar.ProtoTest.FailureDrills.ABareStatusHidesWhatTheApplicationSaid"];
+        var state = tests["Northstar.ProtoTest.FailureDrills.AnUnknownProjectIdIsTreatedAsMine"];
+        var address = tests["Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine"];
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(webhook.Failure!.Kind, Is.EqualTo("northstar.webhook.deliver"));
-            Assert.That(captured.Failure!.Kind, Is.EqualTo("assert.json.shape"));
-            Assert.That(dashboard.Failure!.Kind, Is.EqualTo("assert.web"));
-            Assert.That(organization.Failure!.Kind, Is.EqualTo("assert.json.shape"));
+            Assert.That(time.Failure!.Kind, Is.EqualTo("assert.json.shape"));
+            Assert.That(visibility.Failure!.Kind, Is.EqualTo("assert.http.status"));
+            Assert.That(state.Failure!.Kind, Is.EqualTo("assert.http.status"));
+            Assert.That(address.Failure!.Kind, Is.EqualTo("test.execution"));
 
-            // The shape checks were judged on a protocol call, so the context package names that call.
-            Assert.That(tests["ProtoTest.Demo.DiagnosticsShowcase.ShapeMismatchesAreCapturedWithoutFailingTheRun"].CallAncestor(captured.Failure!)!.Kind, Is.EqualTo("http.request"));
-            Assert.That(tests["ProtoTest.Demo.DiagnosticsShowcase.TheOrganizationReportsItsPlanAndProjectCount"].CallAncestor(organization.Failure!)!.Kind, Is.EqualTo("http.request"));
-            Assert.That(dashboard.CallAncestor(dashboard.Failure!), Is.Null);
+            // The shape check was judged on a protocol call, so the context package names that call; the
+            // address drill threw before any call was recorded.
+            Assert.That(time.CallAncestor(time.Failure!)!.Kind, Is.EqualTo("http.request"));
+            Assert.That(address.CallAncestor(address.Failure!), Is.Null);
         }
     }
 
@@ -63,6 +63,25 @@ public sealed class FailureSelectorTests
 
             return Task.CompletedTask;
         }, path => DiagnosisFixtures.WriteAssertionFailureAsync(path));
+    }
+
+    [Test]
+    public async Task CancelledChild_ShouldNotOutrankTheFailedOperation()
+    {
+        await DiagnosisFixtures.WithTraceAsync(path =>
+        {
+            var test = ProtoTraceArchive.Open(path).Tests.Single();
+            var cancelled = test.Operations.Single(operation => operation.Status == "cancelled");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(test.Failure!.Failed, Is.True, "a cancelled child must not hide the failure above it");
+                Assert.That(test.Failure!.SpanId, Is.Not.EqualTo(cancelled.SpanId));
+                Assert.That(cancelled.HasError, Is.True, "the cancelled child recorded the cancellation as an error");
+            }
+
+            return Task.CompletedTask;
+        }, path => DiagnosisFixtures.WriteCancelledChildAsync(path));
     }
 
     [Test]

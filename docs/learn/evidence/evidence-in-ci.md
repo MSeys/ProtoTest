@@ -2,7 +2,7 @@
 id: evidence-in-ci
 title: Take the evidence to CI
 sidebar_label: Take the evidence to CI
-sidebar_position: 4
+sidebar_position: 5
 description: "Keep the trace and the reports as CI artifacts, post the digest with the action, and run the same suite at three depths."
 ---
 
@@ -12,10 +12,10 @@ import Link from '@docusaurus/Link';
 
 # Take the evidence to CI
 
-A red job that prints one line is not evidence. The suite already wrote the trace and the reports; the job has to keep them, and one step turns them into a comment the reviewer can open.
+A red job that prints one line is not evidence. The suite already wrote the trace and the reports. The job must keep them. One step turns them into a comment the reviewer can open.
 
 <LearnShell
-  level="Level 4, lesson 4"
+  level="Level 4, lesson 5"
   minutes="About 9 minutes"
   outcome={[
     'Point every output at one directory and upload it as one CI artifact.',
@@ -37,7 +37,7 @@ A red job that prints one line is not evidence. The suite already wrote the trac
       'The test step failed. Which steps still run, and what does the reviewer open from the comment?',
     verify: (
       <>
-        Read the workflow on the <Link to="/docs/continuous-integration/">CI page</Link>, then the steps of the feedback action in the repository.
+        Read <Link to="/docs/continuous-integration/#put-every-artifact-in-one-place">Put every artifact in one place</Link> and <Link to="/docs/continuous-integration/#the-feedback-action">The feedback action</Link> on the CI page, then the two steps in this lesson that carry <code>if: always()</code>. The three jobs further down are shapes a pipeline can take, not the contract.
       </>
     ),
     reveal: (
@@ -50,6 +50,7 @@ A red job that prints one line is not evidence. The suite already wrote the trac
     'One output directory and one artifact step keep the trace and the reports together.',
     'The artifact step runs with if: always(), because the failed run is the one worth reading.',
     'The action posts the digest and the artifact link; the verdict comes from comparing two reports.',
+    'The job split is a shape a pipeline can take. The action and the artifact wiring are the contract.',
   ]}
   next={[
     {
@@ -60,7 +61,7 @@ A red job that prints one line is not evidence. The suite already wrote the trac
     {
       label: 'Continuous integration',
       to: '/docs/continuous-integration/',
-      note: 'The working workflow, the action, and the three jobs.',
+      note: 'The working workflow and the action.',
     },
   ]}>
 
@@ -115,15 +116,15 @@ The feedback action installs the CLI, uploads the trace, posts the digest and ch
 
 The comment carries the failing tests, the cause and the artifact link. One check annotation lands on each failing test's source location, and a missing target skips with its reason instead of failing the job. Give the action a `baseline-report` and a `current-report` as well, and the step also fails the pull request when the run is worse than the baseline.
 
-## Three jobs, one suite
+## Three shapes, one suite
 
-The [CI page](/docs/continuous-integration/) documents three jobs:
+A pipeline around this suite usually splits into three jobs:
 
 - The **pull request** job runs the suite in-process and posts the digest. It is the fast one, and it runs on every change.
 - The **nightly** job runs the same suite against the container topology, where the store and the broker are real processes the run owns.
 - The **smoke** job is optional and points the suite at a deployed environment. Capability skips drop the journeys that need the test host, and the rest run against real addresses.
 
-The suite is the same in all three. What changes is the composition, and the composition is what decides which capabilities exist and which journeys skip.
+These are shapes a suite of this kind fits, not a fixed pipeline. The [CI page](/docs/continuous-integration/#one-suite-three-jobs) carries the same three, and its workflows are the ones to start from. The suite is the same in all three. What changes is the composition, and the composition is what decides which capabilities exist and which journeys skip.
 
 ## Naming the build in the trace
 

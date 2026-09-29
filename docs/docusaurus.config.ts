@@ -167,9 +167,9 @@ export default async function createConfig(): Promise<Config> {
           label: 'Docs',
         },
         {to: '/docs/recipes/overview', label: 'Recipes', position: 'left'},
-        {href: 'https://prototest.dev/api/', label: 'API reference', position: 'left'},
-        {href: 'https://trace.prototest.dev', label: 'Trace viewer', position: 'left'},
         {to: '/changelog', label: 'Changelog', position: 'left'},
+        // API reference and the trace viewer live in the footer's Reference group: the navbar keeps the four
+        // routes a reader follows, and the icons stay for the utilities (search, GitHub, NuGet).
         {
           type: 'custom-github',
           position: 'right',

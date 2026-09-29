@@ -4,11 +4,10 @@ import Head from '@docusaurus/Head';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 
-import CommandBox from '@site/src/components/CommandBox';
+import CommandBox, {type CommandBoxRunner} from '@site/src/components/CommandBox';
 import CodeSnippet from '@site/src/components/CodeSnippet';
 import Frame from '@site/src/components/Frame';
 import TabbedCode, {type CodeTab} from '@site/src/components/TabbedCode';
-import ReleaseFeed from '@site/src/components/ReleaseFeed';
 import ViewerWalkthrough from '@site/src/components/ViewerWalkthrough';
 import FailureGallery from '@site/src/components/FailureGallery';
 import styles from './index.module.css';
@@ -16,7 +15,7 @@ import styles from './index.module.css';
 const heroTabs: CodeTab[] = [
   {
     id: 'journey',
-    label: 'One journey',
+    label: 'Test',
     filename: 'PlatformJourney.cs',
     code: `[ProtoTest]
 [SignedInAs]
@@ -51,7 +50,7 @@ public async Task
   },
   {
     id: 'compose',
-    label: 'Compose',
+    label: 'Setup',
     filename: 'Setup.cs',
     code: `[SetUpFixture]
 public sealed class Setup : ProtoTestAssembly
@@ -61,32 +60,22 @@ public sealed class Setup : ProtoTestAssembly
         // The application: hosted in-process, reached over three protocols.
         builder.AddApplication(NorthstarTargets.Api, app => app
             .AddAspNetCoreServer<Program>()
-            .AddRest(rest => rest.AddClient("Api")
-                .AddCollector<OpenApiCoverageCollector>())
-            .AddGraphQL(graphQL => graphQL.AddClient("GraphQL")
-                .WithSchemaCoverage("northstar.graphql"))
-            .AddGrpc(grpc => grpc.AddClient("Api")));
+            .AddRest(rest => rest.AddClient("Api"))
+            .AddGraphQL(graphQL => graphQL.AddClient("GraphQL")));
 
-        // In front of it, behind it, and what a scenario needs.
+        // In front of it, behind it, and what the run leaves behind.
         builder.AddWeb();
         builder.AddSql(_ => new SqliteConnection("Data Source=northstar.db"));
-        builder.AddEntityFrameworkCore<BillingDbContext>((services, options) =>
-            options.UseSqlite(services.GetRequiredService<DbConnection>()));
-        builder.AddMessaging(messaging => messaging.UseRabbitMq());
-        builder.AddSheets();
-        builder.AddData(data => data.AddDefaults<NorthstarDataDefaults>());
-
-        // What the run leaves behind.
         builder.ConfigureTracing(trace => trace.OutputPath = "northstar.prototrace");
         builder.AddSink<HtmlReportSink>();
     }
 }`,
     footnote:
-      'Each Add… is a capability. Compose the ones your suite needs; leave one out and its client, its attributes and its part of the trace simply are not there.',
+      'The short form. Each Add… is a capability: leave one out and its client, its attributes and its part of the trace simply are not there. The package for each one is on the installation page.',
   },
   {
     id: 'evidence',
-    label: 'Evidence',
+    label: 'Trace',
     filename: 'prototest summary run.prototrace',
     language: 'text',
     code: `ProtoTest trace 2.0 · run 29e344f9cf54431ca7d8bad3f87a1749
@@ -120,6 +109,19 @@ FAILED orders match their shape (16 ms)
   },
 ];
 
+function templateCommands(runner?: string): string[] {
+  return ['dotnet new install ProtoTest.Templates', `dotnet new prototest -n Shop${runner ? ` --runner ${runner}` : ''}`];
+}
+
+// The template defaults to NUnit, so its row keeps the plain commands a reader copies without thinking.
+const runnerChoices: CommandBoxRunner[] = [
+  {id: 'nunit', label: 'NUnit (default)', commands: templateCommands()},
+  {id: 'xunit', label: 'xUnit v2', commands: templateCommands('xunit')},
+  {id: 'xunit3', label: 'xUnit v3', commands: templateCommands('xunit3')},
+  {id: 'tunit', label: 'TUnit', commands: templateCommands('tunit')},
+  {id: 'mstest', label: 'MSTest', commands: templateCommands('mstest')},
+];
+
 function Hero() {
   return (
     <header data-surface="blueprint" className={styles.hero}>
@@ -131,14 +133,15 @@ function Hero() {
               Test the whole journey. Trace every layer.
             </Heading>
             <p className={styles.heroLead}>
-              ProtoTest brings the setup around an integration test into one place. Compose REST, GraphQL,
-              SQL, messaging, a browser or a spreadsheet; they share one context, lifecycle, cleanup and
-              trace.
+              An integration test checks the app plus its API, database, broker and browser together.
+              ProtoTest brings the setup around that test into one place: REST, GraphQL, SQL,
+              messaging, a browser or a spreadsheet share one context, lifecycle, cleanup and trace.
             </p>
-            <CommandBox
-              title="Start a project"
-              commands={['dotnet new install ProtoTest.Templates', 'dotnet new prototest -n Shop']}
-            />
+            <CommandBox title="Start a project" commands={templateCommands()} runners={runnerChoices} />
+            <p className={styles.heroNext}>
+              That installs a green suite. <code>dotnet test</code> runs it and writes{' '}
+              <code>TestResults/Shop.prototrace</code> plus <code>Shop.html</code>.
+            </p>
             <div className={styles.heroLinks}>
               <Link
                 className={`${styles.btn} ${styles.btnSecondary}`}
@@ -154,6 +157,49 @@ function Hero() {
         </div>
       </div>
     </header>
+  );
+}
+
+const proofPoints = [
+  {
+    to: '/docs/project/benchmarks#opencsms-at-1000-tests',
+    value: '35-36 ms',
+    label: 'per-test median in the 1,000-test product benchmark',
+  },
+  {
+    to: '/docs/project/benchmarks#the-viewer-at-1000-tests',
+    value: '1,200 tests',
+    label: 'viewer cold open in about 1.3 s',
+  },
+  {
+    to: '/docs/getting-started/installation',
+    value: '44 packages',
+    label: 'on NuGet, across .NET 8, 9 and 10',
+  },
+];
+
+/*
+ * The numbers a reader comparing frameworks asks for first, each linked to the page that measured it.
+ * A quiet row, not a card row: the hero already spent the page's boldness.
+ */
+function ProofStrip() {
+  return (
+    <section className={styles.proof} aria-label="ProtoTest measured at scale">
+      <div className={`container ${styles.proofInner}`}>
+        <span className={styles.proofLead}>Measured</span>
+        <div className={styles.proofFacts}>
+          {proofPoints.map((point) => (
+            <Link key={point.value} className={styles.proofFact} to={point.to}>
+              <span className={styles.proofValue}>{point.value}</span>
+              <span className={styles.proofLabel}>{point.label}</span>
+            </Link>
+          ))}
+        </div>
+        <Link className={styles.proofViewer} href="https://trace.prototest.dev">
+          Open the viewer
+        </Link>
+      </div>
+    </section>
   );
 }
 
@@ -183,18 +229,20 @@ function PathsSection() {
               before adopting it.
             </p>
             <div className={styles.pathLinks}>
-              <Link to="/docs/project/compare">Comparison</Link>
-              <Link to="/docs/project/benchmarks">Benchmarks</Link>
-              <Link to="/docs/project/faq">FAQ</Link>
+              <Link to="/docs/project/compare">Compare alternatives</Link>
+              <Link to="/docs/project/benchmarks">Cost at scale</Link>
+              <Link to="/docs/project/faq">Adoption questions</Link>
             </div>
           </div>
           <div className={styles.pathCard}>
             <Heading as="h3">Already have a suite</Heading>
             <p>
-              Recipes for common journeys, and the pages to reach for when a run needs explaining.
+              Recipes for common journeys, the conversion order for an xUnit suite you already have, and the
+              pages to reach for when a run needs explaining.
             </p>
             <div className={styles.pathLinks}>
               <Link to="/docs/recipes/overview">Recipes</Link>
+              <Link to="/docs/runners/bring-your-existing-suite">Bring an existing xUnit suite</Link>
               <Link to="/docs/getting-started/troubleshooting">Troubleshooting</Link>
             </div>
           </div>
@@ -264,7 +312,7 @@ function AgentExchange() {
       head={
         <>
           <strong>get_failure</strong>
-          <span className={styles.frameMeta}>run 29e344f9 · fixture trace</span>
+          <span className={styles.frameMeta}>run 29e344f9 · fixture example</span>
         </>
       }
       foot={
@@ -281,7 +329,7 @@ function AgentExchange() {
     "testId": "00002",
     "name": "orders match their shape",
     "outcome": "failed",
-    "durationMs": 16.4395
+    "durationMs": 16.44
   },
   "failure": {
     "kind": "assert.json.shape",
@@ -332,8 +380,22 @@ function CtaSection() {
         <div className={styles.ctaBanner}>
           <Heading as="h2">Try the starter project</Heading>
           <p>
-            The template creates a small ASP.NET Core API and a ProtoTest suite. Run it locally and open
-            the trace it writes.
+            The template creates a small ASP.NET Core API and a ProtoTest suite. Paste the commands from
+            the top of this page, then run the suite. A green run ends like this (abridged), with the trace
+            and the report beside it:
+          </p>
+          <div className={styles.ctaSnippet}>
+            <CodeSnippet
+              language="text"
+              code={`dotnet test
+Passed! - Failed: 0, Passed: 1 - Shop.Tests.dll
+TestResults/Shop.prototrace
+TestResults/Shop.html`}
+            />
+          </div>
+          <p>
+            1.1.0 adds readiness probes and a per-test clock.{' '}
+            <Link to="/changelog">Full list in the changelog →</Link>
           </p>
           <div className={styles.heroButtons}>
             <Link className={`${styles.btn} ${styles.btnPrimary}`} to="/docs/getting-started/first-test">
@@ -359,7 +421,7 @@ export default function Home(): ReactNode {
             name: 'ProtoTest',
             applicationCategory: 'DeveloperApplication',
             operatingSystem: 'Windows, Linux, macOS',
-            softwareVersion: '1.0',
+            softwareVersion: '1.1.0',
             programmingLanguage: 'C#',
             url: 'https://prototest.dev/',
             downloadUrl: 'https://www.nuget.org/profiles/MSeys',
@@ -372,13 +434,13 @@ export default function Home(): ReactNode {
       </Head>
       <Hero />
       <main>
+        <ProofStrip />
         <PathsSection />
         <FailureSection />
         <TraceSection />
         <AgentSection />
         <CtaSection />
       </main>
-      <ReleaseFeed />
     </Layout>
   );
 }

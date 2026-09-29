@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Contract coverage, not code coverage
 
-Code coverage counts the lines that ran. It cannot tell you whether anyone checked what those lines returned. The report this lesson reads answers the other question, and the gap it shows is the interesting part.
+Code coverage counts the lines that ran. It does not say whether a check read what they returned. The report this lesson reads answers the other question, and the gap it shows is the interesting part.
 
 <LearnShell
   level="Level 4, lesson 2"
@@ -95,7 +95,7 @@ The journey writes a project over REST and reads it back over GraphQL. The repor
 | `gate` `no error findings`, passed | the run gate the sample registers |
 | `resource` rows for the run pieces | what the run owned, still registered when the report was written |
 
-The summary reads `CoverageTotal: 1`, `Covered: 1`, `Uncovered: 0`. That number is honest and narrow: one unit of the contract was checked, the write's endpoint. The six fields are not part of it, and the traffic section says so.
+The summary reads `CoverageTotal: 1`, `Covered: 1`, `Uncovered: 0`. That number is narrow: one unit of the contract was checked, the write's endpoint. The six fields are not part of it, and the traffic section says so.
 
 ## What claims a field
 

@@ -26,6 +26,13 @@ internal sealed class DeviceClientRegistration(string name)
     /// <summary>The client's transport settings, keyed by the transport's own names, filled per device.</summary>
     public Dictionary<string, string?> Settings { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// The configuration keys the client's address can come from, declared by a backend whose address
+    /// is configuration-driven; empty when the address is provided in code or by a path, which keeps
+    /// the client's capabilities unconditional.
+    /// </summary>
+    public List<string> AddressKeys { get; } = [];
+
     public List<Type> DeviceTypes { get; } = [];
 
     public List<Type> ProtocolTypes { get; } = [];

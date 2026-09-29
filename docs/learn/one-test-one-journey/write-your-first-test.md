@@ -123,14 +123,18 @@ The filter runs one test. The run is green, and it writes the same three files a
 bin/Debug/net8.0/TestResults/Northstar.ProtoTest/northstar.prototrace
 ```
 
-This is the same journey as `l1-first-journey.prototrace`, the archive the next lesson walks, so your run and the annotated one line up.
+The next lesson walks `l1-first-journey.prototrace`, the sample's own version of this journey. It is not the same recording: the archive's test is `ProjectsJourney`, its name starts with `atlas-` instead of `first-`, and it asserts more of the response. Compare the shape, not the values: both traces hold the four layers, one REST create, the request and response artifacts and a shape check.
 
-## 3. Remove the file when you are done
+## 3. Keep the file, or remove it
+
+Keep `MyFirstJourney.cs` if you plan to continue into Level 6, which reuses it for its attribute and milestone exercises. This page's step 1 recreates it in a minute if you removed it.
+
+Delete it when you are done with the level:
 
 ```bash
 rm MyFirstJourney.cs
 ```
 
-Run that from the sample folder, or delete the file in your editor. The suite is a fixture, not a scratchpad. Deleting the file leaves the repository unchanged, and `git status` is clean. If you want to keep the test while you work through the level, keep it; the sample's own journeys do not change.
+Run that from the sample folder, or delete the file in your editor. The suite is a fixture, not a scratchpad, so the repository stays unchanged without it and `git status` is clean. The sample's own journeys do not change either way.
 
 </LearnShell>

@@ -19,7 +19,7 @@ response.Should.HaveHttpStatus(HttpStatusCode.OK)
 var id = response.ReadRequired<int>("$.id");  // throws naming the route and path when missing
 ```
 
-## What does it add?
+## Includes
 
 The request can use a named target when your application has more than one API. Authentication can also use information that was added to the test context during setup.
 

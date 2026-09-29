@@ -10,6 +10,7 @@ public sealed class ProtoMessagingBuilder
     internal ProtoMessagingBuilder(IServiceCollection services)
         => Services = services ?? throw new ArgumentNullException(nameof(services));
 
+    /// <summary>Gets the service collection the messaging integration registers into.</summary>
     public IServiceCollection Services { get; }
 
     internal Func<IServiceProvider, IProtoMessageBroker>? AdapterFactory { get; private set; }
@@ -21,10 +22,11 @@ public sealed class ProtoMessagingBuilder
     internal IReadOnlyList<string> BrokerAddressKeys { get; private set; } = [];
 
     /// <summary>
-    /// How <see cref="BrokerAddressKeys"/> decides the <c>Broker</c> capability: an adapter whose
-    /// address must exist, or one that serves only while the environment does not provide it.
+    /// The application whose provider chain decides the <c>Broker</c> capability, when the adapter
+    /// serves only while that application runs in-process; null for an adapter that resolves its own
+    /// address.
     /// </summary>
-    internal ProtoBrokerAddressRule BrokerAddressRule { get; private set; } = ProtoBrokerAddressRule.AddressRequired;
+    internal string? BrokerInProcessApplication { get; private set; }
 
     /// <summary>
     /// Replaces the default in-memory broker with an adapter, for example RabbitMQ. The broker the
@@ -49,27 +51,31 @@ public sealed class ProtoMessagingBuilder
         ArgumentNullException.ThrowIfNull(factory);
         AdapterFactory = factory;
         BrokerAddressKeys = addressKeys ?? [];
-        BrokerAddressRule = ProtoBrokerAddressRule.AddressRequired;
+        BrokerInProcessApplication = null;
         return this;
     }
 
     /// <summary>
     /// Replaces the default in-memory broker with an adapter that serves only while
-    /// <paramref name="addressKeys"/> are <b>not</b> configured - an in-process resource whose
-    /// address being configured means the environment provides it elsewhere. The <c>Broker</c>
-    /// capability is declared only while no key is configured, so a run that configures one skips
-    /// instead of advertising an adapter that cannot serve; the MassTransit bridge over the
-    /// application's in-process test harness is the example. The broker the factory returns is owned
-    /// by ProtoTest: it is released with the run.
+    /// <paramref name="application"/> is hosted in-process - an in-process resource whose harness or
+    /// listener exists only in this process. The <c>Broker</c> capability is declared only while the
+    /// application's provider chain winner runs it in-process, so a loopback, container or AppHost
+    /// application drops it and tests skip instead of advertising an adapter that cannot serve; a host
+    /// whose application declares no chain keeps the configured-keys rule over
+    /// <paramref name="configuredKeys"/>. The MassTransit bridge over the application's in-process test
+    /// harness is the example. The broker the factory returns is owned by ProtoTest: it is released
+    /// with the run.
     /// </summary>
-    public ProtoMessagingBuilder UseBrokerUnlessConfigured(
+    public ProtoMessagingBuilder UseBrokerWhenInProcess(
         Func<IServiceProvider, IProtoMessageBroker> factory,
-        params string[] addressKeys)
+        string application,
+        params string[] configuredKeys)
     {
         ArgumentNullException.ThrowIfNull(factory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(application);
         AdapterFactory = factory;
-        BrokerAddressKeys = addressKeys ?? [];
-        BrokerAddressRule = ProtoBrokerAddressRule.AddressAbsent;
+        BrokerAddressKeys = configuredKeys ?? [];
+        BrokerInProcessApplication = application;
         return this;
     }
 
@@ -91,9 +97,9 @@ public sealed class ProtoMessagingBuilder
     /// still applies over these values, so an environment can add its own.
     /// </summary>
     /// <remarks>
-    /// <c>Tap</c> is a reliability declaration, not just a convenience: pre-bind every destination the
-    /// act publishes to. A destination declared only at the first <c>AwaitAsync</c> is bound then, so it
-    /// misses every message published before that await.
+    /// <c>Tap</c> is a reliability declaration: pre-bind every destination the act publishes to. A
+    /// destination declared only at the first <c>AwaitAsync</c> is bound then, so it misses every
+    /// message published before that await.
     /// </remarks>
     /// <exception cref="ArgumentException">
     /// <paramref name="destinations"/> is empty, or contains a null, empty or whitespace destination.
@@ -194,9 +200,10 @@ public static class ProtoHostBuilderExtensions
     /// <see cref="ProtoMessagingBuilder.UseBroker(Func{IServiceProvider, IProtoMessageBroker}, string[])"/>)
     /// declares the capability conditionally: it is absent while no key can provide the address, so
     /// <c>[RequiresCapability(ProtoCapabilityKinds.Broker)]</c> skips instead of failing. An adapter
-    /// that serves only while the address is absent
-    /// (see <see cref="ProtoMessagingBuilder.UseBrokerUnlessConfigured"/>) declares it the other way:
-    /// it is absent once a key is configured.
+    /// that serves only behind the in-process test host
+    /// (see <see cref="ProtoMessagingBuilder.UseBrokerWhenInProcess"/>) declares it the other way: the
+    /// application's provider chain winner decides, and a host without a chain keeps the
+    /// configured-keys rule.
     /// </summary>
     /// <remarks>
     /// A repeated call is not a no-op: its <c>configure</c> callback always runs, so a later call can add
@@ -237,16 +244,17 @@ public static class ProtoHostBuilderExtensions
             // reachable and runs where one is, instead of always passing against the double. An
             // adapter that names its address keys is honest in both directions: a run with neither a
             // configured value nor a piece that declares one drops the capability and skips, and an
-            // in-process adapter drops it when the environment provides the address it would use.
+            // in-process adapter follows the served application's provider chain, which drops it for a
+            // loopback, container or AppHost winner.
             var capability = new ProtoCapabilityDescriptor(
                 ProtoMessagingProtocol.Protocol.Name, ProtoCapabilityKinds.Broker, ProtoMessagingProtocol.Protocol.TraceSource);
-            if (messaging.BrokerAddressKeys.Count == 0)
+            if (messaging.BrokerInProcessApplication is { } application)
+            {
+                builder.AddCapabilityWhenInProcess(application, capability, [.. messaging.BrokerAddressKeys]);
+            }
+            else if (messaging.BrokerAddressKeys.Count == 0)
             {
                 builder.AddCapability(capability);
-            }
-            else if (messaging.BrokerAddressRule == ProtoBrokerAddressRule.AddressAbsent)
-            {
-                builder.AddCapabilityUnlessConfigured(capability, [.. messaging.BrokerAddressKeys]);
             }
             else
             {
@@ -324,14 +332,4 @@ public static class ProtoHostBuilderExtensions
             return false;
         }
     }
-}
-
-/// <summary>How a configured adapter's address keys decide the <c>Broker</c> capability.</summary>
-internal enum ProtoBrokerAddressRule
-{
-    /// <summary>The adapter needs an address: the capability is declared while a key can provide one.</summary>
-    AddressRequired,
-
-    /// <summary>The adapter serves only while the address is absent: the capability drops once a key is configured.</summary>
-    AddressAbsent
 }

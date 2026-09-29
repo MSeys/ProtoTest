@@ -9,9 +9,26 @@ import TraceDiff from '@site/src/components/TraceDiff';
 
 # ProtoTrace
 
-ProtoTrace is ProtoTest's execution trace. ProtoTest owns the lifecycle and understands its integrations, so it records what happened in every test without a logging line in your tests: hooks, attributes, clients, state, requests, browser actions, assertions, attachments and cleanup. At the end of the run everything is written to one portable `.prototrace` file.
+ProtoTest records each test on its own. No logging calls are needed. The trace holds hooks, requests, checks, state changes, attachments and cleanup, and the run writes it to one portable `.prototrace` file.
 
-When a test fails in CI, download that file and open it in the [ProtoTrace viewer](https://trace.prototest.dev). You see the failing assertion in context: which user was set up, what the request looked like, what came back, what the browser showed.
+When a test fails in CI, download that file and open it in the [ProtoTrace viewer](https://trace.prototest.dev). You see the failing check with the request, the response and the setup around it. Without a browser, read the same story from a terminal:
+
+```bash
+dotnet tool install --global ProtoTest.Cli
+prototest summary TestResults/prototest-{runId}.prototrace
+```
+
+```text
+ProtoTest trace 2.0 · run 761778e6dc82498a9f9965fa1e6b5a24 · 2026-09-29 06:19:01Z - 2026-09-29 06:19:05Z
+1 tests · 1 failed
+
+FAILED Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine (2.66 s)
+  ConnectionError reaching http://127.0.0.1:5099: connection refused.
+  test.execution Test execution · failed
+  cause: runner-reported failure
+```
+
+That is a committed failing run of the Learning track. [Open the sample trace](https://trace.prototest.dev/?demo=1) to look around before you have one of your own, and read [the file format](#the-file-format) for what is inside.
 
 ## What it is
 
@@ -28,24 +45,39 @@ builder.ConfigureTracing(trace =>
 
 With `Enabled = false`, no trace file is written, application spans from the configured sources are not captured, and the in-memory recorder drops operations and records (observations, attachments, findings and tracked values). The run snapshot still lists each test with its outcome, and the reports keep working: run gates read report items, not the operation tree.
 
-The trace is not the same thing as [observations](./coverage.md). The trace is automatic and answers "what did ProtoTest do?". Observations are intentional and answer "what did the test learn?". They share correlation, but observations feed the reports and the trace feeds the viewer.
+The trace is not the same thing as [observations](./coverage.md). The trace is automatic and answers "what did ProtoTest do?". Observations are facts a test chose to record. They share correlation, but observations feed the reports and the trace feeds the viewer.
 
 ## How to read it
 
 ### In the viewer
 
-The [ProtoTrace viewer](https://trace.prototest.dev) is a static web app. Trace files are read **entirely in your browser** and never uploaded. To look around before you have a trace of your own, [open the sample trace](https://trace.prototest.dev/?demo=1): a run of the demo suite, with a failing test and two partial ones.
+The [ProtoTrace viewer](https://trace.prototest.dev) is a static web app. Trace files are read **entirely in your browser** and never uploaded. To look around before you have a trace of your own, [open the sample trace](https://trace.prototest.dev/?demo=1): a run of the demo suite, with four failing tests and one partial one.
 
 - **The run** opens with its verdict, what needs attention (failing and partial tests with the check that decided them, findings, gates), and what the run could see: where the application ran, which capabilities were composed, and which sources of values were present.
 - **A failing test** leads with its failure: the check that failed, expected against actual for every property, and the call it judged.
 - **Story** tells the test phase by phase: each call carries its checks, and the framework's own steps fold away until you open them.
 - **State** shows every tracked item with its lifeline and changes. Select a change to jump to the operation that made it.
 - **Spans** is the complete, searchable tree.
-- **The inspector** shows everything one operation recorded: where in your code it started, request and response, JSON as a collapsible tree, the shape a check validated, what it changed, and every item's change trail. The address holds the selection, so a link opens the same place.
+- **The inspector** shows everything one operation recorded: where in your code it started, request and response, JSON as a collapsible tree, the shape a check validated, what it changed, and every item's change trail. The URL holds the selected operation, so a link opens the same operation.
+
+### Open your own archive
+
+A run leaves its archive at `TestResults/prototest-{runId}.prototrace` under the test project's output folder, or at the path you set with `trace.OutputPath`. From there:
+
+1. Run the suite once so the file exists.
+2. Open it in the [viewer](https://trace.prototest.dev): drop the file on the page, or press **Open trace** and choose it. The file is read in your browser and never uploaded.
+3. Without a browser, read the same story from the terminal:
+
+```bash
+prototest summary TestResults/prototest-{runId}.prototrace
+prototest index TestResults
+```
+
+`prototest summary` lists the run, the outcome counts and every test that did not fully pass, with its error, source location and the failing operation. `prototest index` writes one static `index.html` beside the runs: each run's outcome counts, its failing tests, links to its trace and digest, and every archive that could not be read. The page is one file beside the traces, so a folder of evidence can be shared without a server. Both verbs are the [ProtoTest.Cli](../agent-workflows/cli.md) tool; install it with `dotnet tool install --global ProtoTest.Cli`.
 
 ### Correlating a trace with the run that produced it
 
-Every trace carries the run's own id, its timing and the environment it executed on. When the run happens somewhere you do not control (CI, a shared environment), name the facts that identify it, so a result can be attributed to the build that produced it:
+Every trace carries the run's own id, its timing and the environment it executed on. When the run happens in CI or a shared environment, name the facts that identify the build:
 
 ```csharp
 builder.ConfigureTracing(trace =>
@@ -58,7 +90,7 @@ builder.ConfigureTracing(trace =>
 
 Each entry is written as `environment.{key}` on the run's resource group in `spans.json`, next to the built-in `environment.runtime` and `environment.os`, and every [report sink](./reporting.md) receives it as a run-metadata item. A downloaded `.prototrace`, and the report it carries, names the build and run it came from.
 
-The named variables are read once, when the host is built. A variable that is unset or empty, as on a local run, contributes nothing, and neither the trace nor the report changes. An explicit `RunMetadata` value wins over a lifted variable of the same name. ProtoTest does not detect a CI provider by itself: only the variables you name are read, and a name that would hide one of the built-in facts (`runtime`, `os`, `processArchitecture`, `osArchitecture`) fails the build. Values are recorded exactly as given, so list only variables that are safe to carry in a trace.
+The named variables are read once, when the host is built. A variable that is unset or empty, as on a local run, contributes nothing, and neither the trace nor the report changes. An explicit `RunMetadata` value overrides a variable of the same name. ProtoTest does not detect a CI provider by itself: only the variables you name are read, and a name that would hide one of the built-in facts (`runtime`, `os`, `processArchitecture`, `osArchitecture`) fails the build. Values are recorded exactly as given, so list only variables that are safe to carry in a trace.
 
 The viewer's run model reads every `environment.*` entry, but its run header still shows only the runtime and the operating system. Read the metadata from `spans.json` or from the JSON or HTML report's Run metadata section.
 
@@ -69,7 +101,19 @@ A run contains tests, and a trace records two things about each of them:
 - **What ran**: a tree of **operations** (spans). Each has a duration and an outcome: a request, a flow, a hook. Operations nest, so a `web.flow` contains its clicks and a test's execution contains everything the body did. Moments inside an operation (a server starting, a subscription message) are **events** on it, and so are the observations, attachments and findings it produced.
 - **What existed and changed**: the **state**. Every client, context, resource and tracked value, with its state at the end and a trail of changes. Each change names the operation that caused it and where the value came from: the test itself, a response it observed, or the application's own instrumentation.
 
-Tracked values are items with kind `value` and an id of the form `{type}:{identity}`. Test-side provisioning writes the result type in snake_case as the type segment (`InvoiceLine` becomes `invoice_line`, so the item reads `invoice_line:42`), and `{identity}` is what the provisioner returned. An application's own instrumentation writes the prefix of its identity-shaped attribute instead (`invoice.id = 42` contributes `invoice:42`). The two are the same item only when the attribute prefix matches the type segment and the values match, so name a type's identity attribute after the type (`invoice_line.number`) to correlate them.
+One test, one operation and its records, the shape every section of a trace repeats:
+
+```text
+test.execution  Execution · Succeeded · 314 ms
+├── data.provision                       Provision invoice · Succeeded
+│   └── state change: invoice:42         created by the test
+├── http.request  GET /api/orders/42      Succeeded
+│   ├── assert.http.status  200           Succeeded
+│   └── assert.json.shape   3 properties  Succeeded
+└── events on test.execution
+    ├── observation  invoice.state = paid
+    └── attachment   00001-rest-01-response.json
+```
 
 Every entry belongs to a **phase**:
 
@@ -83,7 +127,9 @@ Every entry belongs to a **phase**:
 
 Every entry also ends with an **outcome**: `Succeeded`, `Failed`, `Partial`, `Cancelled`, `Skipped` or `Unknown`.
 
-A test can pass while something inside it failed (a diagnostic step that is not allowed to fail the run, a best-effort capture). That test is recorded as **Partial** rather than green, so it does not hide in a sea of passing tests.
+A test can pass while something inside it failed (a diagnostic step that is not allowed to fail the run, a best-effort capture). That test is recorded as **Partial**, not Passed.
+
+Tracked values are items with kind `value` and an id of the form `{type}:{identity}`. Test-side provisioning uses the result type in snake_case as the type segment. `InvoiceLine` becomes `invoice_line`, and the item reads `invoice_line:42`. The identity is what the provisioner returned. An application's own instrumentation writes the prefix of its identity-shaped attribute instead (`invoice.id = 42` contributes `invoice:42`). The two are the same item only when the attribute prefix matches the type segment and the values match, so name a type's identity attribute after the type (`invoice_line.number`) to correlate them.
 
 A few of the entry kinds recorded automatically:
 
@@ -128,7 +174,7 @@ The Learning demo runs four deliberate failures next to the tests that do the sa
 Every operation your suite starts (a request, a check, a browser step, a gRPC call) records where in your code it started: the file, the line and the method, as the OpenTelemetry attributes `code.file.path`, `code.line.number` and `code.function.name`. The inspector shows that line with the code around it, so a failed check points at the line that made it.
 
 - The location comes from the stack and your test project's symbols, which the .NET SDK writes by default. ProtoTest's own lifecycle (setup, teardown, the test's execution) records none.
-- Inside a git repository the path is relative to its root (`tests/Orders.Tests/OrderTests.cs`), so it reads the same on every machine and does not carry your local directory layout.
+- Inside a git repository the path is relative to its root, so it reads the same on every machine and does not carry your local directory layout.
 - The trace embeds each source file a location points at, so the viewer can show the code without access to the repository.
 
 ```csharp
@@ -143,7 +189,7 @@ Turn `EmbedSources` off when a trace goes to people who should not read the suit
 
 ### Reading a trace in code
 
-The host exposes a live snapshot, which is how ProtoTest's own tests assert on tracing:
+The host exposes a live snapshot of the same tree, for code that needs to read a run without opening the archive:
 
 ```csharp
 var run = host.Trace.Snapshot();
@@ -155,11 +201,7 @@ To add your own entries, see [Extending ProtoTest](../advanced/extending.md#addi
 
 `ProtoTraceDiscovery.Discover(folder)` lists the readable runs a folder holds, newest first, and names the archives it had to skip. It is the scan the `prototest` CLI and the MCP server share.
 
-Without a browser, `ProtoTest.Traces` reads the archive and the `prototest` CLI prints the failure digest: `prototest summary TestResults/Shop.prototrace` lists the run, the outcome counts, and every test that did not fully succeed with its error, source location and failing operation. It is the same compact story a CI log or an agent can use.
-
-`prototest index TestResults` writes a static `index.html` over the folder of runs: each run's outcome counts, the tests that did not pass, links to its trace and its `<trace>.digest.json` digest, plus any archive that could not be read and the reason. The page is one file beside the traces, so a folder of evidence can be shared without a server.
-
-A coding agent reads the same story through the MCP server. See [Agent workflows](../agent-workflows/coding-agents.md).
+Without a browser, `ProtoTest.Traces` reads the archive and the `prototest` CLI prints the same story: [summary and index](#open-your-own-archive) cover one archive and a folder of runs. A coding agent reads the same story through the MCP server. See [Agent workflows](../agent-workflows/coding-agents.md).
 
 ## The artifact
 
@@ -174,15 +216,15 @@ run.prototrace
 ├── state.json               what existed and changed: tracked items with their changes
 ├── sources/1/OrderTests.cs   the code an operation's location points at, when embedded
 └── resources/
-    ├── {testId}/artifact-1/rest-01-response.json
-    ├── {testId}/artifact-2/playwright-default-trace.zip
+    ├── {testId}/artifact-1/{testId}-rest-01-response
+    ├── {testId}/artifact-2/{testId}-playwright-default-trace.zip
     └── run/HtmlReportSink/run-artifact-1/report.html
 ```
 
 - **`spans.json`** holds a resource group per test (its id, name, class, method, outcome and duration) with its operations, their events, and the artifacts the test declared. The run's own group carries its id, start and end, and the environment it ran in (`environment.runtime`, `environment.os`, and any [run metadata you configured](#correlating-a-trace-with-the-run-that-produced-it)); run-level events such as gate verdicts sit on it too.
 - **`state.json`** holds the run's tracked items and each test's: kind, id, name, scope, first and last seen, the state at the end and every change, with the operation that caused it.
 - **`sources`** in the manifest maps each recorded `code.file.path` to its embedded copy.
-- Each artifact is declared once, with its media type, size and path in the archive. An attachment event refers to it by id.
+- Each artifact is declared once, with its media type, size and path in the archive. An attachment event refers to it by id. The path keeps the name the attachment was given and prefixes the test's id, so a name only has to be unique per test; a run-level artifact keeps its sink's name (`HtmlReportSink` above).
 
 Entries are stored **uncompressed**, so a browser can read the archive without a decompression library. Property names are camelCase. The archive manifest is format **2.0**, its spans document is 2.0, and its state document is **1.1**: tracked values are generic `value` items with the domain type in the id. The live snapshot exposed to code (`host.Trace.Snapshot()`) reports the same span format version.
 
@@ -190,7 +232,7 @@ Test artifacts, every [attachment](../foundation/attachments.md), live under the
 
 ### Format compatibility
 
-The format is versioned and tested against `design/prototrace-wire.contract.json`. The reader that ships with the tooling supports the current major and the one before it, and the viewer keeps opening archives it has always opened. A breaking format change bumps the major and arrives with a migration note in the changelog. A reader that meets a format it does not support fails with a message naming the version rather than guessing. `ProtoTest.Traces` follows the same rule: it reads 2.x and rejects anything else explicitly.
+The library reads manifest and spans **2.x** and state documents **1.x**; anything else fails with a message naming the version rather than guessing. The viewer reads the same spans 2.x and accepts state **1.x or 2.x**, so a state bump the viewer can read still needs a library release before the CLI opens it. A reader only opens an archive from its own era.
 
 ### If the process dies
 
@@ -198,12 +240,14 @@ The archive is written once, at the end of the run, after the gates and the repo
 
 ## Limits
 
-- Evidence is written once, at the end. A run that is killed mid-process leaves no archive.
-- Redaction covers the framework's own capture (form fills by length, sensitive headers, JSON properties and query parameters). Your own attributes, attachments and [run metadata](#correlating-a-trace-with-the-run-that-produced-it) can still carry application data, so treat a trace like test output.
-- Run metadata values are recorded exactly as given. List only variables that are safe to travel in a trace.
-- The viewer's run header shows only the runtime and the operating system. Read the other `environment.*` entries from `spans.json` or the report.
-- `CaptureSourceLocations` is the largest tracing cost; `EmbedSources` and `EmbedArtifacts` control what the archive carries. The [benchmarks page](../project/benchmarks.md) records what a trace costs at 100 and 1,000 tests and the levers that change it (`EmbedSources`, `EmbedArtifacts`, `MaxArtifactBytes`, capture options).
-- A format reader supports the current major and the one before it. An older archive needs a reader from its own era.
+| The limit | When it matters |
+| --- | --- |
+| The archive is written once, at the end | A run killed mid-process leaves no archive; keep the runner's console output |
+| Redaction covers ProtoTest's own capture | Your own attributes, attachments and run metadata can still carry application data, so treat a trace like test output |
+| Run metadata values are recorded exactly as given | List only variables that are safe to travel in a trace |
+| The viewer's run header shows only the runtime and the operating system | Read the other `environment.*` entries from `spans.json` or the report |
+| `CaptureSourceLocations` is the largest tracing cost | `EmbedSources` and `EmbedArtifacts` control what the archive carries; the [benchmarks page](../project/benchmarks.md) records what a trace costs at 100 and 1,000 tests and the levers that change it |
+| The library reads 2.x spans and 1.x state documents; the viewer accepts state 1.x or 2.x | An archive outside those versions needs a reader from its own era |
 
 ## Learn more
 

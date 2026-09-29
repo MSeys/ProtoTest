@@ -6,7 +6,7 @@ A static application for opening `.prototrace` files created by ProtoTest.
 
 ## What is it for?
 
-A failed assertion is not always enough to explain what happened. The viewer shows the test lifecycle, operations, checks, observations, resources, attachments, coverage and gate results in one place.
+A failed assertion is not always enough to explain what happened. The viewer shows the test lifecycle, operations, checks, observations, resources, attachments and gate results in one place. Coverage reports travel in the archive as the JSON and HTML report files, listed with the run's other attachments.
 
 Supported spreadsheet artifacts can also be previewed without leaving the viewer.
 

@@ -8,6 +8,10 @@ description: "Find elements by role, label and text rather than CSS; each backen
 
 `By` builds a `WebLocator`, a description of how to find something, translated by each backend into its native query. Prefer locators that describe what a user sees (roles, labels, text) over ones that describe markup (CSS); they survive redesigns and double as accessibility checks.
 
+:::caution[Two `By` types in a Selenium suite]
+A Selenium suite imports `OpenQA.Selenium` for its driver types, and `OpenQA.Selenium.By` collides with `ProtoTest.Web.By` in any file that uses both (CS0104). Alias one of them in the page-object file, for example `using By = ProtoTest.Web.By;`, or keep the driver factory in its own file. Playwright has no second `By`.
+:::
+
 ## The full list
 
 ```csharp
@@ -59,7 +63,7 @@ Component<InvoiceRow>(By.Role(WebRole.Row).And(By.HasText("INV-123")))
 `HasText` is **only valid as the right-hand side of `And`**; on its own, both backends throw `WebBackendCapabilityException`.
 
 :::caution[Selenium limitations]
-Selenium supports a narrower set of combinations: the right-hand side of `And` must be `HasText`, and the left-hand side can't be `By.Css`. Playwright is not limited to those two forms.
+Selenium supports a narrower set of combinations: the right-hand side of `And` must be `HasText`, and the left-hand side cannot be `By.Css`. Playwright is not limited to those two forms.
 :::
 
 In Playwright, `And(By.HasText(...))` becomes a native filter on the left locator; other right-hand sides become Playwright's own `And`. Selenium throws `WebBackendCapabilityException` for both of those cases.
@@ -70,7 +74,7 @@ In Playwright, `And(By.HasText(...))` becomes a native filter on the left locato
 Element(By.At(By.Role(WebRole.Button, "Remove"), 2))   // the third "Remove" button
 ```
 
-The index is zero-based and must not be negative. Playwright applies `.Nth(index)`; Selenium resolves all matches for the source, indexes the in-memory list, and throws `NoSuchElementException` naming the count when the index is out of range.
+The index is zero-based and must not be negative. Playwright applies `.Nth(index)`; Selenium resolves all matches for the source and indexes the in-memory list. Through the element API, an out-of-range index counts as a missing element. An action or assertion waits until the timeout, then fails with `WebElementResolutionException` naming the locator. A direct resolution reports the count instead (`NoSuchElementException` on Selenium).
 
 For repeated components, [`Components<T>()`](./page-objects.md#lists-of-components) with `At`, `Number`, `First` and `Matching` usually reads better.
 

@@ -6,7 +6,7 @@ description: "Log in once per test the way your application does: a login page, 
 
 # Logging in
 
-Almost every browser test starts by logging someone in, and almost every application does that differently: a login page, an SSO redirect, an API call plus an injected token, saved storage state. ProtoTest doesn't pick one for you. You write a **login strategy**, as many as you need, and apply it with an attribute.
+Almost every browser test starts by logging someone in, and almost every application does that differently: a login page, an SSO redirect, an API call plus an injected token, saved storage state. ProtoTest does not choose one. Write a **login strategy** for your application, as many as you need, and apply it with an attribute.
 
 ```csharp
 [ProtoTest]
@@ -107,7 +107,7 @@ public sealed class LoginAsAttribute<TStrategy>(string persona, params object[] 
 
 ## Sessions and ordering
 
-A logged-in session must exist first. `[WebSession]` declares one during setup and can open a start URL; `Application` selects the application, `Open` the address, and the attribute's fixed `Order = -10` runs it before `[LoginAs]`:
+Declare the session first with `[WebSession]`. It creates the session during setup and can open a start URL; `Application` selects the application, `Open` the address, and the attribute's fixed `Order = -10` runs it before `[LoginAs]`:
 
 ```csharp
 [WebSession("Admin", Application = "ControlPlane", Open = "/back-office")]   // address from ProtoTest:Applications:ControlPlane:BaseUrl
@@ -121,7 +121,7 @@ A relative `Open` resolves against the session's application address, `ProtoTest
 
 ## Tracing
 
-The login runs during setup as a `web.login` trace operation named `Login · {persona} [{session}]`, carrying `web.session`, `web.login.persona` and `web.login.strategy`. If it fails, the test fails in setup and everything that already ran is [rolled back](../../foundation/lifecycle.md#when-setup-fails).
+The login runs during setup as a `web.login` trace operation named `Login · {persona} [{session}]`, carrying `web.session`, `web.login.persona` and `web.login.strategy`. If it fails, the test fails in setup with a failed `web.login` entry and everything that already ran is [rolled back](../../foundation/lifecycle.md#when-setup-fails).
 
 ## Next
 

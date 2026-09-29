@@ -1,23 +1,14 @@
 ---
-sidebar_position: 6
+sidebar_position: 8
 title: Shape matching
 description: "Describe the JSON you expect with an anonymous object: partial, nested, with value constraints, and every mismatch reported at once with its path."
 ---
 
 # Shape matching
 
-REST and GraphQL responses, gRPC replies, consumed messages and sheet rows all use the same matcher from `ProtoTest.Json`. Only the spelling that reaches it differs:
+REST and GraphQL responses, gRPC replies, consumed messages and sheet rows all use the same matcher from `ProtoTest.Json`. Only the spelling that reaches it differs.
 
-| Subject | Call |
-| --- | --- |
-| REST response | `response.Should.MatchShape(shape)`; `PostAsync(...).ExpectAsync(shape)` asserts in the call |
-| GraphQL response | `response.Should.MatchShape(shape)`; `ExpectAsync` / `ExpectNextAsync` assert for you |
-| gRPC reply | `ProtoGrpcAssertions.For(reply).Should.MatchShape(shape)` |
-| Consumed message | `message.Should.MatchShape(shape)` |
-| Sheets table row | `row.Should.MatchShape(shape)` |
-| Sheets model row | `row.ShouldMatchShape(shape)`; a record is a user type, so C# cannot give it a `Should` extension property |
-
-You describe the JSON you expect with an anonymous object, and the matcher compares:
+Objects are partial, arrays are exact and positional, every mismatch is reported at once, and names match case-insensitively while values compare exactly.
 
 ```csharp
 response.Should.MatchShape(new
@@ -33,11 +24,27 @@ response.Should.MatchShape(new
 });
 ```
 
+A failure names the subject, then every mismatch with its path:
+
+```
+GET /api/orders/42 - Shape mismatch failed with 1 error(s):
+  • [$.status]: Values did not match. (Expected: "pending", Actual: "cancelled")
+```
+
+| Subject | Call |
+| --- | --- |
+| REST response | `response.Should.MatchShape(shape)`; `PostAsync(...).ExpectAsync(shape)` asserts in the call |
+| GraphQL response | `response.Should.MatchShape(shape)`; `ExpectAsync` / `ExpectNextAsync` assert for you |
+| gRPC reply | `ProtoGrpcAssertions.For(reply).Should.MatchShape(shape)` |
+| Consumed message | `message.Should.MatchShape(shape)` |
+| Sheets table row | `row.Should.MatchShape(shape)` |
+| Sheets model row | `row.ShouldMatchShape(shape)`; a record is a user type, so C# cannot give it a `Should` extension property |
+
 ## The rules
 
 ### Objects are partial
 
-Only the properties you list are checked. Everything else in the JSON is ignored, so a shape only states what the test is about, and new fields in the API do not break it.
+The matcher checks only the properties you list. It ignores the rest, so new API fields do not break the test.
 
 A listed property that is missing fails with *"Property was missing from the JSON response."* A non-object where you expected one fails with *"Expected an object."*
 
@@ -52,7 +59,7 @@ GET /api/orders/42 - Shape mismatch failed with 1 error(s):
 
 An unmentioned branch reports its shallowest path once, `$.extra`, not every leaf below it, and the unmentioned fields are collected alongside ordinary mismatches, so one run shows everything. A value constraint mentions its whole subtree, so `customer = JsonValue.Any()` never fails an exact match on the fields inside `customer`.
 
-Exact mode is the Verify-style exhaustive check. Partial matching stays the default, and the two share one matcher.
+Partial matching stays the default, and the two share one matcher.
 
 ### Arrays are exact
 
@@ -211,14 +218,22 @@ It returns the JSON paths that matched and throws the matcher exceptions (`JsonS
 
 ## Evidence in the trace
 
-The protocol assertions and Sheets model rows run through the shared `ProtoShapeAssertion.Assert`, which records one `assert.json.shape` operation per assertion with:
+The protocol assertions and Sheets model rows run through the shared `ProtoShapeAssertion.Assert`, which records one `assert.json.shape` operation per assertion. A failed assertion from this page records:
 
-- `expected.type`, `shape.expected` and `shape.actual`: the described shape and the sanitized actual JSON;
-- `matched.property_count` and `matched.properties`, or `shape.mismatches` and `shape.mismatch_count` on failure;
-- `shape.matches` (the matched paths) and `shape.result` (`matched` or `mismatched`);
-- `shape.exact` (`true` only) when the assertion ran in exact mode.
+```json
+{
+  "operation": "assert.json.shape",
+  "expected.type": "<>f__AnonymousType0...",
+  "shape.expected": "{ \"status\": \"cancelled\" }",
+  "shape.actual": "{ \"status\": \"pending\" }",
+  "shape.result": "mismatched",
+  "shape.mismatch_count": "1",
+  "shape.mismatches": "[$.status]: Values did not match.",
+  "shape.matches": "[\"$.id\"]"
+}
+```
 
-The expected-shape description is capped at depth 16 and 4096 expanded containers. Deeper nodes become `<Type at depth limit>`, so a cyclic or pathologically large shape cannot hang the run. On success the protocol records an observation built from the matched paths, `http.contract.shape` for REST or `graphql.contract.shape` for GraphQL, which is what [OpenAPI](../observability/coverage.md) and GraphQL schema coverage consume.
+On success the same operation carries `shape.result: matched` with `matched.property_count` and `matched.properties` instead of the mismatch fields, and `shape.exact: true` appears only when the assertion ran in exact mode. The expected-shape description is capped at depth 16 and 4096 expanded containers. Deeper nodes become `<Type at depth limit>`, so a cyclic or pathologically large shape cannot hang the run. On success the protocol records an observation built from the matched paths, `http.contract.shape` for REST or `graphql.contract.shape` for GraphQL, which is what [OpenAPI](../observability/coverage.md) and GraphQL schema coverage consume.
 
 ## Limits
 

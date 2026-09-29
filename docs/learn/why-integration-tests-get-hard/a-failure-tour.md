@@ -3,7 +3,7 @@ id: a-failure-tour
 title: A failure tour
 sidebar_label: A failure tour
 sidebar_position: 2
-description: "Four deliberate failures from the Learning demo, each read in its trace next to the test that does the same journey the right way."
+description: "Four deliberate failures from the Northstar sample, each read in its trace next to the test that does the same journey the right way."
 ---
 
 import LearnShell from '@site/src/components/LearnShell';
@@ -13,7 +13,7 @@ import Link from '@docusaurus/Link';
 
 # A failure tour
 
-The Learning demo ships four tests that fail on purpose. Each one is paired with a test that runs the same journey the right way, so the difference between failing and holding is a habit, not a rewrite.
+The Northstar sample ships four tests that fail on purpose. Each drill is paired with a test that runs the same journey and passes. The difference is one practice.
 
 <LearnShell
   level="Level 0, lesson 2"
@@ -29,7 +29,7 @@ The Learning demo ships four tests that fail on purpose. Each one is paired with
   ]}
   situation={
     <>
-      <p>A failure you cannot reproduce is hard to trust. The demo solves that by making the failures part of the suite: four tests that fail every time the drills are enabled, next to the four that pass.</p>
+      <p>A failure you cannot reproduce is hard to trust. The sample makes the failures part of the suite. Four tests fail when the drills are enabled. Four paired tests pass.</p>
       <p>Set <code>ProtoTest__Sample__Drills=true</code>, and both halves run. The drills report their failure and leave their trace; the fixes run the same journey and stay green.</p>
     </>
   }
@@ -45,7 +45,7 @@ The Learning demo ships four tests that fail on purpose. Each one is paired with
     ),
     reveal: (
       <>
-        The drill called a raw <code>HttpClient</code> on <code>http://127.0.0.1:5099</code>, an address that belongs to one machine and sits outside the run. The trace records what the run wraps, and the connection error reached only the runner output. The fix calls the same endpoint through <code>Proto.Context.Rest()</code>, and the request, the response and the shape check all appear.
+        The drill called a raw <code>HttpClient</code> on <code>http://127.0.0.1:5099</code>, an address that belongs to one machine and sits outside the run. The trace records the connection error on the <code>test.execution</code> entry and no HTTP operation, because the run wraps what it composes. The fix calls the same endpoint through <code>Proto.Context.Rest()</code>, and the request, the response and the shape check all appear.
       </>
     ),
   }}
@@ -84,7 +84,7 @@ $env:ProtoTest__Sample__Drills = "true"
 dotnet test samples/Northstar.ProtoTest
 ```
 
-The run now reports four failures, one per question, and writes their traces. Each card above links its own archive from `docs/static/lessons/`, written by the same generator that writes the archive your run produces. Download one and drop it on the [viewer](https://trace.prototest.dev) to walk it yourself.
+The run now reports four failures, one per question, and writes their traces. The warning journey beside them passes with a warning, so its trace records a partial outcome and a finding. Each card above links its own archive from `docs/static/lessons/`, written by the same generator that writes the archive your run produces. Download one and drop it on the [viewer](https://trace.prototest.dev) to walk it yourself.
 
 ## One of the fixes, line by line
 

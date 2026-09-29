@@ -419,25 +419,33 @@ using System.Runtime.CompilerServices;
         if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return "skip" }
 
         $root = Join-Path $fixtureRoot "check-docs-repo-paths"
-        New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs"), (Join-Path $root "docs/learn"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "samples/Real.Project"), (Join-Path $root "src/Real.Package") -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs"), (Join-Path $root "docs/learn"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "samples/Real.Project"), (Join-Path $root "src/Real.Package"), (Join-Path $root "tests/Real.Tests") -Force | Out-Null
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot "check-docs.ps1") -Destination (Join-Path $root "eng/check-docs.ps1")
         Set-Content -LiteralPath (Join-Path $root "docs/scripts/generate-changelog.mjs") -Value "process.exit(0);" -Encoding utf8
         Set-Content -LiteralPath (Join-Path $root "docs/configuration-keys.json") -Value '{"sections":[],"allowedKeys":[]}' -Encoding utf8
         Set-Content -LiteralPath (Join-Path $root "samples/Real.Project/File.cs") -Value "// real" -Encoding utf8
         Set-Content -LiteralPath (Join-Path $root "src/Real.Package/Options.cs") -Value "// real" -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root "tests/Real.Tests/File.cs") -Value "// real" -Encoding utf8
 
-        # Existing repository paths pass, and another layout's `src/pages` is not a repository path.
-        Set-Content -LiteralPath (Join-Path $root "docs/docs/page.md") -Value 'See `samples/Real.Project/File.cs` and `src/Real.Package/Options.cs`; a Next.js app keeps pages under `src/pages/`.' -Encoding utf8
+        # Existing repository paths pass, another layout's `src/pages` is not a repository path, and the
+        # demo checkout's suite path is named but owned by another repository.
+        Set-Content -LiteralPath (Join-Path $root "docs/docs/page.md") -Value 'See `samples/Real.Project/File.cs`, `src/Real.Package/Options.cs` and `tests/Real.Tests/File.cs`; a Next.js app keeps pages under `src/pages/`, and the demo runs `dotnet test tests/OpenCsms.Suite` in its own checkout.' -Encoding utf8
         $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
         $text = $output -join [Environment]::NewLine
-        Assert-Fixture ($LASTEXITCODE -eq 0) "existing repository paths and a framework path must pass: $text"
+        Assert-Fixture ($LASTEXITCODE -eq 0) "existing repository paths, a framework path and the demo checkout path must pass: $text"
 
-        # A prose path with nothing behind it fails and names the path.
+        # A prose path with nothing behind it fails and names the path, `tests/` included.
         Set-Content -LiteralPath (Join-Path $root "docs/docs/page.md") -Value 'The retired suite lived at `samples/Missing.Project/File.cs`.' -Encoding utf8
         $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
         $text = $output -join [Environment]::NewLine
         Assert-Fixture ($LASTEXITCODE -ne 0) "a repository path with no file must fail: $text"
         Assert-Fixture ($text.Contains("samples/Missing.Project/File.cs")) "the failure must name the path: $text"
+
+        Set-Content -LiteralPath (Join-Path $root "docs/docs/page.md") -Value 'The retired suite lived at `tests/Missing.Tests/File.cs`.' -Encoding utf8
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+        $text = $output -join [Environment]::NewLine
+        Assert-Fixture ($LASTEXITCODE -ne 0) "a tests/ path with no file must fail: $text"
+        Assert-Fixture ($text.Contains("tests/Missing.Tests/File.cs")) "the failure must name the tests path: $text"
     }
 
     # The integration pages carry the six template headings; the map and the deep task pages are
@@ -498,6 +506,31 @@ HTTP only.
         Assert-Fixture ($LASTEXITCODE -ne 0) "a section index missing a heading must fail: $text"
         Assert-Fixture ($text.Contains("rest/index.md")) "the failure must name the page: $text"
         Assert-Fixture ($text.Contains("## Limits")) "the failure must name the missing heading: $text"
+    }
+
+    # The workflow's template smoke step stays on the shared script, so CI and the local fixture test
+    # the same five runners instead of drifting apart.
+    Invoke-Fixture "template-workflow-script" {
+        $workflow = Get-Content -Raw -LiteralPath (Join-Path $repository ".github/workflows/verify.yml")
+        Assert-Fixture ($workflow -match "run: \./eng/test-template\.ps1") "the template smoke step must call eng/test-template.ps1"
+    }
+
+    # The starter template is proved end to end whenever the packed feed exists: generation, restore,
+    # build and test for all five runners, the same script CI runs after pack. Without the feed
+    # (a plain source checkout) the fixture skips like the MTP guards without built binaries.
+    Invoke-Fixture "template-starter-runners" {
+        $packages = Join-Path $repository "artifacts/packages"
+        $template = if (Test-Path -LiteralPath $packages) {
+            Get-ChildItem -LiteralPath $packages -Filter "ProtoTest.Templates.*.nupkg" -File |
+                Where-Object { $_.Name -notlike '*.snupkg' } |
+                Select-Object -First 1
+        }
+        else { $null }
+        if (-not $template) { return "skip" }
+
+        $output = & pwsh -NoProfile -File (Join-Path $repository "eng/test-template.ps1") 2>&1
+        $text = $output -join [Environment]::NewLine
+        Assert-Fixture ($LASTEXITCODE -eq 0) "the starter template must generate, restore, build and test for every runner: $text"
     }
 
     # Publishing from a branch ref fails before any push; dry runs stay allowed.

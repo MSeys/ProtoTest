@@ -30,6 +30,14 @@ response
 response.ShouldNot.HaveHttpStatus(HttpStatusCode.InternalServerError);
 ```
 
+A mismatch fails with every error at once, each with its JSON path:
+
+```
+POST /api/orders - Shape mismatch failed with 2 error(s):
+  • [$.total]: Expected greater than 200, but found '19.95'. (Expected: "greater than 200", Actual: '19.95')
+  • [$.status]: Values did not match. (Expected: "pending", Actual: "cancelled")
+```
+
 ```csharp
 public RestShouldAssertions Should { get; }
 public RestAssertions ShouldNot { get; }
@@ -45,7 +53,12 @@ public RestResponse MatchShape(object expectedShape, JsonSerializerOptions? opti
 public RestResponse MatchShape(object expectedShape, bool exact, JsonSerializerOptions? options = null);  // on RestShouldAssertions
 ```
 
-`ShouldNot.HaveHttpStatus(expected)` asserts the status is **anything but** `expected`; the same holds for the content type, header, cookie and redirect assertions. Shape is positive-only, because a negated shape match has no meaning, so `MatchShape` lives on the `Should` facade and `ShouldNot` has no shape form.
+`ShouldNot.HaveHttpStatus(expected)` asserts a different status. The same polarity applies to content type, header, cookie and redirect assertions. Shape is positive-only: `MatchShape` lives on the `Should` facade and `ShouldNot` has no shape form.
+
+| Assertion | `Should` | `ShouldNot` |
+| --- | --- | --- |
+| status, content type, header, cookie, redirect | exact match | negated match |
+| `MatchShape` | match | no form (positive-only) |
 
 ### Asserting in the call
 
@@ -62,7 +75,7 @@ On a mismatch the response is disposed and the `RestAssertionException` is rethr
 
 ### Status assertions
 
-A status assertion records an `assert.http.status` operation (source `ProtoTest.Rest`, parented to the request) with the expected and actual status codes, the client identity and `assertion.negated` when it is the `ShouldNot` side. `RestStatusAssertionException` carries `ExpectedStatusCode`, `ActualStatusCode`, `ResponseBody` and `Negated`, and appends the sanitized response body to its message, bounded by the smaller of `ProtoTest:Rest:Responses:MaxDiagnosticBodyLength` and the attachment options' cap, so a failing `400` tells you why without re-running anything.
+A status assertion records an `assert.http.status` operation (source `ProtoTest.Rest`, parented to the request) with the expected and actual status codes, the client identity and `assertion.negated` when it is the `ShouldNot` side. `RestStatusAssertionException` carries the expected and actual status, the body and whether it was negated. It appends the sanitized body up to the smaller of the two length caps.
 
 ### Content type, headers, cookies and redirects
 
@@ -86,22 +99,16 @@ Describe the JSON you expect as an anonymous object. The short version of the ru
 - **Objects match partially.** Only the properties you list are checked; anything else in the response is ignored.
 - **Arrays match exactly.** Same length, compared position by position.
 - **Property names are case-insensitive** by default.
-- **Values can be constraints**, not just literals: `JsonValue.GreaterThan(0)`, `JsonValue.NotNull()`, `JsonValue.Regex(...)` and more.
+- **Values can be literals or constraints** such as `JsonValue.GreaterThan(0)`.
 - **Every mismatch is reported at once**, each with its JSON path.
 
-A failure names the request it was made against, the identifier the trace already carries:
-
-```
-POST /api/orders - Shape mismatch failed with 2 error(s):
-  • [$.total]: Expected greater than 200, but found '19.95'. (Expected: "greater than 200", Actual: '19.95')
-  • [$.status]: Values did not match. (Expected: "pending", Actual: "cancelled")
-```
+A failure names the request it was made against, the identifier the trace already carries (shown in the example above).
 
 The failure is a `RestAssertionException` whose `InnerException` is the shared `JsonShapeMismatchException` (`Mismatches`, `MatchedProperties`), so the mismatch list stays inspectable.
 
-`MatchShape(shape, exact: true)` is the exhaustive form: a field present in the response that the shape does not mention is a mismatch naming that field. A value constraint mentions its whole subtree. The [shape matching page](../../foundation/shape-matching.md#exact-matching) has the rules.
+Keep one copy of the exact-mode rule on the [shape matching page](../../foundation/shape-matching.md#exact-matching): exact mode flags any unlisted field.
 
-The assertion records an `assert.json.shape` operation with the expected type, the actual media type, the expected and actual shapes, and the matched properties or every mismatch (`matched.property_count`, `shape.mismatches`, `shape.mismatch_count`, `shape.result`, plus `shape.exact` in exact mode). On success it records an `http.contract.shape` observation carrying the request identifier, matched property paths, target type and status code, the input [OpenAPI coverage](../openapi.md) and [traffic coverage](../../observability/coverage.md#traffic-coverage-observed-but-unasserted) use. When `CaptureExpectedShapes` is on, the expected shape is attached as `rest-{n:00}-expected-shape` (`-02`, `-03` … for repeated assertions on one response).
+The assertion records an `assert.json.shape` operation. It stores the expected and actual shapes, the match result and the mismatch list. On success it records an `http.contract.shape` observation carrying the request identifier, matched property paths, target type and status code, the input [OpenAPI coverage](../openapi.md) and [traffic coverage](../../observability/coverage.md#traffic-coverage-observed-but-unasserted) use. When `CaptureExpectedShapes` is on, the expected shape is attached as `rest-{n:00}-expected-shape` (`-02`, `-03` … for repeated assertions on one response).
 
 The full rules and every available matcher are on the [Shape matching](../../foundation/shape-matching.md) page.
 
@@ -154,7 +161,7 @@ var total = response.ReadRequired<decimal>("$.order.total");
 var first = response.ReadAsJson<string>("items[0].sku");
 ```
 
-The path subset is `$` for the root, dot members (`$.customer.id`) and zero-based array indices (`$.items[0].sku`); a leading member without `$` is accepted as `$.member`. Members match case-sensitively. The subset deliberately excludes filters, wildcards, quoted names and slices.
+The path subset is `$` for the root, dot members (`$.customer.id`) and zero-based array indices (`$.items[0].sku`); a leading member without `$` is accepted as `$.member`. Members match case-sensitively. Filters, wildcards, quoted names and slices are excluded.
 
 A path that does not resolve throws `RestAssertionException` whose message starts with the request identifier and names the path, for example `GET /orders/42 - The JSON path '$.missing' did not match: the member 'missing' was not found.`; the shared `JsonPathException` stays reachable as `InnerException`. A value of the wrong type throws `JsonException`. `ReadRequired<T>(jsonPath)` additionally throws when the body is empty or the path holds JSON `null`, for every `T`, including value types, because the null check runs before the deserializer, and the nullable `ReadAsJson<T>(jsonPath)` returns `default` for an empty body.
 

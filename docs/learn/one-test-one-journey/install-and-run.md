@@ -23,11 +23,11 @@ Everything in this level runs against the Northstar sample: one suite that compo
   ]}
   before={[
     <>Level 0 (<Link to="/learn/why-integration-tests-get-hard/the-four-questions">the four questions</Link>).</>,
-    'The .NET SDK, version 8 or newer, and git. The first run restores packages and takes a couple of minutes.',
+    'The .NET 8 SDK or newer, and git. The first run restores packages and takes a couple of minutes.',
   ]}
   situation={
     <>
-      <p>The fastest way to judge a test framework is to watch it run a suite that touches real things. The sample is small, it is green on an ordinary run, and it writes down everything it did.</p>
+      <p>To judge a test framework, watch it run a suite that touches an API, a database, a browser and a broker. The sample is small, it is green on an ordinary run, and it writes down everything it did.</p>
       <p>Some tests will not run: the broker journey needs a broker, and no broker is configured, and the four failure drills wait for an explicit opt-in. Those skips are part of the lesson, not a defect.</p>
     </>
   }
@@ -78,11 +78,23 @@ The ordinary run is green and fast. The application is hosted in-process, so the
 - the broker journey, because no broker is configured;
 - the browser journey, when Playwright's Chromium is not installed.
 
-The four failure drills also skip in an ordinary run; `ProtoTest__Sample__Drills=true` lets them fail so you can read their traces. The summary prints how many tests passed, failed and skipped, and lists the skipped tests. Add `--logger "console;verbosity=detailed"` to print each reason beside its test.
+The four failure drills also skip in an ordinary run; `ProtoTest__Sample__Drills=true` lets them fail so you can read their traces. The warning journey beside them skips too. The summary prints how many tests passed, failed and skipped, and lists the skipped tests. Add `--logger "console;verbosity=detailed"` to print each reason beside its test.
+
+A healthy run on a machine with Chromium ends exactly like this:
+
+```text
+Failed:     0, Passed:    14, Skipped:     6, Total:    20
+```
+
+The six skips are the broker journey, the four drills and the warning journey. Without Chromium the browser journey skips too, and the summary reads `Passed: 13, Skipped: 7`. If your clone reports `Total: 0`, it is behind the release; pull or clone again and run it once more.
+
+```bash
+git pull
+```
 
 ## Find what the run left
 
-Every run writes three files under the sample's output folder:
+The run writes three evidence files under the sample's output folder, next to the SQLite store it created for the run:
 
 ```
 bin/Debug/net8.0/TestResults/Northstar.ProtoTest/
@@ -95,15 +107,15 @@ Open `report.html` in a browser for the run's verdict and the routes it covered.
 
 ## The same packages in your own project
 
-The sample composes packages; so does a new project. The quickest start is the template:
+The sample composes packages; so does a new project. The quickest start is the template. It targets `net10.0`, so it needs the .NET 10 SDK; on an older SDK, pass the framework the sample uses:
 
 ```bash
 dotnet new install ProtoTest.Templates
-dotnet new prototest -n Shop
+dotnet new prototest -n Shop --framework net8.0
 cd Shop
 dotnet test
 ```
 
-For an existing test project, add your runner package, `ProtoTest.Core` and one package per integration. The [installation page](/docs/getting-started/installation) lists every package and what arrives with it.
+The template offers `net10.0`, `net9.0` and `net8.0`; `net8.0` matches the sample and the rest of this track. For an existing test project, add your runner package, `ProtoTest.Core` and one package per integration. The [installation page](/docs/getting-started/installation) lists every package and what arrives with it.
 
 </LearnShell>

@@ -28,7 +28,7 @@ Two problems come back in every journey: creating a fixture through the real doo
   ]}
   situation={
     <>
-      <p>Setup data has to come from somewhere. A test that inserts rows directly bypasses every rule the product enforces, and a fixture copy pasted into each test drifts from the route it once matched.</p>
+      <p>Setup data has to come from somewhere. A test that inserts rows directly bypasses product rules. A fixture copied into each test drifts from the endpoint it matched.</p>
       <p>A provisioner creates the object once, through the door you choose, and returns what the system gave back. A page object describes a screen so a test reads as a user instead of a selector.</p>
     </>
   }
@@ -147,14 +147,14 @@ A test provisions a project with the extension the sample keeps for it:
 var project = await Proto.Context.Data().CreateProjectAsync($"provision-{Proto.Context.TestId}");
 ```
 
-One call, and the trace records a chain. From the first journey's archive, where the tenant attribute made the same call:
+One call, and the trace records a chain. From the first journey's archive, <a href="pathname:///lessons/l1-first-journey.prototrace">l1-first-journey.prototrace</a>, where the tenant attribute made the same call:
 
 | Entry | Reading |
 | --- | --- |
-| `Create · ProvisionTenantRequest`, 140.4 ms | the data surface received the request and looked up the registered provisioner |
-| `Build · ProvisionTenantRequest`, 3.6 ms | the defaults and the `With` calls produced the value that was sent |
-| `Provision · ProvisionTenantRequest → TenantResponse`, 135.2 ms | the provisioner made the call and returned the created value |
-| `Release · data:TenantResponse:1`, 9.6 ms, then `Cleanup · TenantResponse` | teardown released the tracked value and ran the cleanup |
+| `Create · ProvisionTenantRequest`, 137.0 ms | the data surface received the request and looked up the registered provisioner |
+| `Build · ProvisionTenantRequest`, 3.5 ms | the defaults and the `With` calls produced the value that was sent |
+| `Provision · ProvisionTenantRequest → TenantResponse`, 132.0 ms | the provisioner made the call and returned the created value |
+| `Release · data:TenantResponse:1`, 10.3 ms, then `Cleanup · TenantResponse` | teardown released the tracked value and ran the cleanup |
 
 Nothing in the test knew a port or a route. The registration decided which implementation ran, and the trace names it.
 

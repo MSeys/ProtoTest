@@ -19,7 +19,7 @@ using ProtoTest.Web.Playwright;
 public sealed class ContainerizedApplicationJourneyTests
 {
     [ProtoTest]
-    public async Task The_browser_and_REST_journey_against_the_containerized_application()
+    public async Task TheBrowserAndRestJourneyAgainstTheContainerizedApplication()
     {
         RequireContainer();
 

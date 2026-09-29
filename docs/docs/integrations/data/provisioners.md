@@ -57,7 +57,7 @@ A provisioner can use every other ProtoTest client through `context.Execution`.
 
 `ProtoDataProvisioningContext` has:
 
-| Member | |
+| Member | Is |
 | --- | --- |
 | `Execution` | the running test's `ProtoExecutionContext` |
 | `Services` | the test's service provider |
@@ -77,7 +77,7 @@ AddDataProvisioner<T, TProvisioner>()                   // input and result are 
 AddDataProvisioner<TInput, TResult, TProvisioner>()     // different types
 ```
 
-Provisioners are resolved from dependency injection and are scoped, so their constructors can take services. A repeat with the same implementation type is a no-op; two *different* provisioners for one input/result pair both register and fail later, when the pair is used. At provisioning time exactly one provisioner must resolve for the pair: none, or more than one, throws `ProtoDataException`; so does a provisioner that returns `null` or a null `Value`.
+Provisioners are resolved from dependency injection and are scoped, so their constructors can take services. A repeat with the same implementation type is a no-op; two *different* provisioners for one input/result pair both register and fail later, when the pair is used. At provisioning time exactly one provisioner must resolve for the pair. Zero provisioners, more than one, or a null return value throws `ProtoDataException`.
 
 ## Using it
 
@@ -136,12 +136,12 @@ sealed class DeleteOnDispose(Func<Task> delete) : IAsyncDisposable
 }
 ```
 
-- Cleanups run in **reverse creation order**, so dependent records go before the things they depend on.
+- Cleanups run in reverse creation order, so dependent records are deleted before their parents.
 - Each cleanup is a test resource (`data:{TypeName}:{sequence}`, kind `data`) released in teardown before the test's clients are disposed.
 - Each release is a `data.cleanup` operation carrying `data.type`, `data.identity` and `data.provisioner`.
 - If several cleanups fail, they are all attempted and the failures are aggregated as an `AggregateException`.
 
-When cleanup happens at a coarser level, say the whole tenant is deleted by an [attribute](../../foundation/attributes.md), just leave `Cleanup` null, as the sample provisioner does.
+When cleanup happens at a coarser level, for example when an [attribute](../../foundation/attributes.md) deletes the whole tenant, leave `Cleanup` null, as the sample provisioner does.
 
 ## Tracing
 

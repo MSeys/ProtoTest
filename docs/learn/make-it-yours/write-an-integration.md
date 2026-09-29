@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Write an integration
 
-Everything a package does, your own code can do: a client the context resolves, a hook around the test, entries in the trace. The sample's correlation layer is a real integration of about fifty lines, and it is the model for this lesson.
+Your code can add what a package adds. That means a client the context resolves, a hook around the test, or entries in the trace. The sample's correlation layer is a real integration of about fifty lines, and it is the model for this lesson.
 
 <LearnShell
   level="Level 6, lesson 3"
@@ -53,9 +53,9 @@ Everything a package does, your own code can do: a client the context resolves, 
   ]}
   next={[
     {
-      label: 'Run the evidence loop with an agent',
-      to: '/learn/make-it-yours/evidence-loop-with-an-agent',
-      note: 'The trace you just learned to write, read by a coding agent over MCP.',
+      label: 'Swap a dependency for one test',
+      to: '/learn/make-it-yours/swap-a-dependency-for-one-test',
+      note: 'Replace a service in the application for one test, and read the dedicated server it builds.',
     },
     {
       label: 'Extending ProtoTest',
@@ -143,11 +143,11 @@ The conventions are short and worth following:
 
 - Attributes are strings. Keep them small, and never put a secret in one.
 - Nesting is automatic. An operation started inside another becomes its child.
-- An operation completes once. Completing it a second time is ignored, and disposing it uncompleted records `Unknown`.
+- Complete an operation once. A second completion has no effect. Disposing it without completion records `Unknown`.
 
 ## Your turn: one milestone
 
-The probe is public, so a test can mark its own step. Add this to the first journey from lesson 1, under the `[RunNote]` you already added:
+The probe is public, so a test can mark its own step. Add this to the first journey from lesson 1, under the `[RunNote]` you already added; if you removed that file, [Write your first test](/learn/one-test-one-journey/write-your-first-test) recreates it, and [Write your own attribute](/learn/make-it-yours/attributes) adds the note.
 
 ```csharp
 Proto.Context.Client<ScenarioProbe>("ScenarioProbe").Mark("first-milestone");
@@ -156,16 +156,16 @@ Proto.Context.Client<ScenarioProbe>("ScenarioProbe").Mark("first-milestone");
 Run the filter and open the trace. The teardown publishes the scenario summary as an attachment. Open it and read the milestones:
 
 ```json
-{"CorrelationId":"scenario-137861000001-93af2aea0c584c4fb32be77b576df122","TestName":"Northstar.ProtoTest.ProjectsJourney.CreatingAProjectReturnsIt","DurationMs":365.901,"Milestones":["scenario-started","scenario-completed"]}
+{"CorrelationId":"scenario-416387000001-6406e159a16243e0beb564c28105893f","TestName":"Northstar.ProtoTest.ProjectsJourney.CreatingAProjectReturnsIt","DurationMs":349.127,"Milestones":["scenario-started","scenario-completed"]}
 ```
 
-The committed archive for the first journey has the same shape, with the sample's own two milestones. Beside it, the trace holds:
+The committed archive for the first journey, <a href="pathname:///lessons/l1-first-journey.prototrace">l1-first-journey.prototrace</a>, has the same shape, with the sample's own two milestones. Beside it, the trace holds:
 
 | Entry | Reading |
 | --- | --- |
-| `Initialize · ScenarioProbe (ScenarioProbe)`, 0.2 ms | the initializer registered the custom client during setup |
-| `Before · NorthstarScenarioHook`, 6.1 ms | the hook ran before the test and wrote the opening event |
-| `Publish · <test id>-scenario-summary.json`, 0.9 ms | the hook attached the milestone trail at teardown |
+| `Initialize · ScenarioProbe (ScenarioProbe)`, 0.1 ms | the initializer registered the custom client during setup |
+| `Before · NorthstarScenarioHook`, 5.9 ms | the hook ran before the test and wrote the opening event |
+| `Publish · <test id>-scenario-summary.json`, 0.5 ms | the hook attached the milestone trail at teardown |
 
 Your milestone lands in the same attachment, because the client, the hook and the attachment are one integration. That is the whole point: a feature you write behaves like a feature that shipped.
 

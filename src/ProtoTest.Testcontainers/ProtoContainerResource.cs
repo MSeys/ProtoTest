@@ -261,12 +261,11 @@ public abstract class ProtoContainerResource<TContainer> : IProtoConnectionInfra
     }
 
     /// <summary>
-    /// Starts a resource a caller just built, reporting why it could not start instead of throwing - a
-    /// machine without a container runtime should be able to fall back or skip rather than fail the run.
+    /// Starts a caller-built resource without throwing; returns the start failure for the caller to
+    /// handle, so a machine without a container runtime can fall back or skip rather than fail the run.
     /// The asynchronous start runs on the thread pool, so a synchronous caller cannot deadlock on its
-    /// own synchronization context while the shared start task completes. <see cref="StartAsync"/>
-    /// already releases the built container when starting fails, so the candidate stays retryable; the
-    /// caller can adopt it, retry, or simply let it go.
+    /// own synchronization context. <see cref="StartAsync"/> already releases the built container when
+    /// starting fails, so the candidate stays retryable; the caller can adopt it, retry, or let it go.
     /// </summary>
     protected static ContainerStartResult<TResource> TryStartContainer<TResource>(TResource resource)
         where TResource : ProtoContainerResource<TContainer>

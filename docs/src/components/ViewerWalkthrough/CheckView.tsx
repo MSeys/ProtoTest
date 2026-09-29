@@ -4,22 +4,22 @@ import styles from './styles.module.css';
 
 /*
  * The viewer's inspector for the failing check: what ran, when, the exception it threw, and the source
- * line the trace recorded around it. The location and code are the inspector's own: DiagnosticsShowcase.cs
- * line 121, with the assertion highlighted.
+ * line the trace recorded around it. The location and code are the inspector's own: FailureDrills.cs
+ * line 34, with the assertion highlighted.
  */
 
 const source = {
-  file: 'DiagnosticsShowcase.cs',
-  line: 121,
-  method: 'ProtoTest.Demo.DiagnosticsShowcase.TheOrganizationReportsItsPlanAndProjectCount',
+  file: 'FailureDrills.cs',
+  line: 34,
+  method: 'Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow',
   lines: [
-    [117, '// Act'],
-    [118, 'using var organization = await Proto.Context.Rest().GetAsync("/api/v1/organization");'],
-    [119, ''],
-    [120, '// Assert'],
-    [121, 'organization.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(new'],
-    [122, '{'],
-    [123, '    projectCount = 99,'],
+    [31, 'await Task.Delay(TimeSpan.FromSeconds(1));'],
+    [32, ''],
+    [33, 'using var organization = await Proto.Context.Rest().GetAsync("/api/v1/organization");'],
+    [34, 'organization'],
+    [35, '    .Should.HaveHttpStatus(HttpStatusCode.OK)'],
+    [36, '    .Should.MatchShape(new { status = SubscriptionStatuses.PastDue });'],
+    [37, '}'],
   ] as const,
 };
 
@@ -46,7 +46,7 @@ export default function CheckView(): ReactNode {
           <i className={styles.outcomeDot} />
           Failed
         </span>
-        <span className={styles.meta}>2.0 ms · +31 ms into the test</span>
+        <span className={styles.meta}>2.1 ms · +1.95 s into the test</span>
         <span className={styles.kind} style={tone('--phase-execution')}>
           Execution
         </span>
@@ -56,7 +56,7 @@ export default function CheckView(): ReactNode {
       <div className={styles.exception}>
         <b>JsonShapeMismatchException</b>
         <span className={styles.exceptionNote}>
-          Response shape mismatch · 2 properties · projectCount, planId
+          Shape mismatch failed with 1 error(s) · $.status
         </span>
       </div>
 

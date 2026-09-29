@@ -7,7 +7,7 @@ description: "Stub an HTTP dependency per test with WireMock.Net: scenario-like 
 
 # WireMock
 
-`ProtoTest.WireMock` starts a fake HTTP service per test, backed by [WireMock.Net](https://github.com/WireMock-Net/WireMock.Net). Stub the dependency your system under test calls, point it at the fake, and read what arrived. Matched requests land in the trace with the [REST](./rest/index.md) response shape, and registered stubs contribute coverage.
+`ProtoTest.WireMock` starts a fake HTTP service per test, backed by [WireMock.Net](https://github.com/WireMock-Net/WireMock.Net). Stub the dependency your system calls, point it at the fake, and verify the requests it received. Matched requests land in the trace with the [REST](./rest/index.md) response shape, and registered stubs contribute coverage.
 
 ## What it adds
 
@@ -44,6 +44,22 @@ var fake = Proto.Context.WireMock("Payments");
 
 ## The tasks
 
+```csharp
+[ProtoTest]
+public async Task Balance_endpoint_returns_the_stubbed_amount()
+{
+    var fake = Proto.Context.WireMock("Payments");
+    var stub = fake.Stub("GET", "/balance/*")
+        .RespondJson(HttpStatusCode.OK, new { available = 1200 });
+
+    using var http = new HttpClient { BaseAddress = new Uri(fake.BaseUrl) };
+    using var response = await http.GetAsync("/balance/42");
+
+    Assert.That((int)response.StatusCode, Is.EqualTo(200));
+    stub.VerifyHappenedOnce();
+}
+```
+
 - **Serve a stubbed response.** `fake.Stub("GET", "/balance/*").RespondJson(HttpStatusCode.OK, new { available = 1200 })` stubs the route; `fake.Stub(HttpMethod.Post, "/charges").RespondWith(HttpStatusCode.Accepted)` and `RespondWith(status, body, contentType)` cover the rest. Paths follow the WireMock path syntax, where `*` matches a segment. A stub serves nothing until a response is set on it, and a response method replaces the mapping, so re-stubbing never stacks two mappings. `WithHeader(name, values)` adds response headers.
 - **Verify the call arrived.** The stub handle answers `ReceivedCount`, `StatusCode` and `VerifyHappened()` / `VerifyHappenedOnce()` / `VerifyHappened(times)`, which fail naming the stub. Assert before the test completes; after teardown the server is gone.
 - **Fail on a route nothing stubbed.** `fake.ReceivedRequests` lists every request the fake served (method, path, matched, status) and `fake.UnmatchedRequests` lists what no stub matched. `VerifyNoUnmatchedRequests()` fails naming the fake and every unmatched request, so call it at the end of a test that must only hit stubbed routes.
@@ -52,7 +68,7 @@ var fake = Proto.Context.WireMock("Payments");
 
 ## In the trace and coverage
 
-Each stub registration records a `wiremock.stub` observation. Each request the fake served records `http.response` when a stub matched (method, route template, status, sanitized body and headers, duration, the same payload [REST](./rest/index.md) records) or `http.failure` when nothing matched. An unmatched request carries the marker `WireMockUnmatchedRequest` as the failure's exception type: no exception produced the observation, so the fake reports the reason in the REST failure shape's type slot. The fake is a `server` run entity (`server:WireMock:{name}`) with its URL, lifetime and state.
+Each stub registration records a `wiremock.stub` observation. Each request the fake served records `http.response` when a stub matched (method, route template, status, sanitized body and headers, duration, the same payload [REST](./rest/index.md) records) or `http.failure` when nothing matched. An unmatched request records `http.failure` with exception type `WireMockUnmatchedRequest`. No exception was thrown; the type field carries the reason. The fake is a `server` run entity (`server:WireMock:{name}`) with its URL, lifetime and state.
 
 Coverage is automatic: every registered fake gets a `WireMock` collector, no `AddCollector` needed. Each stub is an item, uncovered until a matched request covers it, so a stub no test's system under test called stays visible as a gap. [Coverage](../observability/coverage.md) explains what covered and gap mean in a report.
 

@@ -2,7 +2,7 @@
 
 The `prototest` .NET tool.
 
-```
+```bash
 dotnet tool install --global ProtoTest.Cli
 prototest summary TestResults/Shop.prototrace
 prototest index TestResults
@@ -36,7 +36,7 @@ artifact link the comment carries. A missing target skips its channel with the r
 - Four commands: `summary <file>`, `index <folder>`, `feedback <file> [--digest <path>]` and
   `verify <baseline.json> <current.json>`. The models underneath (`ProtoTest.Diagnosis`,
   `ProtoTest.Traces`, `ProtoTest.Feedback`, `ProtoTest.Verification`) are the same ones the MCP tools
-  and the action use, so the surfaces cannot drift apart.
+  use, so the surfaces cannot drift apart.
 - `index` writes only: `index.html` in the named folder and one digest beside each run's archive. It
   never renames, moves or deletes an archive, and it carries no JavaScript.
 - `verify` reads report files, not traces; write them with a `ProtoTest.Reporting` sink. Spec

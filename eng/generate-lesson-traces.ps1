@@ -27,10 +27,41 @@ $traces = @(
     @{ Name = "l2-broker-skip"; Filter = "FullyQualifiedName~BrokerJourney.PayingAnInvoicePublishesAnInvoicePaidEvent"; Expect = "Skipped" },
     @{ Name = "l3-clock-window"; Filter = "FullyQualifiedName~ClockJourney.ClosingTheBillingPeriodIssuesTheInvoiceOnTheTestClock"; Expect = "Passed" },
     @{ Name = "l4-coverage"; Filter = "FullyQualifiedName~PlatformJourney.RestWritesAreVisibleThroughGraphQL"; Expect = "Passed" },
-    @{ Name = "l4-artifacts"; Filter = "FullyQualifiedName~SheetsJourney.TheMonthlyReport_ShouldMatchItsModel"; Expect = "Passed" }
+    @{ Name = "l4-artifacts"; Filter = "FullyQualifiedName~SheetsJourney.TheMonthlyReportMatchesItsModel"; Expect = "Passed" },
+    # NUnit reports a warning test as skipped, so the summary check below expects Skipped; the
+    # archive check after the copy proves the run recorded a partial outcome and a finding.
+    @{ Name = "l4-partial"; Filter = "FullyQualifiedName~FailureDrills.APassingJourneyCanStillCarryAWarning"; Drills = $true; Expect = "Skipped"; ExpectPartial = $true }
 )
 
 New-Item -ItemType Directory -Force -Path $destination | Out-Null
+
+function Assert-PartialTrace([string]$archivePath) {
+    # The runner summary cannot tell a warning from a skip, so read the archive itself: one test
+    # resource with a partial outcome and at least one finding event.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($archivePath)
+    try {
+        $reader = [System.IO.StreamReader]::new($archive.GetEntry("spans.json").Open())
+        try { $spans = $reader.ReadToEnd() | ConvertFrom-Json }
+        finally { $reader.Dispose() }
+        $tests = @($spans.resourceSpans | Where-Object { $_.resource.attributes.testId })
+        if ($tests.Count -ne 1) {
+            throw "Expected one test resource in $archivePath, but found $($tests.Count)."
+        }
+        if ($tests[0].resource.attributes.testOutcome -ne "partial") {
+            throw "Expected a partial outcome in $archivePath, but found $($tests[0].resource.attributes.testOutcome)."
+        }
+        $events = @($spans.resourceSpans | ForEach-Object { $_.scopeSpans } | ForEach-Object {
+            @($_.spans | ForEach-Object { $_.events }) + @($_.events)
+        } | Where-Object { $_ })
+        if (-not ($events | Where-Object { $_.record -eq "finding" })) {
+            throw "Expected a finding event in $archivePath."
+        }
+    }
+    finally {
+        $archive.Dispose()
+    }
+}
 
 foreach ($item in $traces) {
     $arguments = @(
@@ -83,6 +114,10 @@ foreach ($item in $traces) {
 
     Copy-Item -LiteralPath $trace -Destination $destinationFile -Force
     Write-Host "Wrote $($item.Name).prototrace ($($item.Expect.ToLowerInvariant())): $($summary.Value.Trim())"
+
+    if ($item.ExpectPartial) {
+        Assert-PartialTrace $destinationFile
+    }
 }
 
 Write-Host "Wrote $($traces.Count) lesson traces to $destination"

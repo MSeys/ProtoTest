@@ -72,9 +72,10 @@ function bars(test: TestTrace) {
           <span class="file">{{ fileName }}</span>
         </p>
       </div>
-      <!-- The run's shape at a glance: one segment per test, in the order they started, coloured by outcome. -->
-      <div class="strip" role="img" :aria-label="verdict.map(part => part.text).join(', ')">
+      <!-- The run's shape at a glance: one button per test, in the order they started, coloured by outcome. -->
+      <div class="strip" role="group" :aria-label="`${run.tests.length} tests, in start order`">
         <button v-for="test in run.tests" :key="test.id" type="button" class="tick" :class="tone(test.outcome)"
+                :aria-label="`${pad(test.number)} ${testTitle(test)}, ${test.outcome}`"
                 :title="`${pad(test.number)} ${testTitle(test)}`" @click="emit('select', test)" />
       </div>
     </header>

@@ -4,6 +4,10 @@ Posts a failing run's digest where a pull request reads it: a comment with the t
 annotations and a webhook for a machine consumer. The digest is the `ProtoTest.Diagnosis` document,
 so the comment, the CLI and the MCP tools cannot tell different stories.
 
+```bash
+dotnet add package ProtoTest.Feedback
+```
+
 ```csharp
 var digest = ProtoFeedback.ReadDigest("TestResults/Shop.prototrace");
 var report = await ProtoFeedback.PostAsync(

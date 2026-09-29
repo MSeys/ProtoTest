@@ -5,6 +5,7 @@ description: "Download the workbook the application generates over REST and veri
 ---
 
 import TraceExample from '@site/src/components/TraceExample';
+import TabbedCode from '@site/src/components/TabbedCode';
 
 # A downloaded report matches its model
 
@@ -12,7 +13,7 @@ import TraceExample from '@site/src/components/TraceExample';
 
 The application generates a monthly report as an `.xlsx`. A `200` on the download says a file arrived. It does not say the file has the right sheet, the right columns, valid values in every row or the project the test created.
 
-The test downloads the workbook over the API and checks it the way a reader would. The demo runs this journey in [SheetsJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/SheetsJourney.cs).
+The test downloads the workbook over the API and checks its content. The demo runs this journey in [SheetsJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/SheetsJourney.cs).
 
 ## The code
 
@@ -25,22 +26,28 @@ The workbook is read as OpenXML, so it makes no difference whether the applicati
 builder.AddSheets();
 ```
 
-Describe a row of the report once, with the rules every value must meet:
+### The test
 
-```csharp
-[Sheet("Summary", HeaderRows = [1])]
+Describe a row of the report once, with the rules every value must meet. The test creates a project the report must contain, downloads the report and reads it through the model:
+
+<TabbedCode
+  label="The report model and the test that reads it"
+  tabs={[
+    {
+      id: 'model',
+      label: 'Model',
+      filename: 'ProjectReportRow.cs',
+      code: `[Sheet("Summary", HeaderRows = [1])]
 public sealed record ProjectReportRow(
     [property: Column("Name", Unique = true)] string Name,
     [property: Column("Status", Pattern = "^[a-z]+$")] string Status,
-    [property: Column("Environments", Min = 0)] int Environments);
-```
-
-### The test
-
-The test creates a project the report must contain, downloads the report and reads it through the model:
-
-```csharp
-[Application(NorthstarTargets.Api)]
+    [property: Column("Environments", Min = 0)] int Environments);`,
+    },
+    {
+      id: 'test',
+      label: 'Test',
+      filename: 'SheetsJourney.cs',
+      code: `[Application(NorthstarTargets.Api)]
 [NorthstarMember(PlanIds.Growth)]
 public sealed class SheetsJourney
 {
@@ -54,7 +61,7 @@ public sealed class SheetsJourney
             .With(request => request.Name, "report-atlas")
             .CreateAsync<ProjectResponse>();
 
-        // Act: download the generated workbook; the response is content the sheet reader understands.
+        // Act: download the generated workbook and read it through the model.
         using var response = await Proto.Context.Rest().GetAsync("/api/v1/reports/monthly.xlsx");
         response.Should.HaveHttpStatus(HttpStatusCode.OK);
         var report = Proto.Context.Sheets().Open(response).Model<ProjectReportRow>();
@@ -69,10 +76,12 @@ public sealed class SheetsJourney
             Assert.That(row.Environments, Is.EqualTo(0));
         }
     }
-}
-```
+}`,
+    },
+  ]}
+/>
 
-`Open(response)` needs no file: a REST response is named content, so the workbook is read straight from it. `Should.MatchModel()` checks the model's rules across every row, and `Row(...)` proves the report contains the project this test created.
+`Open(response)` needs no file. It reads the workbook directly from the REST response. `Should.MatchModel()` checks the model's rules across every row, and `Row(...)` proves the report contains the project this test created.
 
 ## What the trace shows
 
@@ -82,7 +91,7 @@ The operations land in the order the test caused them:
 - the report download as an `http.request` with its `http.response` observation and, when [capture](../integrations/rest/attachments.md) is on, the workbook itself as a response artifact,
 - `sheets.open` with the sheet it read, then `sheets.model` with the declared columns, and one `assert.sheets` operation per assertion.
 
-Reading a cell or a range records a `sheets.range` observation, and `SheetsCoverageCollector` aggregates those. Opening a workbook is evidence, not coverage: a range is covered only when a read verified it. See [Sheets](../integrations/sheets/index.md#in-the-trace-and-coverage).
+Reading a cell or a range records a `sheets.range` observation, and [`SheetsCoverageCollector`](../integrations/sheets/index.md#in-the-trace-and-coverage) aggregates those. Opening a workbook is evidence, not coverage: a range is covered only when a read verified it. See [Sheets](../integrations/sheets/index.md#in-the-trace-and-coverage).
 
 This is the demo's own run:
 
@@ -101,8 +110,8 @@ This is the demo's own run:
 
 ## What it does not prove
 
-- **OpenXML `.xlsx` only.** There is no `.xls`, no CSV and no writing.
-- **`Should.MatchModel()` reports everything at once.** A missing header fails when the model is read, naming it; broken column rules are collected, each with its cell reference, into one failure.
+- **Only OpenXML `.xlsx` is supported.** It does not read `.xls` or CSV, and it does not write files.
+- **`Should.MatchModel()` collects all column failures into one result.** A missing header fails when the model is read, naming it; broken column rules are collected, each with its cell reference, into one failure.
 - **Formulas are cached values.** Nothing is recalculated, and dates are detected from the cell's style, not a schema.
 - **Ranges are capped at 1,000,000 cells**, and hidden sheets are skipped unless the options ask for them.
 - **Coverage is read-based.** A column present in the file but never read is uncovered.

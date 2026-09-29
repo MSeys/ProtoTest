@@ -47,9 +47,12 @@ public sealed partial class WebModelTests
     {
         // The session assertion poller reads the backend's interval, so Selenium's
         // PollInterval retimes element assertions as well as the backend's own action retries.
+        // An interval far above the assertion timeout pins the probe count: one probe and the
+        // timeout probe, with no race against the real clock. The 50ms default would probe the
+        // driver about twenty times inside the same 500ms.
         var driver = new StubWebDriver();
         var host = new ProtoHostBuilder()
-            .AddWeb(() => driver, options => options.PollInterval = TimeSpan.FromMilliseconds(100))
+            .AddWeb(() => driver, options => options.PollInterval = TimeSpan.FromSeconds(2))
             .Build();
         await using var ownedHost = host;
         await host.StartAsync();
@@ -60,8 +63,8 @@ public sealed partial class WebModelTests
                 TimeSpan.FromMilliseconds(500)));
 
         await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
-        Assert.That(driver.FindAllQueries.Count, Is.LessThanOrEqualTo(16),
-            "a 500ms assertion at the backend's 100ms interval probes a handful of times, not the ~40 lookups the 25ms default produces");
+        Assert.That(driver.FindAllQueries.Count, Is.LessThanOrEqualTo(8),
+            "the backend's 2s interval bounds a 500ms assertion to a probe and its timeout probe, not the ~20 lookups the 50ms default produces");
     }
 
     [Test]

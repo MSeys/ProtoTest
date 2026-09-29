@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # The archive and the reports
 
-One file from CI should explain the run to a reader who was not there. That file is the `.prototrace`: it holds the execution story, the state, the attachments and the reports the run wrote.
+One file from CI must explain the run to a reader who was not there. That file is the `.prototrace`: it holds the execution story, the state, the attachments and the reports the run wrote.
 
 <LearnShell
   level="Level 4, lesson 3"
@@ -53,9 +53,9 @@ One file from CI should explain the run to a reader who was not there. That file
   ]}
   next={[
     {
-      label: 'Take the evidence to CI',
-      to: '/learn/evidence/evidence-in-ci',
-      note: 'Keep the archive, post the digest, and run the same suite at three depths.',
+      label: 'Read the findings and the run gate',
+      to: '/learn/evidence/read-the-findings-and-the-run-gate',
+      note: 'A teardown failure becomes a finding, and a gate turns it into a failed run.',
     },
     {
       label: 'Reporting',
@@ -88,7 +88,7 @@ The sample configures both report sinks in one place:
 .AddSink<HtmlReportSink>(sink =>
 {
     sink.OutputPath = Path.Combine("TestResults", "Northstar.ProtoTest", "report.html");
-    sink.Title = "Northstar Learning demo";
+    sink.Title = "Northstar sample";
 });
 ```
 
@@ -116,8 +116,8 @@ From the archive:
 
 | Entry | Reading |
 | --- | --- |
-| `http.request` REST `GET /api/v1/reports/monthly.xlsx`, 268.1 ms, HTTP 200 | the download, with the response attached |
-| `sheets.open`, 30.6 ms, then `sheets.model` | the workbook was opened and the record model built |
+| `http.request` REST `GET /api/v1/reports/monthly.xlsx`, 128.5 ms, HTTP 200 | the download, with the response attached |
+| `sheets.open`, 28.2 ms, then `sheets.model` | the workbook was opened and the record model built |
 | `assert.sheets`, `Summary.Environments` | the column check the model recorded |
 | `attachment.publish`, `<test id>-rest-01-response` | the workbook's bytes, kept in the run |
 

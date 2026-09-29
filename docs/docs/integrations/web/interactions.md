@@ -30,8 +30,13 @@ await page.RememberMe.CheckAsync();
 
 ### How actions wait
 
-- **Playwright** keeps its own auto-waiting: an action waits until the element is attached, visible, stable and enabled, bounded by `ActionTimeout` (5 s by default). ProtoTest resolves the locator and calls the native action; it never re-issues a failed one. A timed-out action becomes `WebActionabilityException` and a read of an element that never appears becomes `WebElementResolutionException`, so polling assertions and negations behave the same on either backend.
-- **Selenium** retries for up to `ActionTimeout` (5 s by default), polling every `PollInterval`, until the element is displayed and enabled, and, for fills and selects, not read-only; for clicks and checks, not moving (when `WaitForStableBounds`) and not covered by another element (when `CheckClickObstruction` and the driver supports JavaScript). Otherwise it throws `WebActionabilityException` with the component path, locator and last observation.
+| | Playwright | Selenium |
+| --- | --- | --- |
+| Mechanism | its own auto-waiting: an action waits until the element is attached, visible, stable and enabled | retries until the element is displayed and enabled, and, for fills and selects, not read-only; for clicks and checks, not moving (when `WaitForStableBounds`) and not covered by another element (when `CheckClickObstruction` and the driver supports JavaScript) |
+| Bound | `ActionTimeout` (5 s by default) | `ActionTimeout` (5 s by default), polling every `PollInterval` |
+| On timeout | `WebActionabilityException`; a read of an element that never appears becomes `WebElementResolutionException` | `WebActionabilityException` with the component path, locator and last observation |
+
+ProtoTest resolves the locator and calls the native action; it never re-issues a failed one. The shared exceptions keep polling assertions and negations identical on either backend.
 
 To wait for something application-specific, such as a spinner or a pending XHR, add a [wait condition](./middleware.md#wait-conditions).
 
@@ -61,7 +66,7 @@ download.MediaType;                               // text/csv (guessed from the 
 download.Size;                                    // bytes
 ```
 
-`WebSession.DownloadAsync` and its `WebPage` shortcut run the trigger through the normal operation pipeline, wait for the file, return a `WebDownload` and register the file as a test attachment, so it reaches the runner's output and the `.prototrace` archive. A trigger that runs other session operations (like the semantic click above) nests them inside the download's operation. An explicit `name` replaces the browser's suggested file name for the record and the attachment; its extension refines the media type guess. A non-positive `timeout` throws `ArgumentOutOfRangeException`.
+`WebSession.DownloadAsync` and its `WebPage` shortcut run the trigger through the normal operation pipeline. They wait for the file, return a `WebDownload`, and register it as a test attachment. A trigger that runs other session operations (like the semantic click above) nests them inside the download's operation. An explicit `name` replaces the browser's suggested file name for the record and the attachment; its extension refines the media type guess. A non-positive `timeout` throws `ArgumentOutOfRangeException`.
 
 - **Playwright** captures natively: the trigger runs, Playwright waits for the download, and ProtoTest reads the completed file. This covers link, form and generated (`blob:`, `data:`) downloads.
 - **Selenium** has no download API in the WebDriver protocol, so `DownloadAsync` throws `WebBackendCapabilityException` before the trigger runs, naming the limitation. Fetch the file over HTTP with [ProtoTest.Rest](../rest/index.md) instead.
@@ -107,9 +112,9 @@ await page.Status.Should.HaveTextAsync("saved");
 await page.Error.ShouldNot.BeVisibleAsync();
 ```
 
-Assertions **poll**: every 50 ms until the condition holds or the timeout passes (**5 seconds** when you don't pass one). While polling, "element not found yet" and "not actionable yet" are treated as "not yet", not as failures. When time runs out you get a `WebAssertionException` describing the last thing observed.
+Assertions poll every 50 ms until the condition holds or the timeout passes. The default timeout is 5 seconds. While polling, "element not found yet" and "not actionable yet" are treated as "not yet", not as failures. When time runs out you get a `WebAssertionException` describing the last thing observed.
 
-- `HaveTextAsync` is an exact, ordinal comparison; `ContainTextAsync` checks for an ordinal substring. `ShouldNot` is the inverse of each.
+- `HaveTextAsync` compares the element's rendered text exactly and ordinally; `ContainTextAsync` checks for an ordinal substring. The read is the browser's rendered text (Playwright's inner text, Selenium's `Element.Text`), so runs of whitespace and line breaks arrive collapsed; when the failure message shows two identical-looking strings, the expected one still carries the source formatting. `ShouldNot` is the inverse of each.
 - `HaveValueAsync` compares the value ordinally, but the failure message reports only the value's length.
 - A timeout of zero or less throws `ArgumentOutOfRangeException`.
 

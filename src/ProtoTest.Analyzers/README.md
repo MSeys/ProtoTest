@@ -3,7 +3,7 @@
 Roslyn analyzers for ProtoTest suites: the context-scoped mistakes the framework cannot see at
 runtime. Two warnings, deliberately narrow - a noisy analyzer is worse than none.
 
-```
+```bash
 dotnet add package ProtoTest.Analyzers
 ```
 
@@ -56,33 +56,9 @@ is excluded on purpose: `ProtoTestExecutor` runs every TUnit `[Test]` inside the
 `[Test]` is not a plain registration. Suppress with `#pragma warning disable PT0002` or
 `dotnet_diagnostic.PT0002.severity = none`.
 
-## The rejected rule: registration inference
-
-The design considered flagging `context.Rest(...)`/`context.Web(...)` when no application or client
-for the protocol is registered, and `[RequiresCapability(kind, name)]` when no registration
-contributes that kind and name. Both are dropped, for the same reason.
-
-**Why they cannot be made certain.** A compilation sees the calls in its own sources, not the suite's
-composition. `ProtoTestAssembly.Configure` can delegate to a shared helper in a referenced assembly,
-a capability is a runtime `ProtoCapabilityDescriptor` value constructed at registration time, and a
-declaration can be conditional (`AddCapabilityWhenProvided`). "No registration in this compilation" is
-not "no registration in this suite", so both rules would fire on legitimate shared-setup suites -
-exactly the noise this package exists to avoid. The runtime already names what is missing
-(`No HTTP client '{name}' is registered. ...`), so the failure is at least honest where it happens.
-The rules can come back when the capability model records contributions statically.
-
-## Deliberate non-goals
-
-- **Style and API-usage rules.** The package is about lifecycle intent, not formatting.
-- **Code fixes.** Every diagnostic names the attribute to remove or add; the right edit depends on the
-  runner and the test's intent, so no fixer is shipped.
-- **The mixed class without context use.** A plain unit test next to ProtoTest tests is legitimate when
-  it does not touch the context; `PT0002` reports only the case that cannot work.
-- **Registration inference.** `[RequiresCapability]`, application selection and client resolution are
-  runtime concerns the compiler cannot decide (see above).
-- **TUnit.** The executor gives every TUnit test the lifecycle; there is nothing to pair or exclude.
-
 ## Limits
+
+- Client and capability inference are runtime concerns, so no rule flags them; the runtime error names what is missing.
 
 - The analyzers match framework vocabulary by metadata name, never by package reference. A new adapter
   test attribute needs a line in `ProtoTestVocabulary`, pinned by `VocabularyTests`, and a fixture that

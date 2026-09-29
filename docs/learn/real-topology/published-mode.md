@@ -15,7 +15,7 @@ The topology lesson let the AppHost own the processes. This one moves them outsi
 
 <LearnShell
   level="Level 5, lesson 3"
-  minutes="About 9 minutes"
+  minutes="About 15 minutes"
   outcome={[
     'Start the product as real processes and point the suite at them with configuration.',
     'Name the keys that switch the same Setup off the test host.',
@@ -27,7 +27,7 @@ The topology lesson let the AppHost own the processes. This one moves them outsi
   ]}
   situation={
     <>
-      <p>A deployed environment is a set of addresses and a store that outlives the test process. The suite should not care which machine answers, only that the keys resolve.</p>
+      <p>A deployed environment is addresses plus a store. Both outlive the test process. The suite should not care which machine answers, only that the keys resolve.</p>
       <p>OpenCSMS rehearses that shape on one machine: the product's own binaries as processes, the persistent containers, and the same suite from the container lesson.</p>
     </>
   }
@@ -41,7 +41,7 @@ The topology lesson let the AppHost own the processes. This one moves them outsi
     ),
     reveal: (
       <>
-        Both notification targets are unset, so each consumer starts and idles with a named reason: no invoice-ready target and no billing-failure target. That is honest for a local rehearsal. The suite's WireMock fakes live inside the test process, and a real worker process cannot reach them.
+        Both notification targets are unset, so each consumer starts and idles with a named reason: no invoice-ready target and no billing-failure target. That is what a local rehearsal looks like. The suite's WireMock fakes live inside the test process, and a real worker process cannot reach them.
       </>
     ),
   }}
@@ -123,10 +123,10 @@ The monthly export the suite downloads in Chromium. The file is a real `.xlsx` t
 
 ## What this mode is not
 
-The rehearsal is local and it is honest about it:
+The rehearsal is local, and the page says what that costs:
 
 - There is no staging target. The mode starts the product's processes against containers on the same machine, and it stops them when the suite ends.
-- The notification worker idles because the suite's fakes live inside the test process. Pointing a real process at a fake that does not exist would be a lie, so the journeys that need those fakes skip instead.
+- A real process cannot reach the suite's fakes, so those journeys skip.
 - The clock-gated journeys skip, because these processes read the machine clock. Moving a clock inside the test process cannot move a process that is not there.
 
 A team with a real environment exports the same five keys and runs `dotnet test`; the suite does not change.

@@ -13,6 +13,14 @@ Every tool on this page is good, and ProtoTest is built on several of them. Your
 
 This page says where each alternative wins, where ProtoTest wins, and ends with the cases where ProtoTest is the wrong choice.
 
+| If you | Pick |
+| --- | --- |
+| Only test HTTP | `WebApplicationFactory` plus an assertion library |
+| Live in declarative HTTP scenarios with DI stubbing | Alba |
+| Need deploy fidelity | Aspire testing |
+| Only drive a browser | Playwright alone |
+| Cross API, database, broker and browser in one test | ProtoTest |
+
 ## WebApplicationFactory, Testcontainers, Verify and Shouldly
 
 The established .NET combination: host the application with `WebApplicationFactory`, start PostgreSQL and RabbitMQ with Testcontainers, assert responses with Shouldly and snapshot them with Verify. ProtoTest wraps exactly these primitives. The difference is what connects them.
@@ -29,7 +37,7 @@ The established .NET combination: host the application with `WebApplicationFacto
 - One [`.prototrace`](../observability/prototrace.md) per run: the operations of every integration, with the failing assertion in place, readable in the static [trace viewer](https://trace.prototest.dev) or summarized with `prototest summary` in CI.
 - [Contract coverage](../observability/coverage.md) - which endpoints, responses and fields the suite actually asserted - which the four-library stack does not provide.
 - [Provisioners and seed data](../integrations/data/provisioners.md) as reusable setup instead of helpers that grow inside the test project.
-- Five [test-runner adapters](../runners/overview.md): the same suite shape works on NUnit, xUnit v2/v3, MSTest and TUnit.
+- Five [test-runner adapters](../runners/overview.md): the same suite shape works across runners.
 
 If your suite is already shaped this way and the glue does not hurt, keep it. The glue is the product here.
 
@@ -48,9 +56,9 @@ Alba is the closest neighbour: a mature declarative testing library for ASP.NET 
 - Scope beyond HTTP: one test can write through REST, read through [GraphQL](../integrations/graphql/index.md), check the [database](../integrations/sql/index.md), publish through [messaging](../integrations/messaging/index.md) and drive a [browser](../integrations/web/index.md), all in one [trace](../observability/prototrace.md).
 - [Coverage](../observability/coverage.md), [provisioning](../integrations/data/provisioners.md) and [reporting](../observability/reporting.md) belong to the foundation instead of being assembled per project.
 - The trace is a versioned, documented file ([format 2.0](../observability/prototrace.md)) with a static viewer, so a CI failure is readable where it happened.
-- Five [runner adapters](../runners/overview.md) rather than one testing style.
+- Runner adapters for each framework rather than one testing style.
 
-Service substitution is shipped: `context.Override<T>()`, `[ReplaceService<T>]` and `[FailDependency<T>]` replace or fail a dependency in the application under test per test (a dedicated server is built with the substitution, so a shared server never leaks one test's override into the next). Alba remains stronger for suites built entirely around declarative HTTP scenarios with DI stubbing.
+For per-test substitution use `context.Override<T>()`, `[ReplaceService<T>]` or `[FailDependency<T>]`. Each test gets a dedicated server, so an override does not leak into the next test. Alba remains stronger for suites built entirely around declarative HTTP scenarios with DI stubbing.
 
 ## Aspire testing
 
@@ -99,7 +107,7 @@ Some teams build their own integration-testing layer instead. [I did too](./why-
 - The same idea already exists in public, with documentation, tests and a [changelog](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).
 - It survives people. An in-house framework usually stops being maintained when its author changes teams; ProtoTest is MIT, the [trace format is documented](../observability/prototrace.md) and [extension points](../advanced/extending.md) are public.
 - Diagnostics you would rarely fund yourself: the trace, the viewer, contract coverage and reports.
-- Five [runner adapters](../runners/overview.md) and container-backed infrastructure that you would otherwise rebuild one integration at a time.
+- Runner adapters and container-backed infrastructure that you would otherwise rebuild one integration at a time.
 
 A framework you own completely is the right answer when the problem is truly yours alone. When it is the same problem everybody has, sharing the foundation is cheaper.
 

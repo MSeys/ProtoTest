@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Wait for readiness, not for time
 
-Something has to wait when a run starts an address no test owns yet. The choice is between a fixed sleep that sometimes loses and a probe that checks the address and records what it waited.
+The run must wait when it starts an address before any test uses it. The choice is between a fixed sleep that sometimes loses and a probe that checks the address and records what it waited.
 
 <LearnShell
   level="Level 3, lesson 2"
@@ -43,7 +43,7 @@ Something has to wait when a run starts an address no test owns yet. The choice 
     ),
     reveal: (
       <>
-        The loopback instance binds a port at run time, so nothing knows the address is up until it answers. The probe waits for <code>/health</code> and records its URL, the attempts and the time waited; the entity reads 1 attempt and 86 ms. A sleep would record none of that, only a slower entry in one test's execution span.
+        The loopback instance binds a port at run time, so nothing knows the address is up until it answers. The probe waits for <code>/health</code> and records its URL, the attempts and the time waited; the entity reads 1 attempt and 85 ms. A sleep would record none of that, only a slower entry in one test's execution span.
       </>
     ),
   }}
@@ -93,16 +93,16 @@ The run layer holds one readiness entity for the loopback instance. From the arc
 
 | Attribute | Value |
 | --- | --- |
-| `readiness.url` | `http://127.0.0.1:55744/health`, the port this run bound |
+| `readiness.url` | `http://127.0.0.1:64464/health`, the port this run bound |
 | `readiness.attempts` | `1` |
-| `readiness.waitedMs` | `86` |
+| `readiness.waitedMs` | `113` |
 
-The address is the run's own, so it changes between runs. The two numbers are the answer a sleep cannot give: the address answered on the first probe, and the wait cost 86 milliseconds. A run that needs several probes adds attempts, and a slow address shows up as a larger number instead of a mystery failure in the first test that used it.
+The address is the run's own, so it changes between runs. The two numbers are the answer a sleep cannot give: the address answered on the first probe, and the wait cost 113 milliseconds. A run that needs several probes adds attempts, and a slow address shows up as a larger number instead of a mystery failure in the first test that used it.
 
 The entity is released with the run, at the same position the listener is released. That release is a `resource.release` entry in the run layer of the same archive.
 
 ## What the tests do instead
 
-No test in the sample waits for the application. A test starts, takes its client and calls. The waiting happened once, before the first test, and every test after it reads an address the run already checked. If your suite has a `Task.Delay` before a request, this is the piece that replaces it.
+No test in the sample waits for the application. A test starts, takes its client and calls. The waiting happened once, before the first test, and every test after it reads an address the run already checked. Replace a `Task.Delay` before a request with a readiness probe.
 
 </LearnShell>

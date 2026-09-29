@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 title: Host and lifecycle
 description: "How the ProtoTest host is built, started and stopped, and the order in which a test's hooks, attributes and clients run."
 ---
@@ -85,7 +85,7 @@ When the runner completes the test:
 4. `context.DisposeAsync` releases owned resources in reverse registration order, then disposes the DI scope.
 5. The test's trace artifacts are captured and the recorder is completed with its outcome. `Proto.Context` is cleared.
 
-**Every step is attempted**, even when an earlier one throws. A teardown failure is recorded as an `Error` finding and does not replace the outcome the test already reported, so a cleanup error never hides a failed assertion. The failure still surfaces to the runner: one exception is rethrown as-is, several become one `AggregateException`.
+**Teardown attempts each step**, even when an earlier one throws. A teardown failure is recorded as an `Error` finding and does not replace the outcome the test already reported, so a cleanup error never hides a failed assertion. The failure still surfaces to the runner: one exception is rethrown as-is, several become one `AggregateException`.
 
 ### When setup fails
 
@@ -111,10 +111,11 @@ A context is tied to the async flow that started it. Starting a second test on t
 
 ## How to use it
 
-Runner packages call `StartTestAsync` and `CompleteTestAsync` for you. You would only call them yourself when building a runner integration, or when testing ProtoTest extensions, as the repository's own tests do:
+Runner packages call `StartTestAsync` and `CompleteTestAsync` for you. You would only call them yourself when building a runner integration, or when testing ProtoTest extensions:
 
 ```csharp
-var host = new ProtoHostBuilder().AddRest().Build();
+var host = new ProtoHostBuilder().AddApplication("Api", app => app
+    .AddRest(rest => rest.AddClient("Api"))).Build();
 await using var ownedHost = host;
 await host.StartAsync();
 
@@ -145,17 +146,19 @@ public sealed class ProtoHost : IAsyncDisposable
 
     Task<ProtoExecutionContext> StartTestAsync(string testName, MethodInfo testMethod,
         IEnumerable<ProtoAttribute>? attributes = null, IProtoTestAttachmentPublisher? attachmentPublisher = null);
-    Task<ProtoExecutionContext> StartTestAsync(string testName, string testId, MethodInfo testMethod,
-        IEnumerable<ProtoAttribute>? attributes = null, IProtoTestAttachmentPublisher? attachmentPublisher = null);
-    Task<ProtoExecutionContext> StartTestAsync(string testName, MethodInfo testMethod,
-        CancellationToken cancellationToken);
-    Task<ProtoExecutionContext> StartTestAsync(string testName, string testId, MethodInfo testMethod,
-        CancellationToken cancellationToken);
 
     Task CompleteTestAsync();                          // outcome Unknown
     Task CompleteTestAsync(ProtoTestResult result);
 }
 ```
+
+| You need | Overload |
+| --- | --- |
+| the usual start | `StartTestAsync(testName, testMethod)` |
+| an explicit test id | `StartTestAsync(testName, testId, testMethod, ...)` |
+| a token for setup I/O | `StartTestAsync(testName, testMethod, cancellationToken)` |
+| id and token | `StartTestAsync(testName, testId, testMethod, cancellationToken)` |
+| everything at once | `StartTestAsync(testName, testMethod, attributes, attachmentPublisher, cancellationToken)` |
 
 `Proto.Host` returns the host of the current test, or, outside a test, the only active host (with more than one active, it throws).
 
@@ -183,7 +186,7 @@ public interface IProtoTestIdGenerator
 
 ### Run gates and resources
 
-`AddRunGate` registers a check that runs **once, after the last test and before the reports are written**, so it can see everything the run's collectors produced. `ProtoRunGateContext` exposes `Items`, `ItemsOfKind`, `InCategory`, `ForTarget` and `WithStatus`, plus coverage helpers such as `CoverageFor(target)`. A result is `Passed`, `Warning`, `Failed` or `Skipped`; a gate that returns no result is treated as failed, and a failed gate throws `ProtoRunGateException` out of `AfterRunAsync`. The delegate overload is the quick form:
+`AddRunGate` registers a check that runs **once, after the last test and before the reports are written**, so it can see everything the run's collectors produced. `ProtoRunGateContext` exposes `Items`, `ItemsOfKind`, `InCategory`, `ForTarget` and `WithStatus`, plus coverage helpers such as `CoverageFor(target)`. A failed gate throws `ProtoRunGateException` out of `AfterRunAsync`. The delegate overload is the quick form:
 
 ```csharp
 builder.AddRunGate("no error findings", context => context
@@ -192,6 +195,13 @@ builder.AddRunGate("no error findings", context => context
     ? ProtoRunGateResult.Failed("The run recorded error findings.")
     : ProtoRunGateResult.Passed("No error findings were recorded."));
 ```
+
+| Result | Meaning |
+| --- | --- |
+| `Passed` | the run continues to the reports |
+| `Warning` | recorded, but the run continues |
+| `Failed` | throws `ProtoRunGateException` out of `AfterRunAsync` |
+| `Skipped` | recorded; a gate that returns no result is treated as failed |
 
 `AddResource(IProtoResource)` registers an already-created, run-scoped resource, such as a started container or a connection, that the host owns and releases with the run, without starting anything. `AddInfrastructure` is the variant that starts with the run and fills settings; see [Infrastructure](./infrastructure.md).
 
@@ -208,6 +218,6 @@ builder.AddRunGate("no error findings", context => context
 
 - **One context per async flow.** Starting a second test on the same flow before completing the first throws, and completing a test from a different host throws.
 - **One build per builder.** `Build()` can only run once, and once stopping has begun, starting a new test throws.
-- **A skipped test never reaches the lifecycle.** It has no context, no trace record and no teardown.
+- **A skipped test never reaches the lifecycle.** A skipped test never creates a context. See [Skip conditions](./skip-conditions.md).
 - **A teardown failure does not replace the outcome.** It is recorded as an `Error` finding and still surfaces to the runner as an exception.
 - **Ids cannot grow past 18 digits.** Running out of sequence numbers throws. `Proto.Context` is flow-local: work that escapes the test's flow cannot read it. See [Execution context](./execution-context.md) and [Concurrency](./concurrency.md).

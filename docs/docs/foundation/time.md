@@ -1,12 +1,12 @@
 ---
-sidebar_position: 11
+sidebar_position: 13
 title: Test time
 description: "Advance a clock instead of sleeping: each test gets its own TimeProvider, the in-process application sees it, and every advance is recorded in the trace."
 ---
 
 # Test time
 
-Tariffs, expiry, idle fees and retention rules are time-dependent, and a test that sleeps through them is slow and flaky. ProtoTest gives every test a clock you move by hand, and the application under test reads the same clock.
+Some behavior depends on time, for example tariffs and expiry. A test that sleeps through that time is slow and flaky. ProtoTest gives every test a clock you move by hand, and the application under test reads the same clock.
 
 ## Seeding the run
 
@@ -32,6 +32,11 @@ public async Task AnOverstayingCarIsChargedAnIdleFee()
 ```
 
 `Proto.Context.Clock` is this test's `ProtoClock`: `Advance(delta)` moves it forward, `SetUtcNow(instant)` moves it anywhere. Each test starts from the run's seed, so advancing time in one test never leaks into another, and parallel tests keep separate timelines.
+
+| Clock | Moves when |
+| --- | --- |
+| `Proto.Context.Clock` | the test advances it with `Advance` or `SetUtcNow` |
+| `ProtoHost.CurrentHost.Clock` | the run advances it; workers with no test see this clock |
 
 ## What the application sees
 

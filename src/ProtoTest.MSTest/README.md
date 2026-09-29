@@ -8,7 +8,7 @@ dotnet add package ProtoTest.MSTest
 
 Initialize a `ProtoTestAssembly` from `[AssemblyInitialize]`, clean it up from `[AssemblyCleanup]` and use `[ProtoTest]` instead of `[TestMethod]`.
 
-The adapter handles the test context, skip conditions, outcomes and MSTest result attachments. One ProtoTest lifecycle wraps all data rows of a test method.
+The adapter handles the test context, skip conditions, outcomes and MSTest result attachments. Each data row of a test method runs in its own ProtoTest lifecycle, like xUnit theory rows.
 
 ## Learn more
 

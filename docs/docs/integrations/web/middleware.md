@@ -133,7 +133,7 @@ public sealed class SlowOperationWarning(ILogger<SlowOperationWarning> logger) :
 builder.AddWebMiddleware<SlowOperationWarning>();
 ```
 
-Middleware and wait conditions are resolved from dependency injection, so their constructors can take any registered service. `WebOperationContext` exposes `Execution` (the test's `ProtoExecutionContext`), `Kind`, `Name`, `BackendName`, `SessionName`, `CorrelationId`, `Element` and, after `next` returns, `Result`. The backend operation itself is traced as the child `web.backend.execute`, which is what links the middleware pipeline to the native driver call.
+Middleware and wait conditions are resolved from dependency injection, so their constructors can take any registered service. `WebOperationContext` exposes `Execution` (the test's `ProtoExecutionContext`), `Kind`, `Name`, `BackendName`, `SessionName`, `CorrelationId` and `Element`. The backend operation itself is traced as the child `web.backend.execute`, which is what links the middleware pipeline to the native driver call.
 
 Middleware nests like ASP.NET Core's: the **first one registered is the outermost**, and the backend call sits in the middle. All wait conditions run inside one built-in middleware, which takes its place in that order at your first `AddWebWait` call.
 

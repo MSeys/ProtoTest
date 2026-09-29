@@ -59,8 +59,6 @@ A repeated `AddGrpc` is not a no-op: its `configure` callback always runs, so mo
 | `ProtoTest:Grpc:Attachments:CaptureRequestBodies` | `ProtoHttpAttachmentOptions.CaptureRequestBodies` | `bool` | `true` |
 | `ProtoTest:Grpc:Attachments:CaptureResponses` | `ProtoHttpAttachmentOptions.CaptureResponses` | `bool` | `true` |
 | `ProtoTest:Grpc:Attachments:CaptureExpectedShapes` | `ProtoHttpAttachmentOptions.CaptureExpectedShapes` | `bool` | `true` |
-| `ProtoTest:Grpc:Attachments:SensitiveHeaders` | `ProtoHttpAttachmentOptions.SensitiveHeaders` | `List<string>` | `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` |
-| `ProtoTest:Grpc:Attachments:SensitiveQueryParameters` | `ProtoHttpAttachmentOptions.SensitiveQueryParameters` | `List<string>` | `access_token`, `refresh_token`, `token`, `apiKey`, `api_key`, `key` |
 | `ProtoTest:Grpc:Attachments:RedactSensitiveData` | `JsonDiagnosticOptions.RedactSensitiveData` | `bool` | `true` |
 | `ProtoTest:Grpc:Attachments:MaxDiagnosticBodyLength` | `JsonDiagnosticOptions.MaxDiagnosticBodyLength` | `int` | 65536 (64 KiB) |
 | `ProtoTest:Grpc:Attachments:SensitiveJsonProperties` | `JsonDiagnosticOptions.SensitiveJsonProperties` | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret` |
@@ -90,25 +88,27 @@ Task<IReadOnlyList<TResponse>> ServerStreamingAsync<TRequest, TResponse>(Method<
     CancellationToken cancellationToken = default);
 ```
 
-`ServerStreamingAsync` reads the stream to completion and returns the messages; `ClientStreamingAsync` writes every request and completes the stream before reading the response. The raw helpers return the call object untouched for callers that drive it:
+`ServerStreamingAsync` reads the stream to completion and returns the messages; `ClientStreamingAsync` writes every request and completes the stream before reading the response. The raw helpers return the call object untouched for callers that drive it; the blocking two live on `client.Blocking`:
 
 ```csharp
+// client.Blocking
 AsyncServerStreamingCall<TResponse> ServerStreaming<TRequest, TResponse>(Method<TRequest, TResponse> method,
-    TRequest request, Action<Metadata>? metadata = null, DateTime? deadline = null);           // blocks
+    TRequest request, Action<Metadata>? metadata = null, DateTime? deadline = null);
 
+AsyncDuplexStreamingCall<TRequest, TResponse> DuplexStreaming<TRequest, TResponse>(
+    Method<TRequest, TResponse> method, Action<Metadata>? metadata = null, DateTime? deadline = null);
+
+// client
 Task<AsyncServerStreamingCall<TResponse>> OpenServerStreamingAsync<TRequest, TResponse>(
     Method<TRequest, TResponse> method, TRequest request, Action<Metadata>? metadata = null,
     DateTime? deadline = null, CancellationToken cancellationToken = default);
-
-AsyncDuplexStreamingCall<TRequest, TResponse> DuplexStreaming<TRequest, TResponse>(
-    Method<TRequest, TResponse> method, Action<Metadata>? metadata = null, DateTime? deadline = null); // blocks
 
 Task<AsyncDuplexStreamingCall<TRequest, TResponse>> OpenDuplexStreamingAsync<TRequest, TResponse>(
     Method<TRequest, TResponse> method, Action<Metadata>? metadata = null, DateTime? deadline = null,
     CancellationToken cancellationToken = default);
 ```
 
-`ServerStreaming` and `DuplexStreaming` block the calling thread while authenticators and the channel are prepared; prefer the `Open*Async` variants on a synchronizing runner. The raw helpers apply the test's `[Auth]` metadata but are untraced and uncaptured.
+`Blocking.ServerStreaming` and `Blocking.DuplexStreaming` block the calling thread while authenticators and the channel are prepared; prefer the `Open*Async` variants on a synchronizing runner. The raw helpers apply the test's `[Auth]` metadata but are untraced and uncaptured.
 
 #### Method descriptors
 

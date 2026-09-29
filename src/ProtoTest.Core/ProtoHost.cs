@@ -53,11 +53,9 @@ public sealed class ProtoHost : IAsyncDisposable
     public ProtoClock Clock => _clock;
 
     /// <summary>
-    /// Finds this host's clock of the test with the given id, or <see langword="null"/> when no such
-    /// test is running. The lookup is scoped to the owning host: two hosts that share a test id each
-    /// resolve their own clock, and a finished test's clock only leaves its own host's registry. This
-    /// is the lookup an in-process hosting integration uses to link a request the test caused back to
-    /// the test's clock.
+    /// Finds the clock of the running test with the given id, or <see langword="null"/> when no such
+    /// test runs on this host. Scoping the lookup to the owning host keeps two hosts that share a test
+    /// id from resolving each other's clock.
     /// </summary>
     public ProtoClock? FindClock(string testId) => _clockRegistry.Find(testId);
 
@@ -113,8 +111,8 @@ public sealed class ProtoHost : IAsyncDisposable
         => ProtoHostRegistry.FindTraceWriter(traceId);
 
     /// <summary>
-    /// Finds the trace writer for a span: the supplied activity, or <see cref="Activity.Current"/> when
-    /// none is given. The one-line form for a telemetry callback that has an activity in hand.
+    /// Finds the trace writer for the given activity, or <see cref="Activity.Current"/> when none is
+    /// given.
     /// </summary>
     public static IProtoTraceWriter? FindTraceWriter(Activity? activity = null)
     {
@@ -131,12 +129,9 @@ public sealed class ProtoHost : IAsyncDisposable
         => HasCapability(kind, name, instance: null);
 
     /// <summary>
-    /// Returns whether the host is composed with a capability of the given kind narrowed by the
-    /// descriptor <paramref name="name"/> and/or the <paramref name="instance"/> it describes (an
-    /// <c>AddAspNetCoreServer</c> name, an application an in-process device transport belongs to). A
-    /// <see langword="null"/> filter matches anything; every non-null filter must match. The two-argument
-    /// form matches the descriptor name only - use this overload to address an instance such as a named
-    /// server.
+    /// Returns whether the host declares a capability of <paramref name="kind"/> narrowed by the
+    /// descriptor <paramref name="name"/> and/or the <paramref name="instance"/> it describes. A
+    /// <see langword="null"/> filter matches anything; every non-null filter must match.
     /// </summary>
     public bool HasCapability(string kind, string? name, string? instance)
     {
@@ -181,6 +176,7 @@ public sealed class ProtoHost : IAsyncDisposable
                     ?.Reason);
     }
 
+    /// <summary>Gets the run's resolved configuration.</summary>
     public IConfiguration Configuration => _rootServiceProvider.GetRequiredService<IConfiguration>();
 
     /// <summary>Gets immutable snapshots of the current run trace.</summary>
@@ -358,6 +354,14 @@ public sealed class ProtoHost : IAsyncDisposable
     public Task CompleteTestAsync(ProtoTestResult result)
         => _testLifecycle.CompleteAsync(result ?? throw new ArgumentNullException(nameof(result)));
 
+    /// <summary>
+    /// Stops the run, releases the run-scoped resources and disposes the service provider, so
+    /// <c>await using</c> alone ends the run. Disposal is idempotent; a run still starting or stopping
+    /// is rejected rather than torn down halfway.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// A <see cref="StartAsync"/> or <see cref="StopAsync"/> is still in progress on this host.
+    /// </exception>
     public async ValueTask DisposeAsync()
     {
         var exceptions = new List<Exception>();

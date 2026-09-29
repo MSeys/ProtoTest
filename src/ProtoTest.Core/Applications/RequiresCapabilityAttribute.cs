@@ -2,8 +2,8 @@ namespace ProtoTest.Core;
 
 /// <summary>
 /// A condition that can stop a test before its lifecycle starts, with a reason the runner can report.
-/// Adapters evaluate these before starting the test; a runner that does not evaluate them simply runs
-/// the test, so the contract stays opt-in.
+/// Adapters evaluate these before starting the test; a runner that does not evaluate them runs the test,
+/// so the contract stays opt-in.
 /// </summary>
 public interface IProtoSkipCondition
 {

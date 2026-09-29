@@ -2,10 +2,8 @@ namespace ProtoTest.Core.Tests;
 
 using Microsoft.Extensions.Configuration;
 
-// Intentional: this fixture pins the legacy skip-key surface - the obsolete
-// AddInfrastructure(piece, keys) registration and its AddInfrastructureAlways opt-out - which stays
-// the 1.x compatibility path; the chain replacement is covered by TargetProviderChainTests. CS0618
-// is expected here.
+// Pins the obsolete AddInfrastructure skip-key surface, the 1.x compatibility path; the chain
+// replacement is covered by TargetProviderChainTests. CS0618 is expected here.
 #pragma warning disable CS0618
 
 [TestFixture]
@@ -14,7 +12,8 @@ public sealed class ConditionalInfrastructureTests
     [Test]
     public async Task AddInfrastructure_WhenEveryKeyIsConfigured_ShouldSkipTheProvider()
     {
-        // Entries are what Enabled = false turns off and the "not owned" claim needs them.
+        // A skipped piece must leave no ownership record, and the record is only visible in the trace's
+        // entities and entries, so the fixture reads a snapshot rather than a return value.
         using var trace = new TemporaryTrace("skip");
         var provider = new TrackingConnectionInfrastructure("database:tracked", "Host=container");
         var builder = new ProtoHostBuilder();

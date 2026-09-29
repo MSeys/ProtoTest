@@ -31,6 +31,7 @@ public sealed class ProtoGrpcBuilder
         _application = application;
     }
 
+    /// <summary>Gets the service collection the gRPC integration registers into.</summary>
     public IServiceCollection Services { get; }
 
     /// <summary>

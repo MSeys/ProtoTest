@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Wait for readiness, not for time
 
-Something has to wait when a run starts an address no test owns yet. The choice is between a fixed sleep that sometimes loses and a probe that checks the address and records what it waited.
+The run must wait when it starts an address before any test uses it. The choice is between a fixed sleep that sometimes loses and a probe that checks the address and records what it waited.
 
 <LearnShell
   level="Level 3, lesson 2"
@@ -103,6 +103,6 @@ The entity is released with the run, at the same position the listener is releas
 
 ## What the tests do instead
 
-No test in the sample waits for the application. A test starts, takes its client and calls. The waiting happened once, before the first test, and every test after it reads an address the run already checked. If your suite has a `Task.Delay` before a request, this is the piece that replaces it.
+No test in the sample waits for the application. A test starts, takes its client and calls. The waiting happened once, before the first test, and every test after it reads an address the run already checked. Replace a `Task.Delay` before a request with a readiness probe.
 
 </LearnShell>

@@ -28,7 +28,7 @@ The four drills leave failing traces on purpose. Level 4 read one as a human. Th
   situation={
     <>
       <p>The evidence loop is fail, evidence, fix, verify, report. One file carries the evidence, and every step reads that same file, so the log, the agent and the pull request cannot disagree.</p>
-      <p>The drill archive is the honest test case: a failure that was recorded once and did not change afterwards.</p>
+      <p>The drill archive is the right test case: a failure that was recorded once and did not change afterwards.</p>
     </>
   }
   checkpoint={{
@@ -156,6 +156,6 @@ The annotations go to stdout and the per-channel outcomes to stderr. With no tar
 - Every payload is capped, and an archive opened from a stream has no file to read, so its sources and artifact contents are absent with that reason.
 - The rules never guess. A failure whose evidence was not recorded is reported as unexplained, with a pointer to the viewer.
 
-That is the end of the track and the shape of the loop: the suite writes one archive, the human and the agent read the same document, and the fix is verified against the report that came before it.
+The suite writes one archive. The human and the agent read the same file. Verify the fix against the earlier report.
 
 </LearnShell>

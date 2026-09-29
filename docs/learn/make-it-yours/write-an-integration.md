@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Write an integration
 
-Everything a package does, your own code can do: a client the context resolves, a hook around the test, entries in the trace. The sample's correlation layer is a real integration of about fifty lines, and it is the model for this lesson.
+Your code can add what a package adds. That means a client the context resolves, a hook around the test, or entries in the trace. The sample's correlation layer is a real integration of about fifty lines, and it is the model for this lesson.
 
 <LearnShell
   level="Level 6, lesson 3"
@@ -143,7 +143,7 @@ The conventions are short and worth following:
 
 - Attributes are strings. Keep them small, and never put a secret in one.
 - Nesting is automatic. An operation started inside another becomes its child.
-- An operation completes once. Completing it a second time is ignored, and disposing it uncompleted records `Unknown`.
+- Complete an operation once. A second completion has no effect. Disposing it without completion records `Unknown`.
 
 ## Your turn: one milestone
 

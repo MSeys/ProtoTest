@@ -3,7 +3,7 @@ id: a-failure-tour
 title: A failure tour
 sidebar_label: A failure tour
 sidebar_position: 2
-description: "Four deliberate failures from the Learning demo, each read in its trace next to the test that does the same journey the right way."
+description: "Four deliberate failures from the Northstar sample, each read in its trace next to the test that does the same journey the right way."
 ---
 
 import LearnShell from '@site/src/components/LearnShell';
@@ -13,7 +13,7 @@ import Link from '@docusaurus/Link';
 
 # A failure tour
 
-The Learning demo ships four tests that fail on purpose. Each one is paired with a test that runs the same journey the right way, so the difference between failing and holding is a habit, not a rewrite.
+The Northstar sample ships four tests that fail on purpose. Each drill is paired with a test that runs the same journey and passes. The difference is one practice.
 
 <LearnShell
   level="Level 0, lesson 2"
@@ -29,7 +29,7 @@ The Learning demo ships four tests that fail on purpose. Each one is paired with
   ]}
   situation={
     <>
-      <p>A failure you cannot reproduce is hard to trust. The demo solves that by making the failures part of the suite: four tests that fail every time the drills are enabled, next to the four that pass.</p>
+      <p>A failure you cannot reproduce is hard to trust. The sample makes the failures part of the suite. Four tests fail when the drills are enabled. Four paired tests pass.</p>
       <p>Set <code>ProtoTest__Sample__Drills=true</code>, and both halves run. The drills report their failure and leave their trace; the fixes run the same journey and stay green.</p>
     </>
   }

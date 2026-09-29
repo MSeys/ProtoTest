@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Move the test clock
 
-A billing period takes a month. This test closes one in about two hundred milliseconds, because the application runs on the test's clock and the test moves it by hand.
+A billing period takes a month. This test closes one in about 200 ms. The application runs on the test clock, and the test moves it.
 
 <LearnShell
   level="Level 3, lesson 1"

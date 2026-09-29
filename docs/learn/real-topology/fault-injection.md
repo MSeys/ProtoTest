@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Inject faults on purpose
 
-A dependency that goes down at the wrong moment is the failure a suite rarely sees: the broker rejects a publish, a webhook answers 503 every time it is called. Waiting for the environment to produce that on demand does not work. The suite injects it instead.
+A dependency that goes down at the wrong moment is the failure a suite rarely sees: the broker rejects a publish, a webhook answers 503 to every call. Waiting for the environment to produce that on demand does not work. The suite injects it instead.
 
 <LearnShell
   level="Level 5, lesson 4"

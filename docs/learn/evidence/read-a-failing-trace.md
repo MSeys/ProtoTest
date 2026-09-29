@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Read a failing trace
 
-A failed run is a story with a last page you can read. The four drills in the sample fail on purpose, each next to the test that runs the same journey the right way, so the difference is a habit and the trace shows it.
+A failed run ends with a check you can read. The four drills in the sample fail on purpose, each next to the test that runs the same journey the right way, so the difference is one practice and the trace shows it.
 
 <LearnShell
   level="Level 4, lesson 1"
@@ -29,7 +29,7 @@ A failed run is a story with a last page you can read. The four drills in the sa
   situation={
     <>
       <p>The suite in CI reports one failing check. You cannot attach a debugger to that runner, and the log holds a single line. What is left of the run is the trace, and the trace records both halves of the comparison that failed.</p>
-      <p>The four pairs below are the same failures from the Level 0 tour, this time read the way you would read a failure of your own. Set <code>ProtoTest__Sample__Drills=true</code> and both halves run and leave their traces.</p>
+      <p>The four pairs below are the same failures the [Level 0 tour](/learn/why-integration-tests-get-hard/the-trace-as-the-feedback-loop) showed, this time read the way you would read a failure of your own. Set <code>ProtoTest__Sample__Drills=true</code> and both halves run and leave their traces.</p>
     </>
   }
   checkpoint={{

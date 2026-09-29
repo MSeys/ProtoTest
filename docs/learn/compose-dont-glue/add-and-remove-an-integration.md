@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Add and remove an integration
 
-A capability the run cannot serve is absent. A test that needs it does not fail halfway; it skips with a reason. This lesson watches that happen, adds the missing piece, and takes it away again.
+The run omits a capability it cannot serve. A test that needs it skips with a reason. This lesson watches that happen, adds the missing piece, and takes it away again.
 
 <LearnShell
   level="Level 2, lesson 3"
@@ -43,12 +43,12 @@ A capability the run cannot serve is absent. A test that needs it does not fail 
     ),
     reveal: (
       <>
-        The capability gate runs before the test lifecycle starts, so the test never began and there is nothing to record. The trace is honest about that: a run with no tests in it. The reason lives in the runner output, and the composition registers it with <code>AddCapabilityReason</code>.
+        The capability gate runs before the test lifecycle starts, so the test never began and there is nothing to record. The trace holds a run with no tests in it. The reason lives in the runner output, and the composition registers it with <code>AddCapabilityReason</code>.
       </>
     ),
   }}
   learned={[
-    'A run serves a capability only when something in it can.',
+    'The run omits a capability it cannot serve.',
     'A gated test skips before its lifecycle starts, so its trace holds no test.',
     'Adding or removing an integration is a composition change, not a test change.',
   ]}
@@ -136,13 +136,25 @@ The run starts a RabbitMQ container, the journey pays the invoice over REST, and
 
 ## Remove it
 
-Start a new terminal, or clear the variable, and run the journey again:
+Start a new terminal, or clear the variable, and run the journey again. Clear it with `-ErrorAction SilentlyContinue` so the command also works in a terminal that never set it:
 
 ```powershell
-Remove-Item Env:ProtoTest__Messaging__Broker
+Remove-Item Env:ProtoTest__Messaging__Broker -ErrorAction SilentlyContinue
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~BrokerJourney"
 ```
 
 The skip is back, with the same reason. The composition reads the setting once per run, so adding or removing an integration is a run decision.
+
+## The same run, both ways
+
+The whole lesson is one setting and its two outcomes. Nothing in `BrokerJourney` changes between them.
+
+| | No broker configured | `ProtoTest__Messaging__Broker=container` |
+| --- | --- | --- |
+| The run's messaging | the in-memory default, no adapter | `UseRabbitMq()`, which declares the Broker capability |
+| Run resources | the in-memory broker resource | the RabbitMQ container the run owns |
+| `BrokerJourney` | skipped, with the registered reason | runs: it pays the invoice and awaits `invoice.paid` |
+| The archive | three releases and no test | the request, the publish, the await and the container |
+| The test file | unchanged | unchanged |
 
 </LearnShell>

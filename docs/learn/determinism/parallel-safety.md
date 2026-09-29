@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Parallel safety
 
-The sample runs its tests eight at a time. Nothing in a test coordinates with the others, and that is the point: the rules that make a test deterministic also make it safe next to another one.
+The sample runs its tests eight at a time. Tests do not coordinate with each other. The rules that make a test deterministic also keep it isolated in parallel.
 
 <LearnShell
   level="Level 3, lesson 4"
@@ -83,11 +83,11 @@ The sample runs its tests eight at a time. Nothing in a test coordinates with th
 
 ## Rule one: a tenant per test
 
-The unit that keeps durable records apart is the tenant, and its name carries the test id:
+The tenant is what keeps durable records apart, and its name carries the test id:
 
 - The tenant comes from `context.UniqueName("northstar")`, which reads `northstar-<test id>`.
-- Names inside the tenant can be fixed: `atlas` and `report-atlas` never meet another test's project, because no two tests share the tenant.
-- A record that outlives the tenant or is visible across tests still carries the test id: the member email is built from `context.TestId`, and so is the scenario correlation id.
+- Names inside the tenant can be fixed. `atlas` and `report-atlas` are the same in every test, and no two of them meet, because no two tests share the tenant. A name only has to be unique where it can be seen.
+- A record that is visible outside the tenant still carries the test id, because the run has no tenant to hide it in: the member email is built from `context.TestId`, and so is the scenario correlation id.
 - The teardown removes the tenant by the identity setup recorded, not by a search for a name.
 
 The test id carries the run prefix, so the same journey in the same second on two workers still produces two tenants. `TestId` is also what makes a rerun against a persistent store safe, unless a suite deliberately fixes the run prefix.
@@ -109,6 +109,6 @@ Ask these of every test you write:
 
 ## Where the evidence is
 
-Each archive in this track is one test's trace, with its own tenant identity in the setup layer and its own cleanup in teardown. The [concurrency page](/docs/foundation/concurrency) records the parallelism the project has exercised: the demo suite at eight workers is the configuration that runs routinely.
+Each archive in this track is one test's trace, with its own tenant identity in the setup layer and its own cleanup in teardown. Open two of them side by side and the setup layers carry two different tenant names, one per test id. The [concurrency page](/docs/foundation/concurrency) covers the mechanics: what flows with the context, what loses it, and how a suite opts in.
 
 </LearnShell>

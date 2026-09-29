@@ -125,6 +125,6 @@ The value list tells the same story: the tenant item records `owned: true`, and 
 
 ## What a leak would look like
 
-If the cleanup were missing, the teardown layer would hold no `data.cleanup` and no release for the tenant, and the record would stay in the store. The run prefix changes per run, so the next run would provision a fresh tenant under a new name; the leak would grow the store and would collide the moment a suite fixes its run prefix or points at a shared environment. The trace is where the leak is visible before that happens.
+If the cleanup were missing, the teardown layer would hold no `data.cleanup` and no release for the tenant, and the record would stay in the store. The run prefix changes per run, so the next run provisions a fresh tenant. The leak still grows the store. It collides when a suite fixes its run prefix or points at a shared environment. The trace is where the leak is visible before that happens.
 
 </LearnShell>

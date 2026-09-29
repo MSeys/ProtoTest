@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import type { Change, Item, Span, TestTrace } from "../trace/model";
 import { formatOffset, itemKindLabel, itemTitle, sourceLabels, timelinePercent } from "../trace/format";
 import EmptyState from "../ui/EmptyState.vue";
@@ -58,10 +58,27 @@ function tickTitle(change: Change): string {
 function isSelected(item: Item) {
   return props.selected?.kind === item.kind && props.selected.id === item.id;
 }
+
+/** The selected change per item, when the selection names its operation: each cause, in words. */
+const causes = computed(() => {
+  const found = new Map<Item, Change>();
+  if (!props.selectedSpan) return found;
+  for (const item of props.test.items) {
+    const change = item.changes.find(entry => entry.span?.id === props.selectedSpan);
+    if (change) found.set(item, change);
+  }
+  return found;
+});
+
+// A selection made elsewhere - the failure card, the story, a shared link - has to be visible here.
+const root = ref<HTMLElement>();
+watch(() => props.selectedSpan, () => {
+  void nextTick(() => root.value?.querySelector(".tick.active")?.scrollIntoView({ block: "nearest" }));
+}, { immediate: true });
 </script>
 
 <template>
-  <div class="state">
+  <div ref="root" class="state">
     <Panel v-for="group in groups" :key="group.id" :title="group.title" :subtitle="group.note" pad="none">
       <div class="scale" aria-hidden="true"><span>start</span><span>{{ formatOffset(test.duration) }}</span></div>
       <div v-for="item in group.items" :key="item.key" class="item" :class="{ active: isSelected(item) }">
@@ -72,10 +89,11 @@ function isSelected(item: Item) {
         </button>
         <span class="track">
           <i class="life" :style="lifeline(item)" />
-          <button v-for="(change, index) in item.changes" :key="index" type="button" class="tick" :class="[change.source, { active: change.span?.id === selectedSpan }]"
+          <button v-for="(change, index) in item.changes" :key="index" type="button" class="tick" :class="[change.source, { active: change.span?.id === selectedSpan, inferred: change.inferred }]"
                   :style="{ left: position(change.at) }" :title="tickTitle(change)" :aria-label="tickTitle(change)"
                   :disabled="!change.span" @click="change.span && emit('selectSpan', change.span)" />
         </span>
+        <p v-if="causes.get(item)" class="cause">{{ causes.get(item)!.change }} by {{ causes.get(item)!.span!.name }}</p>
       </div>
     </Panel>
     <EmptyState v-if="!groups.length" message="This test tracked no state: no clients, contexts or values were recorded." />
@@ -140,6 +158,12 @@ function isSelected(item: Item) {
 .tick.testside { background: var(--muted); }
 .tick.observed { background: var(--pt-cyan); }
 .tick.applicationside { background: var(--blueprint); }
+/* An inferred change is a guess, not a record: hollow where a recorded change is solid. */
+.tick.inferred { background: transparent; border: 1px solid var(--muted); }
+.tick.inferred.observed { border-color: var(--pt-cyan); }
+.tick.inferred.applicationside { border-color: var(--blueprint); }
+/* The cause in words, under the track that holds it: what changed, and the operation that did it. */
+.cause { grid-column: 2; margin: 0; color: var(--muted); font-size: var(--text-micro); }
 
 .legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); color: var(--muted); font-size: var(--text-micro); }
 .legend span { display: inline-flex; align-items: center; gap: var(--space-1); }
@@ -150,5 +174,6 @@ function isSelected(item: Item) {
   .item { grid-template-columns: minmax(0, 1fr); gap: 0; padding-bottom: var(--space-2); }
   .scale { display: none; }
   .track { margin: 0 var(--space-2); }
+  .cause { grid-column: 1; }
 }
 </style>

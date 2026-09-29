@@ -8,7 +8,7 @@ description: "Run an Aspire AppHost with the suite: the run starts it, each reso
 
 ## What it adds
 
-`ProtoTest.Aspire` runs an Aspire AppHost with the suite: the run starts the AppHost's own entry point after the infrastructure registered before it, each declared resource's endpoint is published as its application's `BaseUrl`, and the run stops the AppHost after the reports are written. Per-test contexts and the trace work on top, unchanged - a test resolves the address and calls it.
+`ProtoTest.Aspire` runs an Aspire AppHost with the suite: the run starts the AppHost's own entry point after the infrastructure registered before it, each declared resource's endpoint is published as its application's `BaseUrl`, and the run stops the AppHost after the reports are written. Per-test contexts and the trace work on top. A test resolves the address and calls it.
 
 ## Install
 
@@ -28,9 +28,21 @@ builder
         .AddRest(rest => rest.AddClient("api")));
 ```
 
-The order is the start order: register containers and other pieces first when the AppHost needs them, and register the readiness probe after the AppHost: probes are awaited at their registration position, so a probe registered first resolves nothing. The AppHost **serves only when selected**: `ProtoTest:Aspire:Enabled` (or a resource's own `ProtoTest:Aspire:Resources:{resource}:Enabled`) starts it, and without either key it never starts and the suite resolves its targets elsewhere. A run that configures every declared resource's `ProtoTest:Applications:{resource}:BaseUrl` satisfies all the keys the AppHost would fill, so the AppHost never starts even when selected and the same suite runs against that environment. When only some are configured, the AppHost still starts for the rest and publishes only the selected keys configuration does not already fill, so a configured address is never masked by the started AppHost.
+Registration order is start order. Register containers and other pieces before the AppHost when it needs them. Register the readiness probe after the AppHost: probes are awaited at their registration position, so a probe registered first resolves nothing.
 
+The AppHost **serves only when selected**: `ProtoTest:Aspire:Enabled` starts every AppHost provider, or `ProtoTest:Aspire:Resources:{resource}:Enabled` starts one resource. Without either key it never starts. See [Options and keys](#options-and-keys).
+
+```mermaid
+flowchart LR
+    C[configured BaseUrl] -->|wins| T[target]
+    S[selected AppHost resource] --> T
+    O[other providers] --> T
+    U[unselected] -.->|never starts| T
+```
+
+:::caution[Selection keys must reach the host]
 Setting the selection keys in a shell is not enough on its own: the host starts with an empty configuration, so `ProtoTest__Aspire__Enabled=true` reaches it only when the suite added `.AddEnvironmentVariables()` (or the runner supplied its own sources). A key that never arrives reads as unset and the AppHost stays off even though the shell shows it set; see [Adding configuration sources](../getting-started/configuration.md#adding-configuration-sources).
+:::
 
 `TEntryPoint` is any public type in the AppHost assembly; the testing host runs the assembly's entry point in-process. A top-level `Program` is internal, so expose an anchor:
 
@@ -76,10 +88,9 @@ builder
 - The AppHost starts **once** when it wins any target, at its registration position; a losing provider
   never starts it, and a target whose configured provider wins skips it without starting anything.
 - The mixed compositions are one selection key away. Setting only
-  `ProtoTest__Aspire__Resources__postgres__Enabled=true` (and the broker's own key) runs the store and
-  broker through the AppHost while the application stays in-process; setting only
-  `ProtoTest__Aspire__Resources__api__Enabled=true` runs the AppHost's application against suite
-  containers. `ProtoTest:Aspire:Enabled` keeps meaning "every AppHost provider".
+  `ProtoTest__Aspire__Resources__opencsms__Enabled=true` runs the store through the AppHost while the application stays in-process; setting only
+  `ProtoTest__Aspire__Resources__api__Enabled=true` runs the AppHost's application against the suite
+  container. `ProtoTest:Aspire:Enabled` keeps meaning "every AppHost provider".
 
 The run hands the AppHost its configuration, the settings earlier infrastructure published and the
 options' `Set` values, as command-line arguments in that order (each layer wins over the one before
@@ -89,20 +100,17 @@ value into its projects - so a suite container's address reaches the AppHost exa
 the suite's readers.
 
 The plain `AddAspireAppHost` registration follows the same selection semantics: it is one target whose
-providers are the configured step-aside, the selected AppHost provider and a fallback, so a suite that
+providers are the configured provider, the selected AppHost provider and a fallback, so a suite that
 registers it without a selection key keeps resolving its targets through the other providers, and the
 AppHost starts only when a selection key is set and at least one key it fills is not configured. The
 skip record names the condition (`unselected`, or the missing keys for `configured`) like any other
 chain.
 
-The examples above come from the full product demo. OpenCSMS is an independent EV charging platform in
-its own repository, and its AppHost runs the API project (which also serves the dashboard) and both
-workers beside PostgreSQL and RabbitMQ. The [Aspire topology
-lesson](/learn/real-topology/aspire-topology) selects it with one key and reads the skip list.
+The example above wires one AppHost, one probe, and one client.
 
 ![The OpenCSMS public status page: charge points with their connector states, no account needed.](/images/opencsms/status.png)
 
-The API resource the AppHost starts serves the product's dashboard and its public status page.
+*The API resource the AppHost starts serves the product dashboard and its public status page.*
 
 ## The tasks
 
@@ -131,7 +139,7 @@ builder.AddAspireAppHost<TestAppHostAnchor>(
     "api");
 ```
 
-| Key | Type | Default | |
+| Key | Type | Default | Means |
 | --- | --- | --- | --- |
 | `ProtoTest:Aspire:Enabled` | bool | unset → no AppHost provider serves | the global selection key; set it (`ProtoTest__Aspire__Enabled=true`) to resolve every AppHost provider's targets through the AppHost |
 | `ProtoTest:Aspire:Resources:{resource}:Enabled` | bool | unset → only the global key selects the resource | the per-resource selection key; set it (`ProtoTest__Aspire__Resources__api__Enabled=true`) to resolve that resource's targets through the AppHost while the run's other targets stay on their other providers |
@@ -155,7 +163,14 @@ The AppHost is run-scoped infrastructure: the trace records an `aspire` run enti
 
 ## Choosing between a worker and an AppHost
 
-`ProtoTest.Hosting` runs a worker's own entry point **in-process**: the test and the worker share a process, a container and a clock, and white-box accessors reach the worker's services. `ProtoTest.Aspire` runs an AppHost as a **closed box**: the topology starts outside the test process and the suite only sees its endpoints. Choose the worker when the test drives or inspects the host's services; choose the AppHost when the test must prove the deployed topology, including service discovery, ports and process boundaries. Neither substitutes for the other: the closed-box limits below apply only here.
+| | `ProtoTest.Hosting` worker | `ProtoTest.Aspire` AppHost |
+| --- | --- | --- |
+| Runs | the worker's own entry point **in-process** | the topology as a **closed box** outside the test process |
+| Shares | process, container and clock with the test | only endpoints |
+| Sees | white-box accessors reach the worker's services | service discovery, ports and process boundaries |
+| Proves | the host's services, driven or inspected | the deployed topology |
+
+Choose the worker when the test drives or inspects the host's services; choose the AppHost when the test must prove the deployed topology, including service discovery, ports and process boundaries. Neither substitutes for the other: the closed-box limits below apply only here.
 
 ## Skip
 

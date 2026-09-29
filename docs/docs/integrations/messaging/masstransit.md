@@ -45,6 +45,19 @@ ProtoMessagingBuilder UseMassTransit<TProgram>(this ProtoMessagingBuilder messag
 
 `TProgram` is the application's entry point class; `application` names the `AddAspNetCoreServer` registration whose harness serves (default `Default`). Register `AddMessaging` **after** the application's server: the messaging client initializes once the server exists, the same ordering the in-process RabbitMQ topology needs. The bridge is the only adapter for the run - a repeated `AddMessaging` keeps the first adapter configured, and one run has one broker.
 
+```mermaid
+flowchart LR
+    subgraph Harness["harness lane"]
+        P1[PublishAsync] --> Bus[ITestHarness bus]
+        Bus --> H1[history]
+        H1 --> A1[AwaitAsync]
+    end
+    subgraph Envelope["envelope lane"]
+        W[MassTransitEnvelope.Wrap] --> B[RabbitMQ exchange Namespace:Type]
+        B --> U[MassTransitEnvelope.Unwrap]
+    end
+```
+
 ## Destinations
 
 A destination names a **message contract type** - the addressing unit of a MassTransit bus:
@@ -55,7 +68,7 @@ await Proto.Context.Messaging().AwaitAsync("Billing.InvoicePaid", message => ...
 await Proto.Context.Messaging().AwaitAsync("urn:message:Billing:InvoicePaid", message => ...);
 ```
 
-The short name, the full name and the `urn:message:` URN all name the same contract; a publish, and a tap during setup, resolve the name before it becomes a bus address, so a destination that names no loaded contract - or a short name that two loaded contracts share - fails naming it (or the candidates). An await matches a published message by the name as written, so an untapped ambiguous short name matches either contract's messages and an untapped unknown one times out. The awaited `ProtoMessage.Destination` is the contract's full name.
+The short name, the full name and the `urn:message:` URN all name the same contract; a publish, and a tap during setup, resolve the name before it becomes a bus address, so a destination that names no loaded contract - or a short name that two loaded contracts share - fails naming it (or the candidates). An await matches on the name as written. An untapped ambiguous short name can match either contract. An untapped unknown name times out. The awaited `ProtoMessage.Destination` is the contract's full name.
 
 ## Publishing
 
@@ -67,7 +80,7 @@ await Proto.Context.Messaging().PublishAsync(
     """{"invoiceId":42,"amount":10.5}""");
 ```
 
-Headers passed to `PublishAsync` ride the publish context and are visible on the awaited message. A null or empty payload publishes the contract's default instance; a contract that has none fails the publish naming it, and the fix is the contract's shape or an explicit payload. The `contentType` argument is ignored: the envelope's content type is MassTransit's (`application/vnd.masstransit+json`), and the payload the bridge produces for an await is the contract instance re-serialized as JSON.
+Headers passed to `PublishAsync` ride the publish context and are visible on the awaited message. A null or empty payload publishes the contract default instance. A contract without one fails the publish naming the contract. Publish an explicit payload instead. The `contentType` argument is ignored: the envelope's content type is MassTransit's (`application/vnd.masstransit+json`), and the payload the bridge produces for an await is the contract instance re-serialized as JSON.
 
 ## Awaiting
 
@@ -134,7 +147,11 @@ MassTransitEnvelopeContent MassTransitEnvelope.Unwrap(ProtoMessage message);
 T                         MassTransitEnvelope.Unwrap<T>(ProtoMessage message);
 ```
 
-The frame is MassTransit's own envelope, not a lookalike: the package's `JsonMessageEnvelope` serialized with the package's own serializer options, so the camelCase property set, the decimal-as-string rule, the host block and every optional field are MassTransit's, not a reconstruction. It carries the content type `application/vnd.masstransit+json` and, in `messageType`, the `urn:message:` URNs of the contract - interfaces and base message types included, exactly as the bus computes them - so a MassTransit consumer's type filter matches it. No `MT-*` transport headers are involved on this path; the envelope body carries the metadata (the `MT-*` headers belong to MassTransit's raw serializer). The caller's headers ride both the broker frame and the envelope's `headers` object, as they do on a bus publish.
+The frame is MassTransit's own envelope, not a lookalike. `Wrap` serializes the package's `JsonMessageEnvelope` with the package's own serializer options.
+
+:::note[What makes it MassTransit's envelope]
+The camelCase property set, the decimal-as-string rule, the host block and every optional field are MassTransit's, not a reconstruction. It carries the content type `application/vnd.masstransit+json` and, in `messageType`, the `urn:message:` URNs of the contract - interfaces and base message types included, exactly as the bus computes them - so a MassTransit consumer's type filter matches it. No `MT-*` transport headers are involved on this path; the envelope body carries the metadata (the `MT-*` headers belong to MassTransit's raw serializer). The caller's headers ride both the broker frame and the envelope's `headers` object, as they do on a bus publish.
+:::
 
 `Unwrap<T>` reads like the consumer would: the envelope must declare `T` (or one of its message URNs) in `messageType`, and the `message` is deserialized with MassTransit's options. `Unwrap` returns the envelope metadata instead - `MessageTypes`, `MessageId`, `CorrelationId`, `ConversationId`, `SentTime` and the raw `Payload` - for a suite that asserts on the envelope itself. A frame that is not a MassTransit envelope (an empty payload, a plain JSON body, a missing `message` or `messageType`) throws `MessagingAssertionException` naming the destination and the reason, also for a typed unwrap whose envelope does not declare `T`. `Wrap` overloads take either the contract instance or the already-serialized JSON payload plus its type.
 

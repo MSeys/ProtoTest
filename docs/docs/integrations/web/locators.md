@@ -63,7 +63,7 @@ Component<InvoiceRow>(By.Role(WebRole.Row).And(By.HasText("INV-123")))
 `HasText` is **only valid as the right-hand side of `And`**; on its own, both backends throw `WebBackendCapabilityException`.
 
 :::caution[Selenium limitations]
-Selenium supports a narrower set of combinations: the right-hand side of `And` must be `HasText`, and the left-hand side can't be `By.Css`. Playwright is not limited to those two forms.
+Selenium supports a narrower set of combinations: the right-hand side of `And` must be `HasText`, and the left-hand side cannot be `By.Css`. Playwright is not limited to those two forms.
 :::
 
 In Playwright, `And(By.HasText(...))` becomes a native filter on the left locator; other right-hand sides become Playwright's own `And`. Selenium throws `WebBackendCapabilityException` for both of those cases.
@@ -74,7 +74,7 @@ In Playwright, `And(By.HasText(...))` becomes a native filter on the left locato
 Element(By.At(By.Role(WebRole.Button, "Remove"), 2))   // the third "Remove" button
 ```
 
-The index is zero-based and must not be negative. Playwright applies `.Nth(index)`; Selenium resolves all matches for the source and indexes the in-memory list. Through the element API an out-of-range index is a missing element like any other: an action or assertion treats it as "not yet", waits until the timeout and then fails with `WebElementResolutionException` naming the locator, not the match count. A direct resolution reports the count instead (`NoSuchElementException` on Selenium).
+The index is zero-based and must not be negative. Playwright applies `.Nth(index)`; Selenium resolves all matches for the source and indexes the in-memory list. Through the element API, an out-of-range index counts as a missing element. An action or assertion waits until the timeout, then fails with `WebElementResolutionException` naming the locator. A direct resolution reports the count instead (`NoSuchElementException` on Selenium).
 
 For repeated components, [`Components<T>()`](./page-objects.md#lists-of-components) with `At`, `Number`, `First` and `Matching` usually reads better.
 

@@ -55,7 +55,7 @@ protected WebComponentCollection<TComponent> Components<TComponent>(WebLocator i
     where TComponent : WebComponent, new();
 ```
 
-The `name` defaults to the property name (or the component type name), and shows up in traces and failure messages as a path like `InvoicesPage.Table.Invoice.Open`. That's why properties read better than local variables.
+The `name` defaults to the property name (or the component type name), and shows up in traces and failure messages as a path like `InvoicesPage.Table.Invoice.Open`. Prefer properties over local variables for this reason.
 
 ### Scoping
 
@@ -133,6 +133,11 @@ public sealed class InvoiceRow : WebTableRow
 ```
 
 ```csharp
+await page.Table.Invoice("INV-123").Total.Should.HaveTextAsync("€ 10");
+await page.Table.RowNumber(2).Cell("Total").Should.HaveTextAsync("€ 10");
+```
+
+```csharp
 public abstract class WebTable<TRow> : WebComponent where TRow : WebComponent, new()
 {
     protected virtual WebLocator RowLocator => By.Role(WebRole.Row);
@@ -152,23 +157,7 @@ public abstract class WebTableRow : WebComponent
 
 Rows are components, so a row class can hold nested components and elements exactly like any other component, and it can itself be used as the `TRow` of a `WebTable`. `Cell("Total")` finds the cell in the column whose conventional header cell reads "Total", so tests keep working when columns are reordered; the header lookup uses `ancestor::table[1]//tr[1]`.
 
-```csharp
-await page.Table.Invoice("INV-123").Total.Should.HaveTextAsync("€ 10");
-await page.Table.RowNumber(2).Cell("Total").Should.HaveTextAsync("€ 10");
-```
-
 Note that row numbers count every `role=row`, **including the header row**: `RowNumber(2)` is the first data row in a table with one header row.
-
-## Element references
-
-Every `WebElement` carries a `WebElementReference` describing where it lives; [`WaitUntilAsync`](./index.md#sessions) predicates and [custom waits](./middleware.md#wait-conditions) consume it:
-
-```csharp
-string Name { get; }                    // e.g. "Submit"
-string ComponentPath { get; }           // e.g. "LoginPage.Form.Submit"
-WebLocator Locator { get; }
-WebElementReference Reference { get; }  // scope roots, path, name and locator
-```
 
 ## Next
 

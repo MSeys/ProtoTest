@@ -36,7 +36,7 @@ public sealed class WebFlow<TComponent> where TComponent : WebComponent
 }
 ```
 
-`Check` checks and `Uncheck` unchecks. `Do` runs anything else, including assertions, as a step:
+Use `Check` to check a box and `Uncheck` to clear it. `Do` runs anything else, including assertions, as a step:
 
 ```csharp
 await dialog.Flow("Confirm deletion")
@@ -53,7 +53,7 @@ public static WebFlow<TComponent> Flow<TComponent>(this TComponent component, st
     where TComponent : WebComponent;
 ```
 
-The sample drives its own sign-in page through a flow - see [WebJourney.cs](../../../../samples/Northstar.ProtoTest/WebJourney.cs).
+The sign-in example in [WebJourney.cs](../../../../samples/Northstar.ProtoTest/WebJourney.cs) uses a flow.
 
 ## Rules
 

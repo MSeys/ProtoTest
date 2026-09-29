@@ -6,7 +6,7 @@ description: "Register ProtoTest with TUnit: the test executor, the assembly hoo
 
 # TUnit
 
-TUnit is wired differently from the other four. There is no ProtoTest test attribute: you keep TUnit's own `[Test]`, and ProtoTest hooks in through TUnit's executor mechanism.
+TUnit is wired differently from the other four. There is no ProtoTest test attribute. You keep TUnit's own `[Test]`. ProtoTest runs through the TUnit executor.
 
 ## Install
 
@@ -41,7 +41,7 @@ public class Setup : ProtoTestAssembly
 
 The `TUnit` namespace carries TUnit's own `[Test]`, `[Before]` and `[After]`.
 
-`[assembly: TestExecutor<ProtoTestExecutor>()]` applies the executor to every test in the assembly. TUnit also allows `[TestExecutor<T>]` at class or method scope, but only the assembly form is exercised in this repository, so treat narrower scoping as untested.
+`[assembly: TestExecutor<ProtoTestExecutor>()]` applies the executor to every test in the assembly. Register it there. The class and method forms of `[TestExecutor<T>]` are not part of the supported surface.
 
 A test is a normal TUnit test. The executor wraps it.
 
@@ -83,8 +83,8 @@ public class OrderTests
 ## Limits
 
 - There is no ProtoTest attribute. Test discovery and `[Test]` are entirely TUnit's.
-- Only the assembly-level executor is exercised in this repository. `[TestExecutor<T>]` on a class or method is untested.
-- A source-generated test that exposes no reflection `MethodInfo` runs unwrapped, because the executor has nothing to prepare a context from.
+- Register the executor for the assembly. `[TestExecutor<T>]` on a class or a method is not part of the supported surface.
+- A source-generated test without a reflection `MethodInfo` runs unwrapped. The executor has no method data to build a context.
 - The per-test token comes from `TestContext.CancellationToken`: the executor has no token of its own, so a test with no live context (see the `MethodInfo` limit) starts from `CancellationToken.None`.
 - A teardown failure is recorded but can never change the body's outcome.
 

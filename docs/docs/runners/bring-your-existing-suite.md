@@ -6,7 +6,7 @@ description: "Move an existing xUnit v2 or v3 suite onto ProtoTest test by test:
 
 # Bring an existing xUnit suite
 
-ProtoTest takes over a test, not a project. An existing xUnit suite keeps running while you convert it one class at a time, and converted and plain tests can share a class.
+ProtoTest converts one test at a time, not a whole project. An existing xUnit suite keeps running while you convert it one class at a time, and converted and plain tests can share a class.
 
 ## What stays
 

@@ -4,6 +4,8 @@ title: Setup
 description: Install the ProtoTest MCP server and register it with a coding agent so it can read the runs in your repository.
 ---
 
+import TabbedCode from '@site/src/components/TabbedCode';
+
 # Setup
 
 One install connects a coding agent to the runs in your repository. The server is a .NET tool. It reads `.prototrace` archives and answers questions about them over the Model Context Protocol.
@@ -18,51 +20,130 @@ The tool command is `prototest-mcp`. The package targets .NET 8, 9 and 10, so th
 
 ## Register it
 
-An MCP client starts the server and talks to it over stdio. Add the server to the client's configuration file. For a project-scoped client, the file is `.mcp.json` at the repository root:
+An MCP client starts the server and talks to it over stdio. Add the server to the client's configuration file. The shape is the same everywhere; only the file and the root key change.
 
-```json
-{
+<TabbedCode
+  label="Client configuration"
+  tabs={[
+    {
+      id: 'claude-code',
+      label: 'Claude Code',
+      filename: '.mcp.json (repository root)',
+      code: `{
   "mcpServers": {
     "prototest": {
       "command": "prototest-mcp",
       "args": ["--project", "."]
     }
   }
-}
-```
-
-The server resolves `.` against its own working directory, which the client sets. Keep the file at the repository root so discovery starts there. If the client starts the server elsewhere, give `--project` an absolute path.
-
-The same shape works in the other clients, with a different file and root key:
-
-| Client | File | Root key |
-| --- | --- | --- |
-| Claude Code | `.mcp.json` | `mcpServers` |
-| VS Code | `.vscode/mcp.json` | `servers`, with `"type": "stdio"` |
-| Cursor | `.cursor/mcp.json` | `mcpServers` |
-
-VS Code spells the same server like this:
-
-```json
-{
+}`,
+    },
+    {
+      id: 'vscode',
+      label: 'VS Code',
+      filename: '.vscode/mcp.json',
+      code: `{
   "servers": {
     "prototest": {
       "type": "stdio",
       "command": "prototest-mcp",
       "args": ["--project", "."],
-      "cwd": "${workspaceFolder}"
+      "cwd": "\${workspaceFolder}"
     }
   }
-}
+}`,
+    },
+    {
+      id: 'cursor',
+      label: 'Cursor',
+      filename: '.cursor/mcp.json',
+      code: `{
+  "mcpServers": {
+    "prototest": {
+      "command": "prototest-mcp",
+      "args": ["--project", "."]
+    }
+  }
+}`,
+    },
+    {
+      id: 'claude-desktop',
+      label: 'Claude Desktop',
+      filename: 'claude_desktop_config.json (user settings)',
+      code: `{
+  "mcpServers": {
+    "prototest": {
+      "command": "prototest-mcp",
+      "args": ["--project", "C:\\\\dev\\\\your-repo"]
+    }
+  }
+}`,
+      footnote: 'Its working directory is not your repository, so give --project an absolute path.',
+    },
+  ]}
+/>
+
+The server resolves `.` against its working directory. Keep the file at the repository root. If the client starts the server elsewhere, pass an absolute `--project` path.
+
+## Check it
+
+Three steps, none of which needs a suite of your own.
+
+1. Read a committed failing run with the CLI. Download [l0-environment-drill.prototrace](pathname:///lessons/l0-environment-drill.prototrace) from the Learn track, then:
+
+   ```bash
+   dotnet tool install --global ProtoTest.Cli
+   prototest summary l0-environment-drill.prototrace
+   ```
+
+   ```text
+   ProtoTest trace 2.0 · run 761778e6dc82498a9f9965fa1e6b5a24 · 2026-09-29 06:19:01Z - 2026-09-29 06:19:05Z
+   1 tests · 1 failed
+
+   FAILED Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine (2.66 s)
+     ConnectionError reaching http://127.0.0.1:5099: connection refused.
+     test.execution Test execution · failed
+     cause: runner-reported failure
+   ```
+
+   That is a failing run of the Learning demo, so the summary prints the run, the failing test and the failing operation. `prototest summary` prints the same diagnosis the MCP tools return, which makes it the quickest way to check that the file an agent would read says what you expect. The [CLI reference](./cli.md) documents all four verbs, their arguments and their exit codes.
+
+2. Point the server at one file with `--trace`, or at a folder of runs with `--project`. For one archive, `--trace` works wherever the file was written.
+
+3. Run your own suite once so a `.prototrace` exists, and ask the agent to list the runs. It should answer with a run id and a trace file from your machine.
+
+## Where it reads
+
+```mermaid
+flowchart TD
+    start{"How did the server start?"}
+    start -->|"--trace file"| one["Reads exactly that archive<br/>a folder argument is refused"]
+    start -->|"--project folder"| pr{"TestResults/ holds a readable trace?"}
+    start -->|"neither"| env["PROTOTEST_PROJECT, else the working directory"]
+    env --> pr
+    pr -->|"yes"| stop["Use it and stop there"]
+    pr -->|"no"| walk["Walk the tree, skipping<br/>bin, obj, .git, node_modules"]
 ```
 
-Claude Desktop uses the `mcpServers` shape in its own settings file. Its working directory is not your repository, so give `--project` an absolute path there.
+"Newest" is the run's recorded start time, never a file timestamp. An archive the reader cannot open is skipped with a reason in `list_runs` and never guessed at.
+
+The default trace lands below the test project's build output, and the walk skips `bin`, so the server cannot see it from the repository root. Give the suite a results folder the server can see. The [continuous integration page](../continuous-integration/index.md#put-every-artifact-in-one-place) sets that up with one environment variable, so CI and local runs write to the same place:
+
+```csharp
+var results = Environment.GetEnvironmentVariable("PROTOTEST_RESULTS")
+    ?? Path.Combine("TestResults", "ProtoTest");
+
+builder.ConfigureTracing(trace =>
+    trace.OutputPath = Path.Combine(results, "run.prototrace"));
+```
+
+Set `PROTOTEST_RESULTS` to an absolute path such as `<repository>/TestResults` when you run locally.
 
 ## Give the agent the skill
 
 The repository carries one skill that teaches the evidence loop and the four tools: [`skills/prototest-evidence-loop/SKILL.md`](https://github.com/MSeys/ProtoTest/blob/main/skills/prototest-evidence-loop/SKILL.md). It is copy-in, not an install.
 
-A client that reads skills folders (Claude Code, for example) loads it from its skills directory. From a checkout of this repository:
+A client that reads skills folders (Claude Code, for example) loads it from its skills directory. From a checkout of the ProtoTest repository:
 
 ```bash
 mkdir -p .claude/skills
@@ -73,56 +154,37 @@ Otherwise download the file from the repository and place it in the same layout.
 
 The skill is optional. The MCP server's tool descriptions are the contract, so an agent without the bundle can still list the tools and work from them.
 
-## Where it reads
-
-The server takes one of two inputs, in this order:
-
-- `--trace <file.prototrace>` reads exactly that archive. Use it for a single trace downloaded from CI. While it is set, a `folder` argument to `list_runs` is refused.
-- `--project <folder>` discovers the archives under the folder.
-
-Without either, the `PROTOTEST_PROJECT` environment variable is the folder, and without that, the current directory.
-
-Discovery looks at the folder's `TestResults/` first. While that folder yields a readable trace, the rest of the tree is not walked. Otherwise it walks the tree and prunes `bin`, `obj`, `.git` and `node_modules`, so a folder holding only an unreadable archive does not hide readable runs elsewhere. "Newest" is the run's recorded start time, never a file timestamp. An archive the reader cannot open is skipped with a reason in `list_runs` and never guessed at.
-
-The default trace lands below the test project's build output, and discovery prunes `bin`, so the server cannot see it from the repository root. Give the suite a results folder the server can see. The [continuous integration page](../continuous-integration/index.md#put-every-artifact-in-one-place) uses one environment variable, so CI and local runs write to the same place:
-
-```csharp
-var results = Environment.GetEnvironmentVariable("PROTOTEST_RESULTS")
-    ?? Path.Combine("TestResults", "ProtoTest");
-
-builder.ConfigureTracing(trace =>
-    trace.OutputPath = Path.Combine(results, "run.prototrace"));
-```
-
-Set `PROTOTEST_RESULTS` to an absolute path such as `<repository>/TestResults` when you run locally. For one archive, `--trace` always works, wherever it was written.
-
 ## What the agent can see
 
-Every tool is read-only and returns a compact JSON document.
+Every tool is read-only and returns a compact JSON document. `list_runs` over a folder holding one failing run:
 
-| Tool | Input | Returns |
-| --- | --- | --- |
-| `list_runs` | optional `folder`, `limit` (default 10) | the newest runs first: run id, trace file, start and completion, outcome counts, failing test ids, and the archives it had to skip |
-| `get_failure` | optional `runId`, `testId` | the failure entry: outcome, error, source location, the selected failing operation, the shape mismatches and the test's artifacts |
-| `get_diagnosis` | optional `runId`, `testId`, `detail` (`summary` or `context`) | the run's diagnosis, or one failing test's context package |
-| `get_coverage` | optional `runId`, `target`, `category`, `includeUncovered`, `offset`, `limit` | coverage totals and uncovered units from the report the run embedded |
-
-[Diagnosis](./diagnosis.md) explains what `get_failure` and `get_diagnosis` return and what the agent can do with it.
-
-## Check it
-
-You do not need a suite to see the tools work. Download the drill archive from the Learn track and read it with the CLI:
-
-```bash
-dotnet tool install --global ProtoTest.Cli
-prototest summary l0-environment-drill.prototrace
+```json
+{
+  "root": "C:/dev/your-repo",
+  "runs": [
+    {
+      "runId": "761778e6dc82498a9f9965fa1e6b5a24",
+      "traceFile": "C:/dev/your-repo/TestResults/run.prototrace",
+      "startedAtUtc": "2026-09-29T06:19:01Z",
+      "completedAtUtc": "2026-09-29T06:19:05Z",
+      "outcomes": { "failed": 1 },
+      "failingTests": [ { "testId": "00001", "name": "TheAddressWasHardcodedForOneMachine" } ],
+      "failingTestsTruncated": false
+    }
+  ],
+  "truncated": false,
+  "skipped": null
+}
 ```
 
-`https://prototest.dev/lessons/l0-environment-drill.prototrace` is a real failing run of the Learning demo, so the summary prints a run, the failing test and the operation that decided it. Point the MCP server at one file with `--trace`, or at a folder of runs with `--project`.
+| Tool | Input | Returns | Cap |
+| --- | --- | --- | --- |
+| `list_runs` | optional `folder`, `limit` (default 10) | the newest runs first: run id, trace file, start and completion, outcome counts, failing test ids, and the archives it had to skip | 50 runs |
+| `get_failure` | optional `runId`, `testId` | the failure entry: outcome, error, source location, the selected failing operation, the shape mismatches and the test's artifacts | 10 failed operations, 25 mismatches |
+| `get_diagnosis` | optional `runId`, `testId`, `detail` (`summary` or `context`) | the run's diagnosis, or one failing test's context package | the [diagnosis caps](./diagnosis.md#limits) |
+| `get_coverage` | optional `runId`, `target`, `category`, `includeUncovered`, `offset`, `limit` | coverage totals and uncovered units from the report the run embedded | 200 uncovered units |
 
-Then run your own suite once so a `.prototrace` exists, and ask the agent to list the runs. It should answer with a run id and a trace file from your machine.
-
-`prototest summary` is the `ProtoTest.Cli` tool. It prints the same diagnosis the MCP tools return, so it is the quickest way to check that the file the agent would read says what you expect. The [CLI reference](./cli.md) documents all four verbs, their arguments and their exit codes.
+[Diagnosis](./diagnosis.md) explains what `get_failure` and `get_diagnosis` return and what the agent can do with it.
 
 ## Limits
 
@@ -131,4 +193,4 @@ Then run your own suite once so a `.prototrace` exists, and ask the agent to lis
 - Hard caps bound every payload. `list_runs` returns at most 50 runs, `get_coverage` at most 200 uncovered units, and `get_diagnosis` applies the [diagnosis caps](./diagnosis.md#limits).
 - The server reads evidence that already exists. A run with no `.prototrace` is not visible to it; write the trace first.
 - One external dependency: the official `ModelContextProtocol` SDK (Apache-2.0).
-- The demo-only endpoint is built and not hosted. See [Using ProtoTest with coding agents](./coding-agents.md#the-demo-endpoint-honestly).
+- The demo endpoint is a local sample. See [Coding agents](./coding-agents.md#demo-endpoint).

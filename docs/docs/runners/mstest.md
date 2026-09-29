@@ -6,7 +6,7 @@ description: "Register ProtoTest with MSTest: the assembly hooks, the [ProtoTest
 
 # MSTest
 
-`ProtoTest.MSTest` gives you two static helpers to call from MSTest's assembly hooks, plus a `[ProtoTest]` attribute that wraps each invocation in one ProtoTest context. MSTest invokes the attribute once per data row, so each row is its own context and its own trace.
+`ProtoTest.MSTest` has two static helpers for the assembly hooks and a `[ProtoTest]` attribute. The attribute wraps each invocation in one ProtoTest context. MSTest invokes the attribute once per data row, so each row is its own context and its own trace.
 
 ## Install
 
@@ -21,6 +21,10 @@ ProtoTest targets **.NET 8, 9 and 10**, and needs **MSTest.TestFramework 4.0.2 o
 `ProtoTestAssembly` has no lifecycle attributes of its own. It gives you two protected static helpers to call from `[AssemblyInitialize]` and `[AssemblyCleanup]`:
 
 ```csharp
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using ProtoTest.Core;
+using ProtoTest.MSTest;
+
 [TestClass]
 public class Setup : ProtoTestAssembly
 {

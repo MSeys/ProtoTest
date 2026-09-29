@@ -1,16 +1,36 @@
 ---
 sidebar_position: 5
-title: Loop
-description: "The evidence loop end to end: fail, evidence, fix, verify, report, with the GitHub Action that posts the digest and uploads the trace."
+title: The evidence loop
+sidebar_label: The evidence loop
+description: "The evidence loop end to end: fail, evidence, fix, verify, report, with the pull request comment and the check annotations each step produces."
 ---
 
-# Loop
+# The evidence loop
 
-The **evidence loop** is fail, evidence, fix, verify, report. One file carries the evidence: the `.prototrace` archive, with the run's report embedded. Every step reads the same archive, so the CI log, the agent and the pull request cannot tell different stories.
+The **evidence loop** is fail, evidence, fix, verify, report. One file carries the evidence: the `.prototrace` archive with the embedded report. Every step reads the same archive.
 
-## The loop at a glance
+## What the reviewer sees
 
-| Step | What happens | What reads it |
+A failing run leaves three things on the pull request. This is the comment, rendered from the committed failing fixture:
+
+```markdown
+## ProtoTest run `29e344f9cf54431ca7d8bad3f87a1749`
+
+**2 tests · 1 failed · 1 passed**
+
+- **FAILED `orders match their shape`** (16 ms)
+  - `assert.json.shape` · failed
+  - Shape mismatch failed with 1 error(s):
+    • [$.orderId]: Values did not match. (Expected: '7', Actual: '42')
+  - at `artifacts/fixture-gen/Program.cs:65`
+  - mismatch `$.orderId`: expected 7, actual 42
+
+[Full trace](https://github.com/you/your-repo/actions/runs/1/artifacts/prototest-trace)
+```
+
+Next to it, one check annotation per failing test at its source location, one per failed run gate, and one artifact: the `.prototrace` archive with the report inside. A green run posts no comment; its status check is the report.
+
+| Step | What happens | Who reads it |
 | --- | --- | --- |
 | Fail | the suite runs and one test does not pass; the trace and its report are written | `list_runs`, the check annotations |
 | Evidence | the failure and its context are read | `get_failure`, `get_diagnosis` with `detail=context`, `prototest summary` |
@@ -20,14 +40,24 @@ The **evidence loop** is fail, evidence, fix, verify, report. One file carries t
 
 ## Run it locally
 
-Start with a failing test. Run the suite, then read the trace:
+The same four commands, with the output each one prints. Start with a failing test:
 
 ```bash
 dotnet test
 prototest summary TestResults/ProtoTest/run.prototrace
 ```
 
-[Diagnosis](./diagnosis.md) shows what that output says. A coding agent reads the same story through the MCP tools ([Setup](./setup.md)), or you can read the whole run in the viewer.
+```text
+ProtoTest trace 2.0 · run 761778e6dc82498a9f9965fa1e6b5a24 · 2026-09-29 06:19:01Z - 2026-09-29 06:19:05Z
+1 tests · 1 failed
+
+FAILED Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine (2.66 s)
+  ConnectionError reaching http://127.0.0.1:5099: connection refused.
+  test.execution Test execution · failed
+  cause: runner-reported failure
+```
+
+[Diagnosis](./diagnosis.md) reads that output line by line. A coding agent reads the same story through the MCP tools ([Setup](./setup.md)), or you can read the whole run in the viewer.
 
 After the fix, run the suite again and compare the two reports:
 
@@ -42,86 +72,29 @@ Post the digest without a pull request:
 prototest feedback TestResults/ProtoTest/run.prototrace --digest digest.json
 ```
 
-The annotations go to stdout, the per-channel outcomes go to stderr, and `--digest` writes the digest JSON beside the trace. With no target configured, the network channels skip with their reason, so a local run is safe. The committed MCP fixture prints:
-
 ```text
-::error file=artifacts/fixture-gen/Program.cs,line=65::orders match their shape: Shape mismatch failed with 1 error(s):%0D%0A  • [$.orderId]: Values did not match. (Expected: '7', Actual: '42')
+::error::Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine: ConnectionError reaching http://127.0.0.1:5099: connection refused.
 prototest feedback: github-annotations posted (1 annotation.)
 prototest feedback: github-pr-comment skipped (No GitHub token: set GITHUB_TOKEN.)
 prototest feedback: webhook skipped (No webhook URL: set PROTOTEST_FEEDBACK_WEBHOOK_URL.)
 ```
 
-The comment and webhook targets are environment variables, the same names GitHub Actions provides: `GITHUB_TOKEN`, `GITHUB_REPOSITORY`, `GITHUB_EVENT_PATH` for the pull request number, `PROTOTEST_FEEDBACK_TRACE_URL` for the artifact link, and `PROTOTEST_FEEDBACK_WEBHOOK_URL` plus an optional secret header for the webhook. The [CLI reference](./cli.md#environment-targets) lists every target and the exit codes.
+The annotations go to stdout. The per-channel outcomes go to stderr, so a CI log keeps them out of the annotation stream. `--digest` writes the digest JSON to the path you gave it. With no target configured the network channels skip with their reason, so a local run is safe.
+
+The [CLI reference](./cli.md#environment-targets) lists every target the comment and the webhook read, and the exit codes.
 
 ## Wire it into the pull request
 
-The *ProtoTest Feedback* action installs the CLI, uploads the trace as one artifact, posts the digest and runs the verdict. The suite writes its trace and report under `PROTOTEST_RESULTS`, the pattern the [CI page](../continuous-integration/index.md#put-every-artifact-in-one-place) sets up. A workflow:
+The *ProtoTest Feedback* action runs the post-run step. It installs the CLI, uploads the trace as one artifact, posts the digest and runs the verdict when both reports are given.
 
-```yaml
-name: Integration tests
-
-on:
-  pull_request:
-
-permissions:
-  contents: read
-  issues: write
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    env:
-      PROTOTEST_RESULTS: ${{ github.workspace }}/TestResults/ProtoTest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-
-      - run: dotnet restore
-      - run: dotnet test --configuration Release --no-restore
-
-      - name: Post the evidence
-        if: always()
-        uses: MSeys/ProtoTest/.github/actions/feedback@main
-        with:
-          trace: ${{ env.PROTOTEST_RESULTS }}/run.prototrace
-```
-
-- `if: always()` matters. The step runs when the test step failed, which is when the evidence is needed.
-- `issues: write` lets the action comment on the pull request. The annotations and the artifact upload need nothing extra.
-- The comment carries the artifact link, so the reviewer opens the trace from the comment.
-- The action fails when a channel that reached its target failed, so a broken post is not silent.
-
-### Add the verdict
-
-Give the action the two reports and the pull request step becomes the gate:
-
-```yaml
-        with:
-          trace: ${{ env.PROTOTEST_RESULTS }}/run.prototrace
-          baseline-report: baseline/report.json
-          current-report: ${{ env.PROTOTEST_RESULTS }}/report.json
-```
-
-The baseline is the report from the default branch. How it reaches the job is up to you: an artifact from the latest run on the default branch, a nightly job that publishes it, or a report checked into the repository. The action only needs the path; the [CI page](../continuous-integration/index.md#add-the-verdict) has a nightly recipe that produces it. [Verification](./verification.md) explains the verdict and its finding classes.
-
-## What the reviewer sees
-
-- A pull request comment with the run, every test that did not pass, the cause, and the trace link.
-- One check annotation per failing test, at its source location, and one per failed run gate.
-- One uploaded artifact: the `.prototrace` archive with the report inside. Open it in the [ProtoTrace viewer](https://trace.prototest.dev).
-- Locally, `prototest index TestResults` writes a static page over a folder of runs, with each run's outcome counts and links to its trace and digest ([ProtoTrace](../observability/prototrace.md)).
+The workflow, the artifact folder and the `with:` block are on the [CI page](../continuous-integration/index.md#the-feedback-action). The suite writes its trace and report under `PROTOTEST_RESULTS`, the same wiring that page sets up, so one folder holds everything and one artifact step keeps it.
 
 ## Limits
 
-- The digest is post-run by design. It is built from the written archive, after the sinks ran. An in-run sink cannot post it: the archive is written last, and a failed assertion is not a report item.
-- The comment posts only when the digest carries a failure or a failed run gate. A green run's status check is the report. The webhook posts every digest, because a machine consumer decides what to do with it.
+- The digest is built after the run from the written archive. An in-run sink cannot post it. The archive is written last, and a failed assertion is not a report item.
+- The comment posts only when the digest carries a failure or a failed run gate. The webhook posts every digest, because a machine consumer decides what to do with it.
 - A missing target skips its channel with a named reason. A target that is reached and refuses fails its channel, and the CLI exits `1`.
 - A pull request from a fork gets a read-only token, so the comment channel cannot post and fails with its reason. The annotations and the artifact upload still work.
-- The action is a composite action in the main repository. There is no marketplace listing yet; pin a commit SHA for a pipeline that does not move under you, and switch to a release tag once one exists.
 - Nothing leaves the machine unless you configure a target.
 
 Open the pull request comment, follow the trace link, and open the archive in the viewer. The comment carries the same digest your agent read.

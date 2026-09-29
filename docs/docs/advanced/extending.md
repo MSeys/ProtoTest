@@ -1,43 +1,72 @@
 ---
 sidebar_position: 1
 title: Extending ProtoTest
-description: "The public extension points behind every built-in integration, and the contract a package outside this repository follows."
+description: "The public extension points behind every built-in integration, and the contract a package of your own follows."
 ---
 
 # Extending ProtoTest
 
-Every built-in integration is built on public types, and a package outside this repository uses the same ones. This page is the contract: which extension point to use, what it guarantees, and how the result reads in the trace.
+Every built-in integration is built on public types, and a package you write uses the same ones. This page is the contract: which extension point to use, what it guarantees, and how the result reads in the trace.
 
 ## The contract
 
-- **The extension points are public.** `tests/ProtoTest.Extensibility.Tests` compiles a minimal broker adapter and a minimal web backend against the public surface only, so a point that regresses to internals fails that build. An integration never reaches into another package's internals.
+- **The extension points are public.** A minimal broker adapter and a minimal web backend compile against the public surface only, so a point that regressed to internals would break them. An integration never reaches into another package's internals.
 - **One mechanism per concern.** A client is a client initializer, a wait is a readiness probe, run state is infrastructure, a capability is a capability descriptor, and evidence goes through the trace writer. An extension uses those mechanisms; it does not add a second lifecycle.
 - **Options follow one shape.** An options type implements `IProtoConfigurableOptions`, registers through `ProtoOptionsRegistration`, and binds its section over the code callback, so configuration wins the same way everywhere.
 - **The run composes your package like any other.** A builder extension registers services on the `IProtoHostBuilder`; the host owns start, stop and release from there.
 
 ## Where each extension point lives
 
-| You want to… | Use |
-| --- | --- |
-| package setup for *some* tests | a [`ProtoAttribute`](../foundation/attributes.md) |
-| run code around *every* test or the whole run | a [hook](../foundation/hooks.md) |
-| give tests a new client | a [client initializer](../foundation/clients.md) plus an extension method |
-| publish and await over your own broker | an [`IProtoMessageBroker`](../integrations/messaging/index.md#the-adapter-contract) whose consumer derives from [`ProtoMessageConsumerBase`](../integrations/messaging/index.md#writing-an-adapter) |
-| pass data between setup and tests | [typed state](../foundation/execution-context.md#typed-state) |
-| authenticate HTTP requests | an [`IProtoHttpAuthenticator`](../integrations/rest/authentication.md#writing-your-own) |
-| log a browser in | an [`IWebLoginStrategy`](../integrations/web/login.md) |
-| wait for app-specific readiness | an [`IWebWaitCondition`](../integrations/web/middleware.md) |
-| create data in your system | an [`IProtoDataProvisioner`](../integrations/data/provisioners.md) |
-| report on what tests did | observations plus a [collector](../observability/coverage.md#writing-a-collector) |
-| write reports somewhere | an [`IProtoSink`](../observability/reporting.md#writing-a-sink) |
-| show up in the trace viewer | the trace writer, below |
-| support another test runner | `ProtoHost` plus `IProtoTestAttachmentPublisher`, below |
+Start from what you need to say, then take the part of the integration it belongs to:
+
+```mermaid
+flowchart TD
+    need["What does your extension do?"] --> when{"Per test, or per run?"}
+    when -->|"per test"| setup["Set something up<br/>ProtoAttribute"]
+    when -->|"around every test or the whole run"| hooks["A hook"]
+    when -->|"per run, for a system"| data["Give tests a new client, or create data<br/>client initializer · provisioner"]
+    when -->|"during the test"| during{"Bring in data, or take it out?"}
+    during -->|"in"| clients["A client initializer + an extension method"]
+    during -->|"out"| trace["The trace writer"]
+    need --> evidence{"Does it produce evidence?"}
+    evidence -->|"numbers or a list"| obs["Observations + a collector"]
+    evidence -->|"a file or a post"| sink["An IProtoSink"]
+```
+
+| You want to… | Use | Part |
+| --- | --- | --- |
+| package setup for *some* tests | a [`ProtoAttribute`](../foundation/attributes.md) | 1 |
+| run code around *every* test or the whole run | a [hook](../foundation/hooks.md) | 1 |
+| give tests a new client | a [client initializer](../foundation/clients.md) plus an extension method | 2 |
+| publish and await over your own broker | an [`IProtoMessageBroker`](../integrations/messaging/index.md#the-adapter-contract) whose consumer derives from [`ProtoMessageConsumerBase`](../integrations/messaging/index.md#writing-an-adapter) | 2, 3 |
+| pass data between setup and tests | [typed state](../foundation/execution-context.md#typed-state) | 3 |
+| authenticate HTTP requests | an [`IProtoHttpAuthenticator`](../integrations/rest/authentication.md#writing-your-own) | 1 |
+| log a browser in | an [`IWebLoginStrategy`](../integrations/web/login.md) | 1 |
+| wait for app-specific readiness | an [`IWebWaitCondition`](../integrations/web/middleware.md) | 1 |
+| create data in your system | an [`IProtoDataProvisioner`](../integrations/data/provisioners.md) | 2 |
+| report on what tests did | observations plus a [collector](../observability/coverage.md#writing-a-collector) | 4 |
+| write reports somewhere | an [`IProtoSink`](../observability/reporting.md#writing-a-sink) | 4 |
+| show up in the trace viewer | the trace writer, below | 1 |
+| support another test runner | `ProtoHost` plus `IProtoTestAttachmentPublisher`, below | separate |
 
 ## A worked example: a message-bus client
 
-The sketch below is a hypothetical message-bus client. It has the four parts a typical integration has.
+The sketch below is a message-bus client you could write. It has the four parts a typical integration has, and the result is this:
 
-**1. The client and its initializer**
+```csharp
+builder.AddBus("Default", bus => bus.Endpoint = "amqp://localhost");
+
+await Proto.Context.Bus().PublishAsync("orders.created", order);
+```
+
+| Part | The file it belongs in | What it does |
+| --- | --- | --- |
+| 1. The client and its initializer | `BusClient.cs` | Holds the connection, and records a `bus.publish` operation plus the observation that goes with it |
+| 2. A host builder extension | `ProtoHostBuilderBusExtensions.cs` | Registers the options and the initializer on the builder |
+| 3. A context extension | `ProtoExecutionContextBusExtensions.cs` | Resolves the client by name, so a test writes `Proto.Context.Bus()` |
+| 4. Optionally a collector | `BusCoverageCollector.cs` | Turns your `bus.publish` observations into a report section |
+
+### 1. The client and its initializer
 
 ```csharp
 public sealed class BusClient(IConnection connection, ProtoExecutionContext context) : IAsyncDisposable
@@ -72,7 +101,7 @@ internal sealed class BusClientInitializer(string name, BusOptions options) : IP
 
 The initializer reads the test's cancellation token and passes it to its own I/O. A client that a test shares across tests must not hold the context: it resolves the context per call, only while it acts on the test's flow. See [Context lookups](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#context-lookups).
 
-**2. A host builder extension**
+### 2. A host builder extension
 
 ```csharp
 public static class ProtoHostBuilderBusExtensions
@@ -87,7 +116,7 @@ public static class ProtoHostBuilderBusExtensions
 }
 ```
 
-**3. A context extension**
+### 3. A context extension
 
 ```csharp
 public static class ProtoExecutionContextBusExtensions
@@ -97,19 +126,13 @@ public static class ProtoExecutionContextBusExtensions
 }
 ```
 
-**4. Optionally, a collector** consuming your `bus.publish` observations, so topics show up in coverage reports.
+### 4. Optionally, a collector
 
-The result reads like everything else:
-
-```csharp
-builder.AddBus("Default", bus => bus.Endpoint = "amqp://localhost");
-
-await Proto.Context.Bus().PublishAsync("orders.created", order);
-```
+A collector consuming your `bus.publish` observations, so topics show up in coverage reports. It derives from `ProtoCoverageCollector`; the shape is in [writing a collector](../observability/coverage.md#writing-a-collector).
 
 ### Options and configuration
 
-Options are registered through `ProtoOptionsRegistration.Configure`, the call every built-in integration uses. It gives an options type the three behaviors the framework promises: every code callback runs in registration order, the type's configuration section binds over the result, and `Validate()` runs once where the options resolve. The `IConfiguration` comes from the host's service provider, so an extension never touches configuration itself:
+Register options with `ProtoOptionsRegistration.Configure`. It runs code callbacks in registration order. It then binds the config section over the result. It runs `Validate()` once when the options resolve. The `IConfiguration` comes from the host's service provider, so an extension never touches configuration itself:
 
 ```csharp
 public sealed class BusOptions : IProtoConfigurableOptions
@@ -160,7 +183,7 @@ Calling `AddBus` twice now composes: both callbacks run, in order, and one optio
 }
 ```
 
-The built-ins name their section `ProtoTest:<Integration>[:<Area>]`, where the area names the options type's role (`Responses`, `Attachments`, `Client`, `WebSocket`, `RabbitMq`); an integration with one options set has no area segment. A package outside this repository picks its own root. A section renamed during 1.x returns its old name from `FallbackConfigurationSectionName`, so the old key keeps working as a documented fallback, with the current section binding over it.
+Built-ins use `ProtoTest:<Integration>[:<Area>]`. The area names the role, such as `Responses` or `Client`. An integration with one options set has no area. A package you write picks its own root. A section renamed during 1.x returns its old name from `FallbackConfigurationSectionName`, so the old key keeps working as a documented fallback, with the current section binding over it.
 
 ### Authenticator-style construction
 
@@ -208,7 +231,17 @@ catch (Exception exception)
 }
 ```
 
-`ProtoTraceOperation` has `Id`, `SetAttribute(name, value)` (chainable), `Succeed()`, `Fail(exception)`, `Cancel(exception?)` and `Complete(outcome, exception?)`. It completes only once; disposing it without completing records `Unknown`.
+`ProtoTraceOperation` is the handle you manage yourself. It completes once.
+
+| Member | What it does |
+| --- | --- |
+| `Id` | the entry id the archive and the viewer use |
+| `SetAttribute(name, value)` | adds a string attribute; chainable |
+| `Succeed()` | completes as `Succeeded` |
+| `Fail(exception)` | completes as `Failed` and records the exception |
+| `Cancel(exception?)` | completes as `Cancelled` |
+| `Complete(outcome, exception?)` | completes with an outcome you chose |
+| `Dispose()` | releases the operation. Disposing without completing records `Unknown` |
 
 ### Events
 
@@ -228,21 +261,21 @@ context.Trace.WriteEvent(
 - **Source** is your package name.
 - **Attributes** are strings. Keep them small, and never put secrets in them.
 
-Nesting is automatic: an operation started while another is running becomes its child, and the phase is inherited. Pass `parentId` to attach elsewhere, or `phase` to set it explicitly.
+Nesting is automatic. An operation started inside another becomes its child and inherits its phase. Pass `parentId` to attach elsewhere, or `phase` to set it explicitly.
 
 ## Supporting another runner
 
-A runner integration needs three things, all visible in the existing runner packages:
+A runner integration needs three things, and the five shipped adapters are the worked examples:
 
 1. Build and start one `ProtoHost` per process, and stop it at the end.
 2. Around each test, call `ProtoTestAdapter.Prepare(method, host)` and start the returned preparation with `StartAsync(host, publisher)`. Skip through your runner's own mechanism when `CanRun` is false; afterwards, call `CompleteTestAsync(result)` with the best outcome the runner can tell you. `ProtoTestResult` has factories for passed, skipped, partial, failed and cancelled.
 3. Implement `IProtoTestAttachmentPublisher` using the runner's own attachment API.
 
-Start the test on the same async flow the test body will run on, because `Proto.Context` depends on it. The shared compliance suite in `tests/ProtoTest.AdapterContract` is what every adapter package runs; extend it instead of forking it.
+Start the test on the same async flow the test body will run on, because `Proto.Context` depends on it. The shared `ProtoTest.AdapterContract` suite is what every adapter package runs; extend it instead of forking it.
 
 ## Limits of the contract
 
-- **There is no internal surface.** An extension compiles against the public packages only; when it needs a type it cannot see, the owning package publishes the contract or moves the code. If you believe a point is missing, open an issue so it can be added deliberately. See [Community packages](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#community-packages).
+- **There is no internal surface.** An extension compiles against the public packages only. When it needs a type it cannot see, the owning package publishes the contract or moves the code. If you believe a point is missing, open an issue so it can be added deliberately. See [Community packages](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#community-packages).
 - **A capability is declared only by something that can serve it.** An extension declares its capability while its address can be provided; where the address is missing, the capability is absent and gated tests skip instead of failing at first use.
-- **The trace viewer contract is not edited casually.** A new kind or attribute is additive; a viewer release is not needed for a new prefix.
-- **One mechanism per concern is a review rule.** A second host builder, resource registry, capability model or evidence boundary is not an extension; it is the failure mode this contract exists to prevent.
+- **The trace viewer contract is additive.** A new kind or attribute needs no viewer release for a new prefix.
+- **Use one mechanism per concern.** A second host builder or registry is not an extension.

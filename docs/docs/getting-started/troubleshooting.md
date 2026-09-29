@@ -91,7 +91,7 @@ Tests that genuinely cannot run side by side need the runner's own tool: `[NonPa
 
 Without `ConfigureTracing`, the trace goes to `TestResults/prototest-{runId}.prototrace`. Relative paths, that one and your own, resolve against the directory the tests run in, which for `dotnet test` is the test project's output folder: `bin/Debug/net10.0/TestResults/`. Set an absolute path, or one built from an environment variable, to collect it from CI.
 
-If [trace.prototest.dev](https://trace.prototest.dev) says the trace is **from an older ProtoTest**, the file was written before trace snapshot format 1.9. Run the tests again with a current ProtoTest. The archive itself is manifest format 2.0: `spans.json` plus `state.json`, whose state documents are format 1.1.
+If [trace.prototest.dev](https://trace.prototest.dev) says the trace is **from an older ProtoTest**, the file was written by a version whose archive the viewer does not open: it reads spans format 2.x and state format 1.x or 2.x. Run the tests again with a current ProtoTest. The archive itself keeps its shape: manifest format 2.0, `spans.json` plus `state.json`, whose state documents are format 1.1.
 
 ## The CI artifact is empty
 

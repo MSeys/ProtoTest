@@ -37,6 +37,35 @@ public sealed class ProtoTraceDiscoveryTests
     }
 
     [Test]
+    public async Task Discover_ShouldWalkTheTreeWhenTestResultsHoldsOnlyAnUnreadableArchive()
+    {
+        var folder = TraceFolders.Create();
+        try
+        {
+            var testResults = Directory.CreateDirectory(Path.Combine(folder, "TestResults")).FullName;
+            var broken = Path.Combine(testResults, "broken.prototrace");
+            File.WriteAllText(broken, "not a trace");
+            var nested = Directory.CreateDirectory(Path.Combine(folder, "nested")).FullName;
+            var readable = Path.Combine(nested, "run-passed.prototrace");
+            await TraceFixtures.WritePassingAsync(readable);
+
+            var discovered = ProtoTraceDiscovery.Discover(folder);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(discovered.Runs.Count, Is.EqualTo(1), "an unreadable TestResults archive must not hide a readable run elsewhere");
+                Assert.That(discovered.Runs[0].TraceFile, Is.EqualTo(Path.GetFullPath(readable)));
+                Assert.That(discovered.Skipped.Count, Is.EqualTo(1));
+                Assert.That(discovered.Skipped[0].TraceFile, Is.EqualTo(Path.GetFullPath(broken)));
+            }
+        }
+        finally
+        {
+            TraceFolders.Delete(folder);
+        }
+    }
+
+    [Test]
     public void Discover_ShouldNameAMissingFolder()
     {
         var folder = Path.Combine(Path.GetTempPath(), $"prototest-missing-{Guid.NewGuid():N}");

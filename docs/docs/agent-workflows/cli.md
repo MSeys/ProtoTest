@@ -46,7 +46,7 @@ Discovers the `.prototrace` archives under the folder, newest first, and writes 
 - `index.html` in the folder, listing each run's outcome counts, the tests that did not pass, links to the trace and its digest, and every archive that could not be read with the reason.
 - A `.digest.json` file beside each archive, the diagnosis JSON the page links to.
 
-Discovery looks at the folder's `TestResults/` first and then walks the tree; [Setup](./setup.md#where-it-reads) has the details. The command prints the count and the path of the page it wrote, and names any archive it had to skip.
+Discovery looks at the folder's `TestResults/` first and walks the tree only when that yields no readable run; [Setup](./setup.md#where-it-reads) has the details. The command prints the count and the path of the page it wrote, and names any archive it had to skip.
 
 Exit `0` when the page is written. Exit `1` when the folder is missing, holds no readable archive, or the page cannot be written.
 

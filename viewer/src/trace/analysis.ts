@@ -12,13 +12,21 @@ export function checkItems(span: Span) {
   return span.sections.flatMap(section => section.kind === "checks" ? section.items : []);
 }
 
-/** The deepest failing span, preferring a check, then anything with an error, over the phase that contains it. */
+/**
+ * The deepest failing span, preferring a check, then anything with an error, over the phase that
+ * contains it. A failed span outranks a cancelled one whatever the depth, so a cancelled child that
+ * recorded an error never hides the failure above it.
+ */
 export function findFailure(test: TestTrace): Failure | null {
   const failing = test.spans.filter(span => span.status === "failed" || span.error);
   if (!failing.length) return null;
   const score = (span: Span) =>
     span.depth * 10 + (span.error ? 100 : 0) + (span.kind.startsWith("assert.") ? 1000 : 0) + (span.kind.startsWith("test.") ? -500 : 0);
-  const span = failing.reduce((best, candidate) => score(candidate) > score(best) ? candidate : best);
+  const span = failing.reduce((best, candidate) => {
+    const bestTier = best.status === "failed" ? 1 : 0;
+    const candidateTier = candidate.status === "failed" ? 1 : 0;
+    return candidateTier > bestTier || (candidateTier === bestTier && score(candidate) > score(best)) ? candidate : best;
+  });
   const check = checkItems(span).find(item => item.tone === "error") ?? null;
   let call: Span | null = span;
   while (call && !isCall(call)) call = call.parent;

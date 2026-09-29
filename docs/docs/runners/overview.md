@@ -53,10 +53,10 @@ The adapter provides the host startup described above, wraps each test in the Pr
 | Runner | The host starts from | The context spans | Cancellation token | Row name |
 | --- | --- | --- | --- | --- |
 | NUnit | `[SetUpFixture]` | `[SetUp]`, the body and `[TearDown]` | `TestExecutionContext.CancellationToken`, cancelled by `[CancelAfter]` | NUnit's full name, arguments included |
-| xUnit v2 | a collection fixture | the test invocation | the runner's `CancellationTokenSource` | xUnit's display name, arguments included |
-| xUnit v3 | `[assembly: AssemblyFixture]` | the before- and after-attributes | none | xUnit's display name, arguments included |
-| MSTest | `[AssemblyInitialize]` and `[AssemblyCleanup]` | one data row | none | `DeclaringType.MethodName[args]` |
-| TUnit | `[Before(Assembly)]` and `[After(Assembly)]` | the registered executor | none | `DeclaringType.MethodName[args]` |
+| xUnit v2 | a collection fixture | the test invocation, the test class constructor included | the runner's `CancellationTokenSource` | xUnit's display name, arguments included |
+| xUnit v3 | `[assembly: AssemblyFixture]` | the before- and after-attributes | `TestContext.Current.CancellationToken` | xUnit's display name, arguments included |
+| MSTest | `[AssemblyInitialize]` and `[AssemblyCleanup]` | one data row | none at the 4.0.2 floor | `DeclaringType.MethodName[args]` |
+| TUnit | `[Before(Assembly)]` and `[After(Assembly)]` | the registered executor | `TestContext.CancellationToken` | `DeclaringType.MethodName[args]` |
 
 ### The lifecycle
 
@@ -117,7 +117,7 @@ Every adapter resolves `ProtoAttribute` subclasses through the same `ProtoAttrib
 ## Limits
 
 - A skipped test exists only in the runner's own output. ProtoTest records nothing for it: no context, no trace entry and no teardown.
-- Only NUnit and xUnit v2 hand the adapter a cancellation token. MSTest, xUnit v3 and TUnit start with `CancellationToken.None`.
+- Four adapters pass the runner's per-test token into the lifecycle: NUnit's `TestExecutionContext.CancellationToken`, the xUnit v2 runner's `CancellationTokenSource`, xUnit v3's `TestContext.Current.CancellationToken` and TUnit's `TestContext.CancellationToken`. MSTest's 4.0.2 floor exposes no token, so those tests start with `CancellationToken.None`.
 - NUnit and xUnit v3 call the host synchronously, so the test project needs a synchronizing context.
 - xUnit v3 starts its context after class construction and `IAsyncLifetime.InitializeAsync`, and completes it before class disposal. Class-level setup and cleanup stay outside the context.
 - xUnit v2 has no dynamic skip and no attachment API, so its skip reason is decided before the test method is invoked and artifact paths go to the console.
@@ -127,5 +127,6 @@ Every adapter resolves `ProtoAttribute` subclasses through the same `ProtoAttrib
 ## Learn more
 
 - [NUnit](./nunit.md), [xUnit v2](./xunit.md), [xUnit v3](./xunit3.md), [MSTest](./mstest.md), [TUnit](./tunit.md): the registration, the adapter's behavior and its limits.
+- [Bring an existing xUnit suite](./bring-your-existing-suite.md): the conversion order for a suite you already have.
 - [Skip conditions](../foundation/skip-conditions.md): the conditions every adapter evaluates.
 - [Lifecycle](../foundation/lifecycle.md): the hooks and attributes around a test.

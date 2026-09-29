@@ -83,7 +83,7 @@ The summary reads top to bottom:
 }
 ```
 
-The failure selector is the one the viewer uses: the deepest failing operation, an `assert.*` check outranking anything with an error, phase spans last. `prototest summary`, the MCP tools and the viewer therefore select the same failure and tell one story.
+The failure selector is the one the viewer uses: the deepest failing operation, an `assert.*` check outranking anything with an error, phase spans last, and a cancelled operation never outranking a failed one. `prototest summary`, the MCP tools and the viewer therefore select the same failure and tell one story.
 
 ## The rules
 

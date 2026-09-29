@@ -1,5 +1,7 @@
 .title { font-size: var(--text-strong); font-weight: var(--weight-semibold); }
 
+.verdict { padding: var(--space-3) var(--space-5) 0; color: var(--text); font-size: var(--text-body); }
+
 .delta { color: var(--muted); font-size: var(--text-micro); }
 
 .once { color: var(--muted); }

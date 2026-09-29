@@ -76,6 +76,20 @@ public sealed class PlatformJourney
 
 `Query("projects", arguments).ExpectAsync(shape)` builds the selection from the shape and asserts against it in one step, so the query asks for exactly the fields the test checks. See [Shape-driven operations](../integrations/graphql/operations.md#shape-driven-operations).
 
+The shape the test asserts, with what each field proves:
+
+```json
+{
+  "totalCount": 1,          // only this test's project: the tenant holds nothing else
+  "nodes": [
+    {
+      "name": "atlas",      // the REST write's name, read back over GraphQL
+      "status": "active"    // the REST write's status, in GraphQL's terms
+    }
+  ]
+}
+```
+
 ## What the trace shows
 
 Both calls are operations of the same test against the same server, in order:
@@ -104,4 +118,9 @@ The demo's own run:
 - **Filter to what the test created.** `totalCount = 1` only holds if the query is narrowed to this test's data. The demo gets that from its provisioned tenant; a shared database needs its own filter.
 - **The two APIs name things differently.** REST and GraphQL often disagree on casing and enum values (`active` and `ACTIVE`). Assert each in its own terms; the shape matcher compares exactly.
 - **Assume the read may lag the write until the test proves otherwise.** If the read side updates asynchronously, the first query can miss the write. Poll with a deadline instead of adding a delay, so the wait ends as soon as the write is visible.
+
+  ```text
+  BEFORE: await Task.Delay(2000); // slow, and still flaky when the write lags longer
+  AFTER:  poll with a deadline until the row is visible // ends as soon as the write lands
+  ```
 - **Shape-driven queries ask for what the shape names.** A field the shape omits is not fetched, and a field the server does not have fails the query.

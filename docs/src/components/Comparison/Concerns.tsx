@@ -61,7 +61,7 @@ function dedent(lines: string[]): string {
 
 /** The code behind one side of a row: each file once, its ranges in order, a gap marked where lines are skipped. */
 function SliceCode({files, slices}: {files: ComparisonFile[]; slices: ComparisonSlice[]}): ReactNode {
-  if (!slices.length) return <p className={styles.nothing}>Nothing to show: this side has no code for it.</p>;
+  if (!slices.length) return <p className={styles.nothing}>This side has no code for this task.</p>;
   return (
     <>
       {slices.map((slice) => {
@@ -85,7 +85,7 @@ function SliceCode({files, slices}: {files: ComparisonFile[]; slices: Comparison
 function CostLine({value}: {value: Cost}): ReactNode {
   // No code at all means the side does not do it, which is not the same as doing it for free.
   if (!value.fixture && !value.once.length) {
-    return <span className={styles.absent}>Not covered</span>;
+    return <span className={styles.absent}>This side has no code for this task</span>;
   }
   return (
     <span className={styles.cost}>
@@ -137,7 +137,7 @@ export default function Concerns({concerns, without, with: withProto}: ConcernsP
                 {concern.task}
               </span>
               <span className={styles.side}>
-                <em className={styles.sideLabel}>Without</em>
+                <em className={styles.sideLabel}>Without ProtoTest</em>
                 <CostLine value={cost(without, concern.without.slices)} />
                 <span className={styles.summary}>{concern.without.summary}</span>
               </span>

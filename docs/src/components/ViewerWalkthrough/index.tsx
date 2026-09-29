@@ -44,7 +44,8 @@ export default function ViewerWalkthrough(): ReactNode {
       foot={
         <>
           <Link href="https://trace.prototest.dev/?demo=1">Open this exact run in the viewer →</Link>{' '}
-          Drawn from <span className={styles.archive}>prototest-demo.prototrace</span>, as the viewer shows it.
+          Copied from <span className={styles.archive}>prototest-demo.prototrace</span>, shown as the viewer
+          shows it.
         </>
       }>
       <p className={styles.pointer}>

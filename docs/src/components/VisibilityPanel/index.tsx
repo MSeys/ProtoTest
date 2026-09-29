@@ -8,9 +8,13 @@ import styles from './styles.module.css';
  * and what the run could see - including what it could not. Values are the demo trace's.
  */
 
-// 37 tests in start order; the viewer numbers them the same way.
-const outcomes = Array.from({length: 37}, (_, index) =>
-  index === 16 ? 'failed' : index === 1 || index === 12 ? 'partial' : 'passed');
+// 44 tests in start order; the viewer numbers them the same way.
+const outcomes = Array.from({length: 44}, (_, index) => {
+  const test = index + 1;
+  if (test === 29 || test === 36) return 'failed';
+  if (test === 13 || test === 23) return 'partial';
+  return 'passed';
+});
 
 const capabilities = ['Data', 'GraphQL', 'REST', 'ASP.NET Core', 'SQL'];
 
@@ -26,14 +30,14 @@ export default function VisibilityPanel(): ReactNode {
       head={
         <>
           <strong className={styles.verdict}>
-            <span className={styles.failed}>1 failed</span>, <span className={styles.partial}>2 partial</span>, 34 passed
+            <span className={styles.failed}>2 failed</span>, <span className={styles.partial}>2 partial</span>, 40 passed
           </strong>
-          <span className={styles.meta}>37 tests in 2.70 s</span>
+          <span className={styles.meta}>44 tests in 7.40 s</span>
         </>
       }
       foot={<>The run screen of the same trace. Absent sources keep their place, drawn dashed.</>}>
       <div className={styles.body}>
-        <div className={styles.strip} role="img" aria-label="One tick per test: test 17 failed, tests 2 and 13 were partial">
+        <div className={styles.strip} role="img" aria-label="One tick per test: tests 29 and 36 failed, tests 13 and 23 were partial">
           {outcomes.map((outcome, index) => (
             <i key={index} className={styles[outcome]} />
           ))}

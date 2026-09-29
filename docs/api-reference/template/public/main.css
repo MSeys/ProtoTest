@@ -1,5 +1,15 @@
 @import url("./prototest-tokens.css");
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+/* The fonts ship with the reference, the same files the viewer and the docs site serve. */
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/jetbrains-mono-400.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 500; font-display: swap; src: url('./fonts/jetbrains-mono-500.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 600; font-display: swap; src: url('./fonts/jetbrains-mono-600.woff2') format('woff2'); }
+@font-face { font-family: 'Manrope'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/manrope-400.woff2') format('woff2'); }
+@font-face { font-family: 'Manrope'; font-style: normal; font-weight: 500; font-display: swap; src: url('./fonts/manrope-500.woff2') format('woff2'); }
+@font-face { font-family: 'Manrope'; font-style: normal; font-weight: 600; font-display: swap; src: url('./fonts/manrope-600.woff2') format('woff2'); }
+@font-face { font-family: 'Manrope'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/manrope-700.woff2') format('woff2'); }
+@font-face { font-family: 'Space Grotesk'; font-style: normal; font-weight: 600; font-display: swap; src: url('./fonts/space-grotesk-600.woff2') format('woff2'); }
+@font-face { font-family: 'Space Grotesk'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/space-grotesk-700.woff2') format('woff2'); }
 
 :root {
   --bs-body-font-family: var(--font-ui);
@@ -27,7 +37,7 @@
   --hover: #1a3548;
   --text: #dceaf3;
   --muted: #90aec2;
-  --dim: #7a9cb0;
+  --dim: #81a3b6;
   --border: rgba(255, 255, 255, 0.11);
   --border-strong: rgba(255, 255, 255, 0.22);
   --blueprint: #3a9fd6;

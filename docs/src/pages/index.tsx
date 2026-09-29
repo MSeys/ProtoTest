@@ -359,7 +359,7 @@ export default function Home(): ReactNode {
             name: 'ProtoTest',
             applicationCategory: 'DeveloperApplication',
             operatingSystem: 'Windows, Linux, macOS',
-            softwareVersion: '1.0',
+            softwareVersion: '1.1.0',
             programmingLanguage: 'C#',
             url: 'https://prototest.dev/',
             downloadUrl: 'https://www.nuget.org/profiles/MSeys',

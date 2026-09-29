@@ -18,6 +18,13 @@ module.exports = {
         'http://localhost/docs/project/sustainability',
         'http://localhost/docs/project/why-prototest',
         'http://localhost/docs/recipes/overview',
+        // The shells the docs pages do not cover: the generated changelog, the search page, the Learn
+        // track and the 404 route.
+        'http://localhost/changelog',
+        'http://localhost/search',
+        'http://localhost/learn/',
+        'http://localhost/learn/one-test-one-journey/install-and-run',
+        'http://localhost/404.html',
       ],
       numberOfRuns: 1,
     },

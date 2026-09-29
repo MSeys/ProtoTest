@@ -30,7 +30,8 @@ const markedPaths = computed(() => mismatches.value.map(mismatch => mismatch.pat
 
 /**
  * Every attribute, grouped by its namespace (http, auth, shape, ...) so a long list reads as a few short ones.
- * Values that are JSON open as a tree; the rest are text.
+ * Values that are JSON open as a tree; the rest are text. A long operation starts folded: the dedicated views
+ * above (source, comparison, request and response) already say what matters, and the raw list stays one click away.
  */
 const attributeGroups = computed(() => {
   const groups = new Map<string, [string, string | null][]>();
@@ -44,6 +45,8 @@ const attributeGroups = computed(() => {
 // Where in the suite's code this operation started, when the trace recorded it.
 const location = computed(() => sourceLocation(props.span.attributes));
 const attributeCount = computed(() => Object.keys(props.span.attributes).length);
+/** A short list reads inline; past a few groups or a handful of values it folds, one click away. */
+const attributesOpen = computed(() => attributeGroups.value.length <= 3 && attributeCount.value <= 8);
 </script>
 
 <template>
@@ -60,8 +63,8 @@ const attributeCount = computed(() => Object.keys(props.span.attributes).length)
 
     <SourceView v-if="location" :location="location" />
 
+    <!-- The tree carries its own head (the validated document and its legend), so no second title above it. -->
     <section v-if="shapeTree" class="block">
-      <h3>Expected against actual</h3>
       <ShapeResultTree :nodes="shapeTree" />
       <JsonView v-if="actual" :value="actual" label="The response it judged" :open-depth="1" :marks="markedPaths" />
     </section>
@@ -144,7 +147,7 @@ const attributeCount = computed(() => Object.keys(props.span.attributes).length)
       </button>
     </section>
 
-    <details v-if="attributeCount" class="attributes" open>
+    <details v-if="attributeCount" class="attributes" :open="attributesOpen">
       <summary>Attributes <small>{{ attributeCount }}</small></summary>
       <section v-for="[group, entries] in attributeGroups" :key="group" class="attribute-group">
         <h4>{{ group }}</h4>

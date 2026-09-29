@@ -72,6 +72,12 @@ Each stub registration records a `wiremock.stub` observation. Each request the f
 
 Coverage is automatic: every registered fake gets a `WireMock` collector, no `AddCollector` needed. Each stub is an item, uncovered until a matched request covers it, so a stub no test's system under test called stays visible as a gap. [Coverage](../observability/coverage.md) explains what covered and gap mean in a report.
 
+```text
+stub                  status    hits
+GET /balance/*        covered   1
+POST /charges         gap       0  (registered, never called)
+```
+
 ## Skip
 
 ```csharp

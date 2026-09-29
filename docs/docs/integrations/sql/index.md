@@ -10,6 +10,15 @@ description: "A database connection each test owns, optionally wrapped in a tran
 
 `ProtoTest.Sql` gives each test a database connection it owns: opened before the test, optionally wrapped in a transaction that is rolled back when the test ends, and disposed with the test. `ProtoTest.Sql.EntityFrameworkCore` builds Entity Framework Core contexts on that same connection, and `ProtoTest.Sql.Testcontainers` owns a PostgreSQL server for the run. Use it when tests write to a store they control and must leave no rows behind. When the store belongs to a deployed environment, test through the application APIs instead.
 
+Writes made through the connection ProtoTest owns disappear at teardown:
+
+| Write path | `Transaction` (default) | `None` |
+| --- | --- | --- |
+| Through the owned connection | rolled back | persists; provisioners release it |
+| Through the application's own connection | commits | commits |
+
+See [Isolation](#isolation) for the promise and its guard.
+
 ## Install
 
 ```bash
@@ -192,6 +201,13 @@ The context here is built over its own connection on purpose: the step runs outs
 The schema then survives the rollback; the rows do not. Every test sees the tables and writes through `Proto.Context.Sql<TContext>()`, and its transaction carries the writes away when it ends.
 
 ## In the trace and coverage
+
+```text
+sql.connection.open · NpgsqlConnection (Setup)
+├─ sql.transaction.begin (child, sql.isolation = Transaction)
+├─ sql.enlist · OrdersDbContext (Setup, source ProtoTest.Sql.EntityFrameworkCore)
+└─ sql.transaction.rollback (release phase, inside the connection resource release)
+```
 
 - Operations follow the connection's lifecycle, all with source `ProtoTest.Sql`: `sql.connection.open` (Setup, with `sql.connection.type`), `sql.transaction.begin` (Setup, child of the open, with `sql.isolation`), `sql.transaction.rollback` (release phase, inside the connection resource's release), and `sql.enlist` (Setup, when a `DbContext` joins the transaction, with `db.context`, source `ProtoTest.Sql.EntityFrameworkCore`).
 - The connection is a **test-scoped resource**: entity kind `database`, id `database:connection`, described as the connection type and isolation, plus the names it is shared with when there are any. Its release runs in teardown before the test's clients are disposed, and is recorded as a `resource.release` entry with `resource.kind = database`.

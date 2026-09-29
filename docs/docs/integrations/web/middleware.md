@@ -1,5 +1,5 @@
 ---
-sidebar_position: 7
+sidebar_position: 8
 title: Waits and middleware
 description: "Register your application's notion of ready, such as spinners, in-flight requests or animations, once instead of sleeping in tests."
 ---
@@ -7,6 +7,37 @@ description: "Register your application's notion of ready, such as spinners, in-
 # Waits and middleware
 
 Real applications have their own notion of "ready": a loading spinner, an in-flight XHR, an animation. Instead of adding `Task.Delay` calls in tests, register the wait once.
+
+| Need | Register |
+| --- | --- |
+| The app is not ready around ops (spinner, XHR, animation) | a [wait condition](#wait-conditions) |
+| Logging, timing, retries, or extra diagnostics on every op | [middleware](#middleware) |
+
+```mermaid
+flowchart TD
+    T[test op] --> M1[first registered middleware: outermost]
+    M1 --> W[wait conditions at first AddWebWait position]
+    W --> M2[later middleware]
+    M2 --> B[backend call]
+    B --> M2
+    M2 --> W
+    W --> M1
+    M1 --> T
+```
+
+```mermaid
+sequenceDiagram
+    participant Op as Operation
+    participant Wait as Wait condition
+    participant MW as Middleware
+    participant BE as Backend
+    Op->>Wait: Before: poll ObserveAsync until Ready
+    Wait->>MW: ready → next
+    MW->>BE: native call
+    BE-->>MW: result
+    MW-->>Op: result
+    Op->>Wait: After: poll until Ready
+```
 
 ## Wait conditions
 

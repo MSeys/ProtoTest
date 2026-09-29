@@ -1,5 +1,5 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 title: Pages and components
 description: "Model a browser UI with pages, components, elements and tables, so tests read as what a user does rather than as markup."
 ---

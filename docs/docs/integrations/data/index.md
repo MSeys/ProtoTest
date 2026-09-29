@@ -145,7 +145,7 @@ Matching, scoping and failure rules live with the [provisioner contract](./provi
 
 #### Explain
 
-When a value surprises you, ask where it came from, before constructing anything:
+When a value surprises you, ask where it came from, before constructing anything. The shape of the output, with illustrative values:
 
 ```csharp
 var plan = Proto.Context.Data().For<Invoice>()
@@ -165,7 +165,7 @@ Each `ProtoDataValueExplanation` carries `MemberName`, `ValueType`, `Value`, `So
 
 ## In the trace and coverage
 
-Every builder operation is traced with source `ProtoTest.Data`:
+Every builder operation is traced with source `ProtoTest.Data`. The shape of the tree:
 
 ```text
 data.create · Invoice → MembershipResponse        # operation

@@ -140,6 +140,8 @@ Some repeats fail instead. A different run resource under an existing id throws.
       }
     },
     "Rest": { "Responses": { "MaxResponseBodyBytes": 10485760 } },
+    "Sql": { "Isolation": "Transaction" },
+    "Messaging": { "RabbitMq": { "ConnectionString": "amqp://guest:guest@localhost:5672/" } },
     "Web": { "Playwright": { "Browser": "Chromium", "Headless": false } },
     "Reporting": { "Json": { "OutputPath": "TestResults/report.json", "Indented": true } }
   }
@@ -153,10 +155,17 @@ Some repeats fail instead. A different run resource under an existing id throws.
 | `ProtoTest:Applications:{name}:OpenApi:Specification` | one per application | [OpenAPI](../integrations/openapi.md) |
 | `ProtoTest:Applications:{name}:GraphQL:*` | one per application | [GraphQL](../integrations/graphql/index.md), [schema coverage](../integrations/graphql/coverage.md) |
 | `ProtoTest:Applications:{name}:Grpc:Address` | one per application | [gRPC](../integrations/grpc/index.md) |
-| `ProtoTest:Rest:*` | one per integration | [REST attachments](../integrations/rest/attachments.md), [request limits](../integrations/rest/requests.md) |
-| `ProtoTest:GraphQL:*` | one per integration | [GraphQL](../integrations/graphql/index.md) |
-| `ProtoTest:Web:*` | one per integration | [Web](../integrations/web/index.md) |
-| `ProtoTest:Reporting:*` | one per integration | [Reporting](../observability/reporting.md) |
+| `ProtoTest:Rest:Responses`, `ProtoTest:Rest:Attachments` | one per integration | [REST attachments](../integrations/rest/attachments.md), [request limits](../integrations/rest/requests.md) |
+| `ProtoTest:GraphQL:Responses`, `ProtoTest:GraphQL:Attachments` | one per integration | [GraphQL](../integrations/graphql/index.md) |
+| `ProtoTest:Grpc:Client`, `ProtoTest:Grpc:Attachments` | one per integration | [gRPC](../integrations/grpc/index.md) |
+| `ProtoTest:Messaging`, `ProtoTest:Messaging:Attachments` | one per integration | [Messaging](../integrations/messaging/index.md) |
+| `ProtoTest:Messaging:RabbitMq` | one per integration | [Messaging](../integrations/messaging/index.md) (`ConnectionString` names the broker) |
+| `ProtoTest:Sql` | one per integration | [SQL](../integrations/sql/index.md) (`Isolation`, `SharedWithApplications`) |
+| `ProtoTest:Sheets` | one per integration | [Sheets](../integrations/sheets/index.md) (`IncludeHiddenSheets`) |
+| `ProtoTest:Devices:Mqtt`, `ProtoTest:Devices:WebSocket` | one per integration | [Devices](../integrations/devices.md) |
+| `ProtoTest:Web:Playwright`, `ProtoTest:Web:Selenium`, `ProtoTest:Web:Pages` | one per integration | [Web](../integrations/web/index.md) |
+| `ProtoTest:Reporting:Json`, `ProtoTest:Reporting:Html` | one per integration | [Reporting](../observability/reporting.md) |
+| `ProtoTest:Readiness` | one per run | [Infrastructure](../foundation/infrastructure.md) (host probes and containers) |
 
 Each integration binds its options from one section named `ProtoTest:<Integration>`. Some add a second segment for the area covered, for example `ProtoTest:Rest:Responses` or `ProtoTest:Grpc:Client`.
 

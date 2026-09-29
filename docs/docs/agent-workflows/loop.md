@@ -11,12 +11,12 @@ The **evidence loop** is fail, evidence, fix, verify, report. One file carries t
 
 ## What the reviewer sees
 
-A failing run leaves three things on the pull request. This is the comment, rendered from the committed failing fixture:
+A failing run leaves three things on the pull request. The shape of the comment, with values from the committed failing fixture:
 
 ```markdown
 ## ProtoTest run `29e344f9cf54431ca7d8bad3f87a1749`
 
-**2 tests · 1 failed · 1 passed**
+**2 tests · 1 failed · 1 succeeded**
 
 - **FAILED `orders match their shape`** (16 ms)
   - `assert.json.shape` · failed

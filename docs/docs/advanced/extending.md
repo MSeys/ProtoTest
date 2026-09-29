@@ -58,6 +58,17 @@ flowchart TD
 | show up in the trace viewer | the trace writer, below | 1 |
 | support another test runner | `ProtoHost` plus `IProtoTestAttachmentPublisher`, below | separate |
 
+## Your first integration package
+
+A minimal package is six small steps, in this order. The worked bus client below follows them, and each step runs before the next: register the package on a host, write one test through the context accessor, and read its trace before adding the collector.
+
+1. **Options.** An options type implementing `IProtoConfigurableOptions` with a section name, registered through `ProtoOptionsRegistration.Configure`, so code callbacks run in order and configuration binds over them. See [Options and configuration](#options-and-configuration).
+2. **The client and its initializer.** A client class plus an initializer that opens it per test and registers it, so tests get a fresh client with the test's cancellation token. See [part 1](#1-the-client-and-its-initializer).
+3. **A host builder extension.** An `Add...` method that registers the options and the initializer on the `IProtoHostBuilder`. See [part 2](#2-a-host-builder-extension).
+4. **A context extension.** A `Proto.Context.X()` accessor that resolves the client by name. See [part 3](#3-a-context-extension).
+5. **Trace the operations.** One `{area}.{action}` operation per act, so the package reads like a built-in in the viewer. See [Adding to the trace](#adding-to-the-trace).
+6. **Optionally, a collector.** Turn the observations the client records into a report section. See [part 4](#4-optionally-a-collector).
+
 ## A worked example: a message-bus client
 
 The sketch below is a message-bus client you could write. It has the four parts a typical integration has, and the result is this:

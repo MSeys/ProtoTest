@@ -72,7 +72,7 @@ dotnet tool install --global ProtoTest.Cli
 prototest summary l0-time-drill.prototrace
 ```
 
-The command reads the archive and prints one deterministic document. Here is its output for the committed drill, with the run id and timestamps shortened:
+The command reads the archive and prints one deterministic document. The shape of that document, with the drill's values and the run id shortened:
 
 ```text
 ProtoTest trace 2.0 · run 316f2b23... · 2026-09-29 06:18:29Z - 2026-09-29 06:18:34Z
@@ -132,7 +132,7 @@ The server exposes four read-only tools:
 
 Ask the agent to list the runs, then for the failure in the time drill. It answers from the archive, and the failure selector is the same one the viewer and the summary use, so the names, the line and the mismatch come out identical.
 
-With `detail: context`, the same failure returns its context package beside the summary:
+With `detail: context`, the same failure returns its context package beside the summary. The shape of the package, with the drill's values:
 
 ```text
 context: Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow

@@ -43,7 +43,7 @@ A failed run is only useful if you can read it. The loop that makes an integrati
     ),
     reveal: (
       <>
-        The environment drill ran outside the composition, so neither the address nor the call was recorded. The visibility drill ran inside it, so the request and the response were recorded, but the test asserted the status alone and never read the body. The environment answer is "take the address from the composition"; the visibility answer is "read what the application said".
+        The environment drill ran outside the composition, so the failure was recorded and the call was not. The visibility drill ran inside it, so the request and the response were recorded, but the test asserted the status alone and never read the body. The environment answer is "take the address from the composition"; the visibility answer is "read what the application said".
       </>
     ),
   }}
@@ -105,7 +105,7 @@ Two checks, both recorded, both readable from the trace.
 
 ## Worked example: environment
 
-The environment drill is the other direction: the trace says nothing. The test execution span ran about two seconds, recorded no request, and failed with a connection error. Silence in the execution layer is evidence. The call happened outside the run, so nothing wrapped it, and the fix is to call through `Proto.Context.Rest()` like every other journey.
+The environment drill is the other direction: the trace names the failure and stops there. The test execution span ran about two seconds, failed with a connection error and recorded no request at all. The call happened outside the run, so nothing wrapped it; the missing operation is the diagnosis. The fix is to call through `Proto.Context.Rest()` like every other journey.
 
 ## The four failures as one sentence each
 

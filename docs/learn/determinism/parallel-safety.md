@@ -34,7 +34,7 @@ The sample runs its tests eight at a time. Nothing in a test coordinates with th
   }
   checkpoint={{
     question:
-      'The suite fixes no identifier by hand, yet every test in a parallel run creates its own tenant and project and passes. Which two mechanisms keep the tests apart?',
+      'The suite runs eight tests at once, and some journeys create fixed project names like `atlas`. Every test still passes. Which two mechanisms keep the tests apart?',
     verify: (
       <>
         Read the setup layers of <a href="pathname:///lessons/l0-state-fix.prototrace">l0-state-fix.prototrace</a> and{' '}
@@ -44,13 +44,13 @@ The sample runs its tests eight at a time. Nothing in a test coordinates with th
     ),
     reveal: (
       <>
-        The execution context is per test and flow-local, so one test cannot read another's clients, state or trace. And every durable record is named from the test id, which carries the run prefix, so two tests never produce the same name. Isolation and naming are the pair; either one alone leaves a way for tests to collide.
+        The execution context is per test and flow-local, so one test cannot read another's clients, state or trace. And every test works inside its own tenant: the tenant name carries the test id, and fixed names like `atlas` live inside it, so two tests can use the same name without meeting. Isolation and the per-test tenant are the pair; either one alone leaves a way for tests to collide.
       </>
     ),
   }}
   learned={[
     'Parallel tests each get their own execution context, on their own async flow.',
-    'Names built from the test id keep durable records apart; per-test state keeps reads apart.',
+    'The per-test tenant keeps durable records apart; per-test state keeps reads apart.',
     'The run owns what tests share; a test owns what it creates.',
   ]}
   next={[
@@ -81,15 +81,16 @@ The sample runs its tests eight at a time. Nothing in a test coordinates with th
   foot={<>From <code>samples/Northstar.ProtoTest/AssemblyInfo.cs</code>. A suite opts in when its tests isolate their own state; this one does.</>}
 />
 
-## Rule one: per-test names
+## Rule one: a tenant per test
 
-Every durable record the sample creates carries the test id:
+The unit that keeps durable records apart is the tenant, and its name carries the test id:
 
 - The tenant comes from `context.UniqueName("northstar")`, which reads `northstar-<test id>`.
-- The project names in the journeys carry `Proto.Context.TestId`, for example `own-749428000001`.
+- Names inside the tenant can be fixed: `atlas` and `report-atlas` never meet another test's project, because no two tests share the tenant.
+- A record that outlives the tenant or is visible across tests still carries the test id: the member email is built from `context.TestId`, and so is the scenario correlation id.
 - The teardown removes the tenant by the identity setup recorded, not by a search for a name.
 
-The test id carries the run prefix, so the same journey in the same second on two workers still produces two names. `TestId` is also what makes a rerun against a persistent store safe, unless a suite deliberately fixes the run prefix.
+The test id carries the run prefix, so the same journey in the same second on two workers still produces two tenants. `TestId` is also what makes a rerun against a persistent store safe, unless a suite deliberately fixes the run prefix.
 
 ## Rule two: per-test state
 
@@ -101,7 +102,7 @@ What is shared lives in one place: the run. The store, the broker, the loopback 
 
 Ask these of every test you write:
 
-- Does it create a record with a name that is not derived from the test? Replace the name with `UniqueName` or `TestId`.
+- Does it create a record outside its own tenant, or one another test can see, with a name that is not derived from the test? Replace the name with `UniqueName` or `TestId`.
 - Does it write a static or a fixture field another test could read? Move the value into the context.
 - Does it start or dispose something the run should own, or the reverse? Fix the lifetime, not the symptom.
 - Does its teardown remove everything it created? If a release is missing, the leak grows with every parallel run.

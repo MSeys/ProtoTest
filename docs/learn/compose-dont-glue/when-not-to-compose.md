@@ -82,7 +82,7 @@ Three placements are possible, and the sample uses all three:
 
 ## Traps
 
-**Glue in the test.** A raw client, a container started in a test body, or a sleep is work the run cannot manage and the trace cannot see. The environment drill from Level 0 is the evidence: two seconds of test execution, no request, a connection error, and nothing to read. If the test needs an address, take it from the composition.
+**Glue in the test.** A raw client, a container started in a test body, or a sleep is work the run cannot manage and the trace cannot see. The environment drill from Level 0 is the evidence: two seconds of test execution, no request, and only the failure recorded where the operation should be. If the test needs an address, take it from the composition.
 
 **A fixture in the host that one test needs.** The host starts it for every run, even the runs that never touch it. WireMock's registration shows the honest shape: a fake is per test by default, and `PerRun()` marks the one the suite shares. Reach for the run only when more than one test needs the same instance.
 

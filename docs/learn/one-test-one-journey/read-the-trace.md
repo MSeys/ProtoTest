@@ -23,7 +23,7 @@ Your first journey passed. The trace holds what it actually did: what the run co
     'Read a failure message that names the property and both values.',
   ]}
   before={[
-    <>Write your first test (<Link to="/learn/one-test-one-journey/write-your-first-test">lesson 2</Link>). Keep <code>MyFirstJourney.cs</code> if you want your own trace to compare.</>,
+    <>Write your first test (<Link to="/learn/one-test-one-journey/write-your-first-test">lesson 2</Link>). Keep <code>MyFirstJourney.cs</code> if you want your own trace to compare, and for the Level 6 exercises that reuse it.</>,
     'Nothing installed if you read the archive; running needs the sample from lesson 1.',
   ]}
   situation={

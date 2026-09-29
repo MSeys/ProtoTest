@@ -45,7 +45,7 @@ The Learning demo ships four tests that fail on purpose. Each one is paired with
     ),
     reveal: (
       <>
-        The drill called a raw <code>HttpClient</code> on <code>http://127.0.0.1:5099</code>, an address that belongs to one machine and sits outside the run. The trace records what the run wraps, and the connection error reached only the runner output. The fix calls the same endpoint through <code>Proto.Context.Rest()</code>, and the request, the response and the shape check all appear.
+        The drill called a raw <code>HttpClient</code> on <code>http://127.0.0.1:5099</code>, an address that belongs to one machine and sits outside the run. The trace records the connection error on the <code>test.execution</code> entry and no HTTP operation, because the run wraps what it composes. The fix calls the same endpoint through <code>Proto.Context.Rest()</code>, and the request, the response and the shape check all appear.
       </>
     ),
   }}

@@ -96,9 +96,20 @@ public sealed class FailureDrills
         RequireDrills();
         using var client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5099") };
 
-        using var response = await client.GetAsync("/api/v1/organization");
-
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        try
+        {
+            using var response = await client.GetAsync("/api/v1/organization");
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        }
+        catch (HttpRequestException exception)
+        {
+            // The trace is committed and read on every machine, so record the stable error kind
+            // instead of the OS text, which would change with the recorder's language.
+            throw new HttpRequestException(
+                $"{exception.HttpRequestError} reaching http://127.0.0.1:5099: connection refused.",
+                null,
+                exception.StatusCode);
+        }
     }
 
     /// <summary>Environment, fixed: the address comes from the run's composition.</summary>

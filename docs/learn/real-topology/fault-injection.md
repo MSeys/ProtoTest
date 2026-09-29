@@ -16,7 +16,7 @@ A dependency that goes down at the wrong moment is the failure a suite rarely se
 
 <LearnShell
   level="Level 5, lesson 4"
-  minutes="About 9 minutes"
+  minutes="About 15 minutes"
   outcome={[
     'Swap one run piece for a failing one and pin the recovery.',
     'Read a target that stays down through retries to the dead letter.',
@@ -24,7 +24,7 @@ A dependency that goes down at the wrong moment is the failure a suite rarely se
   ]}
   before={[
     <>Point the suite at a real stack (<Link to="/learn/real-topology/published-mode">lesson 3</Link>).</>,
-    'An OpenCSMS checkout and a container runtime for the runs. The kept trace is on this site.',
+    'An OpenCSMS checkout (the repository is not public yet) and a container runtime for the runs. The kept trace is on this site.',
   ]}
   situation={
     <>

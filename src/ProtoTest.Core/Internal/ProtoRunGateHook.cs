@@ -63,7 +63,7 @@ internal sealed class ProtoRunGateHook(
             trace.RunWriter.WriteEvent(
                 "gate.evaluate",
                 $"Gate · {gate.Name}",
-                "ProtoTest.Core",
+                ProtoCoreDiagnostics.TraceSource,
                 ProtoTracePhase.Run,
                 OutcomeOf(result.Outcome),
                 new Dictionary<string, string?>

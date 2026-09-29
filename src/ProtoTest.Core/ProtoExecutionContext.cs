@@ -23,11 +23,24 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     private int _findingSequence;
     private int _clientReplacementSequence;
 
+    /// <summary>
+    /// Creates the execution context for a test, parsing <paramref name="testId"/> with
+    /// <see cref="ProtoTestId.Parse"/>.
+    /// </summary>
+    /// <param name="testName">The test's display name in the trace.</param>
+    /// <param name="scope">The service scope the test resolves its services from.</param>
+    /// <param name="testId">The test's numeric id, 1 to 18 decimal digits.</param>
+    /// <param name="testMethod">The test method the context belongs to.</param>
     public ProtoExecutionContext(string testName, IServiceScope scope, string testId, MethodInfo testMethod)
         : this(testName, scope, ProtoTestId.Parse(testId), testMethod)
     {
     }
 
+    /// <summary>Creates the execution context for a test from an already parsed id.</summary>
+    /// <param name="testName">The test's display name in the trace.</param>
+    /// <param name="scope">The service scope the test resolves its services from.</param>
+    /// <param name="id">The test's numeric id.</param>
+    /// <param name="testMethod">The test method the context belongs to.</param>
     public ProtoExecutionContext(string testName, IServiceScope scope, ProtoTestId id, MethodInfo testMethod)
         : this(testName, scope, id, testMethod, new ProtoTestTraceRecorder(id.Value, testName, testMethod))
     {
@@ -71,7 +84,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         Trace.WriteEvent(
             "clock.advance",
             $"Clock advanced by {change.Delta:g}",
-            "ProtoTest.Core",
+            ProtoCoreDiagnostics.TraceSource,
             attributes: new Dictionary<string, string?>
             {
                 ["clock.delta"] = change.Delta.ToString("g"),
@@ -100,9 +113,10 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     /// <summary>
     /// Gets the token for this test's lifecycle: the token a caller passed to
     /// <c>StartTestAsync(..., cancellationToken)</c>, or the runner's own token where its adapter has
-    /// one (NUnit's test context, the xUnit v2 runner). MSTest, xUnit v3 and TUnit expose no token,
-    /// so those adapters start with <see cref="CancellationToken.None"/>. Setup I/O that can observe
-    /// it - the SQL connection open and transaction begin - passes it to the provider.
+    /// one (NUnit's test context, the xUnit v2 runner, xUnit v3's test context, TUnit's test
+    /// execution). MSTest exposes no token, so that adapter starts with
+    /// <see cref="CancellationToken.None"/>. Setup I/O that can observe it - the SQL connection open
+    /// and transaction begin - passes it to the provider.
     /// </summary>
     public CancellationToken CancellationToken { get; }
 
@@ -244,7 +258,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
             Trace.WriteEvent(
                 "context.resolve",
                 key is null ? $"Resolve context · {typeof(T).Name}" : $"Resolve context · {key} · {typeof(T).Name}",
-                "ProtoTest.Core",
+                ProtoCoreDiagnostics.TraceSource,
                 outcome: ProtoTraceOutcome.Failed,
                 attributes: new Dictionary<string, string?>
                 {
@@ -306,7 +320,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
             Trace.WriteEvent(
                 "client.resolve",
                 $"Resolve · {name} ({typeof(TClient).Name})",
-                "ProtoTest.Core",
+                ProtoCoreDiagnostics.TraceSource,
                 outcome: ProtoTraceOutcome.Failed,
                 attributes: new Dictionary<string, string?>
                 {
@@ -508,7 +522,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
             Trace.WriteEvent(
                 "collector.failed",
                 $"Collector failed · {observation.Kind}",
-                "ProtoTest.Core",
+                ProtoCoreDiagnostics.TraceSource,
                 outcome: ProtoTraceOutcome.Failed,
                 attributes: new Dictionary<string, string?>
                 {
@@ -557,7 +571,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         _clockRegistry?.Remove(Id.Value);
         _clients.Seal();
         using var releaseOperation = Trace
-            .Operation("resources.release", "Release owned resources", "ProtoTest.Core")
+            .Operation("resources.release", "Release owned resources", ProtoCoreDiagnostics.TraceSource)
             .During(phase)
             .Begin();
         var exceptions = (await _resources.ReleaseAllAsync(this, Trace, phase)).ToList();

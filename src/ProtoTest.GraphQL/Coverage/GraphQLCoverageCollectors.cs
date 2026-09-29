@@ -14,7 +14,7 @@ public sealed class GraphQLCoverageCollector(string targetName)
 {
     // GraphQL names are case-sensitive: "query FindProducts" and "query findproducts" are distinct
     // operations and must stay distinct coverage items, which the ordinal identifier comparer keeps.
-    public override string Category => ProtoGraphQLBuilder.Protocol.CoverageCategory ?? ProtoGraphQLBuilder.Protocol.Name;
+    public override string Category => ProtoGraphQLBuilder.Protocol.CoverageCategoryOrName;
 }
 
 public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector

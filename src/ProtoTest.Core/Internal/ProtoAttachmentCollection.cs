@@ -28,7 +28,8 @@ internal sealed class ProtoAttachmentCollection(string testId)
                     string.Equals(existing.Name, attachment.Name, StringComparison.OrdinalIgnoreCase)))
             {
                 throw new InvalidOperationException(
-                    $"An attachment named '{attachment.Name}' is already registered for this test.");
+                    $"An attachment named '{attachment.Name}' is already registered for this test; " +
+                    "give the attachment a different name.");
             }
 
             _attachments.Add(attachment);

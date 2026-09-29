@@ -14,7 +14,7 @@ description: "Register ProtoTest with xUnit v2: the collection fixture, [ProtoTe
 dotnet add package ProtoTest.Xunit
 ```
 
-ProtoTest targets **.NET 8, 9 and 10**. The `dotnet new prototest` template defaults to `net10.0`; pass `-f net8.0` or `-f net9.0` for an older runtime.
+ProtoTest targets **.NET 8, 9 and 10**, and needs **xunit 2.9.3 or newer**; the standard `dotnet new xunit` template already pins it. The `dotnet new prototest` template defaults to `net10.0`; pass `-f net8.0` or `-f net9.0` for an older runtime.
 
 ## Register
 

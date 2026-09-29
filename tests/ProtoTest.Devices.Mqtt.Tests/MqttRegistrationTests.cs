@@ -5,6 +5,7 @@ using ProtoTest.Core;
 using ProtoTest.Devices.Mqtt;
 
 [TestFixture]
+[Category("Characterization")]
 public sealed class MqttRegistrationTests
 {
     [Test]

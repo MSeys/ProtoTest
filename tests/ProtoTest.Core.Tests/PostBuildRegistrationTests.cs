@@ -5,8 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
 /// Pins the one post-<c>Build()</c> rule: every public composition entry - on the host
-/// builder and on an application builder - throws the same single message instead of silently
-/// mutating a collection the built host no longer reads.
+/// builder and on an application builder - reports the same single message instead of silently
+/// mutating a collection the built host no longer reads, and a second <c>Build()</c> reports that
+/// same message.
 /// </summary>
 [TestFixture]
 [Category("Characterization")]
@@ -30,6 +31,9 @@ public sealed class PostBuildRegistrationTests
                 () => builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection())),
             Assert.Throws<InvalidOperationException>(
                 () => builder.ConfigureTestIds(options => options.RunPrefix = 123456)),
+            Assert.Throws<InvalidOperationException>(
+                () => builder.ConfigureReadiness(options => options.Timeout = TimeSpan.FromSeconds(1))),
+            Assert.Throws<InvalidOperationException>(() => builder.Build()),
             Assert.Throws<InvalidOperationException>(() => builder.AddTestHook<LateTestHook>()),
             Assert.Throws<InvalidOperationException>(() => builder.AddRunHook<LateRunHook>()),
             Assert.Throws<InvalidOperationException>(() => builder.AddRunGate<LateRunGate>()),

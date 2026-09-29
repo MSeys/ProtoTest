@@ -77,7 +77,7 @@ public sealed class ProtoHost : IAsyncDisposable
         _trace.RunWriter.WriteEvent(
             "clock.advance",
             $"Run clock advanced by {change.Delta:g}",
-            "ProtoTest.Core",
+            ProtoCoreDiagnostics.TraceSource,
             attributes: new Dictionary<string, string?>
             {
                 ["clock.delta"] = change.Delta.ToString("g"),

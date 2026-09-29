@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 [TestFixture]
 [NonParallelizable]
+[Category("Characterization")]
 public class ProtoHostTests
 {
     [Test]

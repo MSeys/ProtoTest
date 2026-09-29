@@ -14,7 +14,7 @@ public sealed class AttachmentPublishTests
 
         var results = await new ProtoTestAttribute().ExecuteAsync(new FakeTestMethod(method));
 
-        Assert.AreEqual(1, results.Length);
+        Assert.HasCount(1, results);
         Assert.IsNotNull(results[0].ResultFiles, "the adapter must hand the published file to MSTest");
         var path = results[0].ResultFiles!.Single();
         Assert.IsTrue(File.Exists(path), $"the published attachment file '{path}' must exist");

@@ -26,6 +26,14 @@ public static class ProtoReadinessExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(configure);
+        // The options instance is builder state that the built host already resolved: a late change
+        // would mutate the live policy instead of the composition, so this entry takes the terminal
+        // rule along with every other composition entry.
+        if (builder is IProtoComposableBuilder composable)
+        {
+            composable.ThrowIfBuilt();
+        }
+
         configure(ResolveOptions(builder));
         return builder;
     }

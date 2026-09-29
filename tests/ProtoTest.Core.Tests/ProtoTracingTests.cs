@@ -38,6 +38,31 @@ public sealed class ProtoTracingTests
     }
 
     [Test]
+    public async Task CoreOperations_ShouldRecordUnderTheCoreTraceSource()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.OutputPath = TemporaryTracePath());
+        await using var host = builder.Build();
+
+        await host.StartAsync();
+        await host.StartTestAsync("source test", TestMethods.Placeholder);
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        var sources = host.Trace.Snapshot().Tests.Single().Entries
+            .Where(entry => entry.Kind is "test.setup" or "test.execution" or "test.teardown")
+            .Select(entry => entry.Source)
+            .ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(sources, Is.Not.Empty);
+            Assert.That(sources, Is.All.EqualTo(ProtoCoreDiagnostics.TraceSource));
+            Assert.That(ProtoCoreDiagnostics.TraceSource, Is.EqualTo("ProtoTest.Core"));
+        });
+    }
+
+    [Test]
     public async Task Operation_ShouldRecordWhereTheSuiteStartedIt_AndEmbedThatSource()
     {
         var path = TemporaryTracePath();

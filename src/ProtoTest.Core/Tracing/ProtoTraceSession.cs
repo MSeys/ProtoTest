@@ -113,7 +113,7 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
                     _runWriter.WriteEvent(
                         "telemetry.capture_failed",
                         "Telemetry capture failed",
-                        "ProtoTest.Core",
+                        ProtoCoreDiagnostics.TraceSource,
                         ProtoTracePhase.Run,
                         ProtoTraceOutcome.Failed,
                         new Dictionary<string, string?>
@@ -148,7 +148,9 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
             testId.Value, name, method, _options, RegisterTrace, _converter.Forget);
         if (!_tests.TryAdd(testId.Value, recorder))
         {
-            throw new InvalidOperationException($"A trace already exists for test ID '{testId.Value}'.");
+            throw new InvalidOperationException(
+                $"A trace already exists for test ID '{testId.Value}'; " +
+                "pass a test ID that is not already in use.");
         }
         return recorder;
     }

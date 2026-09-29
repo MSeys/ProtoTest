@@ -8,7 +8,7 @@ description: "A database connection each test owns, optionally wrapped in a tran
 
 ## What it adds
 
-`ProtoTest.Sql` gives each test a database connection it owns: opened before the test, optionally wrapped in a transaction that is rolled back when the test ends, and disposed with the test. `ProtoTest.Sql.EntityFrameworkCore` builds Entity Framework Core contexts on that same connection, and `ProtoTest.Sql.Testcontainers` owns a PostgreSQL server for the run. Use it when tests write to a store they control and should leave no trace behind; when the store belongs to a deployed environment you cannot roll back, test through the application's APIs instead.
+`ProtoTest.Sql` gives each test a database connection it owns: opened before the test, optionally wrapped in a transaction that is rolled back when the test ends, and disposed with the test. `ProtoTest.Sql.EntityFrameworkCore` builds Entity Framework Core contexts on that same connection, and `ProtoTest.Sql.Testcontainers` owns a PostgreSQL server for the run. Use it when tests write to a store they control and must leave no rows behind. When the store belongs to a deployed environment, test through the application APIs instead.
 
 ## Install
 
@@ -43,7 +43,7 @@ public static IProtoHostBuilder AddSql(
     Action<SqlOptions>? configure = null);
 ```
 
-It registers the `SQL` store capability, the factory and `ProtoSqlSession` as scoped services (so each test gets its own), the options, the test hook that opens and releases the connection, and the run hook that guards the isolation declarations. Calling it twice on one host is a no-op: the first registration's factory and options win. A host that registered its own `SqlOptions` keeps them: the options registration is `TryAdd`, so the rest of the integration composes around the host's instance instead of switching itself off. The options singleton is built by running `configure` and is then bound from `ProtoTest:Sql`, so configuration layers over code.
+It registers the `SQL` store capability, the factory and `ProtoSqlSession` as scoped services (so each test gets its own), the options, the test hook that opens and releases the connection, and the run hook that guards the isolation declarations. Calling it twice on one host changes nothing. The first registration keeps its factory and options. A host that registered its own `SqlOptions` keeps them: the options registration is `TryAdd`, so the rest of the integration composes around the host's instance instead of switching itself off. The options singleton is built by running `configure` and is then bound from `ProtoTest:Sql`, so configuration layers over code.
 
 The factory runs inside the test's scope, so it can resolve services. The demo reads a container's connection string from infrastructure settings:
 
@@ -59,9 +59,7 @@ builder.AddSql(
     sql => sql.AddressKeys.Add("ConnectionStrings:Orders"));
 ```
 
-With at least one key declared, `AddSql` declares the `SQL` store capability only while one of them can provide a connection: a configured value, or a key a registered container declares and fills. When none can, the integration is inert: the connection is not opened during setup, and `Proto.Context.Sql()`, `SqlConnection()` and `SqlTransaction()` throw naming the missing keys and the `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate. `AddressKeys` is a code API: a `SqlAddressKeys` set that only `Add` (or a `SqlOptions` instance registered before `AddSql`) fills. No configuration section binds it, because the capability decision is made when the host is built and a key that only configuration knows could not have promised the connection the decision was made against. It is empty by default, which keeps the capability unconditional and the factory owning the address.
-
-A sibling access technology that wants the same honest capability shares the rule instead of re-deriving it: `SqlAddressRule.DeclaredKeys(services)` returns the keys the first `AddSql` recorded, so a package registers its own store capability with `AddCapabilityWhenProvided` over them, and `SqlAddressRule.IsInert(context, options)` (or `ThrowIfInert`) applies the same decision at use time. `AddEntityFrameworkCore` is the shipped example; a Dapper or raw ADO.NET package follows the same shape.
+With at least one key declared, `AddSql` declares the `SQL` store capability only while one of them can provide a connection: a configured value, or a key a registered container declares and fills. When none can, the integration is inert: the connection is not opened during setup, and `Proto.Context.Sql()`, `SqlConnection()` and `SqlTransaction()` throw naming the missing keys and the `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate. `AddressKeys` is a code-only API: it is filled with `Add` (or a `SqlOptions` instance registered before `AddSql`), because the capability decision is made when the host is built.
 
 ### Isolation
 
@@ -73,6 +71,12 @@ A sibling access technology that wants the same honest capability shares the rul
 | `None` | No transaction. Writes persist, and provisioners are responsible for releasing what they created. |
 
 `Transaction` promises exactly one thing: **writes made through the connection ProtoTest owns are rolled back.** Entity Framework Core, Dapper and raw ADO.NET all count, because they use that connection. A write through a different connection, such as an application that opened its own or a second connection created by a helper, is not covered and is committed when that connection commits.
+
+| Write path | Transaction | None |
+| --- | --- | --- |
+| Through the owned connection | rolled back | persists; provisioners release it |
+| Through the application's own connection | commits | commits |
+| Through a second helper connection | commits | commits |
 
 Because that promise is easy to believe wrongly, the host registers a guard. When the host has applications registered through `AddApplication` and isolation is `Transaction`, every one of them must be declared as using the test's connection:
 
@@ -97,7 +101,7 @@ An undeclared application fails the run at start with an explanation telling you
 
 ```csharp
 DbConnection connection = Proto.Context.SqlConnection();
-ProtoSqlSession session = Proto.Context.Sql();          // SqlSession() is the historical alias
+ProtoSqlSession session = Proto.Context.Sql();
 DbTransaction? transaction = Proto.Context.SqlTransaction();   // null with SqlIsolation.None
 ```
 
@@ -196,34 +200,7 @@ The schema then survives the rollback; the rows do not. Every test sees the tabl
 
 ## The demo's wiring
 
-The sample suite composes its own domain over the connection ProtoTest owns, except when it is testing a published environment. It owns a PostgreSQL container when `ProtoTest:Database=postgres`, and hands the started connection string to both sides:
-
-```csharp
-if (usePostgres)
-{
-    builder.AddInfrastructure(
-        "NorthstarDatabase",
-        chain => chain
-            .UseConfigured()
-            .UseContainer(PostgresDatabase.Container()),
-        "ConnectionStrings:Northstar");
-}
-
-builder
-    .AddSql(
-        provider => CreateDatabaseConnection(ResolveDatabase(provider, fallbackDatabase), usePostgres),
-        sql => sql.Isolation = SqlIsolation.None)
-    .ConfigureServices(services => services.AddNorthstarDomain(
-        (provider, options) =>
-        {
-            var connection = provider.GetRequiredService<DbConnection>();
-            if (usePostgres) options.UseNpgsql(connection);
-            else options.UseSqlite(connection);
-        },
-        ServiceLifetime.Scoped));
-```
-
-Isolation stays `None` on purpose: the in-process application keeps its own connection, so a test transaction would hide the test's writes from it. The demo releases what it creates instead. When PostgreSQL is not used, the suite owns a file database and the application is given that connection string through its host settings.
+The sample suite composes its own domain over the connection ProtoTest owns, with `SqlIsolation.None` because the in-process application keeps its own connection. See the composition in [`samples/Northstar.ProtoTest/Setup.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs).
 
 ## Skip
 
@@ -243,8 +220,22 @@ With `AddressKeys` declared and none of them provided, the `SQL` capability is a
 - **The guard only sees registered applications.** An application hosted without `AddApplication` cannot be detected, so nothing fails the run if it writes outside the transaction.
 - **`AddSql` is once per host.** A second call is a no-op rather than layering a second connection: the first registration's factory and options win, matching [repeated registration](../../getting-started/configuration.md#repeated-registration).
 - **A rollback failure still disposes everything.** The transaction and the connection are disposed in their own `finally` blocks even when rollback throws; the release failure is aggregated like any other teardown failure.
-- **The connect timeout is provider-owned.** The connection open and transaction begin observe `ProtoExecutionContext.CancellationToken`: a caller that passed one to `StartTestAsync`, or the runner's own token where its adapter has one (NUnit's test context token via `[CancelAfter]`, the xUnit v2 runner's `CancellationTokenSource`, xUnit v3's `TestContext.Current.CancellationToken`, TUnit's `TestContext.CancellationToken`). MSTest's 4.0.2 floor exposes none, so those runner-driven tests fall back to the provider's own connect timeout (Npgsql's default, or `Connect Timeout` in the connection string) ending the wait.
+- **The connect timeout is provider-owned.** The connection open and transaction begin observe `ProtoExecutionContext.CancellationToken`, or the runner's own token where its adapter has one:
+
+  | Runner | Cancellation source |
+  | --- | --- |
+  | NUnit | the test context token via `[CancelAfter]` |
+  | xUnit v2 | the runner's `CancellationTokenSource` |
+  | xUnit v3 | `TestContext.Current.CancellationToken` |
+  | TUnit | `TestContext.CancellationToken` |
+  | MSTest | none (4.0.2 floor exposes none) |
+
+  Without a token the provider's own connect timeout ends the wait (Npgsql's default, or `Connect Timeout` in the connection string).
 - **No automatic migration or database creation.** ProtoTest never creates or migrates a schema by itself. When the run owns the database, create the schema once with [`AddRunSetup`](#run-owned-schema): a test body or hook runs inside the rolled-back transaction, so `EnsureCreated`/`Migrate` there disappears with the test. A deployed environment keeps its own schema.
+
+## For package authors
+
+A sibling access technology that wants the same honest capability shares the rule instead of re-deriving it: `SqlAddressRule.DeclaredKeys(services)` returns the keys the first `AddSql` recorded, so a package registers its own store capability with `AddCapabilityWhenProvided` over them, and `SqlAddressRule.IsInert(context, options)` (or `ThrowIfInert`) applies the same decision at use time. `AddEntityFrameworkCore` is the shipped example; a Dapper or raw ADO.NET package follows the same shape.
 
 ## Links
 

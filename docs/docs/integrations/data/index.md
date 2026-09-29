@@ -5,11 +5,11 @@ sidebar_label: Overview
 description: "Build test objects with deterministic defaults, so a test only states the values it is about, and create them in the system under test."
 ---
 
-# Data
+# Test data
 
 ## What it adds
 
-`ProtoTest.Data` builds test objects with deterministic defaults, so the only values you write in a test are the ones the test is *about*, and it can hand those objects to your application to create them for real.
+`ProtoTest.Data` builds test objects from deterministic defaults. Write only the values the test is about. Hand the object to your application to create it for real.
 
 Numbers, enums, dates and your own value objects are never invented: if nothing supplies a member, the build fails with a `ProtoDataException` naming it, rather than a silently wrong `0`.
 
@@ -50,13 +50,13 @@ public static IProtoHostBuilder AddDataProvisioner<TInput, TResult, TProvisioner
     where TProvisioner : class, IProtoDataProvisioner<TInput, TResult>;
 ```
 
-`AddData` registers the `Data` capability (`ProtoCapabilityKinds.Data`) and a scoped `IProtoData`, one per test. Repeats compose onto one registry: each `AddData` callback runs while the capability and service registrations dedupe. Registering the same member, type or factory twice is **not** a repeat: it throws `ProtoDataException` naming both sources, so two modules cannot silently fight over a value. A second `AddDataProvisioner` with the same implementation type is a no-op; two *different* provisioners for one input/result pair both register and fail later, when that pair is used.
+`AddData` registers the `Data` capability (`ProtoCapabilityKinds.Data`) and a scoped `IProtoData`, one per test. Repeated calls share one registry. Each `AddData` callback runs once, and shared registrations are kept only once.
 
 ### Options and keys
 
 `ProtoTest.Data` has no options type and no `ProtoTest:Data` configuration section. Everything is configured through the `AddData` callback:
 
-| Entry point | What it configures |
+| Entry point | Configures |
 | --- | --- |
 | `data.AddDefaults<TModule>()` | a defaults module with a public parameterless constructor |
 | `data.AddDefaultsFromAssembly(assembly)` | every public, concrete, non-generic module in an assembly, ordered by full type name (ordinal) |
@@ -65,7 +65,7 @@ public static IProtoHostBuilder AddDataProvisioner<TInput, TResult, TProvisioner
 | `data.AddValueResolver(...)` | convention resolvers, run in registration order |
 | `data.RedactValueType<TValue>()` | every resolved value of a type, in ProtoTrace |
 
-[Defaults](./defaults.md) has the precedence order and the full surface, every signature included.
+[Defaults](./defaults.md) lists the precedence order and every signature.
 
 ### Context API
 
@@ -73,14 +73,14 @@ public static IProtoHostBuilder AddDataProvisioner<TInput, TResult, TProvisioner
 IProtoData data = Proto.Context.Data();
 ```
 
-| Member | |
+| Member | Does |
 | --- | --- |
 | `For<T>()` | starts a `ProtoDataObjectBuilder<T>` |
 | `Ref<T>(identity = null)` | resolves a value `CreateAsync` provisioned earlier in this test, from the identity map |
 
 On the builder:
 
-| Member | |
+| Member | Does |
 | --- | --- |
 | `With(member, value)` | sets a scenario-relevant member; returns the same builder |
 | `Explain()` | resolves and describes every value without constructing the object |
@@ -118,7 +118,7 @@ Values set with `With` before `BuildMany` apply to every item.
 
 #### Constructors
 
-Objects are created through their single public constructor (parameters matched to properties by name, ignoring case) or their parameterless one; remaining writable properties are set afterwards. Records work naturally through their primary constructor. Multiple public constructors without a parameterless route, a `With` on a member the chosen route cannot assign, and a non-writable property that is named in `With` all throw `ProtoDataException`. For types that protect their invariants, register a [domain factory](./defaults.md#domain-factories) instead.
+ProtoTest creates objects through the single public constructor or the parameterless one. It matches constructor parameters to properties by name, ignoring case. Then it sets the remaining writable properties. Records work naturally through their primary constructor. Multiple public constructors without a parameterless route, a `With` on a member the chosen route cannot assign, and a non-writable property that is named in `With` all throw `ProtoDataException`. For types that protect their invariants, register a [domain factory](./defaults.md#domain-factories) instead.
 
 #### The identity map
 
@@ -132,10 +132,7 @@ var projects = await Proto.Context.Data()
 var first = Proto.Context.Data().Ref<ProjectResponse>(projects[0].Id);
 ```
 
-- Matching is by requested type (`entry.Value is T`) and, when an identity is given, by `StringComparison.Ordinal` equality; identities are case-sensitive.
-- Zero matches or more than one match throw `ProtoDataException` with guidance: pass an identity when several values of the type exist.
-- Only `CreateAsync` / `CreateManyAsync` results are in the map; `Build()` and `BuildMany()` values are never referenceable.
-- `IProtoData` is scoped to one test, so the map cannot reach data provisioned by another test. `ProtoDataValueContext.Ref<T>(identity)` exposes the same lookup to defaults.
+Matching, scoping and failure rules live with the [provisioner contract](./provisioners.md#refs-and-the-identity-map). In short: identities are case-sensitive, zero or ambiguous matches throw, only created (never built) values are in the map, and the map never crosses tests.
 
 #### Explain
 
@@ -183,12 +180,13 @@ There are no package-specific skip attributes. See [Skip conditions](../../found
 
 ## Limits
 
-- **No invented semantics.** Numbers, enums, booleans, dates and project value objects are never generated; an unresolved member fails with the member's name.
+- **No invented semantics.** As above: an unresolved member fails with the member's name instead of a silently wrong `0`.
 - **Reflection needs a public constructor.** Multiple public constructors without a parameterless one is an error; `With` must target a settable property or be consumed by a registered factory.
 - **The identity map is per test and read-only for `Build`.** Values built in memory are not referenceable, and another test's provisioned data is out of reach.
 - **Ref identity matching is case-sensitive** (`StringComparison.Ordinal`).
 - **Redaction is best-effort and trace-only.** Reference cycles are cut to `[circular]`, and nothing else is redacted, not logs, not HTTP bodies, not reports.
 - **No retry or transaction semantics.** A `Cleanup` that fails is aggregated by the core release path like any other test resource.
+- **Duplicate registrations fail.** Registering the same member, type or factory twice throws `ProtoDataException` naming both sources. Two different provisioners for one input/result pair both register and fail when that pair is used.
 
 ## Links
 

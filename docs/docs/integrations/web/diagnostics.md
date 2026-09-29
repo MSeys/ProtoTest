@@ -6,19 +6,21 @@ description: "Screenshots, console output, page errors, failed requests and Play
 
 # Diagnostics and artifacts
 
-A failing browser test is only useful if you can see what the browser saw. ProtoTest captures that automatically and attaches it to the test, where your [runner](../../runners/overview.md) and the [ProtoTrace viewer](../../observability/prototrace.md) both show it.
+A failing browser test shows what the browser saw at the failure. ProtoTest captures that automatically and attaches it to the test, where your [runner](../../runners/overview.md) and the [ProtoTrace viewer](../../observability/prototrace.md) both show it.
+
+Open what the test left: the `.prototrace` archive (see [Where it lands and how to open it](#where-it-lands-and-how-to-open-it)), or the screenshots and page HTML in the runner output next to the exception.
 
 ## On any failed operation
 
 When an action or assertion fails, the backend captures the page at that moment:
 
-| Artifact | Playwright | Selenium |
-| --- | --- | --- |
-| Screenshot | `web-{session}-{element}-{n}-failure.png` (full page) | `web-{session}-{element}-{n}-failure.png` |
-| Page HTML | `web-{session}-{element}-{n}-page.html` | `web-{session}-{element}-{n}-page.html` |
-| Location | `web-{session}-{element}-{n}-location.txt` (URL and title) | `web-{session}-{element}-{n}-location.txt` (URL and title) |
+| Artifact | File |
+| --- | --- |
+| Screenshot (full page) | `web-{session}-{element}-{n}-failure.png` |
+| Page HTML | `web-{session}-{element}-{n}-page.html` |
+| Location (URL and title) | `web-{session}-{element}-{n}-location.txt` |
 
-The name parts are lowercased and sanitized (non-letters/digits become `-`), `{element}` falls back to the operation name when the failure is not element-bound, and `{n}` is a per-test sequence so a failure repeated on the same element keeps both sets of artifacts. Captures run in order screenshot, DOM, location.
+ProtoTest lowercases the name parts and replaces anything but letters and digits with `-`. It replaces `{element}` with the operation name when the failure has no element. It numbers repeats with a per-test sequence, so a failure repeated on the same element keeps both sets of artifacts. Captures run in order screenshot, DOM, location.
 
 A hand-written backend produces the same artifacts by calling `WebFailureArtifacts.CaptureAsync(…)` in `ProtoTest.Web`, and reports the same resolution and actionability wording through `WebBackendErrors`; both are part of the [backend-neutral building blocks](./index.md#compose).
 

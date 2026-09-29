@@ -4,7 +4,7 @@ title: Defaults
 description: "Keep test-data defaults in small modules, one per feature area, next to the tests that use them."
 ---
 
-# Defaults
+# Test-data defaults
 
 Defaults live in **modules**: small classes, ideally one per feature area, next to the tests that use them.
 
@@ -26,11 +26,11 @@ public sealed class InvoiceDataDefaults : IProtoDataDefaultsModule
 builder.AddData(data => data.AddDefaults<InvoiceDataDefaults>());
 ```
 
-You can also configure inline in `AddData(data => …)`; the trace then reports the source as `"Host configuration"`, while a module's values are attributed to the module's full type name.
+You can configure inline in `AddData(data => ...)`. The trace then reports the source as `"Host configuration"`, while a module's values are attributed to the module's full type name.
 
 ## The configuration surface
 
-| Member | |
+| Member | Does |
 | --- | --- |
 | `data.Values` | a `ProtoDataValueConfiguration` for providers that apply to every member of a type |
 | `data.For<T>()` | a `ProtoDataTypeConfiguration<T>` for one object type |
@@ -44,7 +44,7 @@ You can also configure inline in `AddData(data => …)`; the trace then reports 
 | `For<T>().Redact(member)` | hides one member's value in ProtoTrace while keeping its provenance |
 | `Values.Use<T>(provider)` | supplies a value for every member of `T` |
 
-`AddDefaultsFromAssembly` takes public, concrete, non-generic classes assignable to `IProtoDataDefaultsModule` with a public parameterless constructor, and runs them ordered by `Type.FullName` with `StringComparer.Ordinal`. Registering the same member, type or factory twice throws `ProtoDataException` naming both sources; there is no last-one-wins, so two modules cannot silently fight over a value. Resolvers are the exception: they may repeat and all run in order.
+`AddDefaultsFromAssembly` loads public, concrete, non-generic modules with a public parameterless constructor. It runs them ordered by type full name. Registering the same member, type or factory twice throws `ProtoDataException` naming both sources; there is no last-one-wins, so two modules cannot silently fight over a value. Resolvers are the exception: they may repeat and all run in order.
 
 ## Where a value comes from
 
@@ -82,7 +82,7 @@ data.Values.Use<TenantId>(context => new TenantId(context.NextGuid()));
 
 Both kinds of provider, and every member default, receive a `ProtoDataValueContext`:
 
-| Member | |
+| Member | Is |
 | --- | --- |
 | `TestId` | the running test's id |
 | `ObjectSequence` | the object's position among objects built in this test |
@@ -92,7 +92,7 @@ Both kinds of provider, and every member default, receive a `ProtoDataValueConte
 | `NextString()` | a deterministic string like `Invoice.Reference-0001-00` |
 | `Ref<T>(identity)` | a value provisioned earlier in this test, from the [identity map](./provisioners.md#refs-and-the-identity-map) |
 
-`NextGuid()` is the first 16 bytes of a SHA-256 over `"{TestId}|{ObjectSequence}|{TargetType.FullName}|{MemberName}|{counter}"`, and `NextString()` is `"{TargetType.Name}.{MemberName}-{ObjectSequence:D4}-{counter:D2}"`. Each member resolution gets a fresh context, so the counter starts at 0 per member: the same test produces the same values on every run, while different tests never collide. For a name outside a member default, such as a tenant or an operator, use `Proto.Context.UniqueName("tenant")`, which derives `tenant-{TestId}` from the same test id.
+`NextGuid()` is the first 16 bytes of a SHA-256 over `"{TestId}|{ObjectSequence}|{TargetType.FullName}|{MemberName}|{counter}"`, and `NextString()` is `"{TargetType.Name}.{MemberName}-{ObjectSequence:D4}-{counter:D2}"`. Each member resolution gets a fresh context, so the counter starts at 0 per member. The same test produces the same values on each run. Different tests get different values. For a name outside a member default, such as a tenant or an operator, use `Proto.Context.UniqueName("tenant")`, which derives `tenant-{TestId}` from the same test id.
 
 ## Domain factories
 
@@ -116,7 +116,7 @@ The factory rules:
 
 ## Custom resolvers
 
-For conventions that span many types, say "every property called `CreatedAt` is a fixed clock value":
+For conventions that span many types, such as fixing every property called `CreatedAt` to one clock value:
 
 ```csharp
 public sealed class FixedClockResolver : IProtoDataValueResolver
@@ -145,7 +145,7 @@ Resolvers run after member and type providers, in registration order, and the se
 
 ## Keeping values out of the trace
 
-Resolved values are recorded in ProtoTrace. Redact the sensitive ones: the trace still shows *where* the value came from, just not the value:
+Resolved values are recorded in ProtoTrace. Redact the sensitive ones. The trace still shows where the value came from, without the value:
 
 ```csharp
 data.For<User>().Redact(x => x.AccessToken);   // one member

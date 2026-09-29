@@ -28,7 +28,7 @@ Either backend brings `ProtoTest.Web` with it. The packages target `net8.0`, `ne
 
 ## Browsers
 
-Playwright launches Chromium by default, which runs on Windows, Linux and macOS; set `Channel` (`"msedge"`, `"chrome"`) to use an installed system browser instead. `InstallBrowsers = true` downloads the selected browser through the Playwright driver before the first launch, so a clean machine or CI runner needs no separate step. It is ignored when `Channel` names a system browser:
+Playwright launches Chromium by default on Windows, Linux, and macOS. Set `Channel` (`"msedge"`, `"chrome"`) to use an installed system browser instead. `InstallBrowsers = true` downloads the selected browser through the Playwright driver before the first launch, so a clean machine or CI runner needs no separate step. It is ignored when `Channel` names a system browser:
 
 ```csharp
 builder.AddWeb(options =>
@@ -42,7 +42,7 @@ On Linux, the operating-system libraries a bundled browser needs come from Playw
 
 Selenium takes the driver factory you provide, so the browser itself must already be installed on the machine.
 
-A machine may have no browser at all. Rather than hand-rolling `Assert.Ignore`, gate Playwright tests with the opt-in skip condition from the Playwright package:
+A machine may have no browser at all. Gate Playwright tests with the opt-in skip condition from the Playwright package (see [Skip](#skip)):
 
 ```csharp
 [RequiresPlaywrightBrowser]                       // the configured browser
@@ -51,9 +51,9 @@ A machine may have no browser at all. Rather than hand-rolling `Assert.Ignore`, 
 public async Task ...() { ... }
 ```
 
-It probes the installed browser before the lifecycle starts, without launching one, and skips with a reason naming Playwright and the install options; `InstallBrowsers = true` never skips. Selenium has no equivalent probe, so its tests combine `[RequiresCapability(ProtoCapabilityKinds.Browser, CapabilityName = "Selenium")]` with a try/catch around the first session. Both patterns are documented under [skip conditions](../../foundation/skip-conditions.md#requiring-a-playwright-browser) and summarized under [Skip](#skip).
+It probes the installed browser before the lifecycle starts, without launching one, and skips with a reason naming Playwright and the install options; `InstallBrowsers = true` never skips. Selenium has no equivalent probe (see [Skip](#skip)).
 
-A session follows its application's address: `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with `ProtoTest:Applications:{application}:Endpoints:{endpoint}`. Infrastructure that started an application with the run advertises that same setting, so a browser journey can run against a standalone instance, an application image in its own container or an in-process loopback listener without fixture code ([ASP.NET Core](../aspnetcore.md#hosting-a-browser-journey) has both recipes).
+A session uses its application address from `ProtoTest:Applications:{application}:BaseUrl`. It appends `Endpoints:{endpoint}` when the session names one. Infrastructure that started an application with the run advertises that same setting, so a browser journey can run against a standalone instance, an application image in its own container or an in-process loopback listener without fixture code ([ASP.NET Core](../aspnetcore.md#hosting-a-browser-journey) has both recipes).
 
 ## Compose
 
@@ -83,34 +83,9 @@ public static IProtoApplicationBuilder AddWeb(
     Action<SeleniumWebOptions>? configure = null);
 ```
 
-The backend-neutral building blocks sit in `ProtoTest.Web`, so a hand-written backend can compose them directly:
+The shipped backends compose shared helpers from `ProtoTest.Web`, so a hand-written backend behaves the same way. See [Writing a backend](#writing-a-backend).
 
-```csharp
-IProtoHostBuilder AddWebBackend(this IProtoHostBuilder builder, IWebBackendFactory factory);
-
-IProtoHostBuilder AddWebMiddleware<TMiddleware>(this IProtoHostBuilder builder)
-    where TMiddleware : class, IWebOperationMiddleware;
-
-IProtoHostBuilder AddWebWait<TCondition>(
-    this IProtoHostBuilder builder,
-    WebWaitTiming timing,
-    TimeSpan? timeout = null,               // default 5 s
-    TimeSpan? pollInterval = null,          // default 50 ms
-    params WebOperationKind[] operations)   // default Navigate, Click, Fill
-    where TCondition : class, IWebWaitCondition;
-```
-
-A hand-written backend composes the same helpers the shipped backends use, so its behavior matches theirs:
-
-- `WebBackendOptions.Resolve<TOptions>(context, configure, validate)` - the options precedence (code callback, started infrastructure, `ProtoTest:Web:{backend}` section, validation).
-- `WebBackendErrors` - the resolution and actionability failures (`NotPresent`, `NotActionable`, `MultipleMatch`) with the documented wording.
-- `WebFailureArtifacts.CaptureAsync(…)` - the screenshot, DOM and location attachments with the documented naming rule; `TraceArtifactFailure` records a capture that itself failed.
-- `WebProbeLoop` with `WebProbe` - the retry loop whose observation form treats `WebElementResolutionException` and `WebActionabilityException` as "not yet", polling at the backend's `PollInterval`.
-- `WebBackendDefaults` - the 5 s action timeout and 50 ms poll interval defaults; `IWebBackend.PollInterval` returns `WebBackendDefaults.DefaultPollInterval` unless the backend has its own interval option.
-- `WebArtifactNames.SafeName` - the lowercased, dash-sanitized identifier rule for artifact file names.
-- `WebMediaTypes.Guess` - the best-effort media type for a downloaded file, with `WebMediaTypes.Default` as the fallback.
-
-Sessions are not declared at registration: a test names the sessions it needs with `Proto.Context.Web(name)` ([below](#sessions)). `AddWebBackend` is first-wins (`TryAddSingleton`), and a host resolves exactly one `IWebBackendFactory`; zero or more than one throws `InvalidOperationException`. For Playwright, every `AddWeb(...)` call still runs its `configure` callback while only the first supplies the skip-probe defaults; the Selenium application overload guards the whole call so a repeat is a no-op.
+Sessions are not declared at registration: a test names the sessions it needs with `Proto.Context.Web(name)` ([below](#sessions)). `AddWebBackend` keeps the first registration. A host resolves exactly one `IWebBackendFactory`. Zero or more than one throws `InvalidOperationException`. For Playwright, every `AddWeb(...)` call still runs its `configure` callback while only the first supplies the skip-probe defaults; the Selenium application overload guards the whole call so a repeat is a no-op.
 
 ### Options and keys
 
@@ -123,9 +98,9 @@ Started infrastructure settings are merged over static configuration before bind
 
 #### Playwright options
 
-Key names below are relative to `ProtoTest:Web:Playwright` (`src/ProtoTest.Web.Playwright/PlaywrightWebOptions.cs`):
+Key names below are relative to `ProtoTest:Web:Playwright` (see `PlaywrightWebOptions`):
 
-| Key | Type | Default | |
+| Key | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `Browser` | `PlaywrightBrowser` | `Chromium` | `Chromium`, `Firefox` or `Webkit` |
 | `Headless` | bool | `true` | |
@@ -143,9 +118,9 @@ Key names below are relative to `ProtoTest:Web:Playwright` (`src/ProtoTest.Web.P
 
 #### Selenium options
 
-Key names below are relative to `ProtoTest:Web:Selenium` (`src/ProtoTest.Web.Selenium/SeleniumWebOptions.cs`):
+Key names below are relative to `ProtoTest:Web:Selenium` (see `SeleniumWebOptions`):
 
-| Key | Type | Default | |
+| Key | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `ActionTimeout` | `TimeSpan` | 5 s | how long an action retries until the element is actionable |
 | `PollInterval` | `TimeSpan` | 50 ms | how often it re-checks |
@@ -155,7 +130,7 @@ Key names below are relative to `ProtoTest:Web:Selenium` (`src/ProtoTest.Web.Sel
 
 #### Demanding a session
 
-A session exists because a test asks for it, not because configuration declares it. Demand it in code with the attribute:
+A test creates a session by asking for it in code. Demand it in code with the attribute:
 
 ```csharp
 [WebSession("Admin", Application = "BackOffice", Endpoint = "Admin", DiscoverRoutes = true,
@@ -480,6 +455,33 @@ React has no generic runtime route table to read, and ProtoTest deliberately doe
 - **Page origin:** an external redirect contributes no visited or verified coverage, and a backend that cannot report an address still passes the test.
 - **Playwright:** the browser pool is scoped to one test; identical launch options share a process only inside that test. Reads and actions use Playwright's own auto-waiting, bounded by `ActionTimeout` (5 s by default); a timeout becomes the same resolution or actionability exception Selenium raises. `InstallBrowsers` does nothing when `Channel` is set, trace groups are serialized by a semaphore and skipped when `TraceRetention = Off`, console/page-error/request-failure text is truncated at 4096 characters, and the skip probe starts the Playwright driver.
 - **Selenium:** one driver per session, no pooling, so sessions do not share cookies or storage; native failures surface as `WebActionabilityException` after `ActionTimeout`; `CheckAsync` and `SelectOptionAsync` verify the selected state after the click, so a click the page ignored fails like Playwright's auto-wait instead of passing silently; `SelectOptionAsync` requires exactly one option carrying the requested `value`.
+
+## Writing a backend
+
+A hand-written backend composes the same helpers the shipped backends use, so its behavior matches theirs:
+
+```csharp
+IProtoHostBuilder AddWebBackend(this IProtoHostBuilder builder, IWebBackendFactory factory);
+
+IProtoHostBuilder AddWebMiddleware<TMiddleware>(this IProtoHostBuilder builder)
+    where TMiddleware : class, IWebOperationMiddleware;
+
+IProtoHostBuilder AddWebWait<TCondition>(
+    this IProtoHostBuilder builder,
+    WebWaitTiming timing,
+    TimeSpan? timeout = null,               // default 5 s
+    TimeSpan? pollInterval = null,          // default 50 ms
+    params WebOperationKind[] operations)   // default Navigate, Click, Fill
+    where TCondition : class, IWebWaitCondition;
+```
+
+- `WebBackendOptions.Resolve<TOptions>(context, configure, validate)` - the options precedence (code callback, started infrastructure, `ProtoTest:Web:{backend}` section, validation).
+- `WebBackendErrors` - the resolution and actionability failures (`NotPresent`, `NotActionable`, `MultipleMatch`) with the documented wording.
+- `WebFailureArtifacts.CaptureAsync(…)` - the screenshot, DOM and location attachments with the documented naming rule; `TraceArtifactFailure` records a capture that itself failed.
+- `WebProbeLoop` with `WebProbe` - the retry loop whose observation form treats `WebElementResolutionException` and `WebActionabilityException` as "not yet", polling at the backend's `PollInterval`.
+- `WebBackendDefaults` - the 5 s action timeout and 50 ms poll interval defaults; `IWebBackend.PollInterval` returns `WebBackendDefaults.DefaultPollInterval` unless the backend has its own interval option.
+- `WebArtifactNames.SafeName` - the lowercased, dash-sanitized identifier rule for artifact file names.
+- `WebMediaTypes.Guess` - the best-effort media type for a downloaded file, with `WebMediaTypes.Default` as the fallback.
 
 ## Next
 

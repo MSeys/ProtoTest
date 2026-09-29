@@ -69,7 +69,7 @@ Without `[Collection(ProtoTestCollection.Name)]` the fixture never runs, so `Pro
 
 ## Bring an existing suite
 
-Adoption is per test, not per project. A plain `[Fact]` or `[Theory]` keeps running unchanged, and a class that joins the collection can mix converted and plain tests: only `[ProtoTestFact]` and `[ProtoTestTheory]` start a context. Convert a class when its tests should have a host, a trace or capability-driven skips, and add `[Collection(ProtoTestCollection.Name)]` in the same change, because the fixture is what starts the host. [Bring an existing xUnit suite](./bring-your-existing-suite.md) walks the order.
+Adoption is per test, not per project. A plain `[Fact]` or `[Theory]` keeps running unchanged, and a class that joins the collection can mix converted and plain tests: only `[ProtoTestFact]` and `[ProtoTestTheory]` start a context. Convert a class when its tests need a host, a trace or capability skips. Add the collection attribute in the same change: the fixture starts the host. [Bring an existing xUnit suite](./bring-your-existing-suite.md) walks the order.
 
 ## What the adapter changes
 
@@ -84,7 +84,7 @@ Adoption is per test, not per project. A plain `[Fact]` or `[Theory]` keeps runn
 | Cancellation | The runner's `CancellationTokenSource` token rides the lifecycle. A body `OperationCanceledException` and a signalled source both record `Cancelled`. |
 | Outcomes | `passed` to `Passed`, `failed` to `Failed` with the exception, a failed `OperationCanceledException` to `Cancelled`, and a cancelled case to `Cancelled`. A skipped test records nothing, because xUnit never invokes it. |
 | Skips | Skip conditions are evaluated in the runner's constructor, before xUnit invokes anything, and the reason becomes xUnit's `SkipReason`. |
-| Attachments | xUnit v2 has no attachment API. In-memory content is materialized under `%TEMP%\ProtoTest\attachments`, and the path is written to the console: `ProtoTest attachment 'rest-01-response': /path/to/...`. The message needs `--logger "console;verbosity=detailed"` to show. |
+| Attachments | xUnit v2 has no attachment API. ProtoTest writes in-memory content under `%TEMP%\ProtoTest\attachments` and prints the path to the console: `ProtoTest attachment 'rest-01-response': /path/to/...`. The message needs `--logger "console;verbosity=detailed"` to show. |
 | Test names | xUnit's display name, with the row's arguments included. |
 
 ## Limits

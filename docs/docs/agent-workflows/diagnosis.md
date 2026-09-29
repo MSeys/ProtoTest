@@ -6,7 +6,7 @@ description: The deterministic document that says which test failed, why, and wh
 
 # Diagnosis
 
-A run has dozens of tests and one of them fails. The log says an assertion expected `99` and got `0`. The interesting part is which request produced that number, what the code around it looked like, and what the operation changed. The diagnosis answers all of that from the trace, with recorded evidence and no guessing.
+One test in the run fails. The log shows expected `99`, actual `0`. The diagnosis names the request that produced it, the surrounding code, and what the operation changed. It answers all of that from the trace, with recorded evidence and no guessing.
 
 ## The summary in a terminal
 
@@ -15,32 +15,37 @@ dotnet tool install --global ProtoTest.Cli
 prototest summary TestResults/run.prototrace
 ```
 
-The [CLI reference](./cli.md) lists the verb's arguments, the exit codes and the other three commands.
+Every line of a failing block says one thing:
 
-Here is that output for the committed MCP test fixture, `tests/ProtoTest.Mcp.Tests/Fixtures/run-failed.prototrace`. It is abridged; every test that did not fully succeed gets a block like these.
+import AnnotatedCode from '@site/src/components/AnnotatedCode';
 
-```text
-ProtoTest trace 2.0 · run 29e344f9cf54431ca7d8bad3f87a1749 · 2026-09-28 09:55:33Z - 2026-09-28 09:55:33Z
+<AnnotatedCode
+  filename="prototest summary"
+  language="text"
+  code={`ProtoTest trace 2.0 · run 29e344f9cf54431ca7d8bad3f87a1749 · 2026-09-28 09:55:33Z - 2026-09-28 09:55:33Z
 2 tests · 1 failed · 1 succeeded
 
 FAILED orders match their shape (16 ms)
   Shape mismatch failed with 1 error(s):
-    • [$.orderId]: Values did not match. (Expected: '7', Actual: '42')
+    • [\$.orderId]: Values did not match. (Expected: '7', Actual: '42')
   at artifacts/fixture-gen/Program.cs:65 (Program.<<Main)
   assert.json.shape · failed
   cause: assertion (1 mismatch)
-  mismatch: $.orderId: expected 7, actual 42
-```
+  mismatch: \$.orderId: expected 7, actual 42`}
+  callouts={[
+    {line: 1, title: 'The document', note: 'Trace format, run id, and the recorded time range of the run.'},
+    {line: 2, title: 'The counts', note: 'Every test by outcome. A partial test passed its runner outcome but something inside it failed, and the summary does not hide it.'},
+    {line: 4, title: 'The test', note: 'Outcome, name and duration. Every test that did not fully succeed gets a block like this one.'},
+    {line: 5, title: 'The recorded error', note: 'The message the run recorded, so it points at the code that failed.'},
+    {line: 8, title: 'The source location', note: 'The file and line of the selected failure.'},
+    {line: 9, title: 'The selected operation', note: 'The kind and name of the failing operation, and its status. The kind prints once when it is the name.'},
+    {line: 10, title: 'The rule', note: 'The diagnosis rule that matched. An assertion lists its mismatches; an operation error names the error.'},
+    {line: 11, title: 'The mismatches', note: 'Path, expected and actual, capped at three per block with a truncation line.'},
+  ]}
+  foot={<>A failed run gate gets its own block at the end, with the gate's message and details. The output above is the committed MCP test fixture; a run with nothing to report prints two lines and the words <code>All green.</code></>}
+/>
 
-The summary reads top to bottom:
-
-- The first line names the trace format, the run id and the recorded time range.
-- The second counts every test by outcome. A **partial** test passed its runner outcome but something inside it failed, and the summary does not hide it.
-- Each block starts with the outcome, the test name and its duration.
-- The error message and the `at` line come from the failure the run recorded, so they point at the code that failed.
-- The operation line names the selected failing operation and its status.
-- The `cause` line is the diagnosis rule. An assertion lists its mismatches; an operation error names the error.
-- A failed run gate gets its own block at the end, with the gate's message and details.
+The [CLI reference](./cli.md) lists the verb's arguments, the exit codes and the other three commands.
 
 ## The same document for an agent
 
@@ -83,7 +88,7 @@ The summary reads top to bottom:
 }
 ```
 
-The failure selector is the one the viewer uses: the deepest failing operation, an `assert.*` check outranking anything with an error, phase spans last, and a cancelled operation never outranking a failed one. `prototest summary`, the MCP tools and the viewer therefore select the same failure and tell one story.
+The failure selector matches the viewer's. It picks the deepest failing operation. An `assert.*` check outranks an error. Phase spans rank last. A cancelled operation never outranks a failed one. `prototest summary`, the MCP tools and the viewer therefore select the same failure and tell one story.
 
 ## The rules
 
@@ -102,7 +107,16 @@ Anything else is reported as **unexplained**, with the run and test ids and a po
 
 ## The context package
 
-`get_diagnosis` with `detail=context` returns what an agent needs to fix one failure:
+`get_diagnosis` with `detail=context` returns what an agent needs to fix one failure. Everything the agent reads arrives around the one operation it has to fix:
+
+```text
+                    ancestors (≤ 32)
+                          │
+   section previews (16) ──┤
+   source snippet (41 lines) ─┤
+   state changes (≤ 10) ─────┤──▶ the selected failure ──▶ artifacts (≤ 10, metadata)
+   the nearest call ancestor ──┘      operation        └─▶ report rows (≤ 10)
+```
 
 - the selected failure operation: kind, name, phase, status, error, source file, line, function and the recorded attributes;
 - its ancestor chain to the test execution, and the nearest call ancestor (`http.request`, `graphql.operation`, `grpc.call`, a `messaging.*` operation);
@@ -116,7 +130,20 @@ Anything else is reported as **unexplained**, with the run and test ids and a po
 
 - Deterministic and offline: one archive and one report in, one JSON document out. No model runs inside ProtoTest, no network call is made, and nothing is written. The same archive produces byte-identical JSON.
 - Coverage, gates and findings come from the JSON report a `ProtoTest.Reporting` sink embedded. Without a report, coverage is omitted with the reason, and gates and findings fall back to the trace's own records. Coverage is never recomputed from spans.
-- Hard caps bound every document and context: 25 mismatches, 10 findings, 10 gates, 10 artifacts, 4,000-character messages, 4 KB section previews, 41 source-snippet lines, 32 ancestors, 10 state items, 16 sections and 10 coverage rows.
+- Hard caps bound every document and context:
+
+| What is capped | The cap |
+| --- | --- |
+| mismatches in one failure | 25 |
+| findings, run gates and artifacts in one document | 10 each |
+| an error message | 4,000 characters |
+| one section preview | 4 KB |
+| the source snippet | 41 lines, 512 KB of embedded source |
+| the ancestor chain | 32 |
+| state items in the context package | 10 |
+| sections in the context package | 16 |
+| coverage rows in the context package | 10 |
+
 - An archive read from a stream has no file to read, so its state, sources and artifact content are absent with that reason. Open the file instead.
 - The rules read recorded evidence only. A failure whose evidence was not recorded is unexplained, and the viewer is the place to read the rest of the story.
 

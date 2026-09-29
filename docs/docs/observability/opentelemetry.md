@@ -6,7 +6,9 @@ description: "Export ProtoTest operations to OpenTelemetry, so test runs land in
 
 # OpenTelemetry
 
-Every operation ProtoTest starts is also a .NET `Activity` on the `ActivitySource` named **`ProtoTest`**. Subscribe an OpenTelemetry tracer to it with `AddSource("ProtoTest")`, and test runs land in the same backend as your application's telemetry.
+Every operation ProtoTest records is also a .NET `Activity` on the `ActivitySource` named **`ProtoTest`**. Subscribe an OpenTelemetry tracer to it with `AddSource("ProtoTest")`, and test runs appear in the same backend as application telemetry.
+
+The one exception is on [the what-does-not-travel list](#what-does-not-reach-the-backend) below: operations captured from your own activity sources are not re-emitted on `ProtoTest`.
 
 ## What it is
 
@@ -62,7 +64,7 @@ The export is a translation of the ProtoTrace tree:
 
 Spans nest the same way the ProtoTrace tree does: a test's `test.setup`, `test.execution` and `test.teardown` spans contain everything that happened in those phases, and an operation started in your test body is a child of `test.execution`. The execution span opens the W3C trace context the test body's calls carry, so application spans those calls cause line up under the test in your backend.
 
-The three phases are three root spans, because they run on separate activities; they share the `prototest.test.id` tag, which is the join key for a test in a backend that shows whole traces. Without a resource of your own, the exporter reports every span under the default service name (`unknown_service:<host>`); set OpenTelemetry's standard `OTEL_SERVICE_NAME` (for example `prototest`) in the run environment, or build a resource in the hook, so test runs are findable next to the application's telemetry.
+The three phases are three root spans, because they run on separate activities. Join them on the `prototest.test.id` tag, which every one of them carries. Without a resource of your own, spans use the default service name (`unknown_service:<host>`). Set OpenTelemetry's standard `OTEL_SERVICE_NAME` (for example `prototest`) in the run environment, or build a resource in the hook, so test runs are findable next to application telemetry.
 
 Spans and events carry these tags:
 
@@ -81,24 +83,33 @@ The operation's own trace attributes (`http.method`, `web.locator`, your custom 
 
 ### Correlating with your application
 
-Operations are real `Activity` instances, so `HttpClient`'s standard W3C trace-context propagation applies to requests sent while one is current. When your application is instrumented with OpenTelemetry too, that is what lets its server spans line up under the test step that caused them.
+Operations are real `Activity` instances, so `HttpClient`'s standard W3C trace-context propagation applies to requests sent while one is current. When your application is instrumented with OpenTelemetry too, that is what lets its server spans line up under the test step that caused them:
+
+```text
+test.execution  (root span, opens the trace context)
+├── http.request  GET /api/orders      injects traceparent
+│   └── server span (your app, joins under the request)
+└── assert.json.shape                  an event on the request's parent
+```
+
+The three phase spans are separate roots joined by `prototest.test.id`, and a failed operation carries status `Error` plus an `exception` event.
 
 ## The artifact
 
-The backend trace is a second consumer of the same operations: every operation ProtoTest starts, with its events and outcome, appears as a span in your tracing system. The `.prototrace` archive is unaffected and remains the complete record, because tracing stays on by default and OpenTelemetry is a second consumer of the same operations.
+The backend sees the operations ProtoTest records, with their events and outcome. The `.prototrace` archive still holds the full record.
 
 ### What does not reach the backend
 
+- **Operations captured from your own sources.** A source named in `ProtoTraceOptions.ActivitySources` is recorded into the `.prototrace` tree from the application's own activities, but it is not re-emitted on `ProtoTest`. Subscribe to the application's source as well to see both in one backend; otherwise those operations appear in the archive only, and the archive's copy is the complete one.
 - **Run-level evidence.** Gate verdicts, target resolutions and skips, capability decisions and run resources are events on the run group in the archive, not spans. The run's identity and environment (`runId`, `environment.*`, the CI metadata you configured) are archive-only too.
-- **Application spans captured from your own sources.** A source named in `ProtoTraceOptions.ActivitySources` is recorded into the `.prototrace` tree from the application's own activities, but it is not re-emitted on `ProtoTest`; a backend subscribed only to `ProtoTest` does not show it. Subscribe to the application's source as well to see both in one backend.
 - **Values above the tag cap**, listed under Limits below: they exist in the archive, not on the span.
 
 ## Limits
 
 - **No exporter included.** Subscribing is one `AddSource` call; install and configure the exporter you want, as above.
 - **Large values stay out of spans.** Values longer than 2,048 characters and the structured keys `context.value`, `observation.data`, `observation.metadata`, `shape.expected`, `shape.actual`, `shape.matches` and `shape.mismatches` exist only in `.prototrace`. The same cap applies to spans captured from your application.
-- **Propagation reaches an in-process application; an out-of-process one is the environment's.** The HTTP client handler and the raw-request transport inject `traceparent` from the current test's W3C context (pinned by `ClientHandlerTests`), and the configured activity sources capture the application's own spans into the same trace. An application running as its own process joins the trace only when that environment propagates OpenTelemetry context.
-- **The end-to-end path is expected, not guaranteed.** The repository's tests pin the injection and the capture; a full test-to-backend round trip is not covered by them yet.
+- **Propagation reaches an in-process application; an out-of-process one is the environment's.** The HTTP client handler and the raw-request transport inject `traceparent` from the current test's W3C context, and the configured activity sources capture the application's own spans into the same trace. An application running as its own process joins the trace only when that environment propagates OpenTelemetry context.
+- **The end-to-end path is expected, not guaranteed.** The injection and the capture are covered; a full test-to-backend round trip is not.
 
 ## Learn more
 

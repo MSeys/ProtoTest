@@ -46,7 +46,7 @@ public class Setup : ProtoTestAssembly
 }
 ```
 
-Without the assembly fixture the host is never initialized, and `ProtoTestAssembly.Host` throws `InvalidOperationException` telling you to register it.
+Without the assembly fixture the host is not initialized. `ProtoTestAssembly.Host` throws an `InvalidOperationException` that names the missing registration.
 
 The test attributes are `[ProtoTestFact]` and `[ProtoTestTheory]`, and both implement xUnit v3's `IBeforeAfterTestAttribute`, so their `Before` and `After` run around every test case.
 

@@ -132,6 +132,18 @@ The server exposes four read-only tools:
 
 Ask the agent to list the runs, then for the failure in the time drill. It answers from the archive, and the failure selector is the same one the viewer and the summary use, so the names, the line and the mismatch come out identical.
 
+With `detail: context`, the same failure returns its context package beside the summary:
+
+```text
+context: Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow
+ancestors: test.execution > http.request REST GET /api/v1/organization > assert.json.shape
+attributes: $.status, expected past_due, actual active; clock unmoved, elapsed 1.33 s
+source: samples/Northstar.ProtoTest/FailureDrills.cs:34
+artifacts: rest-01-response, rest-01-expected-shape, scenario-summary.json
+```
+
+The five lines are the ancestor chain, the attributes, the source snippet location, the artifacts it can reach and the state it changed. The checkpoint at the top of this lesson asks what the package adds over the one-line summary, and what it can never do.
+
 ## Close the loop
 
 A fix is not verified by the fix. Compare the new report with the report from before the change:

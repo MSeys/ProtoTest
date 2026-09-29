@@ -78,8 +78,9 @@ A `.prototrace` is a zip with named entries:
 
 The sample configures both report sinks in one place:
 
-```csharp
-.ConfigureTracing(trace =>
+<AnnotatedCode
+  filename="Setup.cs"
+  code={`.ConfigureTracing(trace =>
 {
     trace.OutputPath = Path.Combine("TestResults", "Northstar.ProtoTest", "northstar.prototrace");
 })
@@ -89,8 +90,13 @@ The sample configures both report sinks in one place:
 {
     sink.OutputPath = Path.Combine("TestResults", "Northstar.ProtoTest", "report.html");
     sink.Title = "Northstar sample";
-});
-```
+});`}
+  callouts={[
+    {line: 3, title: 'The trace path', note: 'One archive per run. CI points this at its artifact directory instead; the evidence lesson shows how.'},
+    {line: 5, title: 'Both sinks copied into the archive', note: 'The JSON and HTML reports are written beside the trace and copied into resources/, so one upload carries all three.'},
+  ]}
+  foot={<>From <code>samples/Northstar.ProtoTest/Setup.cs</code>. The paths below <code>TestResults/Northstar.ProtoTest/</code> are the local default.</>}
+/>
 
 Both files are written at the end of the run and copied into the archive, so the one artifact a CI job uploads carries the story and the report.
 

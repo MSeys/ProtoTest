@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Keep state per test and clean it up
 
-The state drill from Level 0 reads a project id that no test in the run created, and the request 404s. The fix creates its own state and reads only that. This lesson reads the fix in the trace, including what the run owns and removes.
+The state drill from Level 0 reads a project id that no test in the run created (`prj_1`, a fixed id that belongs to no tenant), and the request 404s. That drill is one of the four in [the failure tour](/learn/why-integration-tests-get-hard/a-failure-tour). The fix creates its own state and reads only that. This lesson reads the fix in the trace, including what the run owns and removes.
 
 <LearnShell
   level="Level 3, lesson 3"
@@ -97,15 +97,21 @@ The attribute that provisions it uses a name from the test:
 
 `EachTenantSeesOnlyItsOwnProjects` creates a project and lists the projects its tenant can see:
 
-```csharp
-var name = $"own-{Proto.Context.TestId}";
+<AnnotatedCode
+  filename="FailureDrills.cs"
+  code={`var name = $"own-{Proto.Context.TestId}";
 var project = await Proto.Context.Data().CreateProjectAsync(name);
 
 using var response = await Proto.Context.Rest().GetAsync("/api/v1/projects");
 var page = response
     .Should.HaveHttpStatus(HttpStatusCode.OK)
-    .ReadRequired<CursorPage<ProjectResponse>>();
-```
+    .ReadRequired<CursorPage<ProjectResponse>>();`}
+  callouts={[
+    {line: 1, title: 'Create with the test id', note: 'The name carries TestId, so the record belongs to this test even though the project name itself is ordinary.'},
+    {line: 3, title: 'Read only the own tenant', note: 'The list call runs inside the provisioned tenant, so it returns the one project this test created.'},
+  ]}
+  foot={<>From <code>samples/Northstar.ProtoTest/FailureDrills.cs</code>. The drill next to it read <code>prj_1</code>, a fixed id that belonged to no test in the run.</>}
+/>
 
 The list holds one project, and it is the one the test just created. The drill next to it read `prj_1`, a fixed id that belonged to no test in the run, and the check failed on the 404 the application answered.
 

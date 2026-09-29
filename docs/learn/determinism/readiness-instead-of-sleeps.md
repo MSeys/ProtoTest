@@ -8,6 +8,7 @@ description: "Register a readiness probe after the application it probes, read t
 
 import LearnShell from '@site/src/components/LearnShell';
 import AnnotatedCode from '@site/src/components/AnnotatedCode';
+import Checkpoint from '@site/src/components/Checkpoint';
 import Link from '@docusaurus/Link';
 
 # Wait for readiness, not for time
@@ -34,7 +35,7 @@ The run must wait when it starts an address before any test uses it. The choice 
   }
   checkpoint={{
     question:
-      'The API journeys run in-process, so they need no address. Why does the run layer still carry a readiness entity, and what would a sleep for the same wait leave in its place?',
+      'The API journeys run in-process, so they need no address. Why does the run layer still carry a readiness entity?',
     verify: (
       <>
         Download <a href="pathname:///lessons/l3-clock-window.prototrace">l3-clock-window.prototrace</a>, open it in the{' '}
@@ -104,5 +105,11 @@ The entity is released with the run, at the same position the listener is releas
 ## What the tests do instead
 
 No test in the sample waits for the application. A test starts, takes its client and calls. The waiting happened once, before the first test, and every test after it reads an address the run already checked. Replace a `Task.Delay` before a request with a readiness probe.
+
+<Checkpoint
+  question="What would a sleep for the same wait leave in the trace instead of the readiness entity?"
+  verify={<>Read the test execution spans in <a href="pathname:///lessons/l3-clock-window.prototrace">l3-clock-window.prototrace</a>. No test span waits for the address.</>}
+  reveal={<>Nothing but a slower span. A sleep records no URL, no attempts and no waited time. The readiness entity reads 1 attempt and 113 ms; the sleep would leave only a slower entry in one test's execution span.</>}
+/>
 
 </LearnShell>

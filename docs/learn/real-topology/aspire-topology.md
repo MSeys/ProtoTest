@@ -8,6 +8,7 @@ description: "Select the OpenCSMS AppHost with one key and let it run the API an
 
 import LearnShell from '@site/src/components/LearnShell';
 import AnnotatedCode from '@site/src/components/AnnotatedCode';
+import ModesComparison from '@site/src/components/ModesComparison';
 import Link from '@docusaurus/Link';
 
 # Let Aspire start the topology
@@ -114,15 +115,18 @@ Passed!  - Failed:     0, Passed:    61, Skipped:    13, Total:    74, Duration:
 
 That is the run recorded on 2026-09-28 in `opencsms-topology-20260928-094052.log`. The 13 skips are the journeys that need the test host or the run's clock; the log lists each one by name, and the condition on the test names the reason. The suite still owns the tests, the fixtures and the evidence. It does not own the product's lifetime any more.
 
+:::note What this mode cannot do
+
+Two limits are worth knowing before you build an AppHost for a suite. The AppHost must target the suite's framework: the testing host runs the AppHost's entry point inside the test process, and the AppHost's orchestrator launches project resources with `dotnet run`, which cannot choose a target framework. OpenCSMS keeps every project on net8.0 for this reason. And real processes mean real clocks: a test that moves the run's clock cannot move a process it does not own, so it should declare `[RequiresTestClock]` and skip here instead of failing.
+
+:::
+
+How the three modes compare, with the counts each lesson quotes:
+
+<ModesComparison />
+
 ![The station timeline: a charge point, the remote-start panel and the sessions the dashboard lists.](/images/opencsms/station-timeline.png)
 
 The dashboard the API resource serves. The station screen is the operator's view of the sessions the product recorded.
-
-## What this mode cannot do
-
-Two limits are worth knowing before you build an AppHost for a suite:
-
-- The AppHost must target the suite's framework. The testing host runs the AppHost's entry point inside the test process, and the AppHost's orchestrator launches project resources with `dotnet run`, which cannot choose a target framework. OpenCSMS keeps every project on net8.0 for this reason.
-- Real processes mean real clocks. A test that moves the run's clock cannot move a process it does not own, so it should declare `[RequiresTestClock]` and skip here instead of failing.
 
 </LearnShell>

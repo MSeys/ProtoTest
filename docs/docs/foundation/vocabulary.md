@@ -4,9 +4,55 @@ title: Vocabulary
 description: "The words the rest of the documentation uses: host, execution context, capability, address, provider chain, lifecycle phases, trace entity kinds, and observations against findings and attachments."
 ---
 
+import AnnotatedCode from '@site/src/components/AnnotatedCode';
+
+export const entityCode = `{
+  "id": "client:System.Net.Http.HttpClient:Northstar",
+  "client.name": "Northstar",
+  "client.owned": true,
+  "client.initializer": "AspNetCoreClientInitializer\`1",
+  "resource.state": "released"
+}
+{
+  "id": "Northstar.ProtoTest.NorthstarMemberContext",
+  "context.type": "Northstar.ProtoTest.NorthstarMemberContext",
+  "context.value": { "Id": "owner", "Token": "[REDACTED]" }
+}
+{
+  "kind": "http.request",
+  "name": "REST - POST /api/v1/projects",
+  "entity": "client:System.Net.Http.HttpClient:Northstar",
+  "http.response.status_code": 201
+}`;
+
+export const entityCallouts = [
+  {
+    line: 1,
+    title: 'A client entity',
+    note: 'The in-process client the test used. Owned by the test, created by the ASP.NET Core initializer, released at teardown.',
+  },
+  {
+    line: 8,
+    title: 'A context entity',
+    note: 'Typed state the member attribute set. Secrets are redacted in the archive, so the token reads [REDACTED].',
+  },
+  {
+    line: 13,
+    title: 'The operation that points at it',
+    note: 'The POST names the client entity by id and carries what it returned: status 201.',
+  },
+];
+
 # Vocabulary
 
 The docs use a small, deliberate vocabulary. This page is the whole of it, one table per idea. The name in prose is the name the trace records. Setup, report and viewer use the same term.
+
+<AnnotatedCode
+  filename="state.json (l1-first-journey)"
+  code={entityCode}
+  callouts={entityCallouts}
+  foot={<>Two entities and the operation that points at them, from <code>docs/static/lessons/l1-first-journey.prototrace</code>.</>}
+/>
 
 ## The first hour
 
@@ -41,17 +87,17 @@ The order, the failure rules and the rollback walk are in [Host and lifecycle](.
 
 ## Trace entity kinds
 
-Entities are state, not history: each appears once in the archive with its latest state and its versions.
+Entities are state, not history: each appears once in the archive with its latest state and its versions. Example ids come from the lesson archives (`l1-first-journey`, `l3-clock-window`).
 
-| Kind | Id | What it records |
-| --- | --- | --- |
-| `client` | `client:{fullTypeName}:{name}` | a client a test resolved |
-| `context` | `{fullTypeName}`, or `{key}:{fullTypeName}` when set with a key | typed state an attribute or hook set |
-| `auth` | `auth:user` | the test user and how it signed in |
-| `server` | `server:{entryPointFullName}` | the in-process application server |
-| `capability` | `{kind}:{name}`, with `:{instance}` when the descriptor carries one | what the run can serve |
-| `clock` | `clock:run` for the run, and a clock per test | the clocks a test can advance |
-| `device` | `device:{client}:{deviceType}:{id}` | a device session |
+| Kind | Id | Example id | What it records |
+| --- | --- | --- | --- |
+| `client` | `client:{fullTypeName}:{name}` | `client:System.Net.Http.HttpClient:Northstar` | a client a test resolved |
+| `context` | `{fullTypeName}`, or `{key}:{fullTypeName}` when set with a key | `Northstar.ProtoTest.NorthstarMemberContext` | typed state an attribute or hook set |
+| `auth` | `auth:user` | `auth:user` | the test user and how it signed in |
+| `server` | `server:{entryPointFullName}` | `server:ProtoTest.SampleApp.Program:Northstar` | the in-process application server |
+| `capability` | `{kind}:{name}`, with `:{instance}` when the descriptor carries one | `server:ASP.NET Core:Northstar` | what the run can serve |
+| `clock` | `clock:run` for the run, and a clock per test | `clock:683368000001` | the clocks a test can advance |
+| `device` | `device:{client}:{deviceType}:{id}` | a pattern; no lesson archive records one | a device session |
 
 Tracked values are state items with kind `value` and an id of the form `{type}:{identity}`. Infrastructure and resources use their own ids. The entry kinds themselves, from `test.setup` to the last assertion, are listed in [ProtoTrace](../observability/prototrace.md#what-a-trace-contains).
 

@@ -24,21 +24,21 @@ The test declares what it needs. The attribute provides it. No base fixture clas
 
 ## Attributes ProtoTest ships
 
-| Attribute | Kind |
-| --- | --- |
-| [`[WebSession]`](../integrations/web/index.md#several-sessions-in-one-test) | `ProtoAttribute`: declares and optionally opens a browser session |
-| [`[LoginAs<TStrategy>]`](../integrations/web/login.md) | `ProtoAttribute`: logs a browser session in |
-| [`[Auth<T>]`](../integrations/rest/authentication.md) | metadata read by the HTTP hooks, one authenticator for REST and GraphQL, narrowed with `Protocols` |
-| [`[SignedInAs]`](../integrations/rest/authentication.md#built-in-test-user) | `ProtoAttribute` plus HTTP auth metadata: declares the test user's name, roles and claims for the in-process application |
-| `[Application("Name", "Protocol:Client")]` | `ProtoAttribute`: selects the application under test and, optionally, which client each protocol uses |
-| [`[RequiresCapability(kind)]`](./skip-conditions.md) | `ProtoAttribute`: skips the test unless the host has the capability |
-| [`[RequiresWorker<TProgram>]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute`: skips unless `AddWorkerHost<TProgram>()` hosts the worker |
-| [`[RequiresServer(name)]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute`: skips unless the named `AddAspNetCoreServer` instance is composed |
-| [`[RequiresApplication(name)]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute`: skips unless `AddApplication` declared the application |
-| [`[RequiresInProcess]`](./skip-conditions.md) | `ProtoAttribute`: `[RequiresCapability("server")]` |
-| `[ProtoTest]`, `[ProtoTestFact]`, `[ProtoTestTheory]` | [runner](../runners/overview.md) entry points |
+| Attribute | Kind | Lifecycle or metadata |
+| --- | --- | --- |
+| [`[WebSession]`](../integrations/web/index.md#several-sessions-in-one-test) | `ProtoAttribute`: declares and optionally opens a browser session | lifecycle |
+| [`[LoginAs<TStrategy>]`](../integrations/web/login.md) | `ProtoAttribute`: logs a browser session in | lifecycle |
+| [`[Auth<T>]`](../integrations/rest/authentication.md) | metadata read by the HTTP hooks, one authenticator for REST and GraphQL, narrowed with `Protocols` | metadata |
+| [`[SignedInAs]`](../integrations/rest/authentication.md#built-in-test-user) | `ProtoAttribute` plus HTTP auth metadata: declares the test user's name, roles and claims for the in-process application | lifecycle and metadata |
+| `[Application("Name", "Protocol:Client")]` | `ProtoAttribute`: selects the application under test and, optionally, which client each protocol uses | lifecycle |
+| [`[RequiresCapability(kind)]`](./skip-conditions.md) | `ProtoAttribute`: skips the test unless the host has the capability | skip gate |
+| [`[RequiresWorker<TProgram>]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute`: skips unless `AddWorkerHost<TProgram>()` hosts the worker | skip gate |
+| [`[RequiresServer(name)]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute`: skips unless the named `AddAspNetCoreServer` instance is composed | skip gate |
+| [`[RequiresApplication(name)]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute`: skips unless `AddApplication` declared the application | skip gate |
+| [`[RequiresInProcess]`](./skip-conditions.md) | `ProtoAttribute`: `[RequiresCapability("server")]` | skip gate |
+| `[ProtoTest]`, `[ProtoTestFact]`, `[ProtoTestTheory]` | [runner](../runners/overview.md) entry points | runner entry |
 
-Most of the capabilities in a real suite are ones you write. That is the point.
+Most of the capabilities in a real suite are ones you write. That is the point. `[Auth<T>]` is the one to watch: it is metadata, not a lifecycle attribute, so it never runs setup or teardown. The hooks read it.
 
 ## How it works
 
@@ -54,14 +54,23 @@ public abstract class ProtoAttribute : Attribute
 }
 ```
 
-Attributes run in ascending `Order` before the test and in reverse afterwards. Give a capability that others depend on a **lower** order:
+Attributes run in ascending `Order` before the test and in reverse afterwards. Give a capability that others depend on a **lower** order. Hooks and attributes share one lane: every test hook runs before every attribute, and teardown walks the lane back.
 
-| Attribute | `Order` |
-| --- | --- |
-| `[SampleEnvironment]` | -200 |
-| `[SampleUser]` | -100 |
-| `[WebSession]` | -10 |
-| `[LoginAs<T>]` | 0 |
+```mermaid
+flowchart LR
+    H["hooks: First … Authentication"] --> I["infra band −300 … −201"]
+    I --> E["environment band −200 … −101"]
+    E --> D["identity band −100 … −1"]
+    D --> S["scenario band 0 and above"]
+    S --> B["body"]
+    B --> SR["scenario back"]
+    SR --> DR["identity back"]
+    DR --> ER["environment back"]
+    ER --> IR["infra back"]
+    IR --> HR["hooks back"]
+```
+
+`[SampleEnvironment]` sits in the environment band at -200, `[SampleUser]` in the identity band at -100, `[WebSession]` at -10, `[LoginAs<T>]` at 0. The same lane with the hook positions is in [Hooks](./hooks.md#reserved-order-bands): one lane, two pages, so they cannot drift apart.
 
 Because `Order` is an `init` property, callers can override it where they apply the attribute:
 
@@ -104,6 +113,15 @@ public sealed class BillingJourney
     public async Task UsageIsMeteredAgainstThePlanAllowance() { ... }
 }
 ```
+
+```mermaid
+flowchart TB
+    M["NorthstarMember at Order 0"] --> T["NorthstarTenant at −200:\nprovisions the tenant"]
+    M --> A["Auth at 0:\ncarries the member token"]
+    M --> O["own behavior at 0:\nsees both dependencies"]
+```
+
+The expansion dedupes by declaration: same type plus same public property values runs once, so an explicit `NorthstarTenant` and the composed copy collapse into one. `Order` differs means different, and the explicit declaration wins.
 
 How the expansion behaves:
 
@@ -178,6 +196,13 @@ public sealed class SampleUserAttribute : ProtoAttribute
 ```
 
 The sample suite's environment and user attributes are `SampleEnvironmentAttribute` and `SampleUserAttribute` (see below). The learning sample groups its pair as `NorthstarMemberAttribute` in `samples/Northstar.ProtoTest`.
+
+```mermaid
+flowchart LR
+    E["environment at −200:\nSetContext"] --> ST["typed state"]
+    ST --> U["user at −100:\nResolve"]
+    U --> TD["teardown:\nTryResolve, early return\nwhen setup never got that far"]
+```
 
 What makes these work well:
 

@@ -5,6 +5,45 @@ sidebar_label: Overview
 description: "The handful of ProtoTest.Core concepts every integration builds on: the host, the execution context, attributes, clients, hooks and the trace."
 ---
 
+import TraceAnatomy from '@site/src/components/TraceAnatomy';
+import {lessonTraces} from '@site/src/data/traceSources';
+
+export const lifecycleLayers = [
+  {
+    id: 'setup',
+    label: '1-2 Setup',
+    when: '522.9 ms',
+    lead: 'Steps 1 and 2 of the lifecycle: hooks create the clients, attributes provision the tenant.',
+    entries: [
+      {kind: 'hook.before', name: 'Client initializer, SQL, scenario, auth hooks', meta: '6 hooks, lowest order first'},
+      {kind: 'client.initialize', name: 'Rest, GraphQL, loopback web, in-process, probe, messaging', meta: 'one operation per client'},
+      {kind: 'attribute.before', name: 'Application, NorthstarTenant, SignedInAs, NorthstarMember', meta: '4 attributes in Order'},
+    ],
+  },
+  {
+    id: 'execution',
+    label: '3 Execution',
+    when: '161.1 ms',
+    lead: 'Step 3: the body runs. One request and the two checks that decided the test.',
+    entries: [
+      {kind: 'http.request', name: 'REST POST /api/v1/projects', meta: '142.2 ms, 201 Created'},
+      {kind: 'assert.http.status', name: 'Assert status 201 Created', meta: 'the check that decided the request'},
+      {kind: 'assert.json.shape', name: 'Assert response shape', meta: '5 properties matched at once'},
+    ],
+  },
+  {
+    id: 'teardown',
+    label: '4-5 Teardown',
+    when: '30.0 ms',
+    lead: 'Steps 4 and 5: attributes and hooks reverse, attachments publish, resources release.',
+    entries: [
+      {kind: 'attribute.after', name: 'NorthstarMember down to Application', meta: 'reverse of setup'},
+      {kind: 'attachment.publish', name: 'Request, response, expected shape, scenario summary', meta: '4 files into the archive'},
+      {kind: 'resource.release', name: 'Tenant cleanup, services, connection, consumer', meta: 'reverse registration order'},
+    ],
+  },
+];
+
 # Foundation overview
 
 Everything in ProtoTest sits on a handful of concepts from `ProtoTest.Core`. Learn these once and every integration makes sense. One host per process, one context per test; everything else hangs off these two. New to integration testing? The [Learn track](/learn/) starts from why these tests get hard.
@@ -41,7 +80,7 @@ Two things build on top and have their own sections:
 - **[ProtoTrace](../observability/prototrace.md)** records every operation, automatically.
 - **[Observations and coverage](../observability/coverage.md)** turn what tests did into reports.
 
-Two pieces matter less often. The context can own test-scoped [resources](./execution-context.md#resources) and record [findings](./execution-context.md#findings) without failing the test. The host builder can [gate the whole run](./lifecycle.md#run-gates-and-resources) on what the reports collected.
+Two pieces matter less often. The context can own test-scoped [resources](./execution-context-advanced.md#resources) and record [findings](./execution-context-advanced.md#findings) without failing the test. The host builder can [gate the whole run](./lifecycle.md#run-gates-and-resources) on what the reports collected.
 
 [Test time](./time.md) and [Concurrency](./concurrency.md) cover two questions every suite meets: how to move a clock instead of sleeping, and what ProtoTest keeps isolated when tests run in parallel.
 
@@ -69,11 +108,21 @@ public sealed class BillingTests
 
 What happens around that method:
 
-1. The runner calls `StartTestAsync`. A context and DI scope are created.
-2. **Test hooks** run, including ProtoTest's own, which creates clients and applies `[Auth<T>]`.
-3. **Attributes** run in `Order`: `[SampleEnvironment]` at -200, then `[SampleUser]` at -100.
-4. Your test body runs. Requests, assertions and recorded state are traced. A failing `Resolve` or client lookup is traced too.
-5. The runner calls `CompleteTestAsync`. Attributes and hooks tear down in reverse, attachments are published, and owned resources and the scope are disposed.
+1. **[1]** The runner calls `StartTestAsync`. A context and DI scope are created.
+2. **[2]** **Test hooks** run, including ProtoTest's own, which creates clients and applies `[Auth<T>]`.
+3. **[3]** **Attributes** run in `Order`: `[SampleEnvironment]` at -200, then `[SampleUser]` at -100.
+4. **[4]** Your test body runs. Requests, assertions and recorded state are traced. A failing `Resolve` or client lookup is traced too.
+5. **[5]** The runner calls `CompleteTestAsync`. Attributes and hooks tear down in reverse, attachments are published, and owned resources and the scope are disposed.
+
+The same five steps in a recording, the learning sample's project journey:
+
+<TraceAnatomy
+  source={lessonTraces.firstJourney}
+  title="The lifecycle, recorded"
+  test="Northstar.ProtoTest.ProjectsJourney.CreatingAProjectReturnsIt"
+  layers={lifecycleLayers}
+  blindSpots={[]}
+/>
 
 [Lifecycle](./lifecycle.md) covers the exact rules, including what happens when something fails.
 

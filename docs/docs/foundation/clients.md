@@ -4,6 +4,35 @@ title: Clients
 description: "Clients are what a test talks to. ProtoTest creates them per test, registers them on the context and disposes them afterwards."
 ---
 
+import TraceAnatomy from '@site/src/components/TraceAnatomy';
+import {lessonTraces} from '@site/src/data/traceSources';
+
+export const clientLayers = [
+  {
+    id: 'initialize',
+    label: 'Initialize',
+    when: 'setup, before any other hook',
+    lead: 'One client.initialize operation per group, in registration order. The in-process client carries the server start.',
+    entries: [
+      {kind: 'client.initialize', name: 'Rest:Northstar:Northstar (HttpClient)', meta: '3.78 ms, address deferred to the in-process server'},
+      {kind: 'client.initialize', name: 'GraphQL:Northstar:GraphQL (HttpClient)', meta: '0.21 ms, same name, other protocol slot'},
+      {kind: 'client.initialize', name: 'Rest:Northstar web:Northstar web (HttpClient)', meta: '1.08 ms, address from configuration'},
+      {kind: 'client.initialize', name: 'Northstar (HttpClient)', meta: '317.69 ms, carries the ASP.NET Core server start'},
+      {kind: 'client.initialize', name: 'ScenarioProbe, Default (ProtoMessageClient)', meta: 'typed and messaging clients'},
+    ],
+  },
+  {
+    id: 'release',
+    label: 'Release',
+    when: 'teardown',
+    lead: 'Owned clients release as entity state. The shared factory stays: owned false, no dispose.',
+    entries: [
+      {kind: 'client', name: 'Northstar, Rest, GraphQL, probe, messaging clients', meta: 'client.owned true, resource.state released'},
+      {kind: 'client', name: 'Northstar:Factory', meta: 'client.owned false, shared with the run'},
+    ],
+  },
+];
+
 # Clients
 
 ## What it is
@@ -35,6 +64,12 @@ Clients are keyed by **type and case-insensitive name**: an `HttpClient` named `
 Before any of your hooks or attributes run, ProtoTest's client hook groups initializers by protocol, client type and name, then tries each group in registration order. The trace records one `client.initialize` operation per group, not one per attempt, and the winning initializer is written as the client entity's `client.initializer` state. A candidate that returns `false` is not traced individually; an initializer that throws fails the `client.initialize` operation.
 
 Integrations such as REST and GraphQL set `Protocol`, so they can each register an `HttpClient` named `Default`. Their clients are stored under names such as `Rest:Default` and `GraphQL:Default`, and the integration accessors resolve those names for you. A client with an unambiguous name can also be looked up by its bare name. If several protocols use that name, use the scoped name with `Client<T>` or use the integration accessor.
+
+| You ask for | Stored under | You reach |
+| --- | --- | --- |
+| `Rest("Default")` | `Rest:Default` | the REST `HttpClient` |
+| `GraphQL("Default")` | `GraphQL:Default` | the GraphQL `HttpClient` |
+| `Rest("Northstar")` under `[Application("Northstar")]` | `Rest:Northstar:Northstar` | the application's REST `HttpClient` |
 
 If no initializer in a group succeeds, the test fails in setup with *"No registered initializer could create a client of type 'X' with name 'Y'."*
 
@@ -173,7 +208,20 @@ builder.ConfigureServices(services =>
 
 With `ProtoClientOwnership.Caller` the test registers the client as shared and does not dispose it at teardown. The trace marks the entity `client.owned = false`, and the release writes state, not a dispose. Registering through a factory delegate, as above, lets the host's service provider dispose the initializer, and with it the shared client, when the run ends. Remember that tests running in parallel use a shared client concurrently.
 
+| Ownership | Teardown | Trace |
+| --- | --- | --- |
+| `Context` (the default) | the test disposes the client, in reverse registration order | `client.owned` true, `resource.state` released |
+| `Caller` (shared) | the test leaves it alone; the owner disposes it with the run | `client.owned` false, release writes state, not a dispose |
+
 ## What the trace shows
+
+<TraceAnatomy
+  source={lessonTraces.firstJourney}
+  title="Six clients, one layer"
+  test="Northstar.ProtoTest.ProjectsJourney.CreatingAProjectReturnsIt"
+  layers={clientLayers}
+  blindSpots={[]}
+/>
 
 - One `client.initialize` operation per (protocol, type, name) group, with the winning initializer recorded as the client entity's `client.initializer` state. A group with no winner fails the operation.
 - A failed `Client<T>` lookup writes a `client.resolve` event before it throws. `TryClient` never traces.

@@ -123,8 +123,13 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - Docs: a copy-in skill (`skills/prototest-evidence-loop`) teaches agents the evidence loop and the CLI. [Coding agents](https://prototest.dev/docs/agent-workflows/coding-agents#the-skills-bundle)
 - Docs: the xUnit pages cover converting an existing suite and the Microsoft.Testing.Platform opt-in on SDK 10. [Runners](https://prototest.dev/docs/runners/overview)
 - Docs: the integrations overview lists every `ProtoTest.Devices*` package with a one-line purpose. [Overview](https://prototest.dev/docs/integrations/overview)
+- Docs: the 44 packages are tiered into supported and preview sets, with the stability promise and the graduation path stated. [Installation](https://prototest.dev/docs/getting-started/installation)
+- Docs: the web pages make the backend choice explicit (Playwright or Selenium), and the conversion order covers NUnit, MSTest and TUnit suites. [Web](https://prototest.dev/docs/integrations/web)
+- Docs: the agent workflows document the feedback webhook payload, the configuration page lists every section's keys, and the template page shows what the scaffold creates. [CLI](https://prototest.dev/docs/agent-workflows/cli)
+- Docs: the reference pages gain the recorded trace walks, the decision figures and the triage tables; the longest pages split into child pages (web page coverage, messaging adapters, gRPC calls, the ProtoTrace archive, the CI providers). [Docs](https://prototest.dev/docs/)
 - Samples: Northstar with the Learning demo suite is the in-repo sample. [Learn](https://prototest.dev/learn)
 - Viewer: the viewer stays responsive at 1,000+ tests; search, filter and open times drop. [Benchmarks](https://prototest.dev/docs/project/benchmarks)
+- Viewer: skipped ticks read as planned, focus states and hit targets are restored, and the run header's outcome pill drops under the title on narrow screens. [Trace viewer](https://trace.prototest.dev)
 
 ### Fixes
 
@@ -223,6 +228,9 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - Docs: the coverage page's viewer mock shows the shipped 44-test demo, and the home page's structured data names 1.1.0. [Coverage](https://prototest.dev/docs/observability/coverage)
 - Docs: the accessibility gate also covers the Learn track, the changelog, search and the 404 route. [Design system](https://prototest.dev/docs/advanced/design-system)
 - Docs: the Learning demo's drill archives and lesson values are regenerated from the current code, and the sample README's counts match a fresh run. [Learn](https://prototest.dev/learn)
+- Docs: every value quoted from a lesson archive matches the committed trace; the first-test walk, the readiness waits, the tenant ids and the artifact sizes were reconciled. [Learn](https://prototest.dev/learn)
+- Docs: the teardown finding reads the same in the reporting, lifecycle and Learn pages, and the first test registers the report sink it promises. [Reporting](https://prototest.dev/docs/observability/reporting)
+- Docs: the viewer walkthrough carries the shipped demo's records and the viewer's own chrome, so the mocks and the real screens agree. [Coverage](https://prototest.dev/docs/observability/coverage)
 - Docs: the Learn track adds four lessons: the run's one host, signing in as a test user, findings and the run gate, and swapping a dependency for one test. [Learn](https://prototest.dev/learn)
 - Docs: the home's command box offers every runner's commands, with a proof strip and a link to the conversion page. [Home](https://prototest.dev/)
 - Docs: a vocabulary page for the foundation terms and the trace entities. [Vocabulary](https://prototest.dev/docs/foundation/vocabulary)

@@ -1,5 +1,5 @@
 ---
-sidebar_position: 7
+sidebar_position: 9
 title: Assertions
 description: "One assertion surface across every integration: Should and ShouldNot, chainable members, and shape matching as the chain continuation."
 ---

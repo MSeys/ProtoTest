@@ -1,5 +1,5 @@
 ---
-sidebar_position: 14
+sidebar_position: 17
 title: Environment resolution
 description: "Declare what the run needs as a target with an ordered provider chain: the first provider whose condition holds serves it, and the trace records the decision."
 ---

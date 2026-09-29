@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 title: Execution context advanced topics
 sidebar_label: Advanced topics
 description: "The execution context pieces a suite reaches for less often: services, resources, findings, observations and the trace writer."

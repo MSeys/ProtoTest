@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 6
 title: Host API
 sidebar_label: Host API
 description: "The ProtoHost surface for runner integrations: starting and completing tests by hand, and the host members."

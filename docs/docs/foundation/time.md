@@ -1,5 +1,5 @@
 ---
-sidebar_position: 13
+sidebar_position: 16
 title: Test time
 description: "Advance a clock instead of sleeping: each test gets its own TimeProvider, the in-process application sees it, and every advance is recorded in the trace."
 ---

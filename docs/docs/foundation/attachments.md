@@ -1,5 +1,5 @@
 ---
-sidebar_position: 10
+sidebar_position: 12
 title: Attachments
 description: "Files a test produces reach your runner, so they show up next to the result in your IDE or CI, and land in the trace."
 ---

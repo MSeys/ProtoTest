@@ -1,5 +1,5 @@
 ---
-sidebar_position: 15
+sidebar_position: 18
 title: Concurrency
 description: "How ProtoTest keeps parallel tests isolated, what to do when a test fans out internally, and the parallelism the project has actually exercised."
 ---

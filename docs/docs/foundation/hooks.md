@@ -1,5 +1,5 @@
 ---
-sidebar_position: 9
+sidebar_position: 11
 title: Hooks
 description: "Run code around every test or around the whole run without touching a test: correlation ids, shared resets, one-off startup."
 ---

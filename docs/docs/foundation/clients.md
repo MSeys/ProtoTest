@@ -1,5 +1,5 @@
 ---
-sidebar_position: 6
+sidebar_position: 8
 title: Clients
 description: "Clients are what a test talks to. ProtoTest creates them per test, registers them on the context and disposes them afterwards."
 ---

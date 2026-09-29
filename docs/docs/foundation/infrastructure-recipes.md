@@ -1,5 +1,5 @@
 ---
-sidebar_position: 12
+sidebar_position: 15
 title: Infrastructure recipes
 sidebar_label: Recipes
 description: "Infrastructure recipes: the sample flows, readiness probes, run-scoped setup, and AddResource against AddInfrastructure."

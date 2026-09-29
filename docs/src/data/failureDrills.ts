@@ -107,7 +107,7 @@ export const failureDrills: DrillPair[] = [
   {
     id: 'state',
     question: 'State',
-    ask: 'What does the test share, and what does it leave behind?',
+    ask: 'What does the test leave behind?',
     drill: {
       test: 'AnUnknownProjectIdIsTreatedAsMine',
       what: 'Reads a project id no test in the run created.',
@@ -161,7 +161,7 @@ export const failureDrills: DrillPair[] = [
     ask: 'Where does the address come from?',
     drill: {
       test: 'TheAddressWasHardcodedForOneMachine',
-      what: 'Connects a raw HttpClient to a fixed address, 127.0.0.1:5099.',
+      what: 'Connects a plain HttpClient to a hardcoded address, 127.0.0.1:5099.',
       elapsed: '2.05 s',
       record: [
         {
@@ -175,7 +175,7 @@ export const failureDrills: DrillPair[] = [
     },
     fix: {
       test: 'TheAddressComesFromTheComposition',
-      what: 'Calls the same endpoint through the REST client the run composed.',
+      what: 'Calls the same endpoint through the composed REST client.',
       elapsed: '149.8 ms',
       record: [
         {
@@ -186,12 +186,12 @@ export const failureDrills: DrillPair[] = [
         },
       ],
     },
-    change: 'Take the address from the composition.',
+    change: 'Get the address from ProtoTest instead of hardcoding it.',
   },
   {
     id: 'visibility',
     question: 'Visibility',
-    ask: 'When it fails, what can it show you?',
+    ask: 'When a test fails, what does it show you?',
     drill: {
       test: 'ABareStatusHidesWhatTheApplicationSaid',
       what: 'Sends an empty project name and asserts the status alone.',
@@ -230,6 +230,6 @@ export const failureDrills: DrillPair[] = [
         },
       ],
     },
-    change: 'Assert the body the application sent.',
+    change: 'Assert the error body the application returned.',
   },
 ];

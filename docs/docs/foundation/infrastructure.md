@@ -1,8 +1,56 @@
 ---
-sidebar_position: 12
+sidebar_position: 14
 title: Infrastructure
 description: "Declare a database, broker or emulator on the host; it starts once before any test, fills configuration, and is released with the run."
 ---
+
+import AnnotatedCode from '@site/src/components/AnnotatedCode';
+import TabbedCode from '@site/src/components/TabbedCode';
+
+export const chainCode = `builder.AddInfrastructure(
+    "NorthstarDatabase",
+    chain => chain
+        .UseConfigured()                        // ConnectionStrings:Northstar is set: the environment serves it
+        .UseContainer(PostgresDatabase.Container()),
+    "ConnectionStrings:Northstar");`;
+
+export const chainCallouts = [
+  {
+    line: 1,
+    title: 'One target, once',
+    note: 'The name and the keys identify the target. A repeated target name throws; add providers to the chain instead.',
+  },
+  {
+    line: 4,
+    title: 'Configured first',
+    note: 'Holds when every declared key already has a value. The environment serves the target, so nothing starts.',
+  },
+  {
+    line: 5,
+    title: 'Container next',
+    note: 'Holds when the container runtime is available. Only the winner starts and fills every declared key.',
+  },
+  {
+    line: 6,
+    title: 'Keys live on the target',
+    note: 'Every provider checks or fills these keys. No per-provider address parameter exists.',
+  },
+];
+
+export const chainTabs = [
+  {
+    id: 'database',
+    label: 'Database',
+    filename: 'Setup.cs',
+    code: 'builder.AddInfrastructure(\n    "NorthstarDatabase",\n    chain => chain\n        .UseConfigured()\n        .UseContainer(PostgresDatabase.Container()),\n    "ConnectionStrings:Northstar");',
+  },
+  {
+    id: 'broker',
+    label: 'Broker',
+    filename: 'Setup.cs',
+    code: 'builder.AddInfrastructure(\n    "MessagingBroker",\n    chain => chain\n        .UseConfigured()\n        .UseContainer(RabbitMqBroker.Container()),\n    RabbitMqOptions.ConnectionStringSetting,\n    "Messaging:RabbitMq:ConnectionString");',
+  },
+];
 
 # Infrastructure
 
@@ -10,18 +58,26 @@ description: "Declare a database, broker or emulator on the host; it starts once
 
 Infrastructure is what the run provides for itself: a database, a broker, a storage emulator. Declare it on the host builder, and the host starts it once before any test, records it, and releases it with the run. No `BeforeRun` hook, no manual start and stop.
 
-## Run a container
-
-```csharp
-builder.AddInfrastructure(
-    "NorthstarDatabase",
-    chain => chain
-        .UseConfigured()                        // ConnectionStrings:Northstar is set: the environment serves it
-        .UseContainer(PostgresDatabase.Container()),
-    "ConnectionStrings:Northstar");
+```mermaid
+flowchart LR
+    T["target with keys"] --> C{"chain in order:\nconfigured? container? …"}
+    C --> W["ONE winner starts\nand fills every key"]
+    C --> L["losers recorded skipped\nwith the reason"]
 ```
 
-The first provider whose condition holds serves the target. Only its piece starts and fills every declared key. The sections below explain the chain, the start order, the settings the winner publishes, readiness, and run-scoped setup.
+## Run a container
+
+<AnnotatedCode
+  filename="Setup.cs"
+  code={chainCode}
+  callouts={chainCallouts}
+/>
+
+The first provider whose condition holds serves the target. Only its piece starts and fills every declared key. The same shape for a broker:
+
+<TabbedCode tabs={chainTabs} label="Infrastructure chains" />
+
+The [recipes](./infrastructure-recipes.md) show the sample flows, readiness, run-scoped setup, and when `AddResource` fits instead.
 
 ```csharp
 public interface IProtoInfrastructure : IProtoResource
@@ -58,18 +114,7 @@ IProtoHostBuilder AddInfrastructure(
     params string[] keys);
 ```
 
-Register a **target** once with its **providers** in priority order and the keys every provider checks or fills:
-
-```csharp
-builder.AddInfrastructure(
-    "NorthstarDatabase",
-    chain => chain
-        .UseConfigured()                        // ConnectionStrings:Northstar is set: the environment serves it
-        .UseContainer(PostgresDatabase.Container()),
-    "ConnectionStrings:Northstar");
-```
-
-The first provider whose condition holds serves the target, and only its piece starts and fills every declared key. A container can feed the tests and an in-process application under the configuration roots each of them reads:
+Register a **target** once with its **providers** in priority order and the keys every provider checks or fills. The first provider whose condition holds serves the target, and only its piece starts and fills every declared key. A container can feed the tests and an in-process application under the configuration roots each of them reads:
 
 ```csharp
 builder.AddInfrastructure(
@@ -94,18 +139,7 @@ builder.AddInfrastructureAlways(LocalRelay.Sidecar(), "Relay:Url");
 
 ### When the environment already provides the addresses
 
-`UseConfigured()` is the provider that holds when every key the **target** declares already has a configured value. The environment has the address the piece would fill, so a container or process would only shadow it:
-
-```csharp
-builder.AddInfrastructure(
-    "NorthstarDatabase",
-    chain => chain
-        .UseConfigured()
-        .UseContainer(PostgresDatabase.Container()),
-    "ConnectionStrings:Northstar");
-```
-
-When `ConnectionStrings:Northstar` is configured, through environment variables, user secrets, appsettings in the runner project or an earlier configuration source, `UseConfigured()` wins and the container provider never starts.
+`UseConfigured()` is the provider that holds when every key the **target** declares already has a configured value. The environment has the address the piece would fill, so a container or process would only shadow it. When `ConnectionStrings:Northstar` is configured, through environment variables, user secrets, appsettings in the runner project or an earlier configuration source, `UseConfigured()` wins and the container provider never starts.
 
 The rule reads the target's keys all at once:
 
@@ -120,6 +154,11 @@ Register each target once as a chain. The configured environment, a container, a
 ### When it starts
 
 `ProtoHost.StartAsync` runs in this order:
+
+```text
+run hooks → capabilities → infrastructure in registration order → trace listening begins
+                          (a run setup step starts at its own position)
+```
 
 1. the **run hooks**: `BeforeRunAsync`, ascending `Order`;
 2. the host's **capabilities**, recorded as run entities;
@@ -161,118 +200,9 @@ The address readers share one precedence: an address a started piece published t
 
 `AddAspNetCoreServer`'s **configured provider** is the one deliberate asymmetry: it reads static configuration, so an application whose address only a started piece published keeps its in-process server, for `ServerFactory`-style access, while the address readers above talk to the published process. Give the published process its own application name when both must coexist.
 
-## How to use it
+## Recipes
 
-### The sample's two flows
-
-The learning sample registers its broker and database targets as above ([Environments](../getting-started/environments.md) shows the three shapes they select). The browser journey's address comes from the application chain: see [Hosting a browser journey](../integrations/aspnetcore.md#hosting-a-browser-journey) for the loopback recipe.
-
-An application image is the container counterpart: `ApplicationContainer` (`ProtoTest.Testcontainers`) starts the image as run infrastructure and fills `ProtoTest:Applications:{application}:BaseUrl` from the mapped address, so the application's clients, browser sessions and readiness probe resolve it:
-
-```csharp
-var api = ApplicationContainer.Container("Api", "my-registry.example.test/orders-api:1.4", port: 8080);
-builder.AddInfrastructure(
-    "OrdersApi",
-    chain => chain
-        .UseConfigured()
-        .UseContainer(api),
-    api.BaseUrlKey);
-```
-
-Register it instead of `AddAspNetCoreServer` for that application: a containerized application has no in-process server. [Hosting a browser journey](../integrations/aspnetcore.md#hosting-a-browser-journey) shows the full composition next to the loopback recipe.
-
-### Wait until it is ready
-
-A running container is not necessarily serving, and a published application may still be coming up. Readiness probes replace the sleep at the top of setup:
-
-```csharp
-builder
-    .AddInfrastructure(
-        "NorthstarDatabase",
-        chain => chain.UseContainer(PostgresDatabase.Container()),
-        "ConnectionStrings:Northstar")
-    .AddReadinessProbe("Northstar API", ProtoReadiness.Http(new Uri("http://localhost:5080/health")))
-    .ConfigureReadiness(readiness =>
-    {
-        readiness.Timeout = TimeSpan.FromSeconds(60);
-        readiness.Interval = TimeSpan.FromMilliseconds(200);
-    });
-```
-
-- A probe is infrastructure: the host awaits it at its registration position, and it is recorded as a `readiness` run entity carrying the attempts and the wait it spent.
-- `ProtoReadiness.Tcp(host, port)` is ready when a connection succeeds. `ProtoReadiness.Http(url)` is ready when the address answers at all; pass an acceptance check to demand a status or a health payload. Any delegate returning `ValueTask<bool>` works too.
-- An exception is "not ready yet": a connection refusal while a container boots is normal, and the last error appears in the timeout failure. The default timeout is 30 seconds.
-- One policy governs every wait: `ConfigureReadiness` sets the timeout and interval for host probes **and** for the containers the run starts, and the section `ProtoTest:Readiness` binds over the code values when the host is built. A slow image is tuned in one place.
-- A probe that never becomes ready fails the run before the first test, naming the probe, its attempts and the last error.
-
-The shipped containers declare their own checks: a [PostgreSQL container](../integrations/sql/index.md) waits for its standard port to accept connections, [RabbitMQ](../integrations/messaging/index.md) for the AMQP port. When a custom image listens elsewhere, override the port:
-
-```csharp
-builder.AddInfrastructure(
-    "NorthstarDatabase",
-    chain => chain.UseContainer(PostgresDatabase.Container().ReadyOn(5433)),
-    "ConnectionStrings:Northstar");
-```
-
-A published application is waited for where its address is declared, in `ProtoTest:Applications:{application}:BaseUrl` or the address a settings piece published:
-
-```csharp
-builder.AddHttpReadiness("Northstar API");
-```
-
-Register the probe **after** the piece that publishes the address. Probes are awaited at their registration position, so a probe registered first resolves nothing and records `readiness.skipped` naming its position and the later publisher instead of waiting. It never claims the application runs in-process. An in-process application has no address to wait for, so the probe is skipped and records why.
-
-### Run-scoped setup
-
-Some run-owned state is an action rather than a piece to own: create the schema of a container database, seed a catalogue, warm a cache. `AddRunSetup(name, delegate)` runs it once at the run's start, at its registration position in the infrastructure order. A step registered after a container reads the connection string that container published:
-
-```csharp
-builder
-    .AddInfrastructure(
-        "NorthstarDatabase",
-        chain => chain
-            .UseConfigured()
-            .UseContainer(PostgresDatabase.Container()),
-        "ConnectionStrings:Northstar")
-    .AddSql(
-        provider => new NpgsqlConnection(ResolveDatabase(provider, "ConnectionStrings:Northstar")),
-        sql => sql.AddressKeys.Add("ConnectionStrings:Northstar"))
-    .AddEntityFrameworkCore<OrdersDbContext>((services, options) =>
-        options.UseNpgsql(services.GetRequiredService<DbConnection>()))
-    .AddRunSetup("database schema", async setup =>
-    {
-        var connectionString = setup.Settings.Values.TryGetValue("ConnectionStrings:Northstar", out var published)
-            ? published
-            : setup.Configuration["ConnectionStrings:Northstar"]
-              ?? throw new InvalidOperationException(
-                  "ConnectionStrings:Northstar is not configured and no container published it.");
-        var options = new DbContextOptionsBuilder<OrdersDbContext>().UseNpgsql(connectionString).Options;
-        await using var context = new OrdersDbContext(options);
-        await context.Database.EnsureCreatedAsync(setup.CancellationToken);
-    });
-```
-
-The step receives a `ProtoRunSetupContext`:
-
-- **`Settings`**: the values the pieces registered before it published, so it reads a container's connection string without a second lookup.
-- **`Configuration`**: the suite's configuration, for an environment that provides the address and makes the container skip.
-- **`CancellationToken`**: the run's start token.
-
-A step owns nothing to release. Stop and dispose release the run's resources and do not call the step again, and the run records it as an entity like any other piece. A step that throws fails the run's start with its own exception. What had started is released and the host stays retryable, so a retry runs the step again.
-
-Use a step instead of a run hook or a test setup when the state belongs to the whole run: a run hook runs before infrastructure starts and cannot see a container's address, and a test hook or test body runs inside the per-test transaction, where its DDL is rolled back with the test. The SQL page shows the [run-owned schema recipe](../integrations/sql/index.md#run-owned-schema).
-
-### `AddResource` versus `AddInfrastructure`
-
-`IProtoHostBuilder.AddResource(IProtoResource)` adds a run-scoped resource and nothing else: the host does **not** call `StartAsync` (a plain resource has none) and does **not** fill any settings. The resource is still recorded as owned and released with the run.
-
-| | `AddInfrastructure` | `AddResource` |
-| --- | --- | --- |
-| Starts with the run | yes, the winning provider's piece | no |
-| Fills `ProtoInfrastructureSettings` | connection string per key, plus settings | no |
-| Registered as run entity and released | yes | yes |
-
-Use `AddInfrastructure` when the piece must start with the run or publish values. Use `AddResource` for an already-started handle that only needs the lifecycle.
+The sample flows, readiness probes, run-scoped setup, and `AddResource` against `AddInfrastructure` live on [Infrastructure recipes](./infrastructure-recipes.md).
 
 ## What the trace shows
 
@@ -281,6 +211,17 @@ Use `AddInfrastructure` when the piece must start with the run or publish values
 - A readiness probe as a `readiness` run entity carrying its attempts and the wait it spent, and `readiness.skipped` when it found no address to wait for.
 - A run setup step as a run entity like any other piece. A step that throws fails the run's start.
 - Release runs after the reports export and before the trace archive is written. Each piece is released at most once, and a failed release is reported rather than swallowed.
+
+The winner in run state, the sample suite's project journey:
+
+```text
+application:loopback:Northstar web
+  settings ProtoTest:Applications:Northstar web:BaseUrl, released
+readiness:application:Northstar web
+  1 attempt, waited 92 ms, released
+```
+
+The per-target `environment.resolved` events live in the run phase of a full run archive. The single-test lesson archives carry the winner as run state above, so read the decision there.
 
 ## Limits
 

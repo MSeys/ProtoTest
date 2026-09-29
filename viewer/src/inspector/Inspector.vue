@@ -129,12 +129,12 @@ const itemOrigin = computed(() => {
 .path { min-width: 0; display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .path button { padding: 0; border: 0; background: transparent; color: var(--muted); font-size: var(--text-micro); text-align: left; transition: color var(--motion-fast) var(--motion-ease); }
 .path button:not(:last-child)::after { content: "/"; margin-left: var(--space-1); color: var(--dim); }
-.path button:hover { color: var(--text); }
+.path button:hover { color: var(--text); text-decoration: underline; }
 .path-label { color: var(--muted); font-size: var(--text-micro); font-weight: var(--weight-semibold); }
 
 .title { min-width: 0; display: flex; align-items: flex-start; gap: var(--space-2); }
 .title :deep(.chip) { flex: none; margin-top: var(--space-1); }
-h2 { min-width: 0; font-size: var(--text-heading); letter-spacing: var(--tracking-display); line-height: var(--leading-tight); overflow-wrap: anywhere; }
+h2 { min-width: 0; font-size: var(--text-heading); letter-spacing: var(--tracking-display); line-height: var(--leading-tight); overflow-wrap: anywhere; text-wrap: balance; }
 .facts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-4); color: var(--muted); font-size: var(--text-meta); }
 .phase { display: inline-flex; align-items: center; gap: var(--space-1); text-transform: capitalize; }
 .phase i { width: 7px; height: 7px; border-radius: var(--radius-hairline); background: var(--phase-color); }

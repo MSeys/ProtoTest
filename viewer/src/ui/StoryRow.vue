@@ -136,6 +136,7 @@ function pick() {
 .line.danger { background: var(--danger-soft); box-shadow: inset 2px 0 0 var(--danger); }
 
 .expand {
+  position: relative;
   width: 14px;
   height: 14px;
   padding: 0;
@@ -146,6 +147,8 @@ function pick() {
   background: var(--surface);
   color: var(--muted);
 }
+/* A 14px box is a hard tap target; the hit area extends past the paint. */
+.expand::after { content: ""; position: absolute; inset: -4px; }
 .expand:hover { border-color: var(--blueprint); color: var(--text); }
 .expand[aria-expanded="true"] .stem { opacity: 0; }
 .node { width: 7px; height: 7px; margin: 0 auto; background: var(--node-color, var(--dim)); transform: rotate(45deg); }

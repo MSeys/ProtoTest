@@ -8,7 +8,36 @@ description: "Publish a message, then await the one that matters with a predicat
 
 ## What it adds
 
-Each test gets a broker client. Publish a message, then await the matching message with a predicate and a timeout. Failing to arrive is a `TimeoutException` and a test failure, not a sleep. Without an adapter the client runs against an in-memory broker, so the API works anywhere; `ProtoTest.Messaging.RabbitMq` replaces it with RabbitMQ, `ProtoTest.Messaging.RabbitMq.Testcontainers` owns a broker for the whole run, and `ProtoTest.Messaging.MassTransit` bridges the surface to an in-process application's MassTransit test harness - or, through its `MassTransitEnvelope` helper, speaks the MassTransit wire envelope over any adapter, published applications included.
+Each test gets a broker client. Publish a message, then await the matching message with a predicate and a timeout.
+
+```csharp
+var messages = Proto.Context.Messaging();
+
+await messages.PublishAsync("invoice.paid", """{"id":42}""", contentType: "application/json");
+
+var message = await messages.AwaitAsync(
+    "invoice.paid",
+    candidate => candidate.Payload!.Contains("\"id\":42"));
+```
+
+| Package | Does |
+| --- | --- |
+| `ProtoTest.Messaging` | the surface: publish, await, Tap/Declare, in-memory broker |
+| `ProtoTest.Messaging.RabbitMq` | a real RabbitMQ broker as the adapter |
+| `ProtoTest.Messaging.RabbitMq.Testcontainers` | a broker container owned by the run |
+| `ProtoTest.Messaging.MassTransit` | the application's in-process MassTransit harness as the adapter |
+
+Failing to arrive is a `TimeoutException` and a test failure, not a sleep. Without an adapter the client runs against an in-memory broker, so the API works anywhere; `ProtoTest.Messaging.RabbitMq` replaces it with RabbitMQ, `ProtoTest.Messaging.RabbitMq.Testcontainers` owns a broker for the whole run, and `ProtoTest.Messaging.MassTransit` bridges the surface to an in-process application's MassTransit test harness - or, through its `MassTransitEnvelope` helper, speaks the MassTransit wire envelope over any adapter, published applications included.
+
+## Which brokers
+
+| Broker | Package | What it is |
+| --- | --- | --- |
+| In-memory | `ProtoTest.Messaging` | The default test double. It keeps history for the run, so the API works with no broker. It registers no `Broker` capability, so capability-gated tests skip instead of passing against the double |
+| RabbitMQ | `ProtoTest.Messaging.RabbitMq` (+ `.Testcontainers` to own one) | A real broker as the adapter, with per-test tap queues, suite-owned topology via `Declare`, and the container recipe under [Owning a broker](#owning-a-broker) |
+| MassTransit | `ProtoTest.Messaging.MassTransit` | The application's in-process MassTransit harness as the adapter, or the `MassTransitEnvelope` wire envelope over any adapter. See the [MassTransit page](./masstransit.md) |
+
+Kafka, Azure Service Bus and AWS (MSK, SQS/SNS, EventBridge) are not shipped. There is no plan to announce here either: the extension path is the adapter seam. Implement `IProtoMessageBroker` (publish, one consumer per test, declare) with a consumer derived from `ProtoMessageConsumerBase`, register it with `UseBroker`, and the test-side API, the trace and the `Broker` capability come with it. The full contract is on the [Adapter contract](./adapters.md).
 
 ## Install
 
@@ -19,7 +48,7 @@ dotnet add package ProtoTest.Messaging.RabbitMq.Testcontainers
 dotnet add package ProtoTest.Messaging.MassTransit
 ```
 
-The packages target .NET 8, 9 and 10 (the project template defaults to `net10.0`; pass `-f net8.0` or `net9.0` for an older runtime). The first is the capability. The others are optional adapters: add RabbitMQ to talk to a real broker (with the container package when the run should start one), or `ProtoTest.Messaging.MassTransit` to use an in-process application's MassTransit test harness. See [MassTransit](./masstransit.md). `ProtoTest.Messaging.RabbitMq` and `ProtoTest.Messaging.MassTransit` bring `ProtoTest.Messaging` with them.
+The packages target .NET 8, 9 and 10 (the project template defaults to `net10.0`; pass `--framework net8.0` or `--framework net9.0` for an older runtime). The first is the capability. The others are optional adapters: add RabbitMQ to talk to a real broker (with the container package when the run should start one), or `ProtoTest.Messaging.MassTransit` to use an in-process application's MassTransit test harness. See [MassTransit](./masstransit.md). `ProtoTest.Messaging.RabbitMq` and `ProtoTest.Messaging.MassTransit` bring `ProtoTest.Messaging` with them.
 
 ## Compose
 
@@ -54,7 +83,11 @@ ProtoMessagingBuilder UseMassTransit<TProgram>(this ProtoMessagingBuilder messag
     string application = "Default");
 ```
 
-`UseBroker` is the adapter seam; `UseRabbitMq` and `UseMassTransit` are the built-in implementations of it. `UseBroker` declares the `Broker` capability only while at least one of its `addressKeys` can provide an address. `UseBrokerWhenInProcess` declares it only while the named application is served in-process, which is the direction the MassTransit bridge needs: the application's provider chain winner decides, so a loopback, container or AppHost application drops the capability, and a host whose application declares no chain keeps the configured-keys rule (a configured `BaseUrl` means the application runs published with no test harness here). `Tap` declares the destinations this suite awaits, in code, so an adapter can bind each test's tap during setup. See [Destinations](#destinations). `Declare` declares the destinations this suite owns, in code, so an adapter creates them during setup before any tap binds. See [Suite-owned topology](#suite-owned-topology). When an adapter is configured, `AddMessaging` also registers the `Messaging` capability with kind `broker`. It always registers the options, the per-test client initializer, and the run-scoped broker resource.
+`UseBroker` is the adapter seam; `UseRabbitMq` and `UseMassTransit` are the built-in implementations of it. `UseBroker` declares the `Broker` capability only while at least one of its `addressKeys` can provide an address. `UseBrokerWhenInProcess` declares it only while the named application is served in-process, which is the direction the MassTransit bridge needs: the application's provider chain winner decides, so a loopback, container or AppHost application drops the capability, and a host whose application declares no chain keeps the configured-keys rule (a configured `BaseUrl` means the application runs published with no test harness here).
+
+`Tap` declares the destinations this suite awaits, in code, so an adapter can bind each test's tap during setup. See [Destinations](#destinations). `Declare` declares the destinations this suite owns, in code, so an adapter creates them during setup before any tap binds. See [Suite-owned topology](#suite-owned-topology).
+
+When an adapter is configured, `AddMessaging` also registers the `Messaging` capability with kind `broker`. It always registers the options, the per-test client initializer, and the run-scoped broker resource.
 
 A repeated `AddMessaging` call runs its `configure` callback again, so a later call can add an adapter to an adapter-less first call or extend attachment options. Infrastructure stays idempotent: one options object, one broker holder, one initializer, one capability and one run resource. The first adapter configured wins.
 
@@ -137,58 +170,8 @@ The key is bound when the keyed await starts, so a direct exchange only delivers
 
 `message.Should.MatchShape(shape, exact: true)` is the exhaustive form: a field present in the payload that the shape does not mention is a mismatch naming that field. A value constraint mentions its whole subtree. The [shape matching page](../../foundation/shape-matching.md#exact-matching) has the rules.
 
-#### The adapter contract
+An adapter implements two interfaces: the capability owns the broker resource and the test-side API, and the adapter owns the client technology. The full contract lives on [Adapter contract](./adapters.md).
 
-An adapter implements two interfaces. The capability owns the broker resource and the test-side API; an adapter owns the client technology, and no broker-specific type reaches the test or the trace:
-
-```csharp
-public interface IProtoMessageBroker
-{
-    string Name { get; }
-    ValueTask PublishAsync(ProtoMessage message, CancellationToken cancellationToken = default);
-    ValueTask<IProtoMessageConsumer> CreateConsumerAsync(CancellationToken cancellationToken = default);
-    ValueTask DeclareAsync(IReadOnlyCollection<string> destinations, CancellationToken cancellationToken = default);
-}
-
-public interface IProtoMessageConsumer : IAsyncDisposable
-{
-    ValueTask PrepareAsync(IReadOnlyCollection<string> destinations, CancellationToken cancellationToken = default);
-    ValueTask<ProtoMessage> AwaitAsync(string destination, Func<ProtoMessage, bool> predicate,
-        TimeSpan timeout, CancellationToken cancellationToken = default);
-    // Matches the routing key the transport recorded; a default implementation filters the predicate.
-    ValueTask<ProtoMessage> AwaitAsync(string destination, string? routingKey,
-        Func<ProtoMessage, bool> predicate, TimeSpan timeout, CancellationToken cancellationToken = default);
-}
-```
-
-One broker is shared by the whole run and may publish concurrently; `CreateConsumerAsync` returns a consumer that belongs to exactly one test. `PrepareAsync` declares the destinations that test will await *before* it acts; `DisposeAsync` removes whatever the adapter declared for it. Prepares may run concurrently: a prepare for several destinations may prepare them at the same time and separate prepares may overlap, so every destination must own the resources it declares (the RabbitMQ adapter gives each tap its own channel). Every requested destination is attempted, so one that cannot be prepared does not stop the others; the setup hook records the failure on that destination and the first await on it rethrows the adapter's named error. That is the isolation contract: parallel tests on one destination cannot steal each other's messages. The in-memory broker keeps history instead and treats `PrepareAsync` as a no-op.
-
-`DeclareAsync` creates the destinations this suite owns, those declared with `Declare`, before the first tap is prepared. Declaration is idempotent: an existing destination is left as it is and a repeated declaration is a no-op. A broker whose destinations always exist (the in-memory broker) implements it as a no-op, and an adapter that cannot create a destination refuses instead of pretending: the default interface implementation throws `NotSupportedException` naming the adapter, so a `Declare` against it fails setup loudly.
-
-#### Writing an adapter
-
-An adapter's consumer derives from `ProtoMessageConsumerBase` and supplies only a source; the base owns the await queue the contract above describes:
-
-```csharp
-public abstract class ProtoMessageConsumerBase : IProtoMessageConsumer
-{
-    protected ProtoMessageConsumerBase(long position);
-    protected ValueTask<ProtoMessage> AwaitAsync(string destination, Func<ProtoMessage, bool> predicate,
-        TimeSpan timeout, CancellationToken cancellationToken, Func<IProtoMessageAwaitSource> sourceFactory);
-    protected static Func<ProtoMessage, bool> MatchRoutingKey(Func<ProtoMessage, bool> predicate, string? routingKey);
-    protected void Reset(long position);
-    // PrepareAsync/DisposeAsync are virtual no-ops; a tap-based adapter overrides them.
-}
-
-public interface IProtoMessageAwaitSource
-{
-    ValueTask<ProtoMessageAwaitSnapshot> SnapshotAsync(string destination, long position,
-        CancellationToken cancellationToken);
-    ValueTask WaitAsync(ProtoMessageAwaitSnapshot snapshot, TimeSpan remaining, CancellationToken cancellationToken);
-}
-```
-
-An adapter's public `AwaitAsync` does whatever per-destination work it needs, declaring a tap or resolving the harness, and then calls the protected overload, which resolves the source factory inside the base's await gate. `ProtoMessageAwaitSnapshot` carries the candidates (`ProtoMessageAwaitEntry`: one delivery with its position) plus the wake-up that ends the next wait, when the source has one; the position is the first delivery the consumer may consume, so the in-memory broker starts after the shared history's creation position (`Reset` re-baselines a replaced source) while an empty tap starts at zero. An adapter never implements its own await gate, position, consumed set or deadline rescan.
 
 ## The tasks
 
@@ -274,15 +257,27 @@ var dead = await Proto.Context.Messaging().AwaitAsync(
     message => message.ReadRequired<SessionEnded>().SessionId == sessionId);
 ```
 
-A queue destination is consumed, never declared: the adapter verifies the queue exists - a missing queue fails naming it, like a missing exchange - consumes it on the test's own channel, and leaves the queue as it is when the test ends. `Tap` accepts a queue destination too, so the consume starts during setup instead of at the first await; `Declare` refuses the queue form, because the component that owns the queue creates it. A consumed delivery carries the queue destination on `ProtoMessage.Destination` and the transport's routing key on `ProtoMessage.RoutingKey`.
+A queue destination is consumed, never declared: the adapter verifies the queue exists - a missing queue fails naming it, like a missing exchange - consumes it on the test's own channel, and leaves the queue as it is when the test ends.
 
-Consuming a shared queue has two consequences. A queue await reads what the queue already holds, unlike an exchange tap that only sees what arrives after it binds - and it removes what it reads, so a second test (or a live consumer) awaiting the same queue no longer sees it. Await the queue directly when the test owns it (a dead-letter queue no one else reads, a serial suite); prefer the exchange that feeds it when the suite runs in parallel. A broker whose model has no queues - the in-memory broker, the MassTransit harness - refuses a queue destination with an error naming the transport and the exchange to await instead.
+`Tap` accepts a queue destination too, so the consume starts during setup instead of at the first await; `Declare` refuses the queue form, because the component that owns the queue creates it. A consumed delivery carries the queue destination on `ProtoMessage.Destination` and the transport's routing key on `ProtoMessage.RoutingKey`.
+
+Consuming a shared queue has two consequences. A queue await reads what the queue already holds, unlike an exchange tap that only sees what arrives after it binds - and it removes what it reads, so a second test (or a live consumer) awaiting the same queue no longer sees it.
+
+Await the queue directly when the test owns it (a dead-letter queue no one else reads, a serial suite); prefer the exchange that feeds it when the suite runs in parallel.
+
+A broker whose model has no queues - the in-memory broker, the MassTransit harness - refuses a queue destination with an error naming the transport and the exchange to await instead.
 
 #### Repeats and consumption
 
 A queue await has no exchange to bind, so a keyed await on a queue destination filters the deliveries the queue hands over by the routing key the transport recorded.
 
-Each await consumes the message it matches. Awaits on one consumer are serialized in call order, and a delivery that matches no awaited predicate is not consumed: it stays available to a later await on the same consumer, so concurrent awaits on one destination neither lose nor steal each other's messages and every matched message is consumed exactly once. Consumption is tracked per destination, so an await on one destination never hides another destination's first delivery, even though each destination's tap numbers its deliveries from zero. The in-memory broker behaves the same way: messages live for the run and are ordered, each consumer snapshots the broker position when it is created, so only messages published after its test started can match, and each matched message is consumed once. A predicate that throws fails only the await that owns it. A timeout is a `TimeoutException`; awaiting on a tap whose exchange is missing (or a queue that does not exist) is an `InvalidOperationException` naming the destination, and a `Declare` the broker refuses fails setup with the destination named; an unreachable broker is an `InvalidOperationException` naming the sanitized address and `ProtoTest:Messaging:RabbitMq:ConnectionString`.
+Each await consumes the message it matches. Awaits on one consumer are serialized in call order, and a delivery that matches no awaited predicate is not consumed: it stays available to a later await on the same consumer, so concurrent awaits on one destination neither lose nor steal each other's messages and every matched message is consumed exactly once.
+
+Consumption is tracked per destination, so an await on one destination never hides another destination's first delivery, even though each destination's tap numbers its deliveries from zero.
+
+The in-memory broker behaves the same way: messages live for the run and are ordered, each consumer snapshots the broker position when it is created, so only messages published after its test started can match, and each matched message is consumed once.
+
+A predicate that throws fails only the await that owns it. A timeout is a `TimeoutException`; awaiting on a tap whose exchange is missing (or a queue that does not exist) is an `InvalidOperationException` naming the destination, and a `Declare` the broker refuses fails setup with the destination named; an unreachable broker is an `InvalidOperationException` naming the sanitized address and `ProtoTest:Messaging:RabbitMq:ConnectionString`.
 
 #### Owning a broker
 
@@ -304,11 +299,21 @@ builder.AddMessaging(messaging => messaging
     .UseRabbitMq());
 ```
 
-The target's `UseContainer` provider starts the container with the host and fills every key with the started connection string, so the adapter and the application under test reach the same broker. The provider starts before any test-level skip condition is evaluated, so a machine without a container runtime fails the run at start. `RabbitMqBroker.Container()` creates the resource without starting it; `Start()` starts now or throws with the reason; `TryStart(configure)` reports the reason in its result instead, for a fixture that decides before registering infrastructure. The default image is `rabbitmq:3`, configurable through the builder passed to `Container`. Registering with `AddResource` only owns the release: it neither starts the container nor fills settings. With no application initializer to declare the event exchanges, the suite declares its own with `Declare` (see [Suite-owned topology](#suite-owned-topology)), with no raw broker client in the suite.
+The target's `UseContainer` provider starts the container with the host and fills every key with the started connection string, so the adapter and the application under test reach the same broker.
+
+The provider starts before any test-level skip condition is evaluated, so a machine without a container runtime fails the run at start.
+
+`RabbitMqBroker.Container()` creates the resource without starting it; `Start()` starts now or throws with the reason; `TryStart(configure)` reports the reason in its result instead, for a fixture that decides before registering infrastructure. The default image is `rabbitmq:3`, configurable through the builder passed to `Container`.
+
+Registering with `AddResource` only owns the release: it neither starts the container nor fills settings. With no application initializer to declare the event exchanges, the suite declares its own with `Declare` (see [Suite-owned topology](#suite-owned-topology)), with no raw broker client in the suite.
 
 #### MassTransit bridge
 
-An application that composes `AddMassTransitTestHarness` can be the broker itself: `ProtoTest.Messaging.MassTransit` publishes and awaits over the application's in-process `ITestHarness`, so the events the application publishes through its own `IPublishEndpoint` are the ones a test awaits. A destination names a message contract type (its full name, short name or `urn:message:` URN); `Declare` is a no-op because MassTransit owns message topology; and the `Broker` capability is declared while the application is hosted in-process (the `UseBrokerWhenInProcess` seam), so a published application skips instead of failing. For a published application - or any suite that talks to the broker itself - the package's `MassTransitEnvelope` builds and reads the MassTransit wire envelope (`application/vnd.masstransit+json`) through whichever adapter is configured, no harness needed. The [MassTransit page](./masstransit.md) has the registration, the ordering rule, the envelope interop and the limits.
+An application that composes `AddMassTransitTestHarness` can be the broker itself: `ProtoTest.Messaging.MassTransit` publishes and awaits over the application's in-process `ITestHarness`, so the events the application publishes through its own `IPublishEndpoint` are the ones a test awaits.
+
+A destination names a message contract type (its full name, short name or `urn:message:` URN); `Declare` is a no-op because MassTransit owns message topology; and the `Broker` capability is declared while the application is hosted in-process (the `UseBrokerWhenInProcess` seam), so a published application skips instead of failing.
+
+For a published application - or any suite that talks to the broker itself - the package's `MassTransitEnvelope` builds and reads the MassTransit wire envelope (`application/vnd.masstransit+json`) through whichever adapter is configured, no harness needed. The [MassTransit page](./masstransit.md) has the registration, the ordering rule, the envelope interop and the limits.
 
 #### Attachments
 
@@ -359,6 +364,16 @@ builder.AddMessaging(messaging => messaging
 ```
 
 ## In the trace and coverage
+
+```text
+messaging.publish · invoice.paid                    # system InMemory, payload redacted
+└─ messaging.published observation (target InMemory)
+
+messaging.await · invoice.paid + routing key "session.ended"
+├─ messaging.timeout_ms = 10000
+├─ tap bound during setup (Tap), or just in time at the first await
+└─ messaging.receive observation on match, TimeoutException naming destination and key on timeout
+```
 
 Every publish and await is recorded:
 

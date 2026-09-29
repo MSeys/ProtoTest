@@ -3,7 +3,7 @@ id: install-and-run
 title: Install and run
 sidebar_label: Install and run
 sidebar_position: 1
-description: "Run the Northstar sample, find the trace and the report it leaves, and read the skip a missing capability produces."
+description: "Run the Northstar.ProtoTest sample suite, find the trace and the report it leaves, and read the skip a missing capability produces."
 ---
 
 import LearnShell from '@site/src/components/LearnShell';
@@ -11,7 +11,7 @@ import Link from '@docusaurus/Link';
 
 # Install and run
 
-Everything in this level runs against the Northstar sample: one suite that composes an API, a database, a browser and a message broker over an in-process application.
+Everything in this level runs against the Northstar.ProtoTest sample suite: one suite that composes an API, a database, a browser and a message broker over an in-process application.
 
 <LearnShell
   level="Level 1, lesson 1"
@@ -27,7 +27,7 @@ Everything in this level runs against the Northstar sample: one suite that compo
   ]}
   situation={
     <>
-      <p>To judge a test framework, watch it run a suite that touches an API, a database, a browser and a broker. The sample is small, it is green on an ordinary run, and it writes down everything it did.</p>
+      <p>To judge a test framework, watch it run a suite that touches an API, a database, a browser and a broker. The sample suite is small, it is green on an ordinary run, and it writes down everything it did.</p>
       <p>Some tests will not run: the broker journey needs a broker, and no broker is configured, and the four failure drills wait for an explicit opt-in. Those skips are part of the lesson, not a defect.</p>
     </>
   }

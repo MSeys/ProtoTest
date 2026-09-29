@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type { TestTrace } from "../trace/model";
-import { failureReason, formatDuration, needsAttention, pad, testCodeName, testGroup, testMatches, testTitle, tone } from "../trace/format";
+import { failureReason, formatDuration, needsAttention, outcomeLabel, pad, testCodeName, testGroup, testMatches, testTitle, tone } from "../trace/format";
 import TextInput from "./TextInput.vue";
 import FilterChip from "./FilterChip.vue";
 import EmptyState from "./EmptyState.vue";
@@ -35,7 +35,9 @@ const groups = computed(() => {
 
 /** A test that did not pass says why in the list, so the reader can pick the right one without opening it. */
 function reason(test: TestTrace): string {
-  if (!needsAttention(test) || !test.failure) return "";
+  // Without a failing operation the outcome is still stated in words: never colour alone.
+  if (!needsAttention(test)) return "";
+  if (!test.failure) return outcomeLabel(test.outcome);
   return failureReason(test).title;
 }
 </script>
@@ -61,7 +63,9 @@ function reason(test: TestTrace): string {
           <span v-if="reason(test)" class="reason">{{ reason(test) }}</span>
         </button>
       </section>
-      <EmptyState v-if="!groups.length" message="No test matches." />
+      <EmptyState v-if="!groups.length" message="No test matches.">
+        <FilterChip label="Show all tests" @select="query = ''; problemsOnly = false" />
+      </EmptyState>
     </div>
   </aside>
 </template>

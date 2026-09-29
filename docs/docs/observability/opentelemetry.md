@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 5
 title: OpenTelemetry
 description: "Export ProtoTest operations to OpenTelemetry, so test runs land in the same tracing backend as your application."
 ---
@@ -66,17 +66,20 @@ Spans nest the same way the ProtoTrace tree does: a test's `test.setup`, `test.e
 
 The three phases are three root spans, because they run on separate activities. Join them on the `prototest.test.id` tag, which every one of them carries. Without a resource of your own, spans use the default service name (`unknown_service:<host>`). Set OpenTelemetry's standard `OTEL_SERVICE_NAME` (for example `prototest`) in the run environment, or build a resource in the hook, so test runs are findable next to application telemetry.
 
-Spans and events carry these tags:
+Spans and events carry these tags. The three join keys are the ones to query by; the rest are facets:
 
 | Tag | |
 | --- | --- |
-| `prototest.test.id` | the test id |
+| `prototest.test.id` | the test id: joins the three phase roots |
 | `prototest.entry.id` | the ProtoTrace entry id |
+| `prototest.logical_parent_id` | the ProtoTrace parent entry id (spans only) |
+
+| Tag | |
+| --- | --- |
 | `prototest.entry.kind` | e.g. `web.click` |
 | `prototest.source` | the integration that wrote it |
 | `prototest.phase` | `setup`, `execution`, `teardown`, `rollback` or `run` |
 | `prototest.outcome` | `succeeded`, `failed`, `partial`, `cancelled`, `skipped` or `unknown` |
-| `prototest.logical_parent_id` | the ProtoTrace parent entry id (spans only) |
 | `prototest.entity.kind`, `prototest.entity.id` | the client, context, server or capability an entry belongs to, when it has one |
 
 The operation's own trace attributes (`http.method`, `web.locator`, your custom ones) are exported as tags too, except values longer than 2,048 characters and the large structured ones (shape snapshots, serialised context state, observation data). Those stay in the `.prototrace` file only, so spans remain lightweight.
@@ -99,6 +102,16 @@ The three phase spans are separate roots joined by `prototest.test.id`, and a fa
 The backend sees the operations ProtoTest records, with their events and outcome. The `.prototrace` archive still holds the full record.
 
 ### What does not reach the backend
+
+The archive is complete; the backend is partial. What stays local:
+
+```text
+.prototrace only (never spans)
+├── app-source captures you did not subscribe to
+├── gate verdicts · run identity and environment (runId, environment.*)
+├── target resolutions and skips · capability decisions · run resources
+└── values above the tag cap: over 2,048 chars, shape/context/observation payloads
+```
 
 - **Operations captured from your own sources.** A source named in `ProtoTraceOptions.ActivitySources` is recorded into the `.prototrace` tree from the application's own activities, but it is not re-emitted on `ProtoTest`. Subscribe to the application's source as well to see both in one backend; otherwise those operations appear in the archive only, and the archive's copy is the complete one.
 - **Run-level evidence.** Gate verdicts, target resolutions and skips, capability decisions and run resources are events on the run group in the archive, not spans. The run's identity and environment (`runId`, `environment.*`, the CI metadata you configured) are archive-only too.

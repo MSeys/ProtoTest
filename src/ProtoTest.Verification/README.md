@@ -1,5 +1,7 @@
 # ProtoTest.Verification
 
+> Preview: the surface can change before 1.2.
+
 Compares two runs' reports and returns a verdict a pull request gate can use: coverage regressions,
 new uncovered units, the specification identity the candidate was verified against, and the failed run
 gates the candidate recorded.

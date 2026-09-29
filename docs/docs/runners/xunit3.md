@@ -14,7 +14,7 @@ description: "Register ProtoTest with xUnit v3: the assembly fixture, [ProtoTest
 dotnet add package ProtoTest.Xunit3
 ```
 
-ProtoTest targets **.NET 8, 9 and 10**, and needs **xunit.v3 4.0.0 or newer**. The `dotnet new prototest` template defaults to `net10.0`; pass `-f net8.0` or `-f net9.0` for an older runtime.
+ProtoTest targets **.NET 8, 9 and 10**, and needs **xunit.v3 4.0.0 or newer**. The `dotnet new prototest` template defaults to `net10.0`; pass `--framework net8.0` or `--framework net9.0` for an older runtime.
 
 **On .NET SDK 10, an xUnit v3 project runs on Microsoft.Testing.Platform.** The `dotnet new prototest` template carries the opt-in:
 
@@ -27,6 +27,12 @@ ProtoTest targets **.NET 8, 9 and 10**, and needs **xunit.v3 4.0.0 or newer**. T
 ```
 
 With that file in the project or solution directory, run `dotnet test` from that directory, or `dotnet test --project Starter.Tests/Starter.Tests.csproj` from anywhere. Passing the solution as a path argument (`dotnet test Starter.slnx`) resolves through the old VSTest path and can report `Zero tests ran` instead of running them.
+
+```bash
+dotnet test                                            # right: run from the global.json directory
+dotnet test --project Starter.Tests/Starter.Tests.csproj  # right: name the project, from anywhere
+dotnet test Starter.slnx                              # wrong: old VSTest path, can report zero tests
+```
 
 ## Register
 
@@ -76,6 +82,16 @@ A plain `[Fact]` keeps running unchanged next to the converted tests; it simply 
 
 **Low-ceremony mode.** Add `[assembly: ProtoTestAutoWrap]` and every plain `[Fact]` and `[Theory]` runs through the same lifecycle. A test that carries `[ProtoTestFact]` or `[ProtoTestTheory]` keeps its own handler and is never wrapped twice.
 
+## The context window
+
+`|` is the host bar, `[]` is the context. Construction and disposal stay outside it:
+
+```text
+|[assembly fixture (host)]|  ctor + InitializeAsync OUTSIDE  [[before | body | after]]
+```
+
+Move context reads into `IAsyncLifetime.InitializeAsync` or the body. xUnit v2 is the mirror image: its constructor already sees the context.
+
 ## What the adapter changes
 
 | Item | What the adapter does |
@@ -97,7 +113,7 @@ A plain `[Fact]` keeps running unchanged next to the converted tests; it simply 
 - The lifecycle handler is synchronous-over-async, so xUnit v3 needs a synchronizing context.
 - The attributes are `AllowMultiple = false`, like the `Fact` and `Theory` attributes they replace.
 - The context starts in the before-attribute, so class construction, `IAsyncLifetime.InitializeAsync` and class disposal run outside it.
-- A sibling `IBeforeAfterTestAttribute` that throws prevents xUnit from running the after methods, so the context never completes and the test's trace stays open. Keep other before/after attributes from throwing.
+- **Leaves the trace open.** A sibling `IBeforeAfterTestAttribute` that throws prevents xUnit from running the after methods, so the context never completes and the test's trace stays open. Keep other before/after attributes from throwing.
 - The assembly fixture is mandatory. There is no collection-level variant.
 - Auto-wrap is assembly-wide: the attribute is declared on the assembly, and there is no per-class opt-in.
 - `Unknown` is the fallback for an unmapped result state, so extend the mapping deliberately if a new xUnit state appears.

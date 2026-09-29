@@ -10,6 +10,24 @@ description: "A named gRPC client per test for unary and streaming calls, with m
 
 `ProtoTest.Grpc` gives each test a named gRPC client for unary and streaming calls, with metadata authentication through the shared `[Auth]` pipeline, per-call tracing, and service/method coverage. It follows the same client lifecycle as REST and GraphQL: the client is created during setup and recorded as a client entity, its channel is created lazily on first use, and both are released with the test.
 
+```csharp
+[Application("Api", "Grpc:Api")]
+public sealed class OrderTests
+{
+    [ProtoTest]
+    public async Task GetOrder()
+    {
+        var reply = await Proto.Context.Grpc().UnaryAsync(
+            OrdersMethods.GetOrder,
+            new GetOrderRequest { Id = 42 });
+
+        ProtoGrpcAssertions.For(reply).Should.MatchShape(new { id = 42, status = "PENDING" });
+    }
+}
+```
+
+Run it with `dotnet test`. Each call is traced as a `grpc.call` operation with its request and response attached. [Calls and assertions](./calls.md) covers the streaming helpers, the descriptor holder and the assertion facades.
+
 ## Install
 
 ```bash
@@ -81,7 +99,7 @@ explicit AddClient address? → ProtoTest:Applications:{app}:Grpc:Address? → a
 resolver overload → deferred to first call (null at call time is an error)
 ```
 
-The call helpers, all constrained to `where TRequest : class, TResponse : class`:
+The call helpers are constrained to `where TRequest : class, TResponse : class`:
 
 | Helper | Requests | Responses | Returns | Traced |
 | --- | --- | --- | --- | --- |
@@ -91,122 +109,11 @@ The call helpers, all constrained to `where TRequest : class, TResponse : class`
 | `Blocking.ServerStreaming`, `Blocking.DuplexStreaming` | … | … | call to drive | no, auth only |
 | `OpenServerStreamingAsync`, `OpenDuplexStreamingAsync` | … | … | call to drive | no, auth only |
 
-Use raw calls only when the traced helpers lack the call shape you need.
-
-```csharp
-Task<TResponse> UnaryAsync<TRequest, TResponse>(Method<TRequest, TResponse> method, TRequest request,
-    Action<Metadata>? metadata = null, DateTime? deadline = null, CancellationToken cancellationToken = default);
-
-Task<TResponse> ClientStreamingAsync<TRequest, TResponse>(Method<TRequest, TResponse> method,
-    IEnumerable<TRequest> requests, Action<Metadata>? metadata = null, DateTime? deadline = null,
-    CancellationToken cancellationToken = default);
-
-Task<IReadOnlyList<TResponse>> ServerStreamingAsync<TRequest, TResponse>(Method<TRequest, TResponse> method,
-    TRequest request, Action<Metadata>? metadata = null, DateTime? deadline = null,
-    CancellationToken cancellationToken = default);
-```
-
-`ServerStreamingAsync` reads the stream to completion and returns the messages; `ClientStreamingAsync` writes every request and completes the stream before reading the response. The raw helpers return the call object untouched for callers that drive it; the blocking two live on `client.Blocking`:
-
-```csharp
-// client.Blocking
-AsyncServerStreamingCall<TResponse> ServerStreaming<TRequest, TResponse>(Method<TRequest, TResponse> method,
-    TRequest request, Action<Metadata>? metadata = null, DateTime? deadline = null);
-
-AsyncDuplexStreamingCall<TRequest, TResponse> DuplexStreaming<TRequest, TResponse>(
-    Method<TRequest, TResponse> method, Action<Metadata>? metadata = null, DateTime? deadline = null);
-
-// client
-Task<AsyncServerStreamingCall<TResponse>> OpenServerStreamingAsync<TRequest, TResponse>(
-    Method<TRequest, TResponse> method, TRequest request, Action<Metadata>? metadata = null,
-    DateTime? deadline = null, CancellationToken cancellationToken = default);
-
-Task<AsyncDuplexStreamingCall<TRequest, TResponse>> OpenDuplexStreamingAsync<TRequest, TResponse>(
-    Method<TRequest, TResponse> method, Action<Metadata>? metadata = null, DateTime? deadline = null,
-    CancellationToken cancellationToken = default);
-```
-
-`Blocking.ServerStreaming` and `Blocking.DuplexStreaming` block the calling thread while authenticators and the channel are prepared; prefer the `Open*Async` variants on a synchronizing runner.
-
-#### Method descriptors
-
-The call helpers take a `Method<TRequest, TResponse>`; the generated client classes do not expose one per method, so keep the suite's call descriptors in one holder and use it everywhere:
-
-```csharp
-public static class OrdersMethods
-{
-    private static readonly Marshaller<GetOrderRequest> RequestMarshaller = Marshallers.Create<GetOrderRequest>(
-        (request, context) => context.Complete(request.ToByteArray()),
-        context => GetOrderRequest.Parser.ParseFrom(context.PayloadAsNewBuffer()));
-
-    private static readonly Marshaller<GetOrderReply> ReplyMarshaller = Marshallers.Create<GetOrderReply>(
-        (reply, context) => context.Complete(reply.ToByteArray()),
-        context => GetOrderReply.Parser.ParseFrom(context.PayloadAsNewBuffer()));
-
-    public static readonly Method<GetOrderRequest, GetOrderReply> GetOrder =
-        new(MethodType.Unary, "billing.Orders", "GetOrder", RequestMarshaller, ReplyMarshaller);
-}
-```
-
-The `MethodType` is `Unary`, `ServerStreaming`, `ClientStreaming` or `DuplexStreaming`, and the service name is the proto's fully qualified one (`package.Service`), so the descriptor addresses the same route the generated client uses.
-
-#### Assertions
-
-A reply is a protobuf message, and `Should.MatchShape` matches it with the same [shapes](../../foundation/shape-matching.md) as REST and GraphQL. A message reaches its facade through the factory; `MatchShape` returns the reply:
-
-```csharp
-public static ProtoGrpcMessageAssertions<TResponse> For<TResponse>(TResponse response)
-    where TResponse : IMessage;
-// ProtoGrpcMessageAssertions<TResponse>: Should -> ProtoGrpcMessageAssertions<TResponse>
-//                                       MatchShape(object expectedShape, JsonSerializerOptions? options = null) -> TResponse
-//                                       MatchShape(object expectedShape, bool exact, JsonSerializerOptions? options = null) -> TResponse
-```
-
-The reply is compared through its JSON form: field names are camelCase, enums are their names, and fields left at their default value are still present, so `quantity = 0` can be asserted. Every mismatch is reported at once. The assertion records an `assert.json.shape` operation with a `grpc.contract.shape` observation on the ambient test context, like the other integrations' data-object assertions. A mismatch throws `GrpcAssertionException` whose message starts with the message type, keeping the shared `JsonShapeMismatchException` as `InnerException`. The older `ShouldMatchShape` spelling is listed in [Migrating from 1.0](../../getting-started/migrating-from-1-0.md).
-
-Keep one copy of the exact-mode rule on the [shape matching page](../../foundation/shape-matching.md#exact-matching): exact mode flags any unlisted field.
-
-A failed call throws `RpcException`; `ProtoGrpcAssertions.For(exception)` returns its assertion facade:
-
-```csharp
-public static ProtoGrpcExceptionAssertions For(RpcException exception);
-// ProtoGrpcExceptionAssertions: Should / ShouldNot -> ProtoGrpcExceptionAssertions
-//                               HaveStatus(StatusCode expected) -> RpcException
-```
-
-```csharp
-try
-{
-    await Proto.Context.Grpc().UnaryAsync(OrdersMethods.GetOrder, new GetOrderRequest { Id = 404 });
-    Assert.Fail("Expected the call to fail.");
-}
-catch (RpcException exception)
-{
-    ProtoGrpcAssertions.For(exception).Should.HaveStatus(StatusCode.NotFound);
-    ProtoGrpcAssertions.For(exception).ShouldNot.HaveStatus(StatusCode.Internal);
-}
-```
-
-The assertion records an `assert.grpc.status` operation on the ambient test context with expected and actual `rpc.grpc.status_code`/`rpc.grpc.status` and a `Result` Checks section; a mismatch throws `GrpcAssertionException`. The facade goes through `For(...)` because C# has no extension properties. The older `ShouldHaveStatus`/`ShouldNotHaveStatus` spellings are listed in [Migrating from 1.0](../../getting-started/migrating-from-1-0.md).
+Use raw calls only when the traced helpers lack the call shape you need. Signatures, the method-descriptor holder and both assertion facades are on [Calls and assertions](./calls.md).
 
 ## The tasks
 
-```csharp
-[Application("Api", "Grpc:Api")]
-public sealed class OrderTests
-{
-    [ProtoTest]
-    public async Task GetOrder()
-    {
-        // OrdersMethods is the descriptor holder from "Method descriptors" above.
-        var reply = await Proto.Context.Grpc().UnaryAsync(
-            OrdersMethods.GetOrder,
-            new GetOrderRequest { Id = 42 });
-
-        ProtoGrpcAssertions.For(reply).Should.MatchShape(new { id = 42, status = "PENDING" });
-    }
-}
-```
+The passing test under [What it adds](#what-it-adds) is the whole pattern: resolve the client, call, assert the shape. [Calls and assertions](./calls.md) holds the streaming helpers, the descriptor holder and the status assertions.
 
 Run it with `dotnet test`. A green run prints the passed test, and the trace lands at `TestResults/prototest-{runId}.prototrace` with a `grpc.call` operation for the call.
 
@@ -214,7 +121,7 @@ Run it with `dotnet test`. A green run prints the passed test, and the trace lan
 
 #### Authentication
 
-gRPC uses the same `[Auth]` attributes as the HTTP protocols - including the
+gRPC uses the same `[Auth]` attributes as the HTTP protocols, including the
 [built-in test user](../rest/authentication.md#built-in-test-user), whose header arrives as `prototest-user`
 metadata:
 
@@ -227,7 +134,11 @@ public sealed class OrderTests
 }
 ```
 
-Authenticators write HTTP headers as usual; the gRPC applier translates them to lowercase metadata keys. Metadata is layered client `Metadata` first, then `ConfigureMetadata`, then per-call `metadata`, with authenticators last so they can override. Each call resolves its authenticator from the test's factory, so a stateful authenticator is created per call and never shared between calls. Sensitive metadata values are redacted in the trace; `SensitiveMetadataKeys` starts with the defaults above and entries under `ProtoTest:Grpc:Client:SensitiveMetadataKeys` extend them. Matching is case-insensitive and by substring, so `authorization` also covers `proxy-authorization`.
+Authenticators write HTTP headers as usual; the gRPC applier translates them to lowercase metadata keys. Metadata is layered client `Metadata` first, then `ConfigureMetadata`, then per-call `metadata`, with authenticators last so they can override.
+
+Each call resolves its authenticator from the test's factory, so a stateful authenticator is created per call and never shared between calls.
+
+Sensitive metadata values are redacted in the trace; `SensitiveMetadataKeys` starts with the defaults above and entries under `ProtoTest:Grpc:Client:SensitiveMetadataKeys` extend them. Matching is case-insensitive and by substring, so `authorization` also covers `proxy-authorization`.
 
 #### Attachments
 
@@ -237,7 +148,11 @@ builder.AddGrpc(grpc => grpc
     .AddClient("Api"));
 ```
 
-With capture enabled, each traced call attaches its request and response messages as JSON: `grpc-{client}-{service}-{method}-{request|response}-{n}`, where `{client}` is the sanitized client name and `n` is the call's position in the client's call sequence, so repeated calls to the same method stay distinct, even from two clients in one test. Values run through the shared redaction rules, covering JSON properties such as `password` and `token` and the sensitive metadata keys, and each attachment is capped at `MaxDiagnosticBodyLength` from `ProtoTest:Grpc:Attachments`. `ClientStreamingAsync` and `ServerStreamingAsync` capture up to the first 10 streamed messages and record the total count in the attachment description. A message that cannot be serialized is reported as a `grpc.attachment.failed` event and never fails the call.
+With capture enabled, each traced call attaches its request and response messages as JSON: `grpc-{client}-{service}-{method}-{request|response}-{n}`, where `{client}` is the sanitized client name and `n` is the call's position in the client's call sequence, so repeated calls to the same method stay distinct, even from two clients in one test.
+
+Values run through the shared redaction rules, covering JSON properties such as `password` and `token` and the sensitive metadata keys, and each attachment is capped at `MaxDiagnosticBodyLength` from `ProtoTest:Grpc:Attachments`.
+
+`ClientStreamingAsync` and `ServerStreamingAsync` capture up to the first 10 streamed messages and record the total count in the attachment description. A message that cannot be serialized is reported as a `grpc.attachment.failed` event and never fails the call.
 
 #### Coverage
 
@@ -262,7 +177,18 @@ The resolver overloads register the client with a deferred address, so initializ
 
 ## In the trace and coverage
 
-The async helpers record a `grpc.call` operation named `gRPC · {method.FullName}` with the client entity `client:ProtoTest.Grpc.ProtoGrpcClient:{name}` and attributes `rpc.system`, `rpc.service`, `rpc.method`, `client.name`, `rpc.deadline`, `rpc.metadata.{key}` (sensitive values `(redacted)`), `auth.outcome`/`auth.type`, `grpc.request.count` for client streaming and `grpc.response.count`. Request and response sections are protobuf code; a failure adds `rpc.grpc.status_code`/`rpc.grpc.status` and a `Status` Fields section with `code` and `detail`. Each call records a `grpc.response` observation with `rpc.system`, `rpc.service`, `rpc.method` and `rpc.grpc.status`; a failed call records `grpc.failure` instead, so a call that never succeeded does not count as covered.
+```
+grpc.call "gRPC · billing.Orders/GetOrder"   (operation: the call)
+ ├─ assert.json.shape                        (child: the MatchShape assertion)
+ ├─ grpc.response                            (observation → service/method coverage)
+ └─ grpc-{client}-{service}-{method}-request/response-{n}  (attachments: the messages as JSON)
+```
+
+The async helpers record a `grpc.call` operation named `gRPC · {method.FullName}` with the client entity `client:ProtoTest.Grpc.ProtoGrpcClient:{name}` and attributes `rpc.system`, `rpc.service`, `rpc.method`, `client.name`, `rpc.deadline`, `rpc.metadata.{key}` (sensitive values `(redacted)`), `auth.outcome`/`auth.type`, `grpc.request.count` for client streaming and `grpc.response.count`.
+
+Request and response sections are protobuf code; a failure adds `rpc.grpc.status_code`/`rpc.grpc.status` and a `Status` Fields section with `code` and `detail`.
+
+Each call records a `grpc.response` observation with `rpc.system`, `rpc.service`, `rpc.method` and `rpc.grpc.status`; a failed call records `grpc.failure` instead, so a call that never succeeded does not count as covered.
 
 The client is state, not history: it appears once with `client.name`, `client.protocol`, `client.type`, `client.endpoint_source` and the sanitized `client.address`; Core adds the `client.initialize` operation and the `client.initializer` field. The `grpc.client.resolve` event records a fallback resolution, and `grpc.attachment.failed` records a capture failure with `attachment.name`.
 

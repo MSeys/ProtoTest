@@ -292,7 +292,7 @@ export const withoutProtoTest: ComparisonFile[] = [
     filename: 'BillingTests.cs',
     code: withoutTest,
     scope: 'test',
-    note: 'The fixture wires up the app, the client, authentication and cleanup itself, and the next fixture will do it again.',
+    note: 'The fixture wires up the app, client, authentication, and cleanup. The next fixture repeats all of it.',
     infrastructureLines: [
       1, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 20, 21, 22, 23, 24, 26, 27, 28, 29, 31,
       32, 33, 34, 35, 36, 38, 39, 50, 64, 75,
@@ -387,7 +387,7 @@ export const withProtoTest: ComparisonFile[] = [
     filename: 'Setup.cs',
     code: withSetup,
     scope: 'suite',
-    note: 'One host for the whole suite, and where the trace, the contract coverage and the HTML report come from.',
+    note: 'One host for the whole suite. It produces the trace, the contract coverage, and the HTML report.',
     infrastructureLines: [
       1, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
     ],
@@ -396,7 +396,7 @@ export const withProtoTest: ComparisonFile[] = [
     filename: 'Scenario.cs',
     code: withScenario,
     scope: 'suite',
-    note: 'This is where the setup went: capabilities written once, then composed onto any test as attributes.',
+    note: 'Setup lives here: capabilities you write once, then add to any test as attributes.',
     infrastructureLines: [
       1, 3, 4, 5, 6, 7, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28, 29,
       30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
@@ -455,7 +455,7 @@ export const comparisonConcerns: ComparisonConcern[] = [
     },
     with: {
       home: 'attribute',
-      summary: 'The role is declared on the test that needs it.',
+      summary: 'You declare the role on the test that needs it.',
       slices: [
         {file: 'BillingTests.cs', ranges: [[15, 15]]},
         {file: 'Scenario.cs', ranges: [[41, 59]]},
@@ -471,7 +471,7 @@ export const comparisonConcerns: ComparisonConcern[] = [
     },
     with: {
       home: 'authenticator',
-      summary: 'Applied per request from the test’s own context, so parallel tests never share a header.',
+      summary: 'ProtoTest applies it per request from the test context, so parallel tests keep separate headers.',
       slices: [
         {file: 'BillingTests.cs', ranges: [[9, 9], [11, 11]]},
         {file: 'Scenario.cs', ranges: [[61, 75]]},
@@ -511,7 +511,7 @@ export const comparisonConcerns: ComparisonConcern[] = [
     id: 'cleanup',
     task: 'Clean up, even when the test fails',
     without: {
-      summary: 'TearDown disposes the client and deletes the tenant, if SetUp got that far.',
+      summary: 'TearDown disposes the client and deletes the tenant. If setup failed partway, some cleanup is skipped.',
       slices: [
         {file: 'BillingTests.cs', ranges: [[31, 36]]},
         {file: 'TestSupport.cs', ranges: [[23, 28]]},
@@ -527,12 +527,12 @@ export const comparisonConcerns: ComparisonConcern[] = [
     id: 'diagnose',
     task: 'Find out what happened',
     without: {
-      summary: 'Whatever the assertion message says, and the console output.',
+      summary: 'Only the assertion message and the console output.',
       slices: [],
     },
     with: {
       home: 'suite host',
-      summary: 'Every step, request and assertion lands in a .prototrace and an HTML report, with contract coverage.',
+      summary: 'Steps, requests, and assertions land in a .prototrace file and an HTML report, with contract coverage.',
       slices: [{file: 'Setup.cs', ranges: [[17, 23]]}],
     },
   },

@@ -1,5 +1,5 @@
 ---
-sidebar_position: 15
+sidebar_position: 18
 title: Concurrency
 description: "How ProtoTest keeps parallel tests isolated, what to do when a test fans out internally, and the parallelism the project has actually exercised."
 ---
@@ -29,9 +29,28 @@ Recorded 2026-09-24 on a 16-core developer machine against a suite with Postgres
 | 32 | 53 passed, 6 skipped | 8 s |
 | 64 | 1 failed, then passed on rerun | 21 s |
 
-The suite was stable up to roughly twice the core count. At four times the cores the run oversubscribed and produced one non-reproducible failure, and the single trace file per run overwrote that failure's evidence before it could be read.
+The suite was stable up to roughly twice the core count. At four times the cores the run oversubscribed and produced one failure that never reproduced. Its evidence was lost to a harness limitation: the suite writes a single trace file per run, so the passing rerun overwrote the failed run's trace before it could be read. There is no framework finding behind that row, only an unreadable artifact.
+
+Re-run 2026-09-29 on a 16-core machine (`dotnet test -- NUnit.NumberOfTestWorkers=64`):
+
+- `tests/ProtoTest.Core.Tests`: 380 passed, three runs, about 4 s each.
+- `samples/Northstar.ProtoTest` with container Postgres, container RabbitMQ and a headless Chromium journey: 15 passed, 4 skipped, two runs (6 s and 2 s).
 
 Beyond this range, expect resource pressure rather than a ProtoTest-specific limit: port and container exhaustion, browser memory, and contention on run-scoped infrastructure.
+
+## Per-runner knobs
+
+ProtoTest does not schedule tests. Each runner brings its own switch:
+
+| Runner | Knob |
+| --- | --- |
+| NUnit | `dotnet test -- NUnit.NumberOfTestWorkers=8`, or `[assembly: LevelOfParallelism(8)]` (`tests/NUnitParallelization.cs` links both into every parallel NUnit project) |
+| xUnit v2 | `[assembly: CollectionBehavior(MaxParallelThreads = 8)]`; collections run in parallel by default |
+| xUnit v3 | `[assembly: Xunit.v3.Parallelization(MaxThreads = 8)]`; parallel by default, like v2 |
+| MSTest | `[assembly: Parallelize(Scope = ExecutionScope.MethodLevel)]` |
+| TUnit | parallel by default; `[NotInParallel]` keeps a test off the parallel path, with an optional constraint key to serialize only against the tests that share it |
+
+The runner pages name the same switches where they change behavior: [NUnit](../runners/nunit.md), [xUnit v2](../runners/xunit.md), [xUnit v3](../runners/xunit3.md), [MSTest](../runners/mstest.md), [TUnit](../runners/tunit.md).
 
 ## What the trace shows
 

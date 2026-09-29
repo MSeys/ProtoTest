@@ -10,6 +10,10 @@
   background: var(--surface);
 }
 
+/* Every block may shrink to the shell's width: one unbreakable line, usually an inline code chip,
+   must never widen the whole lesson past the viewport on a phone. */
+.shell > * { min-width: 0; }
+
 .head {
   display: flex;
   flex-wrap: wrap;
@@ -49,6 +53,8 @@
   gap: var(--space-6);
 }
 
+.duo > * { min-width: 0; }
+
 .outcome, .before, .learned {
   margin: 0;
   padding: 0;
@@ -61,6 +67,8 @@
   position: relative;
   padding-left: var(--space-5);
   line-height: 1.6;
+  /* Dotted names and inline code chips break before they push the lesson wide. */
+  overflow-wrap: break-word;
 }
 
 .outcome li::before, .before li::before, .learned li::before {
@@ -77,7 +85,7 @@
 .before li::before { border-radius: 50%; background: var(--muted); }
 .learned li::before { transform: rotate(45deg); background: var(--success); }
 
-.body { line-height: 1.65; }
+.body { min-width: 0; line-height: 1.65; overflow-wrap: break-word; }
 .body > :first-child { margin-top: 0; }
 
 .next {
@@ -87,6 +95,7 @@
 }
 
 .card {
+  min-width: 0;
   padding: var(--space-4);
   display: grid;
   gap: var(--space-1);
@@ -95,6 +104,7 @@
   background: var(--surface-2);
   color: var(--text);
   transition: border-color var(--motion-fast) var(--motion-ease);
+  overflow-wrap: break-word;
 }
 
 .card:hover { border-color: var(--blueprint); color: var(--text); text-decoration: none; }

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { ChangeSource, Visibility } from "../trace/model";
+import type { ChangeSource, Item, Visibility } from "../trace/model";
 import Panel from "./Panel.vue";
 
-const props = defineProps<{ visibility: Visibility }>();
+const props = withDefaults(defineProps<{ visibility: Visibility; resources?: Item[] }>(), { resources: () => [] });
 
 const hosting = computed(() => ({
   "in-process": { label: "In-process", detail: "The application ran inside the test host, so its own work could be traced." },
@@ -21,6 +21,16 @@ const sources: { id: ChangeSource; label: string; detail: string }[] = [
   { id: "applicationside", label: "Application", detail: "Values the application reported through its own instrumentation." }
 ];
 const seen = computed(() => new Set(props.visibility.sources));
+
+/* A run-scoped resource reads by its description; the id stays behind the title for the exact key. */
+function describe(item: Item): string {
+  const description = item.state["resource.description"];
+  return typeof description === "string" && description ? description : item.name;
+}
+function resourceTitle(item: Item): string {
+  const state = item.state["resource.state"];
+  return typeof state === "string" && state ? `${item.id} (${state})` : item.id;
+}
 </script>
 
 <template>
@@ -37,6 +47,14 @@ const seen = computed(() => new Set(props.visibility.sources));
                 :title="capability.state['capability.source'] ?? undefined">{{ capability.name }}</span>
         </dd>
         <dd v-else class="absent">None recorded</dd>
+      </div>
+      <div v-if="visibility.backends.length">
+        <dt>Backends</dt>
+        <dd>{{ visibility.backends.join(", ") }}</dd>
+      </div>
+      <div v-if="resources.length">
+        <dt>Resources</dt>
+        <dd><span v-for="(item, index) in resources" :key="item.key" :title="resourceTitle(item)">{{ describe(item) }}<span v-if="index < resources.length - 1">, </span></span></dd>
       </div>
       <div>
         <dt>Values from</dt>

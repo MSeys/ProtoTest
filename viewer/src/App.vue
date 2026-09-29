@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import AppHeader from "./ui/AppHeader.vue";
+import DemoList from "./ui/DemoList.vue";
 import RunView from "./views/RunView.vue";
 import StoryView from "./views/StoryView.vue";
 import StateView from "./views/StateView.vue";
@@ -23,8 +24,10 @@ import { openTraceArchive, TraceOpenError } from "./trace/archive";
 import type { TraceArchive, TraceProblem } from "./trace/archive";
 import { buildRun } from "./trace/model";
 import type { Artifact, Item, Run, Span, TestTrace } from "./trace/model";
-import { formatDuration, pad, testCodeName, testGroup, testTitle } from "./trace/format";
+import { formatDuration, failureReason, pad, testCodeName, testGroup, testTitle, tone } from "./trace/format";
 import { href, navigate, replace, route } from "./router";
+import { demos, demoFileUrl, resolveDemo, summarizeDemo, type DemoFacts } from "./demos";
+import { parseTraceParam, shareUrl, traceNameFromUrl, type TraceSource } from "./share";
 import { useSources } from "./trace/sources";
 import type { Route, TestView } from "./router";
 
@@ -35,6 +38,10 @@ const fileName = ref("");
 const problem = ref<{ kind: TraceProblem | "load"; message: string }>();
 const loading = ref(false);
 const openArtifact = ref<Artifact>();
+const source = ref<TraceSource>();
+const demoFacts = ref<Record<string, DemoFacts | null>>({});
+// The demos sit in the start panel's sidebar; the reader can put them away and get the drop screen alone.
+const demosOpen = ref(true);
 // Open as a column where it fits; as a drawer on a narrow screen it starts closed.
 const railOpen = ref(matchMedia("(min-width: 1000px)").matches);
 const dragging = ref(false);
@@ -162,6 +169,16 @@ watch(() => [route.value.name === "test" ? route.value.testId : "", view.value],
 const itemSelection = computed(() => selectedItem.value ? { kind: selectedItem.value.kind, id: selectedItem.value.id } : undefined);
 const inspecting = computed(() => Boolean(selectedTest.value && (selectedSpan.value || selectedItem.value)));
 
+/*
+ * A test that stopped short without a failing operation - cancelled, or partial with nothing to blame -
+ * still answers why: the check that decided it, or the outcome in its own words when no check did.
+ */
+const unexplained = computed(() => {
+  const test = selectedTest.value;
+  if (!test || test.failure || test.outcome === "succeeded" || test.outcome === "skipped") return null;
+  return { outcome: test.outcome, ...failureReason(test) };
+});
+
 /**
  * The test a test tab opens when none is chosen yet: the first that failed, then the first that went partial
  * or was cancelled, then the first that ran. That is the test a reader would look for first.
@@ -208,11 +225,12 @@ function selectTab(id: string) {
 }
 
 function openPicker() { fileInput.value?.click(); }
-function showTest(test: TestTrace) {
+function showTest(test: TestTrace, selection?: { span: string }) {
   const current = route.value;
   // Switching test keeps the view the reader chose; only a first visit lands on the story.
+  // A caller that names an operation - a finding - keeps it; otherwise the test decides its landing.
   const next = current.name === "test" ? current.view : "story";
-  navigate({ name: "test", testId: test.id, view: next, selection: landing(test) });
+  navigate({ name: "test", testId: test.id, view: next, selection: selection ?? landing(test) });
   // On a narrow screen the test list is a drawer: picking a test is the reason it was opened.
   if (!railFits.value) railOpen.value = false;
 }
@@ -250,22 +268,47 @@ async function loadBuffer(buffer: ArrayBuffer, name: string) {
 }
 async function loadFile(file: File) {
   await loadBuffer(await file.arrayBuffer(), file.name);
+  source.value = { kind: "file" };
+  syncQuery("");
 }
-const bundledDemos: Record<string, {file: string; label: string}> = {
-  full: { file: "prototest-demo.prototrace", label: "ProtoTest demo trace" },
-  "rest-graphql": { file: "recipes/rest-graphql.prototrace", label: "REST to GraphQL recipe" },
-  "rest-database": { file: "recipes/rest-database.prototrace", label: "REST to database recipe" },
-  workbook: { file: "recipes/workbook.prototrace", label: "Workbook recipe" }
-};
+
+/* The address names the open trace, so a demo or hosted trace is shareable from the bar. */
+function syncQuery(query: string) {
+  try {
+    history.replaceState(null, "", `${location.pathname}${query}${location.hash}`);
+  } catch { /* The address stays as it was; the copy control still shares the open trace. */ }
+}
+
+/* The shared link keeps the reader's hash, so a link to a failing check shares as one. */
+const shareLink = computed(() => {
+  void route.value;
+  return source.value ? shareUrl(location.origin, location.pathname, source.value, location.hash) : null;
+});
+
+/* The facts under each demo come from the traces themselves, read once while the start shows. */
+async function loadDemoFacts() {
+  const missing = demos.filter(entry => !(entry.key in demoFacts.value));
+  await Promise.all(missing.map(async entry => {
+    try {
+      const response = await fetch(demoFileUrl(entry));
+      if (!response.ok) throw new Error(`The demo trace could not be loaded (${response.status}).`);
+      demoFacts.value[entry.key] = await summarizeDemo(await response.arrayBuffer());
+    } catch {
+      demoFacts.value[entry.key] = null;
+    }
+  }));
+}
 
 async function loadDemo(key = "full") {
   loading.value = true;
   try {
-    const demo = bundledDemos[key] ?? bundledDemos.full;
-    const response = await fetch(`${import.meta.env.BASE_URL}demos/${demo.file}`);
+    const entry = resolveDemo(key);
+    const response = await fetch(demoFileUrl(entry));
     if (!response.ok) throw new Error(`The demo trace could not be loaded (${response.status}).`);
-    await loadBuffer(await response.arrayBuffer(), demo.label);
-    if (key !== "full" && run.value?.tests.length === 1) {
+    await loadBuffer(await response.arrayBuffer(), entry.label);
+    source.value = { kind: "demo", key: entry.key };
+    syncQuery(`?demo=${entry.key === "full" ? "1" : entry.key}`);
+    if (entry.key !== "full" && run.value?.tests.length === 1) {
       replace({ name: "test", testId: run.value.tests[0].id, view: "story" });
     }
   } catch (reason) {
@@ -273,13 +316,44 @@ async function loadDemo(key = "full") {
     loading.value = false;
   }
 }
+async function loadTraceUrl(url: string) {
+  loading.value = true;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`The trace at ${url} responded with ${response.status}.`);
+    await loadBuffer(await response.arrayBuffer(), traceNameFromUrl(url));
+    source.value = { kind: "remote", url };
+    syncQuery(`?trace=${encodeURIComponent(url)}`);
+  } catch (reason) {
+    if (reason instanceof TraceOpenError) {
+      problem.value = { kind: reason.problem, message: reason.message };
+    } else if (reason instanceof TypeError) {
+      problem.value = {
+        kind: "load",
+        message: `The trace at ${url} could not be fetched. The server may block cross-origin reads, the link may be wrong, or the network may be down. A downloaded copy still opens by dropping it in.`
+      };
+    } else {
+      problem.value = { kind: "load", message: reason instanceof Error ? reason.message : `The trace at ${url} could not be loaded.` };
+    }
+    loading.value = false;
+  }
+}
 function fileChanged(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0];
   if (file) void loadFile(file);
 }
-// ?demo=1 opens the full run; named demos open compact traces that exactly match a docs recipe.
-const requestedDemo = new URLSearchParams(location.search).get("demo");
-if (requestedDemo !== null) void loadDemo(requestedDemo === "1" ? "full" : requestedDemo);
+// ?demo=<key> opens a bundled demo (?demo=1 is the full one); ?trace=<absolute-url> fetches a hosted trace.
+const query = new URLSearchParams(location.search);
+const requestedDemo = query.get("demo");
+const requestedTrace = parseTraceParam(query.get("trace"));
+if (requestedTrace.state === "valid") void loadTraceUrl(requestedTrace.url);
+else if (requestedTrace.state === "invalid") {
+  problem.value = {
+    kind: "load",
+    message: `“${requestedTrace.value}” is not a usable trace link. Share an absolute http(s) URL to a .prototrace file.`
+  };
+} else if (requestedDemo !== null) void loadDemo(requestedDemo);
+onMounted(() => { if (!run.value) void loadDemoFacts(); });
 function dropped(event: DragEvent) {
   dragging.value = false;
   const file = event.dataTransfer?.files?.[0];
@@ -295,36 +369,47 @@ const problemTitle = computed(() => ({
 </script>
 
 <template>
-  <AppHeader @open="openPicker" />
+  <AppHeader :share="shareLink" @open="openPicker" />
   <input ref="fileInput" type="file" accept=".prototrace,application/zip" hidden @change="fileChanged">
   <main>
     <section v-if="!run" class="empty-state">
-      <div class="drop-zone" :class="{ dragging }" role="button" tabindex="0" aria-label="Open a ProtoTrace file"
-           @click="openPicker" @keydown.enter.prevent="openPicker" @keydown.space.prevent="openPicker"
-           @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="dropped">
-        <BrandMark :size="88" />
-        <template v-if="loading">
-          <h1>Reading the trace</h1>
-          <p>Large runs take a moment; everything stays on this machine.</p>
-        </template>
-        <template v-else-if="problem">
-          <h1>{{ problemTitle }}</h1>
-          <p v-if="problem.kind !== 'legacy'" class="problem">{{ problem.message }}</p>
-          <p v-if="problem.kind === 'legacy'">Run the tests again with the current ProtoTest to produce a trace this viewer reads.</p>
-          <div class="empty-actions">
-            <AppButton variant="primary" @click.stop="openPicker">Choose another file</AppButton>
-            <AppButton @click.stop="loadDemo()">Open the demo trace</AppButton>
-          </div>
-        </template>
-        <template v-else>
-          <h1>Open a ProtoTest execution</h1>
-          <p>Drop a <code>.prototrace</code> file here, choose one, or explore the bundled SaaS demo.</p>
-          <div class="empty-actions">
-            <AppButton variant="primary" @click.stop="openPicker">Choose trace file</AppButton>
-            <AppButton @click.stop="loadDemo()">Open demo trace</AppButton>
-          </div>
-          <small>Your files are read in this browser. Nothing is uploaded.</small>
-        </template>
+      <div class="start-panel" :class="{ 'demos-open': demosOpen }">
+        <AppButton variant="icon" class="demos-toggle" :label="demosOpen ? 'Hide the demos' : 'Show the demos'"
+                   @click="demosOpen = !demosOpen">
+          <Icon name="sidebar" />
+        </AppButton>
+
+        <div class="drop-zone" :class="{ dragging }" role="button" tabindex="0" aria-label="Open a ProtoTrace file"
+             @click="openPicker" @keydown.enter.prevent="openPicker" @keydown.space.prevent="openPicker"
+             @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="dropped">
+          <BrandMark :size="72" />
+          <template v-if="loading">
+            <h1>Reading the trace</h1>
+            <p>Large runs take a moment; everything stays on this machine.</p>
+          </template>
+          <template v-else-if="problem">
+            <h1>{{ problemTitle }}</h1>
+            <p v-if="problem.kind !== 'legacy'" class="problem">{{ problem.message }}</p>
+            <p v-if="problem.kind === 'legacy'">Run the tests again with the current ProtoTest to produce a trace this viewer reads.</p>
+            <div class="empty-actions">
+              <AppButton variant="primary" @click.stop="openPicker">Choose another file</AppButton>
+            </div>
+          </template>
+          <template v-else>
+            <h1>Open a ProtoTest execution</h1>
+            <p v-if="dragging">Drop it to open the trace.</p>
+            <p v-else>Drop a <code>.prototrace</code> file here or choose one.</p>
+            <div class="empty-actions">
+              <AppButton variant="primary" @click.stop="openPicker">Choose trace file</AppButton>
+            </div>
+            <small>Your files are read in this browser. Nothing is uploaded.</small>
+          </template>
+        </div>
+
+        <section v-if="demosOpen" class="demos" aria-label="Bundled demos">
+          <h2>Or start from a demo</h2>
+          <DemoList :facts="demoFacts" @open="loadDemo" />
+        </section>
       </div>
     </section>
 
@@ -334,6 +419,7 @@ const problemTitle = computed(() => ({
                '--inspector-width': inspectorResize.width.value ? `${inspectorResize.width.value}px` : undefined,
                '--inspector-sheet-height': sheetHeight === null ? undefined : `${sheetHeight}px`
              }">
+      <a class="skip" href="#workspace-view">Skip to the view</a>
       <div class="view-bar">
         <!-- Always rendered so the tabs never shift; on the run screen the run itself is the list. -->
         <AppButton variant="icon" class="rail-toggle" :class="{ inert: !selectedTest }" :disabled="!selectedTest"
@@ -349,7 +435,7 @@ const problemTitle = computed(() => ({
       <ColumnResizer v-if="selectedTest && railOpen" class="rail-resizer" label="Resize the test list"
                      @start="railResize.start" @nudge="railResize.nudge" @reset="railResize.reset" />
 
-      <div ref="viewHost" class="view-host" id="workspace-view" role="tabpanel" :aria-labelledby="`workspace-view-tab-${view}`">
+      <div ref="viewHost" class="view-host" id="workspace-view" role="tabpanel" tabindex="-1" :aria-labelledby="`workspace-view-tab-${view}`">
         <div v-if="missingTestId" class="missing-test">
           <h2>This trace has no such test</h2>
           <p>The link names <code>{{ missingTestId }}</code>, which is not in {{ fileName }}. It may come from another run.</p>
@@ -371,6 +457,10 @@ const problemTitle = computed(() => ({
             </header>
             <FailureCard v-if="selectedTest.failure && selectedTest.outcome !== 'succeeded'" :failure="selectedTest.failure"
                          :outcome="selectedTest.outcome" @select="selectSpan" />
+            <section v-else-if="unexplained" class="unexplained" :class="tone(unexplained.outcome)" aria-label="Why this test did not pass">
+              <i class="status" :class="tone(unexplained.outcome)" />
+              <p><strong>{{ unexplained.title }}</strong><span v-if="unexplained.detail">{{ unexplained.detail }}</span></p>
+            </section>
             <StoryView v-if="view === 'story'" :test="selectedTest" :selected="selectedSpan?.id" @select="selectSpan" />
             <StateView v-else-if="view === 'state'" :test="selectedTest" :selected="itemSelection" :selected-span="selectedSpan?.id"
                        @select-item="selectItem" @select-span="selectSpan" />
@@ -425,6 +515,16 @@ main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: minmax(
 .workspace > .rail { margin-bottom: var(--space-4); }
 
 .test { display: grid; gap: var(--space-3); }
+/* Keyboard readers jump past the rail and the tab strip straight to the view. */
+.skip { position: fixed; z-index: 60; top: var(--space-2); left: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--blueprint); border-radius: var(--radius-control); background: var(--surface); font-size: var(--text-meta); transform: translateY(-300%); }
+.skip:focus-visible { transform: none; }
+/* A test that stopped short with no failing operation still says why, in the failure card's shape. */
+.unexplained { padding: var(--space-3) var(--space-4); display: flex; align-items: flex-start; gap: var(--space-3); border: 1px solid var(--border); border-left: 3px solid var(--dim); border-radius: var(--radius-control); background: var(--surface); }
+.unexplained.danger { border-left-color: var(--danger); background: var(--danger-soft); }
+.unexplained.warning { border-left-color: var(--warning); background: var(--warning-soft); }
+.unexplained .status { margin-top: var(--space-1); }
+.unexplained p { display: grid; gap: 2px; font-size: var(--text-meta); }
+.unexplained span { overflow-wrap: anywhere; font: var(--text-micro)/var(--leading) var(--font-mono); }
 .test-head { padding: var(--space-1) var(--space-1) 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: var(--space-3); }
 .test-head > b { padding-top: var(--space-1); color: var(--dim); font: var(--text-meta) var(--font-mono); }
 .test-title { min-width: 0; display: grid; gap: 2px; }
@@ -432,8 +532,17 @@ main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: minmax(
 .test-title p { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); color: var(--muted); font-size: var(--text-micro); }
 .test-title code { overflow-wrap: anywhere; color: var(--dim); font-family: var(--font-mono); }
 .test-head :deep(.pill) { padding-top: var(--space-1); }
+/* Narrow: the outcome keeps its own row under the title instead of squeezing it. */
+@container (max-width: 560px) {
+  .test-head { grid-template-columns: auto minmax(0, 1fr); }
+  .test-head :deep(.pill) { grid-column: 2; padding-top: 0; }
+}
 
 .empty-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center; }
+/* The start panel's one control: the demos sidebar can be put away, and this brings it back. */
+.demos-toggle { position: absolute; top: var(--space-3); right: var(--space-3); z-index: 1; }
+.demos { display: grid; gap: var(--space-3); text-align: left; }
+.demos h2 { font-family: var(--font-ui); font-size: var(--text-title); font-weight: var(--weight-bold); color: var(--text); }
 .drop-zone h1 { margin-top: var(--space-3); }
 .drop-zone code { padding: 1px var(--space-2); border-radius: var(--radius-chip); background: var(--surface-2); font-family: var(--font-mono); font-size: var(--text-meta); }
 .drop-zone .problem { color: var(--danger); }

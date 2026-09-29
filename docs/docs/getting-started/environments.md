@@ -5,11 +5,14 @@ sidebar_label: Three environments
 description: "Run the same suite in-process, container-backed or against a published environment, changing only the host's setup and configuration."
 ---
 
+import TraceAnatomy from '@site/src/components/TraceAnatomy';
+import {brokerSkipLayers, brokerSkipReason, brokerSkipSource, brokerSkipTest} from '@site/src/data/brokerSkipWalk';
+
 # Run one suite in three environments
 
 The same suite runs in three shapes without a code change: **in-process** on a laptop, **container-backed** on a machine with a container runtime, and **published** against a deployed environment. Only the host setup and configuration differ. The journeys, attributes, assertions and reports stay the same.
 
-The shapes below come from the Northstar learning sample (`samples/Northstar.ProtoTest`). Its `NorthstarRun` decides all three from configuration:
+The shapes below come from the Northstar.ProtoTest sample suite (`samples/Northstar.ProtoTest`). Its `NorthstarRun` decides all three from configuration:
 
 ```csharp
 var run = NorthstarRun.From(configuration);
@@ -46,6 +49,13 @@ builder.AddLoopbackApplication(NorthstarTargets.Web, NorthstarProgram.CreateApp)
 builder.AddHttpReadiness(NorthstarTargets.Web, "/health");
 ```
 
+```mermaid
+flowchart LR
+    K["keys: none set"] --> C["chain: UseConfigured loses,\nfallback serves"]
+    C --> W["winner: in-process server\nand loopback listener start"]
+    W --> R["tests read the address\nfrom infrastructure settings"]
+```
+
 The test-side domain is composed over the same store, so `DomainAccessJourney` runs. No broker is configured, so `BrokerJourney` skips.
 
 ## Container-backed
@@ -71,6 +81,13 @@ builder.AddInfrastructure(
 
 The host publishes the started connection strings in `ProtoInfrastructureSettings` for tests and in host settings for both hosted instances. All of them then use the same store or broker. The loopback instance follows the suite's configuration, so the web journey runs in every local mode and skips only when the browser is not installed. A published run skips the loopback and follows the configured `ProtoTest:Applications:{application}:BaseUrl` instead.
 
+```mermaid
+flowchart LR
+    K["keys: Database=postgres,\nBroker=container"] --> C["chain: UseConfigured loses,\ncontainer serves"]
+    C --> W["winner: Postgres and RabbitMQ\ncontainers start"]
+    W --> R["tests read the address\nfrom infrastructure settings"]
+```
+
 ## Published
 
 Setting `ProtoTest:TargetUrl` points the suite at a deployed system:
@@ -95,11 +112,37 @@ The run does not start the application, so the suite cannot assume it is up when
 builder.AddHttpReadiness(NorthstarTargets.Api);   // waits for ProtoTest:Applications:{app}:BaseUrl
 ```
 
+```mermaid
+flowchart LR
+    K["keys: TargetUrl set,\nconnection strings set"] --> C["chain: UseConfigured wins,\nnothing starts"]
+    C --> W["winner: the deployed\nenvironment serves"]
+    W --> R["tests read the address\nfrom configuration"]
+```
+
 :::warning[Readiness probes run in registration order]
-Register the probe **after** the infrastructure that publishes the address. A probe registered first sees no address and records a `readiness.skipped` reason naming the ordering requirement instead of waiting. See [Infrastructure](../foundation/infrastructure.md#wait-until-it-is-ready) for the full rule.
+Register the probe **after** the infrastructure that publishes the address. A probe registered first sees no address and records a `readiness.skipped` reason naming the ordering requirement instead of waiting. See [Infrastructure recipes](../foundation/infrastructure-recipes.md#wait-until-it-is-ready) for the full rule.
 :::
 
 An in-process application has no address to wait for, so the probe skips and records the reason.
+
+## What a skip records
+
+No broker is configured, so `BrokerJourney` skips with the reason the sample declares once in its setup:
+
+```text
+Skipped PayingAnInvoicePublishesAnInvoicePaidEvent
+  {brokerSkipReason}
+```
+
+The archive for that run holds the run and nothing else: five entries, two run reports plus manifest, spans and state, and no test record at all.
+
+<TraceAnatomy
+  source={brokerSkipSource}
+  title="A skipped test, layer by layer"
+  test={brokerSkipTest}
+  layers={brokerSkipLayers}
+  blindSpots={[]}
+/>
 
 ## What does not change
 

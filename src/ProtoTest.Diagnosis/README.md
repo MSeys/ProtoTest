@@ -1,5 +1,7 @@
 # ProtoTest.Diagnosis
 
+> Preview: the surface can change before 1.2.
+
 Reads one `.prototrace` run and states the deterministic causal summary: which tests failed and why,
 what the failing operation carried and changed, and what the report published.
 

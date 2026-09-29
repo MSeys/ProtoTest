@@ -194,7 +194,7 @@ export default async function createConfig(): Promise<Config> {
         {
           title: 'Learn',
           items: [
-            {label: 'Learn integration testing', to: '/learn/'},
+            {label: 'Learn', to: '/learn/'},
             {label: 'Installation', to: '/docs/getting-started/installation'},
             {label: 'Your first test', to: '/docs/getting-started/first-test'},
             {label: 'Recipes', to: '/docs/recipes/overview'},

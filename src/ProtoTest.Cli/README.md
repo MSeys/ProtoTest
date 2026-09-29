@@ -1,5 +1,7 @@
 # ProtoTest.Cli
 
+> Preview: the surface can change before 1.2.
+
 The `prototest` .NET tool.
 
 ```bash

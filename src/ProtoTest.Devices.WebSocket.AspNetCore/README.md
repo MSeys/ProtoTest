@@ -1,5 +1,7 @@
 # ProtoTest.Devices.WebSocket.AspNetCore
 
+> Preview: the surface can change before 1.2.
+
 In-process WebSocket device connections for `ProtoTest.Devices`: reach an application's WebSocket
 endpoint through its `TestServer`, with no listening socket.
 

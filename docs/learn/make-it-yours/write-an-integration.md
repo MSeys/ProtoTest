@@ -34,15 +34,16 @@ Your code can add what a package adds. That means a client the context resolves,
   }
   checkpoint={{
     question:
-      'A helper starts an operation with StartOperation and disposes it without calling Succeed, Fail or Complete. What does the trace record for that operation?',
+      'The first journey runs with the scenario hook registered. Which entry in its trace proves the custom client was registered, and where does your own milestone land?',
     verify: (
       <>
-        Read the adding-to-the-trace section of the extending page, then check the operations in any trace. An operation that was never completed shows its own outcome.
+        Open <a href="pathname:///lessons/l1-first-journey.prototrace">l1-first-journey.prototrace</a> in the{' '}
+        <a href="https://trace.prototest.dev">viewer</a> and read the setup and teardown layers, or read the table at the end of this lesson.
       </>
     ),
     reveal: (
       <>
-        Disposing an operation without completing it records <code>Unknown</code>. The operation completes only once, so the code path that judges the work has to call <code>Succeed()</code>, <code>Fail(exception)</code> or <code>Complete(outcome)</code> before the using block ends.
+        The setup layer holds <code>Initialize · ScenarioProbe (ScenarioProbe)</code>: the initializer registered the custom client, which is what makes <code>context.Client</code> resolve instead of throwing. Your milestone lands in the same place the sample's two milestones do: the scenario summary attachment the hook publishes at teardown.
       </>
     ),
   }}

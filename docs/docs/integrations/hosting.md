@@ -101,7 +101,7 @@ builder.AddWorkerHost<BillingWorker.Program>("Billing", worker =>
 
 The worker is run-scoped infrastructure: the trace records a `worker` run entity with its name and program, the run overview lists a `worker` capability, and a release failure follows the same path as any other run resource.
 
-Register the worker after the pieces it needs: a [readiness probe](../foundation/infrastructure.md#wait-until-it-is-ready) placed before `AddWorkerHost` waits for the broker or database before the worker starts.
+Register the worker after the pieces it needs: a [readiness probe](../foundation/infrastructure-recipes.md#wait-until-it-is-ready) placed before `AddWorkerHost` waits for the broker or database before the worker starts.
 
 ## Limits
 
@@ -111,7 +111,7 @@ Register the worker after the pieces it needs: a [readiness probe](../foundation
 - **One instance per run.** The worker is shared by every test in the run, exactly like the in-process application; tests must not assume a fresh worker per test.
 - **No per-test lifetime.** `AddWorkerHost` has no `PerTest` option; a worker that must restart between tests is not supported.
 - **A parameterless or argument-ignoring `Main` cannot see the overlay before `Build()`.** The run passes the overlay as command-line arguments; an entry point whose `Main()` takes no arguments, or that builds its host without passing `args`, still receives the values when the host is built (the in-memory overlay), so options factories and hosted services read them, but code between creating the builder and calling `Build()` reads only the worker's own sources. A parameterless `Main` also never receives the worker's `--contentRoot`/`--applicationName`, so it reads its own `appsettings.json` from the test process's content root. Build the host from `args` when `Main` itself reads configuration.
-- **Start does not wait for readiness.** The host's `StartAsync` completing is the only signal. If a worker must wait for a dependency to be ready, register a [readiness probe](../foundation/infrastructure.md#wait-until-it-is-ready) before `AddWorkerHost`, or wait inside its own service.
+- **Start does not wait for readiness.** The host's `StartAsync` completing is the only signal. If a worker must wait for a dependency to be ready, register a [readiness probe](../foundation/infrastructure-recipes.md#wait-until-it-is-ready) before `AddWorkerHost`, or wait inside its own service.
 - **The worker host runs in the test process.** Its background threads, loggers and static state are the test process's; a worker that must be killed hard is not a good fit.
 
 ## Learn more

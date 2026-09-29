@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 title: Locators
 description: "Find elements by role, label and text rather than CSS; each backend translates a WebLocator into its native query."
 ---
@@ -31,14 +31,25 @@ By.TableCellAt(int index)                   // zero-based
 
 In order of preference:
 
-| Locator | Use it for |
-| --- | --- |
-| `Role` | buttons, links, headings, checkboxes, rows: anything with an ARIA role and an accessible name |
-| `Label` | form fields with a `<label>` |
-| `Placeholder` | fields without a label (consider adding one) |
-| `Text` | static text |
-| `TestId` | elements with no good semantic handle; `data-testid="…"` |
-| `Attribute` / `Css` | last resort |
+```mermaid
+flowchart TD
+    R[Role] --> L[Label]
+    L --> P[Placeholder]
+    P --> T[Text]
+    T --> I[TestId]
+    I --> A[Attribute or Css: last resort]
+```
+
+| Locator | Use it for | Selenium limit |
+| --- | --- | --- |
+| `Role` | buttons, links, headings, checkboxes, rows: anything with an ARIA role and an accessible name | implicit HTML mappings instead of ARIA resolution |
+| `Label` | form fields with a `<label>` | none |
+| `Placeholder` | fields without a label (consider adding one) | none |
+| `Text` | static text | XPath 1.0 deepest-match |
+| `TestId` | elements with no good semantic handle; `data-testid="…"` | none |
+| `Attribute` / `Css` | last resort | `Css` cannot be the left side of `And` |
+
+The full per-backend translation lives in [How each backend translates a locator](#how-each-backend-translates-a-locator).
 
 `Attribute` only accepts names made of letters, digits, `-`, `_` and `:`; anything else throws an `ArgumentException` at build time.
 

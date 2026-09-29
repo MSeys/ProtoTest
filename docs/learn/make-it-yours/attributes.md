@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Write your own attribute
 
-Level 6 returns to the Northstar sample. The first journey already carries `[NorthstarMember]`, and that one line provisions a tenant and signs a member in. This lesson writes the next attribute yourself.
+Level 6 returns to the sample suite. The first journey already carries `[NorthstarMember]`, and that one line provisions a tenant and signs a member in. This lesson writes the next attribute yourself.
 
 <LearnShell
   level="Level 6, lesson 1"

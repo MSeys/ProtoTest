@@ -42,7 +42,7 @@ One file from CI must explain the run to a reader who was not there. That file i
     ),
     reveal: (
       <>
-        The response bytes are an attachment inside the archive, under <code>resources/&lt;test id&gt;/artifact-1/&lt;test id&gt;-rest-01-response</code>, 2,009 bytes of workbook. The execution layer holds the <code>sheets.open</code>, <code>sheets.model</code> and <code>assert.sheets</code> entries, and the embedded report carries the sheet coverage rows the model and the column check recorded, <code>Summary!A2:C2</code> and <code>Summary!C2:C2</code>.
+        The response bytes are an attachment inside the archive, under <code>resources/&lt;test id&gt;/artifact-1/&lt;test id&gt;-rest-01-response</code>, 2,010 bytes of workbook. The execution layer holds the <code>sheets.open</code>, <code>sheets.model</code> and <code>assert.sheets</code> entries, and the embedded report carries the sheet coverage rows the model and the column check recorded, <code>Summary!A2:C2</code> and <code>Summary!C2:C2</code>.
       </>
     ),
   }}
@@ -78,8 +78,9 @@ A `.prototrace` is a zip with named entries:
 
 The sample configures both report sinks in one place:
 
-```csharp
-.ConfigureTracing(trace =>
+<AnnotatedCode
+  filename="Setup.cs"
+  code={`.ConfigureTracing(trace =>
 {
     trace.OutputPath = Path.Combine("TestResults", "Northstar.ProtoTest", "northstar.prototrace");
 })
@@ -88,9 +89,14 @@ The sample configures both report sinks in one place:
 .AddSink<HtmlReportSink>(sink =>
 {
     sink.OutputPath = Path.Combine("TestResults", "Northstar.ProtoTest", "report.html");
-    sink.Title = "Northstar sample";
-});
-```
+    sink.Title = "Northstar Learning demo";
+});`}
+  callouts={[
+    {line: 3, title: 'The trace path', note: 'One archive per run. CI points this at its artifact directory instead; the evidence lesson shows how.'},
+    {line: 5, title: 'Both sinks copied into the archive', note: 'The JSON and HTML reports are written beside the trace and copied into resources/, so one upload carries all three.'},
+  ]}
+  foot={<>From <code>samples/Northstar.ProtoTest/Setup.cs</code>. The paths below <code>TestResults/Northstar.ProtoTest/</code> are the local default.</>}
+/>
 
 Both files are written at the end of the run and copied into the archive, so the one artifact a CI job uploads carries the story and the report.
 

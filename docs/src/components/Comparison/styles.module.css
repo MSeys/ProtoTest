@@ -1,5 +1,7 @@
 .title { font-size: var(--text-strong); font-weight: var(--weight-semibold); }
 
+.verdict { padding: var(--space-3) var(--space-5) 0; color: var(--text); font-size: var(--text-body); }
+
 .delta { color: var(--muted); font-size: var(--text-micro); }
 
 .once { color: var(--muted); }
@@ -14,6 +16,11 @@
 
 .side { min-width: 0; padding: var(--space-5); display: grid; gap: var(--space-1); align-content: start; }
 .side + .side { border-left: 1px solid var(--border); }
+
+/* Stacked sides divide horizontally, not vertically. The frame is the query container. */
+@container (max-width: 36rem) {
+  .side + .side { border-left: 0; border-top: 1px solid var(--border); }
+}
 .sideLabel { color: var(--muted); font-size: var(--text-meta); font-weight: var(--weight-semibold); }
 
 .figure { display: flex; align-items: baseline; gap: var(--space-2); }
@@ -60,7 +67,7 @@
 }
 
 .docSide { color: var(--text); font-size: var(--text-body); font-weight: var(--weight-semibold); }
-.docName { color: var(--muted); font: var(--text-micro) var(--font-mono); }
+.docName { min-width: 0; color: var(--muted); font: var(--text-micro) var(--font-mono); overflow-wrap: anywhere; }
 
 .docScope {
   padding: 0 var(--space-2);

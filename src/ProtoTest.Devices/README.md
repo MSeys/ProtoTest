@@ -1,5 +1,7 @@
 # ProtoTest.Devices
 
+> Preview: the surface can change before 1.2.
+
 Talk to devices - simulators or hardware - from the same test context, lifecycle and trace. A suite
 declares a named device client once and gets typed device instances per test by id.
 

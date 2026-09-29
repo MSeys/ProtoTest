@@ -60,7 +60,7 @@
 .cost strong { color: var(--text); font-size: var(--text-strong); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }
 .cost strong.zero { color: var(--success); }
 .once { color: var(--dim); font-size: var(--text-micro); }
-.once code { padding: 0; border: 0; background: none; color: inherit; font-size: inherit; }
+.once code { padding: 0; border: 0; background: none; color: inherit; font-size: inherit; overflow-wrap: anywhere; }
 .absent { color: var(--dim); font-size: var(--text-meta); font-style: italic; }
 
 /* Where the work went: a word in the blueprint colour, the one accent on the ProtoTest side. */
@@ -78,7 +78,7 @@
 
 .codeSide { display: grid; gap: var(--space-3); align-content: start; min-width: 0; }
 .slice { overflow: clip; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-sunken); }
-.sliceFile { display: block; padding: var(--space-1) var(--space-3); border-bottom: 1px solid var(--border); color: var(--muted); font: var(--text-micro) var(--font-mono); }
+.sliceFile { display: block; padding: var(--space-1) var(--space-3); border-bottom: 1px solid var(--border); color: var(--muted); font: var(--text-micro) var(--font-mono); overflow-wrap: anywhere; }
 .slice pre { margin: 0; border-radius: 0; }
 
 /* Skipped lines: a dashed rule across the code, not a fake comment in it. */

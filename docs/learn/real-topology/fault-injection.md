@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Inject faults on purpose
 
-A dependency that goes down at the wrong moment is the failure a suite rarely sees: the broker rejects a publish, a webhook answers 503 to every call. Waiting for the environment to produce that on demand does not work. The suite injects it instead.
+Suites rarely see a dependency fail at the wrong moment. The broker rejects a publish. A webhook answers 503 to every call. Waiting for the environment to produce that on demand does not work. The suite injects it instead.
 
 <LearnShell
   level="Level 5, lesson 4"
@@ -37,7 +37,7 @@ A dependency that goes down at the wrong moment is the failure a suite rarely se
       'A fake rejects every notification for one invoice with 503. How many requests does the target see before the delivery is dead-lettered, and what does the dead letter carry?',
     verify: (
       <>
-        Read <code>NotificationTargetOutagesAreDeadLettered</code> in the suite and the assertions at the end of the journey.
+        Read <code>The target that stays down</code> below: the target saw four requests, every one a 503; the dead letter carries the event's own facts and <code>x-opencsms-retries: 3</code>; the invoice is still stored, exactly once. The journey <code>NotificationTargetOutagesAreDeadLettered</code> in the suite asserts that shape.
       </>
     ),
     reveal: (

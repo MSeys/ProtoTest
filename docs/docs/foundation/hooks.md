@@ -1,5 +1,5 @@
 ---
-sidebar_position: 7
+sidebar_position: 9
 title: Hooks
 description: "Run code around every test or around the whole run without touching a test: correlation ids, shared resets, one-off startup."
 ---
@@ -8,7 +8,13 @@ description: "Run code around every test or around the whole run without touchin
 
 ## What it is
 
-A hook runs code around **every** test or around the whole run, without any test mentioning it. Use a hook for cross-cutting behaviour: correlation ids, resetting a shared mailbox, starting a dependency once. When only some tests need the behaviour, write an [attribute](./attributes.md) instead.
+A hook runs code around **every** test or around the whole run, without any test mentioning it. Use a hook for behavior that applies to every test, for example setting a correlation id. When only some tests need the behaviour, write an [attribute](./attributes.md) instead.
+
+```text
+hook or attribute?
+  applies to every test, tests must not know  ->  hook
+  applies to some tests, the test declares it  ->  attribute
+```
 
 ## How it works
 
@@ -60,6 +66,10 @@ Run hooks run once, before the first test and after the last. They do not receiv
 
 ### Ordering
 
+```text
+in (-1000 ... First ... Auth) -> ATTRIBUTES -> out (Auth ... First ... -1000)
+```
+
 | | Before | After |
 | --- | --- | --- |
 | Test hooks | ascending `Order` | descending |
@@ -81,7 +91,7 @@ ProtoTest's built-in hooks sit at the extremes on purpose, and `ProtoHookOrder` 
 
 ### Reserved `Order` bands
 
-First-party attributes and integrations use the ranges below, so a third-party capability can pick the band it belongs to instead of guessing a number. Ties inside a band keep registration order.
+ProtoTest's own attributes and integrations use the ranges below. Put a capability in the band it belongs to instead of guessing a number. Ties inside a band keep registration order.
 
 | Band | `Order` | For |
 | --- | --- | --- |
@@ -89,8 +99,6 @@ First-party attributes and integrations use the ranges below, so a third-party c
 | Environment | `-200` to `-101` | tenant, database, broker and endpoint selection |
 | Identity | `-100` to `-1` | users, authentication and roles |
 | Scenario | `0` and above | the test's own attributes and hooks (`ProtoHookOrder.Default`) |
-
-Integrations add their own test hooks too: the HTTP integrations apply `[Auth<T>]` from a hook at `ProtoHookOrder.Authentication`.
 
 Remember that **all test hooks run before any attribute**. See [Host and lifecycle](./lifecycle.md) for the full sequence and failure rules.
 
@@ -103,7 +111,7 @@ builder.AddTestHook<ResetMailboxHook>();
 builder.AddRunHook<StartDependenciesHook>();
 ```
 
-A fuller test hook, from the sample suite. `NorthstarScenarioHook` gives every test a correlation id, records observations, and attaches a summary:
+A fuller test hook, from the sample suite (condensed). `NorthstarScenarioHook` gives every test a correlation id, records observations, and attaches a summary:
 
 ```csharp
 public sealed class NorthstarScenarioHook : IProtoTestHook
@@ -120,18 +128,26 @@ public sealed class NorthstarScenarioHook : IProtoTestHook
         context.RecordObservation("Northstar", "scenario.started", scenario.CorrelationId);
         return Task.CompletedTask;
     }
+
+    public Task AfterTestAsync(ProtoExecutionContext context)
+    {
+        var scenario = context.Resolve<NorthstarScenarioContext>();
+        var duration = DateTimeOffset.UtcNow - scenario.StartedAtUtc;
+        context.RecordObservation(
+            "Northstar",
+            "scenario.completed",
+            scenario.CorrelationId,
+            new { duration.TotalMilliseconds });
+        context.AddAttachment(
+            "scenario-summary.json",
+            JsonSerializer.Serialize(new { scenario.CorrelationId, scenario.TestName }),
+            "application/json");
+        return Task.CompletedTask;
+    }
 }
 ```
 
-Its `AfterTestAsync` resolves the state, records a `scenario.completed` observation and adds a `scenario-summary.json` attachment. Attachments added in `AfterTestAsync` are still published, because publishing happens after all hooks have finished. The full hook is [`samples/Northstar.ProtoTest/NorthstarScenario.cs`](../../../samples/Northstar.ProtoTest/NorthstarScenario.cs).
-
-### Hook or attribute?
-
-| Use a hook when | Use an attribute when |
-| --- | --- |
-| it applies to every test | it applies to *some* tests |
-| tests should not have to know about it | it is part of what the test is describing |
-| for example correlation ids, cleanup of shared state | for example "a fresh tenant", "as a billing admin" |
+Attachments added in `AfterTestAsync` are still published, because publishing happens after all hooks have finished. The full hook, with its probe milestones and trace events, is `NorthstarScenarioHook` in `samples/Northstar.ProtoTest/NorthstarScenario.cs`.
 
 ## What the trace shows
 
@@ -145,5 +161,5 @@ Its `AfterTestAsync` resolves the state, records a `scenario.completed` observat
 - Test hooks are registered as singletons and resolved from the root container. Per-test state must come from `context.Services` or the context itself.
 - Test hooks receive no token parameter: they read `context.CancellationToken`, which carries the caller's token or the runner's own where its adapter has one (NUnit's test context, the xUnit v2 runner, xUnit v3's `TestContext.Current.CancellationToken`, TUnit's `TestContext.CancellationToken`). MSTest's 4.0.2 floor exposes no token, so those hooks see `CancellationToken.None`.
 - `AddTestHook` and `AddRunHook` do **not** dedupe: every call adds another registration. Register each hook once.
-- Run hooks get no context, since there is no test yet, and `BeforeRunAsync` failures roll back only the hooks that already started, in reverse.
+- Run hooks get no context, since there is no test yet. See [Lifecycle](./lifecycle.md#the-run) for the run sequence and the rollback rule a `BeforeRunAsync` failure follows.
 - A teardown failure in a test hook is recorded as an `Error` finding and does not replace the test's outcome, but it still surfaces to the runner.

@@ -4,13 +4,46 @@ title: Installation
 description: "Install ProtoTest from the template, or add the runner and integration packages to a test project of your own."
 ---
 
+import TabbedCode from '@site/src/components/TabbedCode';
+
+export const installTabs = [
+  {
+    id: 'runners',
+    label: 'Runners',
+    filename: 'terminal',
+    language: 'bash',
+    code: 'dotnet add package ProtoTest.Core   # host, context, hooks, attributes, trace\ndotnet add package ProtoTest.NUnit  # NUnit',
+    footnote: 'The runner packages are ProtoTest.NUnit, ProtoTest.Xunit (v2), ProtoTest.Xunit3, ProtoTest.MSTest and ProtoTest.TUnit. Each one needs a small setup class; see Test runners.',
+  },
+  {
+    id: 'integrations',
+    label: 'Integrations',
+    filename: 'terminal',
+    language: 'bash',
+    code: 'dotnet add package ProtoTest.AspNetCore         # host an ASP.NET Core app in-process\ndotnet add package ProtoTest.Rest               # HTTP/REST APIs\ndotnet add package ProtoTest.GraphQL            # GraphQL APIs\ndotnet add package ProtoTest.Grpc               # gRPC services\ndotnet add package ProtoTest.Web.Playwright     # browser tests with Playwright\ndotnet add package ProtoTest.Web.Selenium       # browser tests with Selenium\ndotnet add package ProtoTest.Data               # test data and provisioning\ndotnet add package ProtoTest.Sql                # a per-test database connection\ndotnet add package ProtoTest.Messaging.RabbitMq # publish and await messages on RabbitMQ\ndotnet add package ProtoTest.Sheets             # assert on generated spreadsheets\ndotnet add package ProtoTest.OpenApi            # OpenAPI contract coverage',
+    footnote: 'The integrations map lists every package, including WireMock fakes, devices, Aspire and background workers.',
+  },
+  {
+    id: 'infrastructure',
+    label: 'Run infrastructure',
+    filename: 'terminal',
+    language: 'bash',
+    code: 'dotnet add package ProtoTest.Sql.Testcontainers                 # a database container\ndotnet add package ProtoTest.Messaging.RabbitMq.Testcontainers  # a RabbitMQ container\ndotnet add package ProtoTest.Sql.EntityFrameworkCore            # EF Core over the per-test connection',
+    footnote: 'Packages for infrastructure the run starts sit next to the integration they serve.',
+  },
+  {
+    id: 'extras',
+    label: 'Extras',
+    filename: 'terminal',
+    language: 'bash',
+    code: 'dotnet add package ProtoTest.Reporting      # JSON and HTML reports\ndotnet add package ProtoTest.Json           # shape matching and JsonValue constraints\ndotnet add package ProtoTest.Testcontainers # base class for run-scoped containers',
+    footnote: 'Json and Testcontainers arrive transitively; add them directly only when you reference their types yourself.',
+  },
+];
+
 # Installation
 
-ProtoTest ships as small NuGet packages: one package for your test runner, `ProtoTest.Core`, and one package per integration you use. The runner and integration packages target .NET 8, 9 and 10; `ProtoTest.Cli` targets .NET 8 only, and `ProtoTest.Analyzers` and `ProtoTest.Templates` are netstandard2.0.
-
-## Start from the template
-
-The template creates a small ASP.NET Core API and a suite for it, already composed, traced and reported:
+One command starts a running suite. The template builds it, runs it and reports on it.
 
 ```bash
 dotnet new install ProtoTest.Templates
@@ -19,7 +52,13 @@ cd Shop
 dotnet test
 ```
 
-What you should see: a green run. The test project leaves `Shop.Tests/bin/Debug/net10.0/TestResults/Shop.prototrace` and `Shop.html`. Open the report for the run's verdict and the routes it covered, or drop the trace on [trace.prototest.dev](https://trace.prototest.dev).
+The run passes. The test project leaves `Shop.Tests/bin/Debug/net10.0/TestResults/Shop.prototrace` and `Shop.html`. Open the report for the run's verdict and the routes it covered, or drop the trace on [trace.prototest.dev](https://trace.prototest.dev).
+
+ProtoTest ships as small NuGet packages: your runner package, `ProtoTest.Core`, and one package per integration you use. The runner and integration packages target .NET 8, 9 and 10. `ProtoTest.Cli` targets .NET 8 only. `ProtoTest.Analyzers` and `ProtoTest.Templates` are netstandard2.0.
+
+## Start from the template
+
+The template creates a small ASP.NET Core API and a suite for it. The suite is ready to run, trace and report. It uses the commands above.
 
 The suite is written for NUnit. Pass `--runner xunit`, `--runner xunit3`, `--runner tunit` or `--runner mstest` to generate it for another runner, and `--framework net8.0` or `--framework net9.0` to target an older framework.
 
@@ -27,60 +66,14 @@ Next: [Your first test](./first-test.md) walks the same path one step at a time 
 
 ## Add ProtoTest to your own project
 
-A suite is **your runner**, **`ProtoTest.Core`**, plus **one package per integration** you use. Every runner and integration depends on Core, so it arrives transitively. Add it directly when you reference the host types from your own code.
+Pick one package per integration you use, plus infrastructure and extras where you need them:
 
-### 1. Core and your runner
+<TabbedCode tabs={installTabs} label="ProtoTest packages by group" />
 
-```bash
-dotnet add package ProtoTest.Core   # host, context, hooks, attributes, trace
-dotnet add package ProtoTest.NUnit  # NUnit
-```
-
-The runner packages are `ProtoTest.NUnit`, `ProtoTest.Xunit` (xUnit v2), `ProtoTest.Xunit3` (xUnit v3), `ProtoTest.MSTest` and `ProtoTest.TUnit`. Each one needs a small setup class; see [Test runners](../runners/overview.md). The NUnit adapter needs **NUnit 4.6.1 or newer**; the standard `dotnet new nunit` template pins an older version, so update it first:
+The NUnit adapter needs **NUnit 4.6.1 or newer**; the standard `dotnet new nunit` template pins an older version, so update it first:
 
 ```bash
 dotnet add package NUnit --version 4.6.1
-```
-
-Each runner page names its framework's floor.
-
-### 2. Your integrations
-
-```bash
-dotnet add package ProtoTest.AspNetCore         # host an ASP.NET Core app in-process
-dotnet add package ProtoTest.Rest               # HTTP/REST APIs
-dotnet add package ProtoTest.GraphQL            # GraphQL APIs
-dotnet add package ProtoTest.Grpc               # gRPC services
-dotnet add package ProtoTest.Web.Playwright     # browser tests with Playwright
-dotnet add package ProtoTest.Web.Selenium       # browser tests with Selenium
-dotnet add package ProtoTest.Data               # test data and provisioning
-dotnet add package ProtoTest.Sql                # a per-test database connection
-dotnet add package ProtoTest.Messaging.RabbitMq # publish and await messages on RabbitMQ
-dotnet add package ProtoTest.Sheets             # assert on generated spreadsheets
-dotnet add package ProtoTest.OpenApi            # OpenAPI contract coverage
-```
-
-The [integrations map](../integrations/overview.md) lists every package, including WireMock fakes, devices, Aspire and background workers.
-
-Infrastructure the run starts and owns comes as its own package, next to the integration it serves:
-
-```bash
-dotnet add package ProtoTest.Sql.Testcontainers                 # a database container
-dotnet add package ProtoTest.Messaging.RabbitMq.Testcontainers  # a RabbitMQ container
-dotnet add package ProtoTest.Sql.EntityFrameworkCore            # EF Core over the per-test connection
-```
-
-Two shared packages arrive transitively through the integrations above; add them directly only when you reference their types yourself:
-
-```bash
-dotnet add package ProtoTest.Json           # shape matching and JsonValue constraints
-dotnet add package ProtoTest.Testcontainers # base class for run-scoped containers
-```
-
-### 3. Optional extras
-
-```bash
-dotnet add package ProtoTest.Reporting      # JSON and HTML reports
 ```
 
 ## What comes along
@@ -100,7 +93,7 @@ dotnet add package ProtoTest.Reporting      # JSON and HTML reports
 
 ## Browsers for Playwright
 
-Set `InstallBrowsers` and Playwright downloads the browser it needs before the first launch, so a clean machine or CI runner needs no separate step. Alternatively, set `Channel = "msedge"` or `"chrome"` to drive a browser that is already installed. See [Web](../integrations/web/index.md).
+Set `InstallBrowsers` to download the browser before the first launch. A clean machine or CI runner then needs no extra install step. See [Web](../integrations/web/index.md).
 
 ## Where to next
 

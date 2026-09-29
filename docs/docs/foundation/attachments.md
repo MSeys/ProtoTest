@@ -1,12 +1,12 @@
 ---
-sidebar_position: 8
+sidebar_position: 10
 title: Attachments
 description: "Files a test produces reach your runner, so they show up next to the result in your IDE or CI, and land in the trace."
 ---
 
 # Attachments
 
-An attachment is a file a test produced: a response body, a screenshot, a Playwright trace, a report you generated. ProtoTest hands attachments to your runner, so they show up next to the test result in your IDE or CI, and bundles them into the [`.prototrace` archive](../observability/prototrace.md).
+An attachment is a file a test produced, for example a response body or a screenshot. ProtoTest hands attachments to your runner, so they show up next to the test result in your IDE or CI, and bundles them into the [`.prototrace` archive](../observability/prototrace.md).
 
 Integrations add attachments on their own ([REST](../integrations/rest/attachments.md), [GraphQL](../integrations/graphql/index.md), [Web](../integrations/web/diagnostics.md)). You can add your own from tests, hooks and attributes.
 
@@ -50,7 +50,7 @@ A failure publishing one attachment does not stop the others. It is recorded lik
 
 ## How each runner receives them
 
-| Runner | |
+| Runner | How each runner receives them |
 | --- | --- |
 | NUnit | `TestContext.AddTestAttachment` |
 | xUnit v3 | `TestContext.Current.AddAttachment` |
@@ -80,5 +80,5 @@ public interface IProtoTestAttachmentPublisher
 - Attachment names are unique per test after prefixing. There is no overwrite.
 - Attachments are in-memory or file-backed references until publishing. The archive copy is made after the test.
 - Publishing is best-effort per attachment: one failure is reported, the rest still publish.
-- A file-backed runner (NUnit, TUnit) makes an in-memory attachment durable by writing a copy under `%TEMP%/ProtoTest/attachments`. ProtoTest does not delete those copies, so they accumulate until the OS temp cleaner runs. They are safe to delete between runs.
+- **A file-backed runner (NUnit, TUnit) makes an in-memory attachment durable** by writing a copy under `%TEMP%/ProtoTest/attachments`. ProtoTest does not delete those copies, so they accumulate until the OS temp cleaner runs. They are safe to delete between runs.
 - The archive embeds attachment bytes by default. `trace.EmbedArtifacts = false` declares them (name, media type, size) without reading or writing the content, and `MaxArtifactBytes` caps any single artifact.

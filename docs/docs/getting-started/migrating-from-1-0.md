@@ -6,6 +6,8 @@ description: "What a 1.0 suite changes for 1.1: the renamed package and options 
 
 # Migrating from 1.0 to 1.1
 
+A 1.0 suite moves to 1.1 in three moves: fix what no longer compiles, replace what warns, and verify what changed behavior.
+
 | Action | What | Count |
 | --- | --- | --- |
 | MUST | [removed members](#removed-in-11) that no longer compile | 10 |

@@ -30,7 +30,7 @@ One glance tells the deliverable: the uncovered rows. Receiving without assertin
 dotnet add package ProtoTest.OpenApi
 ```
 
-ProtoTest supports .NET 8, 9 and 10. The template targets net10.0 unless you pass -f net8.0 or net9.0. The package resolves its document with `Microsoft.OpenApi` (plus `Microsoft.OpenApi.YamlReader` for YAML) and depends on `ProtoTest.Rest`.
+ProtoTest supports .NET 8, 9 and 10. The template targets `net10.0` unless you pass `--framework net8.0` or `--framework net9.0`. The package resolves its document with `Microsoft.OpenApi` (plus `Microsoft.OpenApi.YamlReader` for YAML) and depends on `ProtoTest.Rest`.
 
 ## Compose
 
@@ -106,7 +106,7 @@ The request counts an endpoint and a response hit; the shape assertion is what c
 
 #### How a route matches
 
-| Rule | Behaviour |
+| Rule | Behavior |
 | --- | --- |
 | Normalize | keep the path, strip query and fragment, force a leading slash, trim one trailing slash |
 | Prefer | an exact route beats parameter matches; ties break by literal-segment count, then path, case-insensitively |
@@ -139,7 +139,7 @@ status code → exact key? → yes → count it
 
 #### When it throws and when it stays silent
 
-| Situation | Behaviour |
+| Situation | Behavior |
 | --- | --- |
 | No `OpenApi:Specification` key, or a blank one | throws when the collector is constructed |
 | Document fails to parse | throws with the parser's diagnostics |

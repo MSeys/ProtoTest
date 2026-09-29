@@ -7,6 +7,8 @@ description: "A driver-independent browser-testing model for pages, components, 
 
 # Web
 
+`ProtoTest.Web` gives each test a browser session behind page objects, with Playwright or Selenium underneath.
+
 ## What it adds
 
 `ProtoTest.Web` is a browser-testing model for pages, components, elements, tables, flows and login that doesn't depend on any particular browser driver. A backend package plugs a real driver in underneath:
@@ -55,7 +57,7 @@ dotnet add package ProtoTest.Web.Playwright
 dotnet add package ProtoTest.Web.Selenium
 ```
 
-Either backend brings `ProtoTest.Web` with it. The packages target `net8.0`, `net9.0` and `net10.0`; the project templates default to `net10.0`, so pass `-f net8.0` or `-f net9.0` when a suite targets an older baseline.
+Either backend brings `ProtoTest.Web` with it. The packages target `net8.0`, `net9.0` and `net10.0`; the project templates default to `net10.0`, so pass `--framework net8.0` or `--framework net9.0` when a suite targets an older baseline.
 
 ## Browsers
 

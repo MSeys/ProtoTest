@@ -122,8 +122,7 @@ the OpenCSMS CI.
 | ProtoTest, tracing off | prepare pass, after | 30.74 - 32.40 ms | 11.14 - 11.65 ms | 5.55 - 5.57 ms | 13.67 - 15.91 ms |
 | Raw `WebApplicationFactory` | every pass | 4.79 - 5.00 ms | 0.00 ms | 4.79 - 5.00 ms | - |
 
-Suite startup through the first completed request stays 160-164 ms with tracing and 155-160 ms without
-(74-83 ms raw) across the passes. The 1,000-test health-check trace is 25.8 MB (about 25 KB per test); the
+Suite startup through the first completed request landed between 156 and 179 ms with tracing, 154 and 176 ms without, and 73 and 83 ms raw across the passes. The 1,000-test health-check trace is 25.8 MB (about 25 KB per test); the
 1,000-journey trace is 38.8 MB, and the journey median moved from 67.9 ms before the release fix (64.4 to
 69.5 ms after) to 63.9 ms before the prepare fix and 49.3 and 54.8 ms after it.
 
@@ -266,6 +265,6 @@ the build or CI; the harness needs an installed Chromium-family browser (Edge by
 
 ## Parallel execution
 
-The demo suite - containers and real browsers included - is stable at 8 and 32 workers on a 16-core machine and
-showed one non-reproducible failure at 64 workers. The [concurrency page](../foundation/concurrency.md#exercised-parallelism)
+The `ProtoTest.Demo` sample (since retired, containers and real browsers included) was stable at 8 and 32 workers on a 16-core machine and
+showed one non-reproducible failure at 64 workers, recorded 2026-09-24. The [concurrency page](../foundation/concurrency.md#exercised-parallelism)
 records the runs and the failure mode.

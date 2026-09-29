@@ -30,7 +30,8 @@ Each test gets its own `ProtoExecutionContext`. That context can share state bet
 The idea is that integrations don't each live in their own little world. They participate in the same test execution and can make use of the same lifecycle, context and tracing.
 
 ProtoTest currently integrates with REST, GraphQL, gRPC, SQL, Entity Framework Core,
-Playwright, Selenium, RabbitMQ, ASP.NET Core, Testcontainers, OpenTelemetry and more.
+Playwright, Selenium, RabbitMQ, MassTransit, ASP.NET Core, background workers, Testcontainers,
+WireMock, Aspire, MQTT and more.
 
 This definitely is a large list. I picked these because they're commonly used, but if something is missing, you can easily create an integration yourself, extend an existing one or open a discussion and I'll check it out.
 

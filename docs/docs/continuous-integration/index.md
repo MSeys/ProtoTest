@@ -73,24 +73,70 @@ jobs:
 - `issues: write` lets the action comment on the pull request. The annotations and the artifact upload need nothing extra.
 - The comment carries the artifact link, so a reviewer opens the trace from the comment.
 - The action fails when a channel that reached its target failed, so a broken post is not silent.
-- `@main` tracks the default branch. Pin a release tag when one exists.
+- `@main` tracks the default branch. Pin a commit SHA for a pipeline that does not move under you, and switch to a release tag once one exists.
 
 ### Add the verdict
 
-Give the action the two reports and the pull request step becomes the gate:
+Give the action the two reports and the pull request step becomes the gate. Something has to produce the baseline: a nightly job runs the same suite on the default branch and keeps its `report.json`, and the pull request job fetches it.
 
 ```yaml
+# nightly.yml
+name: Nightly baseline
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    env:
+      PROTOTEST_RESULTS: ${{ github.workspace }}/TestResults/ProtoTest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - run: dotnet restore
+      - run: dotnet test --configuration Release --no-restore
+
+      - name: Keep the baseline report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prototest-baseline
+          path: ${{ env.PROTOTEST_RESULTS }}/report.json
+          if-no-files-found: error
+```
+
+The pull request job downloads the newest nightly artifact and hands the action both reports. It needs `actions: read` in the workflow's permissions for the download:
+
+```yaml
+      - name: Fetch the nightly baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list --workflow nightly.yml --branch main --limit 1 --json databaseId --jq '.[0].databaseId')
+          gh run download "$run_id" --name prototest-baseline --dir baseline
+
+      - name: Post the evidence
+        if: always()
+        uses: MSeys/ProtoTest/.github/actions/feedback@main
         with:
           trace: ${{ env.PROTOTEST_RESULTS }}/run.prototrace
           baseline-report: baseline/report.json
           current-report: ${{ env.PROTOTEST_RESULTS }}/report.json
 ```
 
-The baseline is a report from the default branch. How it reaches the job is up to you: an artifact from the latest run on the default branch, a nightly job that publishes it, or a report checked into the repository. The action only needs the path. [Verification](../agent-workflows/verification.md) explains the verdict and its finding classes.
+The step fails the pull request when the run is worse than the baseline; without the two reports it only posts the digest. To run the same comparison locally, end the loop with `prototest verify baseline/report.json TestResults/ProtoTest/report.json`. [Verification](../agent-workflows/verification.md) explains the verdict and its finding classes.
 
 ### Pin the tool
 
-The action installs the ProtoTest CLI as a global tool. Set `version` to pin it (`version: 1.1.0`). Without it, the action updates the tool to the latest stable release. `dotnet-roll-forward` defaults to `LatestMajor`, so the net8 tool runs on a newer runtime. [Loop](../agent-workflows/loop.md) documents the remaining inputs and what each channel posts; the [CLI reference](../agent-workflows/cli.md) lists every environment target and the exit codes.
+The action installs the ProtoTest CLI as a global tool. Set `version` to pin it (`version: 1.1.0`). Without it, the action updates the tool to the latest stable release. `dotnet-roll-forward` defaults to `LatestMajor`, so the net8 tool runs on a newer runtime.
+
+The action's other inputs are optional. `webhook-url` and `webhook-secret` post the digest JSON to your own endpoint, with `webhook-secret-header` naming the shared-secret header (default `X-ProtoTest-Secret`); `artifact-name` names the uploaded trace (default `prototest-trace`). [Loop](../agent-workflows/loop.md) explains what each channel posts; the [CLI reference](../agent-workflows/cli.md) lists every environment target and the exit codes.
 
 ## GitHub Actions
 
@@ -203,6 +249,16 @@ integration-tests:
 ```
 
 A container-backed suite also needs a Docker-capable GitLab runner. Whether Docker-in-Docker is allowed and which service configuration is required belongs to the runner installation; ProtoTest only needs the Docker endpoint to be reachable.
+
+## One suite, three jobs
+
+A pipeline around this suite usually splits into three jobs:
+
+- The **pull request** job runs the suite in-process, posts the digest and compares reports against the nightly baseline. It is the fast one and runs on every change.
+- The **nightly** job runs the same suite against the container topology, where the store and the broker are real processes the run owns, and publishes the baseline report.
+- The **smoke** job is optional and points the suite at a deployed environment. Capability skips drop the journeys that need the test host, and the rest run against real addresses.
+
+The suite is the same in all three. What changes is the composition, and the composition decides which capabilities exist and which journeys skip. These jobs are the shapes, not a fixed pipeline; the workflows above are the ones to start from.
 
 ## What to keep
 

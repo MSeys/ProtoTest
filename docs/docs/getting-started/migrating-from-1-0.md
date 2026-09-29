@@ -74,6 +74,21 @@ builder.AddInfrastructure(
 
 `GrpcAttachmentOptions.ConfigurationSection` is an obsolete alias. Use the inherited `ConfigurationSectionName` property, or the `SectionName` constant where a name is needed without an instance.
 
+## Removed in 1.1
+
+These members existed in 1.0.1 and are gone. The changelog's Breaking section carries the same list.
+
+- `ProtoExecutionContext.RegisterClient<T>(client, name, bool)` - the third argument is now `ProtoClientOwnership` (`Context` or `Caller`), so a `true` becomes `ProtoClientOwnership.Context`. [Clients](../foundation/clients.md)
+- `ProtoDocumentSource.LoadText(source, baseUrl, httpClient)` - one `LoadText` method with optional parameters replaces the overload. [Extending](../advanced/extending.md)
+- `ProtoHttpAuthLifecycleHook` is sealed, and its constructor takes a `ProtoProtocol` instead of a string. [Hooks](../foundation/hooks.md)
+- `ProtoHttpClientResolution` is a positional record with `ClientEntityName`; `SourceName`, `SourceClientName` and `Deconstruct` are gone, and `ProtoHttpClientResolver.Resolve` takes the client name as an optional third argument. [Extending](../advanced/extending.md)
+- `WebOperationContext` no longer exposes the backend operation's `Result`.
+- The Playwright options no longer carry `Context`; configure the browser context in code with `ConfigureContext`. [Web](../integrations/web/index.md)
+- The `RequiresPlaywrightBrowser` attribute no longer carries `Session`; the condition probes the configured browser or channel. [Skip conditions](../foundation/skip-conditions.md)
+- `GrpcAttachmentOptions` no longer derives from the HTTP attachment options, so `SensitiveHeaders` and `SensitiveQueryParameters` are gone; gRPC metadata redaction uses the gRPC client's `SensitiveMetadataKeys`. [gRPC](../integrations/grpc/index.md)
+- The raw `ServerStreaming` and `DuplexStreaming` helpers moved from the gRPC client to the blocking facade: `client.Blocking.ServerStreaming(...)`. [gRPC](../integrations/grpc/index.md)
+- `RabbitMqOptions` no longer carries `PollInterval`; awaits are event-driven and `MessagingOptions.DefaultTimeout` bounds them. [Messaging](../integrations/messaging/index.md)
+
 ## Also changed
 
 A few 1.1 changes are not deprecations, and they can affect a suite that asserts or filters on the old behavior.

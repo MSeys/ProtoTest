@@ -109,19 +109,58 @@ await Proto.Context.Bus().PublishAsync("orders.created", order);
 
 ### Options and configuration
 
-To make options bindable from `appsettings.json` like the built-in ones, implement `IProtoConfigurableOptions` and call `BindFromConfiguration` after applying the code callback:
+Options are registered through `ProtoOptionsRegistration.Configure`, the call every built-in integration uses. It gives an options type the three behaviors the framework promises: every code callback runs in registration order, the type's configuration section binds over the result, and `Validate()` runs once where the options resolve. The `IConfiguration` comes from the host's service provider, so an extension never touches configuration itself:
 
 ```csharp
 public sealed class BusOptions : IProtoConfigurableOptions
 {
-    public string ConfigurationSectionName => "Acme:Bus";
-    public string Endpoint { get; set; } = "amqp://localhost";
-}
+    public const string SectionName = "Acme:Bus";
 
-options.BindFromConfiguration(configuration);   // configuration wins over code
+    public string Endpoint { get; set; } = "amqp://localhost";
+
+    string IProtoConfigurableOptions.ConfigurationSectionName => SectionName;
+
+    public void Validate()
+    {
+        if (!Uri.TryCreate(Endpoint, UriKind.Absolute, out _))
+        {
+            throw new ArgumentException(
+                $"BusOptions.Endpoint must be an absolute address. Set it in code or under '{SectionName}:Endpoint'.",
+                nameof(Endpoint));
+        }
+    }
+}
 ```
 
-The section name follows `ProtoTest:<Integration>[:<Area>]`, where the area names the options type's role. A renamed section returns its old name from `FallbackConfigurationSectionName`, so the old key keeps working as a documented fallback.
+Register the type in the builder extension and resolve it where it is used:
+
+```csharp
+public static class ProtoHostBuilderBusExtensions
+{
+    public static IProtoHostBuilder AddBus(this IProtoHostBuilder builder, string name,
+        Action<BusOptions>? configure = null) =>
+        builder.ConfigureServices(services =>
+        {
+            ProtoOptionsRegistration.Configure(services, () => new BusOptions(), configure);
+            services.AddSingleton<IProtoClientInitializer>(serviceProvider =>
+                new BusClientInitializer(name, serviceProvider.GetRequiredService<BusOptions>()));
+        });
+}
+```
+
+Calling `AddBus` twice now composes: both callbacks run, in order, and one options instance serves the host. A value in `appsettings.json` binds over the code default:
+
+```json
+{
+  "Acme": {
+    "Bus": {
+      "Endpoint": "amqp://broker.internal:5672"
+    }
+  }
+}
+```
+
+The built-ins name their section `ProtoTest:<Integration>[:<Area>]`, where the area names the options type's role (`Responses`, `Attachments`, `Client`, `WebSocket`, `RabbitMq`); an integration with one options set has no area segment. A package outside this repository picks its own root. A section renamed during 1.x returns its old name from `FallbackConfigurationSectionName`, so the old key keeps working as a documented fallback, with the current section binding over it.
 
 ### Authenticator-style construction
 

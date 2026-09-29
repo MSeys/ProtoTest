@@ -43,6 +43,21 @@ The [ProtoTrace viewer](https://trace.prototest.dev) is a static web app. Trace 
 - **Spans** is the complete, searchable tree.
 - **The inspector** shows everything one operation recorded: where in your code it started, request and response, JSON as a collapsible tree, the shape a check validated, what it changed, and every item's change trail. The address holds the selection, so a link opens the same place.
 
+### Open your own archive
+
+A run leaves its archive at `TestResults/prototest-{runId}.prototrace` under the test project's output folder, or at the path you set with `trace.OutputPath`. From there:
+
+1. Run the suite once so the file exists.
+2. Open it in the [viewer](https://trace.prototest.dev): drop the file on the page, or press **Open trace** and choose it. The file is read in your browser and never uploaded.
+3. Without a browser, read the same story from the terminal:
+
+```bash
+prototest summary TestResults/prototest-{runId}.prototrace
+prototest index TestResults
+```
+
+`prototest summary` lists the run, the outcome counts and every test that did not fully pass, with its error, source location and the failing operation. `prototest index` writes one static `index.html` beside the runs: each run's outcome counts, its failing tests, links to its trace and digest, and every archive that could not be read. The page is one file beside the traces, so a folder of evidence can be shared without a server. Both verbs are the [ProtoTest.Cli](../agent-workflows/cli.md) tool; install it with `dotnet tool install --global ProtoTest.Cli`.
+
 ### Correlating a trace with the run that produced it
 
 Every trace carries the run's own id, its timing and the environment it executed on. When the run happens somewhere you do not control (CI, a shared environment), name the facts that identify it, so a result can be attributed to the build that produced it:
@@ -155,11 +170,7 @@ To add your own entries, see [Extending ProtoTest](../advanced/extending.md#addi
 
 `ProtoTraceDiscovery.Discover(folder)` lists the readable runs a folder holds, newest first, and names the archives it had to skip. It is the scan the `prototest` CLI and the MCP server share.
 
-Without a browser, `ProtoTest.Traces` reads the archive and the `prototest` CLI prints the failure digest: `prototest summary TestResults/Shop.prototrace` lists the run, the outcome counts, and every test that did not fully succeed with its error, source location and failing operation. It is the same compact story a CI log or an agent can use.
-
-`prototest index TestResults` writes a static `index.html` over the folder of runs: each run's outcome counts, the tests that did not pass, links to its trace and its `<trace>.digest.json` digest, plus any archive that could not be read and the reason. The page is one file beside the traces, so a folder of evidence can be shared without a server.
-
-A coding agent reads the same story through the MCP server. See [Agent workflows](../agent-workflows/coding-agents.md).
+Without a browser, `ProtoTest.Traces` reads the archive and the `prototest` CLI prints the same story: [summary and index](#open-your-own-archive) cover one archive and a folder of runs. A coding agent reads the same story through the MCP server. See [Agent workflows](../agent-workflows/coding-agents.md).
 
 ## The artifact
 
@@ -174,15 +185,15 @@ run.prototrace
 ├── state.json               what existed and changed: tracked items with their changes
 ├── sources/1/OrderTests.cs   the code an operation's location points at, when embedded
 └── resources/
-    ├── {testId}/artifact-1/rest-01-response.json
-    ├── {testId}/artifact-2/playwright-default-trace.zip
+    ├── {testId}/artifact-1/{testId}-rest-01-response
+    ├── {testId}/artifact-2/{testId}-playwright-default-trace.zip
     └── run/HtmlReportSink/run-artifact-1/report.html
 ```
 
 - **`spans.json`** holds a resource group per test (its id, name, class, method, outcome and duration) with its operations, their events, and the artifacts the test declared. The run's own group carries its id, start and end, and the environment it ran in (`environment.runtime`, `environment.os`, and any [run metadata you configured](#correlating-a-trace-with-the-run-that-produced-it)); run-level events such as gate verdicts sit on it too.
 - **`state.json`** holds the run's tracked items and each test's: kind, id, name, scope, first and last seen, the state at the end and every change, with the operation that caused it.
 - **`sources`** in the manifest maps each recorded `code.file.path` to its embedded copy.
-- Each artifact is declared once, with its media type, size and path in the archive. An attachment event refers to it by id.
+- Each artifact is declared once, with its media type, size and path in the archive. An attachment event refers to it by id. The path keeps the name the attachment was given and prefixes the test's id, so a name only has to be unique per test; a run-level artifact keeps its sink's name (`HtmlReportSink` above).
 
 Entries are stored **uncompressed**, so a browser can read the archive without a decompression library. Property names are camelCase. The archive manifest is format **2.0**, its spans document is 2.0, and its state document is **1.1**: tracked values are generic `value` items with the domain type in the id. The live snapshot exposed to code (`host.Trace.Snapshot()`) reports the same span format version.
 

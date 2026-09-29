@@ -111,15 +111,18 @@ Every tool is read-only and returns a compact JSON document.
 
 ## Check it
 
-Run your suite once so a `.prototrace` exists, then ask the agent to list the runs. It should answer with a run id and a trace file from your machine.
-
-You can see the same story without an agent:
+You do not need a suite to see the tools work. Download the drill archive from the Learn track and read it with the CLI:
 
 ```bash
-prototest summary TestResults/run.prototrace
+dotnet tool install --global ProtoTest.Cli
+prototest summary l0-environment-drill.prototrace
 ```
 
-`prototest summary` is the `ProtoTest.Cli` tool; install it with `dotnet tool install --global ProtoTest.Cli`. It prints the same diagnosis the MCP tools return, so it is the quickest way to check that the file the agent would read says what you expect. The [CLI reference](./cli.md) documents all four verbs, their arguments and their exit codes.
+`https://prototest.dev/lessons/l0-environment-drill.prototrace` is a real failing run of the Learning demo, so the summary prints a run, the failing test and the operation that decided it. Point the MCP server at one file with `--trace`, or at a folder of runs with `--project`.
+
+Then run your own suite once so a `.prototrace` exists, and ask the agent to list the runs. It should answer with a run id and a trace file from your machine.
+
+`prototest summary` is the `ProtoTest.Cli` tool. It prints the same diagnosis the MCP tools return, so it is the quickest way to check that the file the agent would read says what you expect. The [CLI reference](./cli.md) documents all four verbs, their arguments and their exit codes.
 
 ## Limits
 

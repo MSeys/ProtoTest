@@ -106,7 +106,7 @@ Give the action the two reports and the pull request step becomes the gate:
           current-report: ${{ env.PROTOTEST_RESULTS }}/report.json
 ```
 
-The baseline is the report from the default branch. How it reaches the job is up to you: an artifact from the latest run on the default branch, a nightly job that publishes it, or a report checked into the repository. The action only needs the path. [Verification](./verification.md) explains the verdict and its finding classes.
+The baseline is the report from the default branch. How it reaches the job is up to you: an artifact from the latest run on the default branch, a nightly job that publishes it, or a report checked into the repository. The action only needs the path; the [CI page](../continuous-integration/index.md#add-the-verdict) has a nightly recipe that produces it. [Verification](./verification.md) explains the verdict and its finding classes.
 
 ## What the reviewer sees
 
@@ -121,7 +121,7 @@ The baseline is the report from the default branch. How it reaches the job is up
 - The comment posts only when the digest carries a failure or a failed run gate. A green run's status check is the report. The webhook posts every digest, because a machine consumer decides what to do with it.
 - A missing target skips its channel with a named reason. A target that is reached and refuses fails its channel, and the CLI exits `1`.
 - A pull request from a fork gets a read-only token, so the comment channel cannot post and fails with its reason. The annotations and the artifact upload still work.
-- The action is a composite action in the main repository. There is no marketplace listing yet; pin a release tag when one exists.
+- The action is a composite action in the main repository. There is no marketplace listing yet; pin a commit SHA for a pipeline that does not move under you, and switch to a release tag once one exists.
 - Nothing leaves the machine unless you configure a target.
 
 Open the pull request comment, follow the trace link, and open the archive in the viewer. The comment carries the same digest your agent read.

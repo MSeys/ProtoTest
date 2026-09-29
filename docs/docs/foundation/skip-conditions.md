@@ -41,7 +41,7 @@ The test runs when `ProtoHost.HasCapability(kind, CapabilityName, CapabilityInst
     Reason = "No broker is configured; set ProtoTest:Messaging:RabbitMq:ConnectionString.")]
 ```
 
-Integrations register a capability when they are configured, so the condition answers what the host *can actually do* rather than what it was asked to do. `ProtoCapabilityKinds` lists the built-in kinds: `server`, `protocol`, `browser`, `store`, `broker`, `data`, `document`. An integration may use its own. Use `CapabilityName` to require one specific capability of that kind:
+Integrations register a capability when they are configured, so the condition answers what the host *can actually do* rather than what it was asked to do. `ProtoCapabilityKinds` lists the built-in kinds: `server`, `worker`, `device`, `protocol`, `browser`, `store`, `broker`, `data`, `document`, `aspire` and `clock`. An integration may use its own. Use `CapabilityName` to require one specific capability of that kind:
 
 ```csharp
 [RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "ASP.NET Core")]

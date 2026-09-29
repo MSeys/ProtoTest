@@ -21,7 +21,7 @@ One test owns one context while it is active. A nested lifecycle cannot start on
 
 ## Exercised parallelism
 
-Measured on a 16-core developer machine with the demo suite, which owns Postgres and RabbitMQ containers, plus real browsers, using `NUnit.NumberOfTestWorkers`:
+Recorded 2026-09-24 on a 16-core developer machine with `ProtoTest.Demo` (since retired; the OpenCSMS suite is the full product demo and `samples/Northstar.ProtoTest` the Learning demo), which owned Postgres and RabbitMQ containers plus real browsers, using `NUnit.NumberOfTestWorkers`:
 
 | Workers | Result | Duration |
 | --- | --- | --- |
@@ -29,11 +29,11 @@ Measured on a 16-core developer machine with the demo suite, which owns Postgres
 | 32 | 53 passed, 6 skipped | 8 s |
 | 64 | 1 failed, then passed on rerun | 21 s |
 
-The suite is stable up to roughly twice the core count. At four times the cores (64 workers on 16 cores) the run oversubscribed and produced one non-reproducible failure. The demo writes a single trace file per run, so that failure's evidence was overwritten before it could be read.
+The suite was stable up to roughly twice the core count. At four times the cores (64 workers on 16 cores) the run oversubscribed and produced one non-reproducible failure, and the demo wrote a single trace file per run, so that failure's evidence was overwritten before it could be read.
 
-Beyond this range, expect resource pressure rather than a ProtoTest-specific limit: port and container exhaustion, browser memory, and contention on run-scoped infrastructure. The project's own suites run at `LevelOfParallelism(8)`. The demo at 8 workers is the configuration exercised routinely.
+Beyond this range, expect resource pressure rather than a ProtoTest-specific limit: port and container exhaustion, browser memory, and contention on run-scoped infrastructure. The repository's suites run at `LevelOfParallelism(8)`.
 
-These numbers are indicative, not a contract. Re-run the demo on your own hardware before quoting them.
+These numbers are indicative, not a contract. Re-run your own suite on your own hardware before quoting them.
 
 ## What the trace shows
 

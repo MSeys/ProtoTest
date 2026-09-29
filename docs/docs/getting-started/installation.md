@@ -6,7 +6,7 @@ description: "Install ProtoTest from the template, or add the runner and integra
 
 # Installation
 
-ProtoTest ships as small NuGet packages: one package for your test runner, `ProtoTest.Core`, and one package per integration you use. Everything targets .NET 8, 9 and 10.
+ProtoTest ships as small NuGet packages: one package for your test runner, `ProtoTest.Core`, and one package per integration you use. The runner and integration packages target .NET 8, 9 and 10; `ProtoTest.Cli` targets .NET 8 only, and `ProtoTest.Analyzers` and `ProtoTest.Templates` are netstandard2.0.
 
 ## Start from the template
 
@@ -36,7 +36,13 @@ dotnet add package ProtoTest.Core   # host, context, hooks, attributes, trace
 dotnet add package ProtoTest.NUnit  # NUnit
 ```
 
-The runner packages are `ProtoTest.NUnit`, `ProtoTest.Xunit` (xUnit v2), `ProtoTest.Xunit3` (xUnit v3), `ProtoTest.MSTest` and `ProtoTest.TUnit`. Each one needs a small setup class; see [Test runners](../runners/overview.md).
+The runner packages are `ProtoTest.NUnit`, `ProtoTest.Xunit` (xUnit v2), `ProtoTest.Xunit3` (xUnit v3), `ProtoTest.MSTest` and `ProtoTest.TUnit`. Each one needs a small setup class; see [Test runners](../runners/overview.md). The NUnit adapter needs **NUnit 4.6.1 or newer**; the standard `dotnet new nunit` template pins an older version, so update it first:
+
+```bash
+dotnet add package NUnit --version 4.6.1
+```
+
+Each runner page names its framework's floor.
 
 ### 2. Your integrations
 

@@ -18,4 +18,11 @@ public sealed record ProtoProtocol(
     /// <summary>The capability this protocol declares when it is registered.</summary>
     public ProtoCapabilityDescriptor Capability { get; } =
         new(Name, ProtoCapabilityKinds.Protocol, TraceSource);
+
+    /// <summary>
+    /// The coverage category a collector keys under: the declared category, or the protocol name when
+    /// the protocol ships no category of its own. A collector reads this instead of re-deriving the
+    /// fallback, so adding a collector without a category can never emit a null one.
+    /// </summary>
+    public string CoverageCategoryOrName => CoverageCategory ?? Name;
 }

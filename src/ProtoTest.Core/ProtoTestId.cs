@@ -37,6 +37,9 @@ public readonly record struct ProtoTestId
     }
 }
 
+/// <summary>
+/// Options for the numeric test IDs the host generates: the run's prefix and the sequence width.
+/// </summary>
 public sealed class ProtoTestIdOptions
 {
     /// <summary>A numeric prefix unique to a run, build, or worker. A random six-digit prefix is used by default.</summary>

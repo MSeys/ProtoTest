@@ -91,7 +91,7 @@ internal sealed class ProtoClientInitializerHook(IEnumerable<IProtoClientInitial
         var clientId = $"client:{chain.ClientType.FullName}:{chain.ScopedName}";
         var clientName = $"Client {chain.ClientType.Name} '{chain.ScopedName}'";
         using var clientOperation = context.Trace
-            .Operation("client.initialize", $"Initialize · {chain.ScopedName} ({chain.ClientType.Name})", "ProtoTest.Core")
+            .Operation("client.initialize", $"Initialize · {chain.ScopedName} ({chain.ClientType.Name})", ProtoCoreDiagnostics.TraceSource)
             .During(ProtoTracePhase.Setup)
             .For(ProtoTraceEntityKinds.Client, clientId)
             .With("client.name", chain.ScopedName)

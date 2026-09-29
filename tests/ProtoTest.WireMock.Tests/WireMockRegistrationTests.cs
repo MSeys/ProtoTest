@@ -4,6 +4,7 @@ using System.Net;
 using ProtoTest.Core;
 using ProtoTest.TestSupport;
 
+[Category("Characterization")]
 public sealed class WireMockRegistrationTests
 {
     [Test]

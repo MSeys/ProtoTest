@@ -94,7 +94,7 @@ internal sealed class ProtoRunLifecycle
                 _trace.RunWriter.WriteEvent(
                     ProtoTargetTrace.Resolved,
                     $"Resolved · {resolution.TargetName}",
-                    "ProtoTest.Core",
+                    ProtoCoreDiagnostics.TraceSource,
                     phase: ProtoTracePhase.Run,
                     outcome: ProtoTraceOutcome.Succeeded,
                     attributes: new Dictionary<string, string?>
@@ -112,7 +112,7 @@ internal sealed class ProtoRunLifecycle
                     _trace.RunWriter.WriteEvent(
                         ProtoTargetTrace.ProviderSkipped,
                         $"Skipped · {resolution.TargetName} · {skip.Provider.Name}",
-                        "ProtoTest.Core",
+                        ProtoCoreDiagnostics.TraceSource,
                         phase: ProtoTracePhase.Run,
                         outcome: ProtoTraceOutcome.Skipped,
                         attributes: new Dictionary<string, string?>

@@ -42,8 +42,13 @@ internal static class ProtoTestLifecycleHandler
             global::Xunit.Assert.Skip(preparation.SkipReason!);
         }
 
+        // The runner's per-test token reaches setup I/O; the probe path starts no runner test, so it
+        // has no token to pass.
+        var cancellationToken = test is null
+            ? CancellationToken.None
+            : global::Xunit.TestContext.Current.CancellationToken;
         var scope = ProtoTestAsync.RunSync(() => new ValueTask<ProtoTestScope>(ProtoTestScope.StartAsync(
-            preparation, ProtoTestAssembly.Host, Xunit3AttachmentPublisher.Instance)));
+            preparation, ProtoTestAssembly.Host, Xunit3AttachmentPublisher.Instance, cancellationToken)));
         if (test is not null)
         {
             Scopes.AddOrUpdate(test, new ScopeHolder { Scope = scope });

@@ -33,8 +33,8 @@ public interface IProtoClientInitializer
     /// <para>
     /// The test lifecycle carries the caller's cancellation token, or the runner's own where its
     /// adapter has one; an initializer reads it from
-    /// <see cref="ProtoExecutionContext.CancellationToken"/> and passes it to its own I/O. An adapter
-    /// whose extension point exposes no token (xUnit v3, TUnit) starts with
+    /// <see cref="ProtoExecutionContext.CancellationToken"/> and passes it to its own I/O. MSTest's
+    /// extension point exposes no token, so that adapter starts with
     /// <see cref="CancellationToken.None"/>; a run-scoped hook is the cancellable extension point.
     /// </para>
     /// </summary>

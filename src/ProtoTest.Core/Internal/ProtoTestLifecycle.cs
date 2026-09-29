@@ -41,8 +41,6 @@ internal sealed class ProtoTestLifecycle
     /// <summary>Gets the current test context, or <see langword="null"/> when none is active on this flow.</summary>
     public static ProtoExecutionContext? TryGetCurrentContext => ProtoAmbient.Test?.Context;
 
-    public static ProtoHost? CurrentHost => ProtoAmbient.Host;
-
     public Task<ProtoExecutionContext> StartAsync(
         string testName,
         MethodInfo testMethod,
@@ -132,7 +130,7 @@ internal sealed class ProtoTestLifecycle
     private async Task<ProtoExecutionContext> ExecuteBeforeAsync(ProtoTestLifecycleState state)
     {
         state.SetupOperation = state.Context!.Trace
-            .Operation("test.setup", "Setup", "ProtoTest.Core")
+            .Operation("test.setup", "Setup", ProtoCoreDiagnostics.TraceSource)
             .During(ProtoTracePhase.Setup)
             .With("hook.count", _hooks.Count.ToString())
             .With("attribute.count", state.Attributes.Count.ToString())
@@ -170,7 +168,7 @@ internal sealed class ProtoTestLifecycle
             state.SetupOperation.Succeed();
             state.SetupOperation.Dispose();
             state.ExecutionOperation = state.Context!.Trace
-                .Operation("test.execution", "Test execution", "ProtoTest.Core")
+                .Operation("test.execution", "Test execution", ProtoCoreDiagnostics.TraceSource)
                 .During(ProtoTracePhase.Execution)
                 .With("test.class", state.Context.TestMethod.DeclaringType?.FullName)
                 .With("test.method", state.Context.TestMethod.Name)
@@ -205,7 +203,7 @@ internal sealed class ProtoTestLifecycle
         Func<Task> step,
         Action onCompleted)
         => await context.Trace
-            .Operation(kind, name, "ProtoTest.Core")
+            .Operation(kind, name, ProtoCoreDiagnostics.TraceSource)
             .During(ProtoTracePhase.Setup)
             .With(attributes)
             .RunAsync(async _ =>
@@ -252,7 +250,7 @@ internal sealed class ProtoTestLifecycle
             .Operation(
                 isRollback ? "test.rollback" : "test.teardown",
                 isRollback ? "Rollback" : "Teardown",
-                "ProtoTest.Core")
+                ProtoCoreDiagnostics.TraceSource)
             .During(phase)
             .With("hook.completed_count", state.CompletedHooks.Count.ToString())
             .With("attribute.completed_count", state.CompletedAttributes.Count.ToString())
@@ -265,7 +263,7 @@ internal sealed class ProtoTestLifecycle
         // operation, and the failures come back as a list instead of being threaded through the loops.
         var flow = new ProtoFlow(
             isRollback ? "test.rollback" : "test.teardown",
-            "ProtoTest.Core",
+            ProtoCoreDiagnostics.TraceSource,
             ProtoFlowFailureMode.Collect);
 
         foreach (var attribute in state.CompletedAttributes.AsEnumerable().Reverse())
@@ -275,7 +273,7 @@ internal sealed class ProtoTestLifecycle
                 new ProtoStepDescriptor(
                     "attribute.after",
                     $"After · {current.GetType().Name}",
-                    "ProtoTest.Core",
+                    ProtoCoreDiagnostics.TraceSource,
                     phase,
                     Describe(current)),
                 _ => new ValueTask(current.AfterTestAsync(context)));
@@ -288,7 +286,7 @@ internal sealed class ProtoTestLifecycle
                 new ProtoStepDescriptor(
                     "hook.after",
                     $"After · {current.GetType().Name}",
-                    "ProtoTest.Core",
+                    ProtoCoreDiagnostics.TraceSource,
                     phase,
                     new Dictionary<string, string?>
                     {
@@ -304,7 +302,7 @@ internal sealed class ProtoTestLifecycle
         // the attachment list must be snapshotted after those hooks, not when the first flow was built.
         var releaseFlow = new ProtoFlow(
             isRollback ? "test.rollback" : "test.teardown",
-            "ProtoTest.Core",
+            ProtoCoreDiagnostics.TraceSource,
             ProtoFlowFailureMode.Collect);
         if (state.AttachmentPublisher is { } publisher)
         {
@@ -315,7 +313,7 @@ internal sealed class ProtoTestLifecycle
                     new ProtoStepDescriptor(
                         "attachment.publish",
                         $"Publish · {current.Name}",
-                        "ProtoTest.Core",
+                        ProtoCoreDiagnostics.TraceSource,
                         phase,
                         new Dictionary<string, string?>
                         {
@@ -332,7 +330,7 @@ internal sealed class ProtoTestLifecycle
             new ProtoStepDescriptor(
                 "context.dispose",
                 "Dispose execution context",
-                "ProtoTest.Core",
+                ProtoCoreDiagnostics.TraceSource,
                 phase,
                 new Dictionary<string, string?>
                 {

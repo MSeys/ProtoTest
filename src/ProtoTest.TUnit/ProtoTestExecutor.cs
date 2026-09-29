@@ -34,7 +34,8 @@ public class ProtoTestExecutor : ITestExecutor
         }
 
         var scope = await ProtoTestScope.StartAsync(
-            preparation, ProtoTestAssembly.Host, new TUnitAttachmentPublisher(context));
+            preparation, ProtoTestAssembly.Host, new TUnitAttachmentPublisher(context),
+            context.Execution.CancellationToken);
         var result = ProtoTestResult.Unknown;
         Exception? failure = null;
         try

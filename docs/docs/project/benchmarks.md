@@ -6,7 +6,16 @@ description: "Measured trace size, run time, export time and memory growth for s
 
 # Benchmarks
 
-These numbers come from the in-repo harnesses - `tests/ProtoTest.Core.Tests/TraceScaleTests.cs` for trace size and scale, `tests/ProtoTest.Core.Tests/PerTestPhaseBenchmarkTests.cs` for the per-test phase profile, `tests/ProtoTest.AspNetCore.Tests/OverheadBenchmarkTests.cs` for the `WebApplicationFactory` comparison, and `tests/ProtoTest.Messaging.RabbitMq.Tests/RabbitMqTests.cs` (`PerTestTapLifecycle_ShouldStayWithinTheSanityBound`) for the broker tap cost - on an AMD Ryzen 7 9800X3D (8 cores, 16 threads), Windows 11, .NET 8 (the test projects' target). The OpenCSMS numbers come from that repository's own `eng/run-benchmark.ps1`. They are indicative, not a contract: run the harnesses on your own hardware and CI image before quoting them, and expect run-to-run medians to move by around 20%.
+Same short test: raw 0.33 ms, ProtoTest without trace 0.95 ms (about 3x), with trace 2.55 ms (about 8x). The trace adds about 1.6 ms and 1 MB per test here. On suites whose tests talk to a database or a browser, that difference disappears into the setup the framework replaces.
+
+These numbers come from the in-repo harnesses on an AMD Ryzen 7 9800X3D, Windows 11, .NET 8. `TraceScaleTests.cs` covers trace size. `PerTestPhaseBenchmarkTests.cs` covers the phase profile. `OverheadBenchmarkTests.cs` covers the `WebApplicationFactory` comparison. The OpenCSMS numbers come from that repository's own `eng/run-benchmark.ps1`. They are indicative, not a contract: run the harnesses on your own hardware and CI image before quoting them, and expect run-to-run medians to move by around 20%.
+
+| Question | Harness |
+| --- | --- |
+| How big is the trace, and how does it scale | `tests/ProtoTest.Core.Tests/TraceScaleTests.cs` |
+| What does one test cost, phase by phase | `tests/ProtoTest.Core.Tests/PerTestPhaseBenchmarkTests.cs` |
+| What does the framework add over raw `WebApplicationFactory` | `tests/ProtoTest.AspNetCore.Tests/OverheadBenchmarkTests.cs` |
+| What does a per-test broker tap cost | `tests/ProtoTest.Messaging.RabbitMq.Tests/RabbitMqTests.cs` (`PerTestTapLifecycle_ShouldStayWithinTheSanityBound`) |
 
 | Tests | Trace size | Run time | Stop + export | Allocated | Peak working set growth |
 | --- | --- | --- | --- | --- | --- |
@@ -48,6 +57,15 @@ request at all, and the raw equivalent - 32 warmups and 256 measured, medians:
 | ProtoTest, lifecycle only (no request) | 0.06 ms | 0.15 ms | 0.04 ms | - | 0.02 ms | 60 KB |
 | Raw `WebApplicationFactory` | 0.05 ms | 0.16 ms | 0.00 ms | 0.04 ms | - | 17 KB |
 
+As a waterfall, each layer adds its cost on top of the last:
+
+```text
+raw baseline        0.05 ms
+lifecycle only      0.06 ms   framework bookkeeping is nearly free
++ REST client       0.34 ms   +0.15 ms of capture, wrapping and body reads
++ trace             1.54 ms   +1.0 ms of source locations and recording
+```
+
 Suite startup, measured through the first completed request so both sides pay for building the in-process
 server: ProtoTest 22 ms with tracing, 13 ms without, raw 12 ms.
 
@@ -59,7 +77,7 @@ server: ProtoTest 22 ms with tracing, 13 ms without, raw 12 ms.
   response body - the raw baseline leaves it unread until asked - records the response observation and
   entity state, and builds the typed wrapper. A raw test that asserts a body pays part of that difference
   itself.
-- **The trace is the remaining cost.** Tracing adds roughly 1.0 ms and 0.7 MB per test over the same suite
+- **The trace is the rest of the cost.** Tracing adds roughly 1.0 ms and 0.7 MB per test over the same suite
   with tracing off (start +0.5 ms of setup, complete +0.5 ms of recording and finalizing, call +0.1 ms).
 - **Startup is nearly identical** (22 vs 12 ms): booting the application dominates, not the framework.
 - **The raw baseline creates an `HttpClient` per test**, matching ProtoTest's per-test model; a raw suite
@@ -251,6 +269,6 @@ the build or CI; the harness needs an installed Chromium-family browser (Edge by
 
 ## Parallel execution
 
-The `ProtoTest.Demo` sample (since retired, containers and real browsers included) was stable at 8 and 32 workers on a 16-core machine and
-showed one non-reproducible failure at 64 workers, recorded 2026-09-24. The [concurrency page](../foundation/concurrency.md#exercised-parallelism)
+A suite with containers and real browsers was stable at 8 and 32 workers on a 16-core machine and
+showed one non-reproducible failure at 64 workers. The [concurrency page](../foundation/concurrency.md#exercised-parallelism)
 records the runs and the failure mode.

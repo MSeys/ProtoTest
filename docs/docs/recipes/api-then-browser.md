@@ -8,9 +8,9 @@ description: Arrange a project through the API, sign a real browser in, and chec
 
 ## The situation
 
-A browser test that clicks through a form to create its own data is slow, and it fails for reasons that have nothing to do with the page under test. Arrange through the API instead, and let the browser do only what the test is about: showing the result.
+A browser test that creates its own data through a form is slow. It can fail for reasons outside the page under test. Arrange through the API instead, and let the browser do only what the test is about: showing the result.
 
-A browser also needs a real address. `AddAspNetCoreServer`'s in-memory test host has none. The demo hosts the application's own listener in the test process and lets the page journey follow that address. The journey is `AProjectCreatedThroughTheApiAppearsOnThePage` in [WebJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/WebJourney.cs).
+A browser needs a URL. The in-memory test host has none. The demo hosts the application's own listener in the test process and lets the page journey follow that address. The journey is `AProjectCreatedThroughTheApiAppearsOnThePage` in [WebJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/WebJourney.cs).
 
 ## The code
 
@@ -117,19 +117,31 @@ The trace reads as one story:
 - the session (`web.session.initialize`), the sign-in flow's `web.navigate`, `web.fill` and `web.click`,
 - the page's `web.navigate`, the flow and the reads behind the two text assertions (`assert.web`).
 
-Navigations record `web.page.visited`, passing page assertions record `web.page.verified`, and the page inventory records `web.page.available`. Only a verified page counts as covered, so reaching a page is not the same as checking it. See [Web](../integrations/web/index.md#in-the-trace-and-coverage).
+Navigations record `web.page.visited`, passing page assertions record `web.page.verified`, and the page inventory records `web.page.available`. Reaching a page is not checking it. Only a verified page counts as covered. See [Web](../integrations/web/index.md#in-the-trace-and-coverage).
+
+In short, the trace reads in test order:
+
+```text
+01 http.request POST /api/v1/projects -> assert.http.status
+02 web.session.initialize -> web.navigate -> web.fill -> web.click (sign-in)
+03 web.navigate -> flow -> assert.web (the project row)
+```
+
+A failure in `03` points at the arrange step in `01` or the flow in `02`. All three stay in the same test trace.
 
 ## Variations
 
-- **The application ships as an image.** Start it with `ApplicationContainer` instead of the listener; it maps the port the application listens on and publishes the mapped address as the same `BaseUrl`. See [Infrastructure](../foundation/infrastructure.md).
-- **The application already runs elsewhere.** Point the application's `BaseUrl` at that instance and the loopback listener steps aside, because a configured address always wins.
-- **One application, not two.** When the API and the page live in one instance, one application entry with `AddRest` and `AddWeb` serves both; the demo splits them because its in-process instance is the one that carries the test clock.
-- **Selenium instead of Playwright.** `AddWeb` selects the backend; its options live under `ProtoTest:Web:Selenium` and `ProtoTest:Web:Playwright`.
+| Deployment shape | What changes |
+| --- | --- |
+| The application ships as an image | Start it with `ApplicationContainer` instead of the listener. It maps the port the application listens on and publishes the mapped address as the same `BaseUrl`. See [Infrastructure](../foundation/infrastructure.md). |
+| The application already runs elsewhere | Point the application's `BaseUrl` at that instance. A configured address takes precedence over the loopback listener. |
+| The API and the page live in one instance | Register one application with `AddRest` and `AddWeb`. The demo uses two because only its in-process instance carries the test clock. |
+| Selenium instead of Playwright | `AddWeb` selects the backend; its options live under `ProtoTest:Web:Selenium` and `ProtoTest:Web:Playwright`. |
 
 ## What it does not prove
 
-- **The browser needs a real address.** The in-memory test host has none, so this recipe hosts the application's listener, starts its image, or points the same key at a container or a deployed instance.
-- **The published instance is a real instance, not the test host.** `ServerFactory`, `ApplicationServices` and `[RequiresInProcess]` belong to `AddAspNetCoreServer`; the in-process page inventory and the run's clock bridge run only with it. Reach the loopback or containerized application through its API instead, or register a second application backed by `AddAspNetCoreServer`.
+- **A browser needs a URL.** The in-memory test host has none. This recipe starts the application listener, its container image, or a deployed instance.
+- **A published instance is not the test host.** `ServerFactory`, `ApplicationServices` and `[RequiresInProcess]` work only with `AddAspNetCoreServer`. The page inventory and test clock need it too. Reach the loopback or containerized application through its API instead, or register a second application backed by `AddAspNetCoreServer`.
 - **Assertions poll, with a bounded wait.** `Should.HaveTextAsync` waits for the text to appear until the timeout instead of reading once; a slow client still fails if it arrives later.
 - **Search for your own row.** Other tests create projects in the same application; a name built from `TestId` keeps the row matching independent of whatever else is listed.
 - **The sign-in is application-specific.** The demo's exchange of a tenant token for a session is the application's own flow, not a framework feature.

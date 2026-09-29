@@ -4,11 +4,13 @@ title: A write lands in the database
 description: Create a project over REST, then read the committed row through the suite's own connection to the store the application writes to.
 ---
 
+import TraceExample from '@site/src/components/TraceExample';
+
 # A write lands in the database
 
 ## The situation
 
-The API answers `201 Created`, but did the project reach the store in the state the response promised? The response body is not the row; it is the API's rendering of it.
+The API answers `201 Created`, but did the project reach the store in the state the response promised? The response body is not the row. It is how the API describes the row.
 
 The test creates the project over REST and then reads the committed row itself, through a connection the suite owns to the same database the application writes to. The demo runs this journey in [DomainAccessJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/DomainAccessJourney.cs).
 
@@ -104,25 +106,44 @@ public sealed class DomainAccessJourney
 }
 ```
 
-`Proto.Context.SqlConnection()` resolves the connection the test owns over the store the application writes to, so both sides meet on one address. See [SQL](../integrations/sql/index.md) for the accessors and the isolation rules.
+`Proto.Context.SqlConnection()` returns the test connection to the same store the application writes to. See [SQL](../integrations/sql/index.md) for the accessors and the isolation rules.
 
 ## What the trace shows
 
 - The REST `http.request` for the write, with `assert.http.status` and the response as an `http.response` observation.
 - The `sql.connection.open` operation in setup, with the connection type, and the connection's release at teardown.
 
-The trace does not show the `SELECT`. Individual commands are not traced, so the trace proves the connection's lifecycle and the order of the calls, while the assertion proves the row. When the row is missing, the assertion fails with the message the test wrote. The long-form reading is on [ProtoTrace](../observability/prototrace.md).
+The trace does not show the `SELECT`. Individual commands are not traced. The trace shows the connection lifecycle and call order. The assertion checks the row. When the row is missing, the assertion fails with the message the test wrote. The long-form reading is on [ProtoTrace](../observability/prototrace.md).
+
+In short, the trace reads in test order:
+
+```text
+01 http.request POST /api/v1/projects -> assert.http.status
+02 sql.connection.open in setup, released at teardown
+```
+
+The `SELECT` itself is not traced. The connection at `02` proves the lifecycle. The assertion proves the row.
+
+The demo's own run:
+
+<TraceExample
+  demo="rest-database"
+  title="REST write → committed row"
+  path="POST /api/v1/projects · SELECT the row"
+/>
 
 ## Variations
 
-- **Entity Framework Core.** `AddEntityFrameworkCore<TContext>` reads the declared SQL keys, so the context joins the test's connection. With the default `SqlIsolation.Transaction` the read joins the test's transaction and records `sql.enlist`; with `None` there is no transaction and no enlistment. See [Entity Framework Core](../integrations/sql/index.md#entity-framework-core).
-- **A real PostgreSQL.** Set the demo's environment switch (`ProtoTest__Database=postgres`) and the run starts the container; a configured connection string skips it.
-- **The application shares the connection.** When the application is declared with `ShareConnectionWith(...)`, the test's transaction can cover both sides, and a rollback at teardown undoes the application's write too. See [Isolation](../integrations/sql/index.md#isolation).
-- **Read through the application's context.** With `AddEntityFrameworkCore<NorthstarDbContext>`, the test reads with the same mapping the application wrote with, instead of hand-written SQL.
+| When | Option | What changes |
+| --- | --- | --- |
+| The test reads through Entity Framework Core | `AddEntityFrameworkCore<TContext>` | The context joins the test connection. The default `Transaction` isolation enlists the read and records `sql.enlist`. `None` skips the transaction. See [Entity Framework Core](../integrations/sql/index.md#entity-framework-core). |
+| The run should use a real PostgreSQL | Set `ProtoTest__Database=postgres` | The run starts the container. A configured connection string skips it. |
+| The application should share the test transaction | Declare `ShareConnectionWith(...)` | The test's transaction can cover both sides, and a rollback at teardown undoes the application's write too. See [Isolation](../integrations/sql/index.md#isolation). |
+| The test should read with the application's mapping | `AddEntityFrameworkCore<NorthstarDbContext>` | The test reads with the same mapping the application wrote with, instead of hand-written SQL. |
 
 ## What it does not prove
 
-- **Why `SqlIsolation.None` here.** The in-process application opens its own connection and commits; a rollback on the test's connection would not undo that write. With the default `Transaction` isolation the run-start guard throws while an application registered through `AddApplication` is not declared with `ShareConnectionWith(...)`, and a declaration is a statement, not enforcement.
+- **The test reads outside any transaction.** The in-process application opens its own connection and commits; a rollback on the test's connection would not undo that write. With the default `Transaction` isolation the run fails at startup unless the application declares `ShareConnectionWith(...)`. That declaration is a statement, not a check.
 - **Unique values, not cleanup.** A container lives for one run and the SQLite file is recreated, so nothing survives to the next run. Within a run, a reference built from `TestId` keeps parallel tests out of each other's rows.
 - **No SQL tracing.** The connection and transaction lifecycle is traced; individual commands are not.
-- **Against a deployed environment the suite usually cannot reach the database.** Compose `AddSql` only where it can, and gate the test with `[RequiresCapability(ProtoCapabilityKinds.Store)]`: where no store is composed, it skips instead of failing.
+- **In a deployed environment the suite often cannot reach the database.** Compose `AddSql` only where it can, and gate the test with `[RequiresCapability(ProtoCapabilityKinds.Store)]`: where no store is composed, it skips instead of failing.

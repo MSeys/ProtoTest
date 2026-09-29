@@ -10,13 +10,13 @@ description: Pay an invoice over REST, then await the invoice.paid event the app
 
 Paying an invoice should publish `invoice.paid`. A `200` on the pay call only says the payment was accepted. It does not say the application told the rest of the system.
 
-The test pays over the API and then waits for the event with a predicate and a timeout. That ties the write side to the broker, so the assertion can only pass when the application actually published. The demo runs this journey in [BrokerJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/BrokerJourney.cs).
+The test pays over the API and then waits for the event with a predicate and a timeout. That wait links the API call to the broker. It passes only when the application publishes the event. The demo runs this journey in [BrokerJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/BrokerJourney.cs).
 
 ## The code
 
 ### Compose
 
-The run owns a RabbitMQ broker and hands its address to the application and to the tests. The demo starts one when the environment asks for it, so the piece is registered behind the selection:
+The run owns a RabbitMQ broker and hands its address to the application and to the tests. The demo starts one only when the run selects it:
 
 ```csharp
 // Setup.cs: the broker the run owns, behind the configured address.
@@ -32,7 +32,7 @@ if (run.OwnsMessagingBroker)
 }
 ```
 
-Messaging is registered last, after the application, and declares the destination in code. `Declare` creates it during test setup and `Tap` binds it there too, so an event published before the test's first await is still received:
+Messaging is registered last, after the application, and declares the destination in code. `Declare` creates the destination in setup. `Tap` binds it there too. Events published before the first await are still received:
 
 ```csharp
 // Setup.cs: registered last, so the application has declared its exchanges before the tap binds.
@@ -91,7 +91,17 @@ The trace reads as the story in order:
 - the REST `http.request` for the pay call, with `assert.http.status` and the response body as an `http.response` observation,
 - the `messaging.await` operation with the destination `invoice.paid` and its timeout, and the matched delivery recorded as a `messaging.receive` observation with the payload section.
 
-When the wait times out, the operation fails naming the destination and the timeout; the REST call that should have caused the publish is still in the trace. Where no broker is configured, the `Broker` capability is dropped with its reason in the run's capability evidence, and the gated test never starts.
+On timeout the operation names the destination and the wait. The REST call stays in the trace. Where no broker is configured, the `Broker` capability is dropped with its reason in the run's capability evidence, and the gated test never starts.
+
+In short, the trace reads in test order:
+
+```text
+01 data fixture provisions the invoice for this test
+02 http.request POST /pay -> assert.http.status
+03 messaging.await invoice.paid (15 s) -> messaging.receive
+```
+
+A timeout fails at `03` and names the destination. The REST call at `02` stays in the trace.
 
 ## Variations
 
@@ -104,5 +114,5 @@ When the wait times out, the operation fails naming the destination and the time
 
 - **The await proves arrival, not delivery guarantees.** One matching message on this test's tap says nothing about duplicates, ordering or broker durability.
 - **Match on something this test owns.** Parallel tests pay invoices too; a predicate on the invoice id awaits this test's event, not the first `invoice.paid` that happens to arrive.
-- **Declare before you await, and make sure the destination exists.** An undeclared destination is bound when `AwaitAsync` is called, and an event published before that is missed. The adapter never creates a destination nobody asked for: the application declares its topology, and a suite that owns the broker declares its own with `Declare`. See [Suite-owned topology](../integrations/messaging/index.md#suite-owned-topology).
+- **Declare before you await, and make sure the destination exists.** A destination first bound in `AwaitAsync` misses events published before the call. The adapter creates nothing on its own. Declare suite-owned destinations with `Declare`. See [Suite-owned topology](../integrations/messaging/index.md#suite-owned-topology).
 - **Where there is no broker, skip.** `[RequiresCapability(ProtoCapabilityKinds.Broker)]` skips the test in an environment without one instead of passing against the in-memory double. See [Skip conditions](../foundation/skip-conditions.md).

@@ -44,7 +44,7 @@ var context = await host.StartTestAsync("Checkout", method, cancellation.Token);
 context.CancellationToken;   // the same token in hooks, attributes and setup I/O
 ```
 
-The runner adapters that have a cancellation token pass it in: NUnit's test context token (cancellable with `[CancelAfter]`) and the xUnit v2 runner's `CancellationTokenSource`. MSTest's `ExecuteAsync(ITestMethod)` API, xUnit v3's before/after attributes and TUnit's test executor expose no token, so those runner-driven tests see `CancellationToken.None` and setup runs to the integration's own timeout. `ProtoTest.Sql` passes the token to the connection open and transaction begin. The run-scoped [`IProtoRunHook`](./hooks.md#run-hooks) keeps taking its token as a parameter.
+The runner adapters pass the token their runner exposes: NUnit's test context token (cancellable with `[CancelAfter]`), the xUnit v2 runner's `CancellationTokenSource`, xUnit v3's `TestContext.Current.CancellationToken` and TUnit's `TestContext.CancellationToken`. MSTest's `ExecuteAsync(ITestMethod)` API exposes no token, so its runner-driven tests see `CancellationToken.None` and setup runs to the integration's own timeout. `ProtoTest.Sql` passes the token to the connection open and transaction begin. The run-scoped [`IProtoRunHook`](./hooks.md#run-hooks) keeps taking its token as a parameter.
 
 ### Unique names
 

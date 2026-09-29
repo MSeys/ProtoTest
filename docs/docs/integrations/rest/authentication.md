@@ -22,7 +22,7 @@ public sealed record ProtoHttpAuthenticationContext(
     string ClientName);
 ```
 
-Because the context carries the running test, an authenticator can read typed state that an attribute set up earlier — which is how a test gets a fresh user without any header code.
+Because the context carries the running test, an authenticator can read typed state that an attribute set up earlier, which is how a test gets a fresh user without any header code.
 
 ## Built-in authenticators
 
@@ -67,8 +67,8 @@ public class OrderTests
 
 `AuthAttribute<TAuthenticator>` applies to a class or method, allows several attributes at the same level, and inherits. Two properties shape it:
 
-- `Order` — several attributes at the same level run in this order.
-- `Protocols` — empty (the default) applies to every HTTP-based protocol the application exposes; otherwise it matches protocol names case-insensitively, for example `["GraphQL"]`.
+- `Order`: several attributes at the same level run in this order.
+- `Protocols`: empty (the default) applies to every HTTP-based protocol the application exposes; otherwise it matches protocol names case-insensitively, for example `["GraphQL"]`.
 
 `[Application("Api")]` selects the application the test targets; `Rest()` uses that application's default REST client. Bind a different client with `[Application("Api", "Rest:Billing")]`.
 
@@ -99,7 +99,7 @@ response
 When several of these apply, this is what wins:
 
 1. **`[Application]`** on the method beats the one on the class (and its client bindings replace the class's).
-2. **`[Auth<T>]` on the method replaces the class-level ones entirely** — they don't merge.
+2. **`[Auth<T>]` on the method replaces the class-level ones entirely**; they don't merge.
 3. Several `[Auth<T>]` attributes at the same level are ordered by their `Order` property and **composed**: `ProtoCompositeHttpAuthenticator` runs each in turn on the same request, recording every handler under an `auth.handler.apply` operation with its `auth.type` and `client.name`. The composite's trace source is `ProtoTest.{protocol}`.
 4. **A per-request `.Auth(...)` overrides** whatever the attributes resolved, and **`.WithoutAuth()` clears it**.
 
@@ -185,7 +185,7 @@ public sealed class SampleUserAuthenticator : IProtoHttpAuthenticator
 
 ### Constructor arguments and services
 
-`[Auth<T>(args)]` and `.Auth<T>(args)` construct `T` with `ActivatorUtilities`, so the constructor can mix **positional arguments** from the attribute with **services** from the test's DI scope — including `ProtoExecutionContext` itself:
+`[Auth<T>(args)]` and `.Auth<T>(args)` construct `T` with `ActivatorUtilities`, so the constructor can mix **positional arguments** from the attribute with **services** from the test's DI scope, including `ProtoExecutionContext` itself:
 
 ```csharp
 public sealed class TenantTokenAuthenticator(

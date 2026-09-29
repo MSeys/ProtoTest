@@ -107,7 +107,7 @@ export default function CodePane({
                       {open && source && (
                         <div className={styles.foldBody}>
                           <div className={styles.foldBodyHead}>
-                            {fold.source} · lines {fold.from}–{fold.to}
+                            {fold.source} · lines {fold.from}-{fold.to}
                           </div>
                           <CodeSnippet code={source} startLine={fold.from} showLineNumbers />
                         </div>

@@ -70,7 +70,7 @@ const depths: Depth[] = [
     label: 'After the run',
     note: 'What reads the evidence',
     capabilities: [
-      {name: 'CLI', does: 'Summary, index, verify, feedback', packages: 'Cli', to: '/docs/integrations/overview'},
+      {name: 'CLI', does: 'Summary, index, verify, feedback', packages: 'Cli', to: '/docs/agent-workflows/cli'},
       {name: 'Traces', does: 'The archive and its reader', packages: 'Traces', to: '/docs/observability/prototrace'},
       {name: 'MCP server', does: 'Four read-only tools over the runs', packages: 'Mcp', to: '/docs/agent-workflows/setup'},
       {name: 'Diagnosis', does: 'The summary and failure context', packages: 'Diagnosis', to: '/docs/agent-workflows/diagnosis'},
@@ -110,7 +110,7 @@ export default function CapabilityIndex(): ReactNode {
           <span className={styles.meta}>{count} capabilities, one context</span>
         </>
       }
-      foot={<>Every package is ProtoTest.* — compose the ones your suite needs.</>}>
+      foot={<>Every package is ProtoTest.*; compose the ones your suite needs.</>}>
       <ol className={styles.depths}>
         {depths.map((depth, index) => (
           <li key={depth.label} className={styles.depth} style={{'--level': index} as CSSProperties}>

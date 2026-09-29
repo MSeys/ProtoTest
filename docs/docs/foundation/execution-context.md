@@ -6,7 +6,9 @@ description: "ProtoExecutionContext lives for exactly one test and holds its cli
 
 # Execution context
 
-A `ProtoExecutionContext` lives for exactly one test. It's where that test's clients, state, services, resources, attachments and observations are kept.
+## What it is
+
+A `ProtoExecutionContext` lives for exactly one test. It is where that test's clients, state, services, resources, attachments and observations are kept.
 
 ## Reaching it
 
@@ -14,25 +16,25 @@ A `ProtoExecutionContext` lives for exactly one test. It's where that test's cli
 var context = Proto.Context;
 ```
 
-`Proto.Context` works anywhere on the test's async flow — in the test method, in helpers it awaits, in page objects, in authenticators. Hooks and attributes receive the context as a parameter instead.
+`Proto.Context` works anywhere on the test's async flow: in the test method, in helpers it awaits, in page objects, in authenticators. Hooks and attributes receive the context as a parameter instead.
 
-Outside a test, `Proto.Context` throws *"No active ProtoExecutionContext is available on this flow. …"* and names the alternatives: off-flow telemetry uses `ProtoHost.FindTraceWriter(Activity?)` to reach the owning test's trace, and run-level code uses `ProtoHost.CurrentHost` or the host reference a hook receives. The usual cause is work started with `Task.Run` or a timer callback that escaped the test's flow, or using it from a static initializer.
+Outside a test, `Proto.Context` throws *"No active ProtoExecutionContext is available on this flow. ..."* and names the alternatives: off-flow telemetry uses `ProtoHost.FindTraceWriter(Activity?)` to reach the owning test's trace, and run-level code uses `ProtoHost.CurrentHost` or the host reference a hook receives. The usual cause is work started with `Task.Run` or a timer callback that escaped the test's flow, or code running in a static initializer.
 
 :::tip[Parallel tests are isolated]
-The context is stored in an `AsyncLocal`, so parallel tests each see their own. You don't need to pass it around, and one test can't accidentally read another's state.
+The context is stored in an `AsyncLocal`, so parallel tests each see their own. You do not need to pass it around, and one test cannot accidentally read another's state.
 :::
 
-## Test identity
+### Test identity
 
 | Member | |
 | --- | --- |
 | `TestName` | the name the runner reported |
 | `TestMethod` | the `MethodInfo` of the test |
-| `Id` | a `ProtoTestId` — see [test ids](./lifecycle.md#test-ids) |
+| `Id` | a `ProtoTestId`, see [test ids](./lifecycle.md#test-ids) |
 | `TestId` | the id as a zero-padded string |
 | `TestNumber` | the id as a `long` |
 
-## Cancellation
+### Cancellation
 
 `CancellationToken` is the token the caller supplied when the test was started:
 
@@ -42,11 +44,11 @@ var context = await host.StartTestAsync("Checkout", method, cancellation.Token);
 context.CancellationToken;   // the same token in hooks, attributes and setup I/O
 ```
 
-The runner adapters that have a cancellation token pass it in: NUnit's test context token (cancellable with `[CancelAfter]`) and the xUnit v2 runner's `CancellationTokenSource`. MSTest's `ExecuteAsync(ITestMethod)` API and xUnit v3's before/after attribute and TUnit's test executor expose no token, so those runner-driven tests see `CancellationToken.None` and setup runs to the integration's own timeout. `ProtoTest.Sql` passes the token to the connection open and transaction begin; the run-scoped [`IProtoRunHook`](./hooks.md#run-hooks) keeps taking its token as a parameter.
+The runner adapters that have a cancellation token pass it in: NUnit's test context token (cancellable with `[CancelAfter]`) and the xUnit v2 runner's `CancellationTokenSource`. MSTest's `ExecuteAsync(ITestMethod)` API, xUnit v3's before/after attributes and TUnit's test executor expose no token, so those runner-driven tests see `CancellationToken.None` and setup runs to the integration's own timeout. `ProtoTest.Sql` passes the token to the connection open and transaction begin. The run-scoped [`IProtoRunHook`](./hooks.md#run-hooks) keeps taking its token as a parameter.
 
-## Unique names
+### Unique names
 
-A record that outlives the test process — a tenant, an operator, a customer — needs a name that is unique per test and stable across reruns. `UniqueName` derives one from the test id:
+A record that outlives the test process, such as a tenant, an operator or a customer, needs a name that is unique per test and stable across reruns. `UniqueName` derives one from the test id:
 
 ```csharp
 var tenant = Proto.Context.UniqueName("tenant");        // "tenant-0042317"
@@ -57,9 +59,9 @@ var second = Proto.Context.UniqueName("member", 2);     // "member-0042317-2"
 string UniqueName(string name, int sequence = 0);
 ```
 
-The name is `{name}-{TestId}`, or `{name}-{TestId}-{sequence}` when the optional sequence is given for a second object of the same kind. Because the id carries the run prefix, parallel tests never collide and a rerun against a persistent database or a configured environment never collides either; the same record is reused only when the suite fixes `RunPrefix` (`ConfigureTestIds`), since the default prefix is random per run. `ProtoTest.Data`'s generated member defaults are deterministic per test in the same spirit.
+The name is `{name}-{TestId}`, or `{name}-{TestId}-{sequence}` when the optional sequence is given for a second object of the same kind. Because the id carries the run prefix, parallel tests never collide and a rerun against a persistent database or a configured environment never collides either. The same record is reused only when the suite fixes `RunPrefix` (`ConfigureTestIds`), since the default prefix is random per run. `ProtoTest.Data`'s generated member defaults are deterministic per test in the same spirit.
 
-## Typed state
+### Typed state
 
 Typed state is how attributes, hooks and tests hand information to each other without globals.
 
@@ -84,11 +86,11 @@ T? TryResolve<T>() where T : class, IProtoContext;
 ```
 
 - `IProtoContext` is an empty marker interface.
-- State is keyed by the **exact type** you pass. Setting the same type again replaces it, and you must read it back with the same type — not a base class or interface.
-- A missing *"No context of type 'X' is registered for this test. Register it before the test body reads it - an attribute or hook calls context.SetContext(...) in setup - or use `TryResolve<T>()` when the state is optional."* Use `TryResolve` in teardown code, where setup may not have got that far.
-- `SetContext` records the value as traced state for the context entity. `TryResolve` never traces, and `Resolve` writes a `context.resolve` event only when it fails — so the trace tells you which lookups were missing, not every read.
+- State is keyed by the **exact type** you pass. Setting the same type again replaces it, and you must read it back with the same type, not a base class or interface.
+- A missing resolve throws *"No context of type 'X' is registered for this test. Register it before the test body reads it ..."*. Use `TryResolve` in teardown code, where setup may not have got that far.
+- `SetContext` records the value as traced state for the context entity. `TryResolve` never traces, and `Resolve` writes a `context.resolve` event only when it fails, so the trace tells you which lookups were missing, not every read.
 
-## Services
+### Services
 
 The context has its own DI scope, created at test start and disposed at test end.
 
@@ -102,9 +104,9 @@ IConfiguration configuration = Proto.Context.Configuration;
 
 Register services with `builder.ConfigureServices(...)`. Scoped services are per test.
 
-## Clients
+### Clients
 
-Integrations with a system to talk to register their clients on the context; you normally use their extension methods (`Rest()`, `GraphQL()`, `Web()`). The underlying API:
+Integrations with a system to talk to register their clients on the context. You normally use their extension methods (`Rest()`, `GraphQL()`, `Web()`). The underlying API:
 
 ```csharp
 void RegisterClient<TClient>(TClient client, string name = "Default",
@@ -115,9 +117,9 @@ TClient? TryClient<TClient>(string name = "Default") where TClient : class;
 
 Clients are keyed by type and **case-insensitive** name. Registering the same type and name twice throws, and registering anything after release has begun throws `ObjectDisposedException`. Disposable clients are disposed when the test ends, in reverse registration order. A failing `Client<T>` lookup writes a `client.resolve` event before it throws; `TryClient` never traces. See [Clients](./clients.md) for writing your own.
 
-## Resources
+### Resources
 
-A test can own resources — temporary files, provisioned data, an enlistment — and have them released in reverse registration order during teardown, before the DI scope is disposed.
+A test can own resources, such as temporary files, provisioned data or an enlistment, and have them released in reverse registration order during teardown, before the DI scope is disposed.
 
 ```csharp
 void RegisterResource(IProtoResource resource);
@@ -142,7 +144,7 @@ context.RegisterResource(
     release => new ValueTask(mailbox.DeleteAsync(release.Test!.TestId, release.CancellationToken)));
 ```
 
-## Findings
+### Findings
 
 A finding is something worth reporting that is deliberately **not** a failure: a slow response, a deprecated field, a teardown problem. Findings reach the run's reports and [run gates](./lifecycle.md#run-gates-and-resources), and are traced so they appear in ProtoTrace.
 
@@ -157,9 +159,9 @@ ProtoReportItem AddFinding(
     IReadOnlyDictionary<string, object>? metadata = null);
 ```
 
-Defaults: status `Warning`, identifier `finding-NNN` (per context), category `Finding`, target `Test findings`, display group the test name. Metadata is merged with `test.id` and `test.name`. A run gate can fail the run when an `Error` finding exists.
+Defaults: status `Warning`, identifier `finding-NNN` per context, category `Finding`, target `Test findings`, display group the test name. Metadata is merged with `test.id` and `test.name`. A run gate can fail the run when an `Error` finding exists.
 
-## Attachments
+### Attachments
 
 ```csharp
 ProtoTestAttachment AddAttachment(string name, string content, string mediaType = "text/plain", string? description = null);
@@ -172,7 +174,7 @@ IReadOnlyList<ProtoTestAttachment> Attachments { get; }
 
 Names without a prefix are stored as `{testId}-{name}`, and a duplicate name (case-insensitive) throws. See [Attachments](./attachments.md).
 
-## Observations
+### Observations
 
 ```csharp
 void RecordObservation(string targetName, string kind, string identifier,
@@ -184,17 +186,18 @@ IReadOnlyCollection<ProtoObservation> RecordedObservations { get; }
 
 Recording stores the observation, dispatches it to every collector that accepts it, and traces it. See [Coverage and observations](../observability/coverage.md).
 
-## Trace
+### Trace
 
 ```csharp
 IProtoTraceWriter Trace { get; }
 ```
 
-Add your own entries to the test's trace — see [Extending ProtoTest](../advanced/extending.md#adding-to-the-trace).
+Add your own entries to the test's trace. See [Extending ProtoTest](../advanced/extending.md#adding-to-the-trace).
 
-## Rules and limits
+## Limits
 
-- One context per async flow; starting a second test on the same flow throws, and completing a test from a different host throws.
-- `context.DisposeAsync` is idempotent and attempts every release; failures are aggregated.
-- `RegisterResource` refuses run-scoped resources; `AddResource` on the builder is the run-scoped counterpart.
+- One context per async flow. Starting a second test on the same flow throws, and completing a test from a different host throws.
+- `context.DisposeAsync` is idempotent and attempts every release. Failures are aggregated.
+- `RegisterResource` refuses run-scoped resources. `AddResource` on the builder is the run-scoped counterpart.
 - A skipped test never creates a context, so hooks and attributes do not run for it.
+- `Proto.Context` cannot answer on flows that escaped the test, such as a callback on a library thread. Correlate those by trace id with `ProtoHost.FindTraceWriter`.

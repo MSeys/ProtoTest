@@ -1,12 +1,12 @@
 ---
 sidebar_position: 6
 title: Logging in
-description: "Log in once per test the way your application does — a login page, SSO, an API token or saved storage state — as a reusable capability."
+description: "Log in once per test the way your application does: a login page, SSO, an API token or saved storage state, as a reusable capability."
 ---
 
 # Logging in
 
-Almost every browser test starts by logging someone in, and almost every application does that differently: a login page, an SSO redirect, an API call plus an injected token, saved storage state. ProtoTest doesn't pick one for you. You write a **login strategy** — as many as you need — and apply it with an attribute.
+Almost every browser test starts by logging someone in, and almost every application does that differently: a login page, an SSO redirect, an API call plus an injected token, saved storage state. ProtoTest doesn't pick one for you. You write a **login strategy**, as many as you need, and apply it with an attribute.
 
 ```csharp
 [ProtoTest]
@@ -94,7 +94,7 @@ public sealed class LoginAsAttribute<TStrategy>(string persona, params object[] 
 }
 ```
 
-- **`persona`** is a name, not a credential. Keep secrets in your strategy or a service it depends on — attribute arguments are compiled into your assembly metadata.
+- **`persona`** is a name, not a credential. Keep secrets in your strategy or a service it depends on: attribute arguments are compiled into your assembly metadata.
 - **Constructor arguments** after the persona are passed to the strategy's constructor, and any remaining parameters are resolved from dependency injection through `ProtoAuthenticatorFactory.Create<TStrategy>(context, constructorArgs)`, which also injects the `ProtoExecutionContext` itself:
 
   ```csharp
@@ -117,7 +117,7 @@ A logged-in session must exist first. `[WebSession]` declares one during setup a
 public async Task ...
 ```
 
-A relative `Open` resolves against the session's application address — `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with the named endpoint.
+A relative `Open` resolves against the session's application address, `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with the named endpoint.
 
 ## Tracing
 
@@ -125,5 +125,5 @@ The login runs during setup as a `web.login` trace operation named `Login · {pe
 
 ## Next
 
-- [Waits and middleware](./middleware.md) — wait for the application after a login.
-- [Diagnostics and artifacts](./diagnostics.md) — what a failed login leaves in the trace.
+- [Waits and middleware](./middleware.md) - wait for the application after a login.
+- [Diagnostics and artifacts](./diagnostics.md) - what a failed login leaves in the trace.

@@ -37,9 +37,9 @@ public static IProtoHostBuilder AddSql(
     Action<SqlOptions>? configure = null);
 ```
 
-It registers the `SQL` store capability, the factory and `ProtoSqlSession` as scoped services (so each test gets its own), the options, the test hook that opens and releases the connection, and the run hook that guards the isolation declarations. Calling it twice on one host is a no-op: the first registration's factory and options win. A host that registered its own `SqlOptions` keeps them — the options registration is `TryAdd`, so the rest of the integration composes around the host's instance instead of switching itself off. The options singleton is built by running `configure` and is then bound from `ProtoTest:Sql`, so configuration layers over code.
+It registers the `SQL` store capability, the factory and `ProtoSqlSession` as scoped services (so each test gets its own), the options, the test hook that opens and releases the connection, and the run hook that guards the isolation declarations. Calling it twice on one host is a no-op: the first registration's factory and options win. A host that registered its own `SqlOptions` keeps them: the options registration is `TryAdd`, so the rest of the integration composes around the host's instance instead of switching itself off. The options singleton is built by running `configure` and is then bound from `ProtoTest:Sql`, so configuration layers over code.
 
-The factory runs inside the test's scope, so it can resolve services — the demo reads a container's connection string from infrastructure settings:
+The factory runs inside the test's scope, so it can resolve services. The demo reads a container's connection string from infrastructure settings:
 
 ```csharp
 provider => CreateDatabaseConnection(ResolveDatabase(provider, fallbackDatabase), usePostgres)
@@ -53,7 +53,7 @@ builder.AddSql(
     sql => sql.AddressKeys.Add("ConnectionStrings:Orders"));
 ```
 
-With at least one key declared, `AddSql` declares the `SQL` store capability only while one of them can provide a connection — a configured value, or a key a registered container declares and fills. When none can, the integration is inert: the connection is not opened during setup, and `Proto.Context.Sql()`, `SqlConnection()` and `SqlTransaction()` throw naming the missing keys and the `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate. `AddressKeys` is a code API — a `SqlAddressKeys` set that only `Add` (or a `SqlOptions` instance registered before `AddSql`) fills. No configuration section binds it, because the capability decision is made when the host is built and a key that only configuration knows could not have promised the connection the decision was made against. It is empty by default, which keeps the capability unconditional and the factory owning the address.
+With at least one key declared, `AddSql` declares the `SQL` store capability only while one of them can provide a connection: a configured value, or a key a registered container declares and fills. When none can, the integration is inert: the connection is not opened during setup, and `Proto.Context.Sql()`, `SqlConnection()` and `SqlTransaction()` throw naming the missing keys and the `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate. `AddressKeys` is a code API: a `SqlAddressKeys` set that only `Add` (or a `SqlOptions` instance registered before `AddSql`) fills. No configuration section binds it, because the capability decision is made when the host is built and a key that only configuration knows could not have promised the connection the decision was made against. It is empty by default, which keeps the capability unconditional and the factory owning the address.
 
 A sibling access technology that wants the same honest capability shares the rule instead of re-deriving it: `SqlAddressRule.DeclaredKeys(services)` returns the keys the first `AddSql` recorded, so a package registers its own store capability with `AddCapabilityWhenProvided` over them, and `SqlAddressRule.IsInert(context, options)` (or `ThrowIfInert`) applies the same decision at use time. `AddEntityFrameworkCore` is the shipped example; a Dapper or raw ADO.NET package follows the same shape.
 
@@ -66,7 +66,7 @@ A sibling access technology that wants the same honest capability shares the rul
 | `Transaction` (default) | The connection opens and a transaction begins before the test body. When the test ends the transaction is rolled back and the connection disposed, so every write made through that connection disappears. |
 | `None` | No transaction. Writes persist, and provisioners are responsible for releasing what they created. |
 
-`Transaction` promises exactly one thing: **writes made through the connection ProtoTest owns are rolled back.** Entity Framework Core, Dapper and raw ADO.NET all count, because they use that connection. A write through a different connection — an application that opened its own, a second connection created by a helper — is not covered and is committed when that connection commits.
+`Transaction` promises exactly one thing: **writes made through the connection ProtoTest owns are rolled back.** Entity Framework Core, Dapper and raw ADO.NET all count, because they use that connection. A write through a different connection, such as an application that opened its own or a second connection created by a helper, is not covered and is committed when that connection commits.
 
 Because that promise is easy to believe wrongly, the host registers a guard. When the host has applications registered through `AddApplication` and isolation is `Transaction`, every one of them must be declared as using the test's connection:
 
@@ -76,7 +76,7 @@ builder.AddSql(
     sql => sql.ShareConnectionWith("Orders", "Billing"));
 ```
 
-An undeclared application fails the run at start with an explanation telling you to declare it or to use `SqlIsolation.None`. Applications that were not registered through `AddApplication` are invisible to the guard, and a declaration is a statement that the application uses the connection — if it actually opens its own, its writes still commit.
+An undeclared application fails the run at start with an explanation telling you to declare it or to use `SqlIsolation.None`. Applications that were not registered through `AddApplication` are invisible to the guard, and a declaration is a statement that the application uses the connection; if it actually opens its own, its writes still commit.
 
 ### Options and configuration
 
@@ -121,7 +121,7 @@ public static IProtoHostBuilder AddEntityFrameworkCore<TContext>(
     Action<IServiceProvider, DbContextOptionsBuilder> configure) where TContext : DbContext;
 ```
 
-After the connection hook has opened the connection and begun the transaction, the enlistment hook checks that `dbContext.Database.GetDbConnection()` **is** the connection ProtoTest owns — a context over its own connection throws with an explanation instead of silently escaping the transaction — and then records `sql.enlist` and calls `UseTransaction` with the test's transaction. That is why the provider must be configured with `services.GetRequiredService<DbConnection>()`; with `Isolation = None` there is no transaction and no enlistment.
+After the connection hook has opened the connection and begun the transaction, the enlistment hook checks that `dbContext.Database.GetDbConnection()` **is** the connection ProtoTest owns (a context over its own connection throws with an explanation instead of silently escaping the transaction), and then records `sql.enlist` and calls `UseTransaction` with the test's transaction. That is why the provider must be configured with `services.GetRequiredService<DbConnection>()`; with `Isolation = None` there is no transaction and no enlistment.
 
 `AddEntityFrameworkCore` shares the SQL address rule: when `AddSql` declared `AddressKeys` and none is provided, the `Entity Framework Core` store capability is absent too, gated tests skip, the enlistment hook leaves the session and the context alone, and `Proto.Context.Sql<TContext>()` throws the same missing-keys message. The keys are read when `AddEntityFrameworkCore` runs, so call it after `AddSql`; without declared keys the capability stays unconditional.
 
@@ -145,11 +145,11 @@ var connectionString = provider.GetService<ProtoInfrastructureSettings>() is { }
     : fallback;
 ```
 
-An application hosted in process receives the same keys as host settings automatically (see [ASP.NET Core](../aspnetcore.md)), so the application and the tests can point at one database without environment variables. The default image is `postgres:16-alpine`, configurable through the builder passed to `Container`. `Container()` does not start anything now: the host starts it with the run — before any test-level skip condition — so a missing Docker runtime fails the run's start. `TryStart` reports the reason instead of throwing: call it in the suite fixture before `AddInfrastructure` to fall back or skip the suite, and `Start` starts now or throws.
+An application hosted in process receives the same keys as host settings automatically (see [ASP.NET Core](../aspnetcore.md)), so the application and the tests can point at one database without environment variables. The default image is `postgres:16-alpine`, configurable through the builder passed to `Container`. `Container()` does not start anything now: the host starts it with the run, before any test-level skip condition, so a missing Docker runtime fails the run's start. `TryStart` reports the reason instead of throwing: call it in the suite fixture before `AddInfrastructure` to fall back or skip the suite, and `Start` starts now or throws.
 
 ### Run-owned schema
 
-A container database starts empty, and the schema must exist before the first test — but a test body and a test hook run inside the per-test transaction, so `EnsureCreated`/`Migrate` or raw DDL there is rolled back with the test. Create it once for the run with [run-scoped setup](../../foundation/infrastructure.md#run-scoped-setup), registered **after** the container so it reads the connection string the container published:
+A container database starts empty, and the schema must exist before the first test, but a test body and a test hook run inside the per-test transaction, so `EnsureCreated`/`Migrate` or raw DDL there is rolled back with the test. Create it once for the run with [run-scoped setup](../../foundation/infrastructure.md#run-scoped-setup), registered **after** the container so it reads the connection string the container published:
 
 ```csharp
 builder
@@ -184,7 +184,7 @@ The schema then survives the rollback; the rows do not. Every test sees the tabl
 - Operations follow the connection's lifecycle, all with source `ProtoTest.Sql`: `sql.connection.open` (Setup, with `sql.connection.type`), `sql.transaction.begin` (Setup, child of the open, with `sql.isolation`), `sql.transaction.rollback` (release phase, inside the connection resource's release), and `sql.enlist` (Setup, when a `DbContext` joins the transaction, with `db.context`, source `ProtoTest.Sql.EntityFrameworkCore`).
 - The connection is a **test-scoped resource**: entity kind `database`, id `database:connection`, described as the connection type and isolation, plus the names it is shared with when there are any. Its release runs in teardown before the test's clients are disposed, and is recorded as a `resource.release` entry with `resource.kind = database`.
 - The run registers `SQL` and `Entity Framework Core` as `store` capabilities. Both are declared only while the SQL address keys can provide a connection; with declared-but-unprovided keys the trace records both as `capability.skipped` and no connection is opened.
-- Individual commands are not traced, and neither package emits observations or report items — ProtoTest records the connection's lifecycle, not the SQL your test sends.
+- Individual commands are not traced, and neither package emits observations or report items: ProtoTest records the connection's lifecycle, not the SQL your test sends.
 
 ## The demo's wiring
 
@@ -241,6 +241,6 @@ With `AddressKeys` declared and none of them provided, the `SQL` capability is a
 ## Links
 
 - [Integrations map](../overview.md) - where the store packages sit.
-- [One suite, three environments](../../getting-started/environments.md) — the demo's SQLite and PostgreSQL switch.
-- [Infrastructure](../../foundation/infrastructure.md) — how `PostgresDatabase.Container()` starts and fills settings.
+- [One suite, three environments](../../getting-started/environments.md) - the demo's SQLite and PostgreSQL switch.
+- [Infrastructure](../../foundation/infrastructure.md) - how `PostgresDatabase.Container()` starts and fills settings.
 - EF Core registration order and enlistment in [`tests/ProtoTest.Sql.Tests/SqlIsolationTests.cs`](https://github.com/MSeys/ProtoTest/blob/main/tests/ProtoTest.Sql.Tests/SqlIsolationTests.cs), and the demo's composition in [`samples/Northstar.ProtoTest/Setup.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs).

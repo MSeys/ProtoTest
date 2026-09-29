@@ -28,15 +28,15 @@ Everything in this level runs against the Northstar sample: one suite that compo
   situation={
     <>
       <p>The fastest way to judge a test framework is to watch it run a suite that touches real things. The sample is small, it is green on an ordinary run, and it writes down everything it did.</p>
-      <p>One test will not run: the broker journey needs a broker, and no broker is configured. That skip is part of the lesson, not a defect.</p>
+      <p>Some tests will not run: the broker journey needs a broker, and no broker is configured, and the four failure drills wait for an explicit opt-in. Those skips are part of the lesson, not a defect.</p>
     </>
   }
   checkpoint={{
     question:
-      'The run is green and one test did not run. Which test skipped, what reason did the run give, and where did that reason come from?',
+      'The run is green and the broker journey did not run. What reason did it give, and where did that reason come from?',
     verify: (
       <>
-        Run <code>dotnet test samples/Northstar.ProtoTest</code> and read the runner output. The summary names the skipped test and prints its reason.
+        Run <code>dotnet test samples/Northstar.ProtoTest --logger "console;verbosity=detailed"</code> and read the runner output: the summary lists the skipped test and the reason beside it.
       </>
     ),
     reveal: (
@@ -78,7 +78,7 @@ The ordinary run is green and fast. The application is hosted in-process, so the
 - the broker journey, because no broker is configured;
 - the browser journey, when Playwright's Chromium is not installed.
 
-The summary prints how many tests passed, failed and skipped, and the skipped tests name their reason.
+The four failure drills also skip in an ordinary run; `ProtoTest__Sample__Drills=true` lets them fail so you can read their traces. The summary prints how many tests passed, failed and skipped, and lists the skipped tests. Add `--logger "console;verbosity=detailed"` to print each reason beside its test.
 
 ## Find what the run left
 

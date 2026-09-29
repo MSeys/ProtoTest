@@ -15,6 +15,8 @@ dotnet tool install --global ProtoTest.Cli
 prototest summary TestResults/run.prototrace
 ```
 
+The [CLI reference](./cli.md) lists the verb's arguments, the exit codes and the other three commands.
+
 Here is that output for the committed MCP test fixture, `tests/ProtoTest.Mcp.Tests/Fixtures/run-failed.prototrace`. It is abridged; every test that did not fully succeed gets a block like these.
 
 ```text
@@ -25,7 +27,7 @@ FAILED orders match their shape (16 ms)
   Shape mismatch failed with 1 error(s):
     • [$.orderId]: Values did not match. (Expected: '7', Actual: '42')
   at artifacts/fixture-gen/Program.cs:65 (Program.<<Main)
-  assert.json.shape assert.json.shape · failed
+  assert.json.shape · failed
   cause: assertion (1 mismatch)
   mismatch: $.orderId: expected 7, actual 42
 ```

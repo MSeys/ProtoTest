@@ -24,6 +24,8 @@ The **baseline** is the report from the default branch. The **current** report i
 prototest verify baseline.json current.json
 ```
 
+The [CLI reference](./cli.md) lists the verb's arguments and the exit codes.
+
 A regression prints this. The example comes from a real run of the command over two report files, where the current report has one unit uncovered that the baseline covered.
 
 ```text

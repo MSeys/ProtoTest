@@ -22,7 +22,7 @@ public sealed class FeedbackCommentTests
             "**1 tests · 1 failed**",
             string.Empty,
             "- **FAILED `orders match their shape`** (16 ms)",
-            "  - `assert.json.shape` `assert.json.shape` · failed",
+            "  - `assert.json.shape` · failed",
             "  - Shape mismatch failed with 1 error(s).",
             "  - at `tests/Orders/OrderTests.cs:42`",
             "  - mismatch `$.orderId`: expected 7, actual 42",

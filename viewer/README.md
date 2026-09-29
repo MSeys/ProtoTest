@@ -30,7 +30,7 @@ Create the production output with `npm run build`. The generated `dist` director
 
 `npm run scale:trace` builds a 1,000+ test trace from the bundled demo trace into the gitignored `.perf`
 directory, and `npm run scale:measure` times the built viewer against it in Edge. The measured numbers and
-the method live on the [benchmarks page](https://prototest.dev/docs/benchmarks#the-viewer-at-1000-tests).
+the method live on the [benchmarks page](https://prototest.dev/docs/project/benchmarks#the-viewer-at-1000-tests).
 
 ## Learn more
 

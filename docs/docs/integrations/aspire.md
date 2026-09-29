@@ -28,9 +28,9 @@ builder
         .AddRest(rest => rest.AddClient("api")));
 ```
 
-The order is the start order: register containers and other pieces first when the AppHost needs them, and register the readiness probe after the AppHost — probes are awaited at their registration position, so a probe registered first resolves nothing. The AppHost **serves only when selected**: `ProtoTest:Aspire:Enabled` (or a resource's own `ProtoTest:Aspire:Resources:{resource}:Enabled`) starts it, and without either key it never starts and the suite resolves its targets elsewhere. A run that configures every declared resource's `ProtoTest:Applications:{resource}:BaseUrl` satisfies all the keys the AppHost would fill, so the AppHost never starts even when selected and the same suite runs against that environment. When only some are configured, the AppHost still starts for the rest and publishes only the selected keys configuration does not already fill, so a configured address is never masked by the started AppHost.
+The order is the start order: register containers and other pieces first when the AppHost needs them, and register the readiness probe after the AppHost: probes are awaited at their registration position, so a probe registered first resolves nothing. The AppHost **serves only when selected**: `ProtoTest:Aspire:Enabled` (or a resource's own `ProtoTest:Aspire:Resources:{resource}:Enabled`) starts it, and without either key it never starts and the suite resolves its targets elsewhere. A run that configures every declared resource's `ProtoTest:Applications:{resource}:BaseUrl` satisfies all the keys the AppHost would fill, so the AppHost never starts even when selected and the same suite runs against that environment. When only some are configured, the AppHost still starts for the rest and publishes only the selected keys configuration does not already fill, so a configured address is never masked by the started AppHost.
 
-`TEntryPoint` is any public type in the AppHost assembly — the testing host runs the assembly's entry point in-process. A top-level `Program` is internal, so expose an anchor:
+`TEntryPoint` is any public type in the AppHost assembly; the testing host runs the assembly's entry point in-process. A top-level `Program` is internal, so expose an anchor:
 
 ```csharp
 namespace MyApp.AppHost;
@@ -52,21 +52,21 @@ chain wins over it, and a target it serves needs no plain registration.
 
 ```csharp
 builder
-    .AddAspireAppHost<OpenCsmsAppHost>(options => options
+    .AddAspireAppHost<OpenCsmsAppHostAnchor>(options => options
         .MapConnectionString("postgres", "ConnectionStrings:Csms"),
         "api")
     .AddApplication("Csms", app => app
         .UseConfigured()
-        .UseAspireResource<OpenCsmsAppHost>("api")
+        .UseAspireResource<OpenCsmsAppHostAnchor>("api")
         .UseInProcess<CsmsApi>())
     .AddInfrastructure("CsmsDatabase", piece => piece
         .UseConfigured()
-        .UseAspireResource<OpenCsmsAppHost>("postgres")
+        .UseAspireResource<OpenCsmsAppHostAnchor>("postgres")
         .UseContainer(PostgresDatabase.Container()),
         "ConnectionStrings:Csms");
 ```
 
-- `UseAspireResource<OpenCsmsAppHost>("api")` on an application chain publishes the resource's
+- `UseAspireResource<OpenCsmsAppHostAnchor>("api")` on an application chain publishes the resource's
   endpoint under the application's derived `BaseUrl`. On an infrastructure chain it publishes the
   resource's **connection string** under every key the target declares.
 - `ProtoAspireOptions.MapConnectionString(resource, key)` fills a key no target declares; the mapping
@@ -93,6 +93,15 @@ AppHost starts only when a selection key is set and at least one key it fills is
 skip record names the condition (`unselected`, or the missing keys for `configured`) like any other
 chain.
 
+The examples above come from the full product demo. OpenCSMS is an independent EV charging platform in
+its own repository, and its AppHost runs the API project (which also serves the dashboard) and both
+workers beside PostgreSQL and RabbitMQ. The [Aspire topology
+lesson](/learn/real-topology/aspire-topology) selects it with one key and reads the skip list.
+
+![The OpenCSMS public status page: charge points with their connector states, no account needed.](/images/opencsms/status.png)
+
+The API resource the AppHost starts serves the product's dashboard and its public status page.
+
 ## The tasks
 
 ```csharp
@@ -107,7 +116,7 @@ public async Task Health_endpoint_answers()
 }
 ```
 
-`AspireResource` returns the base address the AppHost published for the resource — or the configured address when the run points at a deployed topology. The application's REST, GraphQL and gRPC clients resolve the same address, so the journey in [Compose](#compose) calls the resource through the normal client. The suite's composition for one AppHost, one probe and one client is in `tests/ProtoTest.Aspire.Tests/AspireAppHostTests.cs`.
+`AspireResource` returns the base address the AppHost published for the resource, or the configured address when the run points at a deployed topology. The application's REST, GraphQL and gRPC clients resolve the same address, so the journey in [Compose](#compose) calls the resource through the normal client. The suite's composition for one AppHost, one probe and one client is in `tests/ProtoTest.Aspire.Tests/AspireAppHostTests.cs`.
 
 ## Options and keys
 
@@ -126,7 +135,7 @@ builder.AddAspireAppHost<TestAppHostAnchor>(
 | `ProtoTest:Aspire:Resources:{resource}:Enabled` | bool | unset → only the global key selects the resource | the per-resource selection key; set it (`ProtoTest__Aspire__Resources__api__Enabled=true`) to resolve that resource's targets through the AppHost while the run's other targets stay on their other providers |
 | `ProtoTest:Applications:{resource}:BaseUrl` | string | unset → the AppHost publishes it | set it to point the suite at a deployed topology instead of starting the AppHost; a configured key wins over the started AppHost's address for that resource |
 
-`MapResource` publishes the resource under a different application name; `UseEndpoint` reads a non-default endpoint of the resource (the default is `http`); `MapConnectionString` publishes a resource's connection string under a target's key instead of an address; `Set` passes a setting to the AppHost as a command-line argument on top of the run's configuration and the settings earlier infrastructure published — the AppHost otherwise reads its own sources. Two resources cannot share one application name.
+`MapResource` publishes the resource under a different application name; `UseEndpoint` reads a non-default endpoint of the resource (the default is `http`); `MapConnectionString` publishes a resource's connection string under a target's key instead of an address; `Set` passes a setting to the AppHost as a command-line argument on top of the run's configuration and the settings earlier infrastructure published; the AppHost otherwise reads its own sources. Two resources cannot share one application name.
 
 ## Context API
 
@@ -142,7 +151,7 @@ The AppHost is run-scoped infrastructure: the trace records an `aspire` run enti
 
 ## Choosing between a worker and an AppHost
 
-`ProtoTest.Hosting` runs a worker's own entry point **in-process**: the test and the worker share a process, a container and a clock, and white-box accessors reach the worker's services. `ProtoTest.Aspire` runs an AppHost as a **closed box**: the topology starts outside the test process and the suite only sees its endpoints. Choose the worker when the test drives or inspects the host's services; choose the AppHost when the test must prove the deployed topology — service discovery, ports and process boundaries included. Neither substitutes for the other: the closed-box limits below apply only here.
+`ProtoTest.Hosting` runs a worker's own entry point **in-process**: the test and the worker share a process, a container and a clock, and white-box accessors reach the worker's services. `ProtoTest.Aspire` runs an AppHost as a **closed box**: the topology starts outside the test process and the suite only sees its endpoints. Choose the worker when the test drives or inspects the host's services; choose the AppHost when the test must prove the deployed topology, including service discovery, ports and process boundaries. Neither substitutes for the other: the closed-box limits below apply only here.
 
 ## Skip
 
@@ -176,6 +185,6 @@ catch (ProtoAspireUnavailableException exception)
 
 ## Links
 
-- [Background workers](./hosting.md) — the in-process alternative and how to choose.
-- [Infrastructure](../foundation/infrastructure.md) — run-scoped settings and readiness.
-- [REST clients](./rest/index.md) — calling a published resource through its application.
+- [Background workers](./hosting.md) - the in-process alternative and how to choose.
+- [Infrastructure](../foundation/infrastructure.md) - run-scoped settings and readiness.
+- [REST clients](./rest/index.md) - calling a published resource through its application.

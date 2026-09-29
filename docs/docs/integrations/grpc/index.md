@@ -73,7 +73,7 @@ One `ProtoTest:Grpc:Client` section serves every named client; each registration
 public static ProtoGrpcClient Grpc(this ProtoExecutionContext context, string? clientName = null);
 ```
 
-Inside an `[Application]` the default or bound client is used unless a name is given, exactly like `Rest()` and `GraphQL()`; resolution tries the application-qualified name (`{application}:{name}`), then the requested name itself, so a host-registered client stays reachable from inside an application, then — when exactly one gRPC client has that unqualified name — the client another application registered, so a unique name is reachable across applications. A name two applications share must be qualified (`App:Client`); a miss lists the registered gRPC client names. When no initialized client matches, the application's in-process transport backs a fallback client, registered so every call shares one channel, and a `grpc.client.resolve` event is written; otherwise the accessor throws naming the client, `AddAspNetCoreServer`, and `ProtoTest:Applications:{application}:Grpc:Address`. A call that reaches the channel with no address to resolve throws `InvalidOperationException`; a call after the client was disposed throws `ObjectDisposedException`.
+Inside an `[Application]` the default or bound client is used unless a name is given, exactly like `Rest()` and `GraphQL()`; resolution tries the application-qualified name (`{application}:{name}`), then the requested name itself, so a host-registered client stays reachable from inside an application, then the client another application registered when exactly one gRPC client has that unqualified name, so a unique name is reachable across applications. A name two applications share must be qualified (`App:Client`); a miss lists the registered gRPC client names. When no initialized client matches, the application's in-process transport backs a fallback client, registered so every call shares one channel, and a `grpc.client.resolve` event is written; otherwise the accessor throws naming the client, `AddAspNetCoreServer`, and `ProtoTest:Applications:{application}:Grpc:Address`. A call that reaches the channel with no address to resolve throws `InvalidOperationException`; a call after the client was disposed throws `ObjectDisposedException`.
 
 The call helpers, all constrained to `where TRequest : class, TResponse : class`:
 
@@ -194,7 +194,7 @@ builder.AddGrpc(grpc => grpc
     .AddClient("Api"));
 ```
 
-With capture enabled, each traced call attaches its request and response messages as JSON: `grpc-{client}-{service}-{method}-{request|response}-{n}`, where `{client}` is the sanitized client name and `n` is the call's position in the client's call sequence, so repeated calls to the same method — even from two clients in one test — stay distinct. Values run through the shared redaction rules — JSON properties such as `password` and `token`, and the sensitive metadata keys — and each attachment is capped at `MaxDiagnosticBodyLength` from `ProtoTest:Grpc:Attachments`. `ClientStreamingAsync` and `ServerStreamingAsync` capture up to the first 10 streamed messages and record the total count in the attachment description. A message that cannot be serialized is reported as a `grpc.attachment.failed` event and never fails the call.
+With capture enabled, each traced call attaches its request and response messages as JSON: `grpc-{client}-{service}-{method}-{request|response}-{n}`, where `{client}` is the sanitized client name and `n` is the call's position in the client's call sequence, so repeated calls to the same method stay distinct, even from two clients in one test. Values run through the shared redaction rules, covering JSON properties such as `password` and `token` and the sensitive metadata keys, and each attachment is capped at `MaxDiagnosticBodyLength` from `ProtoTest:Grpc:Attachments`. `ClientStreamingAsync` and `ServerStreamingAsync` capture up to the first 10 streamed messages and record the total count in the attachment description. A message that cannot be serialized is reported as a `grpc.attachment.failed` event and never fails the call.
 
 #### Coverage
 
@@ -209,7 +209,7 @@ The async call helpers record a `grpc.response` observation per successful call.
 
 #### Address resolution
 
-A resolver runs per test with the test context, so an address that only exists at call time — a container started by the suite, a per-test tenant host — still works:
+A resolver runs per test with the test context, so an address that only exists at call time, such as a container started by the suite or a per-test tenant host, still works:
 
 ```csharp
 .AddGrpc(grpc => grpc.AddClient("Api", context => context.Configuration.GetValue<Uri>("Api:Grpc")))

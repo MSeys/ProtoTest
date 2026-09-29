@@ -4,21 +4,19 @@ import Head from '@docusaurus/Head';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 
+import CommandBox from '@site/src/components/CommandBox';
+import CodeSnippet from '@site/src/components/CodeSnippet';
+import Frame from '@site/src/components/Frame';
 import TabbedCode, {type CodeTab} from '@site/src/components/TabbedCode';
-import Comparison from '@site/src/components/Comparison';
-import {comparisonConcerns, withoutProtoTest, withProtoTest} from '@site/src/data/comparison';
-import CoverageMap from '@site/src/components/CoverageMap';
 import ReleaseFeed from '@site/src/components/ReleaseFeed';
 import ViewerWalkthrough from '@site/src/components/ViewerWalkthrough';
-import CapabilityIndex from '@site/src/components/CapabilityIndex';
-import VisibilityPanel from '@site/src/components/VisibilityPanel';
 import FailureGallery from '@site/src/components/FailureGallery';
 import styles from './index.module.css';
 
 const heroTabs: CodeTab[] = [
   {
     id: 'journey',
-    label: 'Journey',
+    label: 'One journey',
     filename: 'PlatformJourney.cs',
     code: `[ProtoTest]
 [SignedInAs]
@@ -87,198 +85,40 @@ public sealed class Setup : ProtoTestAssembly
       'Each Add… is a capability. Compose the ones your suite needs; leave one out and its client, its attributes and its part of the trace simply are not there.',
   },
   {
-    id: 'rest',
-    label: 'REST',
-    filename: 'DiagnosticsShowcase.cs',
-    code: `[Application(NorthstarTargets.Api)]
-[NorthstarTenant]
-[Auth<NorthstarAuthenticator>]
-public sealed class DiagnosticsShowcase
-{
-    [ProtoTest]
-    [SignedInAs]
-    public async Task TheOrganizationReportsItsPlanAndProjectCount()
-    {
-        using var organization = await Proto.Context.Rest()
-            .GetAsync("/api/v1/organization");
+    id: 'evidence',
+    label: 'Evidence',
+    filename: 'prototest summary run.prototrace',
+    language: 'text',
+    code: `ProtoTest trace 2.0 · run 29e344f9cf54431ca7d8bad3f87a1749
+2 tests · 1 failed · 1 succeeded
 
-        organization
-            .Should.HaveHttpStatus(HttpStatusCode.OK)
-            .Should.MatchShape(new
-            {
-                projectCount = 99,
-                planId = "nonexistent-plan"
-            });
+FAILED orders match their shape (16 ms)
+  Shape mismatch failed with 1 error(s):
+    • [$.orderId]: Values did not match. (Expected: '7', Actual: '42')
+  at artifacts/fixture-gen/Program.cs:65 (Program.<<Main)
+  assert.json.shape · failed
+  cause: assertion (1 mismatch)
+  mismatch: $.orderId: expected 7, actual 42`,
+    footnote:
+      'Abridged from prototest summary on the committed MCP fixture trace. The summary, the viewer and the MCP tools select the same failure from the same archive.',
+  },
+  {
+    id: 'agent',
+    label: 'Agent',
+    filename: '.mcp.json',
+    language: 'json',
+    code: `{
+  "mcpServers": {
+    "prototest": {
+      "command": "prototest-mcp",
+      "args": ["--project", "."]
     }
+  }
 }`,
     footnote:
-      'The tenant, the sign-in and the cleanup are attributes; the shape is the assertion. This is the test whose trace is shown below.',
-  },
-  {
-    id: 'graphql',
-    label: 'GraphQL',
-    filename: 'GraphQLControlPlaneTests.cs',
-    code: `var expected = new
-{
-    id = JsonValue.GreaterThan(0),
-    product = "live-notebook",
-    total = 15m,
-    status = "pending"
-};
-
-await using var subscription = await Proto.Context
-    .GraphQL()
-    .Subscription("orderCreated")
-    .Select(expected)
-    .SubscribeAsync();
-
-// ... mutation fires an orderCreated event ...
-
-using var next = await subscription
-    .ExpectNextAsync(expected, timeout.Token);`,
-    footnote:
-      'One anonymous object does both jobs: it builds the selection set and asserts the payload.',
-  },
-  {
-    id: 'grpc',
-    label: 'gRPC',
-    filename: 'OrderTests.cs',
-    code: `[ProtoTest]
-public async Task A_placed_order_can_be_read_back()
-{
-    var order = await Proto.Context.Grpc().UnaryAsync(
-        Orders.GetOrder,
-        new GetOrderRequest { Id = 42 });
-
-    ProtoGrpcAssertions.For(order).Should.MatchShape(new
-    {
-        id = 42,
-        status = "PENDING",
-        total = JsonValue.GreaterThan(0),
-        lines = new[]
-        {
-            new { sku = "notebook", quantity = 2 }
-        }
-    });
-}`,
-    footnote:
-      'The protobuf reply is matched with the same shapes as REST and GraphQL: declare only the fields the behaviour depends on, nested and partial.',
-  },
-  {
-    id: 'browser',
-    label: 'Browser',
-    filename: 'PortalSignInTests.cs',
-    code: `[ProtoTest]
-[LoginAs<BackOfficeLogin>("billing.admin")]
-public async Task Sign_in_shows_the_dashboard()
-{
-    var login = Proto.Context.Web().Page<LoginPage>();
-    await login.OpenAsync("https://portal.example.test");
-
-    await login.Form.Flow("Sign in")
-        .Fill(form => form.Password, "correct horse")
-        .Check(form => form.RememberMe)
-        .Click(form => form.Submit)
-        .RunAsync();
-
-    await login.Form.Status.ShouldHaveTextAsync(
-        "Signed in", TimeSpan.FromSeconds(2));
-}`,
-    footnote:
-      'A named flow records as one web.flow operation with each step nested under it, and the same page objects run on Playwright or Selenium.',
-  },
-  {
-    id: 'data',
-    label: 'Data',
-    filename: 'CommerceAndSecurityTests.cs',
-    code: `var members = await Proto.Context.Data()
-    .For<CreateUserRequest>()
-    .With(request => request.Role, SampleRoles.Member)
-    .CreateManyAsync<UserResponse>(7);
-
-var admin = Proto.Context.Resolve<SampleUserContext>();
-
-using var response = await Proto.Context.Rest()
-    .GetAsync("/api/admin/users");
-
-response.Should.MatchShape(new
-{
-    tenant = admin.Tenant,
-    memberCount = members.Count + 1   // the seven, and the admin
-});`,
-    footnote:
-      'Defaults come from your data module, provisioning from your provisioner, and the test context is shared with every other client.',
-  },
-  {
-    id: 'sql',
-    label: 'SQL',
-    filename: 'InvoiceTests.cs',
-    code: `[ProtoTest]
-public async Task Paying_an_invoice_marks_it_paid()
-{
-    using var response = await Proto.Context.Rest()
-        .PostAsync("/api/invoices/42/pay");
-    response.Should.HaveHttpStatus(HttpStatusCode.OK);
-
-    // The store the application writes to, on the
-    // connection and transaction the test owns.
-    var billing = Proto.Context.Sql<BillingDbContext>();
-    var invoice = await billing.Invoices.SingleAsync(
-        invoice => invoice.Id == 42);
-
-    Assert.That(invoice.Status, Is.EqualTo("paid"));
-}`,
-    footnote:
-      'ProtoTest opens the connection, begins the transaction and rolls it back, so a test can read and write the real store without leaving anything behind.',
-  },
-  {
-    id: 'messaging',
-    label: 'Messaging',
-    filename: 'BillingEventTests.cs',
-    code: `[ProtoTest]
-public async Task Paying_an_invoice_publishes_invoice_paid()
-{
-    using var response = await Proto.Context.Rest()
-        .PostAsync("/api/invoices/42/pay");
-    response.Should.HaveHttpStatus(HttpStatusCode.OK);
-
-    await Proto.Context.Messaging().AwaitAsync(
-        "invoice.paid",
-        message => message.Payload!.Contains("\\"id\\":42"),
-        TimeSpan.FromSeconds(15));
-}`,
-    footnote:
-      'Await the event the call should cause. The same test runs on the in-memory broker or on RabbitMQ; a timeout fails it with what did arrive.',
-  },
-  {
-    id: 'sheets',
-    label: 'Sheets',
-    filename: 'SalesReportTests.cs',
-    code: `[Sheet("Sales", HeaderRows = [1, 2])]
-public sealed record SalesRow(
-    [property: Column("Region", Pattern = "^[A-Z]+$", Unique = true)] string Region,
-    [property: Column("FY26", "Amount", Min = 0)] decimal Amount,
-    [property: Column("FY26", "Count", Min = 0)] int Count);
-
-[ProtoTest]
-public async Task The_sales_report_ranks_regions_by_amount()
-{
-    using var response = await Proto.Context.Rest()
-        .GetAsync("/api/v1/reports/sales.xlsx");
-
-    var sales = Proto.Context.Sheets().Open(response).Model<SalesRow>();
-    sales.Should.MatchModel();
-
-    sales.Column(row => row.Amount).Should.BeSortedBy(ProtoSortDirection.Descending);
-    sales.Row(row => row.Region == "EMEA")
-        .ShouldMatchShape(new { Amount = 1200m, Count = 12 });
-}`,
-    footnote:
-      'The record is the sheet: header paths bind the columns, and Verify checks every row against their rules and reports every violation at once.',
+      'One local stdio server for the runs in your repository. It answers four read-only tools; the section below shows what get_failure returns.',
   },
 ];
-
-
 
 function Hero() {
   return (
@@ -291,23 +131,26 @@ function Hero() {
               Test the whole journey. Trace every layer.
             </Heading>
             <p className={styles.heroLead}>
-              ProtoTest brings the setup around an integration test into one place. Choose the integrations a
-              suite needs; they share one context, lifecycle, cleanup and trace. A test can call an API, wait
-              for an event, inspect a database, drive a browser or verify a generated file.
+              ProtoTest brings the setup around an integration test into one place. Compose REST, GraphQL,
+              SQL, messaging, a browser or a spreadsheet; they share one context, lifecycle, cleanup and
+              trace.
             </p>
-            <div className={styles.heroButtons}>
-              <Link className={`${styles.btn} ${styles.btnPrimary}`} to="/learn/">
-                Start learning
-              </Link>
-              <Link className={`${styles.btn} ${styles.btnSecondary}`} href="https://trace.prototest.dev/?demo=1">
+            <CommandBox
+              title="Start a project"
+              commands={['dotnet new install ProtoTest.Templates', 'dotnet new prototest -n Shop']}
+            />
+            <div className={styles.heroLinks}>
+              <Link
+                className={`${styles.btn} ${styles.btnSecondary}`}
+                href="https://trace.prototest.dev/?demo=1">
                 See a failing trace
               </Link>
-              <Link className={`${styles.btn} ${styles.btnSecondary}`} to="/docs/getting-started/installation">
-                Get started
+              <Link className={styles.heroLearn} to="/learn/">
+                New to integration testing? Start the learning track
               </Link>
             </div>
           </div>
-          <TabbedCode tabs={heroTabs} />
+          <TabbedCode tabs={heroTabs} label="Four ways a ProtoTest suite looks" />
         </div>
       </div>
     </header>
@@ -340,9 +183,9 @@ function PathsSection() {
               before adopting it.
             </p>
             <div className={styles.pathLinks}>
-              <Link to="/docs/compare">Compared</Link>
-              <Link to="/docs/benchmarks">Benchmarks</Link>
-              <Link to="/docs/faq">FAQ</Link>
+              <Link to="/docs/project/compare">Comparison</Link>
+              <Link to="/docs/project/benchmarks">Benchmarks</Link>
+              <Link to="/docs/project/faq">FAQ</Link>
             </div>
           </div>
           <div className={styles.pathCard}>
@@ -415,118 +258,68 @@ function TraceSection() {
   );
 }
 
-function ComparisonSection() {
+function AgentExchange() {
   return (
-    <section className={`${styles.section} ${styles.sectionAlt}`}>
-      <div className="container">
-        <div className={styles.sectionHead}>
-          <Heading as="h2">What stays in the test</Heading>
-          <p>
-            This is the same scenario against the same in-process application, first with a regular fixture and
-            then with ProtoTest. Hatched lines are setup; solid lines belong to the scenario. Open a task to see
-            the code from both sides.
-          </p>
-        </div>
-        <Comparison without={withoutProtoTest} with={withProtoTest} concerns={comparisonConcerns} />
-      </div>
-    </section>
+    <Frame
+      head={
+        <>
+          <strong>get_failure</strong>
+          <span className={styles.frameMeta}>run 29e344f9 · fixture trace</span>
+        </>
+      }
+      foot={
+        <>
+          Trimmed from the committed MCP fixture trace. The tool is read-only and capped; the whole
+          document is on <Link to="/docs/agent-workflows/diagnosis">Diagnosis</Link>.
+        </>
+      }>
+      <CodeSnippet
+        language="json"
+        code={`{
+  "runId": "29e344f9cf54431ca7d8bad3f87a1749",
+  "test": {
+    "testId": "00002",
+    "name": "orders match their shape",
+    "outcome": "failed",
+    "durationMs": 16.4395
+  },
+  "failure": {
+    "kind": "assert.json.shape",
+    "status": "failed",
+    "errorType": "ProtoTest.Json.JsonShapeMismatchException",
+    "errorMessage": "Shape mismatch failed with 1 error(s): [$.orderId]: Values did not match. (Expected: '7', Actual: '42')",
+    "sourceFile": "artifacts/fixture-gen/Program.cs",
+    "sourceLine": 65
+  }
+}`}
+      />
+    </Frame>
   );
 }
 
-function PayoffSection() {
+function AgentSection() {
   return (
-    <section className={styles.section}>
+    <section className={`${styles.section} ${styles.sectionAlt}`}>
       <div className="container">
-        <div className={styles.sectionHead}>
-          <Heading as="h2">Coverage and run output</Heading>
-          <p>
-            Integrations record observations while a test runs. Collectors use those observations to build
-            coverage and reports for the complete run.
-          </p>
-        </div>
-
         <div className={styles.featureRow}>
           <div className={styles.featureCopy}>
-            <Heading as="h3">Contract coverage</Heading>
+            <Heading as="h2">Point your agent at the trace</Heading>
             <p>
-              OpenAPI and GraphQL collectors compare recorded calls and assertions with the contract. The report
-              shows which endpoints, responses, properties and fields the suite reached or checked.
+              <code>ProtoTest.Mcp</code> is a local stdio server that reads the <code>.prototrace</code>{' '}
+              archives in a repository. An agent works the evidence loop through four read-only tools:{' '}
+              <code>list_runs</code>, <code>get_failure</code>, <code>get_diagnosis</code> and{' '}
+              <code>get_coverage</code>.
             </p>
             <p>
-              This is contract coverage, not source-code coverage.
+              Every answer is the recorded evidence, capped and deterministic. The server binds no port and
+              uploads nothing, and the failure it returns is the one the viewer shows.
             </p>
-            <Link className={styles.featureLink} to="/docs/observability/coverage">
-              How coverage works →
+            <Link className={styles.featureLink} to="/docs/agent-workflows/setup">
+              Connect an agent →
             </Link>
           </div>
-          <CoverageMap />
+          <AgentExchange />
         </div>
-
-        <div className={`${styles.featureRow} ${styles.featureRowReverse}`}>
-          <div className={styles.featureCopy}>
-            <Heading as="h3">Portable trace files</Heading>
-            <p>
-              A <code>.prototrace</code> file contains the hooks, clients, requests, checks and artifacts recorded
-              during the run. Open it locally, or download it from CI and open it in the viewer; the viewer does
-              not upload it.
-            </p>
-            <p>
-              The trace also says what it could not see: whether the application ran in-process, which
-              capabilities were composed, and whether the application reported its own values.
-            </p>
-            <Link className={styles.featureLink} to="/docs/observability/prototrace">
-              What a trace file holds →
-            </Link>
-          </div>
-          <VisibilityPanel />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function LayersSection() {
-  return (
-    <section className={`${styles.section} ${styles.sectionAlt}`}>
-      <div className="container">
-        <div className={styles.sectionHead}>
-          <Heading as="h2">Integrations share one context</Heading>
-          <p>
-            Browser, API, database, messaging, data and document integrations plug into the same{' '}
-            <code>ProtoExecutionContext</code>. A test can use only one of them or combine several, while their
-            operations still land in the same trace.
-          </p>
-          <div className={styles.featureLinks}>
-            <Link className={styles.featureLink} to="/docs/integrations/overview">
-              Every integration →
-            </Link>
-            <Link className={styles.featureLink} to="/docs/recipes/overview">
-              Combined in one test →
-            </Link>
-          </div>
-        </div>
-        <CapabilityIndex />
-      </div>
-    </section>
-  );
-}
-
-function WhySection() {
-  return (
-    <section className={`${styles.section} ${styles.sectionAlt}`}>
-      <div className="container">
-        <figure className={styles.why}>
-          <blockquote>
-            <p>
-              I wanted tests to focus on the scenario again. I wanted integrations to work together
-              instead of every one of them solving lifecycle and diagnostics again. I wanted failures to
-              leave enough information behind to investigate them afterwards.
-            </p>
-          </blockquote>
-          <figcaption>
-            <Link to="/docs/project/why-prototest">Why I built ProtoTest</Link>
-          </figcaption>
-        </figure>
       </div>
     </section>
   );
@@ -539,14 +332,12 @@ function CtaSection() {
         <div className={styles.ctaBanner}>
           <Heading as="h2">Try the starter project</Heading>
           <p>
-            The template creates a small ASP.NET Core API and a ProtoTest suite that you can run locally.
+            The template creates a small ASP.NET Core API and a ProtoTest suite. Run it locally and open
+            the trace it writes.
           </p>
-          <div className={`${styles.heroButtons} ${styles.heroButtonsCenter}`}>
+          <div className={styles.heroButtons}>
             <Link className={`${styles.btn} ${styles.btnPrimary}`} to="/docs/getting-started/first-test">
               Write your first test
-            </Link>
-            <Link className={`${styles.btn} ${styles.btnSecondary}`} to="https://github.com/MSeys/ProtoTest">
-              Star on GitHub
             </Link>
           </div>
         </div>
@@ -584,11 +375,8 @@ export default function Home(): ReactNode {
         <PathsSection />
         <FailureSection />
         <TraceSection />
-        <ComparisonSection />
-        <PayoffSection />
-        <LayersSection />
+        <AgentSection />
         <CtaSection />
-        <WhySection />
       </main>
       <ReleaseFeed />
     </Layout>

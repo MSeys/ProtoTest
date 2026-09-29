@@ -17,7 +17,7 @@ builder.AddApplication("Api", app => app
         .AddClient("Api")));
 ```
 
-`CaptureAttachments` returns the REST builder while `AddClient` returns the client's *target* builder, so call it first — or in its own statement when you want to tune it:
+`CaptureAttachments` returns the REST builder while `AddClient` returns the client's *target* builder, so call it first, or in its own statement when you want to tune it:
 
 ```csharp
 builder.AddApplication("Api", app => app.AddRest(rest =>
@@ -27,7 +27,7 @@ builder.AddApplication("Api", app => app.AddRest(rest =>
 }));
 ```
 
-Without `CaptureAttachments()`, nothing is attached — requests are still traced and observed.
+Without `CaptureAttachments()`, nothing is attached; requests are still traced and observed.
 
 Each test then gets numbered attachments, which your [runner](../../runners/overview.md) shows alongside the result and which are bundled into the [ProtoTrace archive](../../observability/prototrace.md):
 
@@ -41,7 +41,7 @@ The number is a per-test sequence, so the second request in a test is `rest-02-�
 
 ## Options
 
-`ProtoTest:Rest:Attachments` binds a `ProtoHttpAttachmentOptions` — the same base type GraphQL uses under its own key, so capture and redaction stay identical across the HTTP protocols.
+`ProtoTest:Rest:Attachments` binds a `ProtoHttpAttachmentOptions`, the same base type GraphQL uses under its own key, so capture and redaction stay identical across the HTTP protocols.
 
 | Option | Type | Default |
 | --- | --- | --- |
@@ -84,11 +84,11 @@ With `RedactSensitiveData` on (the default):
 - Bodies that aren't JSON are scanned for the same keys: form-urlencoded, multipart (`Content-Disposition` `name=`) and XML (element text of sensitive tags and attributes) are all covered.
 - Every body is truncated at `MaxDiagnosticBodyLength` with a `… [N characters truncated]` marker.
 
-The same sanitizer is used for the response body included in `RestStatusAssertionException` messages and for captured attachment content. GraphQL additionally redacts inline literals in documents — see [Queries and mutations](../graphql/operations.md#transport-details).
+The same sanitizer is used for the response body included in `RestStatusAssertionException` messages and for captured attachment content. GraphQL additionally redacts inline literals in documents; see [Queries and mutations](../graphql/operations.md#transport-details).
 
 ## Coverage
 
-REST emits an `http.response` observation for every response, identified by method and route template — `GET /api/orders/{id}`, not the concrete URL. Attach a collector to a client to turn those into report items:
+REST emits an `http.response` observation for every response, identified by method and route template: `GET /api/orders/{id}`, not the concrete URL. Attach a collector to a client to turn those into report items:
 
 ```csharp
 builder.AddApplication("Api", app => app
@@ -97,6 +97,6 @@ builder.AddApplication("Api", app => app
         .AddCollector<RestCoverageCollector>()));
 ```
 
-`RestCoverageCollector` reports every endpoint your suite **called**, with a hit count, under the `REST` category. It can only list what it saw — to find endpoints you **never** called, and response fields you never asserted, use [`OpenApiCoverageCollector`](../openapi.md), which walks your whole specification and consumes the `http.contract.shape` observations produced by shape assertions.
+`RestCoverageCollector` reports every endpoint your suite **called**, with a hit count, under the `REST` category. It can only list what it saw. To find endpoints you **never** called, and response fields you never asserted, use [`OpenApiCoverageCollector`](../openapi.md), which walks your whole specification and consumes the `http.contract.shape` observations produced by shape assertions.
 
 Both write into the same reports; see [Coverage](../../observability/coverage.md).

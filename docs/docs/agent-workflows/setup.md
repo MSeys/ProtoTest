@@ -119,7 +119,7 @@ You can see the same story without an agent:
 prototest summary TestResults/run.prototrace
 ```
 
-`prototest summary` is the `ProtoTest.Cli` tool; install it with `dotnet tool install --global ProtoTest.Cli`. It prints the same diagnosis the MCP tools return, so it is the quickest way to check that the file the agent would read says what you expect.
+`prototest summary` is the `ProtoTest.Cli` tool; install it with `dotnet tool install --global ProtoTest.Cli`. It prints the same diagnosis the MCP tools return, so it is the quickest way to check that the file the agent would read says what you expect. The [CLI reference](./cli.md) documents all four verbs, their arguments and their exit codes.
 
 ## Limits
 

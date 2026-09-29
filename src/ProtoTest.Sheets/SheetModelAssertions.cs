@@ -84,7 +84,7 @@ public static class SheetModelAssertions
         }
         catch (ProtoAssertionException exception)
         {
-            throw new SpreadsheetAssertionException($"{subject} — {exception.Message}", exception);
+            throw new SpreadsheetAssertionException($"{subject} - {exception.Message}", exception);
         }
     }
 }

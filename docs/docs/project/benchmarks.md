@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 3
 title: Benchmarks
 description: "Measured trace size, run time, export time and memory growth for synthetic suites, and the levers that change them."
 ---
@@ -107,7 +107,7 @@ run. Same machine and .NET 8. The local ProtoTest feed is rebuilt for each round
 The showpiece trace is [opencsms-showpiece.prototrace](/traces/opencsms-showpiece.prototrace): the
 `IdleFeeAfterTariffChange` journey recorded before the tariff-snapshot fix, when a reprice during an open
 session changed the session's billing. The fixed journey asserts the session's original tariff and runs in
-the OpenCSMS gate.
+the OpenCSMS CI.
 
 | Mode | Run | Per test | Start | Call | Complete |
 | --- | --- | --- | --- | --- | --- |
@@ -267,5 +267,5 @@ the build or CI; the harness needs an installed Chromium-family browser (Edge by
 ## Parallel execution
 
 The demo suite - containers and real browsers included - is stable at 8 and 32 workers on a 16-core machine and
-showed one non-reproducible failure at 64 workers. The [concurrency page](foundation/concurrency.md#exercised-parallelism)
+showed one non-reproducible failure at 64 workers. The [concurrency page](../foundation/concurrency.md#exercised-parallelism)
 records the runs and the failure mode.

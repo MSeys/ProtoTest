@@ -8,7 +8,7 @@ description: "Open the .xlsx your application generated and assert on its sheets
 
 ## What it adds
 
-`ProtoTest.Sheets` opens the `.xlsx` your application generated and lets a test assert on its sheets, cells, ranges and typed rows. It reads the file as OpenXML — the format itself — so it does not matter whether the application produced it with SpreadsheetGear, ClosedXML, EPPlus, NPOI, Aspose or raw OpenXML.
+`ProtoTest.Sheets` opens the `.xlsx` your application generated and lets a test assert on its sheets, cells, ranges and typed rows. It reads the file as OpenXML, the format itself, so it does not matter whether the application produced it with SpreadsheetGear, ClosedXML, EPPlus, NPOI, Aspose or raw OpenXML.
 
 Reading is eager and complete: a missing sheet, a malformed reference or a reversed range fails immediately instead of surfacing later. A reference outside the used range is an empty cell, not an error.
 
@@ -59,7 +59,7 @@ Calling it without `AddSheets` throws `InvalidOperationException` with the guida
 | --- | --- |
 | `Open(string path)` | a file on disk; the workbook name is the file name |
 | `Open(Stream stream, string name = "workbook.xlsx")` | an in-memory stream |
-| `Open(IProtoBinaryContent content, string? name = null)` | anything carrying named bytes — a REST response, a captured attachment; the name falls back to `content.FileName`, then `workbook.xlsx` |
+| `Open(IProtoBinaryContent content, string? name = null)` | anything carrying named bytes, such as a REST response or a captured attachment; the name falls back to `content.FileName`, then `workbook.xlsx` |
 
 On the opened workbook:
 
@@ -150,15 +150,15 @@ sales.Row(row => row.Region == "EMEA")
 - `Rows` returns the projected records; `Row(predicate)` fails when nothing matches; `Column(row => row.Amount)` reads a typed column.
 - `Should.MatchHeaders()` compares the sheet's header row with the model's declared columns: every `[Column]` path must appear at its declaration position, the sheet must declare exactly as many columns as the model, and a single-segment path matches the end of a layered path. The read of the header row contributes coverage. `ShouldNot.MatchHeaders()` passes when the headers differ; `ShouldNot.MatchModel()` passes when the sheet has at least one violation.
 - Typed columns support `string`, `decimal`, `double`, `int`, `long`, `bool`, `DateTime` and their nullables. `Should.Be` uses `EqualityComparer<TValue?>.Default`, `Should.BeSortedBy` uses `Comparer<TValue?>.Default`, and `Should.All(predicate)` reports the first failing row (`ShouldNot.All` passes when at least one value does not match).
-- `Should.MatchModel()` checks every declared column and reports **all** violations in one failure — emptiness and non-nullability, conversion, `Min`/`Max` (numbers and date serial values), `Pattern`, `OneOf`, and `Unique` with kind-aware keys. The message shows up to ten, then `+N more`.
+- `Should.MatchModel()` checks every declared column and reports **all** violations in one failure: emptiness and non-nullability, conversion, `Min`/`Max` (numbers and date serial values), `Pattern`, `OneOf`, and `Unique` with kind-aware keys. The message shows up to ten, then `+N more`.
 - A row is matched with the same [shapes](../../foundation/shape-matching.md) as a JSON response: `table.Rows[0].Should.MatchShape(shape)` for a table row and `row.ShouldMatchShape(shape)` for a model row (a record is a user type, so C# cannot give it a `Should` extension property). A model row serializes with its record property names; a table row is keyed by each column's leaf header name with the cell's rendered value (a table whose leaves collide fails instead of guessing). The assertion is a traced `assert.json.shape` operation on the ambient test context with the same expected/actual evidence as a response assertion, and its failure names the row's `Sheet!Range` (or the record type) and keeps the mismatch details as the inner exception.
 
-`table.Rows[0].Should.MatchShape(shape, exact: true)` — or `row.ShouldMatchShape(shape, exact: true)` for a model row — is the exhaustive form: a field present in the row that the shape does not mention is a mismatch naming that field. A value constraint mentions its whole subtree. The [shape matching page](../../foundation/shape-matching.md#exact-matching) has the rules.
+`table.Rows[0].Should.MatchShape(shape, exact: true)`, or `row.ShouldMatchShape(shape, exact: true)` for a model row, is the exhaustive form: a field present in the row that the shape does not mention is a mismatch naming that field. A value constraint mentions its whole subtree. The [shape matching page](../../foundation/shape-matching.md#exact-matching) has the rules.
 - Records are constructed through their primary constructor, so its guards and normalization run; every constructor parameter must map to a `[Column]`, or the model fails naming the parameter. A class with a parameterless constructor is constructed and its declared `[Column]` properties are set, and a class with only a mapped parameterized constructor is constructed through it. An optional empty cell binds as `null`.
 
 #### Key-value sheets
 
-A sheet that is really a label/value block — labels in the first column, values in the second — is modelled the same way, with the sheet's kind declared on the model:
+A sheet that is really a label/value block, with labels in the first column and values in the second, is modelled the same way, with the sheet's kind declared on the model:
 
 ```csharp
 [Sheet("Summary", Kind = ProtoSheetKind.KeyValue)]
@@ -200,7 +200,7 @@ var coverage = Proto.Context.Services.GetServices<IProtoCollector>()
     .GetReportItems();
 ```
 
-Parse a workbook without a test context and there is no coverage — reads silently record nothing.
+Parse a workbook without a test context and there is no coverage: reads silently record nothing.
 
 ## Skip
 
@@ -228,6 +228,6 @@ The capability is name `"Sheets"`, kind `document` (`ProtoCapabilityKinds.Docume
 ## Links
 
 - [Integrations map](../overview.md) - where the document package sits.
-- [Shape matching](../../foundation/shape-matching.md) — the rules behind `Should.MatchShape` on table rows and the model-row extension.
-- [Coverage](../../observability/coverage.md) — how collectors and report items work.
+- [Shape matching](../../foundation/shape-matching.md) - the rules behind `Should.MatchShape` on table rows and the model-row extension.
+- [Coverage](../../observability/coverage.md) - how collectors and report items work.
 - The demo's report journey: [`samples/Northstar.ProtoTest/SheetsJourney.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/SheetsJourney.cs).

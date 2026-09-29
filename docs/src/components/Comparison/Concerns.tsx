@@ -104,7 +104,7 @@ function CostLine({value}: {value: Cost}): ReactNode {
 
 /**
  * The comparison task by task. Each row names a thing every fixture has to do and what it costs on each side
- * — lines the next fixture pays again, lines written once — and opens onto the code from both files.
+ * - lines the next fixture pays again, lines written once - and opens onto the code from both files.
  */
 export default function Concerns({concerns, without, with: withProto}: ConcernsProps): ReactNode {
   const [open, setOpen] = useState<Set<string>>(new Set());

@@ -1,8 +1,8 @@
 import type {ComparisonConcern, ComparisonFile} from '@site/src/components/Comparison';
 
 /**
- * The same scenario — a billing administrator creates an order and reconciles
- * open invoices against an in-process ASP.NET Core app — written twice, with
+ * The same scenario: a billing administrator creates an order and reconciles
+ * open invoices against an in-process ASP.NET Core app, written twice, with
  * every supporting file each version actually needs.
  *
  * `infrastructureLines` marks lines that stand the test up rather than
@@ -292,7 +292,7 @@ export const withoutProtoTest: ComparisonFile[] = [
     filename: 'BillingTests.cs',
     code: withoutTest,
     scope: 'test',
-    note: 'The fixture wires up the app, the client, authentication and cleanup itself — and the next fixture will do it again.',
+    note: 'The fixture wires up the app, the client, authentication and cleanup itself, and the next fixture will do it again.',
     infrastructureLines: [
       1, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 20, 21, 22, 23, 24, 26, 27, 28, 29, 31,
       32, 33, 34, 35, 36, 38, 39, 50, 64, 75,
@@ -387,7 +387,7 @@ export const withProtoTest: ComparisonFile[] = [
     filename: 'Setup.cs',
     code: withSetup,
     scope: 'suite',
-    note: 'One host for the whole suite — and where the trace, the contract coverage and the HTML report come from.',
+    note: 'One host for the whole suite, and where the trace, the contract coverage and the HTML report come from.',
     infrastructureLines: [
       1, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
     ],
@@ -511,7 +511,7 @@ export const comparisonConcerns: ComparisonConcern[] = [
     id: 'cleanup',
     task: 'Clean up, even when the test fails',
     without: {
-      summary: 'TearDown disposes the client and deletes the tenant — if SetUp got that far.',
+      summary: 'TearDown disposes the client and deletes the tenant, if SetUp got that far.',
       slices: [
         {file: 'BillingTests.cs', ranges: [[31, 36]]},
         {file: 'TestSupport.cs', ranges: [[23, 28]]},

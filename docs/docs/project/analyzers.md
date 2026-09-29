@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 8
 title: Analyzers
 description: "ProtoTest.Analyzers: the two context-scoped warnings the framework cannot catch at runtime, and what the package deliberately does not check."
 ---

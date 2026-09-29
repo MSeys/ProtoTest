@@ -41,14 +41,23 @@
 
 .heroLead {
   max-width: 48ch;
-  margin-bottom: var(--space-7);
+  margin-bottom: var(--space-5);
   color: var(--muted);
   font-size: clamp(1rem, 1.1vw, 1.08rem);
   line-height: 1.62;
 }
 
+/* The command box is the primary action; behind it sit one secondary button and one quiet route. */
+.heroLinks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+}
+
+.heroLearn { font-weight: var(--weight-semibold); }
+
 .heroButtons { display: flex; flex-wrap: wrap; gap: var(--space-3); }
-.heroButtonsCenter { justify-content: center; }
 
 /* The viewer's button roles, scaled for a page CTA. */
 .btn {
@@ -107,21 +116,8 @@
 .pathLink { margin-top: auto; font-weight: var(--weight-semibold); }
 .pathLinks { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-top: auto; font-weight: var(--weight-semibold); }
 
-/* The closing quote: one paragraph from the project page, read quietly. */
-.why { max-width: 64ch; margin: 0 auto; text-align: center; }
-
-.why blockquote {
-  margin: 0 0 var(--space-4);
-  color: var(--text);
-  font-family: var(--font-display);
-  font-size: clamp(1.15rem, 1.7vw, 1.4rem);
-  line-height: 1.55;
-}
-
-.why figcaption { color: var(--muted); font-weight: var(--weight-semibold); }
-
-/* Feature rows: copy beside a live visual. The row is its own container, so the alternation flips on the
-   row's width rather than the viewport's. */
+/* Feature rows: copy beside a live visual. The row is its own container, so it restacks on its own width
+   rather than the viewport's. */
 .featureRow {
   container-type: inline-size;
   display: grid;
@@ -133,20 +129,10 @@
 /* Grid items may shrink below their content: a code block scrolls inside its column instead of widening it. */
 .heroInner > *, .featureRow > * { min-width: 0; }
 
-.featureRow + .featureRow { margin-top: calc(var(--space-7) * 2); }
-.featureRowReverse > *:first-child { order: 2; }
-
-@container (max-width: 46rem) {
-  .featureRowReverse > *:first-child { order: 0; }
-}
-
-.featureCopy h3 {
-  margin-bottom: var(--space-3);
-  font-size: clamp(1.2rem, 1.8vw, 1.45rem);
-  letter-spacing: var(--tracking-display);
-}
-
 .featureCopy p { margin-bottom: var(--space-3); color: var(--muted); line-height: 1.65; }
+
+/* The Frame head of the agent exchange: which tool, which run. */
+.frameMeta { color: var(--muted); font: var(--text-meta) var(--font-mono); }
 
 .featureLink { display: inline-block; margin-top: var(--space-2); font-weight: var(--weight-semibold); }
 .featureLinks { display: flex; flex-wrap: wrap; column-gap: var(--space-5); }
@@ -162,6 +148,7 @@
 }
 
 .ctaBanner h2 { margin-bottom: var(--space-3); font-size: clamp(1.6rem, 2.4vw, 2rem); }
+.ctaBanner .heroButtons { justify-content: center; }
 
 .ctaBanner p {
   max-width: 54ch;

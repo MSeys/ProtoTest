@@ -313,7 +313,7 @@ using System.Runtime.CompilerServices;
     }
 
     # The docs key cross-check runs without the private facts checkout, against the tracked public key
-    # list.
+    # list, and covers both content roots: docs/docs and the Learn track under docs/learn.
     Invoke-Fixture "check-docs-public-keys" {
         if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return "skip" }
 
@@ -321,7 +321,7 @@ using System.Runtime.CompilerServices;
             param([string]$Name)
 
             $root = Join-Path $fixtureRoot $Name
-            New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "src") -Force | Out-Null
+            New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs"), (Join-Path $root "docs/learn"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "src") -Force | Out-Null
             Copy-Item -LiteralPath (Join-Path $PSScriptRoot "check-docs.ps1") -Destination (Join-Path $root "eng/check-docs.ps1")
             Set-Content -LiteralPath (Join-Path $root "docs/scripts/generate-changelog.mjs") -Value "process.exit(0);" -Encoding utf8
             Set-Content -LiteralPath (Join-Path $root "src/Fixture.cs") -Value 'namespace Fixture; public static class FixtureOptions { public const string ConfigurationSectionName = "ProtoTest:Fixture"; }' -Encoding utf8
@@ -330,10 +330,13 @@ using System.Runtime.CompilerServices;
         }
 
         function Invoke-CheckDocsFixture {
-            param([string]$Name, [string]$KeyList)
+            param([string]$Name, [string]$KeyList, [string]$LearnPage = '')
 
             $root = New-CheckDocsFixture $Name
             Set-Content -LiteralPath (Join-Path $root "docs/configuration-keys.json") -Value $KeyList -Encoding utf8
+            if ($LearnPage) {
+                Set-Content -LiteralPath (Join-Path $root "docs/learn/page.md") -Value $LearnPage -Encoding utf8
+            }
             $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
             return [pscustomobject]@{ Root = $root; Text = ($output -join [Environment]::NewLine); ExitCode = $LASTEXITCODE }
         }
@@ -352,6 +355,20 @@ using System.Runtime.CompilerServices;
         $drift = Invoke-CheckDocsFixture -Name "check-docs-keys-drift" -KeyList '{"sections":["ProtoTest:Stale"],"allowedKeys":[{"key":"ProtoTest:Mystery:Key","reason":"fixture"}]}'
         Assert-Fixture ($drift.ExitCode -ne 0) "a stale section list must fail: $($drift.Text)"
         Assert-Fixture ($drift.Text.Contains("stale")) "the drift failure must say so: $($drift.Text)"
+
+        # A Learn page is scanned like a reference page: a key it teaches that no section or allowlist
+        # covers fails, and a Learn page whose keys are covered passes.
+        $learnMissing = Invoke-CheckDocsFixture -Name "check-docs-learn-keys" -KeyList '{"sections":["ProtoTest:Fixture"],"allowedKeys":[{"key":"ProtoTest:Mystery:Key","reason":"fixture"}]}' -LearnPage 'Set `ProtoTest:LessonMystery:Key` in the lesson host.'
+        Assert-Fixture ($learnMissing.ExitCode -ne 0) "a key on a Learn page that no source section backs must fail: $($learnMissing.Text)"
+        Assert-Fixture ($learnMissing.Text.Contains("ProtoTest:LessonMystery:Key")) "the failure must name the Learn key: $($learnMissing.Text)"
+
+        $learnCovered = Invoke-CheckDocsFixture -Name "check-docs-learn-covered" -KeyList '{"sections":["ProtoTest:Fixture"],"allowedKeys":[{"key":"ProtoTest:Mystery:Key","reason":"fixture"}]}' -LearnPage 'Set `ProtoTest:Fixture` in the lesson host.'
+        Assert-Fixture ($learnCovered.ExitCode -eq 0) "a Learn page whose keys are covered must pass: $($learnCovered.Text)"
+
+        # The Add* name check reaches the Learn root too.
+        $learnApi = Invoke-CheckDocsFixture -Name "check-docs-learn-api" -KeyList '{"sections":["ProtoTest:Fixture"],"allowedKeys":[{"key":"ProtoTest:Mystery:Key","reason":"fixture"}]}' -LearnPage 'Call `AddLessonOnly` to compose the lesson host.'
+        Assert-Fixture ($learnApi.ExitCode -ne 0) "an Add* name on a Learn page that exists nowhere must fail: $($learnApi.Text)"
+        Assert-Fixture ($learnApi.Text.Contains("AddLessonOnly")) "the failure must name the Learn API name: $($learnApi.Text)"
     }
 
     # A repository path named in docs prose must resolve: the check that catches a retired path after
@@ -360,7 +377,7 @@ using System.Runtime.CompilerServices;
         if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return "skip" }
 
         $root = Join-Path $fixtureRoot "check-docs-repo-paths"
-        New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "samples/Real.Project"), (Join-Path $root "src/Real.Package") -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs"), (Join-Path $root "docs/learn"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "samples/Real.Project"), (Join-Path $root "src/Real.Package") -Force | Out-Null
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot "check-docs.ps1") -Destination (Join-Path $root "eng/check-docs.ps1")
         Set-Content -LiteralPath (Join-Path $root "docs/scripts/generate-changelog.mjs") -Value "process.exit(0);" -Encoding utf8
         Set-Content -LiteralPath (Join-Path $root "docs/configuration-keys.json") -Value '{"sections":[],"allowedKeys":[]}' -Encoding utf8
@@ -387,7 +404,7 @@ using System.Runtime.CompilerServices;
         if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return "skip" }
 
         $root = Join-Path $fixtureRoot "check-docs-integration-shape"
-        New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs/integrations/rest"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "src") -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs/integrations/rest"), (Join-Path $root "docs/learn"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "src") -Force | Out-Null
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot "check-docs.ps1") -Destination (Join-Path $root "eng/check-docs.ps1")
         Set-Content -LiteralPath (Join-Path $root "docs/scripts/generate-changelog.mjs") -Value "process.exit(0);" -Encoding utf8
         Set-Content -LiteralPath (Join-Path $root "docs/configuration-keys.json") -Value '{"sections":[],"allowedKeys":[]}' -Encoding utf8

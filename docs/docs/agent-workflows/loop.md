@@ -51,7 +51,7 @@ prototest feedback: github-pr-comment skipped (No GitHub token: set GITHUB_TOKEN
 prototest feedback: webhook skipped (No webhook URL: set PROTOTEST_FEEDBACK_WEBHOOK_URL.)
 ```
 
-The comment and webhook targets are environment variables, the same names GitHub Actions provides: `GITHUB_TOKEN`, `GITHUB_REPOSITORY`, `GITHUB_EVENT_PATH` for the pull request number, `PROTOTEST_FEEDBACK_TRACE_URL` for the artifact link, and `PROTOTEST_FEEDBACK_WEBHOOK_URL` plus an optional secret header for the webhook.
+The comment and webhook targets are environment variables, the same names GitHub Actions provides: `GITHUB_TOKEN`, `GITHUB_REPOSITORY`, `GITHUB_EVENT_PATH` for the pull request number, `PROTOTEST_FEEDBACK_TRACE_URL` for the artifact link, and `PROTOTEST_FEEDBACK_WEBHOOK_URL` plus an optional secret header for the webhook. The [CLI reference](./cli.md#environment-targets) lists every target and the exit codes.
 
 ## Wire it into the pull request
 

@@ -27,7 +27,7 @@ interface Endpoint {
 
 /**
  * The shape of what OpenApiCoverageCollector reports: every endpoint in the spec, every declared response
- * and every response property — each covered, partially covered, or never reached. The states are the
+ * and every response property: each covered, partially covered, or never reached. The states are the
  * report's, not a tick and a circle.
  */
 const endpoints: Endpoint[] = [
@@ -93,7 +93,7 @@ export default function CoverageMap(): ReactNode {
       }
       foot={
         <>
-          Property-level hits come from <code>Should.MatchShape</code> — the paths your assertion actually
+          Property-level hits come from <code>Should.MatchShape</code>: the paths your assertion actually
           matched.
         </>
       }>

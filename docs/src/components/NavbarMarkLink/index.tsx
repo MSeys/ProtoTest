@@ -31,7 +31,7 @@ export default function NavbarMarkLink({
   mobile,
   onClick,
 }: NavbarMarkLinkProps): ReactNode {
-  const label = typeof count === 'number' ? `${title} — ${count} stars` : title;
+  const label = typeof count === 'number' ? `${title}, ${count} ${count === 1 ? 'star' : 'stars'}` : title;
 
   if (mobile) {
     return (

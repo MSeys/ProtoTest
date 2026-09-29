@@ -67,7 +67,7 @@ export default function FailureGallery({source = drillRun}: FailureGalleryProps)
           const archives = drillPairs[pair.id];
           return (
             <article key={pair.id} className={`${styles.card} ${expanded ? styles.cardOpen : ''}`}>
-              <h3 className={styles.cardHead}>
+              <h3 className={styles.cardHead} aria-label={`${pair.question}: ${pair.ask}`}>
                 <button
                   type="button"
                   className={styles.toggle}

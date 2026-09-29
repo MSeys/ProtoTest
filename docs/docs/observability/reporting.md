@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 title: Reporting
 description: "Write collected observations and coverage out once per run, as JSON or as a self-contained HTML report."
 ---
@@ -33,7 +33,7 @@ builder
 | `JsonReportSink` | `OutputPath`, `Indented` | `TestResults/ProtoTest/report-{processId}.json`, `true` |
 | `HtmlReportSink` | `OutputPath`, `Title` | `TestResults/ProtoTest/report-{processId}.html`, `"ProtoTest Report"` |
 
-Both files are also added to the [`.prototrace` archive](./prototrace.md#the-file-format) under `resources/run/{SinkName}/run-artifact-{n}/{fileName}`, so a single artifact from CI contains the trace and the reports.
+Both files are also added to the [`.prototrace` archive](./prototrace-archive.md#the-file-format) under `resources/run/{SinkName}/run-artifact-{n}/{fileName}`, so a single artifact from CI contains the trace and the reports.
 
 Items arrive sorted by target, category and identifier. Only top-level items are passed; walk `Children` for nested ones.
 
@@ -61,7 +61,7 @@ The report groups items into sections:
 | **Findings** | What tests recorded with `AddFinding`, plus what integrations reported |
 | **Run gates** | Verdicts, labelled passed, warning, failed or skipped |
 | **Resources** | What tests owned and released |
-| **Run metadata** | The CI facts a run [recorded about itself](./prototrace.md#correlating-a-trace-with-the-run-that-produced-it) |
+| **Run metadata** | The CI facts a run [recorded about itself](./prototrace-archive.md#correlating-a-trace-with-the-run-that-produced-it) |
 
 An integration's own kind gets a section too, titled after the kind. Searching and filtering apply across all sections, and a section that filters to nothing disappears.
 

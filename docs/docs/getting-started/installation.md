@@ -119,7 +119,7 @@ dotnet add package ProtoTest.Aspire
 
 ## Browsers for Playwright
 
-Set `InstallBrowsers` to download the browser before the first launch. A clean machine or CI runner then needs no extra install step. See [Web](../integrations/web/index.md).
+Set `InstallBrowsers` to download the browser before the first launch. A clean machine or CI runner then needs no extra install step. Which backend to pick is on [Which backend](../integrations/web/index.md#which-backend).
 
 ## Where to next
 

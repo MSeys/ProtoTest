@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 5
 title: OpenTelemetry
 description: "Export ProtoTest operations to OpenTelemetry, so test runs land in the same tracing backend as your application."
 ---

@@ -1,14 +1,14 @@
 ---
 sidebar_position: 7
-title: Bring an existing xUnit suite
-description: "Move an existing xUnit v2 or v3 suite onto ProtoTest test by test: what keeps running, what converts, and the order that stays green."
+title: Bring an existing suite
+description: "Move an existing suite onto ProtoTest test by test: what keeps running, what converts, and the order that stays green for xUnit, NUnit, MSTest and TUnit."
 ---
 
 import TabbedCode from '@site/src/components/TabbedCode';
 
-# Bring an existing xUnit suite
+# Bring an existing suite
 
-Convert one class at a time. Plain tests keep running.
+Convert one class at a time. Plain tests keep running. The xUnit runbook below is the shape; NUnit, MSTest and TUnit follow it with their own host hook and attribute swap.
 
 ## What stays
 
@@ -114,6 +114,134 @@ What changed in both versions: the arrangement moves into the host, the port mov
 | Attachments | Files land under `%TEMP%\ProtoTest\attachments`, the path prints to the console with `--logger "console;verbosity=detailed"` | `TestContext.Current.AddAttachment(...)`, so artifacts appear with the test in xUnit's output |
 
 The registration details, outcome mapping and limits are on [xUnit v2](./xunit.md) and [xUnit v3](./xunit3.md).
+
+## NUnit: the order that stays green
+
+The same five steps, with NUnit's host hook and attribute swap:
+
+- [ ] **1. Add the package** (`ProtoTest.NUnit`) plus the integration packages the tests use. NUnit needs **4.6.1 or newer**, so update it first when the template pinned an older one. Gate: the solution builds.
+- [ ] **2. Write the host once**: a `[SetUpFixture]` class deriving from `ProtoTestAssembly` with the `Configure` override. Keep it outside any namespace, or it covers only that namespace's subtree. Gate: untouched tests still pass.
+- [ ] **3. Convert one class**: replace `[Test]` with `[ProtoTest]` (it derives from NUnit's `TestAttribute`), keep `[TestFixture]`, and read `Proto.Context` in `[SetUp]`, the body or `[TearDown]`. Gate: converted tests get a trace.
+- [ ] **4. Run `dotnet test`.** Gate: green.
+- [ ] **5. Delete the per-class harness** the converted tests no longer need. Gate: no test shares a fixed row, tenant or file (see [Concurrency](../foundation/concurrency.md)).
+
+Per-class pitfalls: `Proto.Context` works in `[SetUp]`, the body and `[TearDown]`, but not in the fixture's `[OneTimeSetUp]`, which builds the host. Or add `[assembly: ProtoTestAutoWrap]` and every plain `[Test]` runs through the same lifecycle without an attribute swap; an explicit `[ProtoTest]` still wins by NUnit's nearest-wrapper rule.
+
+```csharp
+// Before: per-class harness with its own client.
+[TestFixture]
+public class OrderTests
+{
+    private HttpClient _client = new() { BaseAddress = new Uri("http://localhost:5000") };
+
+    [Test]
+    public async Task Orders_endpoint_responds()
+    {
+        using var response = await _client.GetAsync("/api/orders");
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+}
+
+// After: the arrangement lives in the host, the test reads the context.
+[TestFixture]
+[Application("Api")]
+public class OrderTests
+{
+    [ProtoTest]
+    public async Task Orders_endpoint_responds()
+    {
+        using var response = await Proto.Context.Rest().GetAsync("/api/orders");
+        response.Should.HaveHttpStatus(HttpStatusCode.OK);
+    }
+}
+```
+
+The host hook, the context window and the namespace rule are on [NUnit](./nunit.md).
+
+## MSTest: the order that stays green
+
+The same five steps, with MSTest's assembly hooks and per-row attribute swap:
+
+- [ ] **1. Add the package** (`ProtoTest.MSTest`) plus the integration packages the tests use. Gate: the solution builds.
+- [ ] **2. Write the host once**: a `[TestClass]` deriving from `ProtoTestAssembly` whose `[AssemblyInitialize]` calls `InitializeAsync` and whose `[AssemblyCleanup]` calls `CleanupAsync`. Call `InitializeAsync` exactly once. Gate: untouched tests still pass.
+- [ ] **3. Convert one class**: replace `[TestMethod]` with `[ProtoTest]` (it derives from `TestMethodAttribute`), keep `[TestClass]`, and read `Proto.Context` in the body. Each data row is its own context and its own trace, so `[DataRow]` rows convert together. Gate: converted tests get a trace.
+- [ ] **4. Run `dotnet test`.** Gate: green.
+- [ ] **5. Delete the per-class harness** the converted tests no longer need. Gate: no test shares a fixed row, tenant or file (see [Concurrency](../foundation/concurrency.md)).
+
+Per-class pitfalls: there is no assembly-wide auto-wrap, so every converted method carries `[ProtoTest]`. Skips have no first-class MSTest property: the reason travels on the display name (`Method (skipped: {reason})`) and `LogOutput`. The attribute exposes no cancellation token, so a converted test starts from `CancellationToken.None`.
+
+```csharp
+// Before: per-class harness with its own client.
+[TestClass]
+public class OrderTests
+{
+    private readonly HttpClient _client = new() { BaseAddress = new Uri("http://localhost:5000") };
+
+    [TestMethod]
+    public async Task Orders_endpoint_responds()
+    {
+        using var response = await _client.GetAsync("/api/orders");
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+    }
+}
+
+// After: the arrangement lives in the host, the test reads the context.
+[TestClass]
+[Application("Api")]
+public class OrderTests
+{
+    [ProtoTest]
+    public async Task Orders_endpoint_responds()
+    {
+        using var response = await Proto.Context.Rest().GetAsync("/api/orders");
+        response.Should.HaveHttpStatus(HttpStatusCode.OK);
+    }
+}
+```
+
+The hooks, the per-row lifecycle and the skip path are on [MSTest](./mstest.md).
+
+## TUnit: the order that stays green
+
+The same five steps, with TUnit's executor instead of an attribute swap:
+
+- [ ] **1. Add the package** (`ProtoTest.TUnit`) plus the integration packages the tests use. Gate: the solution builds.
+- [ ] **2. Write the host once**: register `[assembly: TestExecutor<ProtoTestExecutor>()]` for the assembly, and initialize the host from a class deriving from `ProtoTestAssembly` with `[Before(Assembly)]` calling `InitializeAsync` and `[After(Assembly)]` calling `CleanupAsync`. Gate: untouched tests still pass.
+- [ ] **3. Convert one class**: keep TUnit's `[Test]`; the executor wraps every test in the assembly, so there is no attribute to swap. Move the arrangement into the host and read `Proto.Context` in the body. Gate: converted tests get a trace.
+- [ ] **4. Run `dotnet test`.** Gate: green.
+- [ ] **5. Delete the per-class harness** the converted tests no longer need. Gate: no test shares a fixed row, tenant or file (see [Concurrency](../foundation/concurrency.md)).
+
+Per-class pitfalls: the executor applies to every test in the assembly, so plain tests run wrapped rather than untouched. A source-generated test with no reflection `MethodInfo` runs unwrapped, with no context. The live `TestContext.CancellationToken` feeds the lifecycle, so the test and its hooks observe TUnit's per-test token.
+
+```csharp
+// Before: per-class harness with its own client.
+[Application("Api")]
+public class OrderTests
+{
+    private readonly HttpClient _client = new() { BaseAddress = new Uri("http://localhost:5000") };
+
+    [Test]
+    public async Task Orders_endpoint_responds()
+    {
+        using var response = await _client.GetAsync("/api/orders");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+    }
+}
+
+// After: the arrangement lives in the host, the test reads the context.
+[Application("Api")]
+public class OrderTests
+{
+    [Test]
+    public async Task Orders_endpoint_responds()
+    {
+        using var response = await Proto.Context.Rest().GetAsync("/api/orders");
+        response.Should.HaveHttpStatus(HttpStatusCode.OK);
+    }
+}
+```
+
+The executor, the hooks and the interception path are on [TUnit](./tunit.md).
 
 ## Limits
 

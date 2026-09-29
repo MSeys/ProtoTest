@@ -20,7 +20,7 @@ This package reports coverage. It doesn't validate requests or responses against
 dotnet add package ProtoTest.OpenApi
 ```
 
-ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `-f` is passed. The package resolves its document with `Microsoft.OpenApi` (plus `Microsoft.OpenApi.YamlReader` for YAML) and depends on `ProtoTest.Rest`.
+ProtoTest supports .NET 8, 9 and 10. The template targets net10.0 unless you pass -f net8.0 or net9.0. The package resolves its document with `Microsoft.OpenApi` (plus `Microsoft.OpenApi.YamlReader` for YAML) and depends on `ProtoTest.Rest`.
 
 ## Compose
 
@@ -52,15 +52,7 @@ The application is the one the REST client belongs to: a client registered insid
 Application 'Api' has no 'OpenApi:Specification' configured. Set 'ProtoTest:Applications:Api:OpenApi:Specification'.
 ```
 
-### Constructors
-
-```csharp
-OpenApiCoverageCollector(string targetName, IConfiguration configuration, IEnumerable<ProtoApplicationTarget> applicationTargets)
-OpenApiCoverageCollector(string targetName, string openApiSpecSource)
-OpenApiCoverageCollector(string targetName, OpenApiDocument document)
-```
-
-The configuration overload receives the host's `IConfiguration` and its registered application targets from DI. Extra `AddCollector` arguments fill the remaining constructor parameters:
+The configuration overload receives the host's `IConfiguration` and its registered application targets from DI. Extra `AddCollector` arguments fill the remaining constructor parameters, so a second overload takes the specification source directly:
 
 ```csharp
 rest.AddClient("Api")
@@ -98,7 +90,7 @@ The request counts an endpoint and a response hit; the shape assertion is what c
 
 #### How a route matches
 
-Route matching normalizes both sides before comparing: an absolute URI is reduced to its path, the query and fragment are stripped, a leading `/` is forced and one trailing `/` is trimmed. An exact route beats parameter matches; ties break by literal-segment count, then path, case-insensitively.
+Route matching normalizes both sides. It keeps the path, strips query and fragment, forces a leading slash and trims one trailing slash. An exact route beats parameter matches; ties break by literal-segment count, then path, case-insensitively.
 
 A route parameter accepts the request value unless the contract parameter carries a constraint. These are enforced: `int`, `long`, `decimal`/`double`/`float`, `guid`, `bool`, `minlength(n)` and `maxlength(n)`. Unknown constraints are treated as matching, so `/users/abc` never counts toward `/users/{id:int}`, while a constraint the collector doesn't know cannot reject anything.
 
@@ -110,13 +102,13 @@ The exact status code is looked up first, then a case-insensitive wildcard like 
 
 #### How a property matches
 
-- Only shape assertions count. A property is covered when a `Should.MatchShape` assertion actually matched it; receiving a field in a response body is not coverage.
+- Only `Should.MatchShape` counts. Receiving a field without asserting it leaves it uncovered.
 - Array indices are normalized before comparison: `[\d+]` becomes `[]`, and matching is case-insensitive, so `$.lines[0].total` and `$.lines[3].total` both count toward `$.lines[].total`.
 - Schema extraction walks the whole document: every media type with a schema adds a `$` baseline row for the body itself; `allOf`, `oneOf` and `anyOf` are traversed at the same path; each property adds `{path}.{name}`; each array item adds `{path}[]`; `$ref`s resolve through the document's components. Recursion and diamond revisits are cut.
 
 #### What the report contains
 
-The collector walks the **entire** document, not just what was called, and reports three nested levels:
+The collector walks the whole document and reports three levels:
 
 ```
 OpenAPI              GET /api/orders/{id}      12 hits
@@ -150,7 +142,7 @@ The package has no capability descriptor and no package-specific attributes. `[R
 - **Unknown constraints are assumed to match.** Only the listed constraint names are enforced.
 - **No base-path rewriting or authentication**, and no refetch on retry. The loader reads the source once.
 - **The specification identity row is not coverage.** One aggregate item per target records `spec.source` and `spec.hash`; it carries no verdict, so no total or gate changes because of it.
-- **Spec-version support is whatever `Microsoft.OpenApi` 3.10.2 parses, JSON or YAML.**
+- **Spec-version support follows the referenced `Microsoft.OpenApi` version, JSON or YAML.**
 
 ## Links
 

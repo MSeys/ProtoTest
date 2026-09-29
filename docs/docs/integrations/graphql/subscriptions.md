@@ -58,7 +58,7 @@ private static async Task TriggerAsync(CancellationToken cancellationToken)
 The same `expected` object builds the subscription's selection set and asserts the event that arrives.
 
 :::caution[Subscription registration has no acknowledgement]
-`SubscribeAsync()` returns once the server acknowledges the **connection**, not the individual subscription. If you trigger the event immediately afterwards, a fast server can publish it before it has registered the subscriber, and the event is lost. `graphql-transport-ws` has no per-subscription acknowledgement, so there is no signal to wait for, and a fixed `Task.Delay` only narrows the window. The example above triggers until the event lands: the trigger loop runs on the test's own flow, the bounded `ExpectNextAsync` is the wait, and cancelling the token ends the loop. Every trigger produces an event and the test consumes the first, so a duplicate landing after that is harmless.
+`SubscribeAsync` returns after the server acknowledges the connection, not the subscription. Triggering at once can lose the event. Trigger in a loop until `ExpectNextAsync` returns. A fixed `Task.Delay` only narrows the window. The example above triggers until the event lands: the trigger loop runs on the test's own flow, the bounded `ExpectNextAsync` is the wait, and cancelling the token ends the loop. Every trigger produces an event and the test consumes the first, so a duplicate landing after that is harmless.
 :::
 
 ## `GraphQLSubscription`
@@ -89,7 +89,7 @@ await foreach (var message in subscription.WithCancellation(timeout.Token))
 }
 ```
 
-Always pass a cancellation token; a subscription that never receives an event will otherwise wait forever.
+Pass a cancellation token. Without one, a subscription with no events waits indefinitely.
 
 ## Connection payload
 

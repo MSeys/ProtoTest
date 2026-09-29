@@ -6,7 +6,7 @@ description: "From a fresh test project to a passing query, a mutation whose res
 
 # Your first GraphQL suite
 
-This page goes from a fresh test project to a passing query, a mutation whose result is asserted, and a subscription waiting for an event. It uses **NUnit** and an in-process ASP.NET Core application; a deployed endpoint is one configuration change, and the other runners differ only in the setup class ([Test runners](../../runners/overview.md)).
+This page goes from a fresh test project to a passing query, a mutation whose result is asserted, and a subscription waiting for an event. It uses NUnit and an in-process server. A deployed endpoint needs one configuration change. Other runners differ only in the setup class ([Test runners](../../runners/overview.md)).
 
 ## 1. Add the packages
 
@@ -124,7 +124,7 @@ async Task TriggerAsync(CancellationToken cancellationToken)
 }
 ```
 
-[Subscriptions](./subscriptions.md) has the full surface, including SSE, connection payloads and custom sockets. Always pass a cancellation token: a subscription that never receives an event waits forever.
+[Subscriptions](./subscriptions.md) has the full surface, including SSE, connection payloads and custom sockets. Pass a cancellation token. Without one, a subscription with no events waits indefinitely.
 
 ## Where the run is recorded
 

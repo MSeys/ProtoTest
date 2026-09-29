@@ -7,6 +7,7 @@ description: "Run the OpenCSMS API and both workers as real processes, hand the 
 ---
 
 import LearnShell from '@site/src/components/LearnShell';
+import ModesComparison from '@site/src/components/ModesComparison';
 import Link from '@docusaurus/Link';
 
 # Point the suite at a real stack
@@ -99,6 +100,10 @@ Passed!  - Failed:     0, Passed:    61, Skipped:    13, Total:    74, Duration:
 ```
 
 That is the run recorded on 2026-09-28 in `opencsms-published-20260928-090106.log`. The skips are the same clock-gated and in-process-gated journeys as in the topology mode; the log lists each one by name, and the condition on the test names the reason.
+
+How the three modes compare, with the counts each lesson quotes:
+
+<ModesComparison />
 
 The process logs beside the suite log tell the other half of the story. The billing worker consumed the real broker:
 

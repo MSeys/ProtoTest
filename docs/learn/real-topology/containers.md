@@ -8,11 +8,12 @@ description: "Run the OpenCSMS suite with a PostgreSQL and a RabbitMQ container 
 
 import LearnShell from '@site/src/components/LearnShell';
 import AnnotatedCode from '@site/src/components/AnnotatedCode';
+import ModesComparison from '@site/src/components/ModesComparison';
 import Link from '@docusaurus/Link';
 
 # Run the suite on containers
 
-Your suite needs a database and a broker, and you would rather not install either. Level 5 runs OpenCSMS, an EV charging system in its own repository. Its suite has one Setup and four modes, and this level reads three of them plus the faults the suite injects on purpose.
+Your suite needs a database and a broker, and you would rather not install either. Level 5 runs OpenCSMS, an EV charging system in its own repository. OpenCSMS is the suite that uses real infrastructure. Its suite has one Setup and four modes, and this level reads three of them plus the faults the suite injects on purpose.
 
 <LearnShell
   level="Level 5, lesson 1"
@@ -124,13 +125,17 @@ Passed!  - Failed:     0, Passed:    75, Skipped:     0, Total:    75, Duration:
 
 That is the run recorded on 2026-09-28 in `opencsms-container-20260928-194709.log`. All 75 tests ran, including the seven Chromium journeys, the OCPP device journeys and the showpiece journey that once caught the idle fee regression. Container mode is the full suite, not a smoke run.
 
+How the three modes compare, with the counts each lesson quotes:
+
+<ModesComparison />
+
 ![The OpenCSMS stations screen: three stations with their charge points, connector counts and last-seen stamps.](/images/opencsms/dashboard.png)
 
-The operator dashboard on a local run. This is the screen the browser journeys drive, served by the API the run hosts.
+The operator dashboard on a local run. This is the stations screen the seven Chromium journeys drive, served by the API the run hosts.
 
 ![The public network status page: each charge point with its connector states and no account needed.](/images/opencsms/status.png)
 
-The public status page is the anonymous read the suite checks next to the operator surface.
+The public status page is the anonymous read the suite checks next to the operator surface, with no sign-in.
 
 ## When the environment provides the pieces
 

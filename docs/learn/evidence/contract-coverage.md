@@ -92,10 +92,25 @@ The journey writes a project over REST and reads it back over GraphQL. The repor
 | --- | --- |
 | `coverage` REST `POST /api/v1/projects`, covered | the endpoint and the status the test asserted |
 | `traffic` REST `POST /api/v1/projects · 201`, with `$.id`, `$.name`, `$.slug`, `$.status`, `$.environmentCount`, `$.createdAtUtc` | the fields the response carried and no assertion mentioned |
-| `gate` `no error findings`, passed | the run gate the sample registers |
+| `gate` `no error findings`, passed | the run gate the sample registers; the gate row is explained in [lesson 4](/learn/evidence/read-the-findings-and-the-run-gate) |
 | `resource` rows for the run pieces | what the run owned, still registered when the report was written |
 
 The summary reads `CoverageTotal: 1`, `Covered: 1`, `Uncovered: 0`. That number is narrow: one unit of the contract was checked, the write's endpoint. The six fields are not part of it, and the traffic section says so.
+
+The two rows read like this in `report.json` (from <a href="pathname:///lessons/l4-coverage.prototrace">l4-coverage.prototrace</a>, `resources/run/JsonReportSink/run-artifact-1/report.json`):
+
+```json
+{ "TargetName": "Northstar:Northstar", "Category": "REST",
+  "Identifier": "POST /api/v1/projects", "Kind": "coverage",
+  "Status": "Success", "IsCovered": true }
+{ "TargetName": "Northstar:Northstar", "Category": "REST traffic",
+  "Identifier": "POST /api/v1/projects · 201", "Kind": "traffic",
+  "Status": "Neutral",
+  "Message": "Fields that arrived in a response but no shape assertion mentioned.",
+  "Children": ["$.id", "$.name", "$.slug", "$.status", "$.environmentCount", "$.createdAtUtc"] }
+```
+
+The first row is the covered claim: the endpoint and the status the write asserted. The second row is the gap: six fields the response carried that no shape assertion mentioned. A covered row says what the suite checked; a traffic row says what it only saw.
 
 ## What claims a field
 

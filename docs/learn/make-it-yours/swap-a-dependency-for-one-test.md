@@ -141,7 +141,7 @@ Durations vary with the machine; the names and the states do not.
 
 ## Where it cannot substitute
 
-The seam is only as wide as the in-process server it threads through:
+The seam is only as wide as the in-process server it threads through. The attribute form gates and skips; the body form throws:
 
 | Case | What happens |
 | --- | --- |
@@ -149,11 +149,16 @@ The seam is only as wide as the in-process server it threads through:
 | `[ReplaceService]` or `[FailDependency]` with `Server = "Api"` | gates on that named in-process server |
 | Neither, with a selected application | gates on the selected application, falling back to `Default` |
 | The selected application is published, `BaseUrl` set | the attribute skips with a reason naming the application; another live server does not keep the gate open |
+| A container or loopback application | no service container to reach; the attribute skips |
+
+| Case | What happens |
+| --- | --- |
 | Body `Override`, application published | throws: `Application 'Api' runs at '<address>', so its services cannot be substituted`, naming the configured `ProtoTest:Applications:Api:BaseUrl` key |
-| A container or loopback application | no service container to reach; attributes skip and `Override` throws naming the missing `AddAspNetCoreServer` registration |
+| Body `Override`, container or loopback application | throws, naming the missing `AddAspNetCoreServer` registration |
 | The test resolved application services first | that scope stays on the shared server; apply the override before the first resolution |
 | A failed dependency resolved while the server starts | the setup fails with the application's own exception; prefer failing services resolved per request |
-| The replacement's lifetime | a singleton of the dedicated server, released with the test |
+
+The replacement lives as a singleton of the dedicated server and is released with the test.
 
 To see the skip in the sample, add the attribute form and run it against an address that hosts nothing:
 

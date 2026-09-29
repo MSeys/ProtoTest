@@ -40,6 +40,8 @@ When an item ships, it leaves this section and becomes a docs page like everythi
 
 Nothing else is committed. An item moves out of **Exploring** when someone needs it in a real suite.
 
+Preview packages graduate the same way: the agent layer, devices, Sheets, Aspire, WireMock, MassTransit and analyzers stay preview until real suites prove them, then they join the supported set with no breaking change. The [support policy](./sustainability.md) is the same best-effort one for everyone.
+
 ## Exploring: genuinely considered, not committed
 
 | Idea | What would move it |

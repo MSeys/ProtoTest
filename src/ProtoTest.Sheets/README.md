@@ -1,5 +1,7 @@
 # ProtoTest.Sheets
 
+> Preview: the surface can change before 1.2.
+
 Open an `.xlsx` file produced by the application and assert on its cells, ranges, tables, typed rows or label/value blocks.
 
 ```bash

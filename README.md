@@ -43,6 +43,16 @@ Use only what your test suite needs. You're not obligated to use everything.
 
 [Extend ProtoTest yourself](https://prototest.dev/docs/advanced/extending)
 
+## Supported and preview
+
+Most suites need only the supported set: Core, one runner (NUnit, xUnit v2, xUnit v3, MSTest, TUnit), and the integrations for REST, GraphQL, gRPC, OpenAPI, ASP.NET Core, Web (Playwright, Selenium), SQL and Entity Framework Core, Messaging and RabbitMQ, Testcontainers, Data, Reporting, Traces and Templates.
+
+Preview packages exist and work, but their surface can change before 1.2: the agent layer (Mcp, Diagnosis, Verification, Feedback, Cli), the devices family (Devices, Devices.WebSocket, Devices.WebSocket.AspNetCore, Devices.Mqtt, Devices.Mqtt.Testcontainers), Sheets, Aspire, WireMock, Messaging.MassTransit and Analyzers. The [integrations map](https://prototest.dev/docs/integrations/overview) marks each one.
+
+## Stability
+
+ProtoTest 1.x stays additive. Released APIs change only through deprecated shims, and nothing breaks without a plan decision recorded in the changelog. Support is best effort by one maintainer in personal time. See [Support and sustainability](https://prototest.dev/docs/project/sustainability).
+
 ## What if it breaks?
 
 ProtoTest moves setup behind shared layers, which keeps tests clean but can hide failure causes.

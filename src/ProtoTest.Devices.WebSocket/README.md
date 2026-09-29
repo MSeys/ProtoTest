@@ -1,5 +1,7 @@
 # ProtoTest.Devices.WebSocket
 
+> Preview: the surface can change before 1.2.
+
 WebSocket transport for `ProtoTest.Devices`: talk to devices over `ws://` or `wss://` - the simulator
 or gateway in CI, the device's own endpoint in a lab.
 

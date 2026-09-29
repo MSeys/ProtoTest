@@ -1,5 +1,7 @@
 # ProtoTest.WireMock
 
+> Preview: the surface can change before 1.2.
+
 Fake HTTP services for ProtoTest suites, backed by WireMock.Net: stub a dependency per test, read the
 matched requests in the trace with the REST response shape, and cover the stubs.
 

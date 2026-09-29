@@ -46,7 +46,7 @@ public async Task
     projects.Should.HaveNoErrors();
 }`,
     footnote:
-      'One journey writes through REST and reads through GraphQL. Tenant, sign-in, lifecycle, cleanup and trace are shared automatically.',
+      'One journey writes through REST and reads through GraphQL. ProtoTest shares the tenant, sign-in, lifecycle, cleanup and trace.',
   },
   {
     id: 'compose',
@@ -71,7 +71,7 @@ public sealed class Setup : ProtoTestAssembly
     }
 }`,
     footnote:
-      'The short form. Each Add… is a capability: leave one out and its client, its attributes and its part of the trace simply are not there. The package for each one is on the installation page.',
+      'The short form. Each Add adds a capability. Leave one out and its client, attributes and trace output stay out too. Each package is on the installation page.',
   },
   {
     id: 'evidence',
@@ -89,23 +89,7 @@ FAILED orders match their shape (16 ms)
   cause: assertion (1 mismatch)
   mismatch: $.orderId: expected 7, actual 42`,
     footnote:
-      'Abridged from prototest summary on the committed MCP fixture trace. The summary, the viewer and the MCP tools select the same failure from the same archive.',
-  },
-  {
-    id: 'agent',
-    label: 'Agent',
-    filename: '.mcp.json',
-    language: 'json',
-    code: `{
-  "mcpServers": {
-    "prototest": {
-      "command": "prototest-mcp",
-      "args": ["--project", "."]
-    }
-  }
-}`,
-    footnote:
-      'One local stdio server for the runs in your repository. It answers four read-only tools; the section below shows what get_failure returns.',
+      'Shortened from a sample trace. The summary, the viewer and the agent tools read the same failure from the same archive.',
   },
 ];
 
@@ -134,26 +118,19 @@ function Hero() {
             </Heading>
             <p className={styles.heroLead}>
               An integration test checks the app plus its API, database, broker and browser together.
-              ProtoTest brings the setup around that test into one place: REST, GraphQL, SQL,
-              messaging, a browser or a spreadsheet share one context, lifecycle, cleanup and trace.
+              ProtoTest runs it from one shared setup: REST, GraphQL, SQL, messaging, a browser or a
+              spreadsheet share one context, lifecycle, cleanup and trace.
             </p>
             <CommandBox title="Start a project" commands={templateCommands()} runners={runnerChoices} />
             <p className={styles.heroNext}>
               That installs a green suite. <code>dotnet test</code> runs it and writes{' '}
               <code>TestResults/Shop.prototrace</code> plus <code>Shop.html</code>.
             </p>
-            <div className={styles.heroLinks}>
-              <Link
-                className={`${styles.btn} ${styles.btnSecondary}`}
-                href="https://trace.prototest.dev/?demo=1">
-                See a failing trace
-              </Link>
-              <Link className={styles.heroLearn} to="/learn/">
-                New to integration testing? Start the learning track
-              </Link>
-            </div>
+            <p className={styles.heroLearn}>
+              <Link to="/learn/">New to integration testing? Start the learning track</Link>
+            </p>
           </div>
-          <TabbedCode tabs={heroTabs} label="Four ways a ProtoTest suite looks" />
+          <TabbedCode tabs={heroTabs} label="Three ways a ProtoTest suite looks" />
         </div>
       </div>
     </header>
@@ -195,9 +172,6 @@ function ProofStrip() {
             </Link>
           ))}
         </div>
-        <Link className={styles.proofViewer} href="https://trace.prototest.dev">
-          Open the viewer
-        </Link>
       </div>
     </section>
   );
@@ -209,7 +183,7 @@ function PathsSection() {
       <div className="container">
         <div className={styles.sectionHead}>
           <Heading as="h2">Start where you are</Heading>
-          <p>Three ways in. Pick the one that matches what you bring.</p>
+          <p>Three starting points. Pick the one that fits your situation.</p>
         </div>
         <div className={styles.paths}>
           <div className={styles.pathCard}>
@@ -243,6 +217,7 @@ function PathsSection() {
             <div className={styles.pathLinks}>
               <Link to="/docs/recipes/overview">Recipes</Link>
               <Link to="/docs/runners/bring-your-existing-suite">Bring an existing xUnit suite</Link>
+              <Link to="/docs/getting-started/migrating-from-1-0">Migrate from 1.0</Link>
               <Link to="/docs/getting-started/troubleshooting">Troubleshooting</Link>
             </div>
           </div>
@@ -259,18 +234,10 @@ function FailureSection() {
         <div className={styles.sectionHead}>
           <Heading as="h2">Learn by failure</Heading>
           <p>
-            A green suite teaches you little. The useful part is what happens when a test fails: a value
-            that changed, a service that was not ready, a cleanup that hid the cause. The lessons start
-            from failures like those, and the demo trace is a failed test with every layer recorded.
+            A passing suite tells you little. A failure shows what changed, what was not ready, or
+            what cleanup hid the cause. The lessons start from those failures. The demo trace records
+            every layer of one failed test.
           </p>
-          <div className={styles.featureLinks}>
-            <Link className={styles.featureLink} href="https://trace.prototest.dev/?demo=1">
-              Open the failing trace
-            </Link>
-            <Link className={styles.featureLink} to="/learn/">
-              Start the track
-            </Link>
-          </div>
         </div>
         <FailureGallery />
       </div>
@@ -280,19 +247,18 @@ function FailureSection() {
 
 function TraceSection() {
   return (
-    <section className={styles.section}>
+    <section className={`${styles.section} ${styles.sectionAlt}`}>
       <div className="container">
         <div className={styles.featureRow}>
           <div className={styles.featureCopy}>
             <Heading as="h2">Following a failed test</Heading>
             <p>
-              Step through the three views of the demo trace: the run first, then the failed test's story,
-              then the check itself. The values that differed, the exception, and the line that made the
-              assertion.
+              Step through the three views of the demo trace: the run, the failed test story, and
+              the check. You see the changed values, the exception, and the asserting line.
             </p>
             <div className={styles.featureLinks}>
               <Link className={styles.featureLink} href="https://trace.prototest.dev/?demo=1">
-                Open the failing trace ↗
+                Open the failing trace →
               </Link>
               <Link className={styles.featureLink} to="/docs/observability/prototrace">
                 How ProtoTrace works →
@@ -329,7 +295,7 @@ function AgentExchange() {
     "testId": "00002",
     "name": "orders match their shape",
     "outcome": "failed",
-    "durationMs": 16.44
+    "durationMs": 16
   },
   "failure": {
     "kind": "assert.json.shape",
@@ -347,20 +313,20 @@ function AgentExchange() {
 
 function AgentSection() {
   return (
-    <section className={`${styles.section} ${styles.sectionAlt}`}>
+    <section className={styles.section}>
       <div className="container">
         <div className={styles.featureRow}>
           <div className={styles.featureCopy}>
             <Heading as="h2">Point your agent at the trace</Heading>
             <p>
-              <code>ProtoTest.Mcp</code> is a local stdio server that reads the <code>.prototrace</code>{' '}
+              <code>ProtoTest.Mcp</code> is a local server that reads the <code>.prototrace</code>{' '}
               archives in a repository. An agent works the evidence loop through four read-only tools:{' '}
               <code>list_runs</code>, <code>get_failure</code>, <code>get_diagnosis</code> and{' '}
               <code>get_coverage</code>.
             </p>
             <p>
-              Every answer is the recorded evidence, capped and deterministic. The server binds no port and
-              uploads nothing, and the failure it returns is the one the viewer shows.
+              Every answer comes from the recorded trace, with size limits. The server opens no port
+              and uploads nothing. It returns the same failure the viewer shows.
             </p>
             <Link className={styles.featureLink} to="/docs/agent-workflows/setup">
               Connect an agent →
@@ -380,9 +346,10 @@ function CtaSection() {
         <div className={styles.ctaBanner}>
           <Heading as="h2">Try the starter project</Heading>
           <p>
-            The template creates a small ASP.NET Core API and a ProtoTest suite. Paste the commands from
-            the top of this page, then run the suite. A green run ends like this (abridged), with the trace
-            and the report beside it:
+            The template creates a small ASP.NET Core API and a ProtoTest suite. Run the commands
+            from the <Link to="/docs/getting-started/installation">installation page</Link>, then
+            run the suite. A green run ends like this (abridged), with the trace and the report
+            beside it:
           </p>
           <div className={styles.ctaSnippet}>
             <CodeSnippet
@@ -393,13 +360,13 @@ TestResults/Shop.prototrace
 TestResults/Shop.html`}
             />
           </div>
-          <p>
+          <p className={styles.ctaRelease}>
             1.1.0 adds readiness probes and a per-test clock.{' '}
             <Link to="/changelog">Full list in the changelog →</Link>
           </p>
           <div className={styles.heroButtons}>
             <Link className={`${styles.btn} ${styles.btnPrimary}`} to="/docs/getting-started/first-test">
-              Write your first test
+              Your first test
             </Link>
           </div>
         </div>
@@ -435,10 +402,10 @@ export default function Home(): ReactNode {
       <Hero />
       <main>
         <ProofStrip />
-        <PathsSection />
         <FailureSection />
         <TraceSection />
         <AgentSection />
+        <PathsSection />
         <CtaSection />
       </main>
     </Layout>

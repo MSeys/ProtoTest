@@ -99,7 +99,6 @@
 
 .attFailed { border-left-color: var(--danger); background: var(--danger-soft); }
 .attPartial { border-left-color: var(--warning); background: var(--warning-soft); }
-.attFinding { border-left-color: var(--warning); }
 .attPassed { border-left-color: var(--success); }
 
 .attNumber { color: var(--muted); font: var(--text-micro) var(--font-mono); }
@@ -112,7 +111,6 @@
 .attLabel { align-self: start; font-size: var(--text-micro); font-weight: var(--weight-semibold); white-space: nowrap; }
 .attLabelFailed { color: var(--danger); }
 .attLabelPartial { color: var(--warning); }
-.attLabelFinding { color: var(--warning); }
 .attLabelPassed { color: var(--success); }
 
 /* Story view ---------------------------------------------------------------- */

@@ -8,15 +8,16 @@ import styles from './styles.module.css';
  * and what the run could see - including what it could not. Values are the demo trace's.
  */
 
-// 44 tests in start order; the viewer numbers them the same way.
-const outcomes = Array.from({length: 44}, (_, index) => {
+// 18 tests in start order; the viewer numbers them the same way.
+type Tick = 'passed' | 'failed' | 'partial';
+
+const outcomes: Tick[] = Array.from({length: 18}, (_, index) => {
   const test = index + 1;
-  if (test === 29 || test === 36) return 'failed';
-  if (test === 13 || test === 23) return 'partial';
+  if (test === 1 || test === 2 || test === 4 || test === 12) return 'failed';
   return 'passed';
 });
 
-const capabilities = ['Data', 'GraphQL', 'REST', 'ASP.NET Core', 'SQL'];
+const capabilities = ['Playwright', 'Data', 'Sheets', 'GraphQL', 'REST', 'ASP.NET Core', 'SQL'];
 
 const sources = [
   {label: 'Test side', seen: true},
@@ -30,14 +31,14 @@ export default function VisibilityPanel(): ReactNode {
       head={
         <>
           <strong className={styles.verdict}>
-            <span className={styles.failed}>2 failed</span>, <span className={styles.partial}>2 partial</span>, 40 passed
+            <span className={styles.failed}>4 failed</span>, 14 passed
           </strong>
-          <span className={styles.meta}>44 tests in 7.40 s</span>
+          <span className={styles.meta}>18 tests in 5.15 s</span>
         </>
       }
       foot={<>The run screen of the same trace. Absent sources keep their place, drawn dashed.</>}>
       <div className={styles.body}>
-        <div className={styles.strip} role="img" aria-label="One tick per test: tests 29 and 36 failed, tests 13 and 23 were partial">
+        <div className={styles.strip} role="img" aria-label="One tick per test: tests 1, 2, 4 and 12 failed">
           {outcomes.map((outcome, index) => (
             <i key={index} className={styles[outcome]} />
           ))}

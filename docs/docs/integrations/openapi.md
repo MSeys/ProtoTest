@@ -146,6 +146,35 @@ status code → exact key? → yes → count it
 | Request route is not in the document, or the method is not declared | silent: ignored, never reported |
 | Status code matches no key, wildcard or default | silent: the response is not counted |
 
+#### More than one specification
+
+One collector covers one document. An API with versioned or per-area specifications gets one application target per document, each with its own REST client and collector:
+
+```csharp
+builder
+    .AddApplication("V1", app => app
+        .AddRest(rest => rest
+            .AddClient("V1")
+            .AddCollector<OpenApiCoverageCollector>()))
+    .AddApplication("V2", app => app
+        .AddRest(rest => rest
+            .AddClient("V2")
+            .AddCollector<OpenApiCoverageCollector>()));
+```
+
+```json
+{
+  "ProtoTest": {
+    "Applications": {
+      "V1": { "OpenApi": { "Specification": "v1.openapi.json" } },
+      "V2": { "OpenApi": { "Specification": "v2.openapi.json" } }
+    }
+  }
+}
+```
+
+Each collector resolves its specification under its own application, so the two documents report as two targets. To keep the sources in code instead, pass each one directly: `AddCollector<OpenApiCoverageCollector>("v1.openapi.json")`.
+
 #### What the report contains
 
 The collector walks the whole document and reports three levels:

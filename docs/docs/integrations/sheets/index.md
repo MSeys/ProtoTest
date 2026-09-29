@@ -12,6 +12,8 @@ import TraceExample from '@site/src/components/TraceExample';
 
 `ProtoTest.Sheets` opens the `.xlsx` your application generated and lets a test assert on its sheets, cells, ranges and typed rows. It reads the file as OpenXML, the format itself, so it does not matter whether the application produced it with SpreadsheetGear, ClosedXML, EPPlus, NPOI, Aspose or raw OpenXML.
 
+The direction is fixed: the application writes the workbook, the suite reads it. ProtoTest never writes `.xlsx`.
+
 Reading is eager. A missing sheet, a malformed reference, or a reversed range fails immediately. A reference outside the used range is an empty cell, not an error.
 
 ```csharp
@@ -239,7 +241,7 @@ The capability is name `"Sheets"`, kind `document` (`ProtoCapabilityKinds.Docume
 
 ## Limits
 
-- **OpenXML `.xlsx` only.** No writing, no `.xls`, no CSV, and no producer library is involved on either side.
+- **OpenXML `.xlsx` only, read-only.** No writing, no `.xls`, no CSV, and no producer library is involved on either side. To cover a generated workbook, have the application write the file and read it back in the test.
 - **One million cells per range.** Reading a bigger area, or a reversed rectangle, throws; merge propagation is skipped above 1,000,000 cells in a merge.
 - **Dates are a heuristic.** A numeric cell counts as a date when its style or number format says so; the rule is not a schema.
 - **Cached formula values only.** ProtoTest never recalculates; the formula text and the cached result are what the file holds.

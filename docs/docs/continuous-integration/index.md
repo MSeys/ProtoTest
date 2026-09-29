@@ -4,8 +4,6 @@ title: Continuous integration
 description: Run ProtoTest in CI and keep the trace, reports and runner output together as build artifacts on GitHub Actions, Azure Pipelines or GitLab CI.
 ---
 
-import TabbedCode from '@site/src/components/TabbedCode';
-
 # Continuous integration
 
 Keep the runner result, the HTML report and the `.prototrace` together. The runner names the failed test. The report shows coverage and findings. The trace shows the failing operation.
@@ -77,7 +75,7 @@ prototest feedback: webhook skipped (No webhook URL: set PROTOTEST_FEEDBACK_WEBH
 
 The `::error` lines are the check annotations. The channel lines are the per-channel outcome; each one names why it skipped or failed.
 
-The same digest reaches a reviewer as a pull request comment, from the committed failing fixture:
+The same digest reaches a reviewer as a pull request comment. The shape of the comment, with values from the committed failing fixture:
 
 ```markdown
 ## ProtoTest run `29e344f9cf54431ca7d8bad3f87a1749`
@@ -219,18 +217,11 @@ If you prefer to keep only the raw artifacts, each provider runs the suite and u
 | Provider | Results variable | Publish even on failure | Containers |
 | --- | --- | --- | --- |
 | GitHub Actions | `github.workspace` + `/TestResults/ProtoTest` | `if: always()` | Docker available on hosted Linux runners |
-| Azure Pipelines | `$(Build.ArtifactStagingDirectory)/ProtoTest` | `succeededOrFailed()` | Microsoft-hosted Linux agents |
-| GitLab CI | `$CI_PROJECT_DIR/TestResults/ProtoTest` | `when: always` | needs a Docker-capable runner |
+| [Azure Pipelines](./azure-pipelines.md) | `$(Build.ArtifactStagingDirectory)/ProtoTest` | `succeededOrFailed()` | Microsoft-hosted Linux agents |
+| [GitLab CI](./gitlab-ci.md) | `$CI_PROJECT_DIR/TestResults/ProtoTest` | `when: always` | needs a Docker-capable runner |
 
-<TabbedCode
-  label="Raw artifact upload by provider"
-  tabs={[
-    {
-      id: 'gha',
-      label: 'GitHub Actions',
-      filename: '.github/workflows/integration-tests.yml',
-      language: 'yaml',
-      code: `name: Integration tests
+```yaml title=".github/workflows/integration-tests.yml"
+name: Integration tests
 
 on:
   push:
@@ -243,7 +234,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      PROTOTEST_RESULTS: \${{ github.workspace }}/TestResults/ProtoTest
+      PROTOTEST_RESULTS: ${{ github.workspace }}/TestResults/ProtoTest
 
     steps:
       - uses: actions/checkout@v4
@@ -260,61 +251,10 @@ jobs:
         with:
           name: prototest-results
           path: TestResults/ProtoTest
-          if-no-files-found: error`,
-    },
-    {
-      id: 'azure',
-      label: 'Azure Pipelines',
-      filename: 'azure-pipelines.yml',
-      language: 'yaml',
-      code: `trigger:
-  - main
+          if-no-files-found: error
+```
 
-pool:
-  vmImage: ubuntu-latest
-
-variables:
-  PROTOTEST_RESULTS: $(Build.ArtifactStagingDirectory)/ProtoTest
-
-steps:
-  - task: UseDotNet@2
-    inputs:
-      packageType: sdk
-      version: 10.x
-
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: test
-      arguments: --configuration Release
-
-  - task: PublishPipelineArtifact@1
-    condition: succeededOrFailed()
-    inputs:
-      targetPath: $(PROTOTEST_RESULTS)
-      artifact: prototest-results`,
-    },
-    {
-      id: 'gitlab',
-      label: 'GitLab CI',
-      filename: '.gitlab-ci.yml',
-      language: 'yaml',
-      code: `integration-tests:
-  image: mcr.microsoft.com/dotnet/sdk:10.0
-  variables:
-    PROTOTEST_RESULTS: "$CI_PROJECT_DIR/TestResults/ProtoTest"
-  script:
-    - dotnet restore
-    - dotnet test --configuration Release --no-restore
-  artifacts:
-    when: always
-    paths:
-      - TestResults/ProtoTest/
-    expire_in: 14 days`,
-    },
-  ]}
-/>
-
-`if: always()` matters: the trace is most useful when the test step failed. Use `succeededOrFailed()` on Azure and `when: always` on GitLab for the same reason. A container-backed suite on GitLab also needs a Docker-capable runner. Your runner setup decides if Docker-in-Docker is allowed and which service config it needs. ProtoTest only needs a reachable Docker endpoint.
+`if: always()` matters: the trace is most useful when the test step failed. The [Azure](./azure-pipelines.md) and [GitLab](./gitlab-ci.md) pages carry the same shape with `succeededOrFailed()` and `when: always`. A container-backed suite on GitLab also needs a Docker-capable runner. Your runner setup decides if Docker-in-Docker is allowed and which service config it needs. ProtoTest only needs a reachable Docker endpoint.
 
 ### Playwright on Linux
 
@@ -360,6 +300,12 @@ The suite is the same in all three. What changes is the composition, and the com
 | Playwright trace and screenshots | On failure, or for a short retention period | Browser-specific diagnostics carried inside `.prototrace` and by the runner |
 
 The action [above](#the-feedback-action) uploads the trace for you. Without it, upload the results folder as an artifact. Open a downloaded `.prototrace` in the [ProtoTrace viewer](https://trace.prototest.dev). The file stays in the browser. It is not uploaded.
+
+### Retention and size
+
+A trace is small until it carries diagnostics. A synthetic test records about 7 KB of trace; the OpenCSMS health-check trace holds 25.8 MB for 1,000 tests, about 25 KB each. Browser screenshots, response bodies and embedded sources grow it from there: attachment capture is opt-in per integration, and `EmbedSources` and `EmbedArtifacts` decide whether the bytes travel inside the archive. The [benchmarks](../project/benchmarks.md) page has the full numbers.
+
+Keep the same retention as other test results, and shorter for sensitive suites. On GitHub Actions the upload step takes `retention-days`; the feedback action uploads its trace artifact with the defaults, so name it with `artifact-name` and expire the raw folder yourself. On GitLab `expire_in: 14 days` on the [GitLab page](./gitlab-ci.md) is the starting point: shorten it for suites with browser diagnostics, or keep failures longer than green runs.
 
 ## Related
 

@@ -38,6 +38,20 @@ Re-run 2026-09-29 on a 16-core machine (`dotnet test -- NUnit.NumberOfTestWorker
 
 Beyond this range, expect resource pressure rather than a ProtoTest-specific limit: port and container exhaustion, browser memory, and contention on run-scoped infrastructure.
 
+## Per-runner knobs
+
+ProtoTest does not schedule tests. Each runner brings its own switch:
+
+| Runner | Knob |
+| --- | --- |
+| NUnit | `dotnet test -- NUnit.NumberOfTestWorkers=8`, or `[assembly: LevelOfParallelism(8)]` (`tests/NUnitParallelization.cs` links both into every parallel NUnit project) |
+| xUnit v2 | `[assembly: CollectionBehavior(MaxParallelThreads = 8)]`; collections run in parallel by default |
+| xUnit v3 | `[assembly: Xunit.v3.Parallelization(MaxThreads = 8)]`; parallel by default, like v2 |
+| MSTest | `[assembly: Parallelize(Scope = ExecutionScope.MethodLevel)]` |
+| TUnit | parallel by default; `[NotInParallel]` keeps a test off the parallel path, with an optional constraint key to serialize only against the tests that share it |
+
+The runner pages name the same switches where they change behavior: [NUnit](../runners/nunit.md), [xUnit v2](../runners/xunit.md), [xUnit v3](../runners/xunit3.md), [MSTest](../runners/mstest.md), [TUnit](../runners/tunit.md).
+
 ## What the trace shows
 
 - Operations recorded on the test's flow land on that test's record, whichever task recorded them.

@@ -62,6 +62,32 @@ The template creates a small ASP.NET Core API and a suite for it. The suite is r
 
 The suite is written for NUnit. Pass `--runner xunit`, `--runner xunit3`, `--runner tunit` or `--runner mstest` to generate it for another runner, and `--framework net8.0` or `--framework net9.0` to target an older framework.
 
+### What the template creates
+
+Two projects, one setup file picked by the runner, and four order scenarios against a tiny API:
+
+```text
+Shop/
+├── Shop.slnx
+├── global.json                    # xunit3 and tunit only: the Microsoft.Testing.Platform opt-in
+├── README.md
+├── Shop.Api/
+│   ├── Shop.Api.csproj
+│   ├── Program.cs                 # POST /api/orders, GET /api/orders/{id}, in-memory store
+│   └── Orders.cs                  # NewOrder, Order, OrderStore
+└── Shop.Tests/
+    ├── Shop.Tests.csproj          # the runner package plus AspNetCore, Rest, Reporting
+    ├── Setup.cs                   # hosts the API in-process, registers REST, tracing, the HTML report
+    └── OrderTests.cs              # four tests: create, read back, validation, not found
+```
+
+`Setup.cs` starts as `Setup.{runner}.cs` and is renamed for the runner you picked. The test project always adds `ProtoTest.AspNetCore`, `ProtoTest.Rest` and `ProtoTest.Reporting` next to the runner package; TUnit also sets `OutputType` to `Exe`, as TUnit requires.
+
+| Flag | Values | Default |
+| --- | --- | --- |
+| `--runner` | `nunit`, `xunit`, `xunit3`, `tunit`, `mstest` | `nunit` |
+| `--framework` | `net10.0`, `net9.0`, `net8.0` | `net10.0` |
+
 Next: [Your first test](./first-test.md) walks the same path one step at a time and ends at a failure and its trace.
 
 ## Add ProtoTest to your own project

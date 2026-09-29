@@ -76,7 +76,7 @@ flowchart TD
 
 If none apply, `ProtoDataException` names the member. Numbers, enums, booleans, dates and your own value objects are deliberately *not* on the built-in list: provide them explicitly or through a default.
 
-A member resolving shows its source in `Explain()` and the trace:
+A member resolving shows its source in `Explain()` and the trace. The shape of the output, with illustrative values:
 
 ```csharp
 var plan = Proto.Context.Data().For<Invoice>()

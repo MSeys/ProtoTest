@@ -119,7 +119,7 @@ public sealed class FrozenClockJourney
 }`}
   callouts={[
     {line: 10, title: 'Apply it before the first request', note: 'The dedicated server is built when the override lands and application services are resolved after it. The factory form builds the instance lazily; the instance and type forms exist too.'},
-    {line: 12, title: 'The test did not change', note: 'It still sends one request through the composed client. Only the application\'s own provider changed.'},
+    {line: 13, title: 'The test did not change', note: 'It still sends one request through the composed client. Only the application\'s own provider changed.'},
     {line: 21, title: 'The assertion proves the app resolved it', note: 'The stamp comes from the application, so it can only equal the frozen value if the replacement reached it.'},
   ]}
   foot={<>The test behind this lesson. Run it with <code>dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~FrozenClockJourney"</code>.</>}

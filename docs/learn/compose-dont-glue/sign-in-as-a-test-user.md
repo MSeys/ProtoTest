@@ -86,9 +86,9 @@ public sealed class ProjectsJourney
     }
 }`}
   callouts={[
-    {line: 5, title: 'Name the user', note: 'A name and the roles follow; with no arguments the built-in name test-user is used.'},
-    {line: 6, title: 'The role the test needs', note: 'The rest of the class runs as the tenant owner; this one test acts as a viewer, so it can be refused.'},
-    {line: 14, title: 'The application decides', note: 'The 403 comes from the application, which resolved the viewer and applied its own authorization.'},
+    {line: 5, title: 'Start the context', note: '[ProtoTest] wraps this test in its own execution context; the identity belongs to that context alone.'},
+    {line: 6, title: 'Name the user and the role', note: 'The name comes first and roles follow; with no arguments the built-in name test-user is used. Here the viewer role is what the application refuses.'},
+    {line: 13, title: 'The application decides', note: 'The 403 comes from the application, which resolved the viewer and applied its own authorization.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/ProjectsJourney.cs</code>. Claims use the same attribute: <code>Claims = new[] &#123; "tenant=northstar" &#125;</code>.</>}
 />
@@ -110,8 +110,9 @@ The attribute's whole before step publishes the identity:
     return Task.CompletedTask;
 }`}
   callouts={[
-    {line: 3, title: 'One call, per test', note: 'SignIn sets the identity the context resolves, and the next test starts with none.'},
-    {line: 3, title: 'The trace follows the call', note: 'SignIn records the auth:user entity and an auth.user.sign-in event, and it writes whether the shipped transport can serve the selected application.'},
+    {line: 3, title: 'One call publishes the identity', note: 'SignIn sets the type the context resolves and records the auth:user entity, so the next test starts with none.'},
+    {line: 4, title: 'Name and roles', note: 'A bare [SignedInAs] uses the built-in name test-user.'},
+    {line: 6, title: 'Claim values stay types in the trace', note: 'The values travel in the header; the trace records their types only.'},
   ]}
   foot={<>From <code>src/ProtoTest.Http/Authentication/SignedInAsAttribute.cs</code>. REST, GraphQL and gRPC requests carry the identity through the same auth lifecycle.</>}
 />
@@ -163,11 +164,11 @@ Claim values never appear. The entity records `auth.claim_types`, a list of type
 
 ## The published case
 
-The shipped transport needs the application the run hosts in-process. Point the sample at an address that hosts nothing, the dead one from the Level 0 environment drill, add a small test with `[SignedInAs("alice", "admin", Claims = ["tenant=northstar"])]`, and run it:
+The shipped transport needs the application the run hosts in-process. Point the sample at an address that hosts nothing, the dead one from the Level 0 environment drill, add a small test with `[SignedInAs("alice", "admin", Claims = ["tenant=northstar"])]` (the Level 1 file works if you kept it, any test of your own otherwise), and run it by its name:
 
 ```powershell
 $env:ProtoTest__TargetUrl = "http://127.0.0.1:5099"
-dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~MyFirstJourney"
+dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~TheNameOfYourTest"
 Remove-Item Env:ProtoTest__TargetUrl
 ```
 

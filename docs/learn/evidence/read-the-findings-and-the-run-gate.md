@@ -72,7 +72,7 @@ The report holds more than results, and the three kinds are worth telling apart 
 | --- | --- | --- |
 | Observation | clients and collectors, through `RecordObservation` | coverage and traffic rows in the report, operations in the trace |
 | Finding | a test or the lifecycle, through `AddFinding` | a report item with kind `finding`, plus a finding event in the trace |
-| Attachment | tests and clients, through `.CaptureAttachments()` and `Publish` | `resources/&lt;test id&gt;/artifact-N/...` inside the archive, with the bytes |
+| Attachment | tests and clients, through `context.AddAttachment(...)` and `.CaptureAttachments()` | `resources/&lt;test id&gt;/artifact-N/...` inside the archive, with the bytes |
 
 An observation never passes or fails; it counts or lists what the run saw. An attachment is the exact file the test read. A finding is the middle kind: something worth reporting that is deliberately not the test's own result. The [contract coverage lesson](/learn/evidence/contract-coverage) reads observations, and the archive lesson opens attachments.
 
@@ -97,9 +97,9 @@ foreach (var failure in exceptions.Skip(exceptionCountBeforeTeardown))
         tags: [failure.GetType().Name]);
 }`}
   callouts={[
+    {line: 1, title: 'The result stands', note: 'The teardown exception is evidence, not a replacement: the passing body stays a passed test.'},
     {line: 3, title: 'The phase records the failure', note: 'The teardown operation fails with the exception, so the trace shows which step threw.'},
-    {line: 8, title: 'The finding carries the rest', note: 'Status Error, category Teardown, the test as its target and the exception type as a tag. It reaches every sink and every run gate.'},
-    {line: 6, title: 'The test result stands', note: 'AddFinding never changes the result the framework reported, so a passing body stays a passed test.'},
+    {line: 9, title: 'The finding carries the rest', note: 'Status Error, category Teardown, the test as its target and the exception type as a tag. It reaches every sink and every run gate.'},
   ]}
   foot={<>From <code>src/ProtoTest.Core/Internal/ProtoTestLifecycle.cs</code>. The collect-mode flow is why one failing step does not stop the others.</>}
 />
@@ -151,7 +151,7 @@ The sample registers one gate over its findings:
   callouts={[
     {line: 1, title: 'A name and a delegate', note: 'The name becomes the row in the report and the message in the failure; a class implementing IProtoRunGate works the same way.'},
     {line: 2, title: 'It reads items, not tests', note: 'ItemsOfKind selects the findings the run collected, wherever they came from. A teardown finding counts like any other.'},
-    {line: 5, title: 'Failed fails the run', note: 'A Failed verdict throws ProtoRunGateException out of the run teardown. Warning and Skipped are recorded without failing.'},
+    {line: 4, title: 'Failed fails the run', note: 'A Failed verdict throws ProtoRunGateException out of the run teardown. Warning and Skipped are recorded without failing.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/Setup.cs</code>. Gates run once after the last test and before the reports are written, so a failed gate still produces its report.</>}
 />
@@ -170,6 +170,6 @@ Run the broken teardown once more and the same story appears in the archive and 
 | report summary: Findings 1, Errors 2 | the finding and the gate are the two Error items |
 | runner: Passed 1, exit code 1 | the test passed; the gate failed the run |
 
-The same gate row passes in every committed archive. <a href="pathname:///lessons/l4-coverage.prototrace">l4-coverage.prototrace</a> carries `no error findings`, `passed`, `No error findings were recorded.` A finding with status `Warning` would be recorded and still leave that gate passing, because this gate only looks for `Error`.
+The same gate row passes in every committed archive. <a href="pathname:///lessons/l4-coverage.prototrace">l4-coverage.prototrace</a> carries `no error findings` with `No error findings were recorded.` A finding with status `Warning` would be recorded and still leave that gate passing, because this gate only looks for `Error`.
 
 </LearnShell>

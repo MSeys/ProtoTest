@@ -1,5 +1,5 @@
 /*
- * The Learning demo's four failure drills and the tests that fix them. Every name, status and message
+ * The Northstar sample's four failure drills and the tests that fix them. Every name, status and message
  * comes from a run of samples/Northstar.ProtoTest with the drills enabled; the durations are read from
  * the committed archives under docs/static/lessons, so the gallery shows what the reader downloads.
  * Nothing here is invented. A rerun writes its own durations, never different names or statuses.
@@ -167,7 +167,9 @@ export const failureDrills: DrillPair[] = [
         {
           kind: 'test.execution',
           name: 'Test execution',
-          detail: '2.06 s, no operation recorded: the raw client is outside the composition',
+          status: 'failed',
+          detail:
+            '2.06 s, failed: ConnectionError reaching http://127.0.0.1:5099: connection refused. No operation was recorded: the raw client is outside the composition.',
         },
       ],
     },

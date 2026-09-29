@@ -37,7 +37,7 @@ Your first journey passed. The trace holds what it actually did: what the run co
       'Change the shape assertion to expect a different name, for example name = "someone-else". Before you run it, predict what the failure message will name.',
     verify: (
       <>
-        Run the filtered test, read the failure message, then open the trace or the report and find the failed check. Restore the assertion and run again.
+        Run the filtered test and read the failure message the runner prints, then open the trace and find the same failed check inside it. Restore the assertion and run again.
       </>
     ),
     reveal: (
@@ -87,6 +87,8 @@ The checks are the part to read first, because each one records what it compared
 [$.status]: Values did not match. (Expected: "past_due", Actual: "active")
 ```
 
-That is the clock drill from Level 0. The message says which property, what the test expected and what the application sent. Read the call the check judged and the inputs that led to it, and the fix is usually one value or one move of the clock away.
+That is the clock drill from Level 0. The message says which property, what the test expected and what the application sent. Read the call the check judged and its inputs. The fix is one value or one clock move.
+
+The two places that hold those values are the runner output and the trace. The trace records the failed `assert.json.shape` entry and, beside it, the expected shape as an artifact, so the shape the test asked for is in the file too. The reports are the run's verdict: `report.html` marks the test failed and `report.json` carries the coverage and traffic rows. Neither one carries the expected and actual values, so a report is the place to confirm that a test failed, not the place to find out why.
 
 </LearnShell>

@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # The archive and the reports
 
-One file from CI should explain the run to a reader who was not there. That file is the `.prototrace`: it holds the execution story, the state, the attachments and the reports the run wrote.
+One file from CI must explain the run to a reader who was not there. That file is the `.prototrace`: it holds the execution story, the state, the attachments and the reports the run wrote.
 
 <LearnShell
   level="Level 4, lesson 3"
@@ -88,7 +88,7 @@ The sample configures both report sinks in one place:
 .AddSink<HtmlReportSink>(sink =>
 {
     sink.OutputPath = Path.Combine("TestResults", "Northstar.ProtoTest", "report.html");
-    sink.Title = "Northstar Learning demo";
+    sink.Title = "Northstar sample";
 });
 ```
 

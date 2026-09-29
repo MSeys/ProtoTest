@@ -7,11 +7,12 @@ description: "Use the trace to read a failed run, narrow the fix to one answer, 
 ---
 
 import LearnShell from '@site/src/components/LearnShell';
+import TraceDiff from '@site/src/components/TraceDiff';
 import Link from '@docusaurus/Link';
 
 # The trace as a feedback loop
 
-A failed run is only useful if you can read it. The loop that makes an integration suite trustworthy is short: run it, open the trace, read the check that failed, change one thing, run again.
+The loop is short. Run it. Open the trace. Read the check that failed. Change one thing. Run again.
 
 <LearnShell
   level="Level 0, lesson 4"
@@ -106,6 +107,14 @@ Two checks, both recorded, both readable from the trace.
 ## Worked example: environment
 
 The environment drill is the other direction: the trace names the failure and stops there. The test execution span ran about two seconds, failed with a connection error and recorded no request at all. The call happened outside the run, so nothing wrapped it; the missing operation is the diagnosis. The fix is to call through `Proto.Context.Rest()` like every other journey.
+
+## Compare the two runs
+
+The last step of the loop is the comparison, and this is what it looks like. Each pair below is one journey run twice: the drill on the left failed on purpose, and the test beside it holds. Every name, duration and message is the recording's own, and each pane links that test's own archive.
+
+<TraceDiff />
+
+Open the Environment pair for the case above: the left pane holds one entry and a message, the right pane holds an ordinary request.
 
 ## The four failures as one sentence each
 

@@ -28,7 +28,7 @@ Two problems come back in every journey: creating a fixture through the real doo
   ]}
   situation={
     <>
-      <p>Setup data has to come from somewhere. A test that inserts rows directly bypasses every rule the product enforces, and a fixture copy pasted into each test drifts from the route it once matched.</p>
+      <p>Setup data has to come from somewhere. A test that inserts rows directly bypasses product rules. A fixture copied into each test drifts from the endpoint it matched.</p>
       <p>A provisioner creates the object once, through the door you choose, and returns what the system gave back. A page object describes a screen so a test reads as a user instead of a selector.</p>
     </>
   }

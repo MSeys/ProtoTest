@@ -11,7 +11,7 @@ import Link from '@docusaurus/Link';
 
 # What a test leaves behind
 
-A test that reads state it did not create depends on every run before it. That is the state question from lesson 1, and it is the one that turns a green suite red on a Tuesday morning.
+A test that reads state it did not create depends on every run before it. That is the state question from lesson 1. It turns a green suite red without a code change.
 
 <LearnShell
   level="Level 0, lesson 3"

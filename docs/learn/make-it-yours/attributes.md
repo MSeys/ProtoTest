@@ -28,7 +28,7 @@ Level 6 returns to the Northstar sample. The first journey already carries `[Nor
   ]}
   situation={
     <>
-      <p>A test says what it needs. An attribute knows how to provide it. That split is why the sample's journeys carry one declaration each instead of a base fixture class full of setup.</p>
+      <p>A test declares what it needs. An attribute provides it. That split is why the sample's journeys carry one declaration each instead of a base fixture class full of setup.</p>
       <p>The attributes the sample ships are ordinary public code. This lesson reads one and then writes one.</p>
     </>
   }

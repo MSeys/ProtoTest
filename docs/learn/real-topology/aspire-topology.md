@@ -28,8 +28,8 @@ The container mode kept the product inside the test process. The topology mode h
   ]}
   situation={
     <>
-      <p>The next step after fresh containers is the product's own processes: a real API, a real billing worker, a real notification worker. Aspire is how OpenCSMS declares that topology, and the suite can resolve its targets through it without a second Setup.</p>
-      <p>The AppHost stays dormant unless a selection key asks for it. That is what keeps one Setup honest across four modes.</p>
+      <p>The next step after fresh containers is the product's own processes: a real API, a real billing worker, a real notification worker. OpenCSMS declares that topology in Aspire. The suite resolves its targets through it with the same Setup.</p>
+      <p>The AppHost stays dormant unless a selection key asks for it. That is what keeps one Setup working across four modes.</p>
     </>
   }
   checkpoint={{

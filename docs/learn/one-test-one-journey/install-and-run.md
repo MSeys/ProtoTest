@@ -23,11 +23,11 @@ Everything in this level runs against the Northstar sample: one suite that compo
   ]}
   before={[
     <>Level 0 (<Link to="/learn/why-integration-tests-get-hard/the-four-questions">the four questions</Link>).</>,
-    'The .NET SDK, version 8 or newer, and git. The first run restores packages and takes a couple of minutes.',
+    'The .NET 8 SDK or newer, and git. The first run restores packages and takes a couple of minutes.',
   ]}
   situation={
     <>
-      <p>The fastest way to judge a test framework is to watch it run a suite that touches real things. The sample is small, it is green on an ordinary run, and it writes down everything it did.</p>
+      <p>To judge a test framework, watch it run a suite that touches an API, a database, a browser and a broker. The sample is small, it is green on an ordinary run, and it writes down everything it did.</p>
       <p>Some tests will not run: the broker journey needs a broker, and no broker is configured, and the four failure drills wait for an explicit opt-in. Those skips are part of the lesson, not a defect.</p>
     </>
   }
@@ -94,7 +94,7 @@ git pull
 
 ## Find what the run left
 
-Every run writes three files under the sample's output folder:
+The run writes three evidence files under the sample's output folder, next to the SQLite store it created for the run:
 
 ```
 bin/Debug/net8.0/TestResults/Northstar.ProtoTest/
@@ -107,7 +107,7 @@ Open `report.html` in a browser for the run's verdict and the routes it covered.
 
 ## The same packages in your own project
 
-The sample composes packages; so does a new project. The quickest start is the template:
+The sample composes packages; so does a new project. The quickest start is the template. It targets `net10.0`, so it needs the .NET 10 SDK; on an older SDK, pass the framework the sample uses:
 
 ```bash
 dotnet new install ProtoTest.Templates
@@ -116,6 +116,6 @@ cd Shop
 dotnet test
 ```
 
-The template targets `net10.0` by default, so pass the framework your SDK has; `net8.0` matches the sample and the rest of this track. For an existing test project, add your runner package, `ProtoTest.Core` and one package per integration. The [installation page](/docs/getting-started/installation) lists every package and what arrives with it.
+The template offers `net10.0`, `net9.0` and `net8.0`; `net8.0` matches the sample and the rest of this track. For an existing test project, add your runner package, `ProtoTest.Core` and one package per integration. The [installation page](/docs/getting-started/installation) lists every package and what arrives with it.
 
 </LearnShell>

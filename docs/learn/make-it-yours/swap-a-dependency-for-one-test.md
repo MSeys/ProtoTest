@@ -28,7 +28,7 @@ In Level 5 one outbox test replaced the API's event publisher with a failing one
   ]}
   situation={
     <>
-      <p>The outbox tests of the product demo swap <code>IEventPublisher</code> for one test: the replacement fails a bounded number of publishes and delegates every later attempt to the real publisher. Nothing else in that path is faked.</p>
+      <p>The outbox tests of the OpenCSMS product swap <code>IEventPublisher</code> for one test: the replacement fails a bounded number of publishes and delegates every later attempt to the real publisher. Nothing else in that path is faked.</p>
       <p>The seam is <code>context.Override</code>. It needs an application the run hosts in-process, because the replacement is registered in the application's own container. Where there is no container the framework says so instead of pretending: the attribute form skips, the body form throws. This lesson runs a substitution in the sample and reads both outcomes.</p>
     </>
   }
@@ -79,7 +79,7 @@ The same seam has an attribute form and a type form:
 [FailDependency<IEmailSender>]
 ```
 
-Every substitution a test declares goes into one ledger for its server: a class attribute, a method attribute and a body call build one union, and the later registration wins. The test then runs against a **dedicated server** built with that union before it starts. The run's shared server is never reconfigured, one test's replacement cannot leak into the next, and parallel tests that substitute differently each get their own instance. A failed dependency is the error-path twin: resolving it throws instead of returning a fake.
+A test can declare substitutions on the class, on the method, and in the body. They combine into one set. The later registration wins. The test then runs against a **dedicated server** built with that union before it starts. The run's shared server is never reconfigured, one test's replacement cannot leak into the next, and parallel tests that substitute differently each get their own instance. A failed dependency is the error-path twin: resolving it throws instead of returning a fake.
 
 ## Run one in the sample
 

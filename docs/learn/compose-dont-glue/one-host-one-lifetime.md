@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # One host, one lifetime
 
-The first lesson quoted `Setup.cs` and said the host is built once for the run. This one opens it: what the base class does before the first test and after the last, and the line the builder refuses to cross.
+The run builds the host once from `Setup.cs`. This lesson opens it: what the base class does before the first test and after the last, and the line the builder refuses to cross.
 
 <LearnShell
   level="Level 2, lesson 2"
@@ -135,22 +135,24 @@ await host.StartAsync().ConfigureAwait(false);`}
   foot={<>From <code>src/ProtoTest.Core/ProtoTestHostLifetime.cs</code>, the shared start path behind every adapter.</>}
 />
 
-The terminal rule exists because a second registration would not compose anything: it would change a run that is already under way. A second `Build()` throws the same message, and a second start throws `ProtoHost has already been initialized for this assembly.` The rule applies to every entry on the builder, from `ConfigureServices` to `AddRunGate`.
+The terminal rule blocks a second registration. It would change a run that already started. A second `Build()` throws the same message, and a second start throws `ProtoHost has already been initialized for this assembly.` The rule applies to every entry on the builder, from `ConfigureServices` to `AddRunGate`.
 
 ## The run's two ends in the trace
 
-The host records its own work in the trace's run layer, outside every test. `l1-first-journey.prototrace` holds both ends:
+The host records its own work in the trace's run layer, outside every test. `l1-first-journey.prototrace` holds both ends. The two timestamps are the ones the archive records, and both are UTC: the run's own start and the test's setup entry.
 
 | Record | Reading |
 | --- | --- |
 | Seven `capability` entities: Playwright, Data, Sheets, GraphQL, REST, ASP.NET Core, SQL | recorded when the host started, before the test's setup opened |
-| Run start `06:19:31.887`, the test's setup opens `06:19:33.017` | the host was alive about 1.1 seconds before the test |
+| Run start `06:19:31.887Z`, the test's setup opens `06:19:33.017Z` | the host was alive about 1.1 seconds before the test |
 | `Release · messaging:broker`, 0.3 ms | the host releases a run piece after the test |
 | `Release · readiness:application:Northstar web`, 0.0 ms | the readiness probe is a run resource |
 | `Release · application:loopback:Northstar web`, 5.4 ms | the listener the browser journey follows |
 | The report's Resources section lists the run pieces as `Registered` | the report is written before the releases, so its snapshot says so |
 
 A run with no tests still has that shape. `l2-broker-skip.prototrace` holds only the three releases and no test resource at all, because the broker journey skipped before its lifecycle started. The host existed, served the capability list, and was stopped exactly once.
+
+The state entities in the same archive carry their own stamps with a local offset, so the viewer prints two clocks in one run. Compare the two timestamps above with each other, and read a duration rather than a wall time when you compare an entity with a span.
 
 ## One host, not one per test
 

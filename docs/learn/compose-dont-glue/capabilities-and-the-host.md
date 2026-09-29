@@ -67,7 +67,7 @@ Level 0 was about what a test answers. This level is about the other side: what 
 
 ## Capabilities
 
-A capability is a named thing the run can do, such as calling an API, running the application in-process, or serving a broker. Each one has a kind and the package that declares it. The run records all of them as items, and the trace's run layer prints them.
+A capability is a named action the run supports, such as calling an API or serving a broker. Each one has a kind and the package that declares it. The run records all of them as items, and the trace's run layer prints them.
 
 From the first journey's archive:
 
@@ -81,7 +81,7 @@ From the first journey's archive:
 | Sheets | document | ProtoTest.Sheets |
 | Playwright | browser | ProtoTest.Web.Playwright |
 
-Two rules keep the list honest. A capability is declared by the piece that can serve it, never by a test that hopes it exists. And a capability the run cannot serve is absent, with a reason the composition can register.
+Two rules keep the list true. A capability is declared by the piece that can serve it, never by a test that hopes it exists. And the run omits a capability it cannot serve, with a reason the composition can register.
 
 ## One Configure method
 

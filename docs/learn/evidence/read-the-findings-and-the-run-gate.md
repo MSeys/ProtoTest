@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Read the findings and the run gate
 
-A green test list can still be a red run. This lesson follows a teardown failure into the report as a finding, and reads the run gate that turns it into a failed run.
+All tests can pass while the run still fails. This lesson follows a teardown failure into the report as a finding, and reads the run gate that turns it into a failed run.
 
 <LearnShell
   level="Level 4, lesson 4"

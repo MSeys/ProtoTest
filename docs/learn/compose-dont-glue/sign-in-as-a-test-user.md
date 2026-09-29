@@ -37,7 +37,7 @@ The first test you wrote carried `[SignedInAs]`, and every journey in the sample
       'A test declares [SignedInAs("alice", "admin", Claims = ["tenant=northstar"])]. Which parts reach the trace, and which value does not?',
     verify: (
       <>
-        Read the <code>auth:user</code> entity in <a href="pathname:///lessons/l1-first-journey.prototrace">l1-first-journey.prototrace</a>, or run the sample with <code>ProtoTest__TargetUrl=http://127.0.0.1:5099</code> and a test carrying the declaration above. The reason the entity records is in <code>src/ProtoTest.Http/Authentication/SignedInAsAttribute.cs</code>.
+        Read the <code>auth:user</code> entity in <a href="pathname:///lessons/l1-first-journey.prototrace">l1-first-journey.prototrace</a>, or run the published case below with a test that carries only <code>[Application]</code>, <code>[ProtoTest]</code> and <code>[SignedInAs]</code>. The reason the entity records is in <code>src/ProtoTest.Http/Authentication/SignedInAsAttribute.cs</code>.
       </>
     ),
     reveal: (
@@ -47,9 +47,9 @@ The first test you wrote carried `[SignedInAs]`, and every journey in the sample
     ),
   }}
   learned={[
-    'A bare [SignedInAs] signs in as the built-in test-user; name, roles and claims describe the identity further.',
+    'A bare [SignedInAs] signs in as the built-in test-user; a name, roles and claims describe the identity further.',
     'The identity is per-test state; the trace shows the name, roles and claim types, never claim values.',
-    'The shipped transport needs an in-process application; against a published one it is inert and says why.',
+    'The shipped transport needs an in-process application. Against a published one it is inert and records why.',
   ]}
   next={[
     {
@@ -145,7 +145,7 @@ builder.AddApplication("Api", app => app
     .AddRest(rest => rest.AddClient("Api")));
 ```
 
-The handler decodes the `ProtoTest-User` header into the application's `ClaimsPrincipal`, name, roles and custom claims included, and becomes its default authentication scheme. The application's own `[Authorize]` and role checks then decide exactly as in production. The sample leaves it out on purpose: its subject is the application's own authentication, and the handler replaces the default scheme.
+The handler decodes the `ProtoTest-User` header into a `ClaimsPrincipal` with the name, the roles and the custom claims. It becomes the default authentication scheme, so the application's own `[Authorize]` and role checks decide exactly as in production. The sample leaves it out on purpose: its subject is the application's own authentication, and the handler replaces the default scheme.
 
 ## What the trace records
 
@@ -164,11 +164,36 @@ Claim values never appear. The entity records `auth.claim_types`, a list of type
 
 ## The published case
 
-The shipped transport needs the application the run hosts in-process. Point the sample at an address that hosts nothing, the dead one from the Level 0 environment drill, add a small test with `[SignedInAs("alice", "admin", Claims = ["tenant=northstar"])]` (the Level 1 file works if you kept it, any test of your own otherwise), and run it by its name:
+The shipped transport needs an application the run hosts in-process. Point the sample at an address that hosts nothing, the dead one from the Level 0 environment drill, and add a test that declares the identity and nothing else:
+
+<AnnotatedCode
+  filename="PublishedAliceProbe.cs"
+  code={`[Application(NorthstarTargets.Api)]
+public sealed class PublishedAliceProbe
+{
+    [ProtoTest]
+    [SignedInAs("alice", "admin", Claims = ["tenant=northstar"])]
+    public async Task TheIdentityIsStillRecorded()
+    {
+        using var response = await Proto.Context.Rest()
+            .Body(new CreateProjectRequest("alice-atlas"))
+            .PostAsync("/api/v1/projects");
+
+        response.Should.HaveHttpStatus(HttpStatusCode.Created);
+    }
+}`}
+  callouts={[
+    {line: 1, title: 'Select the published application', note: 'The same [Application] the sample journeys carry. Nothing in this test hosts it.'},
+    {line: 4, title: 'Declare the identity', note: 'This is the declaration the lesson is about. The request behind it is ordinary.'},
+  ]}
+  foot={<>Put it in <code>samples/Northstar.ProtoTest/</code>. Leave <code>[NorthstarMember]</code> off: it provisions a tenant first, that call needs a live address, and it would fail before this declaration runs.</>}
+/>
+
+Run it by name against the dead address:
 
 ```powershell
 $env:ProtoTest__TargetUrl = "http://127.0.0.1:5099"
-dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~TheNameOfYourTest"
+dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~PublishedAliceProbe"
 Remove-Item Env:ProtoTest__TargetUrl
 ```
 
@@ -178,6 +203,8 @@ The request fails, because nothing answers at the address. The identity entity i
 - `auth.transport: inert`, with the reason: the application is not hosted in-process, so register it with `AddAspNetCoreServer` and add the app-side authentication with `webHost.AddTestUserAuthentication()`;
 - an `auth.user.inert` event with outcome `skipped`.
 
-That is the honest limit: a published application holds no test user unless the suite declares its own `[Auth<T>]` authenticator that reads `context.SignedInUser()`. The [authentication reference](/docs/integrations/rest/authentication) shows that shape and the full precedence rules.
+The literal `tenant=northstar` appears nowhere in that trace. The name, the role and the claim type do.
+
+That is the limit of the shipped transport: a published application holds no test user unless the suite declares its own `[Auth<T>]` authenticator that reads `context.SignedInUser()`. The [authentication reference](/docs/integrations/rest/authentication) shows that shape and the full precedence rules.
 
 </LearnShell>

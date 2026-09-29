@@ -223,11 +223,12 @@ function selectTab(id: string) {
 }
 
 function openPicker() { fileInput.value?.click(); }
-function showTest(test: TestTrace) {
+function showTest(test: TestTrace, selection?: { span: string }) {
   const current = route.value;
   // Switching test keeps the view the reader chose; only a first visit lands on the story.
+  // A caller that names an operation - a finding - keeps it; otherwise the test decides its landing.
   const next = current.name === "test" ? current.view : "story";
-  navigate({ name: "test", testId: test.id, view: next, selection: landing(test) });
+  navigate({ name: "test", testId: test.id, view: next, selection: selection ?? landing(test) });
   // On a narrow screen the test list is a drawer: picking a test is the reason it was opened.
   if (!railFits.value) railOpen.value = false;
 }

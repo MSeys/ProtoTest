@@ -40,7 +40,7 @@ function value(input: unknown): string {
 
     <ShapeResultTree v-if="shapeTree" :nodes="shapeTree" />
     <table v-else-if="failure.mismatches.length" class="mismatches">
-      <thead><tr><th>Property</th><th>Expected</th><th>Actual</th></tr></thead>
+      <thead><tr><th scope="col">Property</th><th scope="col">Expected</th><th scope="col">Actual</th></tr></thead>
       <tbody>
         <tr v-for="mismatch in failure.mismatches" :key="mismatch.path" :title="mismatch.reason">
           <td>{{ mismatch.path }}</td>

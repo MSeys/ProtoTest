@@ -63,7 +63,9 @@ function reason(test: TestTrace): string {
           <span v-if="reason(test)" class="reason">{{ reason(test) }}</span>
         </button>
       </section>
-      <EmptyState v-if="!groups.length" message="No test matches." />
+      <EmptyState v-if="!groups.length" message="No test matches.">
+        <FilterChip label="Show all tests" @select="query = ''; problemsOnly = false" />
+      </EmptyState>
     </div>
   </aside>
 </template>

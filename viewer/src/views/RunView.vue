@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import type { Artifact, Run, TestTrace } from "../trace/model";
+import type { Artifact, Run, Span, TestTrace } from "../trace/model";
 import { failureReason, formatDate, formatDuration, formatOffset, needsAttention, outcomeLabel, pad, phaseSegments, testCodeName, testGroup, testMatches, testTitle, timelinePercent, tone } from "../trace/format";
 import Panel from "../ui/Panel.vue";
 import TextInput from "../ui/TextInput.vue";
@@ -11,7 +11,7 @@ import type { FileEntry } from "../ui/FileList.vue";
 import VisibilityStrip from "../ui/VisibilityStrip.vue";
 
 const props = defineProps<{ run: Run; fileName: string }>();
-const emit = defineEmits<{ select: [test: TestTrace]; artifact: [artifact: Artifact] }>();
+const emit = defineEmits<{ select: [test: TestTrace, selection?: { span: string }]; artifact: [artifact: Artifact] }>();
 
 // Every file the run produced, in one place: the run's own reports first, then each test's, in test order.
 // The inspector reaches an artifact through the operation that wrote it; this is the whole list.
@@ -29,6 +29,27 @@ const filter = ref<"all" | "attention">("all");
 const attention = computed(() => props.run.tests.filter(needsAttention)
   .sort((left, right) => (left.outcome === "failed" ? 0 : 1) - (right.outcome === "failed" ? 0 : 1) || left.number - right.number));
 
+/*
+ * What the run itself did wrong, outside any test: a release that failed, an error moment. Tests and
+ * gates have their own rows; without these rows a broken teardown would have no surface at all.
+ */
+const runProblems = computed(() => ({
+  spans: props.run.spans.filter(span => span.status === "failed" || span.error),
+  moments: props.run.moments.filter(moment => moment.outcome === "failed" || moment.error)
+}));
+
+function problemReason(error: { message?: string } | null, fallback: string): string {
+  return error?.message?.split(/\r?\n/)[0] ?? fallback;
+}
+
+/* The run owns resources - a server, a broker - that are not capabilities; the strip states what they are. */
+const resources = computed(() => props.run.items.filter(item => item.kind !== "capability"));
+
+/* A finding that names the operation it came from opens the test at that operation, keeping the deep link. */
+function findingSelection(test: TestTrace | null, span: Span | null): { span: string } | undefined {
+  return test && span && span.test === test ? { span: span.id } : undefined;
+}
+
 /** The run in one sentence: what went wrong first, then what passed. */
 const verdict = computed(() => {
   const counts = props.run.counts;
@@ -36,6 +57,7 @@ const verdict = computed(() => {
   if (counts.failed) parts.push({ text: `${counts.failed} failed`, tone: "danger" });
   if (counts.partial) parts.push({ text: `${counts.partial} partial`, tone: "warning" });
   if (counts.cancelled) parts.push({ text: `${counts.cancelled} cancelled`, tone: "warning" });
+  if (counts.unknown) parts.push({ text: `${counts.unknown} unknown`, tone: "neutral" });
   parts.push({ text: `${counts.succeeded} passed`, tone: "success" });
   if (counts.skipped) parts.push({ text: `${counts.skipped} skipped`, tone: "neutral" });
   return parts;
@@ -80,10 +102,10 @@ function bars(test: TestTrace) {
       </div>
     </header>
 
-    <VisibilityStrip :visibility="run.visibility" />
+    <VisibilityStrip :visibility="run.visibility" :resources="resources" />
 
-    <Panel v-if="attention.length || run.findings.length || run.gates.length" title="Needs attention"
-           subtitle="Failing and partial tests first, then what the run itself found and how its gates judged it." pad="none">
+    <Panel v-if="attention.length || runProblems.spans.length || runProblems.moments.length || run.findings.length || run.gates.length" title="Needs attention"
+           subtitle="Failing and partial tests first, then the run's own problems, what it found and how its gates judged it." pad="none">
       <div class="attention">
         <button v-for="test in attention" :key="test.id" type="button" class="issue" :class="tone(test.outcome)" @click="emit('select', test)">
           <b>{{ pad(test.number) }}</b>
@@ -94,9 +116,25 @@ function bars(test: TestTrace) {
           </span>
           <span class="issue-kind">{{ outcomeLabel(test.outcome) }}</span>
         </button>
+        <div v-for="span in runProblems.spans" :key="`run-span-${span.id}`" class="issue run" :class="tone(span.status)">
+          <b>Run</b>
+          <span class="issue-main">
+            <strong>{{ span.name }}</strong>
+            <span class="issue-reason">{{ problemReason(span.error, outcomeLabel(span.status)) }}</span>
+          </span>
+          <span class="issue-kind">{{ outcomeLabel(span.status) }}</span>
+        </div>
+        <div v-for="(moment, index) in runProblems.moments" :key="`run-moment-${index}`" class="issue run" :class="tone(moment.outcome)">
+          <b>Run</b>
+          <span class="issue-main">
+            <strong>{{ moment.name }}</strong>
+            <span class="issue-reason">{{ problemReason(moment.error, outcomeLabel(moment.outcome)) }}</span>
+          </span>
+          <span class="issue-kind">{{ outcomeLabel(moment.outcome) }}</span>
+        </div>
         <component :is="item.test ? 'button' : 'div'" v-for="(item, index) in run.findings" :key="`finding-${index}`"
                    :type="item.test ? 'button' : undefined" class="issue finding" :class="item.finding.status.toLowerCase()"
-                   @click="item.test && emit('select', item.test)">
+                   @click="item.test && emit('select', item.test, findingSelection(item.test, item.finding.span))">
           <b>{{ item.test ? pad(item.test.number) : "Run" }}</b>
           <span class="issue-main">
             <strong>{{ item.finding.message }}</strong>
@@ -163,6 +201,7 @@ function bars(test: TestTrace) {
 
 
 .summary {
+  min-width: 0;
   padding: var(--space-4) var(--space-1) 0;
   display: grid;
   gap: var(--space-3);
@@ -177,7 +216,7 @@ function bars(test: TestTrace) {
 .file { color: var(--dim); }
 
 /* The one bold element on this screen: every test as a tick, so the run's outcome has a shape. */
-.strip { display: flex; align-items: flex-end; gap: 2px; height: 12px; }
+.strip { display: flex; flex-wrap: wrap; align-items: flex-end; align-content: flex-start; gap: 2px; min-height: 12px; }
 /* Passing tests are the quiet majority; what did not pass stands up out of the line. */
 .tick { flex: 1 1 0; min-width: 3px; height: 5px; padding: 0; border: 0; border-radius: var(--radius-hairline); background: var(--outcome-succeeded); opacity: .45; }
 .tick:hover, .tick:focus-visible { opacity: 1; }

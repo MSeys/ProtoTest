@@ -152,14 +152,14 @@ describe("findFailure over the committed demo trace", () => {
     const run = buildRun(archive.spans, archive.state);
     const failureOf = (name: string) => run.tests.find(test => test.name.endsWith(name))?.failure;
 
-    expect(failureOf("AFailedOperationRecordsItsDiagnosticsAndTheRunContinues")?.span.kind).toBe("northstar.webhook.deliver");
-    expect(failureOf("ShapeMismatchesAreCapturedWithoutFailingTheRun")?.span.kind).toBe("assert.json.shape");
-    expect(failureOf("TheDashboardNeverShowsAnotherTenantsPlan")?.span.kind).toBe("assert.web");
-    expect(failureOf("TheOrganizationReportsItsPlanAndProjectCount")?.span.kind).toBe("assert.json.shape");
+    expect(failureOf("ARealWaitDoesNotCloseTheDueWindow")?.span.kind).toBe("assert.json.shape");
+    expect(failureOf("ABareStatusHidesWhatTheApplicationSaid")?.span.kind).toBe("assert.http.status");
+    expect(failureOf("AnUnknownProjectIdIsTreatedAsMine")?.span.kind).toBe("assert.http.status");
+    expect(failureOf("TheAddressWasHardcodedForOneMachine")?.span.kind).toBe("test.execution");
 
-    // The shape checks were judged on a protocol call, so the failure names that call.
-    expect(failureOf("ShapeMismatchesAreCapturedWithoutFailingTheRun")?.call?.kind).toBe("http.request");
-    expect(failureOf("TheOrganizationReportsItsPlanAndProjectCount")?.call?.kind).toBe("http.request");
-    expect(failureOf("TheDashboardNeverShowsAnotherTenantsPlan")?.call).toBeNull();
+    // The shape check was judged on a protocol call, so the failure names that call; the address drill
+    // threw before any call was recorded.
+    expect(failureOf("ARealWaitDoesNotCloseTheDueWindow")?.call?.kind).toBe("http.request");
+    expect(failureOf("TheAddressWasHardcodedForOneMachine")?.call).toBeNull();
   });
 });

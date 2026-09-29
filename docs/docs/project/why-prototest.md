@@ -48,6 +48,10 @@ ProtoTrace exists to show the lifecycle around that failure. It records setup, o
 
 Playwright tracing was a large inspiration, but I wanted the trace to cover more than browser actions.
 
+## Stability you can adopt on
+
+ProtoTest 1.x stays additive. Released APIs change only through deprecated shims, and nothing breaks without a plan decision recorded in the changelog. Most packages are supported; a smaller preview set (the agent layer, devices, Sheets, Aspire, WireMock, MassTransit and analyzers) can still change before 1.2. Support is best effort by one maintainer in personal time; the [sustainability page](./sustainability.md) has the full story.
+
 ## Nothing phones home
 
 ProtoTest runs entirely in your process. Nothing is sent anywhere: there is no telemetry, no account and no

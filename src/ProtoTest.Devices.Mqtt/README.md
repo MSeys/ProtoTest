@@ -1,5 +1,7 @@
 # ProtoTest.Devices.Mqtt
 
+> Preview: the surface can change before 1.2.
+
 MQTT transport for `ProtoTest.Devices`: talk to devices over publish/subscribe against a real broker -
 Mosquitto in CI, the broker behind the lab.
 

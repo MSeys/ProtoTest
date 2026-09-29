@@ -1,5 +1,7 @@
 # ProtoTest.Aspire
 
+> Preview: the surface can change before 1.2.
+
 Runs an Aspire AppHost with the suite: it starts with the run, each declared resource becomes an
 application target, and the run releases it.
 

@@ -1,5 +1,7 @@
 # ProtoTest.Mcp
 
+> Preview: the surface can change before 1.2.
+
 Reads `.prototrace` evidence over the Model Context Protocol, so a coding agent can list runs, read a
 failure, read the diagnosis and read coverage without leaving the machine or opening the viewer.
 

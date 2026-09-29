@@ -1,5 +1,7 @@
 # ProtoTest.Analyzers
 
+> Preview: the surface can change before 1.2.
+
 Roslyn analyzers for ProtoTest suites: the context-scoped mistakes the framework cannot see at
 runtime. Two warnings, deliberately narrow - a noisy analyzer is worse than none.
 

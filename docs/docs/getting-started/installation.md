@@ -20,8 +20,8 @@ export const installTabs = [
     label: 'Integrations',
     filename: 'terminal',
     language: 'bash',
-    code: 'dotnet add package ProtoTest.AspNetCore         # host an ASP.NET Core app in-process\ndotnet add package ProtoTest.Rest               # HTTP/REST APIs\ndotnet add package ProtoTest.GraphQL            # GraphQL APIs\ndotnet add package ProtoTest.Grpc               # gRPC services\ndotnet add package ProtoTest.Web.Playwright     # browser tests with Playwright\ndotnet add package ProtoTest.Web.Selenium       # browser tests with Selenium\ndotnet add package ProtoTest.Data               # test data and provisioning\ndotnet add package ProtoTest.Sql                # a per-test database connection\ndotnet add package ProtoTest.Messaging.RabbitMq # publish and await messages on RabbitMQ\ndotnet add package ProtoTest.Sheets             # assert on generated spreadsheets\ndotnet add package ProtoTest.OpenApi            # OpenAPI contract coverage',
-    footnote: 'The integrations map lists every package, including WireMock fakes, devices, Aspire and background workers.',
+    code: 'dotnet add package ProtoTest.AspNetCore         # host an ASP.NET Core app in-process\ndotnet add package ProtoTest.Rest               # HTTP/REST APIs\ndotnet add package ProtoTest.GraphQL            # GraphQL APIs\ndotnet add package ProtoTest.Grpc               # gRPC services\ndotnet add package ProtoTest.Web.Playwright     # browser tests with Playwright\ndotnet add package ProtoTest.Web.Selenium       # browser tests with Selenium\ndotnet add package ProtoTest.Data               # test data and provisioning\ndotnet add package ProtoTest.Sql                # a per-test database connection\ndotnet add package ProtoTest.Messaging.RabbitMq # publish and await messages on RabbitMQ\ndotnet add package ProtoTest.OpenApi            # OpenAPI contract coverage',
+    footnote: 'These are the supported integrations. The preview packages (Sheets, WireMock, devices, Aspire, MassTransit, the agent layer and analyzers) install the same way; the integrations map marks each one.',
   },
   {
     id: 'infrastructure',
@@ -74,6 +74,16 @@ The NUnit adapter needs **NUnit 4.6.1 or newer**; the standard `dotnet new nunit
 
 ```bash
 dotnet add package NUnit --version 4.6.1
+```
+
+## Preview packages
+
+The preview set works but its surface can change before 1.2: Sheets, WireMock, the devices family, Aspire, the MassTransit bridge, the agent layer (Mcp, Diagnosis, Verification, Feedback, Cli) and Analyzers. Add one per need the same way:
+
+```bash
+dotnet add package ProtoTest.Sheets
+dotnet add package ProtoTest.WireMock
+dotnet add package ProtoTest.Aspire
 ```
 
 ## What comes along

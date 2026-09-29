@@ -19,7 +19,7 @@ dotnet add package ProtoTest.AspNetCore
 dotnet add package ProtoTest.Testcontainers   # the application's image as a container
 ```
 
-`ProtoTest.AspNetCore` targets `net8.0`, `net9.0` and `net10.0`; the project templates default to `net10.0`, so pass `-f net8.0` or `-f net9.0` when a suite targets an older baseline.
+`ProtoTest.AspNetCore` targets `net8.0`, `net9.0` and `net10.0`; the project templates default to `net10.0`, so pass `--framework net8.0` or `--framework net9.0` when a suite targets an older baseline.
 
 ## Compose
 

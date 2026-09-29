@@ -179,7 +179,7 @@ Run it with `dotnet test`. One test passes, and a trace file lands under `TestRe
 
 ## 4. Assert on the response
 
-A status code says little. Describe the parts of the body the behaviour depends on:
+A status code says little. Describe the parts of the body the behavior depends on:
 
 ```csharp
 using ProtoTest.Json;

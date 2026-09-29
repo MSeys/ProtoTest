@@ -8,7 +8,7 @@ description: "Run code around every test or around the whole run without touchin
 
 ## What it is
 
-A hook runs code around **every** test or around the whole run, without any test mentioning it. Use a hook for behavior that applies to every test, for example setting a correlation id. When only some tests need the behaviour, write an [attribute](./attributes.md) instead.
+A hook runs code around **every** test or around the whole run, without any test mentioning it. Use a hook for behavior that applies to every test, for example setting a correlation id. When only some tests need the behavior, write an [attribute](./attributes.md) instead.
 
 ```text
 hook or attribute?

@@ -39,7 +39,7 @@ public sealed class AcCharger : ProtoDevice
 }
 ```
 
-`ExpectAsync` is the assertion: it waits for the frame the behaviour depends on, contributes device coverage, and a timeout fails with the description and the frames exchanged so far.
+`ExpectAsync` is the assertion: it waits for the frame the behavior depends on, contributes device coverage, and a timeout fails with the description and the frames exchanged so far.
 
 ## Compose
 

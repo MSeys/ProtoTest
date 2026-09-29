@@ -14,7 +14,7 @@ description: "Register ProtoTest with NUnit: the SetUpFixture, the [ProtoTest] a
 dotnet add package ProtoTest.NUnit
 ```
 
-ProtoTest targets **.NET 8, 9 and 10**, and needs **NUnit 4.6.1 or newer**; the standard `dotnet new nunit` template pins an older version, so update NUnit first: `dotnet add package NUnit --version 4.6.1`. The `dotnet new prototest` template defaults to `net10.0`; pass `-f net8.0` or `-f net9.0` for an older runtime.
+ProtoTest targets **.NET 8, 9 and 10**, and needs **NUnit 4.6.1 or newer**; the standard `dotnet new nunit` template pins an older version, so update NUnit first: `dotnet add package NUnit --version 4.6.1`. The `dotnet new prototest` template defaults to `net10.0`; pass `--framework net8.0` or `--framework net9.0` for an older runtime.
 
 ## Register
 

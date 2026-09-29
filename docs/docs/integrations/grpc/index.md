@@ -134,7 +134,11 @@ public sealed class OrderTests
 }
 ```
 
-Authenticators write HTTP headers as usual; the gRPC applier translates them to lowercase metadata keys. Metadata is layered client `Metadata` first, then `ConfigureMetadata`, then per-call `metadata`, with authenticators last so they can override. Each call resolves its authenticator from the test's factory, so a stateful authenticator is created per call and never shared between calls. Sensitive metadata values are redacted in the trace; `SensitiveMetadataKeys` starts with the defaults above and entries under `ProtoTest:Grpc:Client:SensitiveMetadataKeys` extend them. Matching is case-insensitive and by substring, so `authorization` also covers `proxy-authorization`.
+Authenticators write HTTP headers as usual; the gRPC applier translates them to lowercase metadata keys. Metadata is layered client `Metadata` first, then `ConfigureMetadata`, then per-call `metadata`, with authenticators last so they can override.
+
+Each call resolves its authenticator from the test's factory, so a stateful authenticator is created per call and never shared between calls.
+
+Sensitive metadata values are redacted in the trace; `SensitiveMetadataKeys` starts with the defaults above and entries under `ProtoTest:Grpc:Client:SensitiveMetadataKeys` extend them. Matching is case-insensitive and by substring, so `authorization` also covers `proxy-authorization`.
 
 #### Attachments
 
@@ -144,7 +148,11 @@ builder.AddGrpc(grpc => grpc
     .AddClient("Api"));
 ```
 
-With capture enabled, each traced call attaches its request and response messages as JSON: `grpc-{client}-{service}-{method}-{request|response}-{n}`, where `{client}` is the sanitized client name and `n` is the call's position in the client's call sequence, so repeated calls to the same method stay distinct, even from two clients in one test. Values run through the shared redaction rules, covering JSON properties such as `password` and `token` and the sensitive metadata keys, and each attachment is capped at `MaxDiagnosticBodyLength` from `ProtoTest:Grpc:Attachments`. `ClientStreamingAsync` and `ServerStreamingAsync` capture up to the first 10 streamed messages and record the total count in the attachment description. A message that cannot be serialized is reported as a `grpc.attachment.failed` event and never fails the call.
+With capture enabled, each traced call attaches its request and response messages as JSON: `grpc-{client}-{service}-{method}-{request|response}-{n}`, where `{client}` is the sanitized client name and `n` is the call's position in the client's call sequence, so repeated calls to the same method stay distinct, even from two clients in one test.
+
+Values run through the shared redaction rules, covering JSON properties such as `password` and `token` and the sensitive metadata keys, and each attachment is capped at `MaxDiagnosticBodyLength` from `ProtoTest:Grpc:Attachments`.
+
+`ClientStreamingAsync` and `ServerStreamingAsync` capture up to the first 10 streamed messages and record the total count in the attachment description. A message that cannot be serialized is reported as a `grpc.attachment.failed` event and never fails the call.
 
 #### Coverage
 
@@ -176,7 +184,11 @@ grpc.call "gRPC · billing.Orders/GetOrder"   (operation: the call)
  └─ grpc-{client}-{service}-{method}-request/response-{n}  (attachments: the messages as JSON)
 ```
 
-The async helpers record a `grpc.call` operation named `gRPC · {method.FullName}` with the client entity `client:ProtoTest.Grpc.ProtoGrpcClient:{name}` and attributes `rpc.system`, `rpc.service`, `rpc.method`, `client.name`, `rpc.deadline`, `rpc.metadata.{key}` (sensitive values `(redacted)`), `auth.outcome`/`auth.type`, `grpc.request.count` for client streaming and `grpc.response.count`. Request and response sections are protobuf code; a failure adds `rpc.grpc.status_code`/`rpc.grpc.status` and a `Status` Fields section with `code` and `detail`. Each call records a `grpc.response` observation with `rpc.system`, `rpc.service`, `rpc.method` and `rpc.grpc.status`; a failed call records `grpc.failure` instead, so a call that never succeeded does not count as covered.
+The async helpers record a `grpc.call` operation named `gRPC · {method.FullName}` with the client entity `client:ProtoTest.Grpc.ProtoGrpcClient:{name}` and attributes `rpc.system`, `rpc.service`, `rpc.method`, `client.name`, `rpc.deadline`, `rpc.metadata.{key}` (sensitive values `(redacted)`), `auth.outcome`/`auth.type`, `grpc.request.count` for client streaming and `grpc.response.count`.
+
+Request and response sections are protobuf code; a failure adds `rpc.grpc.status_code`/`rpc.grpc.status` and a `Status` Fields section with `code` and `detail`.
+
+Each call records a `grpc.response` observation with `rpc.system`, `rpc.service`, `rpc.method` and `rpc.grpc.status`; a failed call records `grpc.failure` instead, so a call that never succeeded does not count as covered.
 
 The client is state, not history: it appears once with `client.name`, `client.protocol`, `client.type`, `client.endpoint_source` and the sanitized `client.address`; Core adds the `client.initialize` operation and the `client.initializer` field. The `grpc.client.resolve` event records a fallback resolution, and `grpc.attachment.failed` records a capture failure with `attachment.name`.
 

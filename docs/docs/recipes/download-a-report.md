@@ -9,6 +9,8 @@ import TabbedCode from '@site/src/components/TabbedCode';
 
 # A downloaded report matches its model
 
+`200` says a file arrived. A sheet model says it is the right report.
+
 ## The situation
 
 The application generates a monthly report as an `.xlsx`. A `200` on the download says a file arrived. It does not say the file has the right sheet, the right columns, valid values in every row or the project the test created.

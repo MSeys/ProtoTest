@@ -139,7 +139,7 @@ FirstHook:After
 
 The test is recorded as failed, the trace shows a `Rollback` phase instead of `Teardown`, and the exception reads *"Test setup failed and completed lifecycle components were rolled back."*
 
-The same reversal in the recording, the learning sample's project journey: setup runs attributes `Application, NorthstarTenant, SignedInAs, NorthstarMember`, and teardown answers `NorthstarMember, SignedInAs, NorthstarTenant, Application`.
+The same reversal in the recording, the sample suite's project journey: setup runs attributes `Application, NorthstarTenant, SignedInAs, NorthstarMember`, and teardown answers `NorthstarMember, SignedInAs, NorthstarTenant, Application`.
 
 <TraceAnatomy
   source={lessonTraces.firstJourney}

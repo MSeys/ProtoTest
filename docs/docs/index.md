@@ -48,7 +48,7 @@ ProtoTest 1.1 packages are available on NuGet. The template targets `net10.0` by
 
 ## See it in a real suite
 
-The repository contains [Northstar](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.SampleApp), a multi-tenant sample application, and a [Learning demo](https://github.com/MSeys/ProtoTest/tree/main/samples/Northstar.ProtoTest) suite that tests it across API, messaging, browser, database and workbook boundaries. Examples throughout these docs come from that suite.
+The repository contains the [Northstar sample app](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.SampleApp), a multi-tenant sample application, and the [Northstar.ProtoTest](https://github.com/MSeys/ProtoTest/tree/main/samples/Northstar.ProtoTest) sample suite that tests it across API, messaging, browser, database and workbook boundaries. Examples throughout these docs come from that suite.
 
 One more suite runs outside this repository. OpenCSMS is an independent EV charging platform in its own repository and the full product demo: its suite runs in containers the run owns, through an Aspire AppHost, against a published stack and with faults injected on purpose. The [Level 5 lessons](/learn/real-topology/containers) walk containers, Aspire, published mode and fault injection.
 

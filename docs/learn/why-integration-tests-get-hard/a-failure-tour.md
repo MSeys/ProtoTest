@@ -3,7 +3,7 @@ id: a-failure-tour
 title: A failure tour
 sidebar_label: A failure tour
 sidebar_position: 2
-description: "Four deliberate failures from the Northstar sample, each read in its trace next to the test that does the same journey the right way."
+description: "Four deliberate failures from the Northstar.ProtoTest sample suite, each read in its trace next to the test that does the same journey the right way."
 ---
 
 import LearnShell from '@site/src/components/LearnShell';
@@ -13,7 +13,7 @@ import Link from '@docusaurus/Link';
 
 # A failure tour
 
-The Northstar sample ships four tests that fail on purpose. Each drill is paired with a test that runs the same journey and passes. The difference is one practice.
+The Northstar.ProtoTest sample suite ships four tests that fail on purpose. Each drill is paired with a test that runs the same journey and passes. The difference is one practice.
 
 <LearnShell
   level="Level 0, lesson 2"

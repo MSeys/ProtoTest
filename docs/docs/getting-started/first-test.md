@@ -132,14 +132,14 @@ public sealed class Setup : ProtoTestAssembly
 {
     protected override void Configure(IProtoHostBuilder builder) =>
         builder
-            .AddSink<HtmlReportSink>()
+            .AddSink<HtmlReportSink>(sink => sink.OutputPath = "TestResults/report.html")
             .AddApplication("Api", app => app
                 .AddAspNetCoreServer<Program>()
                 .AddRest(rest => rest.AddClient("Api")));
 }
 ```
 
-This describes one application, `Api`, that exposes REST. It runs your application **in-process**. No deployed environment and no port are needed. Point it at a real address in an environment by setting `ProtoTest:Applications:Api:BaseUrl`. The sink writes `report.html` next to the trace in step 6.
+This describes one application, `Api`, that exposes REST. It runs your application **in-process**. No deployed environment and no port are needed. Point it at a real address in an environment by setting `ProtoTest:Applications:Api:BaseUrl`. The sink writes `TestResults/report.html` under the test project's output folder, next to the trace in step 6.
 
 :::tip
 A `[SetUpFixture]` only covers its own namespace and the namespaces below it. Keep your tests in or under `Orders.Tests`.
@@ -210,14 +210,20 @@ The message names the fix. Change the expectation back, and the test passes. The
 
 ## 6. Read the trace
 
-Tracing is on by default. Without `ConfigureTracing` the trace is written to `TestResults/prototest-{runId}.prototrace` under the test project's output folder. The sink from step 2 writes `report.html` beside it.
+Tracing is on by default. Without `ConfigureTracing` the trace is written to `TestResults/prototest-{runId}.prototrace` under the test project's output folder. The sink from step 2 writes `TestResults/report.html` beside it.
+
+To choose the trace path yourself, add one line to `Setup`:
+
+```csharp
+builder.ConfigureTracing(trace => trace.OutputPath = "TestResults/orders.prototrace");
+```
 
 Run the tests, then:
 
-- drop `TestResults/orders.prototrace` onto [trace.prototest.dev](https://trace.prototest.dev) to see every step of the test, the request and the shape comparison;
-- open `report.html` for the endpoints the suite exercised. See [Reporting](../observability/reporting.md).
+- drop the trace file (`TestResults/orders.prototrace` with the line above, otherwise the default `TestResults/prototest-{runId}.prototrace`) onto [trace.prototest.dev](https://trace.prototest.dev) to see every step of the test, the request and the shape comparison;
+- open `TestResults/report.html` for the endpoints the suite exercised. See [Reporting](../observability/reporting.md).
 
-One recorded journey reads like this. The walk below is the learning sample's project journey (`ProjectsJourney.CreatingAProjectReturnsIt`), which follows the same six steps against a real application:
+One recorded journey reads like this. The walk below is the sample suite's project journey (`ProjectsJourney.CreatingAProjectReturnsIt`), which follows the same six steps against a real application:
 
 <TraceAnatomy
   source={lessonTraces.firstJourney}
@@ -227,11 +233,7 @@ One recorded journey reads like this. The walk below is the learning sample's pr
   blindSpots={[]}
 />
 
-To choose the trace path yourself, add one line to `Setup`:
-
-```csharp
-builder.ConfigureTracing(trace => trace.OutputPath = "TestResults/orders.prototrace");
-```
+The `ConfigureTracing` line above is optional. Without it the trace keeps its default name; everything else on this page stays the same.
 
 ## Going further: turn setup into a capability
 

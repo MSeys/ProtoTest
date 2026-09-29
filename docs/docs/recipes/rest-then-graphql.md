@@ -12,7 +12,7 @@ import TraceExample from '@site/src/components/TraceExample';
 
 Many applications write through REST and read through GraphQL. Testing each API alone misses the question that matters: does a write through one show up in the other?
 
-Both clients can target the same application in one test. The GraphQL read checks the row the REST write just created. The demo runs this journey in [PlatformJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/PlatformJourney.cs).
+Both clients can target the same application in one test. The GraphQL read checks the row the REST write just created. The sample suite runs this journey in [PlatformJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/PlatformJourney.cs).
 
 ## The code
 
@@ -99,7 +99,7 @@ Both calls are operations of the same test against the same server, in order:
 
 Order matters. A read failure points to the write before it. Both payloads stay in the same test trace.
 
-The demo's own run:
+The sample suite's own run:
 
 <TraceExample
   demo="rest-graphql"
@@ -115,7 +115,7 @@ The demo's own run:
 
 ## What it does not prove
 
-- **Filter to what the test created.** `totalCount = 1` only holds if the query is narrowed to this test's data. The demo gets that from its provisioned tenant; a shared database needs its own filter.
+- **Filter to what the test created.** `totalCount = 1` only holds if the query is narrowed to this test's data. The sample suite gets that from its provisioned tenant; a shared database needs its own filter.
 - **The two APIs name things differently.** REST and GraphQL often disagree on casing and enum values (`active` and `ACTIVE`). Assert each in its own terms; the shape matcher compares exactly.
 - **Assume the read may lag the write until the test proves otherwise.** If the read side updates asynchronously, the first query can miss the write. Poll with a deadline instead of adding a delay, so the wait ends as soon as the write is visible.
 

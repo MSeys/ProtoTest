@@ -195,7 +195,7 @@ public sealed class SampleUserAttribute : ProtoAttribute
 }
 ```
 
-The sample suite's environment and user attributes are `SampleEnvironmentAttribute` and `SampleUserAttribute` (see below). The learning sample groups its pair as `NorthstarMemberAttribute` in `samples/Northstar.ProtoTest`.
+The sample suite's environment and user attributes are `SampleEnvironmentAttribute` and `SampleUserAttribute` (see below). The sample suite groups its pair as `NorthstarMemberAttribute` in `samples/Northstar.ProtoTest`.
 
 ```mermaid
 flowchart LR

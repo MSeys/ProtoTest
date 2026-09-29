@@ -18,7 +18,7 @@ Integration tests touch time, shared state, real addresses, and several protocol
 - Your suite has grown and is now slow, shared-state or hard to debug.
 - You evaluate ProtoTest and want to see how it behaves when a test fails.
 
-No ProtoTest experience is needed to start. The lessons use the Northstar sample. They link to the reference for depth instead of repeating it.
+No ProtoTest experience is needed to start. The lessons use the Northstar.ProtoTest sample suite. They link to the reference for depth instead of repeating it.
 
 ## Start here
 
@@ -54,6 +54,6 @@ Each lesson has the same shape:
 
 ## The sample behind the lessons
 
-The lessons run against [Northstar](https://github.com/MSeys/ProtoTest/tree/main/samples/Northstar.ProtoTest), the sample suite in this repository. It composes API, browser, database, messaging and document integrations in one host, and it ships deliberate failures: four tests that fail on purpose, one per question, next to the tests that do the same journey the right way, plus one passing journey that carries a warning. Run it with `dotnet test samples/Northstar.ProtoTest`, or read the traces without running anything. Every lesson from Level 0 to Level 4 names the trace archive it reads, and the site serves each one for download.
+The lessons run against [Northstar.ProtoTest](https://github.com/MSeys/ProtoTest/tree/main/samples/Northstar.ProtoTest), the sample suite in this repository. It composes API, browser, database, messaging and document integrations in one host, and it ships deliberate failures: four tests that fail on purpose, one per question, next to the tests that do the same journey the right way, plus one passing journey that carries a warning. Run it with `dotnet test samples/Northstar.ProtoTest`, or read the traces without running anything. Every lesson from Level 0 to Level 4 names the trace archive it reads, and the site serves each one for download.
 
 Level 5 leaves the sample and runs OpenCSMS, an EV charging management system and the reference suite for ProtoTest on real infrastructure. It has its own repository, so those lessons need a checkout of it. Each lesson also carries a read-only walk over the committed run logs and traces, so the lesson reads without the checkout. Its suite has one Setup and four modes. Each mode runs the journeys its environment can serve.

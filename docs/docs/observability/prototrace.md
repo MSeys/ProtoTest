@@ -51,7 +51,7 @@ The trace is not the same thing as [observations](./coverage.md). The trace is a
 
 ### In the viewer
 
-The [ProtoTrace viewer](https://trace.prototest.dev) is a static web app. Trace files are read **entirely in your browser** and never uploaded. To look around before you have a trace of your own, [open the sample trace](https://trace.prototest.dev/?demo=1): a run of the demo suite, with four failing tests and one partial one.
+The [ProtoTrace viewer](https://trace.prototest.dev) is a static web app. Trace files are read **entirely in your browser** and never uploaded. To look around before you have a trace of your own, [open the sample trace](https://trace.prototest.dev/?demo=1): a run of the sample suite, with four failing tests and one partial one.
 
 - **The run** opens with its verdict, what needs attention (failing and partial tests with the check that decided them, findings, gates), and what the run could see: where the application ran, which capabilities were composed, and which sources of values were present.
 - **A failing test** leads with its failure: the check that failed, expected against actual for every property, and the call it judged.
@@ -165,7 +165,7 @@ The sample's `TheTestClockClosesTheDueWindow` was recorded with one of each laye
 
 ### The same journey, two ways
 
-The Learning demo runs four deliberate failures next to the tests that do the same journey the right way. Pick a pair to compare what the trace recorded in each run.
+The sample suite runs four deliberate failures next to the tests that do the same journey the right way. Pick a pair to compare what the trace recorded in each run.
 
 <TraceDiff />
 

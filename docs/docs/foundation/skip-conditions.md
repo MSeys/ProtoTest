@@ -226,4 +226,4 @@ Because nothing starts, a skipped test has no context, no trace record and no re
 
 ## In the sample suite
 
-The learning sample gates each environment-dependent journey with a condition: the domain journey requires the `store` capability, the web journey requires the Playwright browser, and the broker journey requires the `broker` capability. The broker reason is declared once in the sample's `Setup` with `AddCapabilityReason`. See [Environments](../getting-started/environments.md) for how the three shapes select those capabilities.
+The sample suite gates each environment-dependent journey with a condition: the domain journey requires the `store` capability, the web journey requires the Playwright browser, and the broker journey requires the `broker` capability. The broker reason is declared once in the sample's `Setup` with `AddCapabilityReason`. See [Environments](../getting-started/environments.md) for how the three shapes select those capabilities.

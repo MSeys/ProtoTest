@@ -18,11 +18,11 @@ Paying an invoice should publish `invoice.paid`. A `200` on the pay call only sa
    +-- 200 says accepted --+----- tap says the system was told ----+
 ```
 
-The test pays over the API and then waits for the event with a predicate and a timeout. That wait links the API call to the broker. It passes only when the application publishes the event. The demo runs this journey in [BrokerJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/BrokerJourney.cs).
+The test pays over the API and then waits for the event with a predicate and a timeout. That wait links the API call to the broker. It passes only when the application publishes the event. The sample suite runs this journey in [BrokerJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/BrokerJourney.cs).
 
 ## The test
 
-The demo test pays an invoice it provisioned through [Data](../integrations/data/index.md), then awaits the event:
+The sample suite test pays an invoice it provisioned through [Data](../integrations/data/index.md), then awaits the event:
 
 ```csharp
 [Application(NorthstarTargets.Api)]
@@ -58,7 +58,7 @@ public sealed class BrokerJourney
 }
 ```
 
-`[NorthstarMember]` is the demo's own composite attribute: it groups an isolated tenant provisioned through [Data](../integrations/data/index.md) with the authenticator that carries the member's token through REST. `IssueInvoiceAsync` is a shortcut over the same data surface.
+`[NorthstarMember]` is the sample suite's own composite attribute: it groups an isolated tenant provisioned through [Data](../integrations/data/index.md) with the authenticator that carries the member's token through REST. `IssueInvoiceAsync` is a shortcut over the same data surface.
 
 The predicate matches this test's invoice id. Parallel tests pay invoices too. The timeout is 15 seconds.
 
@@ -68,7 +68,7 @@ The predicate matches this test's invoice id. Parallel tests pay invoices too. T
 
 ## Compose
 
-The run owns a RabbitMQ broker and hands its address to the application and to the tests. The demo starts one only when the run selects it:
+The run owns a RabbitMQ broker and hands its address to the application and to the tests. The sample suite starts one only when the run selects it:
 
 ```csharp
 // Setup.cs: the broker the run owns, behind the configured address.

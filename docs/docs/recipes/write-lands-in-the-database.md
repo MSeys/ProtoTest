@@ -15,11 +15,11 @@ import AnnotatedCode from '@site/src/components/AnnotatedCode';
 
 The API answers `201 Created`, but did the project reach the store in the state the response promised? The response body is not the row. It is how the API describes the row.
 
-The test creates the project over REST and then reads the committed row itself, through a connection the suite owns to the same database the application writes to. The demo runs this journey in [DomainAccessJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/DomainAccessJourney.cs).
+The test creates the project over REST and then reads the committed row itself, through a connection the suite owns to the same database the application writes to. The sample suite runs this journey in [DomainAccessJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/DomainAccessJourney.cs).
 
 ## The test
 
-The test writes over REST and reads the row with the demo's own SQL:
+The test writes over REST and reads the row with the sample suite's own SQL:
 
 <AnnotatedCode
   filename="DomainAccessJourney.cs"
@@ -91,7 +91,7 @@ public sealed class DomainAccessJourney
 
 ## Compose
 
-The run owns the store. The demo uses a SQLite file that every run recreates, and switches to a PostgreSQL container when the environment asks for it:
+The run owns the store. The sample suite uses a SQLite file that every run recreates, and switches to a PostgreSQL container when the environment asks for it:
 
 ```text
 [default] SQLite file, recreated per run | [ProtoTest__Database=postgres] container, skipped if configured
@@ -153,7 +153,7 @@ In short, the trace reads in test order:
 
 The `SELECT` itself is not traced. The connection at `02` proves the lifecycle. The assertion proves the row.
 
-The demo's own run:
+The sample suite's own run:
 
 <TraceExample
   demo="rest-database"

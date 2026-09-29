@@ -174,7 +174,7 @@ When run-scoped [infrastructure](../foundation/infrastructure.md) started a depe
 1. every `ProtoInfrastructureSettings` key is applied with `webHost.UseSetting(key, value)`,
 2. then your `configureWebHost` runs; explicit user configuration wins.
 
-The demo passes a connection string, the database provider and `ProtoTest:TestSupport` this way, so the application and the tests read one set of values.
+The sample suite passes a connection string, the database provider and `ProtoTest:TestSupport` this way, so the application and the tests read one set of values.
 
 #### Substituting services per test
 
@@ -264,7 +264,7 @@ The `HttpClient` is a regular ProtoTest client, so its REST and GraphQL calls ar
 
 ## The /test-support convention
 
-`ProtoTest:TestSupport` is a **sample-application convention**, not a package API or configuration key of `ProtoTest.AspNetCore`. The sample application maps its scenario-provisioning surface only when the flag is `1` or `true`; `GET /test-support` then answers 200, and answers 404 otherwise. The sample's testing layer verifies it once per run and fails with a message naming `ProtoTest:TestSupport=true` when the route is missing. The in-process demo enables it with `webHost.UseSetting("ProtoTest:TestSupport", "true")`, and the standalone process with the `ProtoTest__TestSupport` environment variable. An application that never maps the route simply ignores the flag.
+`ProtoTest:TestSupport` is a **sample-application convention**, not a package API or configuration key of `ProtoTest.AspNetCore`. The sample application maps its scenario-provisioning surface only when the flag is `1` or `true`; `GET /test-support` then answers 200, and answers 404 otherwise. The sample's testing layer verifies it once per run and fails with a message naming `ProtoTest:TestSupport=true` when the route is missing. The sample's in-process application enables it with `webHost.UseSetting("ProtoTest:TestSupport", "true")`, and the standalone process with the `ProtoTest__TestSupport` environment variable. An application that never maps the route simply ignores the flag.
 
 ## Real server or in-process?
 
@@ -277,7 +277,7 @@ An application's HTTP clients reuse its in-process server when no address resolv
 
 The same suite runs in-process on a developer machine and against a deployed environment in CI, just by setting `BaseUrl` there. With the address **configured**, `AddAspNetCoreServer` **steps aside**: no test server starts, the application's HTTP clients talk to the configured address, and the device clients resolve it the same way. The `ASP.NET Core` capability is dropped with the server, so `[RequiresInProcess]` tests skip instead of failing, and `ServerFactory`/`ApplicationServices` throw naming the address: there is no in-process container to reach.
 
-The step-aside reads **static configuration only**: an address a started piece published does not step the in-process server aside, so `ServerFactory` and the in-process device transport keep working. The HTTP clients do follow the published address (one application-address precedence everywhere), so an application with both a live in-process server and a published address serves its API from the published process. Give the published process **its own application name** when the suite needs both: the demo registers its standalone console as its own application for exactly that reason.
+The step-aside reads **static configuration only**: an address a started piece published does not step the in-process server aside, so `ServerFactory` and the in-process device transport keep working. The HTTP clients do follow the published address (one application-address precedence everywhere), so an application with both a live in-process server and a published address serves its API from the published process. Give the published process **its own application name** when the suite needs both: the sample suite registers its standalone console as its own application for exactly that reason.
 
 Without an address, the application's HTTP clients fall back to its transport automatically, so there is nothing to point at by hand, and with the default `PerRun` lifetime the server only starts the first time a test actually needs it.
 
@@ -316,7 +316,7 @@ builder
 
 The piece assumes only the image and the port it listens on: it maps that port to a random host port, publishes `http://{hostname}:{mapped port}` as the application's `BaseUrl`, and its default readiness check waits for the port to accept a connection. The image, the health path and any container build options (an environment, a command, a Testcontainers wait strategy) belong to the suite; `TryStart` reports why the container could not start so a machine without a container runtime can skip before registering it.
 
-Either way the published instance is a real application, not the test host, so it is registered **instead of** `AddAspNetCoreServer` for that application: `ServerFactory`, `ApplicationServices` and `[RequiresInProcess]` need the test host, and the in-process page inventory and the run's clock bridge run only with it. A run that configures `ProtoTest:Applications:Api:BaseUrl` skips both pieces (the key each one fills is satisfied), and the same journey runs against that environment. When a suite needs both the test host and a browser, give the published instance its own application name; the demo registers its standalone console that way.
+Either way the published instance is a real application, not the test host, so it is registered **instead of** `AddAspNetCoreServer` for that application: `ServerFactory`, `ApplicationServices` and `[RequiresInProcess]` need the test host, and the in-process page inventory and the run's clock bridge run only with it. A run that configures `ProtoTest:Applications:Api:BaseUrl` skips both pieces (the key each one fills is satisfied), and the same journey runs against that environment. When a suite needs both the test host and a browser, give the published instance its own application name; the sample suite registers its standalone console that way.
 
 ### Choosing how the application runs
 
@@ -381,4 +381,4 @@ asserting a time the application never saw.
 - [Web overview](./web/index.md) - sessions, options and page coverage.
 - [REST clients](./rest/index.md) and [GraphQL clients](./graphql/index.md) - the clients that reuse the in-process transport.
 - [Infrastructure](../foundation/infrastructure.md) - how run-scoped settings reach the application.
-- [Sample setup](../../../samples/Northstar.ProtoTest/Setup.cs) - the demo's real registration.
+- [Sample setup](../../../samples/Northstar.ProtoTest/Setup.cs) - the sample suite's real registration.

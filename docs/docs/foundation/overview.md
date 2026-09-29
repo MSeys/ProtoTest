@@ -114,7 +114,7 @@ What happens around that method:
 4. **[4]** Your test body runs. Requests, assertions and recorded state are traced. A failing `Resolve` or client lookup is traced too.
 5. **[5]** The runner calls `CompleteTestAsync`. Attributes and hooks tear down in reverse, attachments are published, and owned resources and the scope are disposed.
 
-The same five steps in a recording, the learning sample's project journey:
+The same five steps in a recording, the sample suite's project journey:
 
 <TraceAnatomy
   source={lessonTraces.firstJourney}

@@ -794,6 +794,9 @@ All ProtoTest packages share one version; breaking API changes are called out be
 - A gRPC client whose in-process transport has no base address fails naming `AddClient`, the
   application's `Grpc:Address`/`BaseUrl` keys and `AddAspNetCoreServer` instead of silently dialing
   `http://localhost`.
+- `prototest summary` and the pull request comment print the selected failing operation once when
+  its kind and name are the same, as they are for assertion operations, instead of repeating the
+  same text on the line.
 
 ### Changed
 

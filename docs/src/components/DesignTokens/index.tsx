@@ -24,8 +24,8 @@ export function Swatches({tokens}: {tokens: string[]}): ReactNode {
 const phases = ['Setup', 'Execution', 'Rollback', 'Teardown'];
 
 /*
- * The execution vocabulary is drawn where ProtoTest draws executions — on the blueprint surface of the
- * viewer and the report — so each sample sits on that surface whatever the page theme.
+ * The execution vocabulary is drawn where ProtoTest draws executions, on the blueprint surface of the
+ * viewer and the report, so each sample sits on that surface whatever the page theme.
  */
 function Stage({children}: {children: ReactNode}): ReactNode {
   return (
@@ -130,11 +130,11 @@ export function BrandMarks(): ReactNode {
     <div className={styles.marks}>
       <figure className={styles.paper}>
         <img src={paper} alt="ProtoTest mark on paper" />
-        <figcaption>Technical paper — navy and blueprint blue</figcaption>
+        <figcaption>Technical paper: navy and blueprint blue</figcaption>
       </figure>
       <figure className={styles.blueprint}>
         <img src={blueprint} alt="ProtoTest mark on the blueprint" />
-        <figcaption>Execution blueprint — paper and cyan</figcaption>
+        <figcaption>Execution blueprint: paper and cyan</figcaption>
       </figure>
     </div>
   );

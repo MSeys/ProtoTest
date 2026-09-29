@@ -98,7 +98,7 @@ The keys are the whole switch. `UseConfigured()` is first in every chain, so the
 Passed!  - Failed:     0, Passed:    61, Skipped:    13, Total:    74, Duration: 20 s - OpenCsms.Suite.dll (net8.0)
 ```
 
-That is the run recorded on 2026-09-28 in `opencsms-published-20260928-090106.log`. The skips are the same clock-gated and in-process-gated journeys as in the topology mode, each with its reason in the log.
+That is the run recorded on 2026-09-28 in `opencsms-published-20260928-090106.log`. The skips are the same clock-gated and in-process-gated journeys as in the topology mode; the log lists each one by name, and the condition on the test names the reason.
 
 The process logs beside the suite log tell the other half of the story. The billing worker consumed the real broker:
 

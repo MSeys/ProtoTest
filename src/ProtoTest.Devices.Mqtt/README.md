@@ -33,7 +33,7 @@ dotnet add package ProtoTest.Devices.Mqtt.Testcontainers   # a Mosquitto broker 
   topic may not.
 - **Transport options are one set per run.** Connect timeout, keep-alive, the packet cap and a broker
   set through `configure` are shared by every MQTT client; a client that needs its own broker passes
-  `address:` or a resolver.
+  a resolver, because a configured or container broker wins over the registration's `address:`.
 - **A missing broker fails the device, naming the key.** Without an address, a resolver or
   `ProtoTest:Devices:Mqtt:Broker`, creating the device fails instead of skipping - a device capability
   cannot see a broker configuration supplies later.

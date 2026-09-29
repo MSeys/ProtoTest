@@ -131,3 +131,11 @@ For a test that only needs *an* in-process server, `[RequiresInProcess]` is the 
 All of them work as environment variables with the usual `__` separator (`ProtoTest__TargetUrl`). See [Configuration](./configuration.md) for how configuration sources are added and which value wins, and [Infrastructure](../foundation/infrastructure.md) for what the host starts and when it is released.
 
 The [recipes](../recipes/overview.md) work in all three modes as they are: [REST, then GraphQL](../recipes/rest-then-graphql.md), [a write that lands in the database](../recipes/write-lands-in-the-database.md) and [API, then browser](../recipes/api-then-browser.md).
+
+## The full product demo
+
+OpenCSMS, an independent EV charging platform in its own repository, runs one suite in every shape on this page and one more: an Aspire AppHost that starts the product's own processes. Each target declares its providers in priority order with `UseConfigured()` first, so the environment decides which link serves the store, the broker and the application, and the Setup is the same in every mode. The [containers lesson](/learn/real-topology/containers) reads the chains, and [published mode](/learn/real-topology/published-mode) follows the run where the environment owns the processes.
+
+![The OpenCSMS station screen showing a charge point, its sessions and the operator's remote-start panel.](/images/opencsms/station-timeline.png)
+
+The same dashboard is served in every mode: in-process, container-backed or published.

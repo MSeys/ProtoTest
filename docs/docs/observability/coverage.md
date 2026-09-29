@@ -4,6 +4,9 @@ title: Coverage and observations
 description: "Coverage of your API's surface rather than its lines: which endpoints, responses, fields and methods your suite actually asserted."
 ---
 
+import CoverageMap from '@site/src/components/CoverageMap';
+import VisibilityPanel from '@site/src/components/VisibilityPanel';
+
 # Coverage and observations
 
 Code coverage tells you which lines ran. It cannot tell you which **parts of your API** your tests actually checked. An endpoint can be called by a setup helper a thousand times and never have its response asserted once.
@@ -27,6 +30,12 @@ flowchart LR
 2. Each observation is offered to every registered **collector** whose `CanCollect` accepts it. Collectors live for the whole run, so they aggregate across all tests.
 3. When the run stops, every collector's **report items** are gathered, sorted by target, category and identifier, and passed to every **sink**.
 4. Files the sinks wrote are added to the `.prototrace` archive.
+
+### What the run could see
+
+Where the observations came from matters as much as the counts. The run screen states where the application ran, which capabilities were composed, and which value sources were present or absent. Absence keeps its place, drawn dashed.
+
+<VisibilityPanel />
 
 ### Turn it on
 
@@ -83,15 +92,9 @@ Proto.Context.RecordObservation(
 
 ### Reading the report
 
-```
-OpenAPI  GET /api/v1/organization                12 hits  ✓
-         └ 200                                   12 hits  ✓
-           └ $.seatCount                          12 hits  ✓
-           └ $.projectCount                        9 hits  ✓
-           └ $.cancelAtPeriodEnd                   0 hits  ○   never asserted
-         └ 403                                    0 hits  ○   never reached
-OpenAPI  POST /api/v1/deployments/{id}/rollback   0 hits  ○   never called
-```
+The report nests endpoints, responses and properties. A covered item, a partially covered one and a gap read differently, and a property no assertion matched says so:
+
+<CoverageMap />
 
 Three different gaps, three different fixes:
 

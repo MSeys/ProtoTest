@@ -1,7 +1,7 @@
 import type {PrismTheme} from 'prism-react-renderer';
 
 /**
- * Code blocks sit on the sunken code surface in both colour modes — the same surface the home page panels,
+ * Code blocks sit on the sunken code surface in both colour modes, the same surface the home page panels,
  * the ProtoTrace viewer and the HTML report use. Every colour here is a CSS variable from
  * design/prototest-tokens.css, so this one theme serves light and dark and cannot drift from the tokens.
  */

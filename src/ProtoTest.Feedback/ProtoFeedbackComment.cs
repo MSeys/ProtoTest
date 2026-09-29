@@ -30,7 +30,11 @@ public static class ProtoFeedbackComment
             var failure = test.Failure;
             if (failure is not null)
             {
-                writer.WriteLine($"  - `{failure.Kind}` `{failure.Name}` · {failure.Status}");
+                // The name is the kind for assertion operations; print the identity once when they match.
+                var identity = string.Equals(failure.Kind, failure.Name, StringComparison.Ordinal)
+                    ? $"`{failure.Kind}`"
+                    : $"`{failure.Kind}` `{failure.Name}`";
+                writer.WriteLine($"  - {identity} · {failure.Status}");
             }
 
             if (failure?.ErrorMessage is { Length: > 0 } message)

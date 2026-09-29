@@ -113,6 +113,18 @@ export default async function createConfig(): Promise<Config> {
         showLastUpdateTime: true,
       },
     ],
+    [
+      '@docusaurus/plugin-client-redirects',
+      {
+        // The project pages moved under /project. Keep the old routes working for links already shared.
+        redirects: [
+          {from: '/docs/compare', to: '/docs/project/compare'},
+          {from: '/docs/benchmarks', to: '/docs/project/benchmarks'},
+          {from: '/docs/faq', to: '/docs/project/faq'},
+          {from: '/docs/roadmap', to: '/docs/project/roadmap'},
+        ],
+      },
+    ],
   ],
 
   themeConfig: {
@@ -127,9 +139,9 @@ export default async function createConfig(): Promise<Config> {
       respectPrefersColorScheme: true,
     },
     announcementBar: {
-      id: 'release-1.0',
+      id: 'release-1.1',
       content:
-        '<span class="announcement-preview">1.0</span> ProtoTest 1.0 is released. <a target="_blank" rel="noopener noreferrer" href="https://www.nuget.org/packages?q=ProtoTest">Install from NuGet</a>',
+        '<span class="announcement-preview">1.1</span> ProtoTest 1.1 is released. <a target="_blank" rel="noopener noreferrer" href="https://www.nuget.org/packages?q=ProtoTest">Install from NuGet</a>',
       isCloseable: true,
     },
     navbar: {
@@ -177,7 +189,7 @@ export default async function createConfig(): Promise<Config> {
         height: 40,
         href: '/',
       },
-      // Three groups: learning it, looking something up, and the project around it.
+      // Four groups: learning it, looking it up, the project around it, and the community.
       links: [
         {
           title: 'Learn',
@@ -186,7 +198,6 @@ export default async function createConfig(): Promise<Config> {
             {label: 'Installation', to: '/docs/getting-started/installation'},
             {label: 'Your first test', to: '/docs/getting-started/first-test'},
             {label: 'Recipes', to: '/docs/recipes/overview'},
-            {label: 'CI', to: '/docs/continuous-integration/'},
             {label: 'Troubleshooting', to: '/docs/getting-started/troubleshooting'},
           ],
         },
@@ -194,27 +205,38 @@ export default async function createConfig(): Promise<Config> {
           title: 'Reference',
           items: [
             {label: 'Foundation', to: '/docs/foundation/overview'},
-            {label: 'API reference', href: 'https://prototest.dev/api/'},
             {label: 'Integrations', to: '/docs/integrations/overview'},
+            {label: 'API reference', href: 'https://prototest.dev/api/'},
             {label: 'Observability', to: '/docs/observability/prototrace'},
+            {label: 'Trace viewer', href: 'https://trace.prototest.dev'},
             {label: 'Test runners', to: '/docs/runners/overview'},
             {label: 'Continuous integration', to: '/docs/continuous-integration/'},
             {label: 'Extending', to: '/docs/advanced/extending'},
+            {label: 'Agent workflows', to: '/docs/agent-workflows/coding-agents'},
           ],
         },
         {
           title: 'Project',
           items: [
-            {label: 'Trace viewer', href: 'https://trace.prototest.dev'},
             {label: 'Why ProtoTest', to: '/docs/project/why-prototest'},
+            {label: 'ProtoTest compared', to: '/docs/project/compare'},
+            {label: 'Benchmarks', to: '/docs/project/benchmarks'},
+            {label: 'Roadmap', to: '/docs/project/roadmap'},
+            {label: 'FAQ', to: '/docs/project/faq'},
+            {label: 'Sustainability', to: '/docs/project/sustainability'},
             {label: 'AI usage', to: '/docs/project/ai-usage'},
             {label: 'Changelog', to: '/changelog'},
+          ],
+        },
+        {
+          title: 'Community',
+          items: [
             {label: 'GitHub', href: 'https://github.com/MSeys/ProtoTest'},
+            {label: 'Discussions', href: 'https://github.com/MSeys/ProtoTest/discussions'},
+            {label: 'Issues', href: 'https://github.com/MSeys/ProtoTest/issues'},
             {label: 'Contributing', href: 'https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md'},
             {label: 'Support', href: 'https://github.com/MSeys/ProtoTest/blob/main/SUPPORT.md'},
-            {label: 'Discussions', href: 'https://github.com/MSeys/ProtoTest/discussions'},
             {label: 'NuGet', href: 'https://www.nuget.org/packages?q=ProtoTest'},
-            {label: 'Issues', href: 'https://github.com/MSeys/ProtoTest/issues'},
           ],
         },
       ],

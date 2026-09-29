@@ -202,7 +202,7 @@ The archive is written once, at the end of the run, after the gates and the repo
 - Redaction covers the framework's own capture (form fills by length, sensitive headers, JSON properties and query parameters). Your own attributes, attachments and [run metadata](#correlating-a-trace-with-the-run-that-produced-it) can still carry application data, so treat a trace like test output.
 - Run metadata values are recorded exactly as given. List only variables that are safe to travel in a trace.
 - The viewer's run header shows only the runtime and the operating system. Read the other `environment.*` entries from `spans.json` or the report.
-- `CaptureSourceLocations` is the largest tracing cost; `EmbedSources` and `EmbedArtifacts` control what the archive carries. The [benchmarks page](../benchmarks.md) records what a trace costs at 100 and 1,000 tests and the levers that change it (`EmbedSources`, `EmbedArtifacts`, `MaxArtifactBytes`, capture options).
+- `CaptureSourceLocations` is the largest tracing cost; `EmbedSources` and `EmbedArtifacts` control what the archive carries. The [benchmarks page](../project/benchmarks.md) records what a trace costs at 100 and 1,000 tests and the levers that change it (`EmbedSources`, `EmbedArtifacts`, `MaxArtifactBytes`, capture options).
 - A format reader supports the current major and the one before it. An older archive needs a reader from its own era.
 
 ## Learn more

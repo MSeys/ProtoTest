@@ -27,7 +27,7 @@ FAILED orders match their shape (16 ms)
   Shape mismatch failed with 1 error(s):
     • [$.orderId]: Values did not match. (Expected: '7', Actual: '42')
   at artifacts/fixture-gen/Program.cs:65 (Program.<<Main)
-  assert.json.shape assert.json.shape · failed
+  assert.json.shape · failed
   cause: assertion (1 mismatch)
   mismatch: $.orderId: expected 7, actual 42
 ```

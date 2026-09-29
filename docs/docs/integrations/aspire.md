@@ -52,21 +52,21 @@ chain wins over it, and a target it serves needs no plain registration.
 
 ```csharp
 builder
-    .AddAspireAppHost<OpenCsmsAppHost>(options => options
+    .AddAspireAppHost<OpenCsmsAppHostAnchor>(options => options
         .MapConnectionString("postgres", "ConnectionStrings:Csms"),
         "api")
     .AddApplication("Csms", app => app
         .UseConfigured()
-        .UseAspireResource<OpenCsmsAppHost>("api")
+        .UseAspireResource<OpenCsmsAppHostAnchor>("api")
         .UseInProcess<CsmsApi>())
     .AddInfrastructure("CsmsDatabase", piece => piece
         .UseConfigured()
-        .UseAspireResource<OpenCsmsAppHost>("postgres")
+        .UseAspireResource<OpenCsmsAppHostAnchor>("postgres")
         .UseContainer(PostgresDatabase.Container()),
         "ConnectionStrings:Csms");
 ```
 
-- `UseAspireResource<OpenCsmsAppHost>("api")` on an application chain publishes the resource's
+- `UseAspireResource<OpenCsmsAppHostAnchor>("api")` on an application chain publishes the resource's
   endpoint under the application's derived `BaseUrl`. On an infrastructure chain it publishes the
   resource's **connection string** under every key the target declares.
 - `ProtoAspireOptions.MapConnectionString(resource, key)` fills a key no target declares; the mapping
@@ -92,6 +92,15 @@ registers it without a selection key keeps resolving its targets through the oth
 AppHost starts only when a selection key is set and at least one key it fills is not configured. The
 skip record names the condition (`unselected`, or the missing keys for `configured`) like any other
 chain.
+
+The examples above come from the full product demo. OpenCSMS is an independent EV charging platform in
+its own repository, and its AppHost runs the API project (which also serves the dashboard) and both
+workers beside PostgreSQL and RabbitMQ. The [Aspire topology
+lesson](/learn/real-topology/aspire-topology) selects it with one key and reads the skip list.
+
+![The OpenCSMS public status page: charge points with their connector states, no account needed.](/images/opencsms/status.png)
+
+The API resource the AppHost starts serves the product's dashboard and its public status page.
 
 ## The tasks
 

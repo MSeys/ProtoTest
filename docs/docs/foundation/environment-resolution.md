@@ -84,7 +84,7 @@ public sealed class GridProvider : IProtoTargetProvider
 ```csharp
 builder.AddApplication("Api", app => app
     .UseConfigured()                                    // the environment's address
-    .UseAspireResource<OpenCsmsAppHost>("api")          // the selected AppHost's endpoint
+    .UseAspireResource<OpenCsmsAppHostAnchor>("api")          // the selected AppHost's endpoint
     .UseInProcess<Program>()                            // the in-process test server
     .AddWorkerHost<BillingWorker>("Billing")            // the run hosts it when the app runs in-process
     .AddDevices(devices => devices

@@ -6,7 +6,7 @@ description: "Build a small ProtoTest suite against an ASP.NET Core API, run it,
 
 # Your first test
 
-This page goes from an empty test project to a passing test, a failure message and the trace that recorded both. It uses **NUnit**; the other runners differ only in the setup class, covered in [Test runners](../runners/overview.md).
+This page goes from a fresh test project to a passing test, a failure message and the trace that recorded both. The steps assume an ASP.NET Core application, `Orders.Api`, beside the tests; the tip below creates one. It uses **NUnit**; the other runners differ only in the setup class, covered in [Test runners](../runners/overview.md).
 
 :::tip[Rather start from a working solution?]
 `dotnet new install ProtoTest.Templates`, then `dotnet new prototest -n Orders` creates an API and a suite for it that is already composed, traced and reported. Steps 1, 2, 3 and 6 below are ready to run, and `--runner` writes the suite for xUnit v2, xUnit v3, TUnit or MSTest instead. See [Installation](./installation.md#start-from-the-template).
@@ -116,7 +116,7 @@ response
 Change `status = "pending"` to `"cancelled"` and run the test again. What you should see: the test fails with the request, the JSON path and both values in the message:
 
 ```
-GET /api/orders - Shape mismatch failed with 1 error(s):
+POST /api/orders - Shape mismatch failed with 1 error(s):
   • [$.status]: Values did not match. (Expected: "cancelled", Actual: "pending")
 ```
 

@@ -42,7 +42,7 @@ The container mode kept the product inside the test process. The topology mode h
     ),
     reveal: (
       <>
-        <code>[RequiresInProcess]</code> needs the test host: the AppHost runs the product as separate processes, so there is no in-process server, no loopback application and no worker host to reach. <code>[RequiresTestClock]</code> needs the run's clock inside the application; these processes read the machine clock. Every skip names its reason in the runner output.
+        <code>[RequiresInProcess]</code> needs the test host: the AppHost runs the product as separate processes, so there is no in-process server, no loopback application and no worker host to reach. <code>[RequiresTestClock]</code> needs the run's clock inside the application; these processes read the machine clock. The runner lists every skipped test; <code>--logger "console;verbosity=detailed"</code> prints each reason beside it.
       </>
     ),
   }}
@@ -112,7 +112,7 @@ The AppHost also steps aside for what the run already provides. A run that expor
 Passed!  - Failed:     0, Passed:    61, Skipped:    13, Total:    74, Duration: 20 s - OpenCsms.Suite.dll (net8.0)
 ```
 
-That is the run recorded on 2026-09-28 in `opencsms-topology-20260928-094052.log`. The 13 skips are the journeys that need the test host or the run's clock; every one of them names its reason in the log above the summary. The suite still owns the tests, the fixtures and the evidence. It does not own the product's lifetime any more.
+That is the run recorded on 2026-09-28 in `opencsms-topology-20260928-094052.log`. The 13 skips are the journeys that need the test host or the run's clock; the log lists each one by name, and the condition on the test names the reason. The suite still owns the tests, the fixtures and the evidence. It does not own the product's lifetime any more.
 
 ![The station timeline: a charge point, the remote-start panel and the sessions the dashboard lists.](/images/opencsms/station-timeline.png)
 

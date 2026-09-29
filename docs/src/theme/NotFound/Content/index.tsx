@@ -12,7 +12,7 @@ interface Props {
 }
 
 const destinations = [
-  {to: '/docs', label: 'Introduction', note: 'What ProtoTest is and where to start'},
+  {to: '/docs', label: 'Start here', note: 'What ProtoTest is and where to start'},
   {to: '/docs/getting-started/first-test', label: 'Your first test', note: 'A small suite, one step at a time'},
   {to: '/docs/integrations/overview', label: 'Integrations', note: 'Every capability you can compose'},
   {to: '/search', label: 'Search', note: 'Find the page by what it covers'},

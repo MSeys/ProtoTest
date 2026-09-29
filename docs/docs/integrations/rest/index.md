@@ -7,9 +7,25 @@ description: "A per-test HTTP client on IHttpClientFactory, with JSON shape asse
 
 # REST
 
-## What it adds
+`ProtoTest.Rest` gives each test a named HTTP client with JSON shape assertions.
 
-`ProtoTest.Rest` gives each test a named HTTP client built on `IHttpClientFactory`, with JSON shape assertions, the shared [authentication model](./authentication.md), optional request/response capture and endpoint coverage. It brings `ProtoTest.Http` and `ProtoTest.Json` with it.
+```csharp
+[Application("Api")]
+public sealed class OrderTests
+{
+    [ProtoTest]
+    public async Task Creates_an_order()
+    {
+        using var response = await Proto.Context.Rest()
+            .Body(new { product = "notebook", quantity = 2 })
+            .PostAsync("/api/orders");
+
+        response.Should.HaveHttpStatus(HttpStatusCode.Created);
+    }
+}
+```
+
+Run it with `dotnet test`. A green run prints `Passed Creates_an_order`, and the trace lands at `TestResults/prototest-{runId}.prototrace` with an `http.request` operation for the call.
 
 ## Install
 
@@ -17,7 +33,11 @@ description: "A per-test HTTP client on IHttpClientFactory, with JSON shape asse
 dotnet add package ProtoTest.Rest
 ```
 
-ProtoTest targets **.NET 8, 9 and 10**. The template defaults to `net10.0` unless you pass `-f net8.0` (or `net9.0`) to `dotnet new`.
+See [Installation](../../getting-started/installation.md) for the supported .NET versions.
+
+## What it adds
+
+Each test gets a named HTTP client built on `IHttpClientFactory`, with JSON shape assertions, the shared [authentication model](./authentication.md), optional request/response capture and endpoint coverage. It brings `ProtoTest.Http` and `ProtoTest.Json` with it.
 
 ## Compose
 
@@ -31,7 +51,7 @@ builder.AddApplication("Api", app => app.AddRest(rest => rest
     .AddClient("Billing", endpoint: "BillingApi")));  // joins BaseUrl with Endpoints:BillingApi
 ```
 
-Repeated registration never errors: the lifecycle hook and keyed options register once, while every `AddRest` callback still runs and composes more clients.
+Calling `AddRest` twice does not throw. The shared setup runs once. Each callback still adds its clients.
 
 ### `AddClient` overloads
 
@@ -41,7 +61,7 @@ Repeated registration never errors: the lifecycle hook and keyed options registe
 | `AddClient(name, Func<ProtoExecutionContext, Uri> resolver, configure = null)` | resolved per request from the running test |
 | `AddClient(name, Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> resolver, configure = null)` | async per-request resolution |
 
-The name may be omitted when the application has one REST client; pass one only to address several targets (`Rest("Billing")`, `[Application("Api", "Rest:Billing")]`).
+Omit the name when the application has one REST client. Pass a name only for several targets (`Rest("Billing")`, `[Application("Api", "Rest:Billing")]`).
 
 There is **no endpoint default**: `endpoint` names the key under `ProtoTest:Applications:{application}:Endpoints` to append to the application's `BaseUrl`. Without it the base URL is used as-is: an explicit `baseUrl`, or the application's `BaseUrl`. An explicit non-absolute base URL throws `ArgumentException`.
 
@@ -73,7 +93,7 @@ There is **no endpoint default**: `endpoint` names the key under `ProtoTest:Appl
 | | `SensitiveQueryParameters` | `access_token`, `refresh_token`, `token`, `apiKey`, `api_key`, `key` |
 | | `SensitiveJsonProperties` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret` |
 
-Set them in code with `ConfigureResponses(...)` and `CaptureAttachments(...)`, or in configuration. Code callbacks run in registration order and repeated calls compose; the known section is then bound over the result, so **configuration wins over code**. Both option types are shared with GraphQL: each protocol owns its own keyed instance and section. The types themselves default to the shared `ProtoTest:Http:Responses` and `ProtoTest:Http:Attachments` sections when a protocol does not name its own; every protocol that ships here names one.
+Set them in code or configuration. Configuration binds last, so it wins over code. Both option types are shared with GraphQL: each protocol owns its own keyed instance and section. When a protocol names no section of its own, the types fall back to the shared `ProtoTest:Http:Responses` and `ProtoTest:Http:Attachments` sections; every protocol here names one.
 
 ### Context API
 
@@ -81,25 +101,24 @@ Set them in code with `ConfigureResponses(...)` and `CaptureAttachments(...)`, o
 RestRequestBuilder Rest(this ProtoExecutionContext context, string? clientName = null);
 ```
 
-`Proto.Context.Rest(name)` resolves the client in this order: the requested name, the client bound by `[Application(…)]` for REST, the application's first registered REST client, then `"Default"`. A requested name first tries its application-qualified form, then the name as given, then the same name another application registered when exactly one client of the protocol has it: `Rest("Api")` under a Dashboard-selected test reaches `Csms:Api` when Dashboard has no `Api` client. Two applications sharing the name fail naming both qualified candidates, so qualify the call (`Rest("Csms:Api")`); an already qualified name is exact. The client's base address is the application's, resolved with the shared precedence (an address a started piece published wins over configuration). A client with no base address and no owner for its address falls back to the application's in-process transport, rooted at the endpoint the client registered, then the requested name, looking up `ProtoTest:Applications:{application}:Endpoints:{name}`. A per-test resolver beats `HttpClient.BaseAddress` at request time. A client whose address resolves is built over a test-owned handler, so its cookie jar carries only that test's session and parallel tests never share sign-in state. If nothing resolves, the call throws `InvalidOperationException` listing the protocol's registered client names.
+`Proto.Context.Rest(name)` picks the client in this order:
+
+| Step | What it tries |
+| --- | --- |
+| 1 | the requested name |
+| 2 | the client bound by `[Application(…)]` for REST |
+| 3 | the application's first registered REST client |
+| 4 | `"Default"` |
+
+A requested name first tries its application-qualified form, then the name as given. When exactly one client of the protocol registered that name on another application, the call reaches it: `Rest("Api")` under a Dashboard-selected test reaches `Csms:Api` when Dashboard has no `Api` client. Two applications sharing the name fail naming both qualified candidates, so qualify the call (`Rest("Csms:Api")`); an already qualified name is exact.
+
+The client's base address is the application's, resolved with the shared precedence: an address a started piece published wins over configuration. A client with no base address and no owner for its address falls back to the application's in-process transport, rooted at the endpoint the client registered, then the requested name, looking up `ProtoTest:Applications:{application}:Endpoints:{name}`. A per-test resolver beats `HttpClient.BaseAddress` at request time.
+
+A client whose address resolves is built over a test-owned handler, so its cookie jar carries only that test's session. Parallel tests never share sign-in state. If nothing resolves, the call throws `InvalidOperationException` listing the protocol's registered client names.
 
 ## The tasks
 
-```csharp
-[Application("Api")]
-public sealed class OrderTests
-{
-    [ProtoTest]
-    public async Task Creates_an_order()
-    {
-        using var response = await Proto.Context.Rest()
-            .Body(new { product = "notebook", quantity = 2 })
-            .PostAsync("/api/orders");
-
-        response.Should.HaveHttpStatus(HttpStatusCode.Created);
-    }
-}
-```
+The `Creates_an_order` test above is the whole pattern: build, send with a verb, assert. The pages below cover each step.
 
 ### Going further
 
@@ -107,7 +126,7 @@ public sealed class OrderTests
 - **Attachments** - `.CaptureAttachments()` records sanitized request, response and expected-shape attachments: [Attachments and coverage](./attachments.md).
 - **Coverage** - attach `.AddCollector<RestCoverageCollector>()` to the client; [OpenAPI coverage](../openapi.md) consumes the shape assertions' matched paths, and `.AddCollector<RestTrafficCoverageCollector>()` reports the fields no shape mentioned: [Coverage](../../observability/coverage.md#traffic-coverage-observed-but-unasserted).
 - **Multiple clients** - pass `.Rest("Billing")`, or bind one for the whole test with `[Application("Api", "Rest:Billing")]`.
-- **In-process server** - `AddAspNetCoreServer<Program>()` plus a client with no URL reuses its transport automatically; a configured `BaseUrl` takes precedence and leaves the server unstarted.
+- **In-process server** - `AddAspNetCoreServer<Program>()` plus a client with no URL reuses its transport automatically. A configured `BaseUrl` wins and the in-process server stays stopped.
 
 ## In the trace and coverage
 

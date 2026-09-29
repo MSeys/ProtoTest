@@ -6,7 +6,15 @@ description: "One authentication model for REST, GraphQL and gRPC: an authentica
 
 # Authentication
 
-REST and GraphQL share one authentication model, defined in `ProtoTest.Http`. An **authenticator** gets the outgoing `HttpRequestMessage` just before it's sent and adds whatever the API needs.
+REST and GraphQL share one authentication model. An authenticator adds credentials to the outgoing request just before it is sent.
+
+```csharp
+await Proto.Context.Rest()
+    .Auth<BearerTokenAuthenticator>("orders-token")
+    .GetAsync("/api/orders");
+```
+
+A method `[Auth]` replaces the class `[Auth]`; a per-request `.Auth()` beats attributes; `.WithoutAuth()` clears all. The full rules are under [Precedence](#precedence).
 
 ```csharp
 public interface IProtoHttpAuthenticator
@@ -22,17 +30,17 @@ public sealed record ProtoHttpAuthenticationContext(
     string ClientName);
 ```
 
-Because the context carries the running test, an authenticator can read typed state that an attribute set up earlier, which is how a test gets a fresh user without any header code.
+The context carries the running test. An authenticator can read state an attribute set earlier, so the test needs no header code.
 
 ## Built-in authenticators
 
 The three shipped authenticators live in `ProtoTest.Http.Authenticators`:
 
-| Authenticator | Constructor | Adds |
+| Authenticator | Constructor | Wire effect |
 | --- | --- | --- |
 | `BearerTokenAuthenticator` | `(string token)` | `Authorization: Bearer <token>` |
 | `BasicAuthAuthenticator` | `(string username, string password)` | `Authorization: Basic <base64>` (UTF-8) |
-| `ApiKeyAuthenticator` | `(string keyName, string keyValue, ApiKeyLocation location = ApiKeyLocation.Header)` | a header via `TryAddWithoutValidation`, or a query parameter with `ApiKeyLocation.Query` |
+| `ApiKeyAuthenticator` | `(string keyName, string keyValue, ApiKeyLocation location = ApiKeyLocation.Header)` | a header via `TryAddWithoutValidation`, or `?name=val` with `ApiKeyLocation.Query` |
 
 `ApiKeyLocation` is `Header` or `Query`; the query form needs a request URI and throws `InvalidOperationException` if there is none.
 
@@ -105,7 +113,7 @@ When several of these apply, this is what wins:
 3. Several `[Auth<T>]` attributes at the same level are ordered by their `Order` property and **composed**: `ProtoCompositeHttpAuthenticator` runs each in turn on the same request, recording every handler under an `auth.handler.apply` operation with its `auth.type` and `client.name`. The composite's trace source is `ProtoTest.{protocol}`.
 4. **A per-request `.Auth(...)` overrides** whatever the attributes resolved, and **`.WithoutAuth()` clears it**.
 
-The REST and GraphQL lifecycle hooks (`ProtoHookOrder.Authentication`) resolve the attributes before each test and record a `Auth` entity state under the protocol name with `auth.source` (`method`, `class` or `none`), `auth.count` and `auth.types`. Per request, the applied authenticator is recorded on the request operation: `auth.outcome` is `applied` or `skipped`, with `auth.type` when applied. Header **values** are never traced; the trace records the header count and each header's name with `http.header.value_recorded=false`.
+The REST and GraphQL lifecycle hooks (`ProtoHookOrder.Authentication`) resolve the attributes before each test and record a `Auth` entity state under the protocol name with `auth.source` (`method`, `class` or `none`), `auth.count` and `auth.types`. Per request, the applied authenticator is recorded on the request operation: `auth.outcome` is `applied` or `skipped`, with `auth.type` when applied. The trace records header names and the count, not header values (`http.header.value_recorded=false`).
 
 ## Built-in test user
 
@@ -156,13 +164,13 @@ The identity is per-test state: the next test starts with none, and parallel tes
 
 - **In-process only.** The shipped handler is installed into the test host; against a published application the request goes out unchanged and the trace marks `auth.transport = inert` with the reason. A suite whose published environment accepts the identity declares its own `[Auth<T>]` authenticator that reads `context.SignedInUser()`.
 - **It replaces the application's default authentication scheme.** Register `AddTestUserAuthentication` where a test user stands in for the application's own authentication, not in a suite whose subject is that authentication; the application's named schemes still serve endpoints that ask for them explicitly with `[Authorize(AuthenticationSchemes = "…")]`.
-- **The header is not a credential.** It carries test data only, and an application that never registers the handler ignores it and stays anonymous - the test's own assertions fail instead of silently passing. The handler trusts any well-formed header on an in-process request, so register it only where a test user stands in for the application's own authentication; a malformed or oversized value fails authentication and the request stays anonymous.
+- **The header is not a credential.** It carries test data only. An application without the handler stays anonymous, so the test assertions fail. The handler trusts any well-formed header on an in-process request, so register it only where a test user stands in for the application's own authentication; a malformed or oversized value fails authentication and the request stays anonymous.
 - **Claim values stay off the trace.** They travel in the header; the `auth:user` entity records the name, roles and claim *types*, never the values, and a gRPC call's `prototest-user` metadata is redacted in the trace.
 - **One identity per test.** Declaring it twice replaces, not merges. A test that needs several simultaneous identities keeps using `.Auth(...)` per request or the application's own provisioning.
 
 ## Writing your own
 
-Most real suites need one. Here's the one from the sample app, which authenticates as whichever user the test's `[SampleUser]` attribute created:
+The sample suite uses one authenticator per user type:
 
 ```csharp
 using System.Net.Http.Headers;

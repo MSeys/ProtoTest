@@ -16,7 +16,7 @@ description: "A named gRPC client per test for unary and streaming calls, with m
 dotnet add package ProtoTest.Grpc
 ```
 
-The package targets .NET 8, 9 and 10 (the project template defaults to `net10.0`; pass `-f net8.0` or `net9.0` for an older runtime), and brings `ProtoTest.Http` and `ProtoTest.Json` with it.
+The package supports .NET 8, 9 and 10. It depends on `ProtoTest.Http` and `ProtoTest.Json`. See [Installation](../../getting-started/installation.md) for the supported .NET versions.
 
 ## Compose
 
@@ -47,7 +47,7 @@ The channel address comes from, in order: the explicit argument to `AddClient`, 
 .AddGrpc(grpc => grpc.AddClient("Api", context => context.Configuration.GetValue<Uri>("Api:Grpc")))
 ```
 
-A repeated `AddGrpc` is not a no-op: its `configure` callback always runs, so more clients compose, while the lifecycle hook and the capability stay registered once. A call whose `configure` throws leaves no guard behind. `CaptureAttachments` callbacks also compose: every callback runs in registration order and the known section binds over the result.
+Calling `AddGrpc` twice does not throw. The shared setup runs once. Each callback still adds its clients. A call whose `configure` throws leaves no guard behind. `CaptureAttachments` callbacks also compose: every callback runs in registration order and the known section binds over the result.
 
 ### Options and keys
 
@@ -63,7 +63,7 @@ A repeated `AddGrpc` is not a no-op: its `configure` callback always runs, so mo
 | `ProtoTest:Grpc:Attachments:MaxDiagnosticBodyLength` | `JsonDiagnosticOptions.MaxDiagnosticBodyLength` | `int` | 65536 (64 KiB) |
 | `ProtoTest:Grpc:Attachments:SensitiveJsonProperties` | `JsonDiagnosticOptions.SensitiveJsonProperties` | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret` |
 
-One `ProtoTest:Grpc:Client` section serves every named client; each registration binds it over its code callback. A client's `configure` callback applies to that client only - metadata, deadline and sensitive keys never reach another client - while the transport-backed fallback client reads the shared section without any named client's callback. The pre-1.1 `ProtoTest:Grpc` section still binds as a deprecated fallback, so a suite on the old key keeps working; a value under `ProtoTest:Grpc:Client` wins. `GrpcAttachmentOptions` derives from the shared HTTP attachment options and binds `ProtoTest:Grpc:Attachments`, so there is one global attachment section per registration, not one per client. `GrpcClientOptions.ConfigureMetadata` is a delegate and is not bindable.
+One `ProtoTest:Grpc:Client` section serves every named client; each registration binds it over its code callback. A client's `configure` callback applies to that client only. The fallback client reads the shared section without any named callback. The older `ProtoTest:Grpc` section still binds as a fallback; see [Migrating from 1.0](../../getting-started/migrating-from-1-0.md). `GrpcAttachmentOptions` derives from the shared HTTP attachment options and binds `ProtoTest:Grpc:Attachments`, so there is one global attachment section per registration, not one per client. `GrpcClientOptions.ConfigureMetadata` is a delegate and is not bindable.
 
 ### API
 
@@ -71,9 +71,27 @@ One `ProtoTest:Grpc:Client` section serves every named client; each registration
 public static ProtoGrpcClient Grpc(this ProtoExecutionContext context, string? clientName = null);
 ```
 
-Inside an `[Application]` the default or bound client is used unless a name is given, exactly like `Rest()` and `GraphQL()`; resolution tries the application-qualified name (`{application}:{name}`), then the requested name itself, so a host-registered client stays reachable from inside an application, then the client another application registered when exactly one gRPC client has that unqualified name, so a unique name is reachable across applications. A name two applications share must be qualified (`App:Client`); a miss lists the registered gRPC client names. When no initialized client matches, the application's in-process transport backs a fallback client, registered so every call shares one channel, and a `grpc.client.resolve` event is written; otherwise the accessor throws naming the client, `AddAspNetCoreServer`, and `ProtoTest:Applications:{application}:Grpc:Address`. A call that reaches the channel with no address to resolve throws `InvalidOperationException`; a call after the client was disposed throws `ObjectDisposedException`.
+Inside `[Application]` the test uses the bound client unless you pass a name. Resolution tries `{application}:{name}`, then the name itself. A host-registered client stays reachable from inside an application, and so is a name exactly one other application registered. A name used by two applications needs the qualified form (`App:Client`). A miss lists the registered gRPC client names.
+
+When no initialized client matches, the application's in-process transport backs a fallback client, registered so every call shares one channel, and a `grpc.client.resolve` event is written. Otherwise the accessor throws naming the client, `AddAspNetCoreServer`, and `ProtoTest:Applications:{application}:Grpc:Address`. A call that reaches the channel with no address to resolve throws `InvalidOperationException`; a call after the client was disposed throws `ObjectDisposedException`.
+
+```
+explicit AddClient address? → ProtoTest:Applications:{app}:Grpc:Address? → app BaseUrl?
+  → in-process transport? → else fallback client + grpc.client.resolve event
+resolver overload → deferred to first call (null at call time is an error)
+```
 
 The call helpers, all constrained to `where TRequest : class, TResponse : class`:
+
+| Helper | Requests | Responses | Returns | Traced |
+| --- | --- | --- | --- | --- |
+| `UnaryAsync` | 1 | 1 | `TResponse` | yes |
+| `ClientStreamingAsync` | N | 1 | `TResponse` | yes, first 10 messages attached |
+| `ServerStreamingAsync` | 1 | N | message list | yes, first 10 messages attached |
+| `Blocking.ServerStreaming`, `Blocking.DuplexStreaming` | … | … | call to drive | no, auth only |
+| `OpenServerStreamingAsync`, `OpenDuplexStreamingAsync` | … | … | call to drive | no, auth only |
+
+Use raw calls only when the traced helpers lack the call shape you need.
 
 ```csharp
 Task<TResponse> UnaryAsync<TRequest, TResponse>(Method<TRequest, TResponse> method, TRequest request,
@@ -108,7 +126,7 @@ Task<AsyncDuplexStreamingCall<TRequest, TResponse>> OpenDuplexStreamingAsync<TRe
     CancellationToken cancellationToken = default);
 ```
 
-`Blocking.ServerStreaming` and `Blocking.DuplexStreaming` block the calling thread while authenticators and the channel are prepared; prefer the `Open*Async` variants on a synchronizing runner. The raw helpers apply the test's `[Auth]` metadata but are untraced and uncaptured.
+`Blocking.ServerStreaming` and `Blocking.DuplexStreaming` block the calling thread while authenticators and the channel are prepared; prefer the `Open*Async` variants on a synchronizing runner.
 
 #### Method descriptors
 
@@ -134,7 +152,7 @@ The `MethodType` is `Unary`, `ServerStreaming`, `ClientStreaming` or `DuplexStre
 
 #### Assertions
 
-A reply is a protobuf message, and `Should.MatchShape` matches it with the same [shapes](../../foundation/shape-matching.md) as REST and GraphQL. C# has no extension properties, so a message reaches its facade through the factory; `MatchShape` returns the reply:
+A reply is a protobuf message, and `Should.MatchShape` matches it with the same [shapes](../../foundation/shape-matching.md) as REST and GraphQL. A message reaches its facade through the factory; `MatchShape` returns the reply:
 
 ```csharp
 public static ProtoGrpcMessageAssertions<TResponse> For<TResponse>(TResponse response)
@@ -144,9 +162,9 @@ public static ProtoGrpcMessageAssertions<TResponse> For<TResponse>(TResponse res
 //                                       MatchShape(object expectedShape, bool exact, JsonSerializerOptions? options = null) -> TResponse
 ```
 
-The reply is compared through its JSON form: field names are camelCase, enums are their names, and fields left at their default value are still present, so `quantity = 0` can be asserted. Every mismatch is reported at once. The assertion records an `assert.json.shape` operation with a `grpc.contract.shape` observation on the ambient test context, like the other integrations' data-object assertions. A mismatch throws `GrpcAssertionException` whose message starts with the message type, keeping the shared `JsonShapeMismatchException` as `InnerException`. The old `ShouldMatchShape` extension remains as an obsolete shim.
+The reply is compared through its JSON form: field names are camelCase, enums are their names, and fields left at their default value are still present, so `quantity = 0` can be asserted. Every mismatch is reported at once. The assertion records an `assert.json.shape` operation with a `grpc.contract.shape` observation on the ambient test context, like the other integrations' data-object assertions. A mismatch throws `GrpcAssertionException` whose message starts with the message type, keeping the shared `JsonShapeMismatchException` as `InnerException`. The older `ShouldMatchShape` spelling is listed in [Migrating from 1.0](../../getting-started/migrating-from-1-0.md).
 
-`ProtoGrpcAssertions.For(reply).Should.MatchShape(shape, exact: true)` is the exhaustive form: a field present in the reply that the shape does not mention is a mismatch naming that field. A value constraint mentions its whole subtree. The [shape matching page](../../foundation/shape-matching.md#exact-matching) has the rules.
+Keep one copy of the exact-mode rule on the [shape matching page](../../foundation/shape-matching.md#exact-matching): exact mode flags any unlisted field.
 
 A failed call throws `RpcException`; `ProtoGrpcAssertions.For(exception)` returns its assertion facade:
 
@@ -169,7 +187,7 @@ catch (RpcException exception)
 }
 ```
 
-The assertion records an `assert.grpc.status` operation on the ambient test context with expected and actual `rpc.grpc.status_code`/`rpc.grpc.status` and a `Result` Checks section; a mismatch throws `GrpcAssertionException`. gRPC deliberately exposes the facade through `For(...)` rather than a `Should` property, because C# has no extension properties; the old `ShouldHaveStatus`/`ShouldNotHaveStatus` extension methods remain as obsolete shims.
+The assertion records an `assert.grpc.status` operation on the ambient test context with expected and actual `rpc.grpc.status_code`/`rpc.grpc.status` and a `Result` Checks section; a mismatch throws `GrpcAssertionException`. The facade goes through `For(...)` because C# has no extension properties. The older `ShouldHaveStatus`/`ShouldNotHaveStatus` spellings are listed in [Migrating from 1.0](../../getting-started/migrating-from-1-0.md).
 
 ## The tasks
 
@@ -189,6 +207,8 @@ public sealed class OrderTests
     }
 }
 ```
+
+Run it with `dotnet test`. A green run prints the passed test, and the trace lands at `TestResults/prototest-{runId}.prototrace` with a `grpc.call` operation for the call.
 
 ### Going further
 
@@ -258,13 +278,15 @@ The client is state, not history: it appears once with `client.name`, `client.pr
 
 ## Limits
 
-- **A missed deadline reports the transport's abort in-process.** A socket endpoint reports `DeadlineExceeded` (4) when a call overruns its deadline, but the in-process transport can surface the server's abort status (`Unknown` or `Internal`) when the deadline passes mid-call, because the canceled exchange reaches the client as a failed response rather than a deadline decision. Assert `Should.HaveStatus(StatusCode.DeadlineExceeded)` against socket endpoints only, or accept either status when the same suite runs against both.
-- **Streaming capture is capped.** Only the first 10 messages of a client- or server-streaming call are attached; the cap is a private constant and not configurable.
-- **Raw helpers are untraced and uncaptured.** `ServerStreaming`, `DuplexStreaming`, `OpenServerStreamingAsync` and `OpenDuplexStreamingAsync` return the call for you to drive; only `[Auth]` metadata is applied. Every call - traced or raw - resolves a fresh authenticator from the test's factory, so a stateful authenticator is never shared between calls; keep raw calls to cases the traced helpers cannot express.
-- **Address-dependent authenticators stay HTTP-only.** An authenticator that needs the request URI - `ApiKeyAuthenticator` with `ApiKeyLocation.Query` - fails when a gRPC call applies it, because metadata has no URI; use a header-location key or `GrpcClientOptions.ConfigureMetadata` for gRPC.
-- **Two serializations.** Trace request/response sections use protobuf text format, while attachments and shape matching use JSON.
-- **One attachments section.** `GrpcAttachmentOptions` binds one global section per registration; there is no per-client section.
-- **No retries.** There is no exponential backoff and no client interceptor beyond metadata.
+| Limit | Matters when |
+| --- | --- |
+| A missed deadline can report the transport's abort in-process | asserting `DeadlineExceeded` against both socket and in-process endpoints; assert it against socket endpoints only, or accept either status |
+| Streaming capture keeps the first 10 messages | reading full streams from attachments; the cap is a private constant and not configurable |
+| Raw helpers are untraced and uncaptured | driving `Blocking` or `Open*` calls; only `[Auth]` metadata is applied |
+| Address-dependent authenticators stay HTTP-only | applying `ApiKeyAuthenticator` with `ApiKeyLocation.Query` to gRPC; metadata has no URI, so use a header-location key or `ConfigureMetadata` |
+| Trace sections use protobuf text format, attachments and shapes use JSON | comparing trace output with attachment content |
+| One global attachment section per registration | expecting per-client attachment settings; there is no per-client section |
+| No retries | expecting backoff; there is no client interceptor beyond metadata |
 
 ## Links
 

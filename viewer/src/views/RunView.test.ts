@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp, h, nextTick, type VNode } from "vue";
 import RunView from "./RunView.vue";
-import type { Gate, Run, TestTrace } from "../trace/model";
+import type { Gate, Item, Run, Span, TestTrace } from "../trace/model";
+
+/** The smallest run-level operation the attention list needs: a name, a kind and a failed status. */
+function span(overrides: Partial<Span>): Span {
+  return {
+    id: "span", parent: null, children: [], depth: 0, name: "Release the broker", kind: "resource.release",
+    source: "ProtoTest", phase: "run", status: "failed", error: { type: "Error", message: "Broker refused to close" },
+    start: 0, duration: 1, end: 1, count: 1, attributes: {}, sections: [], moments: [], evidence: [], itemKey: null,
+    item: null, changes: [], test: null, ...overrides
+  };
+}
 
 /** The smallest test the run strip needs: a number, a method name and an outcome. */
 function testTrace(number: number, outcome: TestTrace["outcome"]): TestTrace {
@@ -135,6 +145,114 @@ describe("RunView needs attention", () => {
 
     expect(axis?.textContent).toContain("start");
     expect(axis?.textContent).toContain("+100 ms");
+    unmount();
+  });
+
+  // An outcome the verdict does not name is an outcome the reader cannot trust the verdict about.
+  it("states unknown outcomes instead of dropping them", () => {
+    const { host, unmount } = mount(h(RunView, {
+      run: run([testTrace(1, "succeeded"), testTrace(2, "unknown")]),
+      fileName: "demo.prototrace", onSelect: () => {}
+    }));
+
+    expect(host.querySelector(".headline h1")?.textContent).toContain("1 unknown");
+    unmount();
+  });
+});
+
+// A broken teardown belongs to no test, so without its own rows it would have no surface at all.
+describe("RunView run problems", () => {
+  it("surfaces a failed run-level release and an error moment as Run rows", () => {
+    const release = span({});
+    const { host, unmount } = mount(h(RunView, {
+      run: run([testTrace(1, "succeeded")], {
+        spans: [release],
+        moments: [{
+          at: 0, name: "Owned the broker", kind: "resource.owned", source: "ProtoTest", outcome: "failed",
+          error: { type: "Error", message: "Broker never started" }, attributes: {}, sections: [], span: null
+        }]
+      }),
+      fileName: "demo.prototrace", onSelect: () => {}
+    }));
+
+    const rows = [...host.querySelectorAll(".attention .issue.run")];
+    expect(rows).toHaveLength(2);
+    expect(rows.map(row => row.querySelector("b")?.textContent)).toEqual(["Run", "Run"]);
+    expect(rows[0].textContent).toContain("Release the broker");
+    expect(rows[0].textContent).toContain("Broker refused to close");
+    expect(rows[1].textContent).toContain("Broker never started");
+    unmount();
+  });
+});
+
+// A finding that names the operation it came from opens the test at that operation.
+describe("RunView findings", () => {
+  it("opens a finding at its operation, and one without an operation at the test landing", () => {
+    const tests = [testTrace(1, "failed")];
+    const operation = span({ id: "op-1", name: "Assert status", kind: "assert.http.status", status: "failed", error: null, test: tests[0] });
+    const select = vi.fn();
+    const { host, unmount } = mount(h(RunView, {
+      run: run(tests, {
+        findings: [
+          {
+            finding: {
+              type: "finding", at: 0, message: "Extra fields", status: "Warning", category: null,
+              target: null, tags: [], metadata: {}, span: operation
+            },
+            test: tests[0]
+          },
+          {
+            finding: {
+              type: "finding", at: 0, message: "Loose warning", status: "Warning", category: null,
+              target: null, tags: [], metadata: {}, span: null
+            },
+            test: tests[0]
+          }
+        ]
+      }),
+      fileName: "demo.prototrace", onSelect: select
+    }));
+
+    const rows = [...host.querySelectorAll<HTMLButtonElement>(".attention .issue.finding")];
+    expect(rows).toHaveLength(2);
+    rows[0].click();
+    expect(select).toHaveBeenCalledWith(tests[0], { span: "op-1" });
+    rows[1].click();
+    expect(select).toHaveBeenCalledWith(tests[0], undefined);
+    unmount();
+  });
+});
+
+// The run owns resources that are not capabilities; the strip states what they are, in their own words.
+describe("RunView resources", () => {
+  function item(overrides: Partial<Item>): Item {
+    return {
+      key: "broker", kind: "broker", id: "messaging:broker", name: "Resource messaging:broker", scope: "run",
+      firstSeen: 0, lastSeen: 1, state: { "resource.description": "Messaging broker", "resource.state": "released" },
+      changes: [], test: null, ...overrides
+    };
+  }
+
+  it("names the run's own resources from their recorded descriptions", () => {
+    const { host, unmount } = mount(h(RunView, {
+      run: run([testTrace(1, "succeeded")], { items: [item({})] }),
+      fileName: "demo.prototrace", onSelect: () => {}
+    }));
+
+    expect(host.textContent).toContain("Messaging broker");
+    expect(host.querySelector('[title="messaging:broker (released)"]')).toBeTruthy();
+    unmount();
+  });
+
+  it("hides the resources row when the run holds only capabilities", () => {
+    const { host, unmount } = mount(h(RunView, {
+      run: run([testTrace(1, "succeeded")], {
+        items: [item({ key: "capability", kind: "capability", id: "protocol:REST", name: "REST", state: {} })]
+      }),
+      fileName: "demo.prototrace", onSelect: () => {}
+    }));
+
+    expect(host.textContent).not.toContain("Resources");
     unmount();
   });
 });

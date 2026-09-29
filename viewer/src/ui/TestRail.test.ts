@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createApp, h, type VNode } from "vue";
+import { createApp, h, nextTick, type VNode } from "vue";
 import TestRail from "./TestRail.vue";
 import type { Span, TestTrace } from "../trace/model";
 
@@ -49,6 +49,27 @@ describe("TestRail reasons", () => {
     }));
 
     expect(host.querySelector(".rail-row .reason")?.textContent?.trim()).toBe("Assert status");
+    unmount();
+  });
+
+  // A filter that matches nothing leaves the reader somewhere; the list offers the way back.
+  it("offers a way back from a search that matches nothing", async () => {
+    const { host, unmount } = mount(h(TestRail, {
+      tests: [testTrace(1, "succeeded")], onSelect: () => {}
+    }));
+
+    const input = host.querySelector<HTMLInputElement>("input[type='search']")!;
+    input.value = "zzz";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await nextTick();
+    expect(host.querySelector(".rail-row")).toBeNull();
+
+    const reset = [...host.querySelectorAll("button")]
+      .find(entry => entry.textContent?.trim() === "Show all tests");
+    expect(reset).toBeTruthy();
+    reset!.click();
+    await nextTick();
+    expect(host.querySelector(".rail-row")).toBeTruthy();
     unmount();
   });
 });

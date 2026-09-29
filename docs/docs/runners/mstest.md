@@ -56,6 +56,14 @@ public class OrderTests
 }
 ```
 
+## The context window
+
+`|` is the host bar, `[]` is the context. Each data row is its own context:
+
+```text
+|[AssemblyInit / AssemblyCleanup (host)]|  [[row 1]]  [[row 2]]
+```
+
 ## What the adapter changes
 
 | Item | What the adapter does |
@@ -70,6 +78,14 @@ public class OrderTests
 | Skips | A skip condition returns an ignored `TestResult` before the lifecycle starts. MSTest 4.4 has no public dynamic-skip API, so the reason travels on the public `LogOutput` and is prefixed to the display name: `Orders_endpoint_responds (skipped: {reason})`. |
 | Test names | `DeclaringType.MethodName[args]` through `ProtoTestName.ForRow`, so parallel rows stay apart. |
 | Parallelism | The usual switch works: `[assembly: Parallelize(Scope = ExecutionScope.MethodLevel)]`. |
+
+The path a skip takes:
+
+```text
+skip condition fails → ignored TestResult (lifecycle never starts, no trace)
+  → reason prefixed to the display name: Orders_endpoint_responds (skipped: {reason})
+  → reason also on LogOutput
+```
 
 ## Limits
 

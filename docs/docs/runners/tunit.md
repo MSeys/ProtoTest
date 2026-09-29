@@ -43,7 +43,14 @@ The `TUnit` namespace carries TUnit's own `[Test]`, `[Before]` and `[After]`.
 
 `[assembly: TestExecutor<ProtoTestExecutor>()]` applies the executor to every test in the assembly. Register it there. The class and method forms of `[TestExecutor<T>]` are not part of the supported surface.
 
-A test is a normal TUnit test. The executor wraps it.
+A test is a normal TUnit test. The executor wraps it. The interception path:
+
+```text
+[Test] → ProtoTestExecutor.ExecuteTest → resolve MethodInfo + attributes
+  → skip? → Skip.Test(reason), nothing starts, no trace
+  → else start the context → await the body → complete with the outcome
+  → body threw? → record, complete, rethrow via ExceptionDispatchInfo
+```
 
 ```csharp
 using System.Net;
@@ -65,6 +72,14 @@ public class OrderTests
 }
 ```
 
+## The context window
+
+`|` is the host bar, `[]` is the context. The executor wraps the body:
+
+```text
+|[Before(Assembly) / After(Assembly) (host)]|  [[executor wraps body]]
+```
+
 ## What the adapter changes
 
 | Item | What the adapter does |
@@ -84,7 +99,7 @@ public class OrderTests
 
 - There is no ProtoTest attribute. Test discovery and `[Test]` are entirely TUnit's.
 - Register the executor for the assembly. `[TestExecutor<T>]` on a class or a method is not part of the supported surface.
-- A source-generated test without a reflection `MethodInfo` runs unwrapped. The executor has no method data to build a context.
+- **Runs unwrapped.** A source-generated test without a reflection `MethodInfo` runs unwrapped. The executor has no method data to build a context.
 - The per-test token comes from `TestContext.CancellationToken`: the executor has no token of its own, so a test with no live context (see the `MethodInfo` limit) starts from `CancellationToken.None`.
 - A teardown failure is recorded but can never change the body's outcome.
 

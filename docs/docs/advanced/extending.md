@@ -17,7 +17,16 @@ Every built-in integration is built on public types, and a package you write use
 
 ## Where each extension point lives
 
-Start from what you need to say, then take the part of the integration it belongs to:
+Start from what you need to say, then take the part of the integration it belongs to. Where each part plugs in:
+
+```mermaid
+flowchart TD
+    tests["tests"] --> hooks["attributes for some · hooks for all"]
+    hooks --> host["host · owns start, stop and release"]
+    host --> clients["clients bring data in · typed state passes it along"]
+    host --> obs["observations"] --> collectors["collectors"] --> sinks["sinks write reports out"]
+    host --> trace["trace writer writes evidence out"] --> viewer["viewer"]
+```
 
 ```mermaid
 flowchart TD
@@ -191,7 +200,15 @@ Built-ins use `ProtoTest:<Integration>[:<Area>]`. The area names the role, such 
 
 ## Adding to the trace
 
-`context.Trace` is an `IProtoTraceWriter`.
+`context.Trace` is an `IProtoTraceWriter`. One operation your package writes reads like this in the viewer:
+
+```text
+bus.publish            BUS · Publish · orders.created     Succeeded · 12 ms
+kind                   name                               outcome
+source: Acme.ProtoTest.Bus          attributes: bus.topic = orders.created
+```
+
+Kind, name, source and attributes are the four things every call sets. The conventions below are what makes the row read like a built-in one.
 
 ### Operations
 

@@ -43,6 +43,16 @@ Items arrive sorted by target, category and identifier. Only top-level items are
 
 The HTML report is one self-contained page. It shows a summary and every report item. Covered, partial and uncovered paths are marked.
 
+```text
+Summary: totals · covered/uncovered · occurrences · findings · gates · resources
+├── Coverage      endpoint → response → property (covered / partial / uncovered)
+├── Findings      what tests recorded with AddFinding, plus what integrations reported
+├── Run gates     verdicts: passed, warning, failed, skipped
+├── Resources     what tests owned and released
+└── Run metadata  the CI facts the run recorded about itself
+search and filters apply across every section; an empty section hides itself
+```
+
 The report groups items into sections:
 
 | Section | What it holds |
@@ -58,6 +68,19 @@ An integration's own kind gets a section too, titled after the kind. Searching a
 ### Occurrences
 
 Every coverage and observation row carries its own occurrence count. The summary's **Occurrences** card adds those per branch: each top-level coverage unit contributes its hit count once, and observations contribute their counts. Units nested under another unit (an OpenAPI response and its properties under the endpoint) are that unit's breakdown of the same calls, so they add nothing again. An aggregate row (a GraphQL type, `IsCovered` null) contributes nothing itself and does not hide the units below it. Findings and gate verdicts are recorded once rather than observed repeatedly, so they never inflate the count.
+
+Worked through with numbers:
+
+```text
+GET /orders endpoint, 12 hits ............... +12 (top-level unit, counted once)
+  ├── 200 response, 12 hits ................. +0 (nested breakdown of the same calls)
+  ├── $.orderId property .................... +0 (nested breakdown)
+  └── 404 response, 3 hits, uncovered ........ +0 (nested breakdown, even uncovered)
+GraphQL type Order (aggregate, IsCovered null) +0 (contributes nothing itself)
+invoice.state observation, seen 5 times ...... +5 (observations always count)
+1 finding + 1 gate verdict .................. +0 (recorded once, never observed)
+TotalOccurrences = 12 + 5 = 17
+```
 
 ### The JSON report
 
@@ -179,8 +202,13 @@ Two optional interfaces make a sink a first-class citizen:
 
 ## Limits
 
+Snapshot timing (what the report can and cannot show):
+
 - A teardown failure never replaces the outcome the test reported. The failing teardown operation is marked failed, and the error becomes a **finding on the test's trace record**: status `Error`, category `Teardown`, target the test name, exception type as a tag. A passing test whose teardown failed reads as **Partial** rather than green. That finding lives on the trace record and in the viewer, not in the report's Findings section, which counts findings tests recorded with `AddFinding` and items integrations report.
 - The report is a snapshot taken before the run's own resources are released. Test-scoped resources have already been released when it is written, but a run-scoped resource (infrastructure, a container) still reads as registered and neutral there. Its release is recorded in the [ProtoTrace](./prototrace.md) afterwards.
+
+Sink failures (what happens when writing fails):
+
 - If a sink throws, the others still run. One failure is rethrown as-is; several become an `AggregateException("One or more report sinks failed to export.")`.
 - The built-in sinks write one report per run. They do not append to a previous report or keep a history.
 

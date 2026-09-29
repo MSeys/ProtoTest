@@ -232,7 +232,12 @@ Test artifacts, every [attachment](../foundation/attachments.md), live under the
 
 ### Format compatibility
 
-The library reads manifest and spans **2.x** and state documents **1.x**; anything else fails with a message naming the version rather than guessing. The viewer reads the same spans 2.x and accepts state **1.x or 2.x**, so a state bump the viewer can read still needs a library release before the CLI opens it. A reader only opens an archive from its own era.
+| Reader | spans 2.x | state 1.x | state 2.x |
+| --- | --- | --- | --- |
+| Library, CLI and MCP server | reads | reads | needs a library release first |
+| Viewer | reads | reads | reads |
+
+The library reads manifest and spans **2.x** and state documents **1.x**; anything else fails with a message naming the version rather than guessing. A state bump the viewer can already read still needs a library release before the CLI opens it. A reader only opens an archive from its own era.
 
 ### If the process dies
 

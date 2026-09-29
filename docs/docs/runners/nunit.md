@@ -54,7 +54,27 @@ public class OrderTests
 This is NUnit's own rule. A `[SetUpFixture]` outside any namespace applies to the whole assembly, while one inside a namespace applies only to that namespace and its children. If tests in another namespace cannot find the host, move the setup class to cover that namespace.
 :::
 
+```text
+Assembly
+├── [SetUpFixture] outside any namespace → every namespace below sees the host
+│   ├── Orders.Tests → host available
+│   └── Billing.Tests → host available
+└── [SetUpFixture] inside namespace Orders.Tests → only that namespace sees it
+    ├── Orders.Tests → host available
+    └── Billing.Tests → InvalidOperationException naming the setup class
+```
+
 **Low-ceremony mode.** Add `[assembly: ProtoTestAutoWrap]` and every plain `[Test]` runs through the same lifecycle. NUnit applies the nearest `IWrapSetUpTearDown` attribute (method, then fixture, then assembly), so a test that carries `[ProtoTest]` keeps its own wrapper and is never wrapped twice.
+
+## The context window
+
+`|` is the host bar, `[]` is the context. Everything outside the bracket runs before the context exists:
+
+```text
+|[SetUpFixture (host)]|  [[SetUp | body | TearDown]]
+```
+
+`Proto.Context` works in `[SetUp]`, the body and `[TearDown]`. It does not work in the fixture's `[OneTimeSetUp]`, which builds the host.
 
 ## What the adapter changes
 

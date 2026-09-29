@@ -54,9 +54,9 @@ Level 0 was about what a test answers. This level is about the other side: what 
   ]}
   next={[
     {
-      label: 'Add and remove an integration',
-      to: '/learn/compose-dont-glue/add-and-remove-an-integration',
-      note: 'Watch a capability go missing, add it back, and take it away again.',
+      label: 'One host, one lifetime',
+      to: '/learn/compose-dont-glue/one-host-one-lifetime',
+      note: 'What the base class starts before the first test, and why Build() is terminal.',
     },
     {
       label: 'The foundation',

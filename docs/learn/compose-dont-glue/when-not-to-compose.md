@@ -2,7 +2,7 @@
 id: when-not-to-compose
 title: When not to compose
 sidebar_label: When not to compose
-sidebar_position: 3
+sidebar_position: 5
 description: "Decide what belongs in the run, what belongs to a test, and what belongs to neither."
 ---
 
@@ -14,7 +14,7 @@ import Link from '@docusaurus/Link';
 Composition has a cost: everything in the host runs for the whole run and is shared by every test. This lesson is about the line between composing and gluing.
 
 <LearnShell
-  level="Level 2, lesson 3"
+  level="Level 2, lesson 5"
   minutes="About 8 minutes"
   outcome={[
     'Decide whether a piece belongs to the run, to a test, or to neither.',
@@ -22,7 +22,7 @@ Composition has a cost: everything in the host runs for the whole run and is sha
     'Name the cost of a piece that only one test needs.',
   ]}
   before={[
-    <>Add and remove an integration (<Link to="/learn/compose-dont-glue/add-and-remove-an-integration">lesson 2</Link>).</>,
+    <>Add and remove an integration (<Link to="/learn/compose-dont-glue/add-and-remove-an-integration">lesson 3</Link>).</>,
     'Nothing installed. The archives are on this site.',
   ]}
   situation={

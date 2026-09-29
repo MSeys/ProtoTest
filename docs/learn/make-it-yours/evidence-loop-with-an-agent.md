@@ -2,7 +2,7 @@
 id: evidence-loop-with-an-agent
 title: Run the evidence loop with an agent
 sidebar_label: The evidence loop with an agent
-sidebar_position: 4
+sidebar_position: 5
 description: "Read a real failing trace with the CLI, connect a coding agent to the same archive over MCP, and close the loop."
 ---
 
@@ -14,7 +14,7 @@ import Link from '@docusaurus/Link';
 The four drills leave failing traces on purpose. Level 4 read one as a human. This lesson reads the same archive with the tools a coding agent uses, and the two must tell one story.
 
 <LearnShell
-  level="Level 6, lesson 4"
+  level="Level 6, lesson 5"
   minutes="About 9 minutes"
   outcome={[
     'Run the deterministic summary on a real failing trace.',

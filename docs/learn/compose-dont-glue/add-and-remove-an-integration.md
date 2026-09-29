@@ -2,7 +2,7 @@
 id: add-and-remove-an-integration
 title: Add and remove an integration
 sidebar_label: Add and remove an integration
-sidebar_position: 2
+sidebar_position: 3
 description: "Watch a capability-gated journey skip, add the broker that serves it, and remove it again."
 ---
 
@@ -15,7 +15,7 @@ import Link from '@docusaurus/Link';
 A capability the run cannot serve is absent. A test that needs it does not fail halfway; it skips with a reason. This lesson watches that happen, adds the missing piece, and takes it away again.
 
 <LearnShell
-  level="Level 2, lesson 2"
+  level="Level 2, lesson 3"
   minutes="About 10 minutes"
   outcome={[
     'Run a capability-gated journey and read its skip.',
@@ -54,9 +54,9 @@ A capability the run cannot serve is absent. A test that needs it does not fail 
   ]}
   next={[
     {
-      label: 'When not to compose',
-      to: '/learn/compose-dont-glue/when-not-to-compose',
-      note: 'Decide what belongs in the run, what belongs to a test, and what belongs to neither.',
+      label: 'Sign in as a test user',
+      to: '/learn/compose-dont-glue/sign-in-as-a-test-user',
+      note: 'The identity every journey declares, and what the trace keeps about it.',
     },
     {
       label: 'Messaging',

@@ -53,9 +53,9 @@ Everything a package does, your own code can do: a client the context resolves, 
   ]}
   next={[
     {
-      label: 'Run the evidence loop with an agent',
-      to: '/learn/make-it-yours/evidence-loop-with-an-agent',
-      note: 'The trace you just learned to write, read by a coding agent over MCP.',
+      label: 'Swap a dependency for one test',
+      to: '/learn/make-it-yours/swap-a-dependency-for-one-test',
+      note: 'Replace a service in the application for one test, and read the dedicated server it builds.',
     },
     {
       label: 'Extending ProtoTest',

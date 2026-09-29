@@ -2,7 +2,7 @@
 id: evidence-in-ci
 title: Take the evidence to CI
 sidebar_label: Take the evidence to CI
-sidebar_position: 4
+sidebar_position: 5
 description: "Keep the trace and the reports as CI artifacts, post the digest with the action, and run the same suite at three depths."
 ---
 
@@ -15,7 +15,7 @@ import Link from '@docusaurus/Link';
 A red job that prints one line is not evidence. The suite already wrote the trace and the reports; the job has to keep them, and one step turns them into a comment the reviewer can open.
 
 <LearnShell
-  level="Level 4, lesson 4"
+  level="Level 4, lesson 5"
   minutes="About 9 minutes"
   outcome={[
     'Point every output at one directory and upload it as one CI artifact.',

@@ -16,6 +16,31 @@ No. The file is opened in browser memory.
 
 It may still contain application data. Treat it as a test artifact and check what was captured before sharing it.
 
+## Bundled demos
+
+The start screen lists the bundled demos with their test counts, read from the traces themselves.
+This includes a genuine OpenCSMS product run alongside the Northstar samples. To add one, drop the
+`.prototrace` file in `public/demos/` and add one entry to the registry in `src/demos.ts` with the
+key, the file name, the label, and a one-line description. The entry opens under `?demo=<key>`.
+
+To refresh a product demo, run its suite, replace the file in `public/demos/`, and keep the entry.
+Do not bundle a trace that misrepresents the product: a synthetic benchmark trace is not a product
+demo.
+
+## Sharing a trace
+
+Two query parameters make a trace shareable:
+
+- `?demo=<key>` opens a bundled demo (`?demo=1` is the full demo). Anyone with the viewer link sees
+  the same trace.
+- `?trace=<absolute-url>` fetches a trace hosted anywhere that allows cross-origin reads, for example
+  a `raw.githubusercontent.com` URL of a committed trace. The host must send CORS headers; when the
+  fetch fails the viewer says so, and a downloaded copy still opens by dropping it in.
+
+The header's Copy link button copies the demo or trace URL behind the open trace, keeping the
+reader's test and selection. A trace opened from a local file has no URL to share, so the button
+stays hidden there.
+
 ## Run locally
 
 ```bash

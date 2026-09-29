@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import AppHeader from "./ui/AppHeader.vue";
+import DemoList from "./ui/DemoList.vue";
 import RunView from "./views/RunView.vue";
 import StoryView from "./views/StoryView.vue";
 import StateView from "./views/StateView.vue";
@@ -25,6 +26,8 @@ import { buildRun } from "./trace/model";
 import type { Artifact, Item, Run, Span, TestTrace } from "./trace/model";
 import { formatDuration, failureReason, pad, testCodeName, testGroup, testTitle, tone } from "./trace/format";
 import { href, navigate, replace, route } from "./router";
+import { demos, demoFileUrl, resolveDemo, summarizeDemo, type DemoFacts } from "./demos";
+import { parseTraceParam, shareUrl, traceNameFromUrl, type TraceSource } from "./share";
 import { useSources } from "./trace/sources";
 import type { Route, TestView } from "./router";
 
@@ -35,6 +38,8 @@ const fileName = ref("");
 const problem = ref<{ kind: TraceProblem | "load"; message: string }>();
 const loading = ref(false);
 const openArtifact = ref<Artifact>();
+const source = ref<TraceSource>();
+const demoFacts = ref<Record<string, DemoFacts | null>>({});
 // Open as a column where it fits; as a drawer on a narrow screen it starts closed.
 const railOpen = ref(matchMedia("(min-width: 1000px)").matches);
 const dragging = ref(false);
@@ -260,22 +265,47 @@ async function loadBuffer(buffer: ArrayBuffer, name: string) {
 }
 async function loadFile(file: File) {
   await loadBuffer(await file.arrayBuffer(), file.name);
+  source.value = { kind: "file" };
+  syncQuery("");
 }
-const bundledDemos: Record<string, {file: string; label: string}> = {
-  full: { file: "prototest-demo.prototrace", label: "ProtoTest demo trace" },
-  "rest-graphql": { file: "recipes/rest-graphql.prototrace", label: "REST to GraphQL recipe" },
-  "rest-database": { file: "recipes/rest-database.prototrace", label: "REST to database recipe" },
-  workbook: { file: "recipes/workbook.prototrace", label: "Workbook recipe" }
-};
+
+/* The address names the open trace, so a demo or hosted trace is shareable from the bar. */
+function syncQuery(query: string) {
+  try {
+    history.replaceState(null, "", `${location.pathname}${query}${location.hash}`);
+  } catch { /* The address stays as it was; the copy control still shares the open trace. */ }
+}
+
+/* The shared link keeps the reader's hash, so a link to a failing check shares as one. */
+const shareLink = computed(() => {
+  void route.value;
+  return source.value ? shareUrl(location.origin, location.pathname, source.value, location.hash) : null;
+});
+
+/* The facts under each demo come from the traces themselves, read once while the start shows. */
+async function loadDemoFacts() {
+  const missing = demos.filter(entry => !(entry.key in demoFacts.value));
+  await Promise.all(missing.map(async entry => {
+    try {
+      const response = await fetch(demoFileUrl(entry));
+      if (!response.ok) throw new Error(`The demo trace could not be loaded (${response.status}).`);
+      demoFacts.value[entry.key] = await summarizeDemo(await response.arrayBuffer());
+    } catch {
+      demoFacts.value[entry.key] = null;
+    }
+  }));
+}
 
 async function loadDemo(key = "full") {
   loading.value = true;
   try {
-    const demo = bundledDemos[key] ?? bundledDemos.full;
-    const response = await fetch(`${import.meta.env.BASE_URL}demos/${demo.file}`);
+    const entry = resolveDemo(key);
+    const response = await fetch(demoFileUrl(entry));
     if (!response.ok) throw new Error(`The demo trace could not be loaded (${response.status}).`);
-    await loadBuffer(await response.arrayBuffer(), demo.label);
-    if (key !== "full" && run.value?.tests.length === 1) {
+    await loadBuffer(await response.arrayBuffer(), entry.label);
+    source.value = { kind: "demo", key: entry.key };
+    syncQuery(`?demo=${entry.key === "full" ? "1" : entry.key}`);
+    if (entry.key !== "full" && run.value?.tests.length === 1) {
       replace({ name: "test", testId: run.value.tests[0].id, view: "story" });
     }
   } catch (reason) {
@@ -283,13 +313,44 @@ async function loadDemo(key = "full") {
     loading.value = false;
   }
 }
+async function loadTraceUrl(url: string) {
+  loading.value = true;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`The trace at ${url} responded with ${response.status}.`);
+    await loadBuffer(await response.arrayBuffer(), traceNameFromUrl(url));
+    source.value = { kind: "remote", url };
+    syncQuery(`?trace=${encodeURIComponent(url)}`);
+  } catch (reason) {
+    if (reason instanceof TraceOpenError) {
+      problem.value = { kind: reason.problem, message: reason.message };
+    } else if (reason instanceof TypeError) {
+      problem.value = {
+        kind: "load",
+        message: `The trace at ${url} could not be fetched. The server may block cross-origin reads, the link may be wrong, or the network may be down. A downloaded copy still opens by dropping it in.`
+      };
+    } else {
+      problem.value = { kind: "load", message: reason instanceof Error ? reason.message : `The trace at ${url} could not be loaded.` };
+    }
+    loading.value = false;
+  }
+}
 function fileChanged(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0];
   if (file) void loadFile(file);
 }
-// ?demo=1 opens the full run; named demos open compact traces that exactly match a docs recipe.
-const requestedDemo = new URLSearchParams(location.search).get("demo");
-if (requestedDemo !== null) void loadDemo(requestedDemo === "1" ? "full" : requestedDemo);
+// ?demo=<key> opens a bundled demo (?demo=1 is the full one); ?trace=<absolute-url> fetches a hosted trace.
+const query = new URLSearchParams(location.search);
+const requestedDemo = query.get("demo");
+const requestedTrace = parseTraceParam(query.get("trace"));
+if (requestedTrace.state === "valid") void loadTraceUrl(requestedTrace.url);
+else if (requestedTrace.state === "invalid") {
+  problem.value = {
+    kind: "load",
+    message: `“${requestedTrace.value}” is not a usable trace link. Share an absolute http(s) URL to a .prototrace file.`
+  };
+} else if (requestedDemo !== null) void loadDemo(requestedDemo);
+onMounted(() => { if (!run.value) void loadDemoFacts(); });
 function dropped(event: DragEvent) {
   dragging.value = false;
   const file = event.dataTransfer?.files?.[0];
@@ -305,7 +366,7 @@ const problemTitle = computed(() => ({
 </script>
 
 <template>
-  <AppHeader @open="openPicker" />
+  <AppHeader :share="shareLink" @open="openPicker" />
   <input ref="fileInput" type="file" accept=".prototrace,application/zip" hidden @change="fileChanged">
   <main>
     <section v-if="!run" class="empty-state">
@@ -323,17 +384,22 @@ const problemTitle = computed(() => ({
           <p v-if="problem.kind === 'legacy'">Run the tests again with the current ProtoTest to produce a trace this viewer reads.</p>
           <div class="empty-actions">
             <AppButton variant="primary" @click.stop="openPicker">Choose another file</AppButton>
-            <AppButton @click.stop="loadDemo()">Open the demo trace</AppButton>
           </div>
+          <section class="demos" aria-label="Bundled demos">
+            <h2>Or try a bundled demo</h2>
+            <DemoList :facts="demoFacts" @open="loadDemo" />
+          </section>
         </template>
         <template v-else>
           <h1>Open a ProtoTest execution</h1>
-          <p>Drop a <code>.prototrace</code> file here, choose one, or explore the bundled SaaS demo.</p>
+          <p>Drop a <code>.prototrace</code> file here or choose one. Your files are read in this browser. Nothing is uploaded.</p>
           <div class="empty-actions">
             <AppButton variant="primary" @click.stop="openPicker">Choose trace file</AppButton>
-            <AppButton @click.stop="loadDemo()">Open demo trace</AppButton>
           </div>
-          <small>Your files are read in this browser. Nothing is uploaded.</small>
+          <section class="demos" aria-label="Bundled demos">
+            <h2>Try a bundled demo</h2>
+            <DemoList :facts="demoFacts" @open="loadDemo" />
+          </section>
         </template>
       </div>
     </section>
@@ -464,6 +530,9 @@ main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: minmax(
 }
 
 .empty-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center; }
+/* The demos sit below the drop action: the file stays first-class, the list stays one click away. */
+.demos { width: min(560px, 100%); margin-top: var(--space-4); display: grid; gap: var(--space-2); text-align: left; }
+.demos h2 { font-size: var(--text-meta); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--dim); text-align: center; }
 .drop-zone h1 { margin-top: var(--space-3); }
 .drop-zone code { padding: 1px var(--space-2); border-radius: var(--radius-chip); background: var(--surface-2); font-family: var(--font-mono); font-size: var(--text-meta); }
 .drop-zone .problem { color: var(--danger); }

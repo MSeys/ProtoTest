@@ -3,7 +3,9 @@ import { ref } from "vue";
 import AppButton from "./AppButton.vue";
 import Icon from "./Icon.vue";
 import BrandMark from "./BrandMark.vue";
+import { copyText } from "../share";
 
+defineProps<{ share?: string | null }>();
 defineEmits<{ open: [] }>();
 type Theme = "light" | "dark";
 let savedTheme: Theme | null = null;
@@ -15,6 +17,16 @@ function toggleTheme() {
   theme.value = theme.value === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = theme.value;
   try { localStorage.setItem("prototest-trace-theme", theme.value); } catch { /* The selected theme still applies to this page. */ }
+}
+
+// The button confirms briefly, so sharing from a trace opened out of a link is one click.
+const copied = ref(false);
+let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+async function copyShare(link: string) {
+  if (!await copyText(link)) return;
+  copied.value = true;
+  clearTimeout(copiedTimer);
+  copiedTimer = setTimeout(() => { copied.value = false; }, 2000);
 }
 </script>
 
@@ -28,6 +40,7 @@ function toggleTheme() {
     <div class="actions">
       <a class="docs" href="https://prototest.dev/docs/">Docs</a>
       <!-- Same order as the HTML report and the docs: the page's own action first, the theme switch last. -->
+      <AppButton v-if="share" @click="copyShare(share!)">{{ copied ? "Copied" : "Copy link" }}</AppButton>
       <AppButton variant="primary" @click="$emit('open')">Open trace</AppButton>
       <AppButton variant="icon" :label="`Use ${theme === 'dark' ? 'light' : 'dark'} mode`" @click="toggleTheme">
         <Icon :name="theme === 'dark' ? 'sun' : 'moon'" />

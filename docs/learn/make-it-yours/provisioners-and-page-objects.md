@@ -147,14 +147,14 @@ A test provisions a project with the extension the sample keeps for it:
 var project = await Proto.Context.Data().CreateProjectAsync($"provision-{Proto.Context.TestId}");
 ```
 
-One call, and the trace records a chain. From the first journey's archive, where the tenant attribute made the same call:
+One call, and the trace records a chain. From the first journey's archive, <a href="pathname:///lessons/l1-first-journey.prototrace">l1-first-journey.prototrace</a>, where the tenant attribute made the same call:
 
 | Entry | Reading |
 | --- | --- |
-| `Create · ProvisionTenantRequest`, 140.4 ms | the data surface received the request and looked up the registered provisioner |
+| `Create · ProvisionTenantRequest`, 138.1 ms | the data surface received the request and looked up the registered provisioner |
 | `Build · ProvisionTenantRequest`, 3.6 ms | the defaults and the `With` calls produced the value that was sent |
-| `Provision · ProvisionTenantRequest → TenantResponse`, 135.2 ms | the provisioner made the call and returned the created value |
-| `Release · data:TenantResponse:1`, 9.6 ms, then `Cleanup · TenantResponse` | teardown released the tracked value and ran the cleanup |
+| `Provision · ProvisionTenantRequest → TenantResponse`, 132.9 ms | the provisioner made the call and returned the created value |
+| `Release · data:TenantResponse:1`, 10.8 ms, then `Cleanup · TenantResponse` | teardown released the tracked value and ran the cleanup |
 
 Nothing in the test knew a port or a route. The registration decided which implementation ran, and the trace names it.
 

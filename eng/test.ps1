@@ -18,8 +18,12 @@ $solution = Join-Path $repository "ProtoTest.slnx"
 
 $includeDirectories = @()
 if (-not [string]::IsNullOrWhiteSpace($Include)) {
+    # verify.ps1 hands over absolute directories; callers may also pass repository-relative ones.
     $includeDirectories = @($Include -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-        ForEach-Object { [IO.Path]::GetFullPath((Join-Path $repository $_)) })
+        ForEach-Object {
+            if ([IO.Path]::IsPathRooted($_)) { [IO.Path]::GetFullPath($_) }
+            else { [IO.Path]::GetFullPath((Join-Path $repository $_)) }
+        })
 }
 
 function Invoke-DotNet {

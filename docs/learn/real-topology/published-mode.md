@@ -15,7 +15,7 @@ The topology lesson let the AppHost own the processes. This one moves them outsi
 
 <LearnShell
   level="Level 5, lesson 3"
-  minutes="About 9 minutes"
+  minutes="About 15 minutes"
   outcome={[
     'Start the product as real processes and point the suite at them with configuration.',
     'Name the keys that switch the same Setup off the test host.',
@@ -23,7 +23,7 @@ The topology lesson let the AppHost own the processes. This one moves them outsi
   ]}
   before={[
     <>Let Aspire start the topology (<Link to="/learn/real-topology/aspire-topology">lesson 2</Link>).</>,
-    'An OpenCSMS checkout and a container runtime. Reading the lesson alone also works.',
+    'An OpenCSMS checkout (the repository is not public yet) and a container runtime. Reading the lesson alone also works.',
   ]}
   situation={
     <>

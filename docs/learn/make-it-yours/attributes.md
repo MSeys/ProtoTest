@@ -143,7 +143,7 @@ public sealed class RunNoteAttribute(string note) : ProtoAttribute
 }
 ```
 
-Apply it to a test. The first journey's file from Level 1 works, or any class in the sample:
+Apply it to a test. The file from Level 1 works; if you removed it there, [Write your first test](/learn/one-test-one-journey/write-your-first-test) has the snippet to recreate it, or apply the attribute to any journey in the sample:
 
 ```csharp
 [Application(NorthstarTargets.Api)]
@@ -162,12 +162,12 @@ Open `bin/Debug/net8.0/TestResults/Northstar.ProtoTest/northstar.prototrace` und
 
 ## The evidence the sample leaves
 
-The committed archive for the first journey shows the same mechanism, with a real provisioning chain inside the attribute:
+The committed archive for the first journey, <a href="pathname:///lessons/l1-first-journey.prototrace">l1-first-journey.prototrace</a>, shows the same mechanism, with a real provisioning chain inside the attribute:
 
 | Entry | Reading |
 | --- | --- |
-| `Before · NorthstarTenantAttribute`, 143.3 ms | the attribute runs first, at Order -200 |
-| `Create · ProvisionTenantRequest`, 140.4 ms, with `Build` and `Provision` below it | the data surface builds the request, creates it and returns the response |
+| `Before · NorthstarTenantAttribute`, 141.3 ms | the attribute runs first, at Order -200 |
+| `Create · ProvisionTenantRequest`, 138.1 ms, with `Build` and `Provision` below it | the data surface builds the request, creates it and returns the response |
 | `Before · NorthstarMemberAttribute` | the composite's own entry, carrying the attributes it composed |
 | `Apply · NorthstarAuthenticator`, 1 ms | the HTTP auth hook applies the member's token on the first call |
 | `After · NorthstarMemberAttribute`, then `After · NorthstarTenantAttribute`, with `data.cleanup Cleanup · TenantResponse` | teardown reverses the order and the provisioned tenant is removed |

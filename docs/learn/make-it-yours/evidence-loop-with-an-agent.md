@@ -75,10 +75,10 @@ prototest summary l0-time-drill.prototrace
 The command reads the archive and prints one deterministic document. Here is its output for the committed drill, with the run id and timestamps shortened:
 
 ```text
-ProtoTest trace 2.0 · run 06ed50a0... · 2026-09-28 20:04:11Z - 2026-09-28 20:04:15Z
+ProtoTest trace 2.0 · run 316f2b23... · 2026-09-29 06:18:29Z - 2026-09-29 06:18:34Z
 1 tests · 1 failed
 
-FAILED Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow (2.20 s)
+FAILED Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow (2.16 s)
   Shape mismatch failed with 1 error(s):
     • [$.status]: Values did not match. (Expected: "past_due", Actual: "active")
   at samples/Northstar.ProtoTest/FailureDrills.cs:34 (Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow)

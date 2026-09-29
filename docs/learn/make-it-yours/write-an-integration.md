@@ -147,7 +147,7 @@ The conventions are short and worth following:
 
 ## Your turn: one milestone
 
-The probe is public, so a test can mark its own step. Add this to the first journey from lesson 1, under the `[RunNote]` you already added:
+The probe is public, so a test can mark its own step. Add this to the first journey from lesson 1, under the `[RunNote]` you already added; if you removed that file, [Write your first test](/learn/one-test-one-journey/write-your-first-test) recreates it, and [Write your own attribute](/learn/make-it-yours/attributes) adds the note.
 
 ```csharp
 Proto.Context.Client<ScenarioProbe>("ScenarioProbe").Mark("first-milestone");
@@ -156,16 +156,16 @@ Proto.Context.Client<ScenarioProbe>("ScenarioProbe").Mark("first-milestone");
 Run the filter and open the trace. The teardown publishes the scenario summary as an attachment. Open it and read the milestones:
 
 ```json
-{"CorrelationId":"scenario-137861000001-93af2aea0c584c4fb32be77b576df122","TestName":"Northstar.ProtoTest.ProjectsJourney.CreatingAProjectReturnsIt","DurationMs":365.901,"Milestones":["scenario-started","scenario-completed"]}
+{"CorrelationId":"scenario-416387000001-6406e159a16243e0beb564c28105893f","TestName":"Northstar.ProtoTest.ProjectsJourney.CreatingAProjectReturnsIt","DurationMs":349.127,"Milestones":["scenario-started","scenario-completed"]}
 ```
 
-The committed archive for the first journey has the same shape, with the sample's own two milestones. Beside it, the trace holds:
+The committed archive for the first journey, <a href="pathname:///lessons/l1-first-journey.prototrace">l1-first-journey.prototrace</a>, has the same shape, with the sample's own two milestones. Beside it, the trace holds:
 
 | Entry | Reading |
 | --- | --- |
-| `Initialize · ScenarioProbe (ScenarioProbe)`, 0.2 ms | the initializer registered the custom client during setup |
-| `Before · NorthstarScenarioHook`, 6.1 ms | the hook ran before the test and wrote the opening event |
-| `Publish · <test id>-scenario-summary.json`, 0.9 ms | the hook attached the milestone trail at teardown |
+| `Initialize · ScenarioProbe (ScenarioProbe)`, 0.1 ms | the initializer registered the custom client during setup |
+| `Before · NorthstarScenarioHook`, 6.2 ms | the hook ran before the test and wrote the opening event |
+| `Publish · <test id>-scenario-summary.json`, 0.6 ms | the hook attached the milestone trail at teardown |
 
 Your milestone lands in the same attachment, because the client, the hook and the attachment are one integration. That is the whole point: a feature you write behaves like a feature that shipped.
 

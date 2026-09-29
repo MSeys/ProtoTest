@@ -88,13 +88,13 @@ A resource that is never released would show up as a missing release entry in th
 
 ## Names that keep tests apart
 
-The sample runs its tests in parallel, eight at a time, and it never shares an identifier across tests:
+The sample runs its tests in parallel, eight at a time, and no identifier it creates can collide across tests:
 
-- The tenant name comes from `context.UniqueName("northstar")`.
-- The project name comes from `Proto.Context.TestId`, so it is unique per test.
+- The tenant name comes from `context.UniqueName("northstar")`, so each test owns its own tenant.
+- Project names are fixed inside that tenant, like `atlas`, or carry `Proto.Context.TestId`; either way no other test can reach them.
 - The teardown removes the tenant by the identity the setup recorded, not by a search.
 
-That is what makes the state answer hold under a parallel run: the test reads only what it created, and what it created is named so no other test can collide with it.
+That is what makes the state answer hold under a parallel run: the test reads only what it created, and what it created lives in a tenant no other test can reach.
 
 ## What a leak looks like
 

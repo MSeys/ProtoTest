@@ -16,7 +16,7 @@ The container mode kept the product inside the test process. The topology mode h
 
 <LearnShell
   level="Level 5, lesson 2"
-  minutes="About 9 minutes"
+  minutes="About 15 minutes"
   outcome={[
     'Select the AppHost with one key and read what it starts.',
     'Tell which provider serves a target when the AppHost is selected.',
@@ -24,7 +24,7 @@ The container mode kept the product inside the test process. The topology mode h
   ]}
   before={[
     <>Run the suite on containers (<Link to="/learn/real-topology/containers">lesson 1</Link>).</>,
-    'An OpenCSMS checkout and a container runtime. Reading the lesson alone also works.',
+    'An OpenCSMS checkout (the repository is not public yet) and a container runtime. Reading the lesson alone also works.',
   ]}
   situation={
     <>

@@ -116,8 +116,8 @@ From the archive:
 
 | Entry | Reading |
 | --- | --- |
-| `http.request` REST `GET /api/v1/reports/monthly.xlsx`, 268.1 ms, HTTP 200 | the download, with the response attached |
-| `sheets.open`, 30.6 ms, then `sheets.model` | the workbook was opened and the record model built |
+| `http.request` REST `GET /api/v1/reports/monthly.xlsx`, 365.9 ms, HTTP 200 | the download, with the response attached |
+| `sheets.open`, 40.9 ms, then `sheets.model` | the workbook was opened and the record model built |
 | `assert.sheets`, `Summary.Environments` | the column check the model recorded |
 | `attachment.publish`, `<test id>-rest-01-response` | the workbook's bytes, kept in the run |
 

@@ -115,11 +115,11 @@ From `l0-state-fix.prototrace`:
 
 | Layer | Entry | What it proves |
 | --- | --- | --- |
-| Setup | `data.create` ProvisionTenantRequest, 149.0 ms, then `data.provision`, 143.9 ms | the tenant exists before the body runs, named `northstar-749428000001` in this recording |
+| Setup | `data.create` ProvisionTenantRequest, 136.8 ms, then `data.provision`, 131.0 ms | the tenant exists before the body runs, named `northstar-651014000001` in this recording |
 | Setup | `attribute.before` SignedInAs, then its `auth.user.sign-in` event | the member acts inside that tenant |
-| Execution | `data.create` CreateProjectRequest, 119.5 ms | the project is created under the test's own tenant |
-| Execution | `http.request` REST `GET /api/v1/projects`, 105.1 ms, HTTP 200 | the read the check judged |
-| Teardown | `data.cleanup` TenantResponse, 10.6 ms, and `resource.release` of `data:TenantResponse:1` | the owned state is removed, and the release is recorded |
+| Execution | `data.create` CreateProjectRequest, 89.2 ms | the project is created under the test's own tenant |
+| Execution | `http.request` REST `GET /api/v1/projects`, 62.4 ms, HTTP 200 | the read the check judged |
+| Teardown | `data.cleanup` TenantResponse, 8.7 ms, and `resource.release` of `data:TenantResponse:1` | the owned state is removed, and the release is recorded |
 
 The value list tells the same story: the tenant item records `owned: true`, and the project is a value the test read. One cleanup covers both.
 

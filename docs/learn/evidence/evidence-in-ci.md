@@ -60,7 +60,7 @@ A red job that prints one line is not evidence. The suite already wrote the trac
     {
       label: 'Continuous integration',
       to: '/docs/continuous-integration/',
-      note: 'The working workflow, the action, and the three jobs.',
+      note: 'The working workflow and the action.',
     },
   ]}>
 
@@ -117,13 +117,13 @@ The comment carries the failing tests, the cause and the artifact link. One chec
 
 ## Three jobs, one suite
 
-The [CI page](/docs/continuous-integration/) documents three jobs:
+A pipeline around this suite usually splits into three jobs:
 
 - The **pull request** job runs the suite in-process and posts the digest. It is the fast one, and it runs on every change.
 - The **nightly** job runs the same suite against the container topology, where the store and the broker are real processes the run owns.
 - The **smoke** job is optional and points the suite at a deployed environment. Capability skips drop the journeys that need the test host, and the rest run against real addresses.
 
-The suite is the same in all three. What changes is the composition, and the composition is what decides which capabilities exist and which journeys skip.
+These are the shapes a suite of this kind fits, not a fixed pipeline; the [CI page](/docs/continuous-integration/) carries the action and a working workflow to start from. The suite is the same in all three. What changes is the composition, and the composition is what decides which capabilities exist and which journeys skip.
 
 ## Naming the build in the trace
 

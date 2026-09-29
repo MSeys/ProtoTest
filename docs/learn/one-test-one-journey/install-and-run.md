@@ -80,6 +80,19 @@ The ordinary run is green and fast. The application is hosted in-process, so the
 
 The four failure drills also skip in an ordinary run; `ProtoTest__Sample__Drills=true` lets them fail so you can read their traces. The summary prints how many tests passed, failed and skipped, and lists the skipped tests. Add `--logger "console;verbosity=detailed"` to print each reason beside its test.
 
+A healthy run on a machine with Chromium ends exactly like this:
+
+```text
+Failed:     0, Passed:    14, Skipped:     5, Total:    19
+```
+
+The five skips are the broker journey and the four drills. Without Chromium the browser journey skips too, and the summary reads `Passed: 13, Skipped: 6`. If your clone reports `Total: 0`, it predates the 1.1 sample; switch to that branch and run it again.
+
+```bash
+git fetch origin version/1.1
+git checkout version/1.1
+```
+
 ## Find what the run left
 
 Every run writes three files under the sample's output folder:
@@ -99,11 +112,11 @@ The sample composes packages; so does a new project. The quickest start is the t
 
 ```bash
 dotnet new install ProtoTest.Templates
-dotnet new prototest -n Shop
+dotnet new prototest -n Shop --framework net8.0
 cd Shop
 dotnet test
 ```
 
-For an existing test project, add your runner package, `ProtoTest.Core` and one package per integration. The [installation page](/docs/getting-started/installation) lists every package and what arrives with it.
+The template targets `net10.0` by default, so pass the framework your SDK has; `net8.0` matches the sample and the rest of this track. For an existing test project, add your runner package, `ProtoTest.Core` and one package per integration. The [installation page](/docs/getting-started/installation) lists every package and what arrives with it.
 
 </LearnShell>

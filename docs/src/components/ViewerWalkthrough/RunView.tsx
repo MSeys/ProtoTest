@@ -120,8 +120,12 @@ export default function RunView(): ReactNode {
       <p className={styles.outcomeLine}>
         <b className={styles.failedText}>4 failed</b>, <b className={styles.partialText}>1 partial</b>, 14 passed
       </p>
-      <p className={styles.meta}>19 tests in 4.06 s · 29 Sep 2026, 18:37:26 UTC</p>
-      <p className={styles.meta}>.NET 8.0.31 on Microsoft Windows 10.0.26200 · prototest-demo.prototrace</p>
+      <p className={styles.meta}>
+        <span>19 tests in 4.06 s</span>
+        <span>29 Sep 2026, 18:37:26 UTC</span>
+        <span>.NET 8.0.31 on Microsoft Windows 10.0.26200</span>
+        <span className={styles.file}>ProtoTest demo trace</span>
+      </p>
 
       <div className={styles.bar} aria-hidden="true">
         {outcomes.map((outcome, index) => (
@@ -130,8 +134,8 @@ export default function RunView(): ReactNode {
       </div>
 
       <section className={styles.panel}>
-        <header className={styles.panelHead}>What this run saw</header>
-        <p className={styles.panelLead}>Where the app ran, which capabilities were active, and what the trace recorded.</p>
+        <header className={styles.panelHead}>What this run could see</header>
+        <p className={styles.panelLead}>Where the application ran, what was composed, and how deep the trace reached.</p>
         <div className={styles.kv}>
           <span className={styles.kvLabel}>Application</span>
           <b>In-process</b>
@@ -158,7 +162,7 @@ export default function RunView(): ReactNode {
 
       <section className={styles.panel}>
         <header className={styles.panelHead}>Needs attention</header>
-        <p className={styles.panelLead}>Failed tests first, then run findings and gate results.</p>
+        <p className={styles.panelLead}>Failing and partial tests first, then what the run itself found and how its gates judged it.</p>
         <div className={styles.attention}>
           {attention.map((row) => (
             <div key={`${row.number}-${row.title}`} className={`${styles.attRow} ${attClass[row.outcome]}`}>

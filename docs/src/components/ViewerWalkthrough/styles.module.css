@@ -73,7 +73,9 @@
 .failedText { color: var(--danger); }
 .partialText { color: var(--warning); }
 
-.meta { margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--text-meta); }
+.meta { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--text-meta); }
+
+.file { color: var(--dim); }
 
 /* The phase bar: one tick per test, in the order they started. Passing tests are the quiet majority;
    what did not pass stands up out of the line, in its outcome colour. */

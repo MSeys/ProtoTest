@@ -231,23 +231,25 @@ With `AddressKeys` declared and none of them provided, the `SQL` capability is a
 
 ## Limits
 
-- **The container needs a container runtime.** The container starts with the host, before any test-level skip condition, so `PostgresDatabase.Container()` fails the run at start when the runtime is missing; call `TryStart` in the suite fixture before registering it to fall back to another database, or skip the suite with the reported reason.
-- **The transaction covers one connection.** The application's own connection is not rolled back unless the application is built on ProtoTest's connection; `ShareConnectionWith` declares that fact and satisfies the run-start guard, but it does not make the application use the connection.
-- **The guard only sees registered applications.** An application hosted without `AddApplication` cannot be detected, so nothing fails the run if it writes outside the transaction.
-- **`AddSql` is once per host.** A second call is a no-op rather than layering a second connection: the first registration's factory and options win, matching [repeated registration](../../getting-started/configuration.md#repeated-registration).
-- **A rollback failure still disposes everything.** The transaction and the connection are disposed in their own `finally` blocks even when rollback throws; the release failure is aggregated like any other teardown failure.
-- **The connect timeout is provider-owned.** The connection open and transaction begin observe `ProtoExecutionContext.CancellationToken`, or the runner's own token where its adapter has one:
+| Limit | Matters when | Severity |
+| --- | --- | --- |
+| **The container needs a container runtime.** The container starts with the host, before any test-level skip condition, so `PostgresDatabase.Container()` fails the run at start when the runtime is missing; call `TryStart` in the suite fixture before registering it to fall back to another database, or skip the suite with the reported reason. | The run owns its database but no runtime is installed. | The run fails at start. |
+| **The transaction covers one connection.** The application's own connection is not rolled back unless the application is built on ProtoTest's connection; `ShareConnectionWith` declares that fact and satisfies the run-start guard, but it does not make the application use the connection. | The application opens its own connection. | Its writes commit and stay behind. |
+| **The guard only sees registered applications.** An application hosted without `AddApplication` cannot be detected, so nothing fails the run if it writes outside the transaction. | An application is hosted outside `AddApplication`. | Writes outside the transaction commit silently. |
+| **`AddSql` is once per host.** A second call is a no-op rather than layering a second connection: the first registration's factory and options win, matching [repeated registration](../../getting-started/configuration.md#repeated-registration). | `AddSql` is called twice on one host. | The second call is ignored. |
+| **A rollback failure still disposes everything.** The transaction and the connection are disposed in their own `finally` blocks even when rollback throws; the release failure is aggregated like any other teardown failure. | Rollback throws. | The failure surfaces as a teardown failure; nothing leaks. |
+| **The connect timeout is provider-owned.** The connection open and transaction begin observe `ProtoExecutionContext.CancellationToken`, or the runner's own token where its adapter has one (table below). Without a token the provider's own connect timeout ends the wait (Npgsql's default, or `Connect Timeout` in the connection string). | Opening the connection hangs. | The provider timeout ends the wait. |
+| **No automatic migration or database creation.** ProtoTest never creates or migrates a schema by itself. When the run owns the database, create the schema once with [`AddRunSetup`](#run-owned-schema): a test body or hook runs inside the rolled-back transaction, so `EnsureCreated`/`Migrate` there disappears with the test. A deployed environment keeps its own schema. | The run owns an empty database. | Tests fail on the missing schema until `AddRunSetup` creates it. |
 
-  | Runner | Cancellation source |
-  | --- | --- |
-  | NUnit | the test context token via `[CancelAfter]` |
-  | xUnit v2 | the runner's `CancellationTokenSource` |
-  | xUnit v3 | `TestContext.Current.CancellationToken` |
-  | TUnit | `TestContext.CancellationToken` |
-  | MSTest | none (4.0.2 floor exposes none) |
+The cancellation source per runner:
 
-  Without a token the provider's own connect timeout ends the wait (Npgsql's default, or `Connect Timeout` in the connection string).
-- **No automatic migration or database creation.** ProtoTest never creates or migrates a schema by itself. When the run owns the database, create the schema once with [`AddRunSetup`](#run-owned-schema): a test body or hook runs inside the rolled-back transaction, so `EnsureCreated`/`Migrate` there disappears with the test. A deployed environment keeps its own schema.
+| Runner | Cancellation source |
+| --- | --- |
+| NUnit | the test context token via `[CancelAfter]` |
+| xUnit v2 | the runner's `CancellationTokenSource` |
+| xUnit v3 | `TestContext.Current.CancellationToken` |
+| TUnit | `TestContext.CancellationToken` |
+| MSTest | none (4.0.2 floor exposes none) |
 
 ## For package authors
 
@@ -256,6 +258,6 @@ A sibling access technology that wants the same honest capability shares the rul
 ## Links
 
 - [Integrations map](../overview.md) - where the store packages sit.
-- [One suite, three environments](../../getting-started/environments.md) - the demo's SQLite and PostgreSQL switch.
+- [One suite, three environments](../../getting-started/environments.md) - the sample suite's SQLite and PostgreSQL switch.
 - [Infrastructure](../../foundation/infrastructure.md) - how `PostgresDatabase.Container()` starts and fills settings.
-- EF Core registration order and enlistment in [`tests/ProtoTest.Sql.Tests/SqlIsolationTests.cs`](https://github.com/MSeys/ProtoTest/blob/main/tests/ProtoTest.Sql.Tests/SqlIsolationTests.cs), and the demo's composition in [`samples/Northstar.ProtoTest/Setup.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs).
+- EF Core registration order and enlistment in [`tests/ProtoTest.Sql.Tests/SqlIsolationTests.cs`](https://github.com/MSeys/ProtoTest/blob/main/tests/ProtoTest.Sql.Tests/SqlIsolationTests.cs), and the sample suite's composition in [`samples/Northstar.ProtoTest/Setup.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs).

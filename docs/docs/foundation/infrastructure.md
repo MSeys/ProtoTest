@@ -212,7 +212,7 @@ The sample flows, readiness probes, run-scoped setup, and `AddResource` against 
 - A run setup step as a run entity like any other piece. A step that throws fails the run's start.
 - Release runs after the reports export and before the trace archive is written. Each piece is released at most once, and a failed release is reported rather than swallowed.
 
-The winner in run state, the learning sample's project journey:
+The winner in run state, the sample suite's project journey:
 
 ```text
 application:loopback:Northstar web

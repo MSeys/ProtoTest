@@ -89,7 +89,7 @@ The sample configures both report sinks in one place:
 .AddSink<HtmlReportSink>(sink =>
 {
     sink.OutputPath = Path.Combine("TestResults", "Northstar.ProtoTest", "report.html");
-    sink.Title = "Northstar sample";
+    sink.Title = "Northstar Learning demo";
 });`}
   callouts={[
     {line: 3, title: 'The trace path', note: 'One archive per run. CI points this at its artifact directory instead; the evidence lesson shows how.'},

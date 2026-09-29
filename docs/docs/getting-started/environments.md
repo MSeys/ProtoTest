@@ -12,7 +12,7 @@ import {brokerSkipLayers, brokerSkipReason, brokerSkipSource, brokerSkipTest} fr
 
 The same suite runs in three shapes without a code change: **in-process** on a laptop, **container-backed** on a machine with a container runtime, and **published** against a deployed environment. Only the host setup and configuration differ. The journeys, attributes, assertions and reports stay the same.
 
-The shapes below come from the Northstar learning sample (`samples/Northstar.ProtoTest`). Its `NorthstarRun` decides all three from configuration:
+The shapes below come from the Northstar.ProtoTest sample suite (`samples/Northstar.ProtoTest`). Its `NorthstarRun` decides all three from configuration:
 
 ```csharp
 var run = NorthstarRun.From(configuration);

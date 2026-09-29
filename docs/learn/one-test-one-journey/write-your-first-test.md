@@ -3,7 +3,7 @@ id: write-your-first-test
 title: Write your first test
 sidebar_label: Write your first test
 sidebar_position: 2
-description: "Add one journey to the Northstar sample, run it alone, and see it pass."
+description: "Add one journey to the Northstar.ProtoTest sample suite, run it alone, and see it pass."
 ---
 
 import LearnShell from '@site/src/components/LearnShell';

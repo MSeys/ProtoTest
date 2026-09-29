@@ -204,7 +204,7 @@ Two optional interfaces make a sink a first-class citizen:
 
 Snapshot timing (what the report can and cannot show):
 
-- A teardown failure never replaces the outcome the test reported. The failing teardown operation is marked failed, and the error becomes a **finding on the test's trace record**: status `Error`, category `Teardown`, target the test name, exception type as a tag. A passing test whose teardown failed reads as **Partial** rather than green. That finding lives on the trace record and in the viewer, not in the report's Findings section, which counts findings tests recorded with `AddFinding` and items integrations report.
+- A teardown failure never replaces the outcome the test reported. The failing teardown operation is marked failed, and the error becomes a **finding on the test's trace record**: status `Error`, category `Teardown`, target the test name, exception type as a tag. A passing test whose teardown failed reads as **Partial** rather than green in the trace; the runner still reports the test itself as passed. That finding travels the same `AddFinding` path as any other finding, so it appears in the report's Findings section, counts in the summary, and run gates see it, as well as living on the trace record and in the viewer.
 - The report is a snapshot taken before the run's own resources are released. Test-scoped resources have already been released when it is written, but a run-scoped resource (infrastructure, a container) still reads as registered and neutral there. Its release is recorded in the [ProtoTrace](./prototrace.md) afterwards.
 
 Sink failures (what happens when writing fails):

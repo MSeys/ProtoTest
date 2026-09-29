@@ -27,4 +27,4 @@ Situation, then code, then trace, then variations, then what the test still does
 - Arrange with an attribute or a builder, not a helper.
 - One trace: the request, the event, the query and the browser steps land in the same test's story.
 
-Each recipe follows a run from the demo suite in `samples/Northstar.ProtoTest`. Each page links to its test file. The tests use the NUnit `[ProtoTest]` attribute. Swap the attribute for another runner, as [Test runners](../runners/overview.md) describes. The test bodies stay the same.
+Each recipe follows a run from the sample suite in `samples/Northstar.ProtoTest`. Each page links to its test file. The tests use the NUnit `[ProtoTest]` attribute. Swap the attribute for another runner, as [Test runners](../runners/overview.md) describes. The test bodies stay the same.

@@ -273,4 +273,4 @@ A suite with containers and real browsers was stable at 8 and 32 workers on a 16
 64 workers one run showed a single failure that never reproduced, and the passing rerun overwrote the
 failed run's single trace file before it could be read. The [concurrency page](../foundation/concurrency.md#exercised-parallelism)
 records the runs, the failure mode, and the current re-runs: Core green three times at 64 workers
-(380 passed each), Northstar with containers and a real browser green twice at 64 workers.
+(380 passed each), Northstar.ProtoTest with containers and a real browser green twice at 64 workers.

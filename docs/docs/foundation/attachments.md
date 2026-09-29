@@ -62,7 +62,7 @@ A failure publishing one attachment does not stop the others. It is recorded lik
 
 An attachment is recorded on the **record axis**, not as an operation: `Trace.Attachment` adds an `attachment-{n}` item to the record of the operation that produced it, or to the test's orphans when there is no active operation. After the test, the content is copied into the archive under `resources/{testId}/{artifact-N}/{name}`, and the item is updated with its archive path and size, so the [viewer](../observability/prototrace.md) can open it right from the step that produced it. If capturing fails, the item carries the capture error instead of a path.
 
-One journey's archive, the learning sample's project journey:
+One journey's archive, the sample suite's project journey:
 
 ```text
 l1-first-journey.prototrace

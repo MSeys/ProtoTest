@@ -13,7 +13,7 @@ import TabbedCode from '@site/src/components/TabbedCode';
 
 The application generates a monthly report as an `.xlsx`. A `200` on the download says a file arrived. It does not say the file has the right sheet, the right columns, valid values in every row or the project the test created.
 
-The test downloads the workbook over the API and checks its content. The demo runs this journey in [SheetsJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/SheetsJourney.cs).
+The test downloads the workbook over the API and checks its content. The sample suite runs this journey in [SheetsJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/SheetsJourney.cs).
 
 ## The code
 
@@ -108,7 +108,7 @@ In short, the trace reads in test order:
 04 assert.sheets MatchModel -> assert.sheets column checks -> Row("report-atlas")
 ```
 
-This is the demo's own run:
+This is the sample suite's own run:
 
 <TraceExample
   demo="workbook"

@@ -106,7 +106,7 @@ Three steps, none of which needs a suite of your own.
      cause: runner-reported failure
    ```
 
-   That is a failing run of the Learning demo, so the summary prints the run, the failing test and the failing operation. `prototest summary` prints the same diagnosis the MCP tools return, which makes it the quickest way to check that the file an agent would read says what you expect. The [CLI reference](./cli.md) documents all four verbs, their arguments and their exit codes.
+   That is a failing run of the sample suite, so the summary prints the run, the failing test and the failing operation. `prototest summary` prints the same diagnosis the MCP tools return, which makes it the quickest way to check that the file an agent would read says what you expect. The [CLI reference](./cli.md) documents all four verbs, their arguments and their exit codes.
 
 2. Point the server at one file with `--trace`, or at a folder of runs with `--project`. For one archive, `--trace` works wherever the file was written.
 

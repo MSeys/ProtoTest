@@ -122,7 +122,7 @@ public sealed class FrozenClockJourney
     {line: 13, title: 'The test did not change', note: 'It still sends one request through the composed client. Only the application\'s own provider changed.'},
     {line: 21, title: 'The assertion proves the app resolved it', note: 'The stamp comes from the application, so it can only equal the frozen value if the replacement reached it.'},
   ]}
-  foot={<>The test behind this lesson. Run it with <code>dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~FrozenClockJourney"</code>.</>}
+  foot={<>Save the file above as <code>FrozenClockJourney.cs</code> in the sample project. It is your own test, not a committed class: the sample's committed clock coverage lives in <code>ClockJourney</code>. Then run it with <code>dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~FrozenClockJourney"</code>.</>}
 />
 
 ## What the run records

@@ -11,7 +11,7 @@ The concept is in [Infrastructure](./infrastructure.md): one target, an ordered 
 
 ## The sample's two flows
 
-The learning sample registers its broker and database targets as above ([Environments](../getting-started/environments.md) shows the three shapes they select). The browser journey's address comes from the application chain: see [Hosting a browser journey](../integrations/aspnetcore.md#hosting-a-browser-journey) for the loopback recipe.
+The sample suite registers its broker and database targets as above ([Environments](../getting-started/environments.md) shows the three shapes they select). The browser journey's address comes from the application chain: see [Hosting a browser journey](../integrations/aspnetcore.md#hosting-a-browser-journey) for the loopback recipe.
 
 An application image is the container counterpart: `ApplicationContainer` (`ProtoTest.Testcontainers`) starts the image as run infrastructure and fills `ProtoTest:Applications:{application}:BaseUrl` from the mapped address, so the application's clients, browser sessions and readiness probe resolve it:
 

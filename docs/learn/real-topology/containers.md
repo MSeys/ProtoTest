@@ -73,7 +73,7 @@ OpenCSMS is an EV charging management system with a real product shape:
 - PostgreSQL for the store and RabbitMQ for events.
 - A billing worker that turns an ended session into an invoice, and a notification worker that pushes invoices to external targets.
 
-Container mode runs the API and both workers inside the test process, the way the Northstar sample does, and starts the two containers the run owns. The suite is the same in every mode; only the winners of the provider chains change.
+Container mode runs the API and both workers inside the test process, the way the sample suite does, and starts the two containers the run owns. The suite is the same in every mode; only the winners of the provider chains change.
 
 ## Run it
 

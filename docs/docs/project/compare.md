@@ -9,9 +9,9 @@ import {comparisonConcerns, withoutProtoTest, withProtoTest} from '@site/src/dat
 
 # ProtoTest compared
 
-Every tool on this page is good, and ProtoTest is built on several of them. Your application runs in-process with `WebApplicationFactory`, infrastructure comes from Testcontainers, browsers are driven by Playwright or Selenium, snapshots and assertions have well-established libraries, and gRPC goes through `Grpc.Net.Client`. The question is never whether those libraries work. It is which shape fits your suite.
+Every tool on this page is good, and ProtoTest is built on several of them. Your application runs in-process with `WebApplicationFactory`. Infrastructure comes from Testcontainers. Browsers use Playwright or Selenium. The question is never whether those libraries work. It is which shape fits your suite.
 
-This page says where each alternative wins, where ProtoTest wins, and ends with the cases where ProtoTest is the wrong choice.
+This page says where each alternative wins, where ProtoTest wins, and ends with the cases where ProtoTest is the wrong choice. [When ProtoTest is not the right choice](#when-prototest-is-not-the-right-choice) is the honest version up front.
 
 | If you | Pick |
 | --- | --- |
@@ -20,6 +20,12 @@ This page says where each alternative wins, where ProtoTest wins, and ends with 
 | Need deploy fidelity | Aspire testing |
 | Only drive a browser | Playwright alone |
 | Cross API, database, broker and browser in one test | ProtoTest |
+
+## What stays in the test
+
+ProtoTest moves setup to the suite host and attributes. The scenario lines stay the same. The same scenario against the same in-process application, first with a regular fixture and then with ProtoTest. Select a task to see both versions.
+
+<Comparison without={withoutProtoTest} with={withProtoTest} concerns={comparisonConcerns} verdict="35 lines of plumbing per fixture without, 13 with. The scenario lines stay the same." />
 
 ## WebApplicationFactory, Testcontainers, Verify and Shouldly
 
@@ -110,12 +116,6 @@ Some teams build their own integration-testing layer instead. [I did too](./why-
 - Runner adapters and container-backed infrastructure that you would otherwise rebuild one integration at a time.
 
 A framework you own completely is the right answer when the problem is truly yours alone. When it is the same problem everybody has, sharing the foundation is cheaper.
-
-## What stays in the test
-
-The same scenario against the same in-process application, first with a regular fixture and then with ProtoTest. Hatched lines are setup; solid lines belong to the scenario. Open a task to see the code from both sides.
-
-<Comparison without={withoutProtoTest} with={withProtoTest} concerns={comparisonConcerns} />
 
 ## When ProtoTest is not the right choice
 

@@ -72,6 +72,9 @@ export default function FailureGallery(): ReactNode {
                   onClick={() => toggle(pair.id)}>
                   <span className={styles.mode}>{pair.question}</span>
                   <span className={styles.ask}>{pair.ask}</span>
+                  <span className={styles.verdict}>
+                    <strong>Fix:</strong> {pair.change}
+                  </span>
                   <code className={styles.test}>{pair.drill.test}</code>
                   <span className={styles.chevron} aria-hidden="true" />
                 </button>
@@ -79,10 +82,6 @@ export default function FailureGallery(): ReactNode {
 
               {expanded && (
                 <div className={styles.panel} id={`failure-${pair.id}`}>
-                  <p className={styles.change}>
-                    <strong>What changes</strong>
-                    {pair.change}
-                  </p>
                   <div className={styles.side}>
                     <div className={styles.sideHead}>
                       <span className={styles.sideLabel}>The drill</span>
@@ -99,7 +98,7 @@ export default function FailureGallery(): ReactNode {
 
                   <div className={`${styles.side} ${styles.sideFix}`}>
                     <div className={styles.sideHead}>
-                      <span className={styles.sideLabel}>The test that holds</span>
+                      <span className={styles.sideLabel}>The fix</span>
                       <span className={styles.elapsed}>{pair.fix.elapsed}</span>
                     </div>
                     <p className={styles.what}>{pair.fix.what}</p>

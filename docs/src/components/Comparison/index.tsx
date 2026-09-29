@@ -24,6 +24,11 @@ interface ComparisonProps {
   with: ComparisonFile[];
   /** The same comparison task by task; the full files stay one click away. */
   concerns: ComparisonConcern[];
+  /** Side names. Default to the framework pair; a recipe pair names its own sides. */
+  withoutLabel?: string;
+  withLabel?: string;
+  /** One-line verdict above the bars, so the point lands before the numbers. */
+  verdict?: string;
 }
 
 interface Ledger {
@@ -58,7 +63,14 @@ function Bar({value, max}: {value: Ledger; max: number}): ReactNode {
   );
 }
 
-export default function Comparison({without, with: withProto, concerns}: ComparisonProps): ReactNode {
+export default function Comparison({
+  without,
+  with: withProto,
+  concerns,
+  withoutLabel = 'Without ProtoTest',
+  withLabel = 'With ProtoTest',
+  verdict,
+}: ComparisonProps): ReactNode {
   const [showFiles, setShowFiles] = useState(false);
   const [openFolds, setOpenFolds] = useState<Set<string>>(new Set());
   const [openPanes, setOpenPanes] = useState<Set<string>>(new Set());
@@ -70,8 +82,8 @@ export default function Comparison({without, with: withProto, concerns}: Compari
   const max = Math.max(withoutLedger.meaningful, withLedger.meaningful);
 
   const groups = [
-    {id: 'without', label: 'Without ProtoTest', files: without, ledger: withoutLedger},
-    {id: 'with', label: 'With ProtoTest', files: withProto, ledger: withLedger},
+    {id: 'without', label: withoutLabel, files: without, ledger: withoutLedger},
+    {id: 'with', label: withLabel, files: withProto, ledger: withLedger},
   ];
 
   function toggleFold(side: string, key: string) {
@@ -110,6 +122,7 @@ export default function Comparison({without, with: withProto, concerns}: Compari
         </span>
       }>
       {/* The point of the comparison, stated once and large: the plumbing each new fixture pays for. */}
+      {verdict && <p className={styles.verdict}>{verdict}</p>}
       <div className={styles.score}>
         {groups.map((group) => (
           <div key={group.id} className={`${styles.side} ${group.id === 'with' ? styles.sideWith : ''}`}>
@@ -119,7 +132,7 @@ export default function Comparison({without, with: withProto, concerns}: Compari
               <span>lines of plumbing</span>
             </span>
             <span className={styles.context}>
-              in a {group.ledger.meaningful}-line fixture, {group.ledger.scenario} of them the scenario
+              in a {group.ledger.meaningful}-line fixture, {group.ledger.scenario} lines describe the scenario
             </span>
             <Bar value={group.ledger} max={max} />
           </div>
@@ -169,7 +182,7 @@ export default function Comparison({without, with: withProto, concerns}: Compari
                   aria-expanded={openPanes.has(group.id)}
                   onClick={() => togglePane(group.id)}>
                   {openPanes.has(group.id)
-                    ? 'Collapse'
+                    ? 'Hide'
                     : `Show all ${test.code.trim().split('\n').length} lines`}
                 </button>
               </div>
@@ -180,9 +193,8 @@ export default function Comparison({without, with: withProto, concerns}: Compari
 
       <div className={styles.notes}>
         <p className={styles.contrast}>
-          A base class can share the left-hand lines too. The difference is where the work happens: inherited
-          setup runs again for every fixture against shared state, while a capability is composed onto a single
-          test on a context the framework manages.
+          A base class can share the left-hand lines too. Inherited setup reruns for every fixture against
+          shared state. A capability attaches to one test, on a context ProtoTest manages.
         </p>
 
         <div className={styles.owned}>

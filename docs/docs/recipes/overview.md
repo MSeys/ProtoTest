@@ -7,35 +7,24 @@ description: "Scenarios that combine several ProtoTest capabilities in one test:
 
 # Recipes
 
-An integration page explains one capability. Real scenarios cross several. The API call is half the check. What matters is the event it publishes, the row it writes or the page that shows it.
+One test, two systems, one trace. Pick the crossing that matches your problem.
 
-These recipes show the capabilities composed in one test: what the host needs, what the test looks like, what the trace shows, what else the pieces can do, and what the test still does not prove.
-
-Each recipe follows a run from the demo suite in `samples/Northstar.ProtoTest`. Each page links to its test file. Where a recipe links the viewer, the trace is the demo's own generated run. The tests use the NUnit `[ProtoTest]` attribute. Swap the attribute for another runner, as [Test runners](../runners/overview.md) describes. The test bodies stay the same.
-
-| Recipe | Composes |
-| --- | --- |
-| [An API call publishes an event](./api-publishes-an-event.md) | REST, Messaging, a broker the run owns |
-| [A write lands in the database](./write-lands-in-the-database.md) | REST, SQL, the store the run shares |
-| [Created through the API, shown in the browser](./api-then-browser.md) | REST, Web, a loopback listener |
-| [A downloaded report matches its model](./download-a-report.md) | REST, Sheets |
-| [Written over REST, read over GraphQL](./rest-then-graphql.md) | REST, GraphQL |
+| If you need | Read this recipe | Crossing | The trace ends with |
+| --- | --- | --- | --- |
+| The event after a REST pay | [An API call publishes an event](./api-publishes-an-event.md) | REST writes, broker delivers | `messaging.await` plus the matched `messaging.receive` |
+| The row after a REST create | [A write lands in the database](./write-lands-in-the-database.md) | REST writes, SQL stores | `sql.connection.open` in setup, released at teardown |
+| The page that shows what the API made | [Created through the API, shown in the browser](./api-then-browser.md) | REST arranges, browser checks | `web.session.initialize` through `assert.web` |
+| The contents of a generated file | [A downloaded report matches its model](./download-a-report.md) | REST downloads, Sheets reads | `sheets.open`, `sheets.model`, `assert.sheets` |
+| The second API seeing the first one's write | [Written over REST, read over GraphQL](./rest-then-graphql.md) | REST writes, GraphQL reads | `graphql.operation` plus `assert.json.shape` |
 
 ## How to read a recipe
 
-Each recipe has the same four parts:
-
-- **The situation.** Why one capability is not enough for this task.
-- **The code.** The composition the scenario needs and the test that runs it.
-- **What the trace shows.** The operations the journey records, in the order the test caused them.
-- **The variations.** The alternatives the same scenario allows, such as a container or a configured address.
-
-Every recipe ends with **what it does not prove**: the assumptions a passing test leaves standing.
+Situation, then code, then trace, then variations, then what the test still does not prove.
 
 ## What they have in common
 
-- **One test, one context.** Every client comes from `Proto.Context`, created for the test and released after it. None of them needs a fixture of its own.
-- **Arrange with an attribute or a builder, not a helper.** State goes through [Data](../integrations/data/index.md) or an [attribute](../foundation/attributes.md), so the next test that needs the same state reuses it by name.
-- **One trace.** The request, the event, the query and the browser steps land in the same test's story, in the order they happened. When a recipe fails, the [trace](../observability/prototrace.md) shows which half broke.
+- One test, one context: every client comes from `Proto.Context`.
+- Arrange with an attribute or a builder, not a helper.
+- One trace: the request, the event, the query and the browser steps land in the same test's story.
 
-The report-download recipe also opens directly on its matching test in the bundled [ProtoTrace demo](https://trace.prototest.dev/?demo=1). The trace file stays local. The link opens the matching test in the demo viewer.
+Each recipe follows a run from the demo suite in `samples/Northstar.ProtoTest`. Each page links to its test file. The tests use the NUnit `[ProtoTest]` attribute. Swap the attribute for another runner, as [Test runners](../runners/overview.md) describes. The test bodies stay the same.

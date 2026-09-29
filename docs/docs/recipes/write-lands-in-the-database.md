@@ -5,8 +5,11 @@ description: Create a project over REST, then read the committed row through the
 ---
 
 import TraceExample from '@site/src/components/TraceExample';
+import AnnotatedCode from '@site/src/components/AnnotatedCode';
 
 # A write lands in the database
+
+`201 Created` is the response rendering. `SELECT` the row is the committed truth.
 
 ## The situation
 
@@ -14,11 +17,85 @@ The API answers `201 Created`, but did the project reach the store in the state 
 
 The test creates the project over REST and then reads the committed row itself, through a connection the suite owns to the same database the application writes to. The demo runs this journey in [DomainAccessJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/DomainAccessJourney.cs).
 
-## The code
+## The test
 
-### Compose
+The test writes over REST and reads the row with the demo's own SQL:
+
+<AnnotatedCode
+  filename="DomainAccessJourney.cs"
+  code={`[Application(NorthstarTargets.Api)]
+[NorthstarMember(PlanIds.Growth)]
+public sealed class DomainAccessJourney
+{
+    [ProtoTest]
+    [SignedInAs]
+    [RequiresCapability(ProtoCapabilityKinds.Store, Reason = "The suite does not own the store, so it cannot inspect it.")]
+    public async Task AProjectCreatedThroughRestIsCommittedToTheDatabase()
+    {
+        const string projectName = "rest-to-store";
+
+        using var created = await Proto.Context.Rest()
+            .Body(new CreateProjectRequest(projectName))
+            .PostAsync("/api/v1/projects");
+        var project = created
+            .Should.HaveHttpStatus(HttpStatusCode.Created)
+            .ReadRequired<ProjectResponse>();
+
+        await using var command = Proto.Context.SqlConnection().CreateCommand();
+        command.CommandText = """
+            SELECT "Id", "Name", "Status"
+            FROM "Projects"
+            WHERE "Id" = @id
+            """;
+        var id = command.CreateParameter();
+        id.ParameterName = "@id";
+        id.Value = project.Id;
+        command.Parameters.Add(id);
+
+        await using var stored = await command.ExecuteReaderAsync();
+        Assert.That(await stored.ReadAsync(), Is.True, "The REST write did not create a project row.");
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(stored.GetString(0), Is.EqualTo(project.Id));
+            Assert.That(stored.GetString(1), Is.EqualTo(projectName));
+            Assert.That(stored.GetString(2), Is.EqualTo(ProjectStatuses.Active));
+        }
+    }
+}`}
+  callouts={[
+    {
+      line: 16,
+      title: 'The write landed',
+      note: 'HaveHttpStatus checks the response. ReadRequired reads the created project for its id.',
+    },
+    {
+      line: 31,
+      title: 'The row exists',
+      note: 'ReadAsync fails with the message the test wrote when the REST write created no row.',
+    },
+    {
+      line: 34,
+      title: 'The row matches',
+      note: 'One scope checks id, name and status together, so a mismatch lists every column that differs.',
+    },
+  ]}
+/>
+
+`Proto.Context.SqlConnection()` returns the test connection to the same store the application writes to. See [SQL](../integrations/sql/index.md) for the accessors and the isolation rules.
+
+| What the test proves | Where it lands |
+| --- | --- |
+| `POST /api/v1/projects` returns `201 Created` | The response body names `rest-to-store` |
+| `SELECT` finds the row | `Id`, `Name` = `rest-to-store`, `Status` = `active` |
+| The row is committed, not staged | The read runs outside any transaction |
+
+## Compose
 
 The run owns the store. The demo uses a SQLite file that every run recreates, and switches to a PostgreSQL container when the environment asks for it:
+
+```text
+[default] SQLite file, recreated per run | [ProtoTest__Database=postgres] container, skipped if configured
+```
 
 ```csharp
 // Setup.cs: PostgreSQL when the run asks for it; a configured key skips the container.
@@ -59,54 +136,6 @@ builder
             },
             ServiceLifetime.Scoped));
 ```
-
-### The test
-
-The test writes over REST and reads the row with the demo's own SQL:
-
-```csharp
-[Application(NorthstarTargets.Api)]
-[NorthstarMember(PlanIds.Growth)]
-public sealed class DomainAccessJourney
-{
-    [ProtoTest]
-    [SignedInAs]
-    [RequiresCapability(ProtoCapabilityKinds.Store, Reason = "The suite does not own the store, so it cannot inspect it.")]
-    public async Task AProjectCreatedThroughRestIsCommittedToTheDatabase()
-    {
-        const string projectName = "rest-to-store";
-
-        using var created = await Proto.Context.Rest()
-            .Body(new CreateProjectRequest(projectName))
-            .PostAsync("/api/v1/projects");
-        var project = created
-            .Should.HaveHttpStatus(HttpStatusCode.Created)
-            .ReadRequired<ProjectResponse>();
-
-        await using var command = Proto.Context.SqlConnection().CreateCommand();
-        command.CommandText = """
-            SELECT "Id", "Name", "Status"
-            FROM "Projects"
-            WHERE "Id" = @id
-            """;
-        var id = command.CreateParameter();
-        id.ParameterName = "@id";
-        id.Value = project.Id;
-        command.Parameters.Add(id);
-
-        await using var stored = await command.ExecuteReaderAsync();
-        Assert.That(await stored.ReadAsync(), Is.True, "The REST write did not create a project row.");
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(stored.GetString(0), Is.EqualTo(project.Id));
-            Assert.That(stored.GetString(1), Is.EqualTo(projectName));
-            Assert.That(stored.GetString(2), Is.EqualTo(ProjectStatuses.Active));
-        }
-    }
-}
-```
-
-`Proto.Context.SqlConnection()` returns the test connection to the same store the application writes to. See [SQL](../integrations/sql/index.md) for the accessors and the isolation rules.
 
 ## What the trace shows
 

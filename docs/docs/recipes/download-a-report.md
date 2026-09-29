@@ -30,6 +30,12 @@ builder.AddSheets();
 
 Describe a row of the report once, with the rules every value must meet. The test creates a project the report must contain, downloads the report and reads it through the model:
 
+| Column | Rule | Fails as |
+| --- | --- | --- |
+| `Name` | Unique | Duplicate cell refs listed |
+| `Status` | `^[a-z]+$` | Per-cell pattern failure |
+| `Environments` | `>= 0` | Collected, not first-only |
+
 <TabbedCode
   label="The report model and the test that reads it"
   tabs={[
@@ -92,6 +98,15 @@ The operations land in the order the test caused them:
 - `sheets.open` with the sheet it read, then `sheets.model` with the declared columns, and one `assert.sheets` operation per assertion.
 
 Reading a cell or a range records a `sheets.range` observation, and [`SheetsCoverageCollector`](../integrations/sheets/index.md#in-the-trace-and-coverage) aggregates those. Opening a workbook is evidence, not coverage: a range is covered only when a read verified it. See [Sheets](../integrations/sheets/index.md#in-the-trace-and-coverage).
+
+In short, the trace reads in test order:
+
+```text
+01 data fixture creates report-atlas
+02 http.request GET monthly.xlsx -> http.response + workbook artifact
+03 sheets.open Summary -> sheets.model ProjectReportRow
+04 assert.sheets MatchModel -> assert.sheets column checks -> Row("report-atlas")
+```
 
 This is the demo's own run:
 

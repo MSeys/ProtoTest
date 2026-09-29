@@ -115,8 +115,8 @@ export default function RunView(): ReactNode {
       </div>
 
       <section className={styles.panel}>
-        <header className={styles.panelHead}>What this run could see</header>
-        <p className={styles.panelLead}>Where the application ran, what was composed, and how deep the trace reached.</p>
+        <header className={styles.panelHead}>What this run saw</header>
+        <p className={styles.panelLead}>Where the app ran, which capabilities were active, and what the trace recorded.</p>
         <div className={styles.kv}>
           <span className={styles.kvLabel}>Application</span>
           <b>In-process</b>
@@ -143,7 +143,7 @@ export default function RunView(): ReactNode {
 
       <section className={styles.panel}>
         <header className={styles.panelHead}>Needs attention</header>
-        <p className={styles.panelLead}>Failing and partial tests first, then what the run itself found and how its gates judged it.</p>
+        <p className={styles.panelLead}>Failed tests first, then run findings and gate results.</p>
         <div className={styles.attention}>
           {attention.map((row) => (
             <div key={`${row.number}-${row.title}`} className={`${styles.attRow} ${attClass[row.outcome]}`}>

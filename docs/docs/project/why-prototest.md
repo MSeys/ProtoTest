@@ -6,15 +6,21 @@ description: The problems and earlier experience that led to ProtoTest.
 
 # Why I built ProtoTest
 
+Every integration was its own island. ProtoTest gives them one host, one context, one trace.
+
 I love programming, but especially building tools and solving abstract problems. I can build features, but problem-solving is like a puzzle.
 
 Integration testing gave me plenty of those problems.
 
 ## Tests stopped being about the test
 
-Integration testing can get rough, especially for bigger applications such as SaaS applications. There is infrastructure to start, users and tenants to create, authentication to arrange, data to clean up and different services to talk to.
+Integration testing gets hard for larger applications, such as multi-tenant services. There is infrastructure to start, users and tenants to create, authentication to arrange, data to clean up and different services to talk to.
 
 At some point more of the test is about that setup than the behavior it is meant to check.
+
+```text
+BEFORE: test = 60% setup, 40% scenario | AFTER: setup in host and attributes, test = scenario
+```
 
 My focus has always been clean and readable code. I wanted common application setup outside the test, while setup that matters to the scenario should remain visible.
 
@@ -22,9 +28,9 @@ My focus has always been clean and readable code. I wanted common application se
 
 ProtoTest was not my first attempt at this.
 
-I had already built a similar testing framework by hand. It started around API testing and grew as we looked at which other parts of an application could be covered.
+I had already built a similar testing framework from scratch. It started around API testing and grew as we looked at which other parts of an application could be covered.
 
-I learned a lot from building and using it. I also knew which parts I wanted to change. Its integrations were more mixed together, its core was less reusable and some lifecycle decisions could be cleaner.
+I learned a lot from building and using it. It covered less and its core was harder to reuse. Building and using it taught me what to change.
 
 ProtoTest was built from scratch, but the vision did not start from scratch.
 
@@ -32,7 +38,11 @@ ProtoTest was built from scratch, but the vision did not start from scratch.
 
 There are already good libraries for HTTP, browsers, containers and most other things ProtoTest works with. I did not build ProtoTest to replace them.
 
-The problem for me was that every integration felt like its own island. Setup, authentication, cleanup and diagnostics were handled differently or had to be connected by the test project.
+Each integration handled setup, auth and diagnostics on its own. Setup, authentication, cleanup and diagnostics were handled differently or had to be connected by the test project.
+
+```text
+ISLANDS: HTTP setup != browser setup != broker setup | FOUNDATION: one host, context, lifecycle, trace
+```
 
 ProtoTest gives those integrations the same host, test context and lifecycle. They can use setup that already happened and write their operations to the same trace.
 
@@ -42,7 +52,11 @@ The integrations are still opinionated wrappers. They represent how I want to wr
 
 Moving common setup outside a test makes the scenario easier to read, but it can also hide what happened before the test method ran.
 
-That becomes a problem when a test only fails in CI, only fails sometimes or depends on several pieces of infrastructure. A failed assertion is often only the final part of the story.
+That hurts when a test fails only in CI, fails intermittently, or needs several infrastructure pieces. A failed assertion is often only the final part of the story.
+
+```text
+ASSERTION without context vs TRACE with setup, operations and cleanup around the failure
+```
 
 ProtoTrace exists to show the lifecycle around that failure. It records setup, operations, checks, cleanup and captured evidence from the integrations that took part.
 
@@ -50,14 +64,17 @@ Playwright tracing was a large inspiration, but I wanted the trace to cover more
 
 ## Nothing phones home
 
-ProtoTest runs entirely in your process. Nothing is sent anywhere: there is no telemetry, no account and no
-service. The trace viewer is a static page that reads the file in your browser, and a `.prototrace` stays on
-your machine unless you move it. Attachments are redacted and sanitized before they are written, and the
-[benchmarks page](./benchmarks.md) documents the size levers if a trace is too large to share.
+ProtoTest runs entirely in your process.
+
+| Telemetry | Account | Viewer | Attachments |
+| --- | --- | --- | --- |
+| None | None | A static page that reads the file in your browser | Redacted and sanitized before they are written |
+
+A `.prototrace` stays on your machine unless you move it. The [benchmarks page](./benchmarks.md) documents the size levers if a trace is too large to share.
 
 ## What I wanted to build
 
-I wanted tests to focus on the scenario again. I wanted integrations to work together instead of every one of them solving lifecycle and diagnostics again. I wanted failures to leave enough information behind to investigate them afterwards.
+Tests should focus on the scenario. Integrations should share lifecycle and diagnostics. Failures should leave enough to investigate.
 
 ProtoTest is my attempt to solve those problems.
 

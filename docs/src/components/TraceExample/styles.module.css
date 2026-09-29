@@ -2,7 +2,7 @@
   margin: var(--space-6) 0;
   padding: var(--space-5);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
   gap: var(--space-3) var(--space-5);
   align-items: end;
   border: 1px solid var(--border-strong);
@@ -16,12 +16,8 @@
 }
 
 .kind { grid-column: 1 / -1; color: var(--phase-execution); font: var(--weight-bold) var(--text-micro) var(--font-mono); letter-spacing: var(--tracking-eyebrow); }
-.example div { display: grid; gap: var(--space-1); }
+.example div { display: grid; gap: var(--space-1); min-width: 0; overflow-wrap: break-word; }
 .example strong { font-size: var(--text-title); }
-.example code { width: fit-content; padding: 0; border: 0; background: none; color: var(--dim); }
-.link { font-weight: var(--weight-semibold); white-space: nowrap; }
-
-@media (max-width: 620px) {
-  .example { grid-template-columns: minmax(0, 1fr); align-items: start; }
-  .link { white-space: normal; }
-}
+.example code { width: fit-content; max-width: 100%; padding: 0; border: 0; background: none; color: var(--dim); overflow-wrap: anywhere; }
+/* The link keeps its own cell on wide frames and drops under the text on narrow ones. */
+.link { justify-self: start; font-weight: var(--weight-semibold); }

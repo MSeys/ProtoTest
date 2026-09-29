@@ -42,9 +42,10 @@
   padding: var(--space-2) var(--space-5) 0;
   color: var(--code-comment);
   font: var(--text-micro) var(--font-mono);
+  overflow-wrap: anywhere;
 }
 
-@media (max-width: 600px) {
+@container (max-width: 37.5rem) {
   /* A box that scrolls inside a page that scrolls is a trap on a phone: the snippet takes its own length. */
   .body { height: auto; }
   .body pre { overflow-y: visible; }

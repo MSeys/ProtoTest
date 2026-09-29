@@ -18,7 +18,7 @@
 .phases i { width: 18px; height: 5px; border-radius: var(--radius-hairline); }
 .dot { width: 8px; height: 8px; border-radius: 50%; }
 
-.families { margin: var(--space-3) 0 var(--space-5); display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); }
+.families { margin: var(--space-3) 0 var(--space-5); display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--space-3); }
 .family { padding: var(--space-4); display: grid; gap: var(--space-2); align-content: start; border: 1px solid var(--border); border-left: 3px solid var(--node); border-radius: var(--radius-control); background: var(--surface); }
 .family strong { font-family: var(--font-display); }
 .family span { color: var(--muted); font-size: var(--text-meta); }
@@ -36,11 +36,11 @@
 }
 
 .scale { margin: var(--space-3) 0 var(--space-5); display: grid; gap: var(--space-2); }
-.scale div { display: flex; align-items: baseline; gap: var(--space-5); }
-.scale span { min-width: 160px; font-family: var(--font-display); line-height: 1.2; }
+.scale div { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-5); }
+.scale span { min-width: 160px; flex: 1 1 auto; font-family: var(--font-display); line-height: 1.2; }
 .scale code { font-size: var(--text-meta); }
 
-.marks { margin: var(--space-3) 0 var(--space-5); display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); }
+.marks { margin: var(--space-3) 0 var(--space-5); display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--space-3); }
 .marks figure { margin: 0; padding: var(--space-6) var(--space-4) var(--space-4); display: grid; justify-items: center; gap: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-panel); }
 .marks img { width: 72px; height: 72px; }
 .marks figcaption { font-size: var(--text-meta); }

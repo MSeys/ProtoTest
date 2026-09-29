@@ -19,7 +19,10 @@
 }
 
 .jump {
+  min-height: var(--control-height);
   padding: var(--space-1) var(--space-3);
+  display: inline-flex;
+  align-items: center;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-pill);
   background: none;
@@ -62,7 +65,7 @@
 
 .tabActive { color: var(--text); border-bottom-color: var(--blueprint); font-weight: var(--weight-bold); }
 
-.view { padding: var(--space-3) 0 0; }
+.view { padding: var(--space-3) 0 0; container-type: inline-size; }
 
 /* Run view ------------------------------------------------------------------ */
 
@@ -126,6 +129,12 @@
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-left: 2px solid transparent;
+}
+
+/* Narrow frames put the outcome under the text, so the label never squeezes the title. */
+@container (max-width: 30rem) {
+  .attRow { grid-template-columns: 34px minmax(0, 1fr); }
+  .attLabel { grid-column: 2; white-space: normal; }
 }
 
 .attRow + .attRow { border-top: 1px solid var(--border); }
@@ -221,6 +230,7 @@
   align-items: baseline;
   gap: var(--space-1);
   font: var(--text-micro) var(--font-mono);
+  overflow-wrap: anywhere;
 }
 
 .mismatch b { color: var(--danger); }
@@ -290,6 +300,18 @@
 .facts { min-width: 0; overflow: hidden; color: var(--muted); font-size: var(--text-micro); text-overflow: ellipsis; white-space: nowrap; }
 .duration { color: var(--muted); font-size: var(--text-micro); text-align: right; white-space: nowrap; }
 
+/* Narrow frames stack the row: marker and chip on the first line with the duration, the title
+   and facts wrap underneath, the checks keep the full width. */
+@container (max-width: 34rem) {
+  .row { grid-template-columns: 10px minmax(0, 1fr) auto; row-gap: var(--space-1); }
+  .fold, .node { grid-column: 1; grid-row: 1; margin-top: var(--space-1); }
+  .kind { grid-column: 2; grid-row: 1; }
+  .duration { grid-column: 3; grid-row: 1; }
+  .label, .wide { grid-column: 2 / -1; grid-row: 2; overflow: visible; white-space: normal; }
+  .facts { grid-column: 2 / -1; grid-row: 3; overflow: visible; white-space: normal; overflow-wrap: break-word; }
+  .checks { grid-column: 2 / -1; }
+}
+
 .checks { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: var(--space-1); }
 
 .check {
@@ -313,7 +335,7 @@
 
 .checkView { padding: 0 var(--space-4) var(--space-1); display: grid; gap: var(--space-2); }
 
-.crumb { margin: 0; color: var(--muted); font-size: var(--text-meta); }
+.crumb { margin: 0; color: var(--muted); font-size: var(--text-meta); overflow-wrap: anywhere; }
 .crumbOp { color: var(--blueprint); font: var(--text-micro) var(--font-mono); }
 
 .checkHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
@@ -324,7 +346,7 @@
 
 .checkStatusOutcome { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold); }
 
-.checkOp { margin: 0; color: var(--muted); font: var(--text-micro) var(--font-mono); }
+.checkOp { margin: 0; color: var(--muted); font: var(--text-micro) var(--font-mono); overflow-wrap: anywhere; }
 
 .exception {
   padding: var(--space-3);
@@ -333,6 +355,7 @@
   border-left: 2px solid var(--danger);
   border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
   background: var(--danger-soft);
+  overflow-wrap: break-word;
 }
 
 .exception b { color: var(--danger); font: var(--weight-semibold) var(--text-meta) var(--font-mono); }

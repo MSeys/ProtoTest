@@ -52,6 +52,7 @@ export default function ModesComparison(): ReactNode {
           match. Each lesson quotes its own run log beside its counts.
         </>
       }>
+      <div className={styles.scroll} tabIndex={0} role="region" aria-label="Level 5 mode comparison">
       <table className={styles.table}>
         <thead>
           <tr>
@@ -78,6 +79,7 @@ export default function ModesComparison(): ReactNode {
           ))}
         </tbody>
       </table>
+      </div>
     </Frame>
   );
 }

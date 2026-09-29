@@ -12,14 +12,15 @@
 
 .head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-2) var(--space-4);
   padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--border);
 }
 
-.title { color: var(--muted); font: var(--weight-semibold) var(--text-meta) var(--font-ui); }
+.title { min-width: 0; color: var(--muted); font: var(--weight-semibold) var(--text-meta) var(--font-ui); }
 
 .copy {
   position: relative;

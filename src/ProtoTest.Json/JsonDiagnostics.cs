@@ -6,9 +6,22 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using ProtoTest.Core;
 
+/// <summary>
+/// Options for diagnostic rendering: what is redacted, and how much of a body survives into the trace
+/// and the reports.
+/// </summary>
 public class JsonDiagnosticOptions
 {
+    /// <summary>
+    /// Whether sensitive property values are redacted before a body is written to evidence. On by
+    /// default, because a diagnostic body is a copy of live traffic.
+    /// </summary>
     public bool RedactSensitiveData { get; set; } = true;
+
+    /// <summary>
+    /// The longest body a diagnostic keeps. Beyond it the body is truncated, so one oversized response
+    /// cannot dominate the artifact.
+    /// </summary>
     public int MaxDiagnosticBodyLength { get; set; } = 64 * 1024;
 
     /// <summary>
@@ -20,8 +33,13 @@ public class JsonDiagnosticOptions
         [.. ProtoRedactionDefaults.SensitivePropertyNames];
 }
 
+/// <summary>Turns a captured body into evidence that is safe to keep and readable in the viewer.</summary>
 public static class JsonDiagnosticSanitizer
 {
+    /// <summary>
+    /// Renders a value as JSON and sanitizes it. A value that cannot be serialized as a whole degrades
+    /// element by element, so one unserializable item does not cost the rest.
+    /// </summary>
     public static string Serialize(object? value, JsonDiagnosticOptions? configured = null)
     {
         var options = new JsonSerializerOptions
@@ -87,6 +105,10 @@ public static class JsonDiagnosticSanitizer
             : type.Name;
     }
 
+    /// <summary>
+    /// Redacts sensitive properties in a captured body and truncates it to the configured length. A
+    /// body that is not JSON is scanned as form, multipart or XML content instead.
+    /// </summary>
     public static string Sanitize(string content, JsonDiagnosticOptions? configured = null, bool truncate = true)
     {
         var options = configured ?? new JsonDiagnosticOptions();

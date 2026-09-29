@@ -26,15 +26,34 @@ public sealed record ProtoCapabilityDescriptor(string Name, string Kind, string 
 /// <summary>The capability kinds ProtoTest itself registers; an integration may use its own.</summary>
 public static class ProtoCapabilityKinds
 {
+    /// <summary>A hosted server address.</summary>
     public const string Server = "server";
+
+    /// <summary>A hosted worker the run processes.</summary>
     public const string Worker = "worker";
+
+    /// <summary>A device the host attached.</summary>
     public const string Device = "device";
+
+    /// <summary>A protocol the run can speak.</summary>
     public const string Protocol = "protocol";
+
+    /// <summary>A browser the run drives.</summary>
     public const string Browser = "browser";
+
+    /// <summary>A store the run reads from or writes to.</summary>
     public const string Store = "store";
+
+    /// <summary>A message broker the run publishes to.</summary>
     public const string Broker = "broker";
+
+    /// <summary>A data backend the run generates records in or reads from.</summary>
     public const string Data = "data";
+
+    /// <summary>A document API the run reads, such as a spreadsheet.</summary>
     public const string Document = "document";
+
+    /// <summary>A composed Aspire AppHost the run starts.</summary>
     public const string Aspire = "aspire";
 
     /// <summary>

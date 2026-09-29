@@ -280,12 +280,12 @@ internal sealed class HostFactoryResolver
                 IsBackground = true
             };
 
-            // Start the thread
             thread.Start();
 
             try
             {
-                // Wait before throwing an exception
+                // The entry point runs on its own thread, so the wait is bounded: a hung host would
+                // otherwise hold the calling test forever.
                 if (!_hostTcs.Task.Wait(_waitTimeout))
                 {
                     throw new InvalidOperationException($"Timed out waiting for the entry point to build the IHost after {s_defaultWaitTimeout}. This timeout can be modified using the '{TimeoutEnvironmentKey}' environment variable.");

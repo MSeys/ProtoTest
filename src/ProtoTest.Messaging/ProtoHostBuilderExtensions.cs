@@ -10,6 +10,7 @@ public sealed class ProtoMessagingBuilder
     internal ProtoMessagingBuilder(IServiceCollection services)
         => Services = services ?? throw new ArgumentNullException(nameof(services));
 
+    /// <summary>Gets the service collection the messaging integration registers into.</summary>
     public IServiceCollection Services { get; }
 
     internal Func<IServiceProvider, IProtoMessageBroker>? AdapterFactory { get; private set; }
@@ -96,9 +97,9 @@ public sealed class ProtoMessagingBuilder
     /// still applies over these values, so an environment can add its own.
     /// </summary>
     /// <remarks>
-    /// <c>Tap</c> is a reliability declaration, not just a convenience: pre-bind every destination the
-    /// act publishes to. A destination declared only at the first <c>AwaitAsync</c> is bound then, so it
-    /// misses every message published before that await.
+    /// <c>Tap</c> is a reliability declaration: pre-bind every destination the act publishes to. A
+    /// destination declared only at the first <c>AwaitAsync</c> is bound then, so it misses every
+    /// message published before that await.
     /// </remarks>
     /// <exception cref="ArgumentException">
     /// <paramref name="destinations"/> is empty, or contains a null, empty or whitespace destination.

@@ -19,7 +19,7 @@ It may still contain application data. Treat it as a test artifact and check wha
 ## Run locally
 
 ```bash
-npm install
+npm ci
 npm test
 npm run dev
 ```

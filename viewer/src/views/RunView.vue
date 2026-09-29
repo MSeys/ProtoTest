@@ -176,11 +176,12 @@ function bars(test: TestTrace) {
 .strip { display: flex; align-items: flex-end; gap: 2px; height: 12px; }
 /* Passing tests are the quiet majority; what did not pass stands up out of the line. */
 .tick { flex: 1 1 0; min-width: 3px; height: 5px; padding: 0; border: 0; border-radius: var(--radius-hairline); background: var(--outcome-succeeded); opacity: .45; }
-.tick:hover { opacity: 1; }
+.tick:hover, .tick:focus-visible { opacity: 1; }
 .tick.danger, .tick.warning { height: 12px; }
 .tick.danger { background: var(--outcome-failed); opacity: 1; }
 .tick.warning { background: var(--outcome-partial); opacity: 1; }
-.tick.neutral { background: var(--outcome-unknown); }
+/* Skipped is planned, not run: a hollow tick keeps its place without reading as a pass. */
+.tick.neutral { background: transparent; box-shadow: inset 0 0 0 1px var(--border-strong); opacity: 1; }
 
 .attention { display: grid; }
 .issue {

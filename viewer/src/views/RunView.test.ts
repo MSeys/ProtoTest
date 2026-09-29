@@ -56,4 +56,25 @@ describe("RunView run strip", () => {
     app.unmount();
     host.remove();
   });
+
+  // Skipped is planned, never run: its tick keeps its own class so it cannot read as a pass.
+  it("gives a skipped test its own tick instead of the passing one", () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const tests = [testTrace(1, "succeeded"), testTrace(2, "skipped"), testTrace(3, "failed")];
+    const app = createApp({
+      render: () => h(RunView, { run: run(tests), fileName: "demo.prototrace", onSelect: () => {} })
+    });
+    app.mount(host);
+
+    const ticks = [...host.querySelectorAll<HTMLButtonElement>(".tick")];
+    expect(ticks.map(tick => tick.className)).toEqual([
+      expect.stringContaining("success"),
+      expect.stringContaining("neutral"),
+      expect.stringContaining("danger")
+    ]);
+
+    app.unmount();
+    host.remove();
+  });
 });

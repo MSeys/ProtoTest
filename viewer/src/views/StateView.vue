@@ -134,6 +134,8 @@ function isSelected(item: Item) {
   background: var(--muted);
 }
 .tick:disabled { cursor: default; }
+/* A 6px tick is a hard tap target; the hit area extends past the paint. */
+.tick::after { content: ""; position: absolute; inset: -5px -4px; }
 .tick:not(:disabled):hover, .tick.active { outline: 2px solid var(--blueprint); outline-offset: 1px; }
 .tick.testside { background: var(--muted); }
 .tick.observed { background: var(--pt-cyan); }

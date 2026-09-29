@@ -139,7 +139,7 @@ onBeforeUnmount(releaseArtifactUrl);
       </div>
       <div class="actions">
         <AppButton v-if="isPlaywrightTrace" :disabled="!artifactBlob || handoff === 'opening'" @click="openInPlaywright">
-          {{ handoff === "opening" ? "Opening…" : "Open in a tab ↗" }}
+          {{ handoff === "opening" ? "Opening…" : "Open in a tab" }}
         </AppButton>
         <AppButton v-else-if="!isWorkbook" :disabled="!artifactUrl" @click="openArtifact">Open</AppButton>
         <AppButton variant="primary" :disabled="!artifactUrl" @click="downloadArtifact">Download</AppButton>

@@ -57,6 +57,45 @@
 
 .heroLearn { font-weight: var(--weight-semibold); }
 
+/* The proof strip between the hero and the paths: measured values in mono, the prose beside them. One row
+   that wraps, no cards: the numbers are evidence, not decoration. */
+.proof {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.proofInner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3) var(--space-6);
+  padding-top: var(--space-5);
+  padding-bottom: var(--space-5);
+}
+
+.proofLead { color: var(--muted); font: var(--weight-semibold) var(--text-meta) var(--font-ui); }
+
+.proofFacts {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3) var(--space-7);
+}
+
+.proofFact { display: flex; align-items: baseline; gap: var(--space-2); color: inherit; text-decoration: none; }
+.proofFact:hover .proofValue { text-decoration: underline; text-underline-offset: 2px; }
+
+.proofValue {
+  color: var(--blueprint);
+  font: var(--weight-semibold) var(--text-title) var(--font-mono);
+  white-space: nowrap;
+}
+
+.proofLabel { max-width: 34ch; color: var(--muted); font-size: var(--text-meta); line-height: 1.45; }
+
+.proofViewer { margin-left: auto; font-weight: var(--weight-semibold); white-space: nowrap; }
+
 .heroButtons { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 
 /* The viewer's button roles, scaled for a page CTA. */

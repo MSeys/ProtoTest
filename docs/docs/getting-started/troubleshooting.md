@@ -8,6 +8,21 @@ description: "The first problems a new suite runs into, and what fixes them: the
 
 The problems below are the ones a new suite meets first. Each one starts with the message you see.
 
+## Messages to fix
+
+The exact messages a new suite hits, and the fix each one points at.
+
+| What you see | What it means | Fix |
+| --- | --- | --- |
+| `CS0616: 'ProtoTest' is not an attribute class` | `[ProtoTest]` resolved to the `ProtoTest` namespace because the adapter's attribute is not in scope | add `using ProtoTest.NUnit;`, or the adapter package for your runner. The runner pages list the usings. |
+| `NU1605: Detected package downgrade: NUnit from 4.6.1 to 4.3.2` | `dotnet new nunit` pins NUnit 4.3.2 while `ProtoTest.NUnit` needs 4.6.1 or newer | bump NUnit first: `dotnet add package NUnit --version 4.6.1`. See [Installation](./installation.md). |
+| `Aspire resource 'api' has no 'http' endpoint` | the AppHost project resource declares no `http` endpoint: no `WithHttpEndpoint`, and no `applicationUrl` in its launch profile | declare the endpoint in the AppHost, or point `UseEndpoint("api", "https")` at one the resource exposes. See [Aspire](../integrations/aspire.md). |
+| `Aspire resource 'api' has no value yet: the AppHost publishes 'ProtoTest:Applications:api:BaseUrl' when the run starts` | the AppHost was never selected, usually because `ProtoTest__Aspire__Enabled=true` set in the shell never reached the host | add `.AddEnvironmentVariables()` to the suite's configuration sources. The host starts with an empty configuration, so an environment key only arrives when a source reads the environment. See [Configuration](./configuration.md#adding-configuration-sources). |
+| `No password has been provided` | the code read the connection string from the opened connection, and opening strips credentials | read the value the run started from `ProtoInfrastructureSettings.Values`, password included. See [SQL](../integrations/sql/index.md). |
+| `prototest summary` shows `?` where a trace name uses `·` | the terminal is not reading the CLI's UTF-8 output as UTF-8 | the CLI sets UTF-8 output when it starts; if the console still substitutes glyphs, switch it to a UTF-8 code page (`chcp 65001` on Windows) or use a UTF-8 terminal. See [CLI reference](../agent-workflows/cli.md). |
+
+The sections below walk each problem in full.
+
 | What you see | Start here |
 | --- | --- |
 | `ProtoHost is not initialized` | [The host is not there](#the-host-is-not-there) |

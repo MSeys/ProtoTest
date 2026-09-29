@@ -77,6 +77,7 @@ What happens around that method:
 
 ## Where to go next
 
+- [Vocabulary](./vocabulary.md): every term above, and the trace entity each one records.
 - [Integrations map](../integrations/overview.md): every package that plugs into this model.
 - [Observability](../observability/prototrace.md): what the run records and how to read it.
 - [Recipes](../recipes/overview.md): common journeys, built from these pieces.

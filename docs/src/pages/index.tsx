@@ -4,7 +4,7 @@ import Head from '@docusaurus/Head';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 
-import CommandBox from '@site/src/components/CommandBox';
+import CommandBox, {type CommandBoxRunner} from '@site/src/components/CommandBox';
 import CodeSnippet from '@site/src/components/CodeSnippet';
 import Frame from '@site/src/components/Frame';
 import TabbedCode, {type CodeTab} from '@site/src/components/TabbedCode';
@@ -120,6 +120,19 @@ FAILED orders match their shape (16 ms)
   },
 ];
 
+function templateCommands(runner?: string): string[] {
+  return ['dotnet new install ProtoTest.Templates', `dotnet new prototest -n Shop${runner ? ` --runner ${runner}` : ''}`];
+}
+
+// The template defaults to NUnit, so its row keeps the plain commands a reader copies without thinking.
+const runnerChoices: CommandBoxRunner[] = [
+  {id: 'nunit', label: 'NUnit (default)', commands: templateCommands()},
+  {id: 'xunit', label: 'xUnit v2', commands: templateCommands('xunit')},
+  {id: 'xunit3', label: 'xUnit v3', commands: templateCommands('xunit3')},
+  {id: 'tunit', label: 'TUnit', commands: templateCommands('tunit')},
+  {id: 'mstest', label: 'MSTest', commands: templateCommands('mstest')},
+];
+
 function Hero() {
   return (
     <header data-surface="blueprint" className={styles.hero}>
@@ -135,10 +148,7 @@ function Hero() {
               SQL, messaging, a browser or a spreadsheet; they share one context, lifecycle, cleanup and
               trace.
             </p>
-            <CommandBox
-              title="Start a project"
-              commands={['dotnet new install ProtoTest.Templates', 'dotnet new prototest -n Shop']}
-            />
+            <CommandBox title="Start a project" commands={templateCommands()} runners={runnerChoices} />
             <div className={styles.heroLinks}>
               <Link
                 className={`${styles.btn} ${styles.btnSecondary}`}
@@ -154,6 +164,49 @@ function Hero() {
         </div>
       </div>
     </header>
+  );
+}
+
+const proofPoints = [
+  {
+    to: '/docs/project/benchmarks#opencsms-at-1000-tests',
+    value: '35-36 ms',
+    label: 'per test in the 1,000-test product benchmark',
+  },
+  {
+    to: '/docs/project/benchmarks#the-viewer-at-1000-tests',
+    value: '1,200 tests',
+    label: 'opened in the viewer in about 1.3 s',
+  },
+  {
+    to: '/docs/getting-started/installation',
+    value: '44 packages',
+    label: 'on NuGet, the runner and integration packages on .NET 8, 9 and 10',
+  },
+];
+
+/*
+ * The numbers a reader comparing frameworks asks for first, each linked to the page that measured it.
+ * A quiet row, not a card row: the hero already spent the page's boldness.
+ */
+function ProofStrip() {
+  return (
+    <section className={styles.proof} aria-label="ProtoTest measured at scale">
+      <div className={`container ${styles.proofInner}`}>
+        <span className={styles.proofLead}>Measured</span>
+        <div className={styles.proofFacts}>
+          {proofPoints.map((point) => (
+            <Link key={point.value} className={styles.proofFact} to={point.to}>
+              <span className={styles.proofValue}>{point.value}</span>
+              <span className={styles.proofLabel}>{point.label}</span>
+            </Link>
+          ))}
+        </div>
+        <Link className={styles.proofViewer} href="https://trace.prototest.dev">
+          Open the viewer
+        </Link>
+      </div>
+    </section>
   );
 }
 
@@ -191,10 +244,12 @@ function PathsSection() {
           <div className={styles.pathCard}>
             <Heading as="h3">Already have a suite</Heading>
             <p>
-              Recipes for common journeys, and the pages to reach for when a run needs explaining.
+              Recipes for common journeys, the conversion order for an xUnit suite you already have, and the
+              pages to reach for when a run needs explaining.
             </p>
             <div className={styles.pathLinks}>
               <Link to="/docs/recipes/overview">Recipes</Link>
+              <Link to="/docs/runners/bring-your-existing-suite">Bring an existing xUnit suite</Link>
               <Link to="/docs/getting-started/troubleshooting">Troubleshooting</Link>
             </div>
           </div>
@@ -372,6 +427,7 @@ export default function Home(): ReactNode {
       </Head>
       <Hero />
       <main>
+        <ProofStrip />
         <PathsSection />
         <FailureSection />
         <TraceSection />

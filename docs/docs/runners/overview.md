@@ -9,6 +9,20 @@ description: "ProtoTest plugs into the runner you already use: NUnit, xUnit v2 a
 
 ProtoTest does not replace your test runner. It plugs into the runner you already use and wraps each test in a ProtoTest execution context, so [the foundation](../foundation/overview.md) works the same whichever runner you pick.
 
+## Which runner
+
+All five adapters start the same host, evaluate the same skip conditions and write the same trace. Pick the one that fits the suite in front of you:
+
+| Your situation | Start with | Why |
+| --- | --- | --- |
+| A new suite, no runner in mind | [NUnit](./nunit.md) | the `dotnet new prototest` default, and the runner the sample suite and most of the docs use |
+| An existing xUnit v2 suite | [xUnit v2](./xunit.md) | plain `[Fact]` tests keep running while a converted class joins the collection, one class at a time |
+| An existing xUnit v3 suite on SDK 10 | [xUnit v3](./xunit3.md) | one assembly fixture covers every class; the project needs the Microsoft.Testing.Platform opt-in before `dotnet test` runs it |
+| A team standardized on MSTest | [MSTest](./mstest.md) | the standard template already pins the version ProtoTest needs, and each data row is its own context |
+| A parallel, async-first suite | [TUnit](./tunit.md) | you keep TUnit's own `[Test]` and register the executor; there is no test attribute to replace |
+
+Converted and untouched tests can share a project on xUnit v2 and v3: see [Bring an existing xUnit suite](./bring-your-existing-suite.md) for the order that stays green.
+
 ## Install
 
 | Runner | Package | Test attribute | Assembly setup |

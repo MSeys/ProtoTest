@@ -55,6 +55,10 @@
     {
       "key": "ProtoTest:TestSupport",
       "reason": "the sample application's test-support convention, documented as sample-side"
+    },
+    {
+      "key": "ProtoTest:Web:Sessions",
+      "reason": "retired in 1.1; the changelog and the migration page name it to say the settings no longer configure sessions"
     }
   ]
 }

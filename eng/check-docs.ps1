@@ -25,6 +25,13 @@ $contentFiles = @($docsContentFiles + $learnContentFiles)
 $docsSourceFiles = @(Get-ChildItem -LiteralPath $docsSourceRoot -Recurse -File |
     Where-Object { $_.Extension -in '.ts', '.tsx', '.md', '.mdx' -and $_.FullName -notmatch $generatedFolders })
 
+# The generated changelog is release history, not teaching content: a breaking-change note names the
+# symbols and methods it removed on purpose, so the removed-name checks skip these two files.
+$generatedChangelogFiles = @(
+    (Join-Path (Join-Path $docsSourceRoot "pages") "changelog.md"),
+    (Join-Path (Join-Path $docsSourceRoot "data") "changelog.generated.ts")
+)
+
 # The fact sheets are internal and live in the private records checkout; a fresh CI checkout has none.
 # The public key list (docs/configuration-keys.json) carries the half that runs everywhere; the fact
 # sheets add the fact-to-docs direction where the checkout exists.
@@ -104,6 +111,7 @@ foreach ($suppressionFile in Get-ChildItem -Path (Join-Path $repository "src") -
 $forbiddenSymbols = @($forbiddenVocabulary) + @($removedApiSymbols | Sort-Object)
 
 foreach ($file in @($contentFiles + $docsSourceFiles)) {
+    if ($generatedChangelogFiles -contains $file.FullName) { continue }
     $relative = Get-RelativePath $file.FullName
     $lines = @(Get-Content -LiteralPath $file.FullName)
     for ($lineNumber = 0; $lineNumber -lt $lines.Count; $lineNumber++) {
@@ -154,6 +162,7 @@ foreach ($sourceRoot in $sourceRoots) {
 }
 
 foreach ($file in @($contentFiles + $docsSourceFiles)) {
+    if ($generatedChangelogFiles -contains $file.FullName) { continue }
     $relative = Get-RelativePath $file.FullName
     $lines = @(Get-Content -LiteralPath $file.FullName)
     for ($lineNumber = 0; $lineNumber -lt $lines.Count; $lineNumber++) {

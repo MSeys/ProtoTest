@@ -7,991 +7,227 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ## [Unreleased]
 
-### Added
+## [1.1.0] - 2026-09-29
 
-- Device clients carry per-client transport settings: `devices.AddClient(...).WithSetting("model",
-  "AC-{deviceId}")` fills `DeviceEndpoint.Settings` for every device the client creates - `{deviceId}`
-  resolves in a value like an address template - and a transport reads its own keys through
-  `DeviceEndpoint.Setting`. A credential belongs in a setting rather than the address, which the trace
-  records.
-- `ProtoDeviceConnect` moved from `ProtoTest.Devices.WebSocket` into `ProtoTest.Devices`, so the socket,
-  in-process and MQTT transports share one connect bound.
-- The integrations overview lists the `ProtoTest.Devices*` packages with their one-line purposes:
-  `ProtoTest.Devices`, `ProtoTest.Devices.WebSocket`, `ProtoTest.Devices.WebSocket.AspNetCore`,
-  `ProtoTest.Devices.Mqtt` and `ProtoTest.Devices.Mqtt.Testcontainers`.
-- A second device transport: `ProtoTest.Devices.Mqtt` talks to devices over publish/subscribe against
-  a real broker. `AddMqttClient("Meters", "meters/{deviceId}/out", "meters/{deviceId}/in")` declares
-  the client's publish topic and subscribe filter - `{deviceId}` filled per device, `+`/`#` allowed in
-  the filter - and the registration carries both as endpoint settings beside the broker address. The
-  broker comes from the registration, a resolver, or `ProtoTest:Devices:Mqtt:Broker` with the one address
-  precedence (a published setting wins over configuration over code); `ConnectTimeout`,
-  `KeepAlivePeriod` and `MaxPacketBytes` are options under `ProtoTest:Devices:Mqtt` and validate when
-  a device is created. A client registered directly with `AddClient` may name the topics in the address
-  query instead (`publishTopic`/`subscribeTopic`), and a setting wins over the address parameter. The
-  transport speaks MQTT 5 over `mqtt://` and reuses the device model
-  unchanged: one conversation per instance, the `device.*` operations and entity, and
-  `IProtoDeviceProtocol` coverage for asserted kinds.
-- `ProtoTest.Devices.Mqtt.Testcontainers` owns a Mosquitto broker for the run: register
-  `MosquittoBroker.Container()` as the `UseContainer(...)` provider of the target that declares
-  `MqttDeviceOptions.BrokerSetting`, and MQTT clients registered without an address follow the broker
-  the run started.
-- A messaging destination can name a queue directly: `ProtoDestination.Queue(name)` builds the
-  `queue:{name}` form, `Tap` accepts it and `AwaitAsync` consumes the named queue through an adapter
-  that owns queues. RabbitMQ verifies the queue passively, reads it on the test's own channel and
-  leaves it in place, so a dead-letter queue fed by the product's own bindings is awaited as the queue
-  it is; the consumed delivery carries the queue destination and the transport's routing key. A queue
-  destination is consumed, never declared (`Declare` refuses it and publishing to it fails naming the
-  exchange to publish to instead), and an adapter with no queue model - the in-memory broker, the
-  MassTransit bridge - refuses it with an error naming the transport and the exchange to await instead.
-- `MassTransitEnvelope` carries the request/response fields: `Wrap` takes
-  `MassTransitEnvelopeAddresses` (source, destination and response addresses and the request id) on
-  both the contract and the raw-payload overloads, so a consumer that replies through `RespondAsync`
-  has the response address and request id it needs, and `Unwrap` returns them on
-  `MassTransitEnvelopeContent` (`SourceAddress`, `DestinationAddress`, `ResponseAddress`,
-  `RequestId`).
-- Composite attributes group declarations: a `ProtoCompositeAttribute` declares the attributes it
-  composes through `Compose()`, and the framework expands them where attributes are resolved (the
-  lifecycle's attribute resolution and the HTTP auth hook's metadata resolution), recursively, with a
-  cycle throwing the chain. Composed attributes run at their own `Order` (before the composite on a
-  tie, so the composite can read what they publish); an attribute that is both explicit and composed
-  runs once, matched by type and public property values, with the explicit declaration winning; and the
-  trace records the expansion (`attribute.composed` on the composite's step) so a run shows what
-  actually executed. `ProtoAttributeResolver.Expand` exposes the expansion to integrations.
-- Applications, workers, containers and AppHost resources declare their providers as an ordered chain:
-  `AddApplication(name, app => app.UseConfigured().UseInProcess<TProgram>().UseLoopback(createApp))`
-  resolves the application's derived `ProtoTest:Applications:{name}:BaseUrl`, with the in-process server
-  declaring honest `server` and `clock` capabilities and the loopback publishing its bound address.
-  `AddWorkerHost` nests under an application (`UseEnvironment()` leaves the worker to the environment
-  that runs the application, `UseHost()` hosts it and bridges the test clock), `AddInProcessWebSocketDevices` follows the application's winner, and
-  `UseContainer(PostgresDatabase.Container())` adds a container behind the Docker probe. The new
-  `[RequiresTestClock]` gate skips tests that need the test clock while the application runs in its own
-  process; `ProtoCapabilityKinds.Clock` is its capability. `IProtoTargetProvider` gained
-  `ConfigureServices` (winner-only service contributions) and `ProtoTargetProvider.WinnerServices`;
-  `IProtoProviderChainBuilder` gained `ResolveAfter` and `Services`, and
-  `ProtoProviderConditionContext` exposes the winners resolved before a chain
-  (`Target("Api")`/`ResolvedTargets`). `AddCapabilityWhenInProcess` declares an adapter that exists only
-  behind the in-process test host (the in-process device transport).
-- Aspire resources serve targets through the chain:
-  `UseAspireResource<TAppHost>(resource)` on an application publishes the resource's endpoint under its
-  `BaseUrl` and on an infrastructure chain publishes the resource's connection string under the
-  target's declared keys; `ProtoAspireOptions.MapConnectionString(resource, key)` fills a key no
-  target declares. The AppHost's providers serve when `ProtoTest:Aspire:Enabled` is set - every
-  resource - or when a resource's own `ProtoTest:Aspire:Resources:{resource}:Enabled` is set, which
-  resolves only that resource's targets, so "AppHost infrastructure with an in-process application"
-  and its reverse are expressible; the providers start once when they win any target, and a configured
-  provider earlier in the chain wins over them. `AddAspireAppHost` is one target with the same
-  selection semantics (see Changed). The run hands the AppHost its configuration, the settings earlier
-  infrastructure published and the options' values as command-line arguments (in that order, options
-  last), so the AppHost's own graph reads the same addresses the suite resolved.
-- `ProtoTest.Testcontainers` adds `UseContainer(container)` and `DockerProbe.IsAvailable()`: a container
-  provider holds on the same Docker endpoint Testcontainers uses, so a machine without a runtime skips
-  it with a named reason instead of failing the start.
-- Targets resolve through an ordered provider chain: `AddInfrastructure(name, chain, keys)` registers a
-  target whose providers are walked in priority order while the host is built, and the first provider
-  whose condition holds serves it - its piece starts and releases with the run, its capabilities are
-  declared, and every other provider is recorded skipped with its unmet condition. A target no provider
-  can serve fails the build naming the target and every condition. The Core conditions are
-  `ProtoProviderConditions.Configured`, `.Selected(key)`, `.Available(requirement, probe)` and
-  `.Always`; the keys live on the target, and a provider is written against the public
-  `IProtoTargetProvider` (name, condition, piece, capabilities) or built with `ProtoTargetProvider`.
-  `Selected(key, moreKeys...)` holds when any of the integration-owned selection keys is set, so a
-  provider with a broad switch and a per-target switch serves when either is set. The run trace
-  records `environment.resolved` per target with the winner and the skipped reasons, and
-  `environment.provider.skipped` per loser; a skipped provider's piece is never started, owned or
-  released.
-- Low-ceremony mode is opt-in per adapter: `[assembly: ProtoTestAutoWrap]` in `ProtoTest.NUnit` runs
-  every plain `[Test]` through the same lifecycle as `[ProtoTest]`, and the same attribute in
-  `ProtoTest.Xunit3` does it for plain `[Fact]` and `[Theory]` tests. A test that already carries the
-  runner's ProtoTest attribute keeps its own wrapper, so existing tests are untouched.
-- `ProtoTestHost.For<TProgram>(builder)` composes an ASP.NET Core application in one line: the
-  application under test hosted in-process under the default name `Api`, with its protocol
-  registrations (`configure: app => app.AddRest(...)`) on the same call. It is the same composition as
-  `AddApplication("Api", app => app.AddAspNetCoreServer<TProgram>())`.
-- `ProtoTest.Hosting` runs a background worker or generic host in-process with the suite:
-  `AddWorkerHost<TProgram>()` starts the worker's own entry point once per run, after the
-  infrastructure registered before it, feeds it the suite's configuration, the run's settings
-  (container connection strings and settings infrastructure values) and `AddWorkerHost` options and
-  stops it with the run. Tests reach it through `Proto.Context.Host<TProgram>()` and
-  `HostService<TProgram, TService>()`; the run records the worker as a `worker` entity and capability,
-  and `ProtoCapabilityKinds.Worker` guards tests that need it.
-- Readiness probes replace setup sleeps: `AddReadinessProbe(name, check)` waits at its registration
-  position with a configurable timeout and interval, records attempts and wait in the trace, and fails
-  the run naming the probe and the last error. `ProtoReadiness.Tcp`/`.Http` cover the common checks;
-  `AddHttpReadiness(application)` waits for a published application's address and skips in-process ones.
-  Containers declare a default TCP check - the PostgreSQL and RabbitMQ containers wait for their
-  standard ports, overridable with `ReadyOn(port)` for custom images.
-- A test clock replaces sleeping in time-dependent tests: `ConfigureClock(new ProtoClock(seed))` seeds
-  the run, `Proto.Context.Clock` is a per-test `ProtoClock` that `Advance`s or `SetUtcNow`s, and the
-  in-process application receives it as its `TimeProvider` (each request is linked to the test that
-  caused it). Workers see the run clock, which `ProtoHost.CurrentHost.Clock` advances for the whole
-  run. Every move records a `clock.advance` event and updates a `clock` entity, and each test starts
-  from the run's seed so parallel tests never share a timeline.
-- `ProtoTest.Devices` talks to devices - a simulator or real hardware - from the same context and
-  trace: declare a named client once (`devices.AddWebSocketClient("Chargers", path:
-  "/ocpp/{deviceId}").AddDevice<AcCharger>()`), then get typed instances per test by id through
-  `Proto.Context.Devices("Chargers").For<AcCharger>("CP-001")`. Addresses resolve per test - an
-  explicit template, a resolver, or the application's address when the client is registered inside
-  `AddApplication` - so there is no per-device configuration. Transports implement
-  `IProtoDeviceTransport`; `ProtoTest.Devices.WebSocket` is the first (`ws://`/`wss://`, options under
-  `ProtoTest:Devices:WebSocket`). A matched `ExpectAsync` contributes protocol coverage with the
-  catalog gaps a registered `IProtoDeviceProtocol` declares, and `[RequiresDevice<TDevice>]` skips what
-  an environment cannot provide. New vocabulary: `ProtoCapabilityKinds.Device`,
-  `ProtoTraceEntityKinds.Device`, and the `device.connect/send/receive/command` operations.
-- Device clients reach an in-process application automatically: register the transport once with
-  `AddInProcessWebSocketDevices<TProgram>(application)` and the same
-  `AddWebSocketClient("Chargers", path: "/ocpp/{deviceId}")` uses the application's `TestServer` when
-  it is hosted in-process and the configured address over a socket when it is published - the client
-  registration never branches on the environment.
-- `IProtoConfiguredInfrastructure` hands infrastructure the run's state as it starts - settings and the
-  suite's configuration - which is how an in-process worker reads a broker a container just started.
-- Infrastructure registered with `AddInfrastructure` is skipped when every key it declares already has
-  a configured value, so a configured environment is never shadowed by a container or process that
-  would fill the same address. `AddInfrastructureAlways` opts a piece out, settings-only infrastructure
-  may declare keys too, and a skipped piece is recorded as a `skipped` run entity without being owned
-  or released.
-- `AddAspNetCoreServer` steps aside when the application's `BaseUrl` is configured: no test server
-  starts, the application's `HttpClient` talks to the configured address (the same address web sessions
-  and device clients resolve), the `ASP.NET Core` capability is dropped so `[RequiresInProcess]` skips
-  instead of failing, and `ServerFactory`/`ApplicationServices` throw naming the address. The trace
-  records `aspnetcore.server.skipped`. `AddCapabilityUnlessConfigured` is the Core primitive behind it,
-  and it is how an integration keeps its capability honest when the environment provides the address.
-- `ProtoCapabilityDescriptor.Instance` names the instance a capability describes - an
-  `AddAspNetCoreServer` name, the application an in-process device transport belongs to. Two instances
-  are two capabilities, in skip checks and in the run trace (`server:ASP.NET Core:A`), so configuring
-  one server's address no longer hides the other.
-- One application-address precedence: an address a started piece published through
-  `ProtoInfrastructureSettings` wins over `ProtoTest:Applications:{app}` configuration for every
-  reader. REST and GraphQL clients, gRPC channels, readiness, web sessions and device clients all
-  resolve through `ProtoApplication` (`GrpcAddress(context, app)` is the gRPC form), so the suite
-  talks to the process the run started; the in-process transport is only the fallback when neither
-  resolves. `AddAspNetCoreServer`'s step-aside still reads static configuration (decided asymmetry),
-  so give a published process its own application name when both must coexist.
-- `ProtoReadinessOptions` implements `IProtoConfigurableOptions` and binds
-  `ProtoTest:Readiness`; the new `ProtoInfrastructureContext.Readiness` hands the run's policy to
-  infrastructure, so `ConfigureReadiness` (or configuration) sets the timeout and interval for host
-  probes and the containers the run starts alike.
-- `AddCapabilityWhenProvided(capability, keys…)` is the missing-address half of the conditional
-  capability pair: the declaration drops when none of its keys can provide the capability — no
-  configured value and no registered infrastructure piece declares one — so an integration whose
-  address cannot exist is absent and `[RequiresCapability]` skips. It composes per declaration with
-  `AddCapabilityUnlessConfigured` and plain declarations, and the `capability.skipped` event names the
-  deciding keys and the reason (`already configured`, or `no key provided`).
-- `SqlOptions.AddressKeys` is a code-declared `SqlAddressKeys` set naming the configuration keys that
-  can provide the SQL connection; no configuration section binds it, because the capability decision is
-  made when the host is built. With at least one declared, `AddSql` declares the `SQL` store capability
-  with `AddCapabilityWhenProvided`; empty (the default) keeps the capability unconditional and the
-  factory owning the address. `AddEntityFrameworkCore` shares the declared keys: it declares its
-  `Entity Framework Core` store capability under the same rule and its enlistment hook stays inert with
-  the SQL integration.
-- `ProtoMessagingBuilder.UseBroker(factory, addressKeys)` lets an adapter name the configuration keys
-  its address comes from, so the `Broker` capability is declared only while one of them is provided.
-- `WebPageInventory.VisitedObservationKind` and `WebPageInventory.VerifiedObservationKind` name the
-  `web.page.visited`/`web.page.verified` observation kinds beside the existing
-  `AvailableObservationKind`, so producers and collectors reference one constant each.
-- One assertion surface across the integrations. GraphQL responses expose `Should.HaveNoErrors()`,
-  `Should.HaveErrors()` and `Should.HaveError(code)`; a failed gRPC call exposes
-  `ProtoGrpcAssertions.For(exception).Should.HaveStatus(...)` (or `.ShouldNot`); a Sheets model exposes
-  `Should.MatchModel()` and a typed column `Should.All(predicate)`, and every Sheets assertion member
-  now returns its subject so assertions chain. `ShouldMatchShape` returns its subject on gRPC replies
-  and model rows, and an untyped table row gained a shape assertion by leaf header names and rendered
-  cell values (spelled `row.Should.MatchShape(shape)` since DX-02). The foundation docs gained an
-  [Assertions](https://prototest.dev/docs/foundation/assertions) page.
-- Shape matching is a facade member: `response.Should.MatchShape(shape)` on REST and GraphQL
-  responses, `message.Should.MatchShape(shape)` on a consumed message (the `Should` property is
-  `[JsonIgnore]`d, so the message's JSON is unchanged),
-  `ProtoGrpcAssertions.For(reply).Should.MatchShape(shape)` on a gRPC reply, and
-  `row.Should.MatchShape(shape)` on a Sheets table row. Each returns its subject, so
-  `response.Should.HaveHttpStatus(Ok).Should.MatchShape(shape)` reads as one chain. Shape stays
-  positive-only: there is no `ShouldNot.MatchShape`. A model row is a user type, so it keeps the
-  `row.ShouldMatchShape(shape)` extension (C# has no extension properties).
-- Messaging taps gain a code API: `AddMessaging(messaging => messaging.Tap("invoice.issued").UseRabbitMq())`
-  declares the destinations an adapter pre-binds during test setup, so a message published before the
-  test's first await is still received. Repeated calls compose and dedupe, and
-  `ProtoTest:Messaging:Destinations` configuration still binds over the code values.
-- REST and GraphQL read a single value by JSON path: `RestResponse.ReadAsJson<T>("$.id")` and
-  `GraphQLResponse.ReadDataAs<T>("$.order.total")`, over the documented subset (`$`, dot members,
-  `[n]` indices; a leading member without `$` is accepted). A path that does not resolve throws the
-  protocol's assertion exception naming the subject and the path and records the protocol's failed
-  deserialize evidence (`http.response.deserialize` event / `graphql.response.deserialize` operation)
-  with the path; `ProtoTest.Json.JsonPathResolver` is the shared resolver.
-- Required reads return `T`: `RestResponse.ReadRequired<T>()` / `ReadRequired<T>(jsonPath)` and
-  `GraphQLResponse.ReadRequired<T>()` / `ReadRequired<T>(jsonPath)` throw the protocol's assertion
-  exception naming the subject (and the path) when the body is empty, JSON `null`, or the path is
-  missing. JSON `null` is checked before deserializing, so a value type reports the protocol exception
-  too; REST records a required-read failure, and GraphQL a required path failure, through the same
-  deserialize evidence. The nullable reads are unchanged.
-- `Proto.Context.UniqueName("tenant")` is the first-class name for records that outlive the process:
-  it derives a deterministic, persistent-store-safe name from the test id (`tenant-{TestId}`, or
-  `tenant-{TestId}-{sequence}` with the optional sequence for a second object of the same kind), so
-  parallel tests never collide and a rerun against a database that outlives the process never
-  collides; the record is reused only when the suite fixes `RunPrefix` (`ConfigureTestIds`), because
-  the default run prefix is random per run. `ProtoTest.Data`'s generated member defaults are
-  deterministic per test in the same spirit.
-- Accessor symmetry: `Proto.Context.Sql()` is the primary SQL accessor (`SqlSession()` stays a
-  documented alias; `SqlConnection()`/`SqlTransaction()` delegate to it), and
-  `Proto.Context.Messaging(name = null)` accepts an optional client name - the run's broker client is
-  `Default` - failing with a message naming `AddMessaging` for an unknown name. The added parameter is
-  source-compatible but binary-breaking for compiled consumers; the per-TFM
-  `ProtoTest.Messaging/CompatibilitySuppressions.xml` records it.
-- Typed skip conditions for the host composition: `[RequiresWorker<TProgram>]` checks the `worker`
-  capability by the program assembly name with a default reason naming `AddWorkerHost<TProgram>()`;
-  `[RequiresServer(name)]` checks the named `AddAspNetCoreServer` instance through the new
-  `ProtoHost.HasCapability(kind, name, instance)` overload; `[RequiresApplication(name)]` checks that
-  the suite declared the application with `AddApplication` through the new `ProtoHost.HasApplication`.
-  `RequiresCapabilityAttribute.CapabilityInstance` exposes the instance filter to open kinds.
-- `ProtoMessage` reads are typed: `message.ReadAsJson<T>(options)` reuses `ProtoJsonDefaults.Reader`
-  (case-insensitive property names) and `message.ReadRequired<T>()` / `ReadRequired<T>(jsonPath)`
-  return `T`, throwing `MessagingAssertionException` naming the destination when the payload is empty,
-  JSON `null`, or the path is missing (the shared `JsonPathResolver` subset). `Payload` stays for raw
-  inspection.
-- Messaging speaks routing keys: `ProtoMessage.RoutingKey` carries the key a transport delivered the
-  message under, `PublishAsync(exchange, routingKey, payload, …)` sends one, and
-  `AwaitAsync(exchange, routingKey, predicate, …)` matches only a message delivered under it (a
-  timeout names the destination and the key, and the operations record `messaging.routing_key`). The
-  RabbitMQ adapter publishes under the message's key (the destination when none is given), fills
-  `RoutingKey` from the delivery, and binds an awaited key on the destination's tap so a direct
-  exchange delivers it; the in-memory broker keeps the key and filters the same way, and an unmatched
-  message stays for the await that names its key. MassTransit addresses message contract types, so its
-  adapter rejects a routing key with an error naming the destination rather than dropping it.
-- Suite-level skip reasons: `builder.AddCapabilityReason(kind, reason, name?)` states a capability
-  gate's reason once, so a suite with many gated tests does not repeat one sentence. A gate's own
-  `Reason` still wins, then the suite reason for its name, then the suite reason for its kind, then the
-  attribute's default; `ProtoHost.FindCapabilityReason(kind, name?)` exposes the lookup to custom
-  conditions. `[RequiresWorker<T>]`, `[RequiresServer(name)]`, `[RequiresDevice<T>]` and
-  `[RequiresInProcess]` inherit the behavior through `[RequiresCapability]`.
-- `IProtoConfigurableOptions.FallbackConfigurationSectionName` lets a renamed options section keep its
-  old key working: the fallback binds first and the current section binds over it, so a scalar in the
-  current section wins; list-valued options accumulate the fallback and current entries (the legacy
-  list is appended, not replaced). `GrpcClientOptions` uses it for the legacy gRPC section.
-- `ProtoResourceState.Releasing` reports a resource whose release callback is running, so a snapshot
-  taken during a blocked release no longer reads as `Registered`.
-- `StartTestAsync` accepts a `CancellationToken`; it is carried as
-  `ProtoExecutionContext.CancellationToken` and `ProtoTest.Sql` passes it to the connection open and
-  transaction begin. A caller that starts a test explicitly can pass one, and the adapter packages pass
-  the runner's own token where the runner exposes one (see Changed).
-- `ProtoTestResult.FromException(Exception)` and `ProtoTestResult.IsCancellation(string)` are the
-  shared outcome classifier the runner adapters use; `ProtoTestName.ForRow` composes the row name MSTest
-  and TUnit record (`…MethodName[1, admin]`).
-- `ProtoTest.Json` hosts the shared mechanics: `ProtoFailureDiagnostics` (sanitized
-  address/type/message/cancellation/duration), `ProtoJsonRead`/`ProtoJsonReadSemantics` (one JSON read)
-  and `ProtoObservationCapture`; `ProtoTest.Http.ProtoHttpFailureDiagnostics` and its capture moved
-  there. `ProtoHttpEndpoint.RequireHttpAddress` is the shared absolute-HTTP(S) rule.
-  `RestShapeMatchData.Method`/`RouteTemplate` structure a shape hit for OpenAPI coverage.
-  `PlaywrightWebOptions.MaxTraceBytes` (32 MiB, 0 off), `WebSocketDeviceOptions.MaxMessageBytes`
-  (4 MiB, 0 off) with `DeviceFrameTooLargeException`, and `IWebBackend.PollInterval` bound the reads
-  and the session timing.
-- `AddLoopbackApplication(applicationName, createApp)` (`ProtoTest.AspNetCore`) hosts a hand-built
-  `WebApplication` on its own loopback listener for browser journeys: it starts the factory on
-  `http://127.0.0.1:0`, publishes the bound address as `ProtoTest:Applications:{app}:BaseUrl` (a
-  configured key skips the listener), forwards the suite's configuration with the started settings
-  available at its registration position as command-line arguments, and releases the application
-  with the run. The published instance is separate from `AddAspNetCoreServer`, with no
-  `ServerFactory` or `[RequiresInProcess]`.
-- Per-test service substitution (`ProtoTest.AspNetCore`): `context.Override<TService>(...)`,
-  `[ReplaceService<TService>(typeof(TImplementation))]` and `[FailDependency<TService>]` build a
-  dedicated per-test server (both lifetimes) with the replacement applied before the server builds, so
-  a shared per-run server never leaks one test's override into the next. A scope resolved before the
-  override still serves the shared server — apply the override before first resolving application
-  services. Substitutions are traced as
-  `service.substitute`/`service.fail` with `aspnetcore.server.substituted` on the server entity; a
-  `RequiresCapability`-style skip applies when the application is not in-process, and closed-box
-  harnesses cannot be substituted. `ProtoExecutionContext.ReplaceClient` swaps a registered client.
-- `ProtoTest.WireMock` fakes HTTP dependencies per test on WireMock.Net: `AddWireMock(name)` with
-  per-test servers by default and `PerRun()`/`Port(n)` opt-ins, scenario-like `Stub(method,
-  path).RespondJson(...)` stubbing, matched requests traced as `http.response` with the REST response
-  payload (`http.failure` when unmatched, never covered), and an automatic `WireMock` coverage collector
-  where registered stubs are gaps until hit. Matched and unmatched requests reuse the REST response
-  and failure kinds (`ProtoRestBuilder.ResponseObservationKind`/`FailureObservationKind`), so the kinds
-  cannot drift apart; the `aspire` capability kind lives on `ProtoCapabilityKinds`.
-- `ProtoTest.Aspire` runs an Aspire AppHost with the suite (`net8.0`/`net9.0`/`net10.0` package assets; Aspire 13.5.4):
-  `AddAspNetCoreServer` stays for white-box servers; `AddAspireAppHost<TEntryPoint>()` starts the
-  AppHost's own entry point once per run, publishes each resource's endpoint as
-  `ProtoTest:Applications:{resource}:BaseUrl`, and stops it with the run. When only some declared
-  resource keys are configured, the AppHost starts for the rest and publishes only the missing keys,
-  so a configured address is never masked. Closed box: no per-test substitution, no in-process
-  assertions. The test AppHost and suite stay `net10.0`: DCP launches `AddProject` resources with
-  `dotnet run`, which cannot choose a target framework for a multi-targeted project. The
-  `Aspire.AppHost.Sdk` version is pinned once in `global.json` (`msbuild-sdks`).
-- REST responses assert their shape where the call is made: `PostAsync(…).ExpectAsync(new { … })`
-  awaits the response and runs the same `Should.MatchShape` facade assertion (disposing the response
-  on a mismatch), and `Should.MatchShape(shape, exact: true)` adds the exhaustive form — a field
-  present in the response that the shape does not mention fails naming its path, while a value
-  constraint mentions its whole subtree. Exact mode and the traffic collector share the one
-  unmentioned-field walk (`JsonShapeMatcher.AssertExactMatch`/`FindUnmentionedFields`), and the shape
-  assertion records `shape.exact` in the trace.
-- The exhaustive exact shape mode is on every protocol, not just REST: `MatchShape(shape, exact: true)`
-  on GraphQL responses, gRPC replies, consumed messages and Sheets table/model rows, with the obsolete
-  `ShouldMatchShape` shims forwarding the new parameter. Every surface sets the shared
-  `ProtoShapeAssertionContext.Exact` (GraphQL through `ProtoHttpResponse.AssertShape`), so all of them
-  run the one `JsonShapeMatcher.AssertExactMatch` walk REST's exact mode and the traffic collector
-  share — there is no second traversal.
-- REST `Should`/`ShouldNot` assert more of the HTTP response: `HaveContentType`, `HaveHeader`
-  (presence or value), `HaveCookie` (presence or value) and `HaveRedirectLocation`, each traced as its
-  own `assert.http.*` operation, with the request identifier on a failure and header/cookie values
-  redacted by the shared rules.
-- `RestTrafficCoverageCollector` (opt-in: `AddCollector<RestTrafficCoverageCollector>()`) reports the
-  fields that arrived in REST responses but that no shape assertion mentioned, as their own `traffic`
-  report and HTML section. Observed fields never count as covered: the coverage arithmetic and run
-  gates keep counting only asserted paths. It reads the run's `http.response` and
-  `http.contract.shape` observations, keyed by method, route template and status code; a body the
-  diagnostic cap truncated cannot be analyzed and contributes nothing.
-- A built-in test user signs a test in with claims and roles: `[SignedInAs("alice", "Admin",
-  Claims = new[] { "tenant=northstar" })]` (or `context.SignIn(new ProtoTestUser(...))` during the
-  test body) publishes the identity as `context.SignedInUser()` and rides the existing HTTP auth
-  pipeline, so REST, GraphQL and gRPC requests carry it (gRPC as `prototest-user` metadata). The
-  declaration composes with `[Auth<T>]` instead of replacing it, the `Auth` entity names
-  `SignedInAsAttribute` among its authenticators, and the identity itself is traced as an `auth`
-  entity with id `auth:user` (name, roles, claim **types**, application; claim values never reach the
-  trace) plus an `auth.user.sign-in` event. `ProtoTest.AspNetCore` ships the app side:
-  `webHost.AddTestUserAuthentication()` inside `AddAspNetCoreServer` decodes the `ProtoTest-User`
-  header into the application's `ClaimsPrincipal` (name, `ClaimTypes.Role` roles, custom claims) and
-  becomes its default authentication scheme, so plain `[Authorize]`/role checks decide. The identity
-  is per-test state; against a published application the shipped transport stays inert - the request
-  goes out unchanged and the trace marks `auth.transport = inert` with the reason.
-- `ProtoTest.Templates`: `dotnet new prototest --runner nunit|xunit|xunit3|tunit|mstest` writes the
-  starter suite for that test runner (NUnit remains the default). The variant selects the runner's
-  ProtoTest adapter and test packages and the matching lifecycle wiring in `Starter.Tests/Setup.cs`,
-  so the generated solution restores, builds and runs with the chosen runner; the Microsoft Testing
-  Platform variants (`xunit3`, `tunit`) also select the MTP `dotnet test` runner in the generated
-  `global.json`.
-- `ProtoTest.Messaging.MassTransit` bridges the messaging surface to an in-process application's MassTransit
-  test harness: `AddMessaging(messaging => messaging.UseMassTransit<Program>())` publishes and awaits
-  over the `ITestHarness` the application composes with `AddMassTransitTestHarness`, so the events the
-  application publishes through its own `IPublishEndpoint` are the ones a test awaits. A destination
-  names a message contract type (its full name, short name or `urn:message:` URN); the payload is JSON
-  for that contract; `Tap` snapshots the harness during setup. `Declare` is a no-op because MassTransit
-  owns message topology, and the `Broker` capability is declared only while the application's `BaseUrl`
-  is not configured, so a published application skips instead of failing. The messaging seam gained
-  `UseBrokerUnlessConfigured` for that in-process direction; the package pins MassTransit 8.5.10
-  (Apache-2.0).
-- `ProtoTest.Messaging.MassTransit` gains the broker-side wire envelope: `MassTransitEnvelope.Wrap(destination,
-  contract)` builds the exact MassTransit JSON envelope as a `ProtoMessage` (`application/vnd.masstransit+json`,
-  the contract's `urn:message:` types, message/correlation/conversation ids, sent time, headers, the
-  host block; a raw JSON payload plus its type works too), and `MassTransitEnvelope.Unwrap(message)` /
-  `Unwrap<T>(message)` read a frame the bus published - typed, or as metadata with the raw payload -
-  failing with `MessagingAssertionException` naming the destination when the frame is not an envelope
-  or does not declare `T`. Both are pure and work with any broker adapter, so a published MassTransit
-  application is testable through `UseRabbitMq` where the in-process harness is unavailable; the
-  envelope needs no `MT-*` transport headers (those belong to MassTransit's raw serializer). Both
-  directions are proved against a real RabbitMQ bus (`MassTransit.RabbitMQ` 8.5.10 is a test
-  dependency only).
-- Messaging adapters get the await contract they were previously friend-only: `ProtoMessageConsumerBase`
-  owns the one await queue (serialized awaits, position, consumed set, deadline rescan), and an adapter
-  derives from it and supplies only an `IProtoMessageAwaitSource` (`ProtoMessageAwaitEntry`/
-  `ProtoMessageAwaitSnapshot` carry the candidates and the wake-up). The in-memory, RabbitMQ and
-  MassTransit consumers derive from the base, so no integration package needs internals; the messaging
-  page documents the shape under [Writing an adapter](https://prototest.dev/docs/integrations/messaging/#writing-an-adapter).
-- HTTP protocol integrations wire their builders up through the public surface: `UseAuthenticatorFactory`
-  and `UseBaseAddressResolver` on `ProtoHttpRequestBuilder<TResponse, TBuilder>` adopt the lifecycle
-  hook's authenticator and the client resolution's per-test base-address resolver, and
-  `ProtoHttpOptionsResolver` resolves the keyed response/attachment options a protocol registered — the
-  seam REST and GraphQL use, now available to any HTTP-based protocol.
-- `ProtoTestContextPropagation` (ProtoTest.AspNetCore) is the public in-process request rule: `ApplyTo`
-  for an `HttpRequestMessage` or an `HttpRequest` adds the ambient trace context and the active test's
-  id (`TestIdHeader`, `x-prototest-test`), so a hand-written in-process transport gets the same clock
-  parity as the in-process HTTP client.
-- `ProtoDeviceConnect.WithTimeoutAsync` is the shared device connect bound: a transport runs its connect
-  under a linked attempt token and an elapsed attempt is a `TimeoutException` naming the target, while a
-  caller's cancellation is never reclassified. Both WebSocket transports (socket and in-process) use it.
-- `ProtoOptionsRegistration.ConfigureKeyed` registers a keyed per-client options instance through the one
-  options primitive: callbacks compose in registration order, the section binds over them, and
-  `registerDefault: true` also registers the unkeyed run-wide instance without any named client's
-  callbacks. HTTP response/attachment options and gRPC client options are registered through it instead
-  of each keeping a private copy of the loop.
-- The extension points a third-party integration needs are public, so no integration reaches into
-  another package's internals: `ProtoRegistrationGuard` gained a marker overload taking the caller's
-  identity rule, and `Find`, alongside the existing type-marker and weak-table forms;
-  `ProtoClientResolution.RegisteredName` resolves the registry key of a client instance;
-  `ProtoClockRegistry` exposes its host-scoped `Find(testId)` (the registry stays the host service it
-  always was); `ProtoTest.Web` publishes the backend building blocks -
-  `WebBackendOptions.Resolve`, `WebBackendErrors`, `WebFailureArtifacts`, `WebProbeLoop`/`WebProbe`,
-  `WebBackendDefaults` (timing) and `WebArtifactNames` (safe names), with `WebMediaTypes` - while the
-  internal `WebTiming`/`WebNames` remain the implementation behind the new facade types;
-  `SqlAddressRule` publishes the declared-keys lookup and the inert predicate a sibling SQL provider
-  gates its Store capability with; and `ProtoTestContextPropagation` publishes the in-process trace
-  context and test-id header for a transport that opens raw requests. Every `InternalsVisibleTo` grant
-  to an integration package is removed; the remaining grants target test assemblies only, plus the
-  in-repo sample's own assemblies under `samples/` (the one recorded exception; never `src/`).
-- `tests/ProtoTest.Extensibility.Tests` compiles a minimal broker adapter and a minimal web backend
-  against the public surface only, so an extension point that regresses to internals fails the build.
-- Sheets models assert the sheet's shape from the declaration alone: `model.Should.MatchHeaders()` (and
-  `ShouldNot.MatchHeaders()`) compares the sheet's header row with the model's `[Column]` paths in
-  declaration order, and a label/value sheet is declared with
-  `[Sheet("Summary", Kind = ProtoSheetKind.KeyValue)]` and read through `workbook.KeyValueModel<T>()`,
-  where `summary.Column(s => s.Total).Should.Be(123.45m)` reads the value under the label and
-  `summary.Should.MatchModel()` checks every declared label. `ProtoSheetKind`, `ShouldNot` on the model
-  facades and the `sheets.label`/`sheets.labels` evidence are additive.
+### Features
 
-- The runner adapters pass their own cancellation token into the test lifecycle where the runner
-  exposes one, so setup I/O that can observe `ProtoExecutionContext.CancellationToken` — the SQL
-  connection open and transaction begin — is cancelled with the runner: NUnit's test context token
-  (cancelled by `[CancelAfter]`) and the xUnit v2 case runner's `CancellationTokenSource`. MSTest's
-  attribute API, xUnit v3's before/after attribute and TUnit's test executor expose no token, so those
-  tests keep the previous uncancellable behavior. `ProtoTestScope.StartAsync` and
-  `ProtoTestPreparation.StartAsync` gained a token overload for an adapter that has one, and
-  `ProtoHost.StartTestAsync` gained the overload that carries the prepared attribute set, the
-  attachment publisher and the token together.
-- Key-value sheets declare their labels with `[Label("Total")]`: the mapping attribute on
-  `ProtoTest.Sheets` reads the label/value block, with `Optional`, `Min`, `Max`, `Pattern` and `OneOf`
-  applying to the value under the label. A `[Column]` on a key-value property fails the read naming
-  `[Label]`; `[Column]` stays the table mapping.
-- `ProtoTest.Mcp` is the read-only MCP server over `.prototrace` evidence: `prototest-mcp` speaks the
-  Model Context Protocol (the official `ModelContextProtocol` SDK, Apache-2.0) over stdio, and the
-  transport-agnostic tools - `list_runs`, `get_failure`, `get_coverage` - read only archives and the
-  report a run embedded. No trace is written, no suite is rerun, no port is bound, nothing leaves the
-  machine. Discovery follows one precedence (`--trace <file>`, then `--project <folder>`, then
-  `PROTOTEST_PROJECT`, then the current directory): the folder's `TestResults/` first, then the tree
-  with `bin`, `obj`, `.git` and `node_modules` pruned; "newest" is the greatest recorded
-  `runStartedAtUtc`, and an unreadable archive is skipped with a named reason. Hard caps bound every
-  payload, and a missing file, folder or report is a named error, never a fallback.
-- `ProtoTest.Traces` declares the run- and test-level artifacts an archive carries
-  (`ProtoTraceArchive.Artifacts`, `ProtoTraceTest.Artifacts`) and reads a declared artifact's
-  content on request (`ReadArtifact`), so a consumer reaches the embedded report without unpacking
-  the archive itself; an archive read from a stream has no artifact content to read.
-- The demo-only MCP endpoint is built in the repository (`samples/ProtoTest.Mcp.DemoEndpoint`, not a
-  package): the same read-only tools over the bundled demo trace, rate-limited per caller, loopback
-  only, with no accounts, uploads or retention. It is not hosted yet; the local stdio server stays
-  the product surface and the recorded local session is the evidence.
-- `ProtoTest.Diagnosis` is the deterministic diagnosis over one `.prototrace` run:
-  `ProtoDiagnosis.Read` builds the digest (run identity, timing and environment, outcome counts, each
-  non-succeeded test's selected failure with its rule and mismatches, run gates, findings and the
-  coverage the embedded report published), and `ProtoDiagnosis.ReadContext` returns one failing test's
-  context package (the ancestor chain and the nearest protocol call, section previews, the embedded
-  source snippet, the test's artifacts with content on request, the state the operation changed and the
-  report rows it touched). The rules are ordered and deterministic: a failed `assert.*` with recorded
-  checks or `shape.mismatches`, a failed operation with an error, a runner-reported failure, a finding
-  on a test the runner did not fail, and a failed run gate; anything else is unexplained with a pointer
-  to the viewer. No LLM, no network, no coverage re-derivation, hard caps on every list, and the same
-  archive produces byte-identical JSON (`ProtoDiagnosisJson`).
-- `ProtoTest.Traces` reads the whole 2.0 archive: each operation's sections and moments, the recorded
-  evidence (observations, attachments, findings), the run attributes and run-level events, the embedded
-  sources (`ReadSource`), the tracked state (`ReadState`) and the embedded report (`ProtoTraceReport`,
-  capped at 64 MB). `ProtoTraceTest.Failure` now selects the same failure the viewer selects: the
-  deepest failing operation, an `assert.*` check outranking anything with an error, phase spans
-  (`test.*`) last, with `Ancestors`, `CallAncestor` and `ProtoTraceOperation.ReadMismatches` beside it.
-- `prototest summary` prints the diagnosis document, so the CLI, the MCP tools and the feedback
-  channels tell one story. `ProtoTraceSummaryText` lives in `ProtoTest.Diagnosis`; the MCP server gains
-  `get_diagnosis` (`detail=context` returns one failing test's context package), and `get_failure` and
-  `get_coverage` read the same failure selector and report projection.
-- The OpenAPI and GraphQL schema coverage collectors record the specification identity beside their
-  coverage: one aggregate item per target (identifier `spec`, metadata `spec.source` and `spec.hash`,
-  the SHA-256 of the loaded content) with no covered verdict, so every coverage total, run gate and
-  report percentage is unchanged, while a cross-run comparison can tell the same specification from
-  a changed one. `ProtoReport.ReadJson` reads the JSON report a `ProtoTest.Reporting` sink wrote,
-  summary, items and metadata included, and names a missing or foreign file.
-- `ProtoTest.Verification` compares a baseline report with the candidate report a pull request
-  carries. Coverage regressions (covered to uncovered) and new uncovered units come from the
-  report's own arithmetic (`CoverageUnits`/`CoverageTotals`), the recorded specification identity is
-  checked against the candidate files you give (a remote source is recorded and never fetched, a
-  missing candidate report is `missing`), and the candidate's failed run gates are surfaced as it
-  recorded them. The verdict carries deterministic findings with a class, a severity from
-  `ProtoVerificationOptions`, the target, category and unit, the baseline versus current values and
-  an evidence pointer; `ProtoVerificationVerdict.Failed` is the gate.
-- `prototest index <folder>` writes the static index over a folder of runs: `index.html` beside the
-  traces, each run with its id, start and completion time, outcome counts and the tests that did not
-  pass, linked to its `.prototrace` and its `<trace>.digest.json` digest. The digest is the one
-  `ProtoDiagnosis` document, the page is deterministic for the same folder, and an archive the reader
-  cannot open is listed on the page with the reason. No server and no script. The folder scan lives
-  in `ProtoTest.Traces` (`ProtoTraceDiscovery.Discover`), shared by the CLI and the MCP tools.
-- `ProtoTest.Feedback` posts a failing run's digest where a pull request reads it. The digest is the
-  `ProtoTest.Diagnosis` document, so the comment cannot disagree with `prototest summary`. The
-  channels are pure functions of it: `github-pr-comment` posts the Markdown digest with the composed
-  trace link to the pull request the event payload named, `github-annotations` writes one workflow
-  `::error` per failing test with its source location and per failed run gate, and `webhook` posts the
-  digest JSON to a configured address with an optional shared-secret header. A missing target skips
-  its channel with the reason and a refused target fails it; the comment posts only for a run with a
-  failure or a failed gate.
-- `prototest feedback <file.prototrace>` runs the channels, reading the targets from the GitHub Actions
-  environment (`GITHUB_TOKEN`, `GITHUB_REPOSITORY`, `GITHUB_EVENT_PATH`, `GITHUB_API_URL`) and the
-  webhook and trace-link variables (`PROTOTEST_FEEDBACK_WEBHOOK_URL`,
-  `PROTOTEST_FEEDBACK_WEBHOOK_SECRET`, `PROTOTEST_FEEDBACK_WEBHOOK_SECRET_HEADER`,
-  `PROTOTEST_FEEDBACK_TRACE_URL`); `--digest <path>` also writes the digest JSON. `prototest verify
-  <baseline.json> <current.json>` prints the `ProtoTest.Verification` verdict, exits 1 on a failing
-  finding and writes one `::error` annotation per failing finding; `ProtoVerificationText` is the
-  verdict's text rendering.
-- The **ProtoTest Feedback** GitHub Action (`.github/actions/feedback`) uploads the trace as an
-  artifact, posts the digest through `prototest feedback` with the artifact URL as the trace link, and
-  runs `prototest verify` against a baseline report when one is given.
-- A copy-in skill for coding agents ships in the repository
-  (`skills/prototest-evidence-loop/SKILL.md`): it teaches the evidence loop, the four MCP tools and
-  when to run the `summary`, `index`, `verify` and `feedback` verbs, with the agent-workflows pages
-  linked. It is a repository file, not a package, and the Setup page documents copying it into a
-  client's skills directory or instructions file.
+- Core: readiness probes replace setup sleeps (`AddReadinessProbe`, `ProtoReadiness.Tcp`/`.Http`). [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
+- Core: one readiness policy (`ProtoTest:Readiness`) tunes host probes and containers. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
+- Core: a per-test clock replaces sleeping (`ConfigureClock`, `Proto.Context.Clock`, `Advance`/`SetUtcNow`). [Time](https://prototest.dev/docs/foundation/time)
+- Core: targets resolve through ordered provider chains; losers record named skip reasons. [Environment resolution](https://prototest.dev/docs/foundation/environment-resolution)
+- Core: applications, workers and containers declare one chain (`UseConfigured`, `UseInProcess`). [Environment resolution](https://prototest.dev/docs/foundation/environment-resolution)
+- Core: `[RequiresTestClock]` skips tests that need the test clock without a provider that bridges it. [Skip conditions](https://prototest.dev/docs/foundation/skip-conditions)
+- Core: `IProtoTargetProvider.ConfigureServices` and `ResolveAfter` are public. [Environment resolution](https://prototest.dev/docs/foundation/environment-resolution)
+- Core: infrastructure with every declared key configured is skipped, unless `AddInfrastructureAlways`. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
+  - The old `AddInfrastructure(piece, keys)` skip rule is deprecated; the provider chain replaces it. [Migrating from 1.0](https://prototest.dev/docs/getting-started/migrating-from-1-0)
+- Core: `IProtoConfiguredInfrastructure` hands infrastructure the run's settings as it starts. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
+- Core: `AddRunSetup(name, delegate)` adds a run-scoped step after the pieces registered before it. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure#run-scoped-setup)
+- Core: composite attributes expand recursively where attributes resolve, with cycles throwing the chain. [Attributes](https://prototest.dev/docs/foundation/attributes#composite-attributes)
+- Core: `ProtoCapabilityDescriptor.Instance` names the instance a capability describes. [Skip conditions](https://prototest.dev/docs/foundation/skip-conditions)
+- Core: `AddCapabilityWhenProvided`/`AddCapabilityUnlessConfigured` gate capabilities on keys. [Skip conditions](https://prototest.dev/docs/foundation/skip-conditions)
+- Core: one application-address precedence: a published address wins over configuration. [Environment resolution](https://prototest.dev/docs/foundation/environment-resolution)
+- Core: `Proto.Context.UniqueName("tenant")` derives a persistent-store-safe name from the test id. [Execution context](https://prototest.dev/docs/foundation/execution-context#unique-names)
+- Core: `Proto.Context.Sql()` is the primary accessor; `Messaging(name)` accepts a name. [Execution context](https://prototest.dev/docs/foundation/execution-context#clients)
+- Core: typed skip gates (`[RequiresWorker<T>]`, `[RequiresServer]`, `[RequiresApplication]`). [Skip conditions](https://prototest.dev/docs/foundation/skip-conditions)
+- Core: `AddCapabilityReason` states a skip reason once for the suite, a kind or a name. [Skip conditions](https://prototest.dev/docs/foundation/skip-conditions)
+- Core: `ProtoResourceState.Releasing` reports a resource while its release callback runs. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
+- Core: `StartTestAsync` accepts a cancellation token on `ProtoExecutionContext`. [Execution context](https://prototest.dev/docs/foundation/execution-context#cancellation)
+- Core: `ProtoTest.Json` hosts the shared JSON read, failure diagnostics and observation capture. [Extending](https://prototest.dev/docs/advanced/extending)
+- Core: `IProtoConfigurableOptions.FallbackConfigurationSectionName` keeps an old section working. [Configuration](https://prototest.dev/docs/getting-started/configuration)
+- Core: `ProtoOptionsRegistration.ConfigureKeyed` registers keyed per-client options. [Configuration](https://prototest.dev/docs/getting-started/configuration)
+- Core: the extension points a third-party integration needs are public. [Extending](https://prototest.dev/docs/advanced/extending)
+- Core: a bare client name resolves across applications; an ambiguous name names both candidates. [Clients](https://prototest.dev/docs/foundation/clients#fallback-chains)
+- Core: clients use protocol-scoped names and one registration path per integration. [Clients](https://prototest.dev/docs/foundation/clients)
+- Core: one `Should` assertion surface across protocols; assertions return their subject and chain. [Assertions](https://prototest.dev/docs/foundation/assertions)
+- Core: shape matching lives under `Should.MatchShape`; old spellings stay as shims. [Shape matching](https://prototest.dev/docs/foundation/shape-matching)
+- Core: exhaustive shape mode (`exact: true`) works on every shape surface through one matcher walk. [Shape matching](https://prototest.dev/docs/foundation/shape-matching#exact-matching)
+- Core: OpenAPI and GraphQL collectors record the specification identity (`spec.source`, `spec.hash`). [Coverage](https://prototest.dev/docs/observability/coverage)
+- Core: `ProtoProtocol.CoverageCategory` is optional and falls back to the protocol name. [Coverage](https://prototest.dev/docs/observability/coverage#writing-a-collector)
+- Core: `ConfigureTracing` captures CI facts with `RunMetadata` and `RunMetadataEnvironmentVariables`. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+- Core: `ProtoApplication.ResolveSetting` publishes the settings-over-configuration precedence. [Environment resolution](https://prototest.dev/docs/foundation/environment-resolution)
+- Core: `ProtoAttributeOrder` names the setup order bands (`Application`, `SessionDeclaration`, `Default`). [Hooks](https://prototest.dev/docs/foundation/hooks#reserved-order-bands)
+- Hosting: `AddWorkerHost<TProgram>()` runs a background worker or generic host in-process with the suite. [Hosting](https://prototest.dev/docs/integrations/hosting)
+- ASP.NET Core: `ProtoTestHost.For<TProgram>(builder)` composes an in-process application in one line. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
+- ASP.NET Core: `AddAspNetCoreServer` steps aside when `BaseUrl` is configured. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore#real-server-or-in-process)
+- ASP.NET Core: `AddLoopbackApplication` hosts a hand-built `WebApplication` on loopback. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore#hosting-a-browser-journey)
+- ASP.NET Core: per-test service substitution (`Override`, `[ReplaceService]`) builds a dedicated server. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
+- ASP.NET Core: `[SignedInAs]` signs a test in; `AddTestUserAuthentication()` reads it app-side. [Authentication](https://prototest.dev/docs/integrations/rest/authentication#built-in-test-user)
+- ASP.NET Core: `ProtoTestContextPropagation` applies the trace context and test id to raw requests. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
+- REST: read one value by JSON path (`ReadAsJson<T>("$.id")`), with the protocol's failure evidence. [Responses](https://prototest.dev/docs/integrations/rest/responses)
+- REST: `ReadRequired<T>` returns `T` and fails naming the subject or path when the body is empty or null. [Responses](https://prototest.dev/docs/integrations/rest/responses)
+- REST: `Should`/`ShouldNot` assert content type, headers, cookies and redirect location. [Responses](https://prototest.dev/docs/integrations/rest/responses)
+- REST: `PostAsync(...).ExpectAsync(shape)` asserts the response shape where the call is made. [Responses](https://prototest.dev/docs/integrations/rest/responses)
+- REST: `RestTrafficCoverageCollector` reports the fields no shape assertion mentioned. [Coverage](https://prototest.dev/docs/observability/coverage)
+- HTTP: protocol builders adopt the public authenticator, base-address and options resolvers. [Extending](https://prototest.dev/docs/advanced/extending)
+- GraphQL: `ReadDataAs<T>(jsonPath)` and `ReadRequired<T>` read data or fail naming the operation. [Responses](https://prototest.dev/docs/integrations/graphql/responses)
+- gRPC: client options bind `ProtoTest:Grpc:Client`; the legacy `ProtoTest:Grpc` section still binds as a fallback. [gRPC](https://prototest.dev/docs/integrations/grpc/#options-and-keys)
+- Messaging: `ProtoDestination.Queue(name)` awaits a named queue; adapters without queues refuse it by name. [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- Messaging: `Declare(...)` or `ProtoTest:Messaging:DeclaredDestinations` declares suite-owned destinations. [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- Messaging: taps gain a code API (`AddMessaging(m => m.Tap(...))`) that pre-binds destinations during setup. [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- Messaging: messages carry a routing key, and `PublishAsync`/`AwaitAsync` accept one. [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- Messaging: `ProtoMessage` reads are typed (`ReadAsJson<T>`, `ReadRequired<T>`). [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- Messaging: `UseBroker(factory, addressKeys)` gates the Broker capability on an address key. [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- Messaging: `UseMassTransit<Program>()` publishes and awaits over the app's MassTransit harness. [MassTransit](https://prototest.dev/docs/integrations/messaging/masstransit)
+- Messaging: `MassTransitEnvelope.Wrap`/`Unwrap` build and read the wire envelope, addresses included. [MassTransit](https://prototest.dev/docs/integrations/messaging/masstransit#envelope-interop)
+- Messaging: `ProtoMessageConsumerBase` exposes the one await contract to adapters. [Messaging](https://prototest.dev/docs/integrations/messaging/#writing-an-adapter)
+- Messaging: RabbitMQ taps prepare and release in parallel, cutting per-test setup and teardown. [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- Devices: `ProtoTest.Devices` talks to simulators and hardware from the test context and trace. [Devices](https://prototest.dev/docs/integrations/devices)
+- Devices: `AddInProcessWebSocketDevices` routes device clients through the in-process server. [Devices](https://prototest.dev/docs/integrations/devices)
+- Devices: clients carry per-client transport settings (`WithSetting`) filled into `DeviceEndpoint.Settings`. [Devices](https://prototest.dev/docs/integrations/devices)
+- Devices: `ProtoTest.Devices.Mqtt` speaks MQTT 5; `AddMqttClient` declares the topics. [Devices](https://prototest.dev/docs/integrations/devices#mqtt)
+- Devices: `ProtoTest.Devices.Mqtt.Testcontainers` owns a Mosquitto broker for the run. [Devices](https://prototest.dev/docs/integrations/devices)
+- Devices: `ProtoDeviceConnect` and its timeout live in `ProtoTest.Devices`, shared by every transport. [Devices](https://prototest.dev/docs/integrations/devices)
+- Devices: `IProtoDeviceTransport.ConnectAsync` gains a default context overload for custom transports. [Devices](https://prototest.dev/docs/integrations/devices)
+- Web: `WebPageInventory.VisitedObservationKind`/`VerifiedObservationKind` name the page observation kinds. [Web](https://prototest.dev/docs/integrations/web/)
+- Web: the backend building blocks are public (`WebBackendOptions`, `WebBackendErrors`, `WebBackendDefaults`). [Web](https://prototest.dev/docs/integrations/web/)
+- Web: `PlaywrightWebOptions.MaxTraceBytes` caps a browser trace; 0 turns the cap off. [Web](https://prototest.dev/docs/integrations/web/)
+- Web: sessions are created when requested and complete through the shared client lifecycle. [Web](https://prototest.dev/docs/integrations/web/)
+- Sheets: `model.Should.MatchHeaders()` asserts the header row against the model in declaration order. [Sheets](https://prototest.dev/docs/integrations/sheets/)
+- Sheets: key-value sheets declare labels with `[Label]` and read through `Workbook.KeyValueModel<T>()`. [Sheets](https://prototest.dev/docs/integrations/sheets/)
+- SQL: `SqlOptions.AddressKeys` declares the connection keys and gates the SQL and EF Core capabilities. [SQL](https://prototest.dev/docs/integrations/sql/)
+- SQL: `SqlAddressRule` publishes the declared-keys lookup for a sibling SQL provider. [SQL](https://prototest.dev/docs/integrations/sql/)
+- Data: generated member defaults are deterministic per test. [Defaults](https://prototest.dev/docs/integrations/data/defaults)
+- Testcontainers: `UseContainer` and `DockerProbe.IsAvailable()` skip without a Docker runtime. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
+- Testcontainers: `ApplicationContainer` runs an application under test in its own image. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
+- Aspire: `AddAspireAppHost<TEntryPoint>()` runs an AppHost when selected and publishes its resources' addresses. [Aspire](https://prototest.dev/docs/integrations/aspire)
+- Aspire: `UseAspireResource` serves an endpoint or connection string through the provider chain. [Aspire](https://prototest.dev/docs/integrations/aspire#serving-targets-through-the-chain)
+- Aspire: the AppHost receives the suite's configuration and the run's settings as arguments. [Aspire](https://prototest.dev/docs/integrations/aspire)
+- WireMock: `AddWireMock(name)` fakes HTTP dependencies per test, with stubs as coverage gaps until hit. [WireMock](https://prototest.dev/docs/integrations/wiremock)
+- OpenAPI: coverage reads specifications with `Microsoft.OpenApi` 3.x (JSON and YAML, including 3.1). [OpenAPI](https://prototest.dev/docs/integrations/openapi)
+- Runners: opt-in low-ceremony mode (`[assembly: ProtoTestAutoWrap]`) wraps plain tests in the lifecycle. [Runners](https://prototest.dev/docs/runners/overview)
+- Runners: one outcome classifier (`ProtoTestResult`) and row-name helper (`ProtoTestName.ForRow`). [Runners](https://prototest.dev/docs/runners/overview)
+- Runners: adapters pass the runner's cancellation token into the lifecycle where one exists. [Execution context](https://prototest.dev/docs/foundation/execution-context#cancellation)
+- Templates: `dotnet new prototest --runner nunit|xunit|xunit3|tunit|mstest` writes a suite per runner. [Overview](https://prototest.dev/docs/integrations/overview)
+- Analyzers: `ProtoTest.Analyzers` reports `PT0001` and `PT0002` for intent the runtime cannot check. [Analyzers](https://prototest.dev/docs/project/analyzers)
+- Cli: `prototest summary` prints the diagnosis document. [Cli](https://prototest.dev/docs/agent-workflows/cli#summary)
+- Cli: `prototest index <folder>` writes a static index and digest for a folder of runs. [Cli](https://prototest.dev/docs/agent-workflows/cli#index)
+- Cli: `prototest feedback` and `prototest verify` post the channels and print a verdict. [Cli](https://prototest.dev/docs/agent-workflows/cli)
+- Mcp: `prototest-mcp` reads `.prototrace` files over stdio (`list_runs`, `get_failure`, `get_coverage`). [Setup](https://prototest.dev/docs/agent-workflows/setup)
+- Mcp: `get_diagnosis` returns the run digest or one failing test's context package. [Diagnosis](https://prototest.dev/docs/agent-workflows/diagnosis)
+- Mcp: the demo endpoint (`samples/ProtoTest.Mcp.DemoEndpoint`) serves the same tools over the demo trace. [Coding agents](https://prototest.dev/docs/agent-workflows/coding-agents#the-demo-endpoint-honestly)
+- Diagnosis: `ProtoDiagnosis.Read` builds a deterministic digest; `ReadContext` adds one test's context. [Diagnosis](https://prototest.dev/docs/agent-workflows/diagnosis)
+- Verification: `ProtoTest.Verification` compares a baseline and a candidate report. [Verification](https://prototest.dev/docs/agent-workflows/verification)
+- Feedback: `ProtoTest.Feedback` posts a failing run's digest to a PR comment, annotations or a webhook. [Loop](https://prototest.dev/docs/agent-workflows/loop)
+- Feedback: the ProtoTest Feedback GitHub Action uploads the trace and posts the digest. [CI](https://prototest.dev/docs/continuous-integration/#the-feedback-action)
+- Traces: run and test artifacts are declared and readable (`ProtoTraceArchive.Artifacts`, `ReadArtifact`). [ProtoTrace](https://prototest.dev/docs/observability/prototrace#reading-a-trace-in-code)
+- Traces: `ProtoTest.Traces` reads the whole 2.0 archive and selects the viewer's failure. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+- Reporting: `ProtoReport.ReadJson` reads the JSON report a sink wrote. [Reporting](https://prototest.dev/docs/observability/reporting#the-json-report)
+- Docs: a copy-in skill (`skills/prototest-evidence-loop`) teaches agents the evidence loop and the CLI. [Coding agents](https://prototest.dev/docs/agent-workflows/coding-agents#the-skills-bundle)
+- Docs: the integrations overview lists every `ProtoTest.Devices*` package with a one-line purpose. [Overview](https://prototest.dev/docs/integrations/overview)
+- Samples: Northstar with the Learning demo suite is the in-repo sample. [Learn](https://prototest.dev/learn)
+- Viewer: the viewer stays responsive at 1,000+ tests; search, filter and open times drop. [Benchmarks](https://prototest.dev/docs/project/benchmarks)
 
-### Deprecated
+### Fixes
 
-- The skip-key registration is obsolete: `AddInfrastructure(piece, keys)` keeps its all-configured skip
-  rule for 1.x and `AddInfrastructureAlways` keeps the always-start opt-out, while
-  `AddInfrastructure(name, chain, keys)` with `UseConfigured()` and `Use(provider)`/`UseContainer(...)`
-  providers is the replacement. The samples, tests and docs moved to the chain; the loopback
-  application keeps its all-configured rule behind a scoped `CS0618` suppression that names the
-  replacement.
+- Core: assertion messages across GraphQL, gRPC, messaging, REST and Sheets use a plain hyphen separator. [Assertions](https://prototest.dev/docs/foundation/assertions)
+- Core: ambient-context errors name the fix (`FindTraceWriter`, `SetContext`, the runner setup). [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
+- Core: `ReplaceClient` with the already-registered instance keeps its owner instead of double-disposing. [Clients](https://prototest.dev/docs/foundation/clients)
+- Core: trace snapshots can be read while other tests record observations, attachments and findings. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+- Core: the test-clock lookup is scoped to its host, so two hosts sharing a prefix keep separate clocks. [Time](https://prototest.dev/docs/foundation/time)
+- Core: `ProtoClock.Advance` is atomic, so concurrent advances add up and each records its event. [Time](https://prototest.dev/docs/foundation/time)
+- Core: capability conditions are evaluated per declaration; one server no longer skips another. [Skip conditions](https://prototest.dev/docs/foundation/skip-conditions)
+- Core: a conditional declaration's key set compares by content, so a repeat leaves one declaration. [Skip conditions](https://prototest.dev/docs/foundation/skip-conditions)
+- Core: `Build()` is terminal; every public registration after it throws the single-build message. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
+- Core: `AddHttpReadiness` names the later publishing piece instead of claiming in-process. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
+- Core: `AddHttpReadiness` rejects a non-absolute address at run start, naming the configuration key. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
+- Core: shape mismatches with value constraints record every mismatch, not an internal type name. [Shape matching](https://prototest.dev/docs/foundation/shape-matching)
+- Core: malformed JSON bodies and report metadata are redacted with the same policy as the trace. [Attachments](https://prototest.dev/docs/foundation/attachments)
+- Core: resources restarted by a retry release with their new ownership period. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
+- Core: a failed run start unwinds completed run hooks in reverse and keeps the trace silent. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
+- Core: a scope disposed off its async flow records a `Lifecycle` finding and throws. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
+- Core: a throwing run gate keeps its exception and stack in the trace and report metadata. [Hooks](https://prototest.dev/docs/foundation/hooks)
+- Core: telemetry capture failures record one coalesced `telemetry.capture_failed` event. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+- Core: `[Application]` runs before every other setup attribute. [Attributes](https://prototest.dev/docs/foundation/attributes)
+- Core: a sink added directly to the service collection is exported once, like one added with `AddSink`. [Reporting](https://prototest.dev/docs/observability/reporting)
+- Core: readiness waits ride the shared `ProtoPolling` loop, with behavior and messages unchanged. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
+- Core: a readiness timeout names the probed URL and the last error. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
+- Core: gRPC and messaging share one failure record and the `{protocol}.diagnostics.failed` event. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+- Core: `ResolveState` returns only the state the `[Application]` attribute set during the lifecycle. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
+- Core: container starts and device connects are bounded on release and recorded as abandoned. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
+- HTTP: a client bound to a configured or published address gets its own handler and cookie jar per test. [Clients](https://prototest.dev/docs/foundation/clients)
+- Hosting: a worker's `Program.Main` sees the run's configuration as `--key=value` arguments. [Hosting](https://prototest.dev/docs/integrations/hosting)
+- Hosting: a worker entry point always gets the run's `--contentRoot`/`--applicationName`. [Hosting](https://prototest.dev/docs/integrations/hosting)
+- Hosting: `AddWorkerHost` throws for a repeated name with another program. [Hosting](https://prototest.dev/docs/integrations/hosting)
+- Hosting: `ProtoWorkerOptions.Set(key, null)` delivers an empty setting. [Hosting](https://prototest.dev/docs/integrations/hosting)
+- ASP.NET Core: the in-process HTTP client is owned by its test, fixing a teardown crash. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
+- ASP.NET Core: a malformed `ProtoTest-User` header leaves the request anonymous instead of a 500. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
+- ASP.NET Core: a repeated `AddAspNetCoreServer` name with another program throws naming both. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
+- ASP.NET Core: an unnamed `[ReplaceService]`/`[FailDependency]` gates on the selected application. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
+- ASP.NET Core: a substituting test's dedicated server is owned before it starts. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
+- ASP.NET Core: a method-level `[SignedInAs]` keeps the class-level authenticators. [Authentication](https://prototest.dev/docs/integrations/rest/authentication)
+- REST: response and attachment defaults bind `ProtoTest:Http:Responses`; attachments stay opt-in. [Attachments](https://prototest.dev/docs/integrations/rest/attachments)
+- GraphQL: a null execution is tolerated like REST, and subscription events are disposed as they advance. [Subscriptions](https://prototest.dev/docs/integrations/graphql/subscriptions)
+- GraphQL: a rejected subscription names the server's errors. [Subscriptions](https://prototest.dev/docs/integrations/graphql/subscriptions)
+- gRPC: the built-in test user's metadata is redacted by default (`prototest-user`). [gRPC](https://prototest.dev/docs/integrations/grpc/)
+- gRPC: a transport with no base address fails naming `AddClient` and the application's keys. [gRPC](https://prototest.dev/docs/integrations/grpc/)
+- gRPC: client options are per named client; the shared section binds over each callback. [gRPC](https://prototest.dev/docs/integrations/grpc/#options-and-keys)
+- Messaging: a null payload on a positional MassTransit contract fails naming the contract. [MassTransit](https://prototest.dev/docs/integrations/messaging/masstransit)
+- Messaging: a MassTransit consumer re-baselines when a substituting test replaces the harness. [MassTransit](https://prototest.dev/docs/integrations/messaging/masstransit)
+- Messaging: awaiting two destinations no longer misses the second destination's first delivery. [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- Messaging: awaits serialize and an unmatched delivery is kept for a later await, across brokers. [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- Messaging: `UseRabbitMq` declares the Broker capability only when the address is provided or declared. [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- Messaging: a missing or non-amqp RabbitMQ connection string fails naming the configuration key. [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- Messaging: `UseRabbitMq` runs its options callback once per registration. [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- Messaging: RabbitMQ uses `RabbitMQ.Client` 7.x end to end (async connect, channel, publish, consume). [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- Messaging: a tap with a missing exchange fails only the tests that await it, with the named error. [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- Messaging: publishing to a released broker throws instead of reopening, and a repeated release is a no-op. [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- Messaging: no coverage collector ships; destinations are deliberately not a coverage category. [Coverage](https://prototest.dev/docs/observability/coverage)
+- Devices: an in-process connect carries the test id, so the application resolves the test's clock. [Devices](https://prototest.dev/docs/integrations/devices)
+- Devices: a canceled connect is cleared, so the next send starts a fresh connect. [Devices](https://prototest.dev/docs/integrations/devices)
+- Devices: reusing a client name under a second application fails naming the client and both applications. [Devices](https://prototest.dev/docs/integrations/devices)
+- Devices: in-process transports are keyed by program and application; a path-only client fails naming the app. [Devices](https://prototest.dev/docs/integrations/devices)
+- Devices: the in-process transport validates its options and applies `ConnectTimeout`. [Devices](https://prototest.dev/docs/integrations/devices)
+- Devices: `DeviceSession` connects single-flight and serializes sends. [Devices](https://prototest.dev/docs/integrations/devices)
+- Devices: device resource and entity ids include the device type. [Devices](https://prototest.dev/docs/integrations/devices)
+- Devices: teardown disconnects and records `device.disconnect`. [Devices](https://prototest.dev/docs/integrations/devices)
+- Devices: the in-process transport declares its capability only while the application runs in-process. [Devices](https://prototest.dev/docs/integrations/devices)
+- Devices: an oversized frame fails naming the address and limit (`WebSocketDeviceOptions.MaxMessageBytes`). [Devices](https://prototest.dev/docs/integrations/devices)
+- Web: a failed backend creation is no longer cached, so a session retries from a clean slate. [Web](https://prototest.dev/docs/integrations/web/)
+- Web: only the backend that wins the first-wins registration declares the browser capability. [Web](https://prototest.dev/docs/integrations/web/)
+- Web: Selenium `Check`/`SelectOption` verify the resulting state or fail within the action timeout. [Interactions](https://prototest.dev/docs/integrations/web/interactions)
+- Web: assertions poll at `IWebBackend.PollInterval`; over-cap traces and stuck pumps are recorded. [Diagnostics](https://prototest.dev/docs/integrations/web/diagnostics)
+- Web: framework routes (`/_`, `/.well-known`) are never page-inventoried. [Web](https://prototest.dev/docs/integrations/web/)
+- Web: `WebDownload` implements `IProtoBinaryContent`, so a download feeds `ProtoSheets.Open` in one line. [Web](https://prototest.dev/docs/integrations/web/)
+- Sheets: `int`/`long` reads accept only finite, integral, in-range values and fail naming the cell. [Sheets](https://prototest.dev/docs/integrations/sheets/)
+- Sheets: record models construct through their mapped primary constructor. [Sheets](https://prototest.dev/docs/integrations/sheets/)
+- Data: optional constructor-parameter defaults win over generated values. [Defaults](https://prototest.dev/docs/integrations/data/defaults)
+- SQL: a run whose declared keys are unprovided keeps the hooks inert and names the required gate. [SQL](https://prototest.dev/docs/integrations/sql/)
+- Testcontainers: container readiness honors the run's readiness policy. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
+- Testcontainers: a released container can be started again, and its connection string is cleared. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
+- Aspire: an AppHost for a partly configured topology publishes only the missing keys. [Aspire](https://prototest.dev/docs/integrations/aspire)
+- WireMock: a run-scoped fake keeps its stubs and request log for the whole run; `Reset()` clears it. [WireMock](https://prototest.dev/docs/integrations/wiremock)
+- WireMock: pinning Humanizer 3.0.10 avoids a `NU1608` next to Aspire. [WireMock](https://prototest.dev/docs/integrations/wiremock)
+- Runners: an NUnit test body that throws is recorded failed with its exception and source location. [NUnit](https://prototest.dev/docs/runners/nunit)
+- Runners: a body `OperationCanceledException` records `Cancelled` under xUnit v2 as under the other adapters. [Runners](https://prototest.dev/docs/runners/overview)
+- Runners: TUnit parameterized rows record their arguments in the trace name. [TUnit](https://prototest.dev/docs/runners/tunit)
+- Cli: `prototest summary` separates its time range with a plain hyphen. [Cli](https://prototest.dev/docs/agent-workflows/cli#summary)
+- Diagnosis: `prototest summary` and the pull request comment print the failing operation once. [Diagnosis](https://prototest.dev/docs/agent-workflows/diagnosis)
+- Docs: the ProtoTrace page states what `Enabled = false` disables. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+- Docs: the Devices page no longer lists the unshipped `device.replay`. [Devices](https://prototest.dev/docs/integrations/devices)
+- Packaging: every package packs again (35), verified in one `eng/pack.ps1` run. [Installation](https://prototest.dev/docs/getting-started/installation)
 
-### Changed
+### Breaking changes
 
-- Assertion messages across GraphQL, gRPC, messaging, REST and Sheets separate the subject from the
-  message with a plain hyphen (` - `) instead of an em-dash, matching the text the docs and the CLI
-  quote.
-- A RabbitMQ test consumer releases its tap queues and channels in parallel instead of one destination
-  after another: the taps are independent, every tap is still attempted and a failure in one never stops
-  the others. Three tapped destinations drop from about 17 ms to about 13 ms of per-test teardown
-  (`PerTestTapLifecycle_ShouldStayWithinTheSanityBound` in `tests/ProtoTest.Messaging.RabbitMq.Tests`).
-- A RabbitMQ test consumer prepares its taps concurrently: one channel per tap, every destination
-  attempted, and a failed preparation recorded per destination instead of stopping the rest. The
-  `PrepareAsync` contract states that preparation may run destinations in parallel, and three tapped
-  destinations drop from about 16 ms to about 11-12 ms of per-test preparation (the OpenCSMS benchmark
-  moves from 44.4 ms to about 35-36 ms per test).
-- The ProtoTrace docs now state what `Enabled = false` does: no archive, no activity listener, and no
-  in-memory operations or records; the run snapshot still lists each test with its outcome, and reports
-  and run gates (which read report items) are unaffected.
-- `AddAspireAppHost` follows one AppHost selection semantics with the `UseAspireResource` providers:
-  the AppHost starts only when `ProtoTest:Aspire:Enabled` or one of its resources' own
-  `ProtoTest:Aspire:Resources:{resource}:Enabled` is set, and only when at least one key it fills is
-  not already configured - a fully configured environment still steps it aside without starting it. A
-  suite that registers the AppHost without a selection key no longer starts it and keeps resolving its
-  targets through its other providers. The AppHost publishes only the selected resources' keys, and
-  its `aspire` capability is declared only while it serves, so a capability-gated test skips instead
-  of starting a topology it did not ask for.
-- `AddAspNetCoreServer<TProgram>(name)` compares the program on a repeated name: the same `TProgram`
-  under one name stays a no-op, and a different one throws naming both programs and the name instead of
-  silently serving the first. The application overload's documented repeat semantics are unchanged, and
-  `AddWorkerHost` already behaved this way.
-- The Devices README and docs Limits no longer mention `device.replay`: frame-script replay is a
-  separate feature design, not part of the shipped device slice (recorded decision), and a Limits
-  bullet about it advertised work that does not exist.
-- The new-in-1.1 `ProtoTest.MassTransit` package is `ProtoTest.Messaging.MassTransit`, the messaging
-  family's nesting (`ProtoTest.Messaging`, `ProtoTest.Messaging.RabbitMq`). The package was never
-  released, so no compatibility shim ships; the public type names (`MassTransitEnvelope`,
-  `UseMassTransit`) are unchanged. In the same pass the in-memory, RabbitMQ and MassTransit consumers
-  share one await machinery, so "awaits on one consumer serialize in call order", "a delivery that
-  matched no awaited predicate stays for a later await" and "a matched message is consumed once" hold
-  identically across the brokers; the adapter-facing await contract is public (see Added).
-- A per-run WireMock fake keeps its stubs and request log for the whole run: teardown reports the
-  test's requests but no longer resets the shared fake, so a stub one test registers still matches in
-  the next. `Reset()` clears the shared fake between tests, and release clears it with the run.
-- An unnamed `[ReplaceService<T>]`/`[FailDependency<T>]` gates on the test's selected application
-  (falling back to `Default`), the same target the substitution resolves, instead of any in-process
-  server: a mixed run that publishes the selected application and hosts another in-process now skips
-  that test instead of failing its setup. A named one still gates on its named server.
-- `ProtoExecutionContext.ReplaceClient` with the already-registered instance is a no-op: the instance
-  keeps its existing owner instead of registering a second release that disposed it twice.
-- A substituting test's dedicated server is owned before it starts: a registration that throws once
-  the test started releasing (the sealed client registry, a racing override) disposes the server
-  instead of leaking a started one.
-- `[SignedInAs]` stays out of the method-over-class replacement `[Auth<T>]` uses: a method-level
-  identity now keeps the class-level authenticators and composes with them, so the common "class owns
-  the authenticator, method names the user" shape works. The REST/GraphQL/gRPC auth entity still
-  reports `auth.source` for the `[Auth]` attributes and lists the test user among `auth.types`.
-- `eng/lint.ps1` fails when an `InternalsVisibleTo` grant — the assembly attribute or the csproj item
-  form — targets an assembly that does not end in `.Tests`, and `eng/test-gates.ps1` proves both
-  directions in the `lint-friend-edges` fixture. An integration that needs a type it cannot see now
-  publishes the contract or moves the code instead of widening the grant.
-- A client name resolves across applications: a bare name the selected application does not register is
-  completed from the host's clients when exactly one client of that protocol has that unqualified name
-  (`Rest("Api")` under a Dashboard-selected test reaches `Csms:Api` from the REST client `AddRest`
-  registered under Csms), a name two applications share fails naming both qualified candidates
-  (`'Csms:Api', 'Dashboard:Api'`), and an explicitly qualified name (`Rest("Csms:Api")`) is exact and
-  never re-qualified with the selected application. The unnamed accessor keeps the selected
-  application's binding, first client and `Default` fallback unchanged, and a client miss now lists the
-  protocol's registered names so the fix is discoverable.
-- `prototest summary` separates the recorded timestamps of its time range with a plain hyphen, so the
-  CLI's own output follows the same no em or en dash rule as the docs.
-- The viewer stays responsive at 1,000+ tests: each test caches its label, title, group and search text,
-  the run view stays mounted behind an open test, and run and rail rows contain their own layout. On a
-  generated 1,200-test trace, typing in the run search drops from 365 ms to 231 ms, filtering to 53 ms,
-  opening a test to 151 ms and returning to the run list from 650 ms to 566 ms; the numbers, the method
-  and what remains (a streaming reader and a windowed list) are on the benchmarks page.
-- The in-repo teaching sample is Northstar with the Learning demo suite (`samples/Northstar.ProtoTest`)
-  as the Learn track's fixture: the suite hosts the application in-process for the clock journeys and on
-  a loopback listener for the browser journey, owns SQLite or PostgreSQL and RabbitMQ when asked, keeps
-  the REST-to-GraphQL, REST-to-database and workbook journeys, gates the broker and browser journeys on
-  their capabilities with named reasons, and pairs four opt-in failure drills with the green tests that
-  do each journey right. The old cross-layer demo suite (`samples/ProtoTest.Demo`) retires behind it;
-  GraphQL subscriptions, gRPC, OpenAPI and webhook delivery leave the in-repo sample and stay covered by
-  the packages' own test suites and the external OpenCSMS product demo.
-
-### Fixed
-
-- An NUnit test whose body throws is recorded as `failed` with the exception, its message and its
-  source location. A fixture without `[SetUp]`/`[TearDown]` left NUnit's result at its initial
-  Inconclusive state until the work item recorded the exception, and the trace read `skipped`.
-- An HTTP protocol client (REST, GraphQL, or another integration over `ProtoHttpClientInitializer`)
-  bound to a configured or published address is built over its own primary handler and cookie container
-  for each test: parallel tests of one run no longer share the handler the factory pools per client
-  name, so one test's sign-in cookies cannot reach another. The named client's configured handlers stay
-  in the chain, and the in-process transport path is unchanged.
-- Publishing a null or empty payload to a `ProtoTest.Messaging.MassTransit` contract without a default instance
-  (a positional record) fails naming the contract and the fix - give the contract a parameterless
-  shape or publish an explicit JSON payload - instead of the raw `MissingMethodException`.
-- A `ProtoTest.Messaging.MassTransit` test that substitutes the application after a `Tap` (`Override` or
-  `[ReplaceService]`) awaits the messages its dedicated server's fresh harness publishes: the
-  consumer re-baselines to that harness instead of applying the replaced harness's position and
-  skipping its first messages.
-- A RabbitMQ consumer awaiting two destinations no longer misses the second destination's first
-  delivery: each tap numbers its deliveries from zero, so the await queue scopes its consumed set to
-  the destination instead of comparing positions across taps (`AwaitsOnTwoDestinations_ShouldEachSeeTheirFirstDelivery`
-  in `tests/ProtoTest.Messaging.RabbitMq.Tests`).
-- A gRPC call made by a signed-in test redacts the built-in test user's metadata: `prototest-user`
-  joins the default `GrpcClientOptions.SensitiveMetadataKeys`, so the Base64 identity and its claim
-  values never reach the trace (`rpc.metadata.prototest-user` records `(redacted)`) while the
-  application still receives the identity.
-- A malformed `ProtoTest-User` header - not Base64, a null role or claim, or an oversized identity -
-  fails the app-side test-user authentication instead of throwing: the request stays anonymous and the
-  application's authorization challenges it as usual, rather than failing with a 500.
-- An Aspire AppHost that starts for a partly configured multi-resource topology no longer masks the
-  configured addresses: it publishes only the keys configuration does not already fill, and its
-  evidence marks `aspire.resource.{resource}.address_source = configuration` for the rest.
-- A suite using `ProtoTest.Aspire` and `ProtoTest.WireMock` together restores one Humanizer line:
-  `ProtoTest.WireMock` pins the Humanizer metapackage at 3.0.10 - the line Aspire.Hosting resolves for
-  `Humanizer.Core` - so its Handlebars helpers' 2.14.1 satellite set no longer raises `NU1608`.
-
-- A browser download is named binary content: `WebDownload` implements `IProtoBinaryContent`, so a
-  downloaded file feeds anything consuming named bytes (for example `ProtoSheets.Open`) in one line
-  instead of through a stream.
-- The in-process HTTP client is owned by its test alone: ProtoTest builds it over the `TestServer`'s
-  handler instead of `WebApplicationFactory.CreateDefaultClient`, so the parallel tests of a run no
-  longer mutate the shared per-run factory's client ledger. A torn ledger entry crashed run teardown
-  with a `NullReferenceException` from `WebApplicationFactory.DisposeAsync`.
-- An in-process device connect carries the test id on the WebSocket handshake, the same way the
-  in-process HTTP client does: the application under test resolves the connecting test's clock instead
-  of falling back to the run clock, so `Proto.Context.Clock.Advance` reaches session timestamps the
-  application stamps from its `TimeProvider`. A handshake with no test on its flow keeps the run clock.
-- A canceled device connect no longer poisons the session: the cancellation reaches its caller and the
-  canceled attempt is cleared, so the next send starts a fresh connect.
-- A device client name reused under a second application fails naming the client and both applications,
-  instead of the bare "already registered" message.
-- A worker entry point always gets the run's `--contentRoot`/`--applicationName`: an overlay key named
-  `contentRoot` or `applicationName` (any casing) is skipped, so the generated pair cannot be replaced.
-- The RabbitMQ broker connection string is validated where the options resolve: a missing, non-absolute
-  or non-`amqp`/`amqps` value fails naming `ProtoTest:Messaging:RabbitMq:ConnectionString` instead of
-  failing later at connect time, including a value a started broker container publishes.
-- The ambient-context failures name the fix: `Proto.Context` outside a test points at
-  `ProtoHost.FindTraceWriter(Activity?)` for off-flow telemetry and `ProtoHost.CurrentHost` for run
-  scope, a missing `Resolve<T>()` names `SetContext` (and the keyed form), and no active host names the
-  runner setup (`ProtoTestAssembly`).
-- `UseRabbitMq` declares the `Broker` capability conditionally on
-  `ProtoTest:Messaging:RabbitMq:ConnectionString`: a run with a configured key or a broker container
-  that declares it keeps the capability, while a run with neither drops it and
-  `[RequiresCapability(ProtoCapabilityKinds.Broker)]` skips instead of failing at setup or first
-  publish. A connection string set in the options callback keeps the unconditional declaration.
-- A SQL run whose declared `AddressKeys` are all unprovided no longer fails at setup or run start: the
-  connection hook, the isolation guard and the Entity Framework Core enlistment hook stay inert, the
-  connection is not opened, and `SqlSession()`/`SqlConnection()`/`SqlTransaction()` (or
-  `Sql<TContext>()`) throw naming the missing keys and the
-  `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate.
-- Conditions are evaluated per declaration: a capability drops only when every conditional declaration
-  for it is satisfied and no plain declaration promises it, and the `capability.skipped` trace event
-  names the deciding keys. Satisfying one server's address no longer skips tests against another server
-  that is still live in-process.
-- `Build()` is terminal for every public registration entry: hooks, run gates, capabilities, the
-  clock, sinks, infrastructure and application entries throw the same single-build message instead of
-  silently registering into a host that already built its provider. A repeated registration that is a
-  no-op by design before `Build()` (the same server or worker name for the same program) stays a
-  no-op; the same name for a different program throws.
-- Only the web backend that wins the first-wins registration declares its browser capability, so
-  referencing both Playwright and Selenium leaves one honest capability behind the one live backend.
-- A conditional declaration's key set compares by content (ordinal, distinct, order-independent), so
-  registering the same declaration twice leaves one declaration.
-- The in-process WebSocket device transport declares its capability only while the application runs
-  in-process; with `BaseUrl` configured the capability is dropped and the socket transport serves.
-- `AddHttpReadiness` no longer records "the application runs in-process" when the piece that publishes
-  its address is registered after it: the skip names the registration position and the later key, and
-  only a probe backed by an in-process server capability claims in-process. Register the probe after
-  the piece that publishes the address.
-- Container readiness honors the run's readiness policy instead of its private 30 s timeout, so a slow
-  image is tuned with `ConfigureReadiness(options => options.Timeout = ...)` or
-  `ProtoTest:Readiness:Timeout`.
-- `AddHttpReadiness` rejects an address that is not an absolute HTTP(S) URL at run start, naming the
-  configuration key, instead of probing it into a timeout.
-- The gRPC missing-address error names the client's application (and the key to set) instead of
-  printing the literal `{app}`.
-- Shape mismatches whose expected shape carries a value constraint now record every mismatch in the
-  trace instead of an internal compiler-generated type name (or an opaque constraint object on
-  .NET 8).
-- Malformed JSON response bodies are redacted with the shared sensitive-name policy instead of
-  passing through unredacted.
-- Report metadata (findings and observations) is redacted with the same policy the trace uses.
-- A released container resource can be started again and its connection string is cleared on
-  release, so a retry after a failed run start works and no released endpoint stays readable.
-- Run resources restarted by a retry are released with their new ownership period instead of being
-  skipped as already released.
-- A failed web backend creation is no longer cached, so a session retries from a clean slate.
-- RabbitMQ uses `RabbitMQ.Client` 7.x end to end (async connection, channel, publish and consume), and
-  a delivery is converted to the broker-neutral message inside the consumer handler, where its body
-  buffer is still valid.
-- Every package packs again: `ProtoTest.AspNetCore`, `ProtoTest.Web`, `ProtoTest.Web.Playwright` and
-  `ProtoTest.Web.Selenium` had lost their `IsPackable` setting, and `ProtoTest.Hosting`,
-  `ProtoTest.Devices.WebSocket` and `ProtoTest.Devices.WebSocket.AspNetCore` were missing from the pack
-  gate, so a 1.1 release would have shipped without them. `eng/pack.ps1` now covers all 35 packages
-  and verifies the whole set in one run.
-- A worker's `Program.Main` sees the run's configuration: `AddWorkerHost` passes the merged overlay
-  (options over infrastructure settings over suite configuration) to the entry point as
-  `--{key}={value}` arguments, so `Host.CreateApplicationBuilder(args)` and
-  `Host.CreateDefaultBuilder(args)` read final-precedence values before `Build()`; the `HostBuilding`
-  in-memory overlay remains the fallback for an entry point that ignores its arguments. A parameterless
-  `Main` stays the documented limit.
-- The test-clock lookup is scoped to the owning host instead of a process-global map keyed by test id
-  alone: two hosts that share a `RunPrefix` each resolve their own clock, a failed test start leaves no
-  entry, context disposal removes only its own host's entry, and host disposal clears the registry. The
-  in-process ASP.NET Core request linking uses the owning host's registry, so a request sees the clock
-  of the test that caused it even when another host has a test with the same id.
-- `ProtoClock.Advance` performs its read-modify-write under the clock's lock, so concurrent advances on
-  the run clock add up instead of losing updates and each advance records its own `clock.advance`.
-- In-process device transports are keyed by `(TProgram, application)`: a second
-  `AddInProcessWebSocketDevices<TProgram>` is a second transport, and a client is only routed through
-  the transport of the application it was registered under. Two applications exposing the same path
-  each serve their own clients, and a path-only client with no matching transport fails naming the
-  application instead of falling back to another transport.
-- The in-process device transport resolves the registered `WebSocketDeviceOptions` from DI and
-  validates them with the transport, and its `ConnectTimeout` bounds the in-process connect - the
-  `configure` callback is no longer dead.
-- `DeviceSession` connects single-flight and serializes sends: concurrent sends share one connection
-  instead of opening one each and leaking the loser. One receive may be in flight at a time (a second
-  fails fast naming the device), and a send that races a disconnect fails with a device error naming
-  the device instead of a disposed-socket exception or an NRE.
-- Device resource and trace entity ids include the device type (`device:{client}:{type}:{id}`), so two
-  device types with the same id on one client coexist with their own resource and entity.
-- The device release path disconnects: teardown emits `device.disconnect` and finalises
-  `device.connected = false`, so a test that never disconnects still ends disconnected and an explicit
-  disconnect followed by a send reconnects and records both connects.
-- `AddWorkerHost` throws when one name is registered for a different program instead of silently
-  dropping the second registration, matches `IHostApplicationBuilder` (covering
-  `WebApplicationBuilder`), and fails loudly naming an unrecognised builder shape instead of leaving it
-  with its own configuration and `TimeProvider`. `ProtoWorkerOptions.Set(key, null)` now delivers an
-  empty setting, as its documentation always promised, and the parameterless-`Main` fallback
-  (`HostBuilding` overlay) is pinned by a test.
-- Readiness waits ride the shared `ProtoPolling` loop instead of a second stopwatch/delay
-  implementation, so one rule owns every poll interval and deadline (audit VOC-4). Observable behavior
-  is unchanged: exceptions mean "not ready yet", and a timeout still names the probe, the attempts and
-  the last error.
-- A sink registered directly in the service collection is exported at run end like one added with
-  `AddSink`; the export hook is registered once by the host build, so mixing both paths still exports
-  once.
-- `[Application]` runs at `ProtoAttributeOrder.Application` (`int.MinValue`), before every other setup
-  attribute, so a web session declaration or a login always sees the selected application; a session
-  created before the selection falls back to its own name and cannot resolve an address.
-- A failed run start unwinds every completed run hook that owns state, in reverse, so a suite-setup
-  hook's `BeforeRunAsync` state is released by its `AfterRunAsync`; gates, reports and the trace
-  archive stay silent for a run that never started.
-- A `ProtoTestScope` disposed off the async flow that started it, or while another test is active,
-  records a `Lifecycle` finding on its test and throws instead of completing nothing silently.
-- A throwing run gate keeps its exception type, message and stack in the run trace and in the gate
-  verdict's report metadata.
-- A telemetry capture failure records one coalesced `telemetry.capture_failed` run event with the
-  exception; later failures collapse into it and capturing still never breaks the application.
-- `UseRabbitMq` runs its options callback exactly once per registration: the capability decision reads
-  the instance the callback configured instead of probing it with a second invocation.
-- A publish to a released RabbitMQ broker throws `ObjectDisposedException` naming it instead of
-  silently reopening the connection, and a repeated release is a no-op.
-- A `Tap` destination whose exchange is missing no longer fails every test in the class at setup: the
-  failure is scoped to the tests that await it, which fail there with the named error, and each tap
-  owns its channel.
-- The gRPC client's options are per named client: each `AddClient` configure callback applies to that
-  client only, so metadata, `DefaultDeadline` and `SensitiveMetadataKeys` never leak into another
-  client; a repeated registration for the same name still composes, the shared `ProtoTest:Grpc:Client`
-  section still binds over each client's callback, and a transport-backed fallback client reads the
-  run-wide configuration default.
-- A gRPC client whose in-process transport has no base address fails naming `AddClient`, the
-  application's `Grpc:Address`/`BaseUrl` keys and `AddAspNetCoreServer` instead of silently dialing
-  `http://localhost`.
-- `prototest summary` and the pull request comment print the selected failing operation once when
-  its kind and name are the same, as they are for assertion operations, instead of repeating the
-  same text on the line.
-
-### Changed
-
-- gRPC client options bind from `ProtoTest:Grpc:Client` (the section rule `ProtoTest:<Integration>
-  [:<Area>]`); the legacy `ProtoTest:Grpc` section still binds as a deprecated fallback, so an existing
-  suite keeps working, and a value under `ProtoTest:Grpc:Client` wins (list-valued options accumulate
-  both sections). `GrpcAttachmentOptions` keeps the inherited `ConfigurationSectionName` instance
-  property and names its constant `SectionName` — a `ConfigurationSectionName` constant would hide the
-  inherited property and break `new GrpcAttachmentOptions().ConfigurationSectionName`. The old
-  `ConfigurationSection` constant stays as an `[Obsolete]` alias.
-- The pre-facade assertion spellings remain as `[Obsolete]` shims that delegate to the facade, so
-  existing tests keep compiling: GraphQL's `ShouldHaveNoErrors()`/`ShouldHaveErrors()`/
-  `ShouldHaveError(code)`, gRPC's `ShouldHaveStatus`/`ShouldNotHaveStatus` extension methods, and
-  Sheets' `Verify()` and `ShouldAll(predicate)`. New tests use `Should.*`; the sheets docs and READMEs
-  now teach `Should.MatchModel()` and `Should.All(predicate)`. The `void` → subject return changes
-  behind the chaining are source-compatible but binary-breaking for compiled consumers; the affected
-  packages' `CompatibilitySuppressions.xml` record them.
-- Shape failures now name their subject and use the protocol's assertion exception. A REST mismatch
-  throws `RestAssertionException` starting with the request identifier (`GET /orders/42 — Shape
-  mismatch failed with 1 error(s): …`), GraphQL throws `GraphQLAssertionException` starting with the
-  operation, gRPC throws `GrpcAssertionException` starting with the message type, messaging throws
-  `MessagingAssertionException` starting with the destination, and a Sheets row throws
-  `SpreadsheetAssertionException` starting with the row's `Sheet!Range` (a model row names the record
-  type). The shared `JsonShapeMismatchException` — with the full mismatch list — stays reachable as
-  the failure's `InnerException`, and the trace attributes, sections and observations are unchanged.
-  This is a behavioral change: code that caught `JsonShapeMismatchException` from a protocol assertion
-  now catches the protocol exception (or `ProtoAssertionException`).
-- The shape spellings are obsolete shims: `RestResponse.ShouldMatchShape`,
-  `GraphQLResponse.ShouldMatchShape`, `ProtoMessagingAssertions.ShouldMatchShape`,
-  `ProtoGrpcAssertions.ShouldMatchShape` and `SheetModelAssertions.ShouldMatchShape(ProtoTableRow, …)`
-  delegate to `Should.MatchShape`; new tests use the facade. `RestResponse.Should` and
-  `GraphQLResponse.Should` now return the positive facade type (`RestShouldAssertions`,
-  `GraphQLShouldAssertions`), which is source-compatible but binary-breaking for compiled consumers;
-  the affected packages' `CompatibilitySuppressions.xml` record it.
-- `IProtoInProcessDeviceTransport.CanConnect` takes the requested application
-  (`CanConnect(context, applicationName)`) instead of a `DeviceEndpoint` it ignored, so a transport
-  answers for the identity it serves. The device transport interface is unreleased 1.1 plumbing; a
-  custom in-process transport updates its one method.
-- REST object request bodies serialize with the shared web defaults (camelCase names), matching
-  GraphQL variables. Pass explicit `JsonSerializerOptions` to keep another naming policy.
-- OpenAPI coverage reads specifications with `Microsoft.OpenApi` 3.x (JSON and YAML, including 3.1
-  documents). `ProtoTest.OpenApi` references `ProtoTest.Core` directly instead of relying on a
-  transitive reference.
-- `ProtoHost.FindClock` is an instance member; the clock lookup is scoped to the host that owns the
-  test. The clock feature is unreleased, so no consumer migration is needed.
-- `ProtoProtocol.CoverageCategory` is optional and `null` for a protocol that ships no collector; a
-  collector with no category falls back to the protocol name, and the shipped REST/GraphQL/gRPC/OpenAPI
-  collectors keep their categories.
-- Messaging adapters share one concurrency contract: awaits serialize and a delivery matching no
-  awaited predicate is kept for a later await, so concurrent awaits neither lose nor steal; RabbitMQ
-  previously discarded the racing delivery and the in-memory adapter advanced past it.
-- A successful publish records the `messaging.published` observation instead of `messaging.publish`
-  (which stays the operation name); update a collector that filtered the old observation kind.
-- Selenium `Check`/`SelectOption` verify the resulting state (`Selected`) and fail with
-  `WebActionabilityException` within the action timeout instead of reporting a click that did not take.
-- Sheet reads of `int`/`long` accept only finite, integral, in-range values; a fraction, an out-of-range
-  number or NaN fails naming the cell instead of rounding or saturating.
-- Sheet record models construct through the constructor their columns map (the record primary
-  constructor); an unmapped constructor parameter fails naming it, and a throwing constructor guard
-  propagates with its original stack.
-- Optional constructor-parameter defaults win over generated values in `ProtoTest.Data`, so a declared
-  default (including `null`) is honored.
-- Messaging destinations a suite owns can be declared with `Declare(...)` on the `AddMessaging` chain
-  or under `ProtoTest:Messaging:DeclaredDestinations`: the adapter creates them during test setup,
-  before any tap binds, so a suite that owns the broker and publishes its own events works from the
-  documented path. RabbitMQ creates a fanout, durable, non-auto-delete exchange once per run and
-  leaves an existing one as it is; the in-memory broker treats a declaration as a no-op.
-  `IProtoMessageBroker.DeclareAsync` is the adapter seam and its default implementation refuses,
-  naming the adapter, instead of pretending.
-- `AddRunSetup(name, delegate)` registers a run-scoped setup step: infrastructure that starts at its
-  registration position — after the pieces registered before it, so it reads the connection string a
-  container published — over the existing start/stop machinery. The step receives
-  `ProtoRunSetupContext` (`Settings`, `Configuration`, the run's `CancellationToken`), owns nothing to
-  release (stop and dispose never call it again), and a throwing step fails the run start with its own
-  exception and leaves the host retryable, like failing infrastructure.
-- An application under test runs in its own container image: `ApplicationContainer`
-  (`ProtoTest.Testcontainers`) starts the image as run infrastructure
-  (`AddInfrastructure(api, api.BaseUrlKey)`), maps the port the application listens on, publishes
-  `http://{hostname}:{mapped port}` as `ProtoTest:Applications:{application}:BaseUrl`, and waits for the
-  mapped port with the run's readiness policy. A run that configures the key skips the container;
-  `TryStart` reports why a container could not start so a suite can skip without a runtime; a
-  containerized application advertises no in-process server, so `[RequiresInProcess]` tests skip.
-- `ProtoApplication.ResolveSetting(configuration, settings, key)` is public: one
-  published-settings-over-configuration precedence for suites that read an application setting, with a
-  blank published value ignored.
-- `ProtoAttributeOrder` names the setup order bands (`Application`, `SessionDeclaration`, `Default`), so
-  an attribute sequences itself against the built-ins without raw numbers and the deliberate bands live
-  in one place.
-- A trace can name the CI run that produced it: `ConfigureTracing` gains `RunMetadata` (explicit
-  key/value facts) and `RunMetadataEnvironmentVariables` (names read from the process environment, such
-  as `GITHUB_RUN_ID`), captured once when the host is built. Each fact is recorded as
-  `environment.{key}` on the run resource in `spans.json` and as a `run_metadata` report item
-  (`ProtoReportItemKinds.RunMetadata`); an unset variable contributes nothing, so a local run's trace
-  and report are unchanged, and a key that would hide a built-in `environment.*` fact fails the build.
-- `IProtoDeviceTransport.ConnectAsync(context, endpoint, cancellationToken)` has a default
-  implementation forwarding to the context-free overload; the in-process transport overrides it, so a
-  connect from a flow without ambient context still reaches the registered application.
-- `ProtoTest.Analyzers` ships the intent-dependent checks the framework cannot make at runtime:
-  `PT0001` reports a method that carries both a ProtoTest test attribute and the runner's own plain
-  test attribute, and `PT0002` reports a test registered by a plain runner attribute that reads
-  `Proto.Context`. Warnings only; consumers opt in by referencing the package.
-- `AddLoopbackApplication(applicationName, createApp)` (`ProtoTest.AspNetCore`) starts the given
-  `WebApplication` factory on `http://127.0.0.1:0` as run infrastructure, publishes the bound address
-  as `ProtoTest:Applications:{application}:BaseUrl`, and forwards the suite's configuration with the
-  started settings at its registration position as command-line arguments, so a browser session, a
-  REST client and a readiness probe resolve one running application. A configured address skips the
-  listener like any address provider; the listener is a separate instance with no `ServerFactory` or
-  `[RequiresInProcess]`.
-- A readiness timeout names the probed URL and the last error; a rejected GraphQL subscription names
-  the server's errors; an oversized WebSocket frame fails naming the address and limit; a stuck
-  Selenium pump is reported (`web.selenium.executor_abandoned`) instead of abandoned silently; a
-  Playwright trace over the cap records `web.playwright.trace_too_large`; coverage reads the address
-  inside the assertion operation.
-- A body `OperationCanceledException` records `Cancelled` under xUnit v2 as it already did under
-  MSTest, TUnit and xUnit v3; NUnit still records `Failed` because its result carries no exception.
-  xUnit v2 completes the test scope in a `finally` even when its own pipeline throws.
-- TUnit parameterized rows record their arguments in the trace name (`…MethodName[1]`) instead of the
-  method name alone, so parallel rows stay distinguishable.
-- Failure evidence is one record: gRPC and messaging record `ProtoFailureDiagnostics` through the
-  protocol-identified guard, so a non-`RpcException` and a failed publish/await are observations; the
-  capture-failure event is `{protocol}.diagnostics.failed` with the protocol's trace source (the old
-  `http.diagnostics.failed`/`ProtoTest.Http` literal is gone).
-- One wait timing per session: assertions poll at `IWebBackend.PollInterval` (Selenium's `PollInterval`,
-  the shared default otherwise), and REST request-URI validation uses the shared wording
-  (`REST request URI '…' must be an absolute HTTP or HTTPS URI`).
-- `ProtoApplicationResolution.ResolveState` returns only the state the `[Application]` attribute set
-  during the test's lifecycle; a context started without the resolved attribute reports "No application
-  is selected" instead of re-reading the method. Adapters pass the resolved attributes, so suite
-  behavior is unchanged.
-- An untraced GraphQL response tolerates a null execution like the REST contract, and enumerating a
-  subscription disposes each event as it advances (the final event stays the caller's).
-- Container and device release are bounded: an in-flight container start is awaited for at most five
-  seconds and recorded as `container.start.abandoned`; a device connect is awaited the same way and
-  recorded as `device.disconnect.abandoned`; normal release with nothing in flight is unchanged.
-- Framework routes (`/_…`, `/.well-known…`) are never page-inventoried, and a table row's shape
-  assertion uses the table's own context instead of the ambient one.
-- The HTTP response and attachment defaults bind `ProtoTest:Http:Responses` through the shared options
-  registration when no explicit registration exists; a resolver that returns null still means capture
-  is opt-in, so attachments stay off unless asked for.
-
-### Removed
-
-- `ProtoTest.OpenTelemetry` was retired: the `ProtoTest` `ActivitySource` always exists, so subscribing
-  is one `AddSource("ProtoTest")` call as the observability page shows; a 12-line bridge did not earn a
-  package of its own.
-- `IProtoReadinessProbe` and `ProtoReadinessResult.LastError` were removed: probes are registered as
-  delegates with `AddReadinessProbe`/`AddHttpReadiness`, the wait result carries attempts and waited
-  time only, and the timeout message still carries the last error. Both were unreleased 1.1 plumbing.
-- Messaging's coverage promise was removed rather than shipped: `ProtoMessageClient` no longer documents
-  destination aggregation, and the Messaging protocol descriptor no longer declares a coverage category.
-  The `messaging.*` observations remain trace evidence for a collector a suite registers; no
-  `ProtoTest.Messaging` collector ships, and destinations are deliberately not a coverage category.
-- `ProtoHttpAssertions<TResponse, TAssertions>` loses the unused `TAssertions` parameter
-  (`ProtoHttpAssertions<TResponse>`); unreleased 1.1 plumbing, a deriver updates one base-type argument.
-- `WebTiming` and `WebNames` are internal (web timing defaults and artifact naming are plumbing, not
-  consumer promises); the web pages teach the public surface.
-
-### Breaking
-
-- `AddClientFrom` was removed from the REST and GraphQL builders. Register clients under an
-  application and configure its base URL or endpoints, or use an `AddClient` resolver when the
-  address depends on test context.
-- Several registration, observation and runner implementation types are now internal. Use the
-  public builder, response and runner APIs instead of constructing those implementation types.
-- `ProtoHost` can no longer be constructed from a service provider directly; use `ProtoHostBuilder`,
-  which registers the stores, gates and hooks the host's reporting depends on.
-- `ProtoFlow` steps now declare the trace operation they record (`ProtoStepDescriptor`); the unused
-  `ProtoStepOptions` retry and timeout surface was removed.
-- `IProtoClientInitializer.TryInitializeAsync` no longer takes a cancellation token. No runner adapter
-  supplies a test cancellation token; a caller that starts a test explicitly can pass one to
-  `StartTestAsync`, visible as `ProtoExecutionContext.CancellationToken`, and a run-scoped hook remains
-  the cancellable extension point for runner-driven suites.
-- `ProtoTest.AspNetCore` now depends on the new `ProtoTest.Web.Pages` package (page identity and
-  inventory) instead of the full `ProtoTest.Web`, for the one concept the in-process server and the
-  browser sessions share. `ProtoTest.Web` depends on it too.
-- `ProtoTest:Web:Sessions:{name}` settings no longer configure sessions. Put addresses under
-  `ProtoTest:Applications:{application}` and select the session with `[WebSession]` or `Web()`;
-  backend options remain under `ProtoTest:Web:Playwright` or `ProtoTest:Web:Selenium`.
-- The web reshape removed members instead of obsoleting them: `IWebBackend.CurrentAddress` and its
-  backend implementations, the old `Web()` overload, `WebFlow<TComponent>.Check(Func<TComponent,
-  WebElement>, bool)`, `WebOperationContext.Result`, `PlaywrightWebOptions.Context`,
-  `RequiresPlaywrightBrowserAttribute.Session`, and Selenium's download surface
-  (`IWebBackendDownloads` and `SeleniumWebBackend.DownloadAsync`). Each package's
-  `CompatibilitySuppressions.xml` records exactly these removals; the web pages describe the
-  replacement surfaces.
-
-### Changed
-
-- REST, GraphQL and gRPC clients use protocol-scoped names, so the same logical name can be used
-  by more than one integration.
-- REST, GraphQL and gRPC now use one registration path per integration for host and application setup;
-  messaging keeps its registration state with the host services rather than in a global table.
-- Web sessions are created when requested and complete through the shared client lifecycle.
-- Trace snapshots can safely read observations, attachments and findings while other test work records them.
-- CI builds the sample UI once and releases the same packages that passed verification.
+- Core: `AddClientFrom` is removed from the REST and GraphQL builders.
+  - Register clients under an application and configure its base URL or endpoints, or use an `AddClient` resolver ([Clients](https://prototest.dev/docs/foundation/clients)).
+- Core: registration, observation and runner implementation types are internal; use the public APIs.
+- Core: `ProtoHost` can no longer be constructed from a service provider; use `ProtoHostBuilder` ([Lifecycle](https://prototest.dev/docs/foundation/lifecycle)).
+- Core: `ProtoFlow` steps declare their operation; unused retry and timeout options are gone.
+- Core: `IProtoClientInitializer.TryInitializeAsync` no longer takes a cancellation token.
+  - Pass one to `StartTestAsync`, or use a run hook as the cancellable extension point ([Lifecycle](https://prototest.dev/docs/foundation/lifecycle)).
+- Core: shape mismatches throw the protocol's assertion exception, with `JsonShapeMismatchException` as the inner.
+  - Code that caught `JsonShapeMismatchException` catches `ProtoAssertionException` ([Migrating from 1.0](https://prototest.dev/docs/getting-started/migrating-from-1-0)).
+- Core: `ProtoTest.OpenTelemetry` is retired.
+  - Subscribe to the `ProtoTest` source with `.AddSource("ProtoTest")` ([OpenTelemetry](https://prototest.dev/docs/observability/opentelemetry)).
+- REST: object request bodies serialize camelCase by default, matching GraphQL variables.
+  - Pass explicit `JsonSerializerOptions` to keep another naming policy ([Migrating from 1.0](https://prototest.dev/docs/getting-started/migrating-from-1-0)).
+- Messaging: a publish records the `messaging.published` observation; the operation stays `messaging.publish`.
+  - Update a collector that filtered the old observation kind ([Migrating from 1.0](https://prototest.dev/docs/getting-started/migrating-from-1-0)).
+- Web: `ProtoTest:Web:Sessions:{name}` settings no longer configure sessions.
+  - Put addresses under `ProtoTest:Applications:{application}` and select with `[WebSession]` or `Web()` ([Web](https://prototest.dev/docs/integrations/web/)).
+- Web: the reshape removed `IWebBackend.CurrentAddress`, the old `Web()` overload and Selenium's download surface.
+  - The web pages describe the replacements; `CompatibilitySuppressions.xml` records the removals.
+- ASP.NET Core: the package now depends on `ProtoTest.Web.Pages` instead of the full `ProtoTest.Web`.
 
 ## [1.0.1] - 2026-09-20
 

@@ -13,6 +13,12 @@ Work in progress is tracked in the repository [CHANGELOG.md](https://github.com/
 
 ## 1.1.0 - 2026-09-29
 
+ProtoTest 1.1 adds the agent evidence layer (the MCP server, diagnosis, verification, feedback and the
+CLI), the devices family (WebSocket and MQTT), the topology integrations (Aspire, WireMock,
+Testcontainers), the extended runner surface, and a rewritten documentation site with the Learn track.
+See [Migrating from 1.0](https://prototest.dev/docs/getting-started/migrating-from-1-0) for the renames
+and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the rest.
+
 ### Features
 
 - Core: readiness probes replace setup sleeps (`AddReadinessProbe`, `ProtoReadiness.Tcp`/`.Http`). [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)

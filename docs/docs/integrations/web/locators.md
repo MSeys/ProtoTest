@@ -8,6 +8,10 @@ description: "Find elements by role, label and text rather than CSS; each backen
 
 `By` builds a `WebLocator`, a description of how to find something, translated by each backend into its native query. Prefer locators that describe what a user sees (roles, labels, text) over ones that describe markup (CSS); they survive redesigns and double as accessibility checks.
 
+:::caution[Two `By` types in a Selenium suite]
+A Selenium suite imports `OpenQA.Selenium` for its driver types, and `OpenQA.Selenium.By` collides with `ProtoTest.Web.By` in any file that uses both (CS0104). Alias one of them in the page-object file, for example `using By = ProtoTest.Web.By;`, or keep the driver factory in its own file. Playwright has no second `By`.
+:::
+
 ## The full list
 
 ```csharp
@@ -70,7 +74,7 @@ In Playwright, `And(By.HasText(...))` becomes a native filter on the left locato
 Element(By.At(By.Role(WebRole.Button, "Remove"), 2))   // the third "Remove" button
 ```
 
-The index is zero-based and must not be negative. Playwright applies `.Nth(index)`; Selenium resolves all matches for the source, indexes the in-memory list, and throws `NoSuchElementException` naming the count when the index is out of range.
+The index is zero-based and must not be negative. Playwright applies `.Nth(index)`; Selenium resolves all matches for the source and indexes the in-memory list. Through the element API an out-of-range index is a missing element like any other: an action or assertion treats it as "not yet", waits until the timeout and then fails with `WebElementResolutionException` naming the locator, not the match count. A direct resolution reports the count instead (`NoSuchElementException` on Selenium).
 
 For repeated components, [`Components<T>()`](./page-objects.md#lists-of-components) with `At`, `Number`, `First` and `Matching` usually reads better.
 

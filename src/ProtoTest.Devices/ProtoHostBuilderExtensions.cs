@@ -87,25 +87,69 @@ public static class ProtoHostBuilderExtensions
         {
             foreach (var deviceType in client.DeviceTypes)
             {
-                AddCapability(capabilityTarget, new ProtoCapabilityDescriptor(deviceType.Name, ProtoCapabilityKinds.Device, ProtoDeviceDiagnostics.TraceSource));
+                AddCapability(
+                    capabilityTarget,
+                    new ProtoCapabilityDescriptor(deviceType.Name, ProtoCapabilityKinds.Device, ProtoDeviceDiagnostics.TraceSource),
+                    client.AddressKeys);
             }
         }
 
         foreach (var (transportType, name) in store.Transports)
         {
-            AddCapability(capabilityTarget, new ProtoCapabilityDescriptor(name ?? transportType.Name, ProtoCapabilityKinds.Device, ProtoDeviceDiagnostics.TraceSource));
+            var transportName = name ?? transportType.Name;
+            AddCapability(
+                capabilityTarget,
+                new ProtoCapabilityDescriptor(transportName, ProtoCapabilityKinds.Device, ProtoDeviceDiagnostics.TraceSource),
+                TransportAddressKeys(store, transportName));
         }
 
         foreach (var transport in store.TransportInstances)
         {
-            AddCapability(capabilityTarget, new ProtoCapabilityDescriptor(transport.Name, ProtoCapabilityKinds.Device, ProtoDeviceDiagnostics.TraceSource));
+            AddCapability(
+                capabilityTarget,
+                new ProtoCapabilityDescriptor(transport.Name, ProtoCapabilityKinds.Device, ProtoDeviceDiagnostics.TraceSource),
+                TransportAddressKeys(store, transport.Name));
         }
     }
 
-    private static void AddCapability(object target, ProtoCapabilityDescriptor capability)
+    /// <summary>
+    /// The address keys that gate one transport's capability: the keys its clients declare, unless a
+    /// client with a code-provided address or a path can serve the transport without configuration.
+    /// </summary>
+    private static IReadOnlyList<string> TransportAddressKeys(DeviceRegistrationStore store, string transportName)
+    {
+        var keys = new List<string>();
+        foreach (var client in store.Clients.Values)
+        {
+            if (!string.Equals(client.TransportName, transportName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (client.AddressKeys.Count == 0)
+            {
+                return [];
+            }
+
+            keys.AddRange(client.AddressKeys);
+        }
+
+        return keys;
+    }
+
+    private static void AddCapability(
+        object target,
+        ProtoCapabilityDescriptor capability,
+        IReadOnlyCollection<string> addressKeys)
     {
         switch (target)
         {
+            case IProtoHostBuilder builder when addressKeys.Count > 0:
+                builder.AddCapabilityWhenProvided(capability, [.. addressKeys]);
+                break;
+            case IProtoApplicationBuilder application when addressKeys.Count > 0:
+                application.AddCapabilityWhenProvided(capability, [.. addressKeys]);
+                break;
             case IProtoHostBuilder builder:
                 builder.AddCapability(capability);
                 break;

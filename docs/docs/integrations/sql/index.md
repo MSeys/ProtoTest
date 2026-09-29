@@ -20,9 +20,15 @@ dotnet add package ProtoTest.Sql.Testcontainers
 
 Only `ProtoTest.Sql` is required. Add the Entity Framework Core adapter when tests use a `DbContext`, and the container package when the run should start its own PostgreSQL. ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `-f` is passed.
 
+The snippets assume the namespaces of the types they name: `ProtoTest.Sql`, `ProtoTest.Sql.EntityFrameworkCore`, `System.Data.Common`, your provider (`Npgsql`), and your runner's attribute namespace for `[ProtoTest]` (`ProtoTest.NUnit` for NUnit, listed with the other runners in [runners](../../runners/overview.md)). A missing `ProtoTest.NUnit` turns `[ProtoTest]` into CS0616, not into a skipped test.
+
 ## Compose
 
 ```csharp
+using System.Data.Common;
+using Npgsql;
+using ProtoTest.Sql;
+
 builder.AddSql(
     services => new NpgsqlConnection(connectionString),
     sql => sql.Isolation = SqlIsolation.Transaction);
@@ -96,6 +102,8 @@ DbTransaction? transaction = Proto.Context.SqlTransaction();   // null with SqlI
 ```
 
 `ProtoSqlSession` exposes the owned `Connection` and, when isolation is `Transaction`, the `Transaction` every access technology enlists in.
+
+The provider's own `ConnectionString` on the opened connection is the post-open form and can drop credentials: Npgsql removes the password from it once the connection is open. Read the connection string the run started, password included, from `ProtoInfrastructureSettings.Values` (as above) when you need to hand it to something else; read `Proto.Context.SqlConnection().ConnectionString` only when the opened form is what you want.
 
 ## The tasks
 

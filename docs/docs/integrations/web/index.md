@@ -133,7 +133,8 @@ Key names below are relative to `ProtoTest:Web:Playwright` (`src/ProtoTest.Web.P
 | `Channel` | string? | `null` | e.g. `"msedge"` or `"chrome"` to use an installed browser |
 | `InstallBrowsers` | bool | `false` | download the selected browser before the first launch when it is missing |
 | `ActionTimeout` | `TimeSpan` | 5 s | how long a read or action waits for its element before failing with the documented resolution/actionability exception |
-| `Context` | `BrowserNewContextOptions` | `new()` | nested keys bind, e.g. `Context:Locale`, `Context:ViewportSize:Width` |
+| `Locale`, `TimezoneId`, `UserAgent`, `ViewportWidth`, `ViewportHeight`, `StorageStatePath` | string/int? | unset | the context settings ProtoTest models; a viewport needs both dimensions |
+| `MaxTraceBytes` | long | 32 MiB (33554432) | the largest attached native trace; 0 reads without a cap |
 | `TraceRetention` | `PlaywrightTraceRetention` | `OnWebFailure` | `Off`, `OnWebFailure`, `Always` |
 | `CorrelateTraceGroups` | bool | `true` | group Playwright trace actions under ProtoTest operations |
 | `ConsoleCapture` | `PlaywrightConsoleCapture` | `WarningsAndErrors` | `Off`, `Errors`, `WarningsAndErrors`, `All` |
@@ -187,7 +188,9 @@ Configuration holds the environment, never the session: addresses under `ProtoTe
         "Browser": "Firefox",
         "Headless": true,
         "TraceRetention": "Always",
-        "Context": { "Locale": "nl-BE", "ViewportSize": { "Width": 1280, "Height": 720 } }
+        "Locale": "nl-BE",
+        "ViewportWidth": 1280,
+        "ViewportHeight": 720
       }
     },
     "Applications": {
@@ -197,7 +200,14 @@ Configuration holds the environment, never the session: addresses under `ProtoTe
 }
 ```
 
-Nested Playwright context options such as `Context:Locale` bind too. Options are bound once, the first time a session opens a browser.
+The context settings ProtoTest models (`Locale`, `TimezoneId`, `UserAgent`, `ViewportWidth`, `ViewportHeight`, `StorageStatePath`) bind from configuration. Anything else on Playwright's `BrowserNewContextOptions` is set in code through the `ConfigureContext` action, which runs after the settings above:
+
+```csharp
+builder.AddWeb(options => options.ConfigureContext = context =>
+    context.ColorScheme = ColorScheme.Dark);
+```
+
+Options are bound once, the first time a session opens a browser.
 
 ### Sessions
 

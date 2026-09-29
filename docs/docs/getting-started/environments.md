@@ -128,7 +128,7 @@ For a test that only needs *an* in-process server, `[RequiresInProcess]` is the 
 | `ConnectionStrings:Northstar` | configuration / environment | points the application and the test-side domain at an existing store |
 | `ProtoTest:Messaging:RabbitMq:ConnectionString` | configuration / environment | points the messaging adapter at an existing broker |
 
-All of them work as environment variables with the usual `__` separator (`ProtoTest__TargetUrl`). See [Configuration](./configuration.md) for how configuration sources are added and which value wins, and [Infrastructure](../foundation/infrastructure.md) for what the host starts and when it is released.
+All of them work as environment variables with the usual `__` separator (`ProtoTest__TargetUrl`), but only when the suite added an environment-variable source: the host starts with an empty configuration, so a key set only in your shell is invisible until `.AddEnvironmentVariables()` is registered. See [Configuration](./configuration.md) for how configuration sources are added and which value wins, and [Infrastructure](../foundation/infrastructure.md) for what the host starts and when it is released.
 
 The [recipes](../recipes/overview.md) work in all three modes as they are: [REST, then GraphQL](../recipes/rest-then-graphql.md), [a write that lands in the database](../recipes/write-lands-in-the-database.md) and [API, then browser](../recipes/api-then-browser.md).
 

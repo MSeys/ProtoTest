@@ -6,7 +6,7 @@ description: "Export ProtoTest operations to OpenTelemetry, so test runs land in
 
 # OpenTelemetry
 
-Every ProtoTrace operation is also a .NET `Activity` on the `ActivitySource` named **`ProtoTest`**. Subscribe an OpenTelemetry tracer to it with `AddSource("ProtoTest")`, and test runs land in the same backend as your application's telemetry.
+Every operation ProtoTest starts is also a .NET `Activity` on the `ActivitySource` named **`ProtoTest`**. Subscribe an OpenTelemetry tracer to it with `AddSource("ProtoTest")`, and test runs land in the same backend as your application's telemetry.
 
 ## What it is
 
@@ -41,6 +41,8 @@ public sealed class OpenTelemetryHook : IProtoRunHook
 }
 ```
 
+Or set `OTEL_SERVICE_NAME=prototest` in the run environment; OpenTelemetry's default resource reads it.
+
 ```csharp
 builder.AddRunHook<OpenTelemetryHook>();
 ```
@@ -60,6 +62,8 @@ The export is a translation of the ProtoTrace tree:
 
 Spans nest the same way the ProtoTrace tree does: a test's `test.setup`, `test.execution` and `test.teardown` spans contain everything that happened in those phases, and an operation started in your test body is a child of `test.execution`. The execution span opens the W3C trace context the test body's calls carry, so application spans those calls cause line up under the test in your backend.
 
+The three phases are three root spans, because they run on separate activities; they share the `prototest.test.id` tag, which is the join key for a test in a backend that shows whole traces. Without a resource of your own, the exporter reports every span under the default service name (`unknown_service:<host>`); set OpenTelemetry's standard `OTEL_SERVICE_NAME` (for example `prototest`) in the run environment, or build a resource in the hook, so test runs are findable next to the application's telemetry.
+
 Spans and events carry these tags:
 
 | Tag | |
@@ -72,7 +76,6 @@ Spans and events carry these tags:
 | `prototest.outcome` | `succeeded`, `failed`, `partial`, `cancelled`, `skipped` or `unknown` |
 | `prototest.logical_parent_id` | the ProtoTrace parent entry id (spans only) |
 | `prototest.entity.kind`, `prototest.entity.id` | the client, context, server or capability an entry belongs to, when it has one |
-| `prototest.entry.count` | how many identical error-free events collapsed into one entry |
 
 The operation's own trace attributes (`http.method`, `web.locator`, your custom ones) are exported as tags too, except values longer than 2,048 characters and the large structured ones (shape snapshots, serialised context state, observation data). Those stay in the `.prototrace` file only, so spans remain lightweight.
 
@@ -82,7 +85,13 @@ Operations are real `Activity` instances, so `HttpClient`'s standard W3C trace-c
 
 ## The artifact
 
-The backend trace is the artifact: the same operations, events and outcomes as the `.prototrace` tree, in your tracing system instead of a local file. The `.prototrace` archive is unaffected and remains the complete record, because tracing stays on by default and OpenTelemetry is a second consumer of the same operations.
+The backend trace is a second consumer of the same operations: every operation ProtoTest starts, with its events and outcome, appears as a span in your tracing system. The `.prototrace` archive is unaffected and remains the complete record, because tracing stays on by default and OpenTelemetry is a second consumer of the same operations.
+
+### What does not reach the backend
+
+- **Run-level evidence.** Gate verdicts, target resolutions and skips, capability decisions and run resources are events on the run group in the archive, not spans. The run's identity and environment (`runId`, `environment.*`, the CI metadata you configured) are archive-only too.
+- **Application spans captured from your own sources.** A source named in `ProtoTraceOptions.ActivitySources` is recorded into the `.prototrace` tree from the application's own activities, but it is not re-emitted on `ProtoTest`; a backend subscribed only to `ProtoTest` does not show it. Subscribe to the application's source as well to see both in one backend.
+- **Values above the tag cap**, listed under Limits below: they exist in the archive, not on the span.
 
 ## Limits
 

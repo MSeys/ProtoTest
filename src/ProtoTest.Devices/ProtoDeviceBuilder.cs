@@ -136,6 +136,38 @@ public sealed class ProtoDeviceClientBuilder
         return this;
     }
 
+    /// <summary>
+    /// Declares the configuration keys the client's address can come from, so the client's device and
+    /// transport capabilities are declared only while a key can actually provide an address - a
+    /// configured value or a key a registered infrastructure piece declares, exactly like
+    /// <c>AddCapabilityWhenProvided</c>. A client whose address is provided in code (an explicit
+    /// address or a resolver) declares no keys and keeps its capabilities unconditional. A backend
+    /// whose address is configuration-driven calls this; the MQTT transport names
+    /// <c>ProtoTest:Devices:Mqtt:Broker</c>.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="keys"/> holds no non-blank key.</exception>
+    public ProtoDeviceClientBuilder WithAddressKeys(params string[] keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        var declared = keys.Where(key => !string.IsNullOrWhiteSpace(key)).ToArray();
+        if (declared.Length == 0)
+        {
+            throw new ArgumentException(
+                "WithAddressKeys requires at least one configuration key; with no key the client's address cannot be provided.",
+                nameof(keys));
+        }
+
+        foreach (var key in declared)
+        {
+            if (!_registration.AddressKeys.Contains(key, StringComparer.Ordinal))
+            {
+                _registration.AddressKeys.Add(key);
+            }
+        }
+
+        return this;
+    }
+
     /// <summary>Registers a typed device the client can create; no address or id is configured here.</summary>
     public ProtoDeviceClientBuilder AddDevice<TDevice>()
         where TDevice : ProtoDevice

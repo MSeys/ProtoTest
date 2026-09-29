@@ -118,10 +118,13 @@ var table = workbook.Sheet("Sales").Table(1, 2);      // header rows 1 and 2
 var amounts = table.Column("FY26", "Amount");         // full header path
 table.Should.ContainRow("Region", "EMEA");            // one rendered value match
 var emea = table.RowWhere("Region", "EMEA");          // throws when no row matches
-string amount = emea["FY26", "Amount"].Text;          // row indexer by header path
+string region = emea["Region"].Text!;                 // text cell
+double amount = emea["FY26", "Amount"].Number!.Value; // numeric cell
 ```
 
 A column is found by its full header path; a single segment may match by suffix when it is unambiguous. Zero matches and more than one full or suffix match throw `SpreadsheetAssertionException` naming the candidate paths, so ambiguity fails instead of guessing. Header matching is ordinal (case-sensitive), and a single-segment path has no case folding. `ContainRow` compares rendered values, so a numeric or date key cell matches its printed form. A row can also be matched against a shape keyed by leaf header names, for example `table.Rows[0].Should.MatchShape(new { Region = "EMEA", Amount = "1200" })`.
+
+Reading a cell without an assertion uses its typed accessors: `Text` holds the textual value only, so a numeric cell has `Text == null`; `Number` (`double?`), `Boolean` (`bool?`) and `Date` (`DateTime?`) hold the typed value the OpenXML cell type and number format produced, `Formula` holds the formula text with the cached result in the typed ones, and `IsEmpty` is true when none carries a value. Range and row comparisons render a cell as its text, else its typed value (invariant culture), which is why a numeric cell reads as `1200` there and not through `Text`.
 
 #### Typed models
 
@@ -221,6 +224,7 @@ The capability is name `"Sheets"`, kind `document` (`ProtoCapabilityKinds.Docume
 - **`ShouldNot.All` passes when at least one value does not match**, and typed columns read the whole declared range whether or not the test looks at every value.
 - **Coverage is read-based.** A column present in the file but never read is uncovered; hidden sheets are excluded by default. Opening a workbook records `sheets.workbook` evidence but covers nothing.
 - **Integer reads are strict.** A cell read as `int` or `long` must be finite, integral and in range: `1200.75` does not round to `1201`, and `1e20` or a `NaN` cell fails the read with a cell-naming `FormatException` instead of saturating. Read a `double` or `decimal` when a fractional value is data.
+- **A proven failure still shows.** A test that asserts a failure with `Assert.Throws`/`Assert.Catch` is green in the runner, but the failed `assert.sheets` operation it provoked leaves the test **Partial** in the trace; that outcome rule applies to every operation, not just Sheets ([ProtoTrace outcomes](../../observability/prototrace.md#what-a-trace-contains)).
 - **Header paths are ordinal.** Matching is case-sensitive, and a suffix match is only allowed when exactly one column matches.
 - **`Should.MatchHeaders()` is exact.** The sheet must declare the model's columns in declaration order with no extra column; a declared single-segment path matches the end of a layered path. Header matching reads the header rows, so coverage covers them.
 - **A key-value sheet is one label/value block.** Labels are the non-empty cells of the first column and values the second, so a sheet that uses those columns for anything else cannot be modelled as key-value; a label the model does not declare is ignored, and a duplicated label fails rather than picking a row.

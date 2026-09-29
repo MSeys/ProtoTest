@@ -13,8 +13,8 @@ public static class ProtoExecutionContextExtensions
     {
         ArgumentNullException.ThrowIfNull(context);
         var application = ProtoApplicationResolution.ResolveApplicationName(context);
-        var (requested, resolvedName) = ProtoClientResolution.ResolveNames(context, "Grpc", clientName);
-        var lookup = ProtoClientResolution.Find<ProtoGrpcClient>(context, "Grpc", requested, resolvedName);
+        var (requested, resolvedName) = ProtoClientResolution.ResolveNames(context, ProtoGrpcBuilder.ProtocolName, clientName);
+        var lookup = ProtoClientResolution.Find<ProtoGrpcClient>(context, ProtoGrpcBuilder.ProtocolName, requested, resolvedName);
         var client = lookup.Client;
         resolvedName = lookup.ResolvedName;
 
@@ -26,7 +26,7 @@ public static class ProtoExecutionContextExtensions
             var transport = ProtoApplicationResolution.ResolveTransportClient(context, application);
             if (transport is null)
             {
-                var registered = ProtoClientResolution.RegisteredNames<ProtoGrpcClient>(context, "Grpc");
+                var registered = ProtoClientResolution.RegisteredNames<ProtoGrpcClient>(context, ProtoGrpcBuilder.ProtocolName);
                 var registeredHint = registered.Count == 0
                     ? string.Empty
                     : $" Registered for this protocol: {string.Join(", ", registered.Select(name => $"'{name}'"))}.";
@@ -41,9 +41,9 @@ public static class ProtoExecutionContextExtensions
                 resolvedName,
                 transport,
                 context.TryService<GrpcClientOptions>() ?? new GrpcClientOptions(),
-                ProtoClientResolution.ScopedName("Grpc", resolvedName),
+                ProtoClientResolution.ScopedName(ProtoGrpcBuilder.ProtocolName, resolvedName),
                 application);
-            context.RegisterClient(client, ProtoClientResolution.ScopedName("Grpc", resolvedName));
+            context.RegisterClient(client, ProtoClientResolution.ScopedName(ProtoGrpcBuilder.ProtocolName, resolvedName));
 
             context.Trace.WriteEvent(
                 "grpc.client.resolve",

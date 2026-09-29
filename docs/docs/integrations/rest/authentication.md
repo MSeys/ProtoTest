@@ -26,6 +26,8 @@ Because the context carries the running test, an authenticator can read typed st
 
 ## Built-in authenticators
 
+The three shipped authenticators live in `ProtoTest.Http.Authenticators`:
+
 | Authenticator | Constructor | Adds |
 | --- | --- | --- |
 | `BearerTokenAuthenticator` | `(string token)` | `Authorization: Bearer <token>` |

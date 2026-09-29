@@ -100,6 +100,14 @@ Other event kinds worth knowing when you read a trace: `web.page.discovery.faile
 
 Web sessions complete during teardown in reverse order, after normal teardown hooks but before attachments are published and before the browser is disposed. The Playwright trace and Selenium diagnostics are written at that point, and a failure is recorded on the session's `web.session.complete` entry and aggregated into a teardown failure. That ordering is what guarantees the native trace and diagnostics make it into the runner's output and the `.prototrace` archive.
 
+## Where it lands and how to open it
+
+Run the failing test, then open what it left:
+
+- The `.prototrace` archive lands at `TestResults/prototest-{runId}.prototrace` relative to the test process's working directory (usually the test project's `bin/<config>/<tfm>`), unless `ConfigureTracing` set `OutputPath`. Drop it on the [ProtoTrace viewer](https://trace.prototest.dev) or read it from the terminal with `prototest summary <file>` ([ProtoTrace](../../observability/prototrace.md)).
+- Screenshots, page HTML, location files, the Playwright trace and the Selenium diagnostics are registered as test attachments: NUnit, MSTest, xUnit v3 and TUnit show them in their own output, while xUnit v2 writes each artifact to a file and prints the path to the console ([runner limits](../../runners/overview.md)).
+- The trace also records every artifact on the failing operation, so the viewer's failure view shows them next to the exception even when the runner's output was lost.
+
 ## Next
 
 - [Overview](./index.md) - sessions, options and page coverage.

@@ -109,7 +109,7 @@ await page.Error.ShouldNot.BeVisibleAsync();
 
 Assertions **poll**: every 50 ms until the condition holds or the timeout passes (**5 seconds** when you don't pass one). While polling, "element not found yet" and "not actionable yet" are treated as "not yet", not as failures. When time runs out you get a `WebAssertionException` describing the last thing observed.
 
-- `HaveTextAsync` is an exact, ordinal comparison; `ContainTextAsync` checks for an ordinal substring. `ShouldNot` is the inverse of each.
+- `HaveTextAsync` compares the element's rendered text exactly and ordinally; `ContainTextAsync` checks for an ordinal substring. The read is the browser's rendered text (Playwright's inner text, Selenium's `Element.Text`), so runs of whitespace and line breaks arrive collapsed; when the failure message shows two identical-looking strings, the expected one still carries the source formatting. `ShouldNot` is the inverse of each.
 - `HaveValueAsync` compares the value ordinally, but the failure message reports only the value's length.
 - A timeout of zero or less throws `ArgumentOutOfRangeException`.
 

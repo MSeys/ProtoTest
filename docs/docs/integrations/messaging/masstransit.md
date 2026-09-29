@@ -32,10 +32,10 @@ The harness is MassTransit's in-memory test transport: it replaces the transport
 
 ```csharp
 builder
-    .AddAspNetCoreServer<Program>()                       // the in-process application, first
+    .AddAspNetCoreServer<Program>("Api")                  // the in-process application, first
     .AddMessaging(messaging => messaging
         .Tap("InvoicePaid")                               // snapshot the harness during setup
-        .UseMassTransit<Program>());                      // the bridge, after the server
+        .UseMassTransit<Program>("Api"));                 // the bridge, after the server
 ```
 
 ```csharp
@@ -144,7 +144,7 @@ Both conversions are pure and need no harness, bus or server: they work with any
 
 ## Skip
 
-The harness exists only while the application is hosted in-process, so the bridge declares the `Broker` capability only while `ProtoTest:Applications:{application}:BaseUrl` is **not** configured:
+The harness exists only while the application is hosted in-process, so the bridge declares the `Broker` capability only while that application's provider chain winner runs it in-process:
 
 ```csharp
 [RequiresCapability(
@@ -152,7 +152,7 @@ The harness exists only while the application is hosted in-process, so the bridg
     Reason = "The application is not hosted in-process; the MassTransit test harness is unavailable.")]
 ```
 
-A published application (a configured `BaseUrl`) drops the capability and its tests skip instead of failing at setup. A suite that composes the bridge without an in-process server, or whose application does not register the harness, fails at first use with an error naming `AddAspNetCoreServer` or `AddMassTransitTestHarness` respectively - the composition promised something the environment cannot serve.
+An application served by a configured address, a loopback listener, a container or an AppHost drops the capability and its tests skip instead of failing at setup. A host whose application declares no chain keeps the configured-address rule: a configured `ProtoTest:Applications:{application}:BaseUrl` drops the capability. A suite that composes the bridge without an in-process server, or whose application does not register the harness, fails at first use with an error naming `AddAspNetCoreServer` or `AddMassTransitTestHarness` respectively - the composition promised something the environment cannot serve.
 
 ## Tracing
 
@@ -161,7 +161,7 @@ The bridge records the messaging vocabulary unchanged: `messaging.publish` and `
 ## Limits
 
 - **No container package for the bus.** MassTransit is a bus library, not a server, so there is nothing for Testcontainers to own: a harness-mode suite needs no container, and an envelope-mode suite over RabbitMQ starts `ProtoTest.Messaging.RabbitMq.Testcontainers` ([Owning a broker](./index.md#owning-a-broker)) and registers it like any other infrastructure. A MassTransit application's real transport is still a broker - the container belongs to that broker's package, not to this one.
-- **The harness bridge is in-process only.** `UseMassTransit<TProgram>` resolves `ITestHarness` from the application's `AddAspNetCoreServer` server. A published application (`BaseUrl` configured) drops the capability; a loopback (`AddLoopbackApplication`), container (`ApplicationContainer`) or Aspire application is a different process boundary and is not served, so gate tests that need the bridge. A published application is tested through the broker instead - [Envelope interop](#envelope-interop) with the RabbitMQ adapter - not through the harness.
+- **The harness bridge is in-process only.** `UseMassTransit<TProgram>` resolves `ITestHarness` from the application's `AddAspNetCoreServer` server. A published application (a configured `BaseUrl`), a loopback (`UseLoopback`), container (`ApplicationContainer`) or Aspire application is a different process boundary: the capability drops through the application's provider chain, so gated tests skip. A published application is tested through the broker instead - [Envelope interop](#envelope-interop) with the RabbitMQ adapter - not through the harness.
 - **The harness's transport is the application's bus in the test process.** `AddMassTransitTestHarness` replaces the real transport with the in-memory test transport; the bridge tests the application's bus behaviour, not a broker.
 - **`Wrap` writes command/event envelopes unless the caller passes the request/response fields.** Without `MassTransitEnvelopeAddresses` the source, destination and response addresses and the request id stay unset; with it, a consumer that replies through `RespondAsync` finds them, and `Unwrap` returns them on `MassTransitEnvelopeContent`. Awaiting the reply is the test's own broker await on the response address - the helper converts frames, it runs no request client. The fault, initiator and expiration fields are not exposed - add them by hand if a scenario needs them.
 - **A queue destination is refused.** A MassTransit destination is a message contract type, and the bus owns its transport's topology, so `AwaitAsync("queue:…")` fails naming the destination and the contract-type address to await instead; a queue is consumed only through a broker adapter that owns queues (the RabbitMQ adapter).

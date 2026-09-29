@@ -81,6 +81,35 @@ public sealed class WireMockObservationTests
     }
 
     [Test]
+    public async Task WireMockAssertionFailures_ShouldThrowProtoAssertionException()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddWireMock();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("assertion base", "00001", TestMethods.Placeholder);
+
+        var fake = Proto.Context.WireMock();
+        var stub = fake.Stub(HttpMethod.Get, "/orders/*").RespondJson(HttpStatusCode.OK, new { id = 7 });
+        using var http = new HttpClient();
+        using (await http.GetAsync($"{fake.BaseUrl}/missing")) { }
+
+        var fromFake = Assert.Catch<ProtoAssertionException>(fake.VerifyNoUnmatchedRequests);
+        var fromStub = Assert.Catch<ProtoAssertionException>(() => stub.VerifyHappened());
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(fromFake, Is.TypeOf<WireMockAssertionException>());
+            Assert.That(fromFake!.Message, Does.Contain("GET /missing"));
+            Assert.That(fromStub, Is.TypeOf<WireMockAssertionException>());
+            Assert.That(fromStub!.Message, Does.Contain("received no requests"));
+        }
+    }
+
+    [Test]
     public async Task StubRegistration_ShouldRecordTheStubObservation()
     {
         var captured = new CapturingCollector();

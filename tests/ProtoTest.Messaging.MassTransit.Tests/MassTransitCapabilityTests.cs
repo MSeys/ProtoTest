@@ -10,9 +10,11 @@ using SampleApi = ProtoTest.AspNetCore.SampleApi;
 
 /// <summary>
 /// Pins the Broker capability's in-process rule: the MassTransit harness exists only while the
-/// application is hosted in-process, so the capability is declared only while the application's
-/// <c>BaseUrl</c> is not configured - a published application drops it and gated tests skip instead of
-/// failing at setup or first use. The failure paths name the fix when the composition cannot serve.
+/// application is hosted in-process, so the capability follows the application's provider chain - an
+/// in-process winner keeps it, a loopback winner drops it, and a host whose application declares no
+/// chain keeps the configured-keys rule (<c>BaseUrl</c> configured means a published application).
+/// Gated tests skip instead of failing at setup or first use. The failure paths name the fix when the
+/// composition cannot serve.
 /// </summary>
 [TestFixture]
 public sealed class MassTransitCapabilityTests
@@ -27,6 +29,41 @@ public sealed class MassTransitCapabilityTests
         await using var host = builder.Build();
 
         Assert.That(host.HasCapability(ProtoCapabilityKinds.Broker), Is.True);
+    }
+
+    [Test]
+    public async Task UseMassTransit_WhenTheChainServesTheApplicationInProcess_ShouldKeepTheBrokerCapability()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddApplication(MassTransitSuite.Application, app => app
+            .UseConfigured()
+            .UseInProcess<Program>());
+        builder.AddMessaging(messaging => messaging.UseMassTransit<Program>(MassTransitSuite.Application));
+        await using var host = builder.Build();
+
+        Assert.That(
+            host.HasCapability(ProtoCapabilityKinds.Broker),
+            Is.True,
+            "the chain's winner hosts the application in-process, so the harness exists");
+    }
+
+    [Test]
+    public async Task UseMassTransit_WhenTheChainServesTheApplicationOnLoopback_ShouldDropTheBrokerCapability()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddApplication(MassTransitSuite.Application, app => app
+            .UseConfigured()
+            .UseLoopback(Program.CreateApp));
+        builder.AddMessaging(messaging => messaging.UseMassTransit<Program>(MassTransitSuite.Application));
+
+        await using var host = builder.Build();
+
+        Assert.That(
+            host.HasCapability(ProtoCapabilityKinds.Broker),
+            Is.False,
+            "a loopback application is a different process boundary and has no test harness in this process");
     }
 
     [Test]

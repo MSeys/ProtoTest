@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type { Artifact, Run, TestTrace } from "../trace/model";
-import { failureReason, formatDate, formatDuration, needsAttention, pad, phaseSegments, testCodeName, testGroup, testMatches, testTitle, timelinePercent, tone } from "../trace/format";
+import { failureReason, formatDate, formatDuration, formatOffset, needsAttention, outcomeLabel, pad, phaseSegments, testCodeName, testGroup, testMatches, testTitle, timelinePercent, tone } from "../trace/format";
 import Panel from "../ui/Panel.vue";
 import TextInput from "../ui/TextInput.vue";
 import FilterChip from "../ui/FilterChip.vue";
@@ -92,7 +92,7 @@ function bars(test: TestTrace) {
             <span class="issue-reason">{{ failureReason(test).title }}</span>
             <span v-if="failureReason(test).detail" class="issue-detail">{{ failureReason(test).detail }}</span>
           </span>
-          <span class="issue-kind">{{ test.outcome === "failed" ? "Failed" : "Partial" }}</span>
+          <span class="issue-kind">{{ outcomeLabel(test.outcome) }}</span>
         </button>
         <component :is="item.test ? 'button' : 'div'" v-for="(item, index) in run.findings" :key="`finding-${index}`"
                    :type="item.test ? 'button' : undefined" class="issue finding" :class="item.finding.status.toLowerCase()"
@@ -109,6 +109,7 @@ function bars(test: TestTrace) {
           <span class="issue-main">
             <strong>{{ gate.name }}</strong>
             <span v-if="gate.message" class="issue-reason">{{ gate.message }}</span>
+            <span v-if="gate.details" class="issue-detail">{{ gate.details }}</span>
           </span>
           <span class="issue-kind">{{ gate.status }}</span>
         </div>
@@ -126,6 +127,9 @@ function bars(test: TestTrace) {
       </template>
       <div class="legend" aria-hidden="true">
         <span v-for="phase in ['setup', 'execution', 'rollback', 'teardown']" :key="phase"><i :style="{ background: `var(--phase-${phase})` }" />{{ phase }}</span>
+      </div>
+      <div v-if="visible.length" class="scale" aria-hidden="true">
+        <span class="axis"><i>start</i><i>{{ formatOffset(run.duration) }}</i></span>
       </div>
       <div v-if="visible.length" class="tests">
         <button v-for="test in visible" :key="test.id" type="button" class="test-row" :class="tone(test.outcome)"
@@ -215,6 +219,9 @@ button.issue:hover { background: var(--hover); }
 .legend { padding: var(--space-2) var(--space-4) 0; display: flex; flex-wrap: wrap; gap: var(--space-4); color: var(--muted); font-size: var(--text-micro); text-transform: capitalize; }
 .legend span { display: inline-flex; align-items: center; gap: var(--space-1); }
 .legend i { width: 10px; height: 4px; border-radius: var(--radius-hairline); }
+/* The bar's own clock: each row is placed on the run's axis, so the axis is labelled once above them. */
+.scale { padding: var(--space-1) var(--space-2) 0; display: grid; grid-template-columns: 22px minmax(0, 1.1fr) minmax(0, 1fr) 58px 7px; gap: var(--space-3); }
+.axis { grid-column: 3; display: flex; justify-content: space-between; color: var(--dim); font-size: var(--text-micro); }
 
 .tests { padding: var(--space-2) var(--space-2) var(--space-3); display: grid; }
 .test-row {
@@ -246,6 +253,7 @@ button.issue:hover { background: var(--hover); }
 @container (max-width: 640px) {
   .test-row { grid-template-columns: 22px minmax(0, 1fr) 52px 7px; }
   .bar, .test-name small { display: none; }
+  .scale { display: none; }
   .issue { grid-template-columns: 30px minmax(0, 1fr); }
   .issue-kind { grid-column: 2; }
 }

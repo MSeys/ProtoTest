@@ -38,6 +38,10 @@ const seen = computed(() => new Set(props.visibility.sources));
         </dd>
         <dd v-else class="absent">None recorded</dd>
       </div>
+      <div v-if="visibility.backends.length">
+        <dt>Backends</dt>
+        <dd>{{ visibility.backends.join(", ") }}</dd>
+      </div>
       <div>
         <dt>Values from</dt>
         <dd class="chips">

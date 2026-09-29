@@ -19,14 +19,23 @@ const query = ref("");
 const folded = ref(new Set<string>());
 watch(() => props.test.id, () => { folded.value = new Set(); });
 
-const matches = computed(() => {
+/** Spans that match the search themselves; ancestors are kept so a hit is never shown out of context. */
+const hits = computed(() => {
   const text = query.value.trim().toLocaleLowerCase();
   if (!text) return null;
-  const keep = new Set<string>();
+  const found = new Set<string>();
   for (const span of props.test.spans) {
     const haystack = [span.name, span.kind, span.source, ...Object.values(span.attributes)].join(" ").toLocaleLowerCase();
-    if (!haystack.includes(text)) continue;
-    for (let current: Span | null = span; current; current = current.parent) keep.add(current.id);
+    if (haystack.includes(text)) found.add(span.id);
+  }
+  return found;
+});
+
+const matches = computed(() => {
+  if (!hits.value) return null;
+  const keep = new Set<string>();
+  for (const id of hits.value) {
+    for (let current: Span | null = props.test.byId.get(id) ?? null; current; current = current.parent) keep.add(current.id);
   }
   return keep;
 });
@@ -56,6 +65,7 @@ function toggle(id: string) {
 <template>
   <Panel class="spans" title="Every span" :subtitle="`${test.spans.length} spans as recorded, in the order they started.`" pad="none">
     <template #actions>
+      <span v-if="hits" class="count" role="status">{{ hits.size }} of {{ test.spans.length }} matches</span>
       <TextInput v-model="query" type="search" placeholder="Find by name, kind or attribute" label="Find a span" class="find" />
     </template>
     <div v-if="rows.length" ref="list" class="list" role="tree">
@@ -83,6 +93,7 @@ function toggle(id: string) {
 <style scoped>
 .spans { container-type: inline-size; }
 .find { width: clamp(160px, 40%, 300px); }
+.count { color: var(--muted); font-size: var(--text-micro); white-space: nowrap; }
 .list { padding: var(--space-2); }
 .row {
   min-height: var(--row-height);

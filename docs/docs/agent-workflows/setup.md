@@ -82,7 +82,7 @@ The server takes one of two inputs, in this order:
 
 Without either, the `PROTOTEST_PROJECT` environment variable is the folder, and without that, the current directory.
 
-Discovery looks at the folder's `TestResults/` first. While that folder holds a trace, the rest of the tree is not walked. Otherwise it walks the tree and prunes `bin`, `obj`, `.git` and `node_modules`. "Newest" is the run's recorded start time, never a file timestamp. An archive the reader cannot open is skipped with a reason in `list_runs` and never guessed at.
+Discovery looks at the folder's `TestResults/` first. While that folder yields a readable trace, the rest of the tree is not walked. Otherwise it walks the tree and prunes `bin`, `obj`, `.git` and `node_modules`, so a folder holding only an unreadable archive does not hide readable runs elsewhere. "Newest" is the run's recorded start time, never a file timestamp. An archive the reader cannot open is skipped with a reason in `list_runs` and never guessed at.
 
 The default trace lands below the test project's build output, and discovery prunes `bin`, so the server cannot see it from the repository root. Give the suite a results folder the server can see. The [continuous integration page](../continuous-integration/index.md#put-every-artifact-in-one-place) uses one environment variable, so CI and local runs write to the same place:
 

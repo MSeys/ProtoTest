@@ -92,6 +92,22 @@ describe("findFailure", () => {
     expect(failure?.call?.id).toBe("call");
   });
 
+  it("does not let a deeper cancelled child outrank the failed operation", () => {
+    const failed = span({
+      id: "failed", kind: "http.request", status: "failed", depth: 1,
+      error: { type: "TimeoutException", message: "the request timed out" }
+    });
+    const cancelled = span({
+      id: "cancelled", kind: "http.request", status: "cancelled", depth: 2, parent: failed,
+      error: { type: "OperationCanceledException", message: "the retry was cancelled" }
+    });
+    failed.children = [cancelled];
+
+    const failure = findFailure(testTrace([span({ id: "phase", kind: "test.execution", status: "failed" }), failed, cancelled]));
+
+    expect(failure?.span.id).toBe("failed");
+  });
+
   it("returns null when nothing failed", () => {
     expect(findFailure(testTrace([span({})]))).toBeNull();
   });

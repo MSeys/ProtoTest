@@ -79,6 +79,30 @@ internal static class DiagnosisFixtures
         await host.StopAsync();
     }
 
+    /// <summary>A failed call with a deeper cancelled call inside it that recorded an error.</summary>
+    public static async Task WriteCancelledChildAsync(string path)
+    {
+        await using var host = NewHost(path).Build();
+        await host.StartAsync();
+        var failing = await host.StartTestAsync("orders are listed", "00007", TestMethods.Placeholder);
+        using (var request = failing.Trace.Operation("http.request", "REST · GET orders", Source)
+            .With("request.identifier", RequestIdentifier)
+            .Begin())
+        {
+            using (var retry = failing.Trace.Operation("http.request", "REST · GET orders retry", Source)
+                .With("request.identifier", RequestIdentifier)
+                .Begin())
+            {
+                retry.Cancel(new OperationCanceledException("The retry was cancelled."));
+            }
+
+            request.Fail(new TimeoutException("The API did not answer within 2 seconds."));
+        }
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(new TimeoutException("The API did not answer within 2 seconds.")));
+        await host.StopAsync();
+    }
+
     /// <summary>A runner-reported failure with no recorded operation at all.</summary>
     public static async Task WriteRunnerFailureAsync(string path)
     {

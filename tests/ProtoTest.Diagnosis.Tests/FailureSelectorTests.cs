@@ -66,6 +66,25 @@ public sealed class FailureSelectorTests
     }
 
     [Test]
+    public async Task CancelledChild_ShouldNotOutrankTheFailedOperation()
+    {
+        await DiagnosisFixtures.WithTraceAsync(path =>
+        {
+            var test = ProtoTraceArchive.Open(path).Tests.Single();
+            var cancelled = test.Operations.Single(operation => operation.Status == "cancelled");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(test.Failure!.Failed, Is.True, "a cancelled child must not hide the failure above it");
+                Assert.That(test.Failure!.SpanId, Is.Not.EqualTo(cancelled.SpanId));
+                Assert.That(cancelled.HasError, Is.True, "the cancelled child recorded the cancellation as an error");
+            }
+
+            return Task.CompletedTask;
+        }, path => DiagnosisFixtures.WriteCancelledChildAsync(path));
+    }
+
+    [Test]
     public async Task CallAncestor_ShouldFindTheNestedProtocolCall()
     {
         await DiagnosisFixtures.WithTraceAsync(path =>

@@ -128,7 +128,7 @@ The Learning demo runs four deliberate failures next to the tests that do the sa
 Every operation your suite starts (a request, a check, a browser step, a gRPC call) records where in your code it started: the file, the line and the method, as the OpenTelemetry attributes `code.file.path`, `code.line.number` and `code.function.name`. The inspector shows that line with the code around it, so a failed check points at the line that made it.
 
 - The location comes from the stack and your test project's symbols, which the .NET SDK writes by default. ProtoTest's own lifecycle (setup, teardown, the test's execution) records none.
-- Inside a git repository the path is relative to its root (`tests/Orders.Tests/OrderTests.cs`), so it reads the same on every machine and does not carry your local directory layout.
+- Inside a git repository the path is relative to its root (this repository records `src/ProtoTest.Core/ProtoHost.cs`), so it reads the same on every machine and does not carry your local directory layout.
 - The trace embeds each source file a location points at, so the viewer can show the code without access to the repository.
 
 ```csharp
@@ -190,7 +190,7 @@ Test artifacts, every [attachment](../foundation/attachments.md), live under the
 
 ### Format compatibility
 
-The format is versioned and tested against `design/prototrace-wire.contract.json`. The reader that ships with the tooling supports the current major and the one before it, and the viewer keeps opening archives it has always opened. A breaking format change bumps the major and arrives with a migration note in the changelog. A reader that meets a format it does not support fails with a message naming the version rather than guessing. `ProtoTest.Traces` follows the same rule: it reads 2.x and rejects anything else explicitly.
+The format is versioned and tested against `design/prototrace-wire.contract.json`. `ProtoTest.Traces`, and with it the CLI and the MCP tools, reads manifest and spans **2.x** and state documents **1.x**; anything else fails with a message naming the version rather than guessing. The viewer reads the same spans 2.x and accepts state **1.x or 2.x**, so a state bump the viewer can read still needs a library release before the CLI opens it. A breaking format change bumps the major and arrives with a migration note in the changelog.
 
 ### If the process dies
 
@@ -203,7 +203,7 @@ The archive is written once, at the end of the run, after the gates and the repo
 - Run metadata values are recorded exactly as given. List only variables that are safe to travel in a trace.
 - The viewer's run header shows only the runtime and the operating system. Read the other `environment.*` entries from `spans.json` or the report.
 - `CaptureSourceLocations` is the largest tracing cost; `EmbedSources` and `EmbedArtifacts` control what the archive carries. The [benchmarks page](../project/benchmarks.md) records what a trace costs at 100 and 1,000 tests and the levers that change it (`EmbedSources`, `EmbedArtifacts`, `MaxArtifactBytes`, capture options).
-- A format reader supports the current major and the one before it. An older archive needs a reader from its own era.
+- The library reads 2.x spans and 1.x state documents; the viewer accepts state 1.x or 2.x. An archive outside those versions needs a reader from its own era.
 
 ## Learn more
 

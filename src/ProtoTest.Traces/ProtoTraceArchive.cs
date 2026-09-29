@@ -193,7 +193,9 @@ public sealed record ProtoTraceTest(
     /// <summary>
     /// The operation that best explains a non-succeeded test: the deepest failing operation, letting an
     /// <c>assert.*</c> check outrank anything with an error and ranking phase spans (<c>test.*</c>)
-    /// last. The viewer applies the same rule, so the CLI, the tools and the viewer select one failure.
+    /// last. A cancelled operation that recorded an error never outranks a failed one; it is selected
+    /// only when nothing failed. The viewer applies the same rule, so the CLI, the tools and the viewer
+    /// select one failure.
     /// </summary>
     public ProtoTraceOperation? Failure
     {
@@ -201,6 +203,7 @@ public sealed record ProtoTraceTest(
         {
             var byId = BySpanId();
             ProtoTraceOperation? best = null;
+            var bestTier = int.MinValue;
             var bestScore = int.MinValue;
             foreach (var operation in Operations)
             {
@@ -209,13 +212,17 @@ public sealed record ProtoTraceTest(
                     continue;
                 }
 
+                // Failures outrank cancellations whatever their depth: a cancelled child is usually a
+                // consequence of the failure above it, so depth only decides inside one tier.
+                var tier = operation.Failed ? 1 : 0;
                 var score = Depth(operation, byId) * 10
                     + (operation.HasError ? 100 : 0)
                     + (operation.Kind.StartsWith("assert.", StringComparison.Ordinal) ? 1000 : 0)
                     + (operation.Kind.StartsWith("test.", StringComparison.Ordinal) ? -500 : 0);
-                if (best is null || score > bestScore)
+                if (best is null || tier > bestTier || (tier == bestTier && score > bestScore))
                 {
                     best = operation;
+                    bestTier = tier;
                     bestScore = score;
                 }
             }

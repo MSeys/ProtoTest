@@ -21,6 +21,10 @@ ProtoTest targets **.NET 8, 9 and 10**, and needs **TUnit 1.66.0 or newer**. The
 Two things: register the executor for the assembly, and initialize the host from TUnit's assembly hooks.
 
 ```csharp
+using ProtoTest.Core;
+using ProtoTest.TUnit;
+using TUnit.Core;
+
 [assembly: TestExecutor<ProtoTestExecutor>()]
 
 public class Setup : ProtoTestAssembly
@@ -35,11 +39,20 @@ public class Setup : ProtoTestAssembly
 }
 ```
 
+The `TUnit` namespace carries TUnit's own `[Test]`, `[Before]` and `[After]`.
+
 `[assembly: TestExecutor<ProtoTestExecutor>()]` applies the executor to every test in the assembly. TUnit also allows `[TestExecutor<T>]` at class or method scope, but only the assembly form is exercised in this repository, so treat narrower scoping as untested.
 
 A test is a normal TUnit test. The executor wraps it.
 
 ```csharp
+using System.Net;
+using ProtoTest.Core;
+using ProtoTest.Rest;
+using TUnit.Core;
+
+namespace Orders.Tests;
+
 [Application("Api")]
 public class OrderTests
 {
@@ -61,7 +74,7 @@ public class OrderTests
 | The lifecycle | `ExecuteTest` resolves the test's `MethodInfo` and attributes, starts the context, awaits the test action, then completes the context. |
 | Failure handling | If the body throws, the executor records the outcome, completes the context, and rethrows with `ExceptionDispatchInfo`, so TUnit still sees the exception. A teardown failure never replaces the body's outcome. |
 | Scheduling | Fully async, like xUnit v2 and MSTest. |
-| Cancellation | `ITestExecutor` exposes no token, so the test starts with `CancellationToken.None`. |
+| Cancellation | The live `TestContext.CancellationToken` is passed into the lifecycle, so the test, its hooks and the SQL connect wait observe TUnit's per-test token. |
 | Outcomes | A completed body is `Passed`. A thrown `SkipTestException` (a body-level `Skip.Test`) is `Skipped`. A thrown `OperationCanceledException` is `Cancelled`. Anything else is `Failed` with the exception, rethrown to TUnit. |
 | Skips | Skip conditions are evaluated before the lifecycle starts and raised through `TUnit.Core.Skip.Test(reason)`, so nothing starts and no trace entry is written. |
 | Attachments | The live `TestContext` is passed to the attachment publisher, which calls `context.Output.AttachArtifact(path, name, description)`. Per test and parallel-safe. |
@@ -72,7 +85,7 @@ public class OrderTests
 - There is no ProtoTest attribute. Test discovery and `[Test]` are entirely TUnit's.
 - Only the assembly-level executor is exercised in this repository. `[TestExecutor<T>]` on a class or method is untested.
 - A source-generated test that exposes no reflection `MethodInfo` runs unwrapped, because the executor has nothing to prepare a context from.
-- `ITestExecutor` exposes no cancellation token, so a test starts with `CancellationToken.None`.
+- The per-test token comes from `TestContext.CancellationToken`: the executor has no token of its own, so a test with no live context (see the `MethodInfo` limit) starts from `CancellationToken.None`.
 - A teardown failure is recorded but can never change the body's outcome.
 
 ## Learn more

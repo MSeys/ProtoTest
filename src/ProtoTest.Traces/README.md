@@ -12,8 +12,9 @@ foreach (var test in archive.Tests.Where(test => !test.Succeeded))
 
 One failure selector serves the CLI, the tools and the viewer: `ProtoTraceTest.Failure` picks the
 deepest failing operation, lets an `assert.*` check outrank anything with an error and ranks phase
-spans (`test.*`) last. `Ancestors`, `CallAncestor` and `ProtoTraceOperation.ReadMismatches` expose what
-`ProtoTest.Diagnosis` and the tools build on.
+spans (`test.*`) last. A failed operation outranks a cancelled one whatever their depth, so a
+cancelled child that recorded an error never hides the failure above it. `Ancestors`, `CallAncestor`
+and `ProtoTraceOperation.ReadMismatches` expose what `ProtoTest.Diagnosis` and the tools build on.
 
 The reader also exposes each operation's sections, moments and recorded evidence (observations,
 attachments, findings), the run's attributes and run-level events, the declared artifacts and the
@@ -21,9 +22,9 @@ embedded sources with their content on request, the tracked state (`ReadState`) 
 report (`ProtoTraceReport.TryRead`).
 
 `ProtoTraceDiscovery.Discover(folder)` finds the readable runs a folder holds: its `TestResults/`
-first, then the tree with `bin`, `obj`, `.git` and `node_modules` pruned, newest first by the run's
-recorded start time. An archive that cannot be read comes back with the reason it was skipped instead
-of failing the scan.
+first, then, when that yields no readable run, the tree with `bin`, `obj`, `.git` and `node_modules`
+pruned, newest first by the run's recorded start time. An archive that cannot be read comes back with
+the reason it was skipped instead of failing the scan.
 
 ## Limits
 

@@ -332,18 +332,23 @@ foreach ($file in $contentFiles) {
     }
 }
 
-# A rooted `samples/` or `src/` reference is a path into this repository unless it belongs to another
-# layout (Next.js's `src/pages`): this repository names its projects in PascalCase, so a lowercase
+# A rooted `samples/`, `src/` or `tests/` reference is a path into this repository unless it belongs
+# to another layout (Next.js's `src/pages`) or to the demo checkout, whose suite path the lessons name
+# while it runs in that repository. This repository names its projects in PascalCase, so a lowercase
 # first segment is prose about another tree and is left alone. Relative links were resolved above.
-$repoPathPattern = [regex]'(?<![\w./\\-])(samples|src)/([A-Za-z0-9_.\-]+(?:/[A-Za-z0-9_.\-]+)*)'
+$externalRepoPaths = @(
+    'tests/OpenCsms.Suite'  # the OpenCSMS demo repository's suite, run in its own checkout
+)
+$repoPathPattern = [regex]'(?<![\w./\\-])(samples|src|tests)/([A-Za-z0-9_.\-]+(?:/[A-Za-z0-9_.\-]+)*)'
 foreach ($file in @($contentFiles + $docsSourceFiles)) {
     $relative = Get-RelativePath $file.FullName
     $lines = @(Get-Content -LiteralPath $file.FullName)
     for ($lineNumber = 0; $lineNumber -lt $lines.Count; $lineNumber++) {
         foreach ($match in $repoPathPattern.Matches($lines[$lineNumber])) {
+            $path = $match.Value.TrimEnd('.', ',', ';', ':')
+            if ($externalRepoPaths -contains $path) { continue }
             $firstSegment = $match.Groups[2].Value.Split('/')[0]
             if ($firstSegment -cnotmatch '[A-Z]') { continue }
-            $path = $match.Value.TrimEnd('.', ',', ';', ':')
             if (-not (Test-Path -LiteralPath (Join-Path $repository $path))) {
                 $linkFailures.Add(("{0}:{1}: '{2}' names no file in the repository" -f $relative, ($lineNumber + 1), $path))
             }

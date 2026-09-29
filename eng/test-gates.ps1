@@ -371,6 +371,48 @@ using System.Runtime.CompilerServices;
         Assert-Fixture ($learnApi.Text.Contains("AddLessonOnly")) "the failure must name the Learn API name: $($learnApi.Text)"
     }
 
+    # The generated changelog is release history: a breaking-change note names the symbols and methods
+    # it removed on purpose, so the removed-name checks skip it while a normal page still fails.
+    Invoke-Fixture "check-docs-generated-changelog" {
+        if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return "skip" }
+
+        function New-ChangelogFixture {
+            param([string]$Name, [string]$ChangelogPage, [string]$RegularPage = '')
+
+            $root = Join-Path $fixtureRoot $Name
+            New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs"), (Join-Path $root "docs/learn"), (Join-Path $root "docs/src/pages"), (Join-Path $root "docs/src/data"), (Join-Path $root "docs/scripts"), (Join-Path $root "src") -Force | Out-Null
+            Copy-Item -LiteralPath (Join-Path $PSScriptRoot "check-docs.ps1") -Destination (Join-Path $root "eng/check-docs.ps1")
+            Set-Content -LiteralPath (Join-Path $root "docs/scripts/generate-changelog.mjs") -Value "process.exit(0);" -Encoding utf8
+            Set-Content -LiteralPath (Join-Path $root "docs/configuration-keys.json") -Value '{"sections":[],"allowedKeys":[]}' -Encoding utf8
+            Set-Content -LiteralPath (Join-Path $root "src/Fixture.cs") -Value 'namespace Fixture; public sealed class Widget { }' -Encoding utf8
+            Set-Content -LiteralPath (Join-Path $root "src/CompatibilitySuppressions.xml") -Value @'
+<?xml version="1.0" encoding="utf-8"?>
+<Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Fixture.Widget.get_Gone</Target>
+  </Suppression>
+</Suppressions>
+'@ -Encoding utf8
+            Set-Content -LiteralPath (Join-Path $root "docs/src/pages/changelog.md") -Value $ChangelogPage -Encoding utf8
+            Set-Content -LiteralPath (Join-Path $root "docs/src/data/changelog.generated.ts") -Value "export const body = '';" -Encoding utf8
+            if ($RegularPage) {
+                Set-Content -LiteralPath (Join-Path $root "docs/docs/page.md") -Value $RegularPage -Encoding utf8
+            }
+            $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+            return [pscustomobject]@{ Text = ($output -join [Environment]::NewLine); ExitCode = $LASTEXITCODE }
+        }
+
+        # The changelog may name a removed member and an Add* method that no longer exists.
+        $exempt = New-ChangelogFixture -Name "check-docs-changelog-exempt" -ChangelogPage 'The reshape removed `Widget.Gone` and `AddGoneThing`.'
+        Assert-Fixture ($exempt.ExitCode -eq 0) "the generated changelog must be exempt from the removed-name checks: $($exempt.Text)"
+
+        # A normal docs page still fails on the same names.
+        $regular = New-ChangelogFixture -Name "check-docs-changelog-regular" -ChangelogPage 'Nothing was removed.' -RegularPage 'The reshape removed `Widget.Gone`.'
+        Assert-Fixture ($regular.ExitCode -ne 0) "a normal page naming a removed member must still fail: $($regular.Text)"
+        Assert-Fixture ($regular.Text.Contains("Widget.Gone")) "the failure must name the member: $($regular.Text)"
+    }
+
     # A repository path named in docs prose must resolve: the check that catches a retired path after
     # its files were deleted, without waiting for the site build to fail on a bundled file.
     Invoke-Fixture "check-docs-repository-paths" {

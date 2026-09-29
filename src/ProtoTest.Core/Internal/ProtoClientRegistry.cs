@@ -29,7 +29,8 @@ internal sealed class ProtoClientRegistry
                 // configuration conflict.
                 if (ReferenceEquals(existing, client)) return;
                 throw new InvalidOperationException(
-                    $"A client of type '{typeof(TClient).Name}' is already registered with name '{name}'.");
+                    $"A client of type '{typeof(TClient).Name}' is already registered with name '{name}'; " +
+                    "reuse the registered instance or register the new one under its own name.");
             }
 
             _clients[key] = client;

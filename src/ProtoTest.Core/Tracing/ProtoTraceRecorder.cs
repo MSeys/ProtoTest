@@ -233,7 +233,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         string? scope = null,
         string? operationId = null)
     {
-        Validate(kind, name, "ProtoTest.Core");
+        Validate(kind, name, ProtoCoreDiagnostics.TraceSource);
         if (!_options.Enabled) return;
         var linkedOperationId = operationId
             ?? _current.Value?.Id

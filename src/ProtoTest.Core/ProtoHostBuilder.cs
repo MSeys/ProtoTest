@@ -7,7 +7,7 @@ using ProtoTest.Core.Internal;
 /// <summary>
 /// Implements the builder pattern for configuring and constructing a <see cref="ProtoHost"/> instance.
 /// </summary>
-public sealed class ProtoHostBuilder : IProtoHostBuilder
+public sealed class ProtoHostBuilder : IProtoHostBuilder, IProtoComposableBuilder
 {
     private readonly IServiceCollection _services = new ServiceCollection();
     private readonly ConfigurationBuilder _configurationBuilder = new();
@@ -22,6 +22,12 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
 
     /// <summary>Whether a host was already built; the application builder shares this terminal rule.</summary>
     internal bool IsBuilt => _built;
+
+    /// <summary>
+    /// Lets builder extensions that keep their own state - the readiness policy, for example - apply the
+    /// same terminal rule as the builder's own entries.
+    /// </summary>
+    void IProtoComposableBuilder.ThrowIfBuilt() => ThrowIfBuilt();
 
     /// <inheritdoc />
     public IProtoHostBuilder ConfigureServices(Action<IServiceCollection> configure)
@@ -116,7 +122,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder
     {
         if (_built)
         {
-            throw new InvalidOperationException("A ProtoHostBuilder can only build one ProtoHost.");
+            throw new InvalidOperationException(BuiltMessage);
         }
 
         _built = true;

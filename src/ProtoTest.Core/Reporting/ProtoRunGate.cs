@@ -6,8 +6,14 @@ namespace ProtoTest.Core;
 /// </summary>
 public interface IProtoRunGate
 {
+    /// <summary>The gate's name: it identifies the verdict in the run report and in a failure.</summary>
     string Name { get; }
 
+    /// <summary>
+    /// Evaluates the run's evidence once the suite has finished. Returning
+    /// <see cref="ProtoRunGateResult.Failed(string, IReadOnlyList{string}?)"/> fails the run; every
+    /// other verdict is recorded and does not.
+    /// </summary>
     ProtoRunGateResult Evaluate(ProtoRunGateContext context);
 }
 
@@ -24,8 +30,10 @@ public sealed class ProtoRunGate : IProtoRunGate
         _evaluate = evaluate;
     }
 
+    /// <inheritdoc />
     public string Name { get; }
 
+    /// <inheritdoc />
     public ProtoRunGateResult Evaluate(ProtoRunGateContext context)
     {
         ArgumentNullException.ThrowIfNull(context);

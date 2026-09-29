@@ -5,6 +5,7 @@ namespace ProtoTest.Core.Tests;
 /// would mutate the live host instead of composing it, so both are rejected like a second build.
 /// </summary>
 [TestFixture]
+[Category("Characterization")]
 public sealed class ProtoHostBuilderTests
 {
     [Test]

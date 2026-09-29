@@ -24,6 +24,8 @@ dotnet add package ProtoTest.AspNetCore
 dotnet add package ProtoTest.Reporting
 ```
 
+`ProtoTest.NUnit` needs NUnit 4.6.1 or newer; the standard `dotnet new nunit` template pins an older version, so update NUnit first.
+
 For a minimal-API application, make its entry point visible to the tests by adding this to `Orders.Api`:
 
 ```csharp

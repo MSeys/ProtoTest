@@ -1,5 +1,9 @@
 namespace ProtoTest.Core;
 
+/// <summary>
+/// Options for the automatic execution trace: whether it is collected, where it is written and what
+/// travels with it. Code values are the only source; <c>ConfigureTracing</c> supplies them.
+/// </summary>
 public sealed class ProtoTraceOptions
 {
     /// <summary>Enables automatic trace collection and export.</summary>

@@ -5,6 +5,7 @@ using ProtoTest.Diagnosis;
 
 /// <summary>The static index command: the page over a folder of runs, the digest beside each archive, and the exit codes.</summary>
 [TestFixture]
+[Category("Characterization")]
 public sealed class TraceIndexTests
 {
     [Test]

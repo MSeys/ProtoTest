@@ -32,7 +32,7 @@ internal sealed class ProtoRunResourceHook(
             trace.RunWriter.WriteEvent(
                 "resource.owned",
                 $"Owned · {resource.Id}",
-                "ProtoTest.Core",
+                ProtoCoreDiagnostics.TraceSource,
                 ProtoTracePhase.Run,
                 ProtoTraceOutcome.Succeeded,
                 new Dictionary<string, string?>

@@ -172,7 +172,7 @@ internal sealed class ProtoResourceRegistry
         using var operation = frameworkManaged
             ? null
             : trace
-                .Operation("resource.release", $"Release · {resource.Id}", "ProtoTest.Core")
+                .Operation("resource.release", $"Release · {resource.Id}", ProtoCoreDiagnostics.TraceSource)
                 .During(phase)
                 .For(resource.Kind, resource.Id)
                 .With("resource.id", resource.Id)
@@ -208,7 +208,7 @@ internal sealed class ProtoResourceRegistry
                 trace.WriteEvent(
                     "resource.release",
                     $"Release · {resource.Id}",
-                    "ProtoTest.Core",
+                    ProtoCoreDiagnostics.TraceSource,
                     phase,
                     ProtoTraceOutcome.Failed,
                     new Dictionary<string, string?>

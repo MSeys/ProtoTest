@@ -15,6 +15,7 @@ public sealed record ProtoRunGateResult(
     string? Message = null,
     IReadOnlyList<string>? Details = null)
 {
+    /// <summary>A gate that passed.</summary>
     public static ProtoRunGateResult Passed(string? message = null)
         => new(ProtoRunGateOutcome.Passed, message);
 
@@ -22,9 +23,11 @@ public sealed record ProtoRunGateResult(
     public static ProtoRunGateResult Warning(string message, IReadOnlyList<string>? details = null)
         => new(ProtoRunGateOutcome.Warning, message, details);
 
+    /// <summary>A gate that failed the run.</summary>
     public static ProtoRunGateResult Failed(string message, IReadOnlyList<string>? details = null)
         => new(ProtoRunGateOutcome.Failed, message, details);
 
+    /// <summary>A gate that does not apply to this run; it never fails the run.</summary>
     public static ProtoRunGateResult Skipped(string? message = null)
         => new(ProtoRunGateOutcome.Skipped, message);
 }

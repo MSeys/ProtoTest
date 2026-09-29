@@ -432,6 +432,11 @@ main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: minmax(
 .test-title p { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); color: var(--muted); font-size: var(--text-micro); }
 .test-title code { overflow-wrap: anywhere; color: var(--dim); font-family: var(--font-mono); }
 .test-head :deep(.pill) { padding-top: var(--space-1); }
+/* Narrow: the outcome keeps its own row under the title instead of squeezing it. */
+@container (max-width: 560px) {
+  .test-head { grid-template-columns: auto minmax(0, 1fr); }
+  .test-head :deep(.pill) { grid-column: 2; padding-top: 0; }
+}
 
 .empty-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center; }
 .drop-zone h1 { margin-top: var(--space-3); }

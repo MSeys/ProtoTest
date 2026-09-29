@@ -56,7 +56,7 @@ public sealed class ProtoMessagingAssertionsTests
         Assert.Multiple(() =>
         {
             Assert.That(exception!.Message, Does.StartWith(
-                "invoice.paid — Shape mismatch failed with 1 error(s):"));
+                "invoice.paid - Shape mismatch failed with 1 error(s):"));
             Assert.That(exception.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
                 "the shared mismatch data stays reachable");
             Assert.That(operation.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
@@ -84,10 +84,10 @@ public sealed class ProtoMessagingAssertionsTests
         await host.CompleteTestAsync(ProtoTestResult.Failed(text!));
         Assert.Multiple(() =>
         {
-            Assert.That(empty!.Message, Does.StartWith("invoice.paid — "));
+            Assert.That(empty!.Message, Does.StartWith("invoice.paid - "));
             Assert.That(empty.Message, Does.Contain("Expected JSON"));
             Assert.That(empty.InnerException, Is.TypeOf<JsonDocumentAssertionException>());
-            Assert.That(text!.Message, Does.StartWith("invoice.paid — "));
+            Assert.That(text!.Message, Does.StartWith("invoice.paid - "));
             Assert.That(text.Message, Does.Contain("Expected valid JSON"));
             Assert.That(host.Trace.Snapshot().Tests.Single().Entries
                 .Count(entry => entry.Kind == "assert.json.shape"), Is.EqualTo(2));
@@ -113,7 +113,7 @@ public sealed class ProtoMessagingAssertionsTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exception!.Message, Does.StartWith(
-                "invoice.paid — Shape mismatch failed with 1 error(s):"));
+                "invoice.paid - Shape mismatch failed with 1 error(s):"));
             Assert.That(exception.Message, Does.Contain("$.extra"));
             Assert.That(exception.Message, Does.Contain("Property was not mentioned in the expected shape."));
             Assert.That(exception.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
@@ -195,7 +195,7 @@ public sealed class ProtoMessagingAssertionsTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(returned, Is.SameAs(message));
-            Assert.That(exception!.Message, Does.StartWith("invoice.paid — "));
+            Assert.That(exception!.Message, Does.StartWith("invoice.paid - "));
         }
         await host.CompleteTestAsync(ProtoTestResult.Failed(exception!));
         await host.StopAsync();

@@ -44,7 +44,7 @@ public sealed class RestResponseFactAssertionTests
             var exception = Assert.Throws<RestAssertionException>(
                 () => response.Should.HaveContentType("text/plain"));
             Assert.That(exception!.Message, Is.EqualTo(
-                "GET /orders/42 — Expected content type 'text/plain', but received 'application/json'."));
+                "GET /orders/42 - Expected content type 'text/plain', but received 'application/json'."));
 
             var negated = Assert.Throws<RestAssertionException>(
                 () => response.ShouldNot.HaveContentType("application/json"));
@@ -78,7 +78,7 @@ public sealed class RestResponseFactAssertionTests
 
             var missing = Assert.Throws<RestAssertionException>(() => response.Should.HaveHeader("X-Missing"));
             Assert.That(missing!.Message, Is.EqualTo(
-                "GET /orders/42 — Expected header 'X-Missing' to be present, but the response carried none."));
+                "GET /orders/42 - Expected header 'X-Missing' to be present, but the response carried none."));
 
             var negated = Assert.Throws<RestAssertionException>(() => response.ShouldNot.HaveHeader("X-Correlation"));
             Assert.That(negated!.Message, Does.Contain("Expected header 'X-Correlation' not to be present"));
@@ -86,7 +86,7 @@ public sealed class RestResponseFactAssertionTests
             var wrongValue = Assert.Throws<RestAssertionException>(
                 () => response.Should.HaveHeader("X-Correlation", "other"));
             Assert.That(wrongValue!.Message, Is.EqualTo(
-                "GET /orders/42 — Expected header 'X-Correlation' to have value 'other', but it was abc."));
+                "GET /orders/42 - Expected header 'X-Correlation' to have value 'other', but it was abc."));
         }
     }
 
@@ -130,12 +130,12 @@ public sealed class RestResponseFactAssertionTests
 
             var missing = Assert.Throws<RestAssertionException>(() => response.Should.HaveCookie("missing"));
             Assert.That(missing!.Message, Is.EqualTo(
-                "GET /orders/42 — Expected cookie 'missing' to be set, but the response set none."));
+                "GET /orders/42 - Expected cookie 'missing' to be set, but the response set none."));
 
             var wrongValue = Assert.Throws<RestAssertionException>(
                 () => response.Should.HaveCookie("session", "other"));
             Assert.That(wrongValue!.Message, Does.StartWith(
-                "GET /orders/42 — Expected cookie 'session' to have value 'other', but it was "));
+                "GET /orders/42 - Expected cookie 'session' to have value 'other', but it was "));
         }
     }
 
@@ -172,7 +172,7 @@ public sealed class RestResponseFactAssertionTests
             var wrong = Assert.Throws<RestAssertionException>(
                 () => relative.Should.HaveRedirectLocation("/orders/2"));
             Assert.That(wrong!.Message, Is.EqualTo(
-                "GET /orders/42 — Expected redirect location '/orders/2', but received '/orders/1'."));
+                "GET /orders/42 - Expected redirect location '/orders/2', but received '/orders/1'."));
 
             var negated = Assert.Throws<RestAssertionException>(
                 () => relative.ShouldNot.HaveRedirectLocation("/orders/1"));

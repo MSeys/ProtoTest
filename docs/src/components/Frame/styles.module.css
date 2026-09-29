@@ -1,4 +1,4 @@
-/* The viewer's Panel: border only — the blueprint against the page is contrast enough. */
+/* The viewer's Panel: border only. The blueprint against the page is contrast enough. */
 .frame {
   min-width: 0;
   overflow: clip;

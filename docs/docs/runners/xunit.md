@@ -1,12 +1,12 @@
 ---
 sidebar_position: 2
 title: xUnit v2
-description: "Set up ProtoTest with xUnit v2: the collection fixture, [ProtoTestFact] tests, theories and outcomes."
+description: "Register ProtoTest with xUnit v2: the collection fixture, [ProtoTestFact] and [ProtoTestTheory], what the adapter changes and its limits."
 ---
 
 # xUnit v2
 
-`ProtoTest.Xunit` wraps xUnit v2's runner: a collection fixture starts the host once per test process, and `[ProtoTestFact]` / `[ProtoTestTheory]` start and complete a ProtoTest context around each test.
+`ProtoTest.Xunit` wraps xUnit v2's runner. A collection fixture starts the host once per test process, and `[ProtoTestFact]` / `[ProtoTestTheory]` start and complete a ProtoTest context around each test.
 
 ## Install
 
@@ -16,16 +16,11 @@ dotnet add package ProtoTest.Xunit
 
 ProtoTest targets **.NET 8, 9 and 10**. The `dotnet new prototest` template defaults to `net10.0`; pass `-f net8.0` or `-f net9.0` for an older runtime.
 
-## Enable it
+## Register
 
 `ProtoTestAssembly` implements xUnit's `IAsyncLifetime`, so it works as a collection fixture. Every test class that needs ProtoTest joins that collection.
 
 ```csharp
-using ProtoTest.Core;
-using ProtoTest.Rest;
-using ProtoTest.Xunit;
-using Xunit;
-
 public class ProtoTestFixture : ProtoTestAssembly
 {
     protected override void Configure(IProtoHostBuilder builder) =>
@@ -39,21 +34,9 @@ public class ProtoTestCollection : ICollectionFixture<ProtoTestFixture>
 }
 ```
 
-:::warning[Forgetting `[Collection]`]
-Without `[Collection(ProtoTestCollection.Name)]` the fixture never runs. `ProtoTestAssembly.Host` throws `InvalidOperationException` and the test fails before its body.
-:::
-
-## Quick start
-
-`[ProtoTestFact]` and `[ProtoTestTheory]` derive from `FactAttribute` and `TheoryAttribute`, so they replace them outright — don't add `[Fact]` as well. The discoverers are `ProtoTest.Xunit.Sdk.ProtoTestFactDiscoverer` and `ProtoTest.Xunit.Sdk.ProtoTestTheoryDiscoverer`.
+The test attributes are `[ProtoTestFact]` and `[ProtoTestTheory]`. They derive from `FactAttribute` and `TheoryAttribute`, so they replace them outright. Do not add `[Fact]` as well.
 
 ```csharp
-using System.Net;
-using ProtoTest.Core;
-using ProtoTest.Rest;
-using ProtoTest.Xunit;
-using Xunit;
-
 [Collection(ProtoTestCollection.Name)]
 [Application("Api")]
 public class OrderTests
@@ -67,46 +50,37 @@ public class OrderTests
 }
 ```
 
-A `[ProtoTestTheory]` behaves the same way; each `[InlineData]` row is a test of its own.
+A `[ProtoTestTheory]` behaves the same way, and each `[InlineData]` row is a test of its own.
 
-## Per-test lifecycle
+:::warning[Forgetting `[Collection]`]
+Without `[Collection(ProtoTestCollection.Name)]` the fixture never runs. `ProtoTestAssembly.Host` throws `InvalidOperationException`, and the test fails before its body.
+:::
 
-`ProtoXunitTestRunner.InvokeTestMethodAsync` starts the context with xUnit's display name, runs the test, then completes it in a `finally` with the outcome xUnit recorded, so the context completes even if xUnit's own pipeline throws. If setup fails the context is already rolled back, the failure goes into xUnit's aggregator, and the test fails.
+## What the adapter changes
 
-Each theory row is its own test: the runner creates one `ProtoXunitTestRunner` per row, recorded under xUnit's display name with the arguments included — `….Invoices_filter_by_state(state: "open")` — so the trace keeps them apart.
-
-## Outcomes
-
-| xUnit reports | ProtoTest records | Why |
-| --- | --- | --- |
-| passed | `Passed` | nothing failed in xUnit's aggregator |
-| failed | `Failed` with the exception | the aggregator's exception is recorded and rethrown by xUnit |
-| failed with an `OperationCanceledException` | `Cancelled` | the test was interrupted, not broken |
-| cancelled | `Cancelled` | the runner's `CancellationTokenSource` was signalled |
-| skipped | nothing | xUnit never invokes a skipped test, so no context starts |
-
-The lifecycle is fully async — nothing blocks on a task.
-
-## Skipping
-
-Skip conditions are evaluated in the runner's constructor, before xUnit invokes anything: `ProtoTestSkip.GetReason` resolves the test's attributes and the result becomes xUnit's `SkipReason`. `[RequiresCapability]`, `[RequiresInProcess]` and `[RequiresPlaywrightBrowser]` therefore read as normal xUnit skips with their reason, and the test produces no trace entry. See [Skip conditions](../foundation/skip-conditions.md).
-
-## Attachments
-
-xUnit v2 has no attachment API, so each artifact is materialized to a file and its path is written to the console:
-
-```
-ProtoTest attachment 'rest-01-response': /path/to/TestResults/.../rest-01-response.json
-```
+| Item | What the adapter does |
+| --- | --- |
+| The host | Starts once through the collection fixture. A class that does not join the collection has no host. |
+| The test attributes | `[ProtoTestFact]` and `[ProtoTestTheory]` replace `[Fact]` and `[Theory]`, with `ProtoTest.Xunit.Sdk.ProtoTestFactDiscoverer` and `ProtoTest.Xunit.Sdk.ProtoTestTheoryDiscoverer` behind them. |
+| The lifecycle | `ProtoXunitTestRunner.InvokeTestMethodAsync` starts the context, runs the test, then completes it in a `finally` with the outcome xUnit recorded, so the context completes even when xUnit's own pipeline throws. |
+| Row handling | Each row is its own `ProtoXunitTestRunner` under xUnit's display name, with the arguments included, so the rows stay apart in the trace. |
+| Scheduling | Fully async. Nothing blocks on a task. |
+| Cancellation | The runner's `CancellationTokenSource` token rides the lifecycle. A body `OperationCanceledException` and a signalled source both record `Cancelled`. |
+| Outcomes | `passed` to `Passed`, `failed` to `Failed` with the exception, a failed `OperationCanceledException` to `Cancelled`, and a cancelled case to `Cancelled`. A skipped test records nothing, because xUnit never invokes it. |
+| Skips | Skip conditions are evaluated in the runner's constructor, before xUnit invokes anything, and the reason becomes xUnit's `SkipReason`. |
+| Attachments | xUnit v2 has no attachment API. The adapter writes each artifact to a file and writes the path to the console: `ProtoTest attachment 'rest-01-response': /path/to/...`. |
+| Test names | xUnit's display name, with the row's arguments included. |
 
 ## Limits
 
-- No native attachments — artifacts land next to the trace, not in xUnit's output.
-- No dynamic skip: the reason is decided before the test method is invoked, so a condition cannot depend on the body.
-- Every test class must join the collection; the host is never initialized otherwise.
-- Theory rows are recorded under xUnit's display name; NUnit, MSTest and TUnit also append the row's arguments, while a plain method keeps the fully qualified name.
+- No native attachments. Artifacts land next to the trace, not in xUnit's output.
+- No dynamic skip. The reason is decided before the test method is invoked, so it cannot depend on the body.
+- Every test class must join the collection. The host is never initialized otherwise.
+- A skipped test exists only in xUnit's output. ProtoTest records nothing for it.
+- Theory rows are recorded under xUnit's display name, unlike MSTest and TUnit, which compose `MethodName[args]`.
 
-## Next
+## Learn more
 
-- [Test runners](./overview.md) — the same setup for the other four runners.
-- [Skip conditions](../foundation/skip-conditions.md) — the conditions every adapter evaluates.
+- [Test runners](./overview.md): the five adapters side by side.
+- [Skip conditions](../foundation/skip-conditions.md): the conditions every adapter evaluates.
+- [Lifecycle](../foundation/lifecycle.md): the hooks and attributes around a test.

@@ -31,9 +31,9 @@ await page.RememberMe.CheckAsync();
 ### How actions wait
 
 - **Playwright** keeps its own auto-waiting: an action waits until the element is attached, visible, stable and enabled, bounded by `ActionTimeout` (5 s by default). ProtoTest resolves the locator and calls the native action; it never re-issues a failed one. A timed-out action becomes `WebActionabilityException` and a read of an element that never appears becomes `WebElementResolutionException`, so polling assertions and negations behave the same on either backend.
-- **Selenium** retries for up to `ActionTimeout` (5 s by default), polling every `PollInterval`, until the element is displayed and enabled — and, for fills and selects, not read-only; for clicks and checks, not moving (when `WaitForStableBounds`) and not covered by another element (when `CheckClickObstruction` and the driver supports JavaScript). Otherwise it throws `WebActionabilityException` with the component path, locator and last observation.
+- **Selenium** retries for up to `ActionTimeout` (5 s by default), polling every `PollInterval`, until the element is displayed and enabled, and, for fills and selects, not read-only; for clicks and checks, not moving (when `WaitForStableBounds`) and not covered by another element (when `CheckClickObstruction` and the driver supports JavaScript). Otherwise it throws `WebActionabilityException` with the component path, locator and last observation.
 
-To wait for something application-specific — a spinner, a pending XHR — add a [wait condition](./middleware.md#wait-conditions).
+To wait for something application-specific, such as a spinner or a pending XHR, add a [wait condition](./middleware.md#wait-conditions).
 
 ## Downloads
 
@@ -76,7 +76,7 @@ ValueTask<bool> IsEnabledAsync(CancellationToken cancellationToken = default);
 ValueTask<bool> IsCheckedAsync(CancellationToken cancellationToken = default);
 ```
 
-These read **once**, right now. For checks in a test, prefer the assertions below — they retry.
+These read **once**, right now. For checks in a test, prefer the assertions below; they retry.
 
 ## Assertions
 
@@ -115,7 +115,7 @@ Assertions **poll**: every 50 ms until the condition holds or the timeout passes
 
 ### Trace evidence
 
-Each assertion is a `assert.web` operation on the element, with `web.expectation`, `web.assert.negated` and `web.assert.timeout` attributes. A passing assertion records a `web.page.verified` [coverage observation](./index.md#page-coverage) for the page it was checked on — that is what makes a page count as covered.
+Each assertion is a `assert.web` operation on the element, with `web.expectation`, `web.assert.negated` and `web.assert.timeout` attributes. A passing assertion records a `web.page.verified` [coverage observation](./index.md#page-coverage) for the page it was checked on; that is what makes a page count as covered.
 
 :::note[Form values stay out of the trace]
 `FillAsync` records only the *length* of what was typed (`web.value` is `[REDACTED]`), and `HaveValueAsync` failures report the value's length rather than the value. Passwords and personal data you type in tests never end up in a `.prototrace` file.
@@ -132,5 +132,5 @@ WebElementReference Reference { get; }  // what WaitUntilAsync and custom waits 
 
 ## Next
 
-- [Flows](./flows.md) — group actions on a component into one named operation.
-- [Diagnostics and artifacts](./diagnostics.md) — what a failed action leaves behind.
+- [Flows](./flows.md) - group actions on a component into one named operation.
+- [Diagnostics and artifacts](./diagnostics.md) - what a failed action leaves behind.

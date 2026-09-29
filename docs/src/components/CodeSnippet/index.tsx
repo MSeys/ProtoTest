@@ -25,8 +25,8 @@ interface CodeSnippetProps {
  * code block on the site. Long lines wrap with a hanging indent instead of scrolling sideways, so a phone
  * shows the whole line.
  *
- * Plumbing lines keep their line number in the normal quiet tone and are marked with a dashed gutter rule —
- * coloured numbers would read as syntax, and fading the number past legibility hides the count it exists for.
+ * Plumbing lines keep their line number in the normal quiet tone and are marked with a dashed gutter rule.
+ * Coloured numbers would read as syntax, and fading the number past legibility hides the count it exists for.
  */
 export default function CodeSnippet({
   code,

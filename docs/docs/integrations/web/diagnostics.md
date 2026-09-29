@@ -22,7 +22,7 @@ The name parts are lowercased and sanitized (non-letters/digits become `-`), `{e
 
 A hand-written backend produces the same artifacts by calling `WebFailureArtifacts.CaptureAsync(…)` in `ProtoTest.Web`, and reports the same resolution and actionability wording through `WebBackendErrors`; both are part of the [backend-neutral building blocks](./index.md#compose).
 
-Capturing never replaces the original error. Each artifact registers on its own, so one failing attachment does not drop the rest. If capture itself fails, you'll see a `web.diagnostics.artifact_failed` entry — or `web.diagnostics.failed` when the backend produced no attachments at all — and still get the real exception.
+Capturing never replaces the original error. Each artifact registers on its own, so one failing attachment does not drop the rest. If capture itself fails, you'll see a `web.diagnostics.artifact_failed` entry, or `web.diagnostics.failed` when the backend produced no attachments at all, and still get the real exception.
 
 ## Captured downloads
 
@@ -30,7 +30,7 @@ Capturing never replaces the original error. Each artifact registers on its own,
 
 ## Playwright traces
 
-Playwright's own trace — a timeline with DOM snapshots you can open in the [Playwright Trace Viewer](https://trace.playwright.dev) — is recorded while the test runs and kept according to `TraceRetention`:
+Playwright's own trace, a timeline with DOM snapshots you can open in the [Playwright Trace Viewer](https://trace.playwright.dev), is recorded while the test runs and kept according to `TraceRetention`:
 
 | Value | Keeps the trace |
 | --- | --- |
@@ -40,7 +40,7 @@ Playwright's own trace — a timeline with DOM snapshots you can open in the [Pl
 
 The kept trace is attached as `playwright-{session}-trace.zip` with content type `application/vnd.microsoft.playwright.trace+zip`; a capture failure is traced as `web.playwright.trace_failed` and never replaces the test's own error.
 
-With `CorrelateTraceGroups` on (the default), each ProtoTest operation is a named group in the Playwright trace, `[correlationId] [session] {name}`, so the two timelines line up. Grouping is re-entrant: an operation nested inside another on the same session — a `WaitUntilAsync` predicate that reads an element — joins its caller's group instead of blocking on it. Groups are serialized by a semaphore, are skipped entirely when `TraceRetention = Off`, and a failure to start or end a group is traced as `web.playwright.correlation_failed`.
+With `CorrelateTraceGroups` on (the default), each ProtoTest operation is a named group in the Playwright trace, `[correlationId] [session] {name}`, so the two timelines line up. Grouping is re-entrant: an operation nested inside another on the same session, such as a `WaitUntilAsync` predicate that reads an element, joins its caller's group instead of blocking on it. Groups are serialized by a semaphore, are skipped entirely when `TraceRetention = Off`, and a failure to start or end a group is traced as `web.playwright.correlation_failed`.
 
 ### Browser signals
 
@@ -48,9 +48,9 @@ These go into ProtoTrace as events on the test, parented to the active operation
 
 | Option | Trace entry |
 | --- | --- |
-| `ConsoleCapture` (`WarningsAndErrors` by default) | `web.browser.console` — `browser.console.type` and `browser.console.text`, truncated at 4096 characters |
-| `CapturePageErrors` | `web.browser.page_error` — `browser.error.message`, truncated at 4096 characters |
-| `CaptureRequestFailures` | `web.browser.request_failed` — `http.method`, `http.url` without query or fragment, and `browser.request.failure`, truncated at 4096 characters |
+| `ConsoleCapture` (`WarningsAndErrors` by default) | `web.browser.console` carrying `browser.console.type` and `browser.console.text`, truncated at 4096 characters |
+| `CapturePageErrors` | `web.browser.page_error` carrying `browser.error.message`, truncated at 4096 characters |
+| `CaptureRequestFailures` | `web.browser.request_failed` carrying `http.method`, `http.url` without query or fragment, and `browser.request.failure`, truncated at 4096 characters |
 
 ## Selenium diagnostics
 
@@ -64,7 +64,7 @@ Selenium has no equivalent trace format, so ProtoTest writes its own `selenium-{
 | `url`, `title` | the final location, best-effort |
 | `entries[]` | **every actionability attempt**: `TimestampUtc`, `Operation`, `ComponentPath`, `Element`, `Locator`, `Attempt`, `Outcome`, `Observation` and `ElapsedMilliseconds` |
 
-When a Selenium click "randomly" fails, this is where you find out it was covered by a toast for 4.8 seconds. A failure while writing the attachment is traced as `web.diagnostics.artifact_failed`. The timeline exists only as this one JSON attachment — there is no second report system.
+When a Selenium click "randomly" fails, this is where you find out it was covered by a toast for 4.8 seconds. A failure while writing the attachment is traced as `web.diagnostics.artifact_failed`. The timeline exists only as this one JSON attachment; there is no second report system.
 
 ## What the trace records for every operation
 
@@ -90,7 +90,7 @@ Every web operation is a trace entry carrying `web.backend` and `web.session`; e
 | `web.session.initialize` | the browser starting | `web.backend` |
 | `web.session.complete` | the session closing, teardown phase | `web.backend` |
 
-Inside each parent operation, a child `web.backend.execute` named `{backend} · {kind}` carries `web.correlation_id`, the phase, the outcome and any failure — it is the link between a semantic operation and the native driver call.
+Inside each parent operation, a child `web.backend.execute` named `{backend} · {kind}` carries `web.correlation_id`, the phase, the outcome and any failure; it is the link between a semantic operation and the native driver call.
 
 Coverage observations are the other half of the trace: `web.page.visited`, `web.page.verified` and `web.page.available`, each with `web.session` and `web.page.source` (`navigate`, `assert`, `vue-router` or `aspnetcore`). See [Page coverage](./index.md#page-coverage).
 
@@ -102,5 +102,5 @@ Web sessions complete during teardown in reverse order, after normal teardown ho
 
 ## Next
 
-- [Overview](./index.md) — sessions, options and page coverage.
-- [Waits and middleware](./middleware.md) — the `web.wait` entries in context.
+- [Overview](./index.md) - sessions, options and page coverage.
+- [Waits and middleware](./middleware.md) - the `web.wait` entries in context.

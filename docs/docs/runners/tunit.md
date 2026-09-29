@@ -1,12 +1,12 @@
 ---
 sidebar_position: 6
 title: TUnit
-description: "Set up ProtoTest with TUnit: the test executor, the assembly hooks, [Test] tests and outcomes."
+description: "Register ProtoTest with TUnit: the test executor, the assembly hooks, TUnit's own [Test] attribute, what the adapter changes and its limits."
 ---
 
 # TUnit
 
-TUnit is wired differently from the other four: **there is no ProtoTest test attribute**. You keep TUnit's own `[Test]`, and ProtoTest hooks in through TUnit's executor mechanism.
+TUnit is wired differently from the other four. There is no ProtoTest test attribute: you keep TUnit's own `[Test]`, and ProtoTest hooks in through TUnit's executor mechanism.
 
 ## Install
 
@@ -16,16 +16,11 @@ dotnet add package ProtoTest.TUnit
 
 ProtoTest targets **.NET 8, 9 and 10**. The `dotnet new prototest` template defaults to `net10.0`; pass `-f net8.0` or `-f net9.0` for an older runtime.
 
-## Enable it
+## Register
 
 Two things: register the executor for the assembly, and initialize the host from TUnit's assembly hooks.
 
 ```csharp
-using ProtoTest.Core;
-using ProtoTest.Rest;
-using ProtoTest.TUnit;
-using TUnit.Core.Executors;
-
 [assembly: TestExecutor<ProtoTestExecutor>()]
 
 public class Setup : ProtoTestAssembly
@@ -40,17 +35,11 @@ public class Setup : ProtoTestAssembly
 }
 ```
 
-`[assembly: TestExecutor<ProtoTestExecutor>()]` applies the executor to every test in the assembly. TUnit also allows `[TestExecutor<T>]` at class or method scope, but only the assembly form is exercised in this repository — treat narrower scoping as untested.
+`[assembly: TestExecutor<ProtoTestExecutor>()]` applies the executor to every test in the assembly. TUnit also allows `[TestExecutor<T>]` at class or method scope, but only the assembly form is exercised in this repository, so treat narrower scoping as untested.
 
-## Quick start
-
-Just a normal TUnit test. The executor wraps it.
+A test is a normal TUnit test. The executor wraps it.
 
 ```csharp
-using System.Net;
-using ProtoTest.Core;
-using ProtoTest.Rest;
-
 [Application("Api")]
 public class OrderTests
 {
@@ -63,37 +52,31 @@ public class OrderTests
 }
 ```
 
-## Per-test lifecycle
+## What the adapter changes
 
-`ProtoTestExecutor.ExecuteTest` resolves the test's `MethodInfo` and attributes, starts the context with the stable fully qualified name from `ProtoTestName.FromMethod` (a parameterized row appends its arguments, `…MethodName[1]`), awaits the test action, then completes the context; the live `TestContext` is what the attachment publisher writes to. It runs asynchronously, like xUnit v2 and MSTest.
-
-If the body throws, the executor records the outcome, completes the context, and rethrows with `ExceptionDispatchInfo` so TUnit still sees the exception. Teardown never replaces the original failure.
-
-## Outcomes
-
-| What happens | ProtoTest records | Why |
-| --- | --- | --- |
-| the body completes | `Passed` | |
-| the body throws `SkipTestException` (a body-level `Skip.Test`) | `Skipped` | a test that skips itself is not a failure |
-| the body throws `OperationCanceledException` | `Cancelled` | with the exception |
-| the body throws anything else | `Failed` | with the exception, rethrown to TUnit |
-
-## Skipping
-
-Skip conditions are evaluated before the lifecycle starts with `ProtoTestSkip.GetReason` and raised through `TUnit.Core.Skip.Test(reason)`, so nothing is started and no trace entry is written. A body-level skip is caught separately and still maps to `Skipped`. See [Skip conditions](../foundation/skip-conditions.md).
-
-## Attachments
-
-The publisher is constructed with the live `TestContext` and calls `context.Output.AttachArtifact(path, name, description)` — per-test and parallel-safe, so artifacts land on the right test even under heavy parallelism.
+| Item | What the adapter does |
+| --- | --- |
+| The host | `ProtoTestAssembly` gives you `InitializeAsync` and `CleanupAsync` for TUnit's `[Before(Assembly)]` and `[After(Assembly)]`. |
+| The test attribute | None. You keep TUnit's `[Test]`, and `ProtoTestExecutor` intercepts the execution. |
+| The lifecycle | `ExecuteTest` resolves the test's `MethodInfo` and attributes, starts the context, awaits the test action, then completes the context. |
+| Failure handling | If the body throws, the executor records the outcome, completes the context, and rethrows with `ExceptionDispatchInfo`, so TUnit still sees the exception. A teardown failure never replaces the body's outcome. |
+| Scheduling | Fully async, like xUnit v2 and MSTest. |
+| Cancellation | `ITestExecutor` exposes no token, so the test starts with `CancellationToken.None`. |
+| Outcomes | A completed body is `Passed`. A thrown `SkipTestException` (a body-level `Skip.Test`) is `Skipped`. A thrown `OperationCanceledException` is `Cancelled`. Anything else is `Failed` with the exception, rethrown to TUnit. |
+| Skips | Skip conditions are evaluated before the lifecycle starts and raised through `TUnit.Core.Skip.Test(reason)`, so nothing starts and no trace entry is written. |
+| Attachments | The live `TestContext` is passed to the attachment publisher, which calls `context.Output.AttachArtifact(path, name, description)`. Per test and parallel-safe. |
+| Test names | `DeclaringType.MethodName[args]` through `ProtoTestName.ForRow` when the test has arguments, so parallel rows stay apart. |
 
 ## Limits
 
-- No ProtoTest attribute: test discovery and the `[Test]` attribute are entirely TUnit's.
-- Narrower executor scoping (`[TestExecutor<T>]` on a class or method) is not exercised by this repository's tests.
-- A source-generated test that exposes no reflection `MethodInfo` runs unwrapped; the executor cannot prepare a context for it.
+- There is no ProtoTest attribute. Test discovery and `[Test]` are entirely TUnit's.
+- Only the assembly-level executor is exercised in this repository. `[TestExecutor<T>]` on a class or method is untested.
+- A source-generated test that exposes no reflection `MethodInfo` runs unwrapped, because the executor has nothing to prepare a context from.
+- `ITestExecutor` exposes no cancellation token, so a test starts with `CancellationToken.None`.
 - A teardown failure is recorded but can never change the body's outcome.
 
-## Next
+## Learn more
 
-- [Test runners](./overview.md) — the same setup for the other four runners.
-- [Skip conditions](../foundation/skip-conditions.md) — the conditions every adapter evaluates.
+- [Test runners](./overview.md): the five adapters side by side.
+- [Skip conditions](../foundation/skip-conditions.md): the conditions every adapter evaluates.
+- [Lifecycle](../foundation/lifecycle.md): the hooks and attributes around a test.

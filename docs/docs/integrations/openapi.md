@@ -8,7 +8,7 @@ description: "Compare what your REST tests did against your OpenAPI document, an
 
 ## What it adds
 
-`ProtoTest.OpenApi` compares what your REST tests did against your OpenAPI document, and reports the endpoints, responses and properties no test has touched. It builds on [`ProtoTest.Rest`](./rest/index.md) — it listens to the requests and shape assertions REST records.
+`ProtoTest.OpenApi` compares what your REST tests did against your OpenAPI document, and reports the endpoints, responses and properties no test has touched. It builds on [`ProtoTest.Rest`](./rest/index.md) and listens to the requests and shape assertions REST records.
 
 :::note[Coverage, not validation]
 This package reports coverage. It doesn't validate requests or responses against the schema.
@@ -44,7 +44,7 @@ builder
 
 ### The specification source
 
-`ProtoTest:Applications:{application}:OpenApi:Specification` may be a local file path, the document itself as JSON or YAML, or an http(s) URL. A relative URL is resolved against the application's `ProtoTest:Applications:{application}:BaseUrl` — handy for pointing at `/swagger/v1/swagger.json` on a deployed API. A document that fails to parse throws with the parser's diagnostics.
+`ProtoTest:Applications:{application}:OpenApi:Specification` may be a local file path, the document itself as JSON or YAML, or an http(s) URL. A relative URL is resolved against the application's `ProtoTest:Applications:{application}:BaseUrl`, which is handy for pointing at `/swagger/v1/swagger.json` on a deployed API. A document that fails to parse throws with the parser's diagnostics.
 
 The application is the one the REST client belongs to: `ProtoTest:Applications:{scope}:Application` maps a client target to an application, falling back to the target name. If the key is missing or blank, the collector fails when it is constructed:
 
@@ -103,7 +103,7 @@ Route matching normalizes both sides before comparing: an absolute URI is reduce
 
 A route parameter accepts the request value unless the contract parameter carries a constraint. These are enforced: `int`, `long`, `decimal`/`double`/`float`, `guid`, `bool`, `minlength(n)` and `maxlength(n)`. Unknown constraints are treated as matching, so `/users/abc` never counts toward `/users/{id:int}`, while a constraint the collector doesn't know cannot reject anything.
 
-A route the document doesn't describe is ignored, and a method the document doesn't declare for a matched route is not counted — the report only enumerates spec operations.
+A route the document doesn't describe is ignored, and a method the document doesn't declare for a matched route is not counted; the report only enumerates spec operations.
 
 #### How a response matches
 
@@ -117,7 +117,7 @@ The exact status code is looked up first, then a case-insensitive wildcard like 
 
 #### What the report contains
 
-The collector walks the **entire** document — not just what was called — and reports three nested levels:
+The collector walks the **entire** document, not just what was called, and reports three nested levels:
 
 ```
 OpenAPI              GET /api/orders/{id}      12 hits
@@ -140,7 +140,7 @@ This package emits **no** trace operations, observations, values or entities of 
 
 ## Skip
 
-The package has no capability descriptor and no package-specific attributes. `[RequiresCapability(...)]` cannot make the collector appear — it is registered on the target builder, and it only produces report items where a REST observation exists.
+The package has no capability descriptor and no package-specific attributes. `[RequiresCapability(...)]` cannot make the collector appear. It is registered on the target builder, and it only produces report items where a REST observation exists.
 
 ## Limits
 
@@ -149,13 +149,13 @@ The package has no capability descriptor and no package-specific attributes. `[R
 - **Unmatched routes are silent.** A route the spec doesn't describe, or a method it doesn't declare, is ignored rather than reported.
 - **A missing specification fails at construction.** The configuration overload throws when the DI-resolved collector is created, not at report time.
 - **Unknown constraints are assumed to match.** Only the listed constraint names are enforced.
-- **No base-path rewriting or authentication**, and no refetch on retry — the loader reads the source once.
+- **No base-path rewriting or authentication**, and no refetch on retry. The loader reads the source once.
 - **The specification identity row is not coverage.** One aggregate item per target records `spec.source` and `spec.hash`; it carries no verdict, so no total or gate changes because of it.
 - **Spec-version support is whatever `Microsoft.OpenApi.Readers` 1.6.31 parses.**
 
 ## Links
 
-- [REST responses and assertions](./rest/responses.md) — the shape assertions that produce property hits.
-- [Coverage](../observability/coverage.md) — collectors and report items.
-- [Reporting](../observability/reporting.md) — seeing the items in a report.
+- [REST responses and assertions](./rest/responses.md): the shape assertions that produce property hits.
+- [Coverage](../observability/coverage.md): collectors and report items.
+- [Reporting](../observability/reporting.md): seeing the items in a report.
 - The collector registers on the REST client's chain like every other collector; the package tests are in [`tests/ProtoTest.OpenApi.Tests`](https://github.com/MSeys/ProtoTest/tree/main/tests/ProtoTest.OpenApi.Tests).

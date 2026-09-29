@@ -109,4 +109,46 @@ public sealed class DiagnosisSummaryTextTests
             return Task.CompletedTask;
         }, path => DiagnosisFixtures.WriteAssertionFailureAsync(path));
     }
+
+    [Test]
+    public async Task Cli_ShouldPrintTheOperationIdentityOnceWhenTheNameMatchesTheKind()
+    {
+        await DiagnosisFixtures.WithTraceAsync(path =>
+        {
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var exit = CliHost.Run(["summary", path], output, error);
+            var summary = output.ToString();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exit, Is.EqualTo(0));
+                Assert.That(summary, Does.Contain("  assert.json.shape · failed"));
+                Assert.That(summary, Does.Not.Contain("assert.json.shape assert.json.shape"));
+                Assert.That(error.ToString(), Is.Empty);
+            }
+
+            return Task.CompletedTask;
+        }, path => DiagnosisFixtures.WriteAssertionFailureAsync(path));
+    }
+
+    [Test]
+    public async Task Cli_ShouldPrintTheKindAndNameWhenTheyDiffer()
+    {
+        await DiagnosisFixtures.WithTraceAsync(path =>
+        {
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var exit = CliHost.Run(["summary", path], output, error);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exit, Is.EqualTo(0));
+                Assert.That(output.ToString(), Does.Contain("  http.request REST · GET orders · failed"));
+                Assert.That(error.ToString(), Is.Empty);
+            }
+
+            return Task.CompletedTask;
+        }, path => DiagnosisFixtures.WriteOperationErrorAsync(path));
+    }
 }

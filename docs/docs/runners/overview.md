@@ -2,14 +2,14 @@
 sidebar_position: 1
 title: .NET test runners
 sidebar_label: Overview
-description: "ProtoTest plugs into the test runner you already use — NUnit, xUnit v2 and v3, MSTest or TUnit — and behaves the same on each."
+description: "ProtoTest plugs into the runner you already use: NUnit, xUnit v2 and v3, MSTest or TUnit, with one host, one context and one trace behind each."
 ---
 
 # Test runners
 
-ProtoTest doesn't replace your test runner. It plugs into the one you already use and wraps each test in a `ProtoExecutionContext`, so everything in [Foundation](../foundation/overview.md) works identically no matter which runner you pick.
+ProtoTest does not replace your test runner. It plugs into the runner you already use and wraps each test in a ProtoTest execution context, so [the foundation](../foundation/overview.md) works the same whichever runner you pick.
 
-ProtoTest targets **.NET 8, 9 and 10**, and every adapter package is stable on NuGet: install it with `dotnet add package <id>`.
+## Install
 
 | Runner | Package | Test attribute | Assembly setup |
 | --- | --- | --- | --- |
@@ -19,7 +19,15 @@ ProtoTest targets **.NET 8, 9 and 10**, and every adapter package is stable on N
 | [MSTest](./mstest.md) | `ProtoTest.MSTest` | `[ProtoTest]` (replaces `[TestMethod]`) | `[AssemblyInitialize]` / `[AssemblyCleanup]` |
 | [TUnit](./tunit.md) | `ProtoTest.TUnit` | `[Test]` (TUnit's own) | `[assembly: TestExecutor<ProtoTestExecutor>]` |
 
-## The two pieces
+Install one package:
+
+```bash
+dotnet add package ProtoTest.NUnit   # or ProtoTest.Xunit, ProtoTest.Xunit3, ProtoTest.MSTest, ProtoTest.TUnit
+```
+
+ProtoTest and every adapter target **.NET 8, 9 and 10**.
+
+## Register
 
 Whichever runner you use, you write the same two things.
 
@@ -30,53 +38,55 @@ protected override void Configure(IProtoHostBuilder builder) =>
     builder.AddApplication("Api", app => app.AddRest(rest => rest.AddClient("Api")));
 ```
 
-**2. A test attribute** — or, for TUnit, the registered executor — that starts the execution context before your method body and completes it afterwards. Tests select the application with `[Application("Api")]`, and the protocol accessors (`Proto.Context.Rest()`, `Proto.Context.GraphQL()`, `Proto.Context.Web()`) then use the clients bound to it.
+**2. The runner's test attribute** (or, for TUnit, the registered executor). Each runner page below shows the exact form.
+
+Tests select their application with `[Application("Api")]`. The protocol accessors (`Proto.Context.Rest()`, `Proto.Context.GraphQL()`, `Proto.Context.Web()`) then resolve the clients bound to it.
 
 :::note[One host per process]
-`Host` is a static member inside each runner package — there is one host per test process. Touching `Proto.Context` before the assembly setup has run throws an `InvalidOperationException` naming the setup class the runner expects.
+`Host` is a static member inside each adapter package, so there is one host per test process. Touching `Proto.Context` before the assembly setup has run throws an `InvalidOperationException` naming the setup class the runner expects.
 :::
 
-## Per-test lifecycle
+## What the adapter changes
 
-Before the body the adapter calls `StartTestAsync`: the context is created, the test's hooks and attributes run — clients and test-scoped resources are initialized here — and `test.execution` opens. After the body it calls `CompleteTestAsync` with the outcome the runner recorded, and the context is torn down. Those are the trace's `test.setup`, `test.execution` and `test.teardown` entries. A setup failure is rolled back and reported as a failure; a skipped test never starts, so it has no context and no trace entry.
+The adapter provides the host startup described above, wraps each test in the ProtoTest lifecycle, and maps the runner's own result to the trace. Discovery, ordering and parallelism stay the runner's.
+
+| Runner | The host starts from | The context spans | Cancellation token | Row name |
+| --- | --- | --- | --- | --- |
+| NUnit | `[SetUpFixture]` | `[SetUp]`, the body and `[TearDown]` | `TestExecutionContext.CancellationToken`, cancelled by `[CancelAfter]` | NUnit's full name, arguments included |
+| xUnit v2 | a collection fixture | the test invocation | the runner's `CancellationTokenSource` | xUnit's display name, arguments included |
+| xUnit v3 | `[assembly: AssemblyFixture]` | the before- and after-attributes | none | xUnit's display name, arguments included |
+| MSTest | `[AssemblyInitialize]` and `[AssemblyCleanup]` | one data row | none | `DeclaringType.MethodName[args]` |
+| TUnit | `[Before(Assembly)]` and `[After(Assembly)]` | the registered executor | none | `DeclaringType.MethodName[args]` |
+
+### The lifecycle
+
+Before the body the adapter calls `StartTestAsync`: the context is created, the test's hooks and attributes run, and `test.execution` opens. After the body it calls `CompleteTestAsync` with the outcome the runner recorded, and the context is torn down. Those calls are the trace's `test.setup`, `test.execution` and `test.teardown` entries.
+
+A setup failure is rolled back and reported as a failure. A skipped test never starts, so it has no context and no trace entry.
 
 xUnit v2, MSTest and TUnit run this lifecycle asynchronously. NUnit and xUnit v3 call the host synchronously (`GetAwaiter().GetResult()`), so they need a synchronizing context.
 
-## Cancellation
+### Outcomes
 
-The runner's cancellation token rides the lifecycle: the adapter passes it to `StartTestAsync`, hooks and attributes read it as `ProtoExecutionContext.CancellationToken`, and setup I/O that can observe it — the SQL connection open and transaction begin — is cancelled with it. Where the runner exposes no token, the test starts with `CancellationToken.None` and setup runs to the integration's own timeout.
-
-| Runner | Token the adapter supplies |
-| --- | --- |
-| NUnit | `TestExecutionContext.CancellationToken`, cancelled by `[CancelAfter]` |
-| xUnit v2 | the runner's `CancellationTokenSource` |
-| MSTest | none — `TestMethodAttribute.ExecuteAsync(ITestMethod)` exposes no token |
-| xUnit v3 | none — `IBeforeAfterTestAttribute` exposes no token |
-| TUnit | none — `ITestExecutor` exposes no token |
-
-## Outcomes
-
-| Runner | Outcomes ProtoTest records | Why |
+| Runner | ProtoTest records | Why |
 | --- | --- | --- |
-| xUnit v2 | Passed, Failed, Cancelled | xUnit's aggregator decides pass/fail; cancellation is a body `OperationCanceledException` or the runner's signalled `CancellationTokenSource`; a failure keeps the exception. |
-| xUnit v3 | Passed, Failed, Skipped, Cancelled, Unknown | Skipped covers xUnit's `Skipped` and `NotRun`; a cancelled exception type maps to Cancelled; Unknown is the fallback for an unmapped state. |
-| NUnit | Passed, Failed, Skipped, Partial, Unknown | Inconclusive maps to Skipped; Warning maps to Partial because the test passed with warnings attached. NUnit exposes no exception type, so a cancelled test reads as Failed. |
-| MSTest | Passed, Failed, Skipped, Cancelled, Unknown | Ignored, Inconclusive and NotRunnable map to Skipped; a cancelled exception, timeout or abort maps to Cancelled. |
-| TUnit | Passed, Failed, Skipped, Cancelled | `SkipTestException` maps to Skipped, `OperationCanceledException` to Cancelled; anything else fails. |
+| xUnit v2 | Passed, Failed, Cancelled | xUnit's aggregator decides pass or fail. A body `OperationCanceledException` and a signalled cancellation source both read as Cancelled. A failure keeps its exception. |
+| xUnit v3 | Passed, Failed, Skipped, Cancelled, Unknown | Skipped covers xUnit's Skipped and NotRun. A cancelled exception type maps to Cancelled. Anything unmapped is Unknown. |
+| NUnit | Passed, Failed, Skipped, Partial, Unknown | Inconclusive maps to Skipped. Warning maps to Partial because the test passed with warnings attached. NUnit exposes no exception type, so a cancelled test reads as Failed. |
+| MSTest | Passed, Failed, Skipped, Cancelled, Unknown | Ignored, Inconclusive and NotRunnable map to Skipped. A cancelled exception, a timeout or an abort maps to Cancelled. |
+| TUnit | Passed, Failed, Skipped, Cancelled | `SkipTestException` maps to Skipped and `OperationCanceledException` to Cancelled. Anything else fails. |
 
-Failure detail: xUnit v2 carries the exception into the trace; xUnit v3 records the state's exception type, message and stack; NUnit reports the type as `NUnit.{Label}` (`NUnit.Failed` when the label is empty) and its message and stack; MSTest uses `MSTest.{Outcome}` when the result has no failure exception; TUnit records the thrown exception.
+Failure detail: xUnit v2 carries the exception into the trace. xUnit v3 records the state's exception type, message and stack. NUnit reports the type as `NUnit.{Label}` (`NUnit.Failed` when the label is empty), plus the message and stack. MSTest uses `MSTest.{Outcome}` when the result has no failure exception. TUnit records the thrown exception.
 
-Lifecycle boundary: the context wraps the test method. NUnit, xUnit v2, MSTest and TUnit span setup and teardown because their wrappers sit outside them. xUnit v3 starts in the before-attribute, so class construction, `IAsyncLifetime.InitializeAsync` and class disposal stay outside the context.
+A skipped test appears only in the runner's own results. ProtoTest writes no trace entry, no report row and no teardown for it.
 
-A skipped test appears only in the runner's own results. Nothing is written to ProtoTest's trace or reports for it — no record, no teardown.
-
-## Skip conditions
+### Skips
 
 All adapters evaluate [`[RequiresCapability]`, `[RequiresInProcess]` and `[RequiresPlaywrightBrowser]`](../foundation/skip-conditions.md) before `StartTestAsync`, so a skipped test has no context, no trace entry and no teardown. The reason reaches the runner:
 
 | Runner | How the skip is raised | Reason reported |
 | --- | --- | --- |
-| NUnit | `Assert.Ignore(reason)` | as-is |
+| NUnit | an ignored result (`ResultState.Ignored`) | as-is |
 | xUnit v2 | xUnit's `SkipReason` | as-is |
 | xUnit v3 | `Assert.Skip(reason)` | as-is |
 | TUnit | `TUnit.Core.Skip.Test(reason)` | as-is |
@@ -84,22 +94,38 @@ All adapters evaluate [`[RequiresCapability]`, `[RequiresInProcess]` and `[Requi
 
 MSTest has no public dynamic-skip API in the version ProtoTest targets, so the adapter returns an ignored result and the reason travels on `LogOutput` and the display name.
 
-## Attachments
+### Attachments
 
-Artifacts ProtoTest captures (request/response bodies, screenshots, Playwright traces) are handed to the runner so they appear in its own reporting:
+Artifacts ProtoTest captures (request and response bodies, screenshots, Playwright traces) go to the runner's own reporting:
 
 | Runner | How |
 | --- | --- |
 | NUnit | `TestContext.AddTestAttachment(path, description)` |
 | xUnit v3 | `TestContext.Current.AddAttachment(name, bytes, mediaType)` |
-| MSTest | appended to the **first** data-row result's `TestResult.ResultFiles` |
+| MSTest | appended to the row's `TestResult.ResultFiles` |
 | TUnit | `context.Output.AttachArtifact(path, name, description)` |
-| xUnit v2 | materialized to a file, with the path written to the console — v2 has no attachment API |
+| xUnit v2 | written to a file, with the path on the console, because v2 has no attachment API |
 
-## Test names
+### Test names
 
-Every adapter except xUnit v2 starts from `ProtoTestName.FromMethod`, which produces `DeclaringType.FullName.MethodName`. Parameterized rows append their arguments — MSTest and TUnit record `…MethodName[1, admin]`, NUnit and xUnit v3 use the runner's own display name — while xUnit v2 records xUnit's display name (`…Invoices_filter_by_state(state: "open")`). A plain method keeps the fully qualified name.
+NUnit and xUnit v3 record the name the runner gives the test case: the fully qualified method name for a plain method, with the row's arguments included for a parameterized one. xUnit v2 records xUnit's display name. MSTest and TUnit compose `DeclaringType.MethodName[args]` through `ProtoTestName.ForRow`, so parallel rows stay apart.
 
-## Custom attributes work everywhere
+### Custom attributes
 
-Every runner resolves `ProtoAttribute` subclasses through the same `ProtoAttributeResolver`, so capabilities you write once — see [Attributes](../foundation/attributes.md) — behave identically across all five.
+Every adapter resolves `ProtoAttribute` subclasses through the same `ProtoAttributeResolver`. Attributes you write once, see [Attributes](../foundation/attributes.md), behave identically across all five runners.
+
+## Limits
+
+- A skipped test exists only in the runner's own output. ProtoTest records nothing for it: no context, no trace entry and no teardown.
+- Only NUnit and xUnit v2 hand the adapter a cancellation token. MSTest, xUnit v3 and TUnit start with `CancellationToken.None`.
+- NUnit and xUnit v3 call the host synchronously, so the test project needs a synchronizing context.
+- xUnit v3 starts its context after class construction and `IAsyncLifetime.InitializeAsync`, and completes it before class disposal. Class-level setup and cleanup stay outside the context.
+- xUnit v2 has no dynamic skip and no attachment API, so its skip reason is decided before the test method is invoked and artifact paths go to the console.
+- MSTest has no public dynamic-skip API and no assembly-wide hook: every test method carries `[ProtoTest]`, and the skip reason is not a first-class MSTest property.
+- TUnit runs a test with no reflection `MethodInfo` unwrapped, because the executor has nothing to prepare from.
+
+## Learn more
+
+- [NUnit](./nunit.md), [xUnit v2](./xunit.md), [xUnit v3](./xunit3.md), [MSTest](./mstest.md), [TUnit](./tunit.md): the registration, the adapter's behavior and its limits.
+- [Skip conditions](../foundation/skip-conditions.md): the conditions every adapter evaluates.
+- [Lifecycle](../foundation/lifecycle.md): the hooks and attributes around a test.

@@ -1,18 +1,18 @@
 ---
 sidebar_position: 2
 title: Queries and mutations
-description: "Three ways to describe a GraphQL query or mutation — shape-driven, fluent or a raw document — all ending in the same ExecuteAsync()."
+description: "Three ways to describe a GraphQL query or mutation: shape-driven, fluent or a raw document, all ending in the same ExecuteAsync()."
 ---
 
 # Queries and mutations
 
-There are three ways to describe an operation. Pick per test — they all end in the same `ExecuteAsync()`.
+There are three ways to describe an operation. Pick per test; they all end in the same `ExecuteAsync()`.
 
 | Style | Best for |
 | --- | --- |
-| **Shape-driven** — `Query("root", args).Select(shape)` | one root field, where the selection is also what you assert |
-| **Fluent** — `Query("Name", q => q.Field(...))` | several root fields, aliases, connections with filters and paging |
-| **Raw** — `Request("query { … }")` | fragments, directives, anything the builders don't cover |
+| **Shape-driven**: `Query("root", args).Select(shape)` | one root field, where the selection is also what you assert |
+| **Fluent**: `Query("Name", q => q.Field(...))` | several root fields, aliases, connections with filters and paging |
+| **Raw**: `Request("query { … }")` | fragments, directives, anything the builders don't cover |
 
 ## Shape-driven operations
 
@@ -59,7 +59,7 @@ using var controlPlane = await Proto.Context.GraphQL()
 controlPlane.Should.HaveNoErrors();
 ```
 
-Arrays work too — the element shape becomes the selection, and the whole array is asserted:
+Arrays work too. The element shape becomes the selection, and the whole array is asserted:
 
 ```csharp
 using var workspaces = await Proto.Context.GraphQL()
@@ -89,15 +89,15 @@ var viewer = response.ReadDataAs<ViewerSelection>();
 - Recursion stops at a **leaf**: `Gql.Field`, any `JsonValue` matcher, or a value of a primitive, enum, `string`, `decimal`, `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `Guid` or `Uri` type.
 - An array or enumerable is unwrapped to its first element, so `new[] { new { id = Gql.Field } }` selects `{ id }`.
 - `IDictionary<string, …>` shapes are supported; the keys are the field names and the values describe their selections.
-- A nested object with no public properties throws `ArgumentException` (`GraphQL selection type '…' has no selectable public properties.`) — GraphQL doesn't allow an empty selection. A fluent operation with no fields at all throws `InvalidOperationException`.
+- A nested object with no public properties throws `ArgumentException` (`GraphQL selection type '…' has no selectable public properties.`), because GraphQL doesn't allow an empty selection. A fluent operation with no fields at all throws `InvalidOperationException`.
 
 :::caution
-Don't put `Gql.Enum(...)` inside a *selection* shape — it isn't treated as a leaf. It belongs in *arguments*.
+Don't put `Gql.Enum(...)` inside a *selection* shape; it isn't treated as a leaf. It belongs in *arguments*.
 :::
 
 ### Arguments and variables
 
-Anything in the arguments object is inlined as a literal — except `Gql.Variable(...)`, which declares an operation variable and sends the value separately:
+Anything in the arguments object is inlined as a literal, except `Gql.Variable(...)`, which declares an operation variable and sends the value separately:
 
 ```csharp
 .Mutation("createOrder", new
@@ -156,7 +156,7 @@ using var response = await Proto.Context.GraphQL()
 
 ### Connections
 
-`Connection` understands the common cursor-connection shape — filtering, ordering and paging:
+`Connection` understands the common cursor-connection shape: filtering, ordering and paging.
 
 ```csharp
 using var response = await Proto.Context.GraphQL()
@@ -187,13 +187,13 @@ response.Should.HaveNoErrors().Should.MatchShape(new
 | `Where(filter => …)` | a `where:` argument |
 | `OrderBy(order => order.Ascending(f).Descending(g))` | an `order:` argument with `ASC`/`DESC` enums |
 | `Nodes(params fields)` / `Nodes(field => …)` | `nodes { … }` |
-| `PageInfo(params fields)` | `pageInfo { … }` — `hasNextPage`, `hasPreviousPage`, `startCursor`, `endCursor` when none are given |
+| `PageInfo(params fields)` | `pageInfo { … }`: `hasNextPage`, `hasPreviousPage`, `startCursor`, `endCursor` when none are given |
 | `TotalCount()` | `totalCount` |
 
 The filter builder emits the `{ field: { op: value } }` convention used by Hot Chocolate: `Equal`, `NotEqual`, `Contains`, `StartsWith`, `EndsWith`, `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual`, `In`, plus `Nested(field, …)`, `Some(field, …)` for lists, and `Or(...)`.
 
 :::note[Fluent responses aren't unwrapped]
-With shape-driven operations, `Should.MatchShape` compares against the **root field's value**. With fluent and raw operations there's no single root, so it compares against the whole `data` object — which is why the example above wraps its shape in `orders = …`.
+With shape-driven operations, `Should.MatchShape` compares against the **root field's value**. With fluent and raw operations there's no single root, so it compares against the whole `data` object. That is why the example above wraps its shape in `orders = …`.
 :::
 
 ## Raw documents
@@ -232,7 +232,7 @@ GraphQLRequestBuilder Variables(object variables);
 GraphQLRequestBuilder ConnectionPayload(object payload);
 ```
 
-Header values are never traced; the trace records the count and each header's name. `ConnectionPayload` sets the optional `connection_init` payload subscriptions send — see [Subscriptions](./subscriptions.md#connection-payload).
+Header values are never traced; the trace records the count and each header's name. `ConnectionPayload` sets the optional `connection_init` payload subscriptions send. See [Subscriptions](./subscriptions.md#connection-payload).
 
 ## File uploads
 
@@ -270,4 +270,4 @@ The request is sent as `multipart/form-data` with `operations`, `map` and number
 
 ## Transport details
 
-Queries and mutations are sent as `POST` with `Accept: application/graphql-response+json, application/json;q=0.9`. The endpoint must be an absolute HTTP(S) URI; the resolve step is traced as `graphql.endpoint.resolve` with the server address. Calling `ExecuteAsync()` on a subscription throws — use [`SubscribeAsync()`](./subscriptions.md).
+Queries and mutations are sent as `POST` with `Accept: application/graphql-response+json, application/json;q=0.9`. The endpoint must be an absolute HTTP(S) URI; the resolve step is traced as `graphql.endpoint.resolve` with the server address. Calling `ExecuteAsync()` on a subscription throws; use [`SubscribeAsync()`](./subscriptions.md).

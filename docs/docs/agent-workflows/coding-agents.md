@@ -14,6 +14,9 @@ This page is the map for the section:
 - [Diagnosis](./diagnosis.md) shows what the agent reads when a test fails.
 - [Verification](./verification.md) turns two runs' reports into a pull request verdict.
 - [Loop](./loop.md) wires the whole workflow into CI.
+- [CLI reference](./cli.md) runs the same evidence from a terminal, with no agent.
+
+The tools here are for your agent. How the project itself uses AI is on the [AI usage](../project/ai-usage.md) page.
 
 ## The workflow an agent follows
 

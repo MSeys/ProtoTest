@@ -74,7 +74,7 @@ The groups below are the map. Each line names the packages and links the page th
 
 ## Tooling and agent
 
-- **The CLI** (`ProtoTest.Cli`) - the `prototest` tool: `summary`, `index`, `verify` and `feedback` over a trace, a folder of runs or two reports, with no agent in the loop. [Loop](../agent-workflows/loop.md).
+- **The CLI** (`ProtoTest.Cli`) - the `prototest` tool: `summary`, `index`, `verify` and `feedback` over a trace, a folder of runs or two reports, with no agent in the loop. [CLI reference](../agent-workflows/cli.md).
 - **Traces** (`ProtoTest.Traces`) - the `.prototrace` archive and the reader that opens it: the run's operations, checks and artifacts in one file. [ProtoTrace](../observability/prototrace.md).
 - **MCP server** (`ProtoTest.Mcp`) - a local stdio server that answers questions about the runs in a repository through four read-only tools. [Setup](../agent-workflows/setup.md).
 - **Diagnosis** (`ProtoTest.Diagnosis`) - the run summary and the failing test's context package, behind the CLI and the MCP tools. [Diagnosis](../agent-workflows/diagnosis.md).

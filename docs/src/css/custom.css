@@ -2,7 +2,7 @@
  * ProtoTest documentation theme.
  *
  * The palette, type scale, spacing, radii and execution vocabulary come from the one shared token file at
- * the repository root — the same file the ProtoTrace viewer and the HTML report sink use. This file maps
+ * the repository root, the same file the ProtoTrace viewer and the HTML report sink use. This file maps
  * those tokens onto Infima and restyles the few Docusaurus parts Infima's variables do not reach. It
  * declares no colour of its own.
  */

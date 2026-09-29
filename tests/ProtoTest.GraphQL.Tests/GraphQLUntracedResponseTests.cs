@@ -21,7 +21,7 @@ public sealed class GraphQLUntracedResponseTests
         var mismatch = Assert.Throws<GraphQLAssertionException>(
             () => response.Should.MatchShape(new { value = 1 }));
 
-        Assert.That(mismatch!.Message, Does.StartWith("query <anonymous> — Shape mismatch"),
+        Assert.That(mismatch!.Message, Does.StartWith("query <anonymous> - Shape mismatch"),
             "the failure still names the operation");
     }
 
@@ -37,7 +37,7 @@ public sealed class GraphQLUntracedResponseTests
             Assert.That(response.ReadDataAs<ValueData>()!.Value, Is.EqualTo(42));
             Assert.That(response.ReadRequired<ValueData>().Value, Is.EqualTo(42));
             Assert.That(exception!.Message, Does.StartWith(
-                "query <anonymous> — The JSON path '$.missing' did not match"));
+                "query <anonymous> - The JSON path '$.missing' did not match"));
         }
     }
 

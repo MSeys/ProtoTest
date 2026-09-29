@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 6
 title: Support and sustainability
 description: "Who maintains ProtoTest, how it is funded, what the versioning and deprecation policy is, and what happens if the maintainer stops."
 ---
@@ -43,8 +43,8 @@ This is the question in-house frameworks fail, and the project is designed aroun
 - The [extension points](../advanced/extending.md) are public, so new integrations can be written without changing the core.
 - There is no hosted service, account system or license server that could be switched off; the packages are local and the viewer is a static page.
 
-None of that is a guarantee of continued maintenance - nothing in open source is. It is the difference between a framework that can be taken over and one that merely stops: the [same argument](../compare.md#building-the-foundation-in-house) that makes adopting a public foundation safer than building your own.
+None of that is a guarantee of continued maintenance - nothing in open source is. It is the difference between a framework that can be taken over and one that merely stops: the [same argument](./compare.md#building-the-foundation-in-house) that makes adopting a public foundation safer than building your own.
 
 ## The honest caveats
 
-ProtoTest is young, and the trade-offs of a solo project are real: reviews can take time, the ecosystem is small, and answers on the internet are rare compared to older libraries. If any of that is disqualifying for your team, the [comparison page](../compare.md) lists good alternatives - choosing them is a legitimate outcome, not a failure of this page.
+ProtoTest is young, and the trade-offs of a solo project are real: reviews can take time, the ecosystem is small, and answers on the internet are rare compared to older libraries. If any of that is disqualifying for your team, the [comparison page](./compare.md) lists good alternatives - choosing them is a legitimate outcome, not a failure of this page.

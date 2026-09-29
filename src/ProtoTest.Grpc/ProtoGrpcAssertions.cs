@@ -180,11 +180,11 @@ public sealed class ProtoGrpcMessageAssertions<TResponse>
         }
         catch (JsonShapeMismatchException exception)
         {
-            throw new GrpcAssertionException($"{subject} — {exception.Message}", exception);
+            throw new GrpcAssertionException($"{subject} - {exception.Message}", exception);
         }
         catch (JsonDocumentAssertionException exception)
         {
-            throw new GrpcAssertionException($"{subject} — {exception.Message}", exception);
+            throw new GrpcAssertionException($"{subject} - {exception.Message}", exception);
         }
 
         return _response;

@@ -6,7 +6,7 @@ description: "Group steps on one component into a named flow that reads as one o
 
 # Flows
 
-A flow is a named sequence of steps on one component. It reads better than repeating the component on every line, and it shows up in the trace as **one** operation with the steps nested underneath — so a failed checkout reads as "`Checkout` › step 3 failed", not as a flat list of clicks.
+A flow is a named sequence of steps on one component. It reads better than repeating the component on every line, and it shows up in the trace as **one** operation with the steps nested underneath, so a failed checkout reads as "`Checkout` › step 3 failed", not as a flat list of clicks.
 
 ```csharp
 await checkout.Payment.Flow("Pay by card")
@@ -36,7 +36,7 @@ public sealed class WebFlow<TComponent> where TComponent : WebComponent
 }
 ```
 
-`Check` checks and `Uncheck` unchecks. `Do` runs anything else — including assertions — as a step:
+`Check` checks and `Uncheck` unchecks. `Do` runs anything else, including assertions, as a step:
 
 ```csharp
 await dialog.Flow("Confirm deletion")
@@ -81,5 +81,5 @@ await page.Banner.InteractAsync("Dismiss cookie banner", banner => banner.Accept
 
 ## Next
 
-- [Logging in](./login.md) — a login strategy built from flows.
-- [Diagnostics and artifacts](./diagnostics.md) — how a failed flow step appears in the trace.
+- [Logging in](./login.md) - a login strategy built from flows.
+- [Diagnostics and artifacts](./diagnostics.md) - how a failed flow step appears in the trace.

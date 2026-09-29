@@ -26,6 +26,7 @@ function toggleTheme() {
     </a>
     <p class="privacy"><span aria-hidden="true">◇</span> Trace stays in this browser</p>
     <div class="actions">
+      <a class="docs" href="https://prototest.dev/docs/">Docs</a>
       <!-- Same order as the HTML report and the docs: the page's own action first, the theme switch last. -->
       <AppButton variant="primary" @click="$emit('open')">Open trace</AppButton>
       <AppButton variant="icon" :label="`Use ${theme === 'dark' ? 'light' : 'dark'} mode`" @click="toggleTheme">
@@ -52,6 +53,8 @@ function toggleTheme() {
 .brand > span { min-width: 0; display: flex; flex-direction: column; line-height: var(--leading-tight); }
 .brand strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-display); font-size: var(--text-title); letter-spacing: .01em; }
 .brand small { color: var(--dim); font-size: var(--text-micro); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; }
+.docs { height: var(--control-height); padding: 0 var(--space-3); display: grid; place-items: center; border: 1px solid transparent; border-radius: var(--radius-control); color: var(--muted); font-size: var(--text-meta); text-decoration: none; white-space: nowrap; }
+.docs:hover { border-color: var(--border); color: var(--text); }
 .privacy { grid-column: 2; justify-self: center; color: var(--muted); font-size: var(--text-meta); white-space: nowrap; }
 .privacy span { color: var(--success); }
 /* Each part owns its column, so hiding the middle one never lets the buttons drift in from the right edge.

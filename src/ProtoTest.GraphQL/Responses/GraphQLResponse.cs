@@ -221,7 +221,7 @@ public sealed class GraphQLResponse : ProtoHttpResponse
     // The operation identifier the protocol reported the call under is the subject a mismatch or a
     // required read names; a response asserted without one keeps the message unchanged.
     private string PrefixIdentifier(string message)
-        => string.IsNullOrEmpty(Identifier) ? message : $"{Identifier} — {message}";
+        => string.IsNullOrEmpty(Identifier) ? message : $"{Identifier} - {message}";
 
     // An errors-only response has nothing to match, and the server's own message is what the author
     // needs to see: a rejected subscription or a failed operation must not read as "no data".

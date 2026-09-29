@@ -20,9 +20,10 @@ public sealed class MqttDeviceOptions : IProtoConfigurableOptions
     string IProtoConfigurableOptions.ConfigurationSectionName => ConfigurationSectionName;
 
     /// <summary>
-    /// Gets or sets the broker address (<c>mqtt://host:port</c>) a client registered without an
-    /// address or a resolver uses. A started piece that publishes <see cref="BrokerSetting"/> wins
-    /// over it, and an explicit address or resolver on the registration wins over both.
+    /// Gets or sets the broker address (<c>mqtt://host:port</c>) a client registered without a
+    /// resolver falls back to. The configuration or a started piece that publishes
+    /// <see cref="BrokerSetting"/> wins over it, an <c>address</c> passed to <c>AddMqttClient</c>
+    /// is used only after it, and a registered resolver replaces the whole precedence.
     /// </summary>
     public string? Broker { get; set; }
 

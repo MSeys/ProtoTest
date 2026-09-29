@@ -1,12 +1,12 @@
 ---
 sidebar_position: 5
 title: Troubleshooting
-description: The first problems a new suite runs into — the host not starting, a client that cannot be resolved, containers, browsers, parallel tests — and what fixes them.
+description: "The first problems a new suite runs into, and what fixes them: the host, the context, clients, containers, browsers, parallel tests and missing artifacts."
 ---
 
 # Troubleshooting
 
-The problems below are the ones a new suite meets first. Each starts with the message you see.
+The problems below are the ones a new suite meets first. Each one starts with the message you see.
 
 | What you see | Start here |
 | --- | --- |
@@ -21,22 +21,22 @@ The problems below are the ones a new suite meets first. Each starts with the me
 
 ## The host is not there
 
-> **No active ProtoHost is available. The runner setup creates it: derive the suite's [SetUpFixture] from ProtoTestAssembly …**
+> **No active ProtoHost is available. The runner setup creates it: derive the suite's [SetUpFixture] from ProtoTestAssembly ...**
 
-The runner never ran your setup class, so no host was built — the rest of the message points at the fix, and the adapter's own hint (`Ensure your setup class inherits from ProtoTestAssembly.`, `Register your fixture with [assembly: AssemblyFixture(...)]`, …) tells you which one. Check the one that applies to your runner:
+The runner never ran your setup class, so no host was built. The rest of the message points at the fix, and the adapter's own hint (`Ensure your setup class inherits from ProtoTestAssembly.`, `Register your fixture with [assembly: AssemblyFixture(...)]`, ...) tells you which one. Check the one that applies to your runner:
 
-- **NUnit** — the `[SetUpFixture]` only covers its own namespace and the namespaces below it. A test in `Orders.Tests.Api` is covered by a setup in `Orders.Tests`, not by one in `Orders.Tests.Web`. Move the setup up, or out of any namespace to cover the whole assembly.
-- **xUnit v3** — `[assembly: AssemblyFixture(typeof(Setup))]` is missing.
-- **xUnit v2** — the test class is not in the ProtoTest collection: add `[Collection(ProtoTestCollection.Name)]`.
-- **MSTest, TUnit** — the assembly hooks do not call `InitializeAsync`, or the class holding them is not discovered (MSTest needs `[TestClass]` on it).
+- **NUnit**: the `[SetUpFixture]` only covers its own namespace and the namespaces below it. A test in `Orders.Tests.Api` is covered by a setup in `Orders.Tests`, not by one in `Orders.Tests.Web`. Move the setup up, or out of any namespace to cover the whole assembly.
+- **xUnit v3**: `[assembly: AssemblyFixture(typeof(Setup))]` is missing.
+- **xUnit v2**: the test class is not in the ProtoTest collection. Add `[Collection(ProtoTestCollection.Name)]`.
+- **MSTest, TUnit**: the assembly hooks do not call `InitializeAsync`, or the class holding them is not discovered (MSTest needs `[TestClass]` on it).
 
 Each runner's page under [Test runners](../runners/overview.md) shows the complete setup.
 
 ## There is no test context
 
-> **No active ProtoExecutionContext is available on this flow. Proto.Context only works inside a test body … Off-flow telemetry uses ProtoHost.FindTraceWriter(Activity?) …**
+> **No active ProtoExecutionContext is available on this flow. Proto.Context only works inside a test body ...**
 
-`Proto.Context` was read outside a ProtoTest test. Usually the test uses the runner's own attribute — `[Test]`, `[Fact]`, `[TestMethod]` — instead of the ProtoTest attribute that opens the context (`[ProtoTest]`, or `[ProtoTestFact]` / `[ProtoTestTheory]` for xUnit). It also happens in code that runs outside the test's async flow, such as a static initializer or a thread started by hand: pass the `ProtoExecutionContext` along, or — for telemetry that cannot — reach the owning test's trace with `ProtoHost.FindTraceWriter(Activity?)`.
+`Proto.Context` was read outside a ProtoTest test. Usually the test uses the runner's own attribute (`[Test]`, `[Fact]`, `[TestMethod]`) instead of the ProtoTest attribute that opens the context (`[ProtoTest]`, or `[ProtoTestFact]` / `[ProtoTestTheory]` for xUnit). It also happens in code that runs outside the test's async flow, such as a static initializer or a thread started by hand. Pass the `ProtoExecutionContext` along, or, for telemetry that cannot take it, reach the owning test's trace with `ProtoHost.FindTraceWriter(Activity?)`. Off test flows the message also names the alternatives.
 
 ## A client cannot be resolved
 
@@ -55,7 +55,7 @@ The client has nowhere to send requests. Either host the application in-process 
 ## The application does not start in-process
 
 - **`Program` is inaccessible.** A minimal-API application's entry point is internal. Add `public partial class Program;` to the application, as in [Your first test](./first-test.md#1-create-the-project).
-- **The application reads configuration the test run does not have.** The in-process server runs the application's own `Program`, with its own `appsettings.json`. Values that come from the environment in production — connection strings, secrets — have to come from the test run: from [infrastructure](../foundation/infrastructure.md) that fills them, or from `configureWebHost` on `AddAspNetCoreServer`.
+- **The application reads configuration the test run does not have.** The in-process server runs the application's own `Program`, with its own `appsettings.json`. Values that come from the environment in production, such as connection strings and secrets, have to come from the test run: from [infrastructure](../foundation/infrastructure.md) that fills them, or from `configureWebHost` on `AddAspNetCoreServer`.
 
 ## Containers do not start
 
@@ -63,7 +63,7 @@ Infrastructure such as `PostgresDatabase.Container()` runs on Docker through Tes
 
 - Start Docker Desktop, or on Linux make sure the current user can reach the Docker socket.
 - On CI, use a runner image with Docker available.
-- To run the suite where Docker is not available, give it a connection string through configuration instead of a container. A test-level skip cannot get in front of it: `AddInfrastructure` starts the container with the host, before any skip condition is evaluated, so a missing runtime fails the run at start. Start the container in the suite fixture instead, before registering anything: `PostgresDatabase.TryStart(...)` and `RabbitMqBroker.TryStart(...)` report the failure instead of throwing, so the fixture can fall back, replace the connection string, or skip the suite. When the fixture starts the container itself, register it with `AddResource` so the host still releases it — `AddInfrastructure` is for containers the host starts. `TryStart` blocks the calling thread while the container starts and has no timeout. See [Skip conditions](../foundation/skip-conditions.md).
+- To run the suite where Docker is not available, give it a connection string through configuration instead of a container. A test-level skip cannot get in front of it: `AddInfrastructure` starts the container with the host, before any skip condition is evaluated, so a missing runtime fails the run at start. Start the container in the suite fixture instead, before registering anything: `PostgresDatabase.TryStart(...)` and `RabbitMqBroker.TryStart(...)` report the failure instead of throwing, so the fixture can fall back, replace the connection string, or skip the suite. When the fixture starts the container itself, register it with `AddResource` so the host still releases it; `AddInfrastructure` is for containers the host starts. `TryStart` blocks the calling thread while the container starts and has no timeout. See [Skip conditions](../foundation/skip-conditions.md).
 
 ## The browser does not launch
 
@@ -71,9 +71,9 @@ Playwright reports that the browser executable does not exist when it was never 
 
 ## Tests pass alone and fail together
 
-Parallel tests share the application and its data. When two tests create the same customer, order number or email address, one of them fails — but only when they happen to run at the same time.
+Parallel tests share the application and its data. When two tests create the same customer, order number or email address, one of them fails, but only when they happen to run at the same time.
 
-Make every value a test creates unique to that test. `Proto.Context.UniqueName("customer")` derives a deterministic, persistent-store-safe name from the test id, so a rerun against a database that outlives the process never collides; fix `RunPrefix` if the same record should be reused:
+Make every value a test creates unique to that test. `Proto.Context.UniqueName("customer")` derives a deterministic name from the test id that is safe for a persistent store, so a rerun against a database that outlives the process never collides. Fix `RunPrefix` if the same record should be reused:
 
 ```csharp
 new { name = Proto.Context.UniqueName("customer") }   // "customer-0042317"
@@ -85,13 +85,13 @@ For a one-off value that does not need to survive the run, `context.TestId` inte
 new { email = $"customer-{context.TestId}@example.test" }
 ```
 
-Tests that genuinely cannot run side by side need the runner's own tool: `[NonParallelizable]` on NUnit, a collection on xUnit.
+Tests that genuinely cannot run side by side need the runner's own tool: `[NonParallelizable]` on NUnit, a collection on xUnit. See [Concurrency](../foundation/concurrency.md) for what ProtoTest keeps isolated.
 
 ## Where is the trace?
 
-Without `ConfigureTracing`, the trace is written to `TestResults/prototest-{runId}.prototrace`. Relative paths — that one and your own — resolve against the directory the tests run in, which for `dotnet test` is the test project's output folder: `bin/Debug/net10.0/TestResults/`. Set an absolute path, or one built from an environment variable, to collect it from CI.
+Without `ConfigureTracing`, the trace goes to `TestResults/prototest-{runId}.prototrace`. Relative paths, that one and your own, resolve against the directory the tests run in, which for `dotnet test` is the test project's output folder: `bin/Debug/net10.0/TestResults/`. Set an absolute path, or one built from an environment variable, to collect it from CI.
 
-If [trace.prototest.dev](https://trace.prototest.dev) says the trace is **from an older ProtoTest**, the file was written before trace snapshot format 1.9. Run the tests again with a current ProtoTest. (The archive itself is manifest format 2.0: `spans.json` plus `state.json`, whose state documents are format 1.1.)
+If [trace.prototest.dev](https://trace.prototest.dev) says the trace is **from an older ProtoTest**, the file was written before trace snapshot format 1.9. Run the tests again with a current ProtoTest. The archive itself is manifest format 2.0: `spans.json` plus `state.json`, whose state documents are format 1.1.
 
 ## The CI artifact is empty
 
@@ -99,7 +99,7 @@ If [trace.prototest.dev](https://trace.prototest.dev) says the trace is **from a
 
 The trace's default relative path starts below the test process working directory, commonly `bin/Release/net10.0/TestResults/`, while the CI upload step usually searches from the repository root. Set an absolute `PROTOTEST_RESULTS` directory and use it for the trace and report sinks as shown in [Continuous integration](../continuous-integration/index.md#put-every-artifact-in-one-place).
 
-Also make the upload step run after failures: `if: always()` on GitHub Actions, `succeededOrFailed()` on Azure Pipelines or `artifacts: when: always` on GitLab. If the upload still fails, print the configured absolute directory once from the suite setup; do not broaden the artifact glob to the entire workspace, where it can accidentally collect unrelated files.
+Also make the upload step run after failures: `if: always()` on GitHub Actions, `succeededOrFailed()` on Azure Pipelines or `artifacts: when: always` on GitLab. If the upload still fails, print the configured absolute directory once from the suite setup. Do not broaden the artifact glob to the entire workspace, where it can collect unrelated files.
 
 ## Still stuck?
 

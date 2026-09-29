@@ -29,7 +29,7 @@ interface ComparisonProps {
 interface Ledger {
   /** Every line in the file. */
   total: number;
-  /** Lines that are not blank — the lines the bar is drawn from. */
+  /** Lines that are not blank: the lines the bar is drawn from. */
   meaningful: number;
   plumbing: number;
   scenario: number;
@@ -105,7 +105,7 @@ export default function Comparison({without, with: withProto, concerns}: Compari
       foot={
         <span className={styles.once}>
           <strong>Written once.</strong> Without, {suiteLines(without)} lines of helpers and DTOs. With,{' '}
-          {suiteLines(withProto)} lines — the host, the collectors and the sinks that produce the trace, the
+          {suiteLines(withProto)} lines: the host, the collectors and the sinks that produce the trace, the
           contract coverage and the report.
         </span>
       }>

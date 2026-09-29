@@ -11,11 +11,11 @@ The web model has four building blocks:
 | Type | What it is |
 | --- | --- |
 | `WebPage : WebComponent` | a top-level page you can open |
-| `WebComponent` | a reusable part of a page — a form, a dialog, a navigation bar |
+| `WebComponent` | a reusable part of a page: a form, a dialog, a navigation bar |
 | `WebElement` | one thing you act on or assert against |
 | `WebTable<TRow> : WebComponent` / `WebTableRow : WebComponent` | a table and its rows |
 
-You describe them as classes with **properties**, and ProtoTest builds a fresh element every time a property is read. Nothing is cached — each action resolves its element again against the live page, which is why the model tolerates re-rendering front-ends.
+You describe them as classes with **properties**, and ProtoTest builds a fresh element every time a property is read. Nothing is cached: each action resolves its element again against the live page, which is why the model tolerates re-rendering front-ends.
 
 ## Pages
 
@@ -32,14 +32,14 @@ var page = Proto.Context.Web().Page<InvoicesPage>();
 await page.OpenAsync("https://portal.example.test/invoices");
 ```
 
-`Page<T>()` doesn't navigate — it gives you a page object bound to the session, one instance per page type per session. `OpenAsync` navigates:
+`Page<T>()` doesn't navigate; it gives you a page object bound to the session, one instance per page type per session. `OpenAsync` navigates:
 
 ```csharp
 ValueTask OpenAsync(string address, CancellationToken cancellationToken = default);
 ValueTask OpenAsync(Uri address, CancellationToken cancellationToken = default);
 ```
 
-A relative address is resolved against the session's application address — `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with the named endpoint (see [Sessions](./index.md#sessions)). With no address configured, a relative address throws an `InvalidOperationException` naming the application. An absolute address is used as given.
+A relative address is resolved against the session's application address, `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with the named endpoint (see [Sessions](./index.md#sessions)). With no address configured, a relative address throws an `InvalidOperationException` naming the application. An absolute address is used as given.
 
 ## Components
 
@@ -74,7 +74,7 @@ public sealed class AddressForm : WebComponent
 }
 ```
 
-`page.Billing.Street` and `page.Shipping.Street` find different fields even though both are labelled "Street" — one reusable class, two scopes. Each `root` appends one level to the component path (`{parentPath}.{name}`).
+`page.Billing.Street` and `page.Shipping.Street` find different fields even though both are labelled "Street": one reusable class, two scopes. Each `root` appends one level to the component path (`{parentPath}.{name}`).
 
 `Component<T>()` without a root doesn't add a scope level; it just groups elements under a name.
 
@@ -82,7 +82,7 @@ public sealed class AddressForm : WebComponent
 
 `WebComponent` also exposes `protected WebSession Web { get; }`, for components that need to open another page or reach the backend.
 
-Components must be created through `Page<T>()`, `Component<T>()` or `Components<T>()` — instantiating one with `new` and using it throws, and a component can only be initialised once.
+Components must be created through `Page<T>()`, `Component<T>()` or `Components<T>()`; instantiating one with `new` and using it throws, and a component can only be initialised once.
 
 ## Lists of components
 
@@ -157,11 +157,11 @@ await page.Table.Invoice("INV-123").Total.Should.HaveTextAsync("€ 10");
 await page.Table.RowNumber(2).Cell("Total").Should.HaveTextAsync("€ 10");
 ```
 
-Note that row numbers count every `role=row`, **including the header row** — `RowNumber(2)` is the first data row in a table with one header row.
+Note that row numbers count every `role=row`, **including the header row**: `RowNumber(2)` is the first data row in a table with one header row.
 
 ## Element references
 
-Every `WebElement` carries a `WebElementReference` describing where it lives — [`WaitUntilAsync`](./index.md#sessions) predicates and [custom waits](./middleware.md#wait-conditions) consume it:
+Every `WebElement` carries a `WebElementReference` describing where it lives; [`WaitUntilAsync`](./index.md#sessions) predicates and [custom waits](./middleware.md#wait-conditions) consume it:
 
 ```csharp
 string Name { get; }                    // e.g. "Submit"
@@ -172,5 +172,5 @@ WebElementReference Reference { get; }  // scope roots, path, name and locator
 
 ## Next
 
-- [Locators](./locators.md) — how the `By` factory and each backend find these elements.
-- [Actions and assertions](./interactions.md) — what you can do with an element.
+- [Locators](./locators.md) - how the `By` factory and each backend find these elements.
+- [Actions and assertions](./interactions.md) - what you can do with an element.

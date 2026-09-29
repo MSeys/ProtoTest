@@ -315,14 +315,14 @@ public static class MassTransitEnvelope
         catch (JsonException exception)
         {
             throw new MessagingAssertionException(
-                $"{message.Destination} — not a MassTransit envelope: its message is not valid JSON for " +
+                $"{message.Destination} - not a MassTransit envelope: its message is not valid JSON for " +
                 $"{typeof(T).Name}: {exception.Message}",
                 exception);
         }
         catch (NotSupportedException exception)
         {
             throw new MessagingAssertionException(
-                $"{message.Destination} — not a MassTransit envelope: its message cannot be read as " +
+                $"{message.Destination} - not a MassTransit envelope: its message cannot be read as " +
                 $"{typeof(T).Name}: {exception.Message}",
                 exception);
         }
@@ -443,10 +443,10 @@ public static class MassTransitEnvelope
     }
 
     private static MessagingAssertionException NotAnEnvelope(ProtoMessage message, string reason)
-        => new($"{message.Destination} — not a MassTransit envelope: {reason}.");
+        => new($"{message.Destination} - not a MassTransit envelope: {reason}.");
 
     private static MessagingAssertionException NotAnEnvelope(ProtoMessage message, string reason, Exception inner)
-        => new($"{message.Destination} — not a MassTransit envelope: {reason}: {inner.Message}", inner);
+        => new($"{message.Destination} - not a MassTransit envelope: {reason}: {inner.Message}", inner);
 }
 
 /// <summary>

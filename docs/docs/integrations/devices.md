@@ -183,7 +183,7 @@ the test never called `DisconnectAsync`.
 - **Transports ship one at a time.** WebSocket and MQTT today; TCP/serial after a real user needs them.
 - **MQTT speaks MQTT 5 over plain TCP.** `mqtt://` only: an MQTT 3.1.1-only broker and `mqtts://` come later.
 - **An MQTT client carries one publish topic and one subscribe filter.** `{deviceId}` is the only placeholder, so one client covers one topic convention; two device families are two clients. The filter may use the `+` and `#` wildcards, the publish topic may not.
-- **MQTT transport options are one set per run.** Connect timeout, keep-alive, the packet cap and a broker set through `configure` are shared by every MQTT client; a client that needs its own broker passes `address:` or a resolver.
+- **MQTT transport options are one set per run.** Connect timeout, keep-alive, the packet cap and a broker set through `configure` are shared by every MQTT client; a client that needs its own broker passes a resolver, because a configured or container broker wins over the registration's `address:`.
 - **A missing MQTT broker fails the device, naming the key.** A device capability or a skip cannot see a broker that configuration or a container supplies later, so a client without an address, a resolver or `ProtoTest:Devices:Mqtt:Broker` fails when the device is created instead of skipping.
 - **The MQTT broker is shared state.** One broker serves the run (and a parallel suite), so tests publish and subscribe in their own topic namespace; ProtoTest leaves no topics behind and cleans up none.
 - **The transport moves frames.** Protocol semantics - message kinds, sessions, OCPP operations - are the suite's code, and coverage only names what the catalog declares.

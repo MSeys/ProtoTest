@@ -81,11 +81,11 @@ public sealed class ProtoMessageAssertions
         }
         catch (JsonShapeMismatchException exception)
         {
-            throw new MessagingAssertionException($"{_message.Destination} — {exception.Message}", exception);
+            throw new MessagingAssertionException($"{_message.Destination} - {exception.Message}", exception);
         }
         catch (JsonDocumentAssertionException exception)
         {
-            throw new MessagingAssertionException($"{_message.Destination} — {exception.Message}", exception);
+            throw new MessagingAssertionException($"{_message.Destination} - {exception.Message}", exception);
         }
 
         return _message;

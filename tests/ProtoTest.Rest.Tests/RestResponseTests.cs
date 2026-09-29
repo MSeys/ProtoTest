@@ -190,7 +190,7 @@ public class RestResponseTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exception!.Message, Does.StartWith(
-                "GET /orders/42 — Shape mismatch failed with 1 error(s):"));
+                "GET /orders/42 - Shape mismatch failed with 1 error(s):"));
             Assert.That(exception.Message, Does.Contain("$.id"));
             Assert.That(exception.InnerException, Is.TypeOf<JsonShapeMismatchException>(),
                 "the shared mismatch data stays reachable");
@@ -275,7 +275,7 @@ public class RestResponseTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(returned, Is.SameAs(response));
-            Assert.That(exception!.Message, Does.StartWith("GET /orders/42 — Shape mismatch"));
+            Assert.That(exception!.Message, Does.StartWith("GET /orders/42 - Shape mismatch"));
         }
     }
 
@@ -360,7 +360,7 @@ public class RestResponseTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exception!.Message, Does.StartWith(
-                "GET /orders/42 — The JSON path '$.missing' did not match: the member 'missing' was not found."));
+                "GET /orders/42 - The JSON path '$.missing' did not match: the member 'missing' was not found."));
             Assert.That(exception.InnerException, Is.TypeOf<JsonPathException>());
         }
     }
@@ -383,7 +383,7 @@ public class RestResponseTests
         var exception = Assert.Throws<RestAssertionException>(() => response.ReadRequired<SampleDto>());
 
         Assert.That(exception!.Message, Is.EqualTo(
-            "GET /orders/42 — ReadRequired<SampleDto> failed: the response body was empty."));
+            "GET /orders/42 - ReadRequired<SampleDto> failed: the response body was empty."));
     }
 
     [Test]
@@ -404,7 +404,7 @@ public class RestResponseTests
         var exception = Assert.Throws<RestAssertionException>(() => response.ReadRequired<int>());
 
         Assert.That(exception!.Message, Is.EqualTo(
-            "GET /orders/42 — ReadRequired<Int32> failed: the response body was JSON null."));
+            "GET /orders/42 - ReadRequired<Int32> failed: the response body was JSON null."));
     }
 
     [Test]
@@ -432,7 +432,7 @@ public class RestResponseTests
         var exception = Assert.Throws<RestAssertionException>(() => response.ReadRequired<int>("$.note"));
 
         Assert.That(exception!.Message, Is.EqualTo(
-            "GET /orders/42 — ReadRequired<Int32>('$.note') failed: the value at '$.note' was JSON null."));
+            "GET /orders/42 - ReadRequired<Int32>('$.note') failed: the value at '$.note' was JSON null."));
     }
 
     [Test]
@@ -504,7 +504,7 @@ public class RestResponseTests
             Assert.That(entry.Attributes["json.path"], Is.EqualTo("$.missing"));
             Assert.That(entry.Error!.Type, Is.EqualTo(typeof(RestAssertionException).FullName));
             Assert.That(entry.Error!.Message, Does.StartWith(
-                "GET /orders/42 — The JSON path '$.missing' did not match"));
+                "GET /orders/42 - The JSON path '$.missing' did not match"));
         }
         await host.StopAsync();
     }

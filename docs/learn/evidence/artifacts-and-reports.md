@@ -53,9 +53,9 @@ One file from CI should explain the run to a reader who was not there. That file
   ]}
   next={[
     {
-      label: 'Take the evidence to CI',
-      to: '/learn/evidence/evidence-in-ci',
-      note: 'Keep the archive, post the digest, and run the same suite at three depths.',
+      label: 'Read the findings and the run gate',
+      to: '/learn/evidence/read-the-findings-and-the-run-gate',
+      note: 'A teardown failure becomes a finding, and a gate turns it into a failed run.',
     },
     {
       label: 'Reporting',

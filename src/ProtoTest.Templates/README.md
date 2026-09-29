@@ -1,6 +1,6 @@
 # ProtoTest.Templates
 
-This package contains a small starter project that you can generate, run and experiment with.
+A `dotnet new` template with a small runnable API and ProtoTest suite. Generate it, run it, experiment with it.
 
 For a larger (more complicated) example, see [Learning demo](https://github.com/MSeys/ProtoTest/tree/main/samples/Northstar.ProtoTest).
 

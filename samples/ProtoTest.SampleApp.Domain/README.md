@@ -2,7 +2,7 @@
 
 The Northstar domain, kept separate from the ASP.NET Core host that exposes it.
 
-It contains the store that owns organizations, projects, environments, deployments, usage, invoices and the webhook outbox; the plan catalogue and its entitlements; the domain exceptions; and the event bus that backs GraphQL subscriptions. It depends on nothing but the BCL and the contracts.
+It contains the store that owns organizations, projects, environments, deployments, usage, invoices and the webhook outbox; the plan catalogue and its entitlements; the domain exceptions; and the event bus that backs GraphQL subscriptions. It depends only on the BCL and the contracts package.
 
 The separation is what makes the sample teachable: the application is one host of this domain, and a test can compose the same domain itself - in-process or against a published environment's database - to arrange data through real domain logic rather than only through the API.
 

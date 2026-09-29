@@ -13,9 +13,9 @@ ProtoTest is a foundation for integration testing on .NET 8, 9 and 10.
 
 ## What is ProtoTest?
 
-Hard to describe it. You could call it a foundation, a large test framework or something else. I have a preference for "foundation", since that best describes what I personally want ProtoTest to be.
+ProtoTest is a foundation for integration testing: shared lifecycle, context and tracing that integrations build on.
 
-It's something you can build upon to do integration testing without having to build all of the supporting infrastructure yourself.
+It is something you can build upon to do integration testing without having to build all of the supporting infrastructure yourself.
 
 [Documentation](https://prototest.dev/)
 
@@ -23,7 +23,7 @@ It's something you can build upon to do integration testing without having to bu
 
 Core gives you the foundation of ProtoTest.
 
-It provides a lifecycle independent of the test runner you choose, so ProtoTest itself doesn't lock you into one runner. Adapters are available for NUnit, xUnit, TUnit and MSTest.
+It provides a lifecycle independent of the test runner you choose, so ProtoTest itself doesn't lock you into one runner. Adapters are available for NUnit, xUnit.net v2, xUnit.net v3, TUnit and MSTest.
 
 Each test gets its own `ProtoExecutionContext`. That context can share state between hooks, attributes and the test itself, while also giving you access to configured clients and integrations, observations, tracing and other shared functionality.
 
@@ -33,7 +33,7 @@ ProtoTest currently integrates with REST, GraphQL, gRPC, SQL, Entity Framework C
 Playwright, Selenium, RabbitMQ, MassTransit, ASP.NET Core, background workers, Testcontainers,
 WireMock, Aspire, MQTT and more.
 
-This definitely is a large list. I picked these because they're commonly used, but if something is missing, you can easily create an integration yourself, extend an existing one or open a discussion and I'll check it out.
+The integrations cover commonly used infrastructure. A missing one can be added as an integration; see Extend ProtoTest yourself.
 
 Use only what your test suite needs. You're not obligated to use everything.
 
@@ -45,15 +45,9 @@ Use only what your test suite needs. You're not obligated to use everything.
 
 ## What if it breaks?
 
-I admit, ProtoTest hides a lot of setup for you, or puts it behind abstract layers.
+ProtoTest moves setup behind shared layers, which keeps tests clean but can hide failure causes.
 
-That makes tests cleaner, but it can also make figuring out what went wrong harder.
-
-To help with that, I took inspiration from Playwright traces.
-
-The built-in integrations hook into the tracing provided by Core. At the end of a run, ProtoTest writes a `.prototrace` file containing the execution trace, including setup and teardown, observations, state, attachments and additional reports when configured.
-
-That brings us to ProtoTrace. The place where you can hopefully find what went wrong with your test.
+The built-in integrations hook into the tracing provided by Core. Every run writes a `.prototrace` file with setup, teardown, observations, state and attachments for the ProtoTrace viewer.
 
 <p align="center">
   <img src="assets/trace-viewer.png" alt="ProtoTrace showing a failed integration test, its execution story, response mismatch and cleanup" />
@@ -62,21 +56,16 @@ That brings us to ProtoTrace. The place where you can hopefully find what went w
 [ProtoTrace](https://trace.prototest.dev) ·
 [Open an interactive trace](https://trace.prototest.dev/?demo=1)
 
-## Why did I build this?
+## Why ProtoTest
 
-I love programming, but especially building tools and solving abstract problems.
+Integration suites repeat the same infrastructure setup. ProtoTest owns that setup once so each test states only its behavior.
 
-Integration testing can get rough, especially for bigger applications such as SaaS applications. There's so much infrastructure, setup and so on.
-
-My focus is and always has been clean and readable code. ProtoTest is my response to how messy that setup gets.
-
-It's built from scratch, but on what I learned from a testing framework I wrote by hand years ago. I had already been thinking about building ProtoTest since March, but was in a bit of a coding slump and never really got started. Once I did, it moved very quickly.
-
-[Read more about why I built ProtoTest.](https://prototest.dev/docs/project/why-prototest)
+[Read more about why ProtoTest exists.](https://prototest.dev/docs/project/why-prototest)
 
 ## What does that look like?
 
 ```csharp
+[Application("Api")]
 [ProtoTest]
 [SignedInAs]
 public async Task RestWritesAreVisibleThroughGraphQL()
@@ -103,19 +92,9 @@ This is a simple example combining the REST and GraphQL integrations. The focus 
 
 The test can focus on the behavior. If something goes wrong, its lifecycle, operations and checks are written to the same `.prototrace` file.
 
-## Is it just wrappers?
+## Wrappers with one lifecycle
 
-In essence, you could call it that. They wrap around proven frameworks that do certain jobs really well.
-
-If they already do their job well, why wrap them?
-
-I'm a huge fan of AAA since discovering that principle. Tests should simply be that readable: Arrange-Act-Assert. Straight to the point.
-
-That's why the wrappers exist. They integrate with the Core and they're my opinionated view on how I want to test with them.
-
-Common application setup can stay outside the test. Setup that matters to the scenario should still be visible.
-
-Is it the best for everyone? Probably not. But it might just help someone do integration testing.
+The integrations wrap proven libraries and share one lifecycle, context and trace, so tests read as arrange, act, assert. Setup shared by the suite stays out of the test; setup the scenario needs stays visible.
 
 ## Try it
 
@@ -128,32 +107,6 @@ dotnet test
 
 [The Learning demo suite](https://github.com/MSeys/ProtoTest/tree/main/samples/Northstar.ProtoTest)
 
-## Bonus: Behind the name
-
-A little bonus since ProtoTest might seem like a weird name. I tend to use Proto for projects that match my vision. As a student, I created ProtoEngine (a C++ 2D game engine, also available on GitHub).
-
-Why Proto? Is it short for Prototype?
-
-Yes, you'd be correct. Prototype in the sense of looking simple and straight to the point.
-
-That's always my goal, even if I don't succeed in every step or implementation. It has to look readable and simple while still being extendable.
-
-That's where the name ProtoTest comes from: Proto, from Prototype, combined with Testing. Bringing some of that simplicity and directness to integration testing.
-
-## AI usage?
-
-Yes, extensively. This is the first personal project where I have used AI this much.
-
-I had already built a similar testing framework by hand before the AI boom. ProtoTest was built from scratch, but the vision for most of it already existed.
-
-AI helped me work through ideas, alternatives and implementations much faster. I know what it can produce without enough direction, so I used different models, compared their suggestions, said no often and kept control over what ProtoTest became.
-
-Do I regret using it? I don't know yet.
-
-**ProtoTest is still what I wanted to build.**
-
-[Read the longer explanation in the documentation.](https://prototest.dev/docs/project/ai-usage)
-
 ## License
 
-ProtoTest is available under the [MIT license](https://github.com/MSeys/ProtoTest/blob/main/LICENSE). Issues and contributions are welcome.
+ProtoTest is available under the [MIT license](https://github.com/MSeys/ProtoTest/blob/main/LICENSE). Issues and contributions are welcome. AI assistance is used in development and disclosed per change; see the [AI usage notes](https://prototest.dev/docs/project/ai-usage).

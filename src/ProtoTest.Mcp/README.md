@@ -62,5 +62,4 @@ Every tool is read-only and returns a compact JSON document.
   (`ProtoTest.Reporting`); without one they say so and do not recompute coverage from spans.
 - One external dependency: the official `ModelContextProtocol` SDK (Apache-2.0).
 - The demo-only endpoint lives in `samples/ProtoTest.Mcp.DemoEndpoint`: built in this repository and
-  **not hosted** - read-only over the bundled demo trace, rate-limited, no accounts, no retention.
-  The local stdio server stays the product surface.
+  **not hosted**; see its README for the full honest-state list. The local stdio server stays the product surface.

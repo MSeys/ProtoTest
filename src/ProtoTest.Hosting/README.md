@@ -10,10 +10,10 @@ dotnet add package ProtoTest.Hosting
 ## Includes
 
 - Registration through `AddWorkerHost<TProgram>()`; the suite runs the worker's own entry point.
-- Nested workers: `AddApplication(...).AddWorkerHost<TProgram>("Billing")` follows the application's provider chain - `UseEnvironment()` leaves the worker to the environment that runs the application, `UseHost()` hosts it in this process and bridges the test clock.
+- Nested workers: `AddApplication(...).AddWorkerHost<TProgram>("Billing")` follows the application's provider chain: `UseEnvironment()` leaves the worker to the environment that runs the application, while `UseHost()` hosts it in this process and bridges the test clock.
 - Run-scoped lifetime: started after the infrastructure registered before it, stopped with the run.
-- The suite's configuration, the run's settings - container connection strings and settings
-  infrastructure values - and `AddWorkerHost` options reach the worker's normal configuration, in that
+- The suite's configuration, the run's settings (container connection strings and settings
+  infrastructure values) and `AddWorkerHost` options reach the worker's normal configuration, in that
   order of precedence, and are passed to the worker's `Main` as command-line arguments, so
   `Host.CreateApplicationBuilder(args)` reads final-precedence values before `Build()`.
 - Access from a test through `Proto.Context.Host<TProgram>()` and

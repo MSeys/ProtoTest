@@ -2,6 +2,10 @@
 
 Reads `.prototrace` archives without a dependency on `ProtoTest.Core`.
 
+```bash
+dotnet add package ProtoTest.Traces
+```
+
 ```csharp
 var archive = ProtoTraceArchive.Open("TestResults/Shop.prototrace");
 foreach (var test in archive.Tests.Where(test => !test.Succeeded))
@@ -36,3 +40,9 @@ the reason it was skipped instead of failing the scan.
   has no content or state to read and says so.
 - The embedded report is a projection of the JSON a `ProtoTest.Reporting` sink wrote, capped at 64 MB;
   the coverage arithmetic stays the sink's.
+
+## Learn more
+
+- [ProtoTrace and the trace format](https://prototest.dev/docs/observability/prototrace)
+- [CLI reference](https://prototest.dev/docs/agent-workflows/cli)
+- [Coding agents and MCP](https://prototest.dev/docs/agent-workflows/coding-agents)

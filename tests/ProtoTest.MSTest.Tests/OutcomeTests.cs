@@ -40,7 +40,7 @@ public sealed class OutcomeTests
 
         var results = await new ProtoTestAttribute().ExecuteAsync(new FakeTestMethod(method));
 
-        Assert.AreEqual(1, results.Length);
+        Assert.HasCount(1, results);
         Assert.AreEqual(UnitTestOutcome.Ignored, results[0].Outcome);
         StringAssert.Contains(results[0].LogOutput, "the adapter proves the skip path");
         StringAssert.Contains(results[0].DisplayName, "the adapter proves the skip path");

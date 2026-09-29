@@ -204,6 +204,7 @@ Work in progress is tracked in the repository [CHANGELOG.md](https://github.com/
 - Runners: an NUnit test body that throws is recorded failed with its exception and source location. [NUnit](https://prototest.dev/docs/runners/nunit)
 - Runners: a body `OperationCanceledException` records `Cancelled` under xUnit v2 as under the other adapters. [Runners](https://prototest.dev/docs/runners/overview)
 - Runners: TUnit parameterized rows record their arguments in the trace name. [TUnit](https://prototest.dev/docs/runners/tunit)
+- Runners: the MSTest floor accepts the standard template's version, and every runner page states its framework minimum. [Runners](https://prototest.dev/docs/runners/overview)
 - Cli: `prototest summary` separates its time range with a plain hyphen. [Cli](https://prototest.dev/docs/agent-workflows/cli#summary)
 - Diagnosis: `prototest summary` and the pull request comment print the failing operation once. [Diagnosis](https://prototest.dev/docs/agent-workflows/diagnosis)
 - Docs: the ProtoTrace page states what `Enabled = false` disables. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)

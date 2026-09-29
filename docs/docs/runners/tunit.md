@@ -14,7 +14,7 @@ TUnit is wired differently from the other four. There is no ProtoTest test attri
 dotnet add package ProtoTest.TUnit
 ```
 
-ProtoTest targets **.NET 8, 9 and 10**. The `dotnet new prototest` template defaults to `net10.0`; pass `-f net8.0` or `-f net9.0` for an older runtime.
+ProtoTest targets **.NET 8, 9 and 10**, and needs **TUnit 1.66.0 or newer**. The `dotnet new prototest` template defaults to `net10.0`; pass `-f net8.0` or `-f net9.0` for an older runtime.
 
 ## Register
 

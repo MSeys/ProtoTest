@@ -9,20 +9,9 @@ for the Learn track: every journey here ends in a trace, a report or a failure a
 dotnet test samples/Northstar.ProtoTest
 ```
 
-An ordinary run is green and fast, and it ends `Failed: 0, Passed: 14, Skipped: 5, Total: 19` on a
-machine with Playwright's Chromium. The application is hosted in-process, so the tests control the
-clock; the store is a SQLite file under `TestResults/Northstar.ProtoTest/` that each run recreates.
-The broker journey skips with a named reason because no broker is configured, the four drills skip
-without their opt-in, and the browser journey skips when Playwright's Chromium is not installed
-(`Passed: 13, Skipped: 6` in that case).
+An ordinary run is green: the application is hosted in-process, the store is recreated per run, and environment-dependent journeys skip with a named reason (broker, drills, browser).
 
-If the run reports `Total: 0`, the clone landed on a checkout older than 1.1. The lessons are written
-against the 1.1 sample, so fetch that branch before running:
-
-```bash
-git fetch origin version/1.1
-git checkout version/1.1
-```
+The lessons match the checked-out release. If the run reports `Total: 0`, check out the matching release branch first.
 
 ## The journeys
 
@@ -101,7 +90,7 @@ public sealed class MyFirstJourney
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~MyFirstJourney"
 ```
 
-3. Open `samples/Northstar.ProtoTest/bin/Debug/net8.0/TestResults/Northstar.ProtoTest/northstar.prototrace`
+3. Open `samples/Northstar.ProtoTest/bin/Debug/<tfm>/TestResults/Northstar.ProtoTest/northstar.prototrace`
    in the [trace viewer](https://trace.prototest.dev). The committed archive
    `l1-first-journey.prototrace` is the sample's own version of this journey: the same layers, one
    REST create and a shape check, with `atlas-...` names and more asserted fields. Compare the shape,

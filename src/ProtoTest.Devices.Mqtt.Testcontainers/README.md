@@ -8,7 +8,7 @@ dotnet add package ProtoTest.Devices.Mqtt.Testcontainers
 
 `MosquittoBroker.Container()` creates the resource. Register it as the `UseContainer(...)` provider of
 the target that declares `MqttDeviceOptions.BrokerSetting`, so the MQTT clients and anything else that
-reads the key resolve the same broker:
+reads the key resolve the same broker; see `ProtoTest.Testcontainers` for the shared container contract:
 
 ```csharp
 builder.AddInfrastructure("Mqtt", chain => chain

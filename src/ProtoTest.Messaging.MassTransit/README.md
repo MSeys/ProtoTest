@@ -4,7 +4,7 @@ Bridges the ProtoTest messaging surface to the application's MassTransit test ha
 command and await the events the application publishes, over the in-process `ITestHarness` the
 application composes with `AddMassTransitTestHarness`. The package also carries the MassTransit wire
 envelope (`MassTransitEnvelope`), so the same surface can test a published application through a real
-broker - RabbitMQ or any other adapter - without a harness.
+broker without a harness.
 
 ```bash
 dotnet add package ProtoTest.Messaging.MassTransit
@@ -113,11 +113,7 @@ await on the response address.
   on the bus or is created on first use.
 - `AwaitAsync` observes what the bus **published**; the application's consumption is not part of the
   surface.
-- The payload is the contract instance re-serialized with the shared web JSON defaults (camelCase);
-  the original wire bytes and the MassTransit envelope are not retained. A published `contentType`
-  argument is ignored - the envelope's content type is MassTransit's. A null or empty payload
-  publishes the contract's default instance; a positional record has none, so it fails the publish
-  naming the contract.
+- The payload is the contract re-serialized with the shared web JSON defaults. A null or empty payload publishes a default instance; a contract with no parameterless constructor fails the publish with an error naming the contract.
 - Publishing needs a concrete message contract; an interface contract can be awaited when the
   application publishes it, but not published from the test.
 - The harness keeps its published history for the whole run, and each test's consumer snapshots the

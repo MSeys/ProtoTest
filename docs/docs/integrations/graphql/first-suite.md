@@ -8,6 +8,11 @@ description: "From a fresh test project to a passing query, a mutation whose res
 
 This page goes from a fresh test project to a passing query, a mutation whose result is asserted, and a subscription waiting for an event. It uses NUnit and an in-process server. A deployed endpoint needs one configuration change. Other runners differ only in the setup class ([Test runners](../../runners/overview.md)).
 
+```mermaid
+flowchart LR
+    S1["1. Packages"] --> S2["2. Host"] --> S3["✅ 3. Query\nfirst green run"] --> S4["4. Mutate"] --> S5["5. Subscribe"]
+```
+
 ## 1. Add the packages
 
 ```bash
@@ -72,6 +77,10 @@ public sealed class ViewerTests
 
 `ExpectAsync` builds the selection set from the shape and asserts the same shape against the result; `JsonValue` adds constraints beyond equality (greater than, not null, one of). Run it with `dotnet test`. [Queries and mutations](./operations.md) covers variables, the fluent builder and raw documents.
 
+:::tip[Checkpoint: first green run]
+`dotnet test` passes after this step. The trace lands at `TestResults/prototest-{runId}.prototrace` with a `graphql.operation` entry for the query. Steps 4 and 5 build on this host without changing it.
+:::
+
 ## 4. Mutate and read the result
 
 ```csharp
@@ -125,6 +134,10 @@ async Task TriggerAsync(CancellationToken cancellationToken)
 ```
 
 [Subscriptions](./subscriptions.md) has the full surface, including SSE, connection payloads and custom sockets. Pass a cancellation token. Without one, a subscription with no events waits indefinitely.
+
+:::tip[Checkpoint: the suite is green]
+`dotnet test` passes with all three tests. The trace holds `graphql.operation` entries for the query and the mutation plus `graphql.subscription.start|next|complete` events for the subscription. If the subscription test flakes, check the two items in the list below: a token on every wait, and triggers that run until the event lands.
+:::
 
 ## Where the run is recorded
 

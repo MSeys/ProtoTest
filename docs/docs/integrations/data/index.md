@@ -90,6 +90,15 @@ On the builder:
 
 ## The tasks
 
+```mermaid
+flowchart LR
+    W[With] --> D[defaults pipeline]
+    D --> B[Build: object in memory]
+    D --> C[CreateAsync: provisioner creates it in the app]
+    C --> M[identity map: Ref resolves it]
+    M --> K[cleanup in reverse order at teardown]
+```
+
 ```csharp
 var project = Proto.Context.Data()
     .For<CreateProjectRequest>()
@@ -145,6 +154,11 @@ var plan = Proto.Context.Data().For<Invoice>()
 
 foreach (var value in plan.Values)
     Console.WriteLine($"{value.MemberName} = {value.Value}  [{value.SourceKind}]");
+
+// Total = 125  [Explicit]
+// Currency = EUR  [MemberDefault]
+// Customer = customer-7F3A  [MemberDefault]
+// Id = 3fa85f64-5717-4562-b3fc-2c963f66afa6  [TypeProvider]
 ```
 
 Each `ProtoDataValueExplanation` carries `MemberName`, `ValueType`, `Value`, `SourceKind` and `Source`, which for defaults is the module that registered them. `SourceKind` is one of `Explicit`, `MemberDefault`, `TypeProvider`, `CustomResolver`, `BuiltIn` or `ConstructorDefault`. For a factory type, `Explain()` lists only the explicit `With(...)` values plus the construction source, because the factory resolves its inputs when `Build()` runs.
@@ -152,6 +166,14 @@ Each `ProtoDataValueExplanation` carries `MemberName`, `ValueType`, `Value`, `So
 ## In the trace and coverage
 
 Every builder operation is traced with source `ProtoTest.Data`:
+
+```text
+data.create · Invoice → MembershipResponse        # operation
+├─ data.value.resolve · Total = 125               # [Explicit] from With
+├─ data.value.resolve · Currency = EUR            # [MemberDefault] InvoiceDataDefaults
+└─ data.provision · NorthstarMemberProvisioner    # child: request → app → member.Id
+   └─ value item value:membership:42              # identity map entry
+```
 
 | Operation | Notes |
 | --- | --- |

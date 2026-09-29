@@ -203,6 +203,14 @@ builder.ConfigureServices(services => services.AddSingleton<IProtoCollector>(
     new DeviceCoverageCollector("Devices", [new OcppProtocol()])));
 ```
 
+A report row names the message kind, whether a test asserted it, and how often:
+
+```text
+kind        status    count
+PING_ACK    covered   1
+PONG_ACK    gap       0  (no test asserted it)
+```
+
 ## Transport options
 
 The WebSocket backend takes code defaults in `AddWebSocketClient(..., configure)` (or the same callback on `AddInProcessWebSocketDevices<TProgram>(application, configure)`) and lets configuration override them; the in-process
@@ -226,6 +234,13 @@ The MQTT backend takes the same shape - code defaults in `AddMqttClient(..., con
 
 ## In the trace and coverage
 
+```text
+device.command · the peer reads a flow reading
+├─ device:Meters:FlowMeter:M-001 (client, type, transport, address, connection state)
+├─ predicate + timeout 5s; matched frame → message kind recorded for coverage
+└─ timeout fails with the description and the frames exchanged so far
+```
+
 A `device` entity per device (client, type, transport, address, connection state) and `device.connect`,
 `device.send`, `device.receive` and `device.command` operations; a failed expectation is a failed
 `device.command` carrying the awaited description and the frame log. The entity id is
@@ -240,7 +255,7 @@ the test never called `DisconnectAsync`.
 - **Per-client configuration, resolved per device.** The client's address template or resolver, its settings and the device id are the whole story; `{deviceId}` resolves in the address, the path and a setting value alike, and the shared transport options stay per run.
 - **In-process endpoints follow the application's winner.** When `AddInProcessWebSocketDevices<TProgram>(application)` is registered, the client uses the application's `TestServer` while the application's provider chain is served in-process (`UseInProcess<TProgram>()`, or `AddAspNetCoreServer` without a chain); when a configured, loopback or AppHost provider wins, the same registration declines and the socket at the winner's address serves it. The transport belongs to one `(TProgram, application)` pair, so multi-application suites route each client to its own application, and its `device` capability is declared only while the in-process winner can actually serve it.
 - **`ExpectAsync` consumes frames.** The bounded exchange log is for failure messages, not for matching a frame twice.
-- **Two transports ship.** WebSocket and MQTT are available; there is no TCP/serial transport.
+- **Two transports ship.** ProtoTest ships WebSocket and MQTT transports; there is no TCP/serial transport.
 - **MQTT speaks MQTT 5 over plain TCP.** `mqtt://` only. An MQTT 3.1.1-only broker and `mqtts://` fail the connect.
 - **An MQTT client carries one publish topic and one subscribe filter.** `{deviceId}` is the only placeholder, so one client covers one topic convention; two device families are two clients. The filter may use the `+` and `#` wildcards, the publish topic may not.
 - **MQTT transport options are one set per run.** Connect timeout, keep-alive, the packet cap and a broker set through `configure` are shared by every MQTT client; a client that needs its own broker passes a resolver, because a configured or container broker wins over the registration's `address:`.

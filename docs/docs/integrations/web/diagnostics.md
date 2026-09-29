@@ -1,5 +1,5 @@
 ---
-sidebar_position: 8
+sidebar_position: 9
 title: Diagnostics and artifacts
 description: "Screenshots, console output, page errors, failed requests and Playwright traces are captured automatically and attached to the failing test."
 ---
@@ -7,6 +7,14 @@ description: "Screenshots, console output, page errors, failed requests and Play
 # Diagnostics and artifacts
 
 A failing browser test shows what the browser saw at the failure. ProtoTest captures that automatically and attaches it to the test, where your [runner](../../runners/overview.md) and the [ProtoTrace viewer](../../observability/prototrace.md) both show it.
+
+```text
+web.click · LoginPage.Form.Submit                    # FAILED (WebActionabilityException)
+├─ web.backend.execute · playwright · click          # the native driver call
+├─ web-{session}-{element}-{n}-failure.png           # full-page screenshot
+├─ web-{session}-{element}-{n}-page.html             # page HTML
+└─ web-{session}-{element}-{n}-location.txt          # URL and title
+```
 
 Open what the test left: the `.prototrace` archive (see [Where it lands and how to open it](#where-it-lands-and-how-to-open-it)), or the screenshots and page HTML in the runner output next to the exception.
 

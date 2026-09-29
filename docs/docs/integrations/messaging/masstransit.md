@@ -173,6 +173,15 @@ An application served by a configured address, a loopback listener, a container 
 
 ## Tracing
 
+```text
+messaging.publish · PaymentReceived                  # messaging.system = MassTransit
+└─ messaging.published observation (target MassTransit)
+
+messaging.await · InvoicePaid
+├─ messaging.system = MassTransit, messaging.timeout_ms = 10000
+└─ messaging.receive observation on match (the bus publish the test awaited)
+```
+
 The bridge records the messaging vocabulary unchanged: `messaging.publish` and `messaging.await` operations with `messaging.system` set to `MassTransit`, the `messaging.published`, `messaging.receive`, `messaging.contract.shape` and `messaging.failure` observations, and the run-scoped `messaging:broker` resource. Payload sections and attachments use the shared JSON redaction.
 
 ## Limits

@@ -130,6 +130,7 @@ table.Should.ContainRow("Region", "EMEA");            // one rendered value matc
 var emea = table.RowWhere("Region", "EMEA");          // throws when no row matches
 string region = emea["Region"].Text!;                 // text cell
 double amount = emea["FY26", "Amount"].Number!.Value; // numeric cell
+double total = workbook.Sheet("Summary").Cell("B1").Number!.Value; // one numeric cell, no assertion
 ```
 
 A column is found by its full header path; a single segment may match by suffix when it is unambiguous. Zero matches and more than one full or suffix match throw `SpreadsheetAssertionException` naming the candidate paths, so ambiguity fails instead of guessing. Header matching is ordinal (case-sensitive), and a single-segment path has no case folding. `ContainRow` compares rendered values, so a numeric or date key cell matches its printed form. A row can also be matched against a shape keyed by leaf header names, for example `table.Rows[0].Should.MatchShape(new { Region = "EMEA", Amount = "1200" })`.

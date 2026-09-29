@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 5
 title: Actions and assertions
 description: "Click, type, select and assert on a WebElement; every action waits until the element is ready to take it."
 ---
@@ -112,6 +112,15 @@ await page.Status.Should.HaveTextAsync("saved");
 await page.Error.ShouldNot.BeVisibleAsync();
 ```
 
+Two tracks, one rule: actions act once, assertions poll.
+
+```mermaid
+flowchart LR
+    A[resolve locator] --> B{action or assertion?}
+    B -->|action| C[wait actionable, act once, never re-issue]
+    B -->|assertion| D[poll every 50 ms, absorb not-found, pass or fail at timeout]
+```
+
 Assertions poll every 50 ms until the condition holds or the timeout passes. The default timeout is 5 seconds. While polling, "element not found yet" and "not actionable yet" are treated as "not yet", not as failures. When time runs out you get a `WebAssertionException` describing the last thing observed.
 
 - `HaveTextAsync` compares the element's rendered text exactly and ordinally; `ContainTextAsync` checks for an ordinal substring. The read is the browser's rendered text (Playwright's inner text, Selenium's `Element.Text`), so runs of whitespace and line breaks arrive collapsed; when the failure message shows two identical-looking strings, the expected one still carries the source formatting. `ShouldNot` is the inverse of each.
@@ -120,7 +129,14 @@ Assertions poll every 50 ms until the condition holds or the timeout passes. The
 
 ### Trace evidence
 
-Each assertion is a `assert.web` operation on the element, with `web.expectation`, `web.assert.negated` and `web.assert.timeout` attributes. A passing assertion records a `web.page.verified` [coverage observation](./index.md#page-coverage) for the page it was checked on; that is what makes a page count as covered.
+```text
+assert.web · Status should have text "saved"
+├─ web.expectation = HaveText, web.assert.negated = false, web.assert.timeout = 5s
+├─ poll every 50 ms: not-found and not-actionable count as "not yet"
+└─ pass → web.page.verified observation (the page counts as covered)
+```
+
+Each assertion is a `assert.web` operation on the element, with `web.expectation`, `web.assert.negated` and `web.assert.timeout` attributes. A passing assertion records a `web.page.verified` [coverage observation](./page-coverage.md) for the page it was checked on; that is what makes a page count as covered.
 
 :::note[Form values stay out of the trace]
 `FillAsync` records only the *length* of what was typed (`web.value` is `[REDACTED]`), and `HaveValueAsync` failures report the value's length rather than the value. Passwords and personal data you type in tests never end up in a `.prototrace` file.

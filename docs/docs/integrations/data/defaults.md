@@ -50,6 +50,23 @@ You can configure inline in `AddData(data => ...)`. The trace then reports the s
 
 For each member, the first of these that applies wins:
 
+```mermaid
+flowchart TD
+    M[member needs a value] --> W1{With in the test?}
+    W1 -->|yes| S1[Explicit]
+    W1 -->|no| M2{member default on the type or a base type?}
+    M2 -->|yes| S2[MemberDefault]
+    M2 -->|no| T3{type provider for the exact type?}
+    T3 -->|yes| S3[TypeProvider]
+    T3 -->|no| R4{custom resolver claims it?}
+    R4 -->|yes| S4[CustomResolver]
+    R4 -->|no| C5{constructor default on this route?}
+    C5 -->|yes| S5[ConstructorDefault]
+    C5 -->|no| B6{safe built-in?}
+    B6 -->|yes| S6[BuiltIn]
+    B6 -->|no| X[ProtoDataException names the member]
+```
+
 1. **`With(...)`** in the test.
 2. A **member default**: `data.For<T>().Default(x => x.Member, …)`, resolved by walking the target type and its base types.
 3. A **type provider**: `data.Values.Use<TValue>(…)`, matched on the exact type only.
@@ -58,6 +75,20 @@ For each member, the first of these that applies wins:
 6. A **safe built-in**, for a member with no constructor default: `null` for a nullable member or a nullable-annotated reference, a generated string for `string`, a generated `Guid`, and an empty array or list for array, `IEnumerable<T>`, `IReadOnlyCollection<T>`, `IReadOnlyList<T>`, `ICollection<T>`, `IList<T>` and `List<T>`.
 
 If none apply, `ProtoDataException` names the member. Numbers, enums, booleans, dates and your own value objects are deliberately *not* on the built-in list: provide them explicitly or through a default.
+
+A member resolving shows its source in `Explain()` and the trace:
+
+```csharp
+var plan = Proto.Context.Data().For<Invoice>()
+    .With(x => x.Total, 125m)
+    .Explain();
+// Total = 125  [Explicit]
+// Currency = EUR  [MemberDefault]
+// Id = 3fa85f64-5717-4562-b3fc-2c963f66afa6  [TypeProvider]
+// Each entry also names its source: the module type for defaults, "Host configuration" for inline setup.
+```
+
+Constant or provider, member or type? Use the provider overload when the value must be unique per test, a member default when it belongs to one object type, a type provider when every member of a type shares it, and a resolver when the convention spans many types.
 
 ## Member defaults
 

@@ -38,7 +38,7 @@ flowchart TD
 | package setup for *some* tests | a [`ProtoAttribute`](../foundation/attributes.md) | 1 |
 | run code around *every* test or the whole run | a [hook](../foundation/hooks.md) | 1 |
 | give tests a new client | a [client initializer](../foundation/clients.md) plus an extension method | 2 |
-| publish and await over your own broker | an [`IProtoMessageBroker`](../integrations/messaging/index.md#the-adapter-contract) whose consumer derives from [`ProtoMessageConsumerBase`](../integrations/messaging/index.md#writing-an-adapter) | 2, 3 |
+| publish and await over your own broker | an [`IProtoMessageBroker`](../integrations/messaging/adapters.md#the-adapter-contract) whose consumer derives from [`ProtoMessageConsumerBase`](../integrations/messaging/adapters.md#writing-an-adapter) | 2, 3 |
 | pass data between setup and tests | [typed state](../foundation/execution-context.md#typed-state) | 3 |
 | authenticate HTTP requests | an [`IProtoHttpAuthenticator`](../integrations/rest/authentication.md#writing-your-own) | 1 |
 | log a browser in | an [`IWebLoginStrategy`](../integrations/web/login.md) | 1 |

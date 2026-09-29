@@ -43,7 +43,7 @@ The run must wait when it starts an address before any test uses it. The choice 
     ),
     reveal: (
       <>
-        The loopback instance binds a port at run time, so nothing knows the address is up until it answers. The probe waits for <code>/health</code> and records its URL, the attempts and the time waited; the entity reads 1 attempt and 113 ms. A sleep would record none of that, only a slower entry in one test's execution span.
+        The loopback instance binds a port at run time, so nothing knows the address is up until it answers. The probe waits for <code>/health</code> and records its URL, the attempts and the time waited; the entity reads 1 attempt and 85 ms. A sleep would record none of that, only a slower entry in one test's execution span.
       </>
     ),
   }}

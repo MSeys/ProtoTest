@@ -13,13 +13,18 @@ $destination = Join-Path $destinationDirectory "prototest-demo.prototrace"
 $runStartedAtUtc = [DateTime]::UtcNow
 
 # The bundled demo is the whole Northstar suite with the drills switched on, so the viewer's landing
-# demo shows real failures next to the passing journeys. The four drills fail on purpose; the archive
-# check below requires exactly those and no others, and the run's own gate verdict travels with it.
+# demo shows real failures next to the passing journeys. The four drills fail on purpose; the warning
+# journey passes with a warning, so the archive also carries one partial outcome and its finding.
+# The archive checks below require exactly those and no others, and the run's own gate verdict
+# travels with it.
 $intentionalFailureNames = @(
     "ARealWaitDoesNotCloseTheDueWindow",
     "AnUnknownProjectIdIsTreatedAsMine",
     "ABareStatusHidesWhatTheApplicationSaid",
     "TheAddressWasHardcodedForOneMachine"
+)
+$intentionalPartialNames = @(
+    "APassingJourneyCanStillCarryAWarning"
 )
 
 New-Item -ItemType Directory -Force -Path $destinationDirectory | Out-Null
@@ -163,6 +168,24 @@ if ($unexpectedFailures.Count -gt 0) {
     throw "Expected no failures other than the intentional ones, but found: $names."
 }
 
+$partialTests = @($testGroups | Where-Object { $_.resource.attributes.testOutcome -eq "partial" })
+foreach ($intentionalPartial in $intentionalPartialNames) {
+    $intentionalPartials = @($partialTests | Where-Object {
+        $_.resource.attributes.testMethod -eq $intentionalPartial
+    })
+    if ($intentionalPartials.Count -ne 1) {
+        throw "Expected exactly one intentional partial '$intentionalPartial' in spans.json, but found $($intentionalPartials.Count)."
+    }
+}
+
+$unexpectedPartials = @($partialTests | Where-Object {
+    $_.resource.attributes.testMethod -notin $intentionalPartialNames
+})
+if ($unexpectedPartials.Count -gt 0) {
+    $names = @($unexpectedPartials | ForEach-Object { $_.resource.attributes.testMethod }) -join ", "
+    throw "Expected no partials other than the intentional one, but found: $names."
+}
+
 $allEvents = @($groups | ForEach-Object {
         $scopes = @($_.scopeSpans)
         @($scopes | ForEach-Object { $_.spans } | ForEach-Object { $_.events }) + @($scopes | ForEach-Object { $_.events })
@@ -182,9 +205,9 @@ if ($runKinds -notcontains "gate.evaluate") {
     throw "Expected the run's gate verdicts in the viewer trace."
 }
 
-# Evidence is span events: observations and attachments. A finding is optional (the Northstar gate
-# reports none), but the two the viewer always reads must be there.
-foreach ($record in @("observation", "attachment")) {
+# Evidence is span events: observations and attachments. The warning journey records a finding,
+# so the demo carries one too; the two the viewer always reads must be there.
+foreach ($record in @("observation", "attachment", "finding")) {
     if (-not ($allEvents | Where-Object { $_.record -eq $record })) {
         throw "Expected $record events in spans.json."
     }
@@ -203,4 +226,4 @@ if (-not ($changes | Where-Object { $_.source -eq "applicationside" })) {
 
 Copy-Item -LiteralPath $trace -Destination $destination -Force
 Write-Host "Updated viewer demo trace: $destination"
-Write-Host "Run: $($summary.Value.Trim()) - $($testGroups.Count) test resources, $($failedTests.Count) intentional failures"
+Write-Host "Run: $($summary.Value.Trim()) - $($testGroups.Count) test resources, $($failedTests.Count) intentional failures, $($partialTests.Count) intentional partials"

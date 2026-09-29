@@ -170,6 +170,19 @@ Run the broken teardown once more and the same story appears in the archive and 
 | report summary: Findings 1, Errors 2 | the finding and the gate are the two Error items |
 | runner: Passed 1, exit code 1 | the test passed; the gate failed the run |
 
-The same gate row passes in every committed archive. <a href="pathname:///lessons/l4-coverage.prototrace">l4-coverage.prototrace</a> carries `no error findings` with `No error findings were recorded.` A finding with status `Warning` would be recorded and still leave that gate passing, because this gate only looks for `Error`.
+The same gate row passes in every committed archive. <a href="pathname:///lessons/l4-coverage.prototrace">l4-coverage.prototrace</a> carries `no error findings` with `No error findings were recorded.`
+
+## A warning finding leaves the gate passing
+
+Not every finding fails the run. <a href="pathname:///lessons/l4-partial.prototrace">l4-partial.prototrace</a> holds a journey that passed its checks but named the response fields it left unread. The run recorded both halves:
+
+| Record | Reading |
+| --- | --- |
+| `test.execution`, partial, 172.5 ms | the body passed with a warning, so the test outcome is partial |
+| finding `finding-001`, Warning, category `Coverage`, message `The create response carried 4 fields no assertion mentioned: createdAtUtc, environmentCount, id, slug.` | the report item, grouped under the test |
+| gate `no error findings`, passed, message `No error findings were recorded.` | the verdict: a Warning is recorded and still leaves this gate passing, because the gate only looks for `Error` |
+| report summary: Findings 1, Warnings 1, Errors 0 | the finding is the one Warning item |
+
+The runner prints this test as skipped: NUnit has no partial status, so a warning reads as a skip in the summary while the trace records partial. Read the trace for the outcome, not the summary line.
 
 </LearnShell>

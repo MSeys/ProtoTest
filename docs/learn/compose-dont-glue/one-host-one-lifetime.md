@@ -144,10 +144,10 @@ The host records its own work in the trace's run layer, outside every test. `l1-
 | Record | Reading |
 | --- | --- |
 | Seven `capability` entities: Playwright, Data, Sheets, GraphQL, REST, ASP.NET Core, SQL | recorded when the host started, before the test's setup opened |
-| Run start `06:19:31.887Z`, the test's setup opens `06:19:33.017Z` | the host was alive about 1.1 seconds before the test |
+| Run start `18:37:08.068Z`, the test's setup opens `18:37:09.060Z` | the host was alive about 1.0 second before the test |
 | `Release · messaging:broker`, 0.3 ms | the host releases a run piece after the test |
 | `Release · readiness:application:Northstar web`, 0.0 ms | the readiness probe is a run resource |
-| `Release · application:loopback:Northstar web`, 5.4 ms | the listener the browser journey follows |
+| `Release · application:loopback:Northstar web`, 5.0 ms | the listener the browser journey follows |
 | The report's Resources section lists the run pieces as `Registered` | the report is written before the releases, so its snapshot says so |
 
 A run with no tests still has that shape. `l2-broker-skip.prototrace` holds only the three releases and no test resource at all, because the broker journey skipped before its lifecycle started. The host existed, served the capability list, and was stopped exactly once.

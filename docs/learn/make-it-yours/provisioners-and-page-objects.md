@@ -151,10 +151,10 @@ One call, and the trace records a chain. From the first journey's archive, <a hr
 
 | Entry | Reading |
 | --- | --- |
-| `Create · ProvisionTenantRequest`, 138.1 ms | the data surface received the request and looked up the registered provisioner |
-| `Build · ProvisionTenantRequest`, 3.6 ms | the defaults and the `With` calls produced the value that was sent |
-| `Provision · ProvisionTenantRequest → TenantResponse`, 132.9 ms | the provisioner made the call and returned the created value |
-| `Release · data:TenantResponse:1`, 10.8 ms, then `Cleanup · TenantResponse` | teardown released the tracked value and ran the cleanup |
+| `Create · ProvisionTenantRequest`, 137.0 ms | the data surface received the request and looked up the registered provisioner |
+| `Build · ProvisionTenantRequest`, 3.5 ms | the defaults and the `With` calls produced the value that was sent |
+| `Provision · ProvisionTenantRequest → TenantResponse`, 132.0 ms | the provisioner made the call and returned the created value |
+| `Release · data:TenantResponse:1`, 10.3 ms, then `Cleanup · TenantResponse` | teardown released the tracked value and ran the cleanup |
 
 Nothing in the test knew a port or a route. The registration decided which implementation ran, and the trace names it.
 

@@ -166,8 +166,8 @@ The committed archive for the first journey, <a href="pathname:///lessons/l1-fir
 
 | Entry | Reading |
 | --- | --- |
-| `Before · NorthstarTenantAttribute`, 141.3 ms | the attribute runs first, at Order -200 |
-| `Create · ProvisionTenantRequest`, 138.1 ms, with `Build` and `Provision` below it | the data surface builds the request, creates it and returns the response |
+| `Before · NorthstarTenantAttribute`, 139.9 ms | the attribute runs first, at Order -200 |
+| `Create · ProvisionTenantRequest`, 137.0 ms, with `Build` and `Provision` below it | the data surface builds the request, creates it and returns the response |
 | `Before · NorthstarMemberAttribute` | the composite's own entry, carrying the attributes it composed |
 | `Apply · NorthstarAuthenticator`, 1 ms | the HTTP auth hook applies the member's token on the first call |
 | `After · NorthstarMemberAttribute`, then `After · NorthstarTenantAttribute`, with `data.cleanup Cleanup · TenantResponse` | teardown reverses the order and the provisioned tenant is removed |

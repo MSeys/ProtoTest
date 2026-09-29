@@ -78,15 +78,15 @@ The ordinary run is green and fast. The application is hosted in-process, so the
 - the broker journey, because no broker is configured;
 - the browser journey, when Playwright's Chromium is not installed.
 
-The four failure drills also skip in an ordinary run; `ProtoTest__Sample__Drills=true` lets them fail so you can read their traces. The summary prints how many tests passed, failed and skipped, and lists the skipped tests. Add `--logger "console;verbosity=detailed"` to print each reason beside its test.
+The four failure drills also skip in an ordinary run; `ProtoTest__Sample__Drills=true` lets them fail so you can read their traces. The warning journey beside them skips too. The summary prints how many tests passed, failed and skipped, and lists the skipped tests. Add `--logger "console;verbosity=detailed"` to print each reason beside its test.
 
 A healthy run on a machine with Chromium ends exactly like this:
 
 ```text
-Failed:     0, Passed:    14, Skipped:     5, Total:    19
+Failed:     0, Passed:    14, Skipped:     6, Total:    20
 ```
 
-The five skips are the broker journey and the four drills. Without Chromium the browser journey skips too, and the summary reads `Passed: 13, Skipped: 6`. If your clone reports `Total: 0`, it is behind the release; pull or clone again and run it once more.
+The six skips are the broker journey, the four drills and the warning journey. Without Chromium the browser journey skips too, and the summary reads `Passed: 13, Skipped: 7`. If your clone reports `Total: 0`, it is behind the release; pull or clone again and run it once more.
 
 ```bash
 git pull

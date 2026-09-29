@@ -124,10 +124,10 @@ From the archive:
 | Entry | What it shows |
 | --- | --- |
 | `clock.advance` on `test.execution`, "Clock advanced by 30:0:00:01" | the delta, from the test side |
-| `http.request` REST `GET /api/v1/subscription`, 177.8 ms, HTTP 200 | the period the test read |
+| `http.request` REST `GET /api/v1/subscription`, 141.9 ms, HTTP 200 | the period the test read |
 | `Northstar.Domain` `invoice.issue`, reported by the application | the application closed the period |
-| `http.request` REST `GET /api/v1/invoices`, 71.3 ms, HTTP 200 | the invoice the test read |
-| `test.execution`, 282.7 ms | the whole journey |
+| `http.request` REST `GET /api/v1/invoices`, 68.4 ms, HTTP 200 | the invoice the test read |
+| `test.execution`, 233.7 ms | the whole journey |
 
 The clock advance is an event on the test execution, not a request. Nothing was sent anywhere to move time: the test holds the clock, and the application reads it.
 

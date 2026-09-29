@@ -24,7 +24,8 @@ The lessons match the checked-out release. If the run reports `Total: 0`, check 
 - `PlatformJourney`, `DomainAccessJourney` and `SheetsJourney` cross protocols: REST to GraphQL, REST
   to the database, and a downloaded workbook.
 - `FailureDrills` holds four deliberate failures, one per failure mode (time, state, environment,
-  visibility), each paired with the green test that does the journey the right way.
+  visibility), each paired with the green test that does the journey the right way, plus one passing
+  journey that carries a warning, so the run records a partial outcome and a finding.
 
 ## What the lessons embed
 
@@ -46,7 +47,8 @@ failure.
 | `l2-broker-skip.prototrace` | `BrokerJourney.PayingAnInvoicePublishesAnInvoicePaidEvent` | The `Broker` capability is absent without a broker; the gated journey never starts. | L2 `add-and-remove-an-integration`, L2 `one-host-one-lifetime` |
 | `l3-clock-window.prototrace` | `ClockJourney.ClosingTheBillingPeriodIssuesTheInvoiceOnTheTestClock` | The test clock closes the billing period; the run also carries the `/health` readiness entity. | L3 (`the-test-clock`, `readiness-instead-of-sleeps`, `parallel-safety`) |
 | `l4-coverage.prototrace` | `PlatformJourney.RestWritesAreVisibleThroughGraphQL` | One REST write and one GraphQL read; the embedded report carries the contract coverage row the run recorded. | L4 `contract-coverage`, L4 `read-the-findings-and-the-run-gate` |
-| `l4-artifacts.prototrace` | `SheetsJourney.TheMonthlyReport_ShouldMatchItsModel` | A downloaded workbook with its response artifact and the model assertions. | L4 `artifacts-and-reports` |
+| `l4-artifacts.prototrace` | `SheetsJourney.TheMonthlyReportMatchesItsModel` | A downloaded workbook with its response artifact and the model assertions. | L4 `artifacts-and-reports` |
+| `l4-partial.prototrace` | `FailureDrills.APassingJourneyCanStillCarryAWarning` | The journey passes but names the fields it left unread: the run records a partial outcome and a Warning finding, and the `no error findings` gate still passes. | L4 `read-the-findings-and-the-run-gate` |
 
 ## Start from a clean file
 

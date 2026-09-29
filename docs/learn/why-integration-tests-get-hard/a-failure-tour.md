@@ -84,7 +84,7 @@ $env:ProtoTest__Sample__Drills = "true"
 dotnet test samples/Northstar.ProtoTest
 ```
 
-The run now reports four failures, one per question, and writes their traces. Each card above links its own archive from `docs/static/lessons/`, written by the same generator that writes the archive your run produces. Download one and drop it on the [viewer](https://trace.prototest.dev) to walk it yourself.
+The run now reports four failures, one per question, and writes their traces. The warning journey beside them passes with a warning, so its trace records a partial outcome and a finding. Each card above links its own archive from `docs/static/lessons/`, written by the same generator that writes the archive your run produces. Download one and drop it on the [viewer](https://trace.prototest.dev) to walk it yourself.
 
 ## One of the fixes, line by line
 

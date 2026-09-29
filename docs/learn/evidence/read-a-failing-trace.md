@@ -87,13 +87,13 @@ The time pair is the clearest:
 | | The drill | The test that holds |
 | --- | --- | --- |
 | Before the read | an invoice is provisioned | an invoice is provisioned, then the clock moves eight days |
-| The call | `REST GET /api/v1/organization`, 89.7 ms, HTTP 200 | the same call, 77.3 ms, HTTP 200 |
+| The call | `REST GET /api/v1/organization`, 74.0 ms, HTTP 200 | the same call, 65.3 ms, HTTP 200 |
 | The check | shape failed: `$.status` expected `past_due`, read `active` | shape succeeded, then the invoice is paid |
 
 The call succeeded in both runs. The application answered quickly, with a subscription that was still `active`, because nothing had moved the clock the application reads. The drill waited a real second, and that changed nothing. The fix advanced the test clock, and the same shape check passed. One failure, four answers, and the pair writes the fix down.
 
 ## When the trace is silent
 
-The environment pair is the other direction. Its execution layer holds a single `test.execution` entry of 2.06 s and no request at all. The entry records the failure, a connection error, and nothing about the call: the raw client ran outside the composition, so the run never wrapped it. That missing operation is the diagnosis. The fix takes the address from the composition, and the same call turns into an ordinary request entry.
+The environment pair is the other direction. Its execution layer holds a single `test.execution` entry of 2.05 s and no request at all. The entry records the failure, a connection error, and nothing about the call: the raw client ran outside the composition, so the run never wrapped it. That missing operation is the diagnosis. The fix takes the address from the composition, and the same call turns into an ordinary request entry.
 
 </LearnShell>

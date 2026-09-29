@@ -164,8 +164,8 @@ The committed archive for the first journey, <a href="pathname:///lessons/l1-fir
 | Entry | Reading |
 | --- | --- |
 | `Initialize · ScenarioProbe (ScenarioProbe)`, 0.1 ms | the initializer registered the custom client during setup |
-| `Before · NorthstarScenarioHook`, 6.2 ms | the hook ran before the test and wrote the opening event |
-| `Publish · <test id>-scenario-summary.json`, 0.6 ms | the hook attached the milestone trail at teardown |
+| `Before · NorthstarScenarioHook`, 5.9 ms | the hook ran before the test and wrote the opening event |
+| `Publish · <test id>-scenario-summary.json`, 0.5 ms | the hook attached the milestone trail at teardown |
 
 Your milestone lands in the same attachment, because the client, the hook and the attachment are one integration. That is the whole point: a feature you write behaves like a feature that shipped.
 

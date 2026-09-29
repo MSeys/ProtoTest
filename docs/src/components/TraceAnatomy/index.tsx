@@ -46,7 +46,7 @@ const layers: Layer[] = [
       {
         kind: 'application',
         name: 'Northstar web on a loopback listener',
-        meta: 'readiness /health, 1 attempt, waited 88 ms',
+        meta: 'readiness /health, 1 attempt, waited 84 ms',
       },
       { kind: 'environment', name: '.NET 8.0.31 on Windows 10.0.26200, X64' },
     ],
@@ -54,20 +54,20 @@ const layers: Layer[] = [
   {
     id: 'setup',
     label: 'Setup',
-    when: '512.8 ms',
+    when: '508.4 ms',
     lead: 'Everything before the test body: hooks, attributes, clients, the database connection and the state the test asked for.',
     entries: [
-      { kind: 'test.setup', name: 'Setup', meta: '512.8 ms' },
+      { kind: 'test.setup', name: 'Setup', meta: '508.4 ms' },
       {
         kind: 'client.initialize',
         name: 'Rest, GraphQL, and the web client',
         meta: 'each client initializes once, with its address recorded',
       },
-      { kind: 'sql.connection.open', name: 'Open SqliteConnection', meta: '0.06 ms' },
+      { kind: 'sql.connection.open', name: 'Open SqliteConnection', meta: '0.05 ms' },
       {
         kind: 'attribute.before',
         name: 'Application, NorthstarTenant',
-        meta: 'the tenant attribute provisions a TenantResponse in 154.3 ms',
+        meta: 'the tenant attribute provisions a TenantResponse in 151.7 ms',
       },
       { kind: 'attribute.before', name: 'SignedInAs, NorthstarMember', meta: 'the sign-in is recorded as state, not as a log line' },
     ],
@@ -75,34 +75,34 @@ const layers: Layer[] = [
   {
     id: 'execution',
     label: 'Execution',
-    when: '314.0 ms',
+    when: '286.8 ms',
     lead: 'The test body. New entries nest under test.execution; the clock move is an event on it.',
     entries: [
-      { kind: 'test.execution', name: 'Test execution', meta: '314.0 ms, succeeded' },
-      { kind: 'data.create', name: 'Create · IssueInvoiceRequest', meta: '176.9 ms' },
-      { kind: 'data.provision', name: 'Provision · IssueInvoiceRequest to InvoiceResponse', meta: '175.5 ms' },
+      { kind: 'test.execution', name: 'Test execution', meta: '286.8 ms, succeeded' },
+      { kind: 'data.create', name: 'Create · IssueInvoiceRequest', meta: '165.8 ms' },
+      { kind: 'data.provision', name: 'Provision · IssueInvoiceRequest to InvoiceResponse', meta: '164.5 ms' },
       { kind: 'clock.advance', name: 'Clock advanced by 8:0:00:00', meta: 'event on test.execution, from the test side' },
       { kind: 'Northstar.Domain', name: 'invoice.issue', meta: 'reported by the application itself' },
-      { kind: 'http.request', name: 'REST · GET /api/v1/organization', meta: '77.3 ms' },
+      { kind: 'http.request', name: 'REST · GET /api/v1/organization', meta: '65.3 ms' },
       { kind: 'assert.http.status', name: 'Assert status · 200 OK', meta: 'the check that decided the request' },
       { kind: 'assert.json.shape', name: 'Assert response shape', meta: '7.5 ms, the property the test depended on' },
-      { kind: 'http.request', name: 'REST · POST /api/v1/invoices/{invoiceId}/pay', meta: '39.5 ms' },
+      { kind: 'http.request', name: 'REST · POST /api/v1/invoices/{invoiceId}/pay', meta: '35.0 ms' },
       { kind: 'assert.json.shape', name: 'Assert response shape', meta: 'the paid status' },
     ],
   },
   {
     id: 'teardown',
     label: 'Teardown',
-    when: '43.7 ms',
+    when: '40.6 ms',
     lead: 'What the test leaves behind, and what the run releases for it. The trace records the releases, so a leaked resource would show here.',
     entries: [
-      { kind: 'test.teardown', name: 'Teardown', meta: '43.7 ms' },
+      { kind: 'test.teardown', name: 'Teardown', meta: '40.6 ms' },
       {
         kind: 'attachment.publish',
         name: '5 REST artifacts and the scenario summary',
         meta: 'request, response and expected shape for each call',
       },
-      { kind: 'data.cleanup', name: 'Cleanup · TenantResponse', meta: '8.7 ms, the provisioned tenant is removed' },
+      { kind: 'data.cleanup', name: 'Cleanup · TenantResponse', meta: '8.9 ms, the provisioned tenant is removed' },
       {
         kind: 'resource.release',
         name: 'Application services, database connection, messaging consumer',
@@ -115,7 +115,7 @@ const layers: Layer[] = [
 const blindSpots = [
   {
     title: 'Work outside the composition',
-    body: 'The environment drill used a raw HttpClient against a fixed address. Its test.execution span ran 2.06 s and recorded no operation at all; the entry holds the connection failure, and the call it never wrapped cannot appear in the trace.',
+    body: 'The environment drill used a raw HttpClient against a fixed address. Its test.execution span ran 2.05 s and recorded no operation at all; the entry holds the connection failure, and the call it never wrapped cannot appear in the trace.',
   },
   {
     title: 'Work inside the application',

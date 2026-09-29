@@ -153,8 +153,8 @@ The first journey's archive is the in-process case:
 
 | Entry | Reading |
 | --- | --- |
-| `Before · NorthstarTenantAttribute`, 141.3 ms | the tenant is provisioned first, at Order -200 |
-| `Before · SignedInAsAttribute`, 1.8 ms | the declaration runs next, at Order -100, and its event reads `Signed in as test-user` |
+| `Before · NorthstarTenantAttribute`, 139.9 ms | the tenant is provisioned first, at Order -200 |
+| `Before · SignedInAsAttribute`, 1.7 ms | the declaration runs next, at Order -100, and its event reads `Signed in as test-user` |
 | `Apply · TestUserAuthenticator`, 1.2 ms | the shipped transport applies for the in-process server |
 | `Apply · NorthstarAuthenticator`, 1.0 ms | the sample's own authenticator rides along on the same request |
 | auth entity `auth:user`: name `test-user`, roles empty, claim types empty, application `Northstar`, transport `in-process` | the identity the trace keeps |

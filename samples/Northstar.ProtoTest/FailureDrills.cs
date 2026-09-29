@@ -1,6 +1,7 @@
 namespace Northstar.ProtoTest;
 
 using System.Net;
+using System.Text.Json;
 using global::NUnit.Framework;
 using global::ProtoTest.Core;
 using global::ProtoTest.Data;
@@ -12,7 +13,8 @@ using global::ProtoTest.SampleApp.Contracts;
 
 /// <summary>
 /// The opt-in failures the Learn track reads, each paired with the green counterpart that does the
-/// same journey the right way: time, state, environment and visibility. Set
+/// same journey the right way: time, state, environment and visibility. The last test passes but
+/// carries a warning, so the run records a partial outcome and a finding. Set
 /// <c>ProtoTest:Sample:Drills=true</c> to let the drills fail and record their traces; an ordinary run
 /// ignores them and runs only the fixes.
 /// </summary>
@@ -153,6 +155,34 @@ public sealed class FailureDrills
                 code = ProblemCodes.ValidationFailed,
                 message = JsonValue.StringContaining("name")
             });
+    }
+
+    /// <summary>Evidence, kept: the journey passes but names the fields it left unread, so the run records a partial outcome and a finding.</summary>
+    [ProtoTest]
+    [SignedInAs]
+    public async Task APassingJourneyCanStillCarryAWarning()
+    {
+        RequireDrills();
+        var name = $"warn-{Proto.Context.TestId}";
+        using var created = await Proto.Context.Rest()
+            .Body(new CreateProjectRequest(name))
+            .PostAsync("/api/v1/projects");
+
+        created
+            .Should.HaveHttpStatus(HttpStatusCode.Created)
+            .Should.MatchShape(new { name, status = ProjectStatuses.Active });
+
+        // The shape names two fields; the response carries six. The rest went unread, so the passing
+        // check warns instead of passing cleanly: the run keeps the warning as evidence.
+        using var body = created.ReadRequired<JsonDocument>();
+        var unread = body.RootElement.EnumerateObject()
+            .Select(property => property.Name)
+            .Where(field => field != "name" && field != "status")
+            .OrderBy(field => field, StringComparer.Ordinal)
+            .ToList();
+        var message = $"The create response carried {unread.Count} fields no assertion mentioned: {string.Join(", ", unread)}.";
+        Proto.Context.AddFinding(message, category: "Coverage");
+        Assert.Warn(message);
     }
 
     private static void RequireDrills()

@@ -3,9 +3,9 @@ import type {ReactNode} from 'react';
 import styles from './styles.module.css';
 
 /*
- * The viewer's Run view for the bundled demo: the outcome line, the phase bar with the four failures,
- * the "what this run could see" panel, and the needs-attention list. Values come from
- * prototest-demo.prototrace; the test list below needs-attention is left out on purpose - the failed
+ * The viewer's Run view for the bundled demo: the outcome line, the phase bar with the four failures
+ * and the partial test, the "what this run could see" panel, and the needs-attention list. Values come
+ * from prototest-demo.prototrace; the test list below needs-attention is left out on purpose - the failed
  * tests are the story here.
  */
 
@@ -29,9 +29,10 @@ const attLabelClass: Record<Tick, string> = {
   passed: styles.attLabelPassed,
 };
 
-const outcomes: Tick[] = Array.from({length: 18}, (_, index) => {
+const outcomes: Tick[] = Array.from({length: 19}, (_, index) => {
   const test = index + 1;
-  if (test === 1 || test === 2 || test === 4 || test === 12) return 'failed';
+  if (test === 8 || test === 10 || test === 12 || test === 15) return 'failed';
+  if (test === 11) return 'partial';
   return 'passed';
 });
 
@@ -48,15 +49,7 @@ interface Attention {
 
 const attention: Attention[] = [
   {
-    number: '01',
-    title: 'A real wait does not close the due window',
-    kicker: 'Assert response shape',
-    detail: '$.status: expected "past_due", got "active"',
-    outcome: 'failed',
-    label: 'Failed',
-  },
-  {
-    number: '02',
+    number: '08',
     title: 'A bare status hides what the application said',
     kicker: 'Assert status · 201 Created',
     detail: 'Expected HTTP status 201 (Created), but received 400 (BadRequest).',
@@ -64,7 +57,7 @@ const attention: Attention[] = [
     label: 'Failed',
   },
   {
-    number: '04',
+    number: '10',
     title: 'An unknown project ID is treated as mine',
     kicker: 'Assert status · 200 OK',
     detail: 'Expected HTTP status 200 (OK), but received 404 (NotFound).',
@@ -72,7 +65,23 @@ const attention: Attention[] = [
     label: 'Failed',
   },
   {
+    number: '11',
+    title: 'A passing journey can still carry a warning',
+    kicker: 'Coverage finding',
+    detail: 'The create response carried 4 fields no assertion mentioned: createdAtUtc, environmentCount, id, slug.',
+    outcome: 'partial',
+    label: 'Partial',
+  },
+  {
     number: '12',
+    title: 'A real wait does not close the due window',
+    kicker: 'Assert response shape',
+    detail: '$.status: expected "past_due", got "active"',
+    outcome: 'failed',
+    label: 'Failed',
+  },
+  {
+    number: '15',
     title: 'The address was hardcoded for one machine',
     kicker: 'Test execution',
     detail: 'ConnectionError reaching http://127.0.0.1:5099: connection refused.',
@@ -93,10 +102,10 @@ export default function RunView(): ReactNode {
   return (
     <div className={styles.run}>
       <p className={styles.outcomeLine}>
-        <b className={styles.failedText}>4 failed</b>,{' '}
+        <b className={styles.failedText}>4 failed</b>, <b className={styles.partialText}>1 partial</b>,{' '}
         <b className={styles.passedText}>14 passed</b>
       </p>
-      <p className={styles.meta}>18 tests in 5.15 s · 29 sep 2026, 17:52:38</p>
+      <p className={styles.meta}>19 tests in 4.06 s · 29 sep 2026, 18:37:30</p>
       <p className={styles.meta}>.NET 8.0.31 on Microsoft Windows 10.0.26200 · ProtoTest demo trace</p>
 
       <div className={styles.bar} aria-hidden="true">

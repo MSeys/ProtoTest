@@ -280,6 +280,18 @@ context.Trace.WriteEvent(
 
 Nesting is automatic. An operation started inside another becomes its child and inherits its phase. Pass `parentId` to attach elsewhere, or `phase` to set it explicitly.
 
+### Reading a trace in code
+
+The host exposes a live snapshot of the same tree, for code that needs to read a run without opening the archive:
+
+```csharp
+var run = host.Trace.Snapshot();
+var click = run.Tests.Single().Entries.Single(entry => entry.Kind == "web.click");
+Assert.That(click.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
+```
+
+`ProtoTraceDiscovery.Discover(folder)` lists the readable runs a folder holds, newest first, and names the archives it had to skip. `ProtoTest.Traces` reads one archive.
+
 ## Supporting another runner
 
 A runner integration needs three things, and the five shipped adapters are the worked examples:

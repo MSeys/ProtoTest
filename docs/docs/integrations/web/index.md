@@ -31,6 +31,22 @@ flowchart LR
     B --> E[trace web.* + artifacts + coverage]
 ```
 
+## Which backend
+
+Default to Playwright. It launches and manages browsers for you, downloads the browser on a clean machine with `InstallBrowsers`, probes for it without launching one for skips, records the native Playwright trace, supports downloads, and translates the wider set of locator combinations. Pick Selenium when the browsers are driven through WebDriver already: a grid, a driver setup, or a browser you provide yourself through your own `IWebDriver` factory.
+
+| Question | Playwright | Selenium |
+| --- | --- | --- |
+| Default | Start here for a new suite | When WebDriver drives your browsers already |
+| Browser install | `InstallBrowsers = true` downloads the selected browser before the first launch; `Channel` (`"msedge"`, `"chrome"`) uses an installed system browser instead | You create the `IWebDriver`, so the browser must already be installed on the machine |
+| Missing browser | `[RequiresPlaywrightBrowser]` probes without launching and skips with a reason naming the install options | No probe; gate on the `browser` capability and handle the first session use (see [Skip](#skip)) |
+| Sessions and pooling | One test-scoped pool; sessions with identical launch options share a browser process inside the test | One driver per session, no pooling, so sessions share no cookies or storage |
+| Channels and system browsers | `Channel` names an installed browser; Linux system libraries come from Playwright's own tooling | Any driver your factory builds, with its own options and grid address |
+| Downloads | `DownloadAsync` registers the file as a test attachment | No download API in the WebDriver protocol; the call fails with `WebBackendCapabilityException` before the trigger runs |
+| Locator parity | ARIA role resolution and native text matching, with the wider `And` combinations | Implicit HTML role mappings instead of ARIA resolution, XPath 1.0 deepest-match text, and only `HasText` as the right-hand side of `And` with no `By.Css` left side (see [Locators](./locators.md)) |
+| Diagnostics artifact | The native Playwright trace (`playwright-{session}-trace.zip`, kept per `TraceRetention`), plus console, page-error and failed-request events | ProtoTest's own `selenium-{session}-diagnostics.json` with every actionability attempt (kept per `DiagnosticTraceRetention`); there is no second report system |
+| What both share | The same page objects and tests, the same `web.*` trace vocabulary with a `web.backend.execute` child per driver call, and the same failure screenshot, page HTML and location files | The same |
+
 ## Install
 
 ```bash

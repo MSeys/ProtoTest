@@ -161,6 +161,59 @@ Every channel reports its outcome on stderr. A channel with no target, or nothin
 
 The [feedback action](../continuous-integration/index.md#action-inputs) maps its inputs to these names, so a local command and the action take the same path.
 
+## Webhook payload
+
+The webhook posts the run's diagnosis digest: the same document `prototest summary` prints as text and `get_diagnosis` returns as JSON. It is `POST`ed to `PROTOTEST_FEEDBACK_WEBHOOK_URL` with content type `application/json`, serialized with camel-case property names. A green run is posted too: the digest carries empty failures, so a machine consumer decides what to do with it. Only a missing URL skips.
+
+```json
+{
+  "digestVersion": "1",
+  "traceFormatVersion": "2.0",
+  "runId": "761778e6dc82498a9f9965fa1e6b5a24",
+  "traceFile": "TestResults/prototest-761778e6.run.prototrace",
+  "startedAtUtc": "2026-09-29T06:19:01Z",
+  "completedAtUtc": "2026-09-29T06:19:05Z",
+  "environment": { "runtime": ".NET 10", "os": "Linux" },
+  "outcomes": { "passed": 12, "failed": 1 },
+  "failures": [
+    {
+      "testId": "…",
+      "name": "Orders_endpoint_responds",
+      "className": "Shop.Tests.OrderTests",
+      "methodName": "Orders_endpoint_responds",
+      "outcome": "failed",
+      "durationMs": 2660.0,
+      "failure": {
+        "kind": "http.request",
+        "name": "GET /api/orders",
+        "phase": "Execution",
+        "status": "Failed",
+        "errorType": "ConnectionError",
+        "errorMessage": "Connection refused.",
+        "sourceFile": "Shop.Tests/OrderTests.cs",
+        "sourceLine": 42
+      },
+      "rule": "operationError"
+    }
+  ],
+  "gates": [{ "name": "NoRegressions", "verdict": "failed", "message": "…", "details": [] }],
+  "findings": [],
+  "coverage": { "total": 24, "covered": 23, "uncovered": 1, "percentage": 95.8 },
+  "coverageAbsentReason": null
+}
+```
+
+Trimmed: each failure also carries its mismatches, findings and artifacts, each gate its details, and the coverage its report artifact path. A run with no failures posts the same shape with empty `failures`, `gates` and `findings` and no stdout annotations.
+
+The secret header rules:
+
+| Fact | Rule |
+| --- | --- |
+| No `PROTOTEST_FEEDBACK_WEBHOOK_SECRET` | No header is sent |
+| Secret set, no custom header name | The secret rides `X-ProtoTest-Secret` |
+| `PROTOTEST_FEEDBACK_WEBHOOK_SECRET_HEADER` set | The secret rides that header name instead |
+| The endpoint refuses or does not answer | The channel reports `failed` and the verb exits `1` |
+
 ## Exit codes
 
 ```mermaid

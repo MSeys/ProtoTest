@@ -29,6 +29,16 @@ var message = await messages.AwaitAsync(
 
 Failing to arrive is a `TimeoutException` and a test failure, not a sleep. Without an adapter the client runs against an in-memory broker, so the API works anywhere; `ProtoTest.Messaging.RabbitMq` replaces it with RabbitMQ, `ProtoTest.Messaging.RabbitMq.Testcontainers` owns a broker for the whole run, and `ProtoTest.Messaging.MassTransit` bridges the surface to an in-process application's MassTransit test harness - or, through its `MassTransitEnvelope` helper, speaks the MassTransit wire envelope over any adapter, published applications included.
 
+## Which brokers
+
+| Broker | Package | What it is |
+| --- | --- | --- |
+| In-memory | `ProtoTest.Messaging` | The default test double. It keeps history for the run, so the API works with no broker. It registers no `Broker` capability, so capability-gated tests skip instead of passing against the double |
+| RabbitMQ | `ProtoTest.Messaging.RabbitMq` (+ `.Testcontainers` to own one) | A real broker as the adapter, with per-test tap queues, suite-owned topology via `Declare`, and the container recipe under [Owning a broker](#owning-a-broker) |
+| MassTransit | `ProtoTest.Messaging.MassTransit` | The application's in-process MassTransit harness as the adapter, or the `MassTransitEnvelope` wire envelope over any adapter. See the [MassTransit page](./masstransit.md) |
+
+Kafka, Azure Service Bus and AWS (MSK, SQS/SNS, EventBridge) are not shipped. There is no plan to announce here either: the extension path is the adapter seam. Implement `IProtoMessageBroker` (publish, one consumer per test, declare) with a consumer derived from `ProtoMessageConsumerBase`, register it with `UseBroker`, and the test-side API, the trace and the `Broker` capability come with it. The full contract is on the [Adapter contract](./adapters.md).
+
 ## Install
 
 ```bash

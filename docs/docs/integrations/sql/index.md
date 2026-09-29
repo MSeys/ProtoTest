@@ -19,6 +19,14 @@ Writes made through the connection ProtoTest owns disappear at teardown:
 
 See [Isolation](#isolation) for the promise and its guard.
 
+## Stores other than SQL
+
+This page is relational: `ProtoTest.Sql` owns a `DbConnection` per test. When the store is MongoDB, Redis, Elasticsearch or anything else without ADO.NET, pick one of three options:
+
+1. **Test through the application APIs.** When the store belongs to a deployed environment rather than the test, drive it through the application's REST, GraphQL or gRPC surface and assert on what comes back. Nothing here is needed.
+2. **Register a raw client.** When the test must reach the store directly, register the client as an ordinary scoped service on the host builder and resolve it in the test. There is no per-test transaction or rollback; provision what the test needs and release it in teardown or with a [provisioner](../data/provisioners.md).
+3. **Write an adapter that follows the SQL rule.** When several suites need the same owned-connection shape, package it like `ProtoTest.Sql` does: a host builder extension that registers the client scoped, a test hook that opens and releases it, and the same honest capability rule. `SqlAddressRule.DeclaredKeys` and `SqlAddressRule.IsInert` carry the address decision, and `AddEntityFrameworkCore` is the canonical example to copy (see [For package authors](#for-package-authors)).
+
 ## Install
 
 ```bash

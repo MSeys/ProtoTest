@@ -40,6 +40,8 @@ const loading = ref(false);
 const openArtifact = ref<Artifact>();
 const source = ref<TraceSource>();
 const demoFacts = ref<Record<string, DemoFacts | null>>({});
+// The demos sit in the start panel's sidebar; the reader can put them away and get the drop screen alone.
+const demosOpen = ref(true);
 // Open as a column where it fits; as a drawer on a narrow screen it starts closed.
 const railOpen = ref(matchMedia("(min-width: 1000px)").matches);
 const dragging = ref(false);
@@ -371,37 +373,43 @@ const problemTitle = computed(() => ({
   <input ref="fileInput" type="file" accept=".prototrace,application/zip" hidden @change="fileChanged">
   <main>
     <section v-if="!run" class="empty-state">
-      <div class="drop-zone" :class="{ dragging }" role="button" tabindex="0" aria-label="Open a ProtoTrace file"
-           @click="openPicker" @keydown.enter.prevent="openPicker" @keydown.space.prevent="openPicker"
-           @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="dropped">
-        <BrandMark :size="88" />
-        <template v-if="loading">
-          <h1>Reading the trace</h1>
-          <p>Large runs take a moment; everything stays on this machine.</p>
-        </template>
-        <template v-else-if="problem">
-          <h1>{{ problemTitle }}</h1>
-          <p v-if="problem.kind !== 'legacy'" class="problem">{{ problem.message }}</p>
-          <p v-if="problem.kind === 'legacy'">Run the tests again with the current ProtoTest to produce a trace this viewer reads.</p>
-          <div class="empty-actions">
-            <AppButton variant="primary" @click.stop="openPicker">Choose another file</AppButton>
-          </div>
-          <section class="demos" aria-label="Bundled demos">
-            <h2>Or try a bundled demo</h2>
-            <DemoList :facts="demoFacts" @open="loadDemo" />
-          </section>
-        </template>
-        <template v-else>
-          <h1>Open a ProtoTest execution</h1>
-          <p>Drop a <code>.prototrace</code> file here or choose one. Your files are read in this browser. Nothing is uploaded.</p>
-          <div class="empty-actions">
-            <AppButton variant="primary" @click.stop="openPicker">Choose trace file</AppButton>
-          </div>
-          <section class="demos" aria-label="Bundled demos">
-            <h2>Try a bundled demo</h2>
-            <DemoList :facts="demoFacts" @open="loadDemo" />
-          </section>
-        </template>
+      <div class="start-panel" :class="{ 'demos-open': demosOpen }">
+        <AppButton variant="icon" class="demos-toggle" :label="demosOpen ? 'Hide the demos' : 'Show the demos'"
+                   @click="demosOpen = !demosOpen">
+          <Icon name="sidebar" />
+        </AppButton>
+
+        <div class="drop-zone" :class="{ dragging }" role="button" tabindex="0" aria-label="Open a ProtoTrace file"
+             @click="openPicker" @keydown.enter.prevent="openPicker" @keydown.space.prevent="openPicker"
+             @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="dropped">
+          <BrandMark :size="72" />
+          <template v-if="loading">
+            <h1>Reading the trace</h1>
+            <p>Large runs take a moment; everything stays on this machine.</p>
+          </template>
+          <template v-else-if="problem">
+            <h1>{{ problemTitle }}</h1>
+            <p v-if="problem.kind !== 'legacy'" class="problem">{{ problem.message }}</p>
+            <p v-if="problem.kind === 'legacy'">Run the tests again with the current ProtoTest to produce a trace this viewer reads.</p>
+            <div class="empty-actions">
+              <AppButton variant="primary" @click.stop="openPicker">Choose another file</AppButton>
+            </div>
+          </template>
+          <template v-else>
+            <h1>Open a ProtoTest execution</h1>
+            <p v-if="dragging">Drop it to open the trace.</p>
+            <p v-else>Drop a <code>.prototrace</code> file here or choose one.</p>
+            <div class="empty-actions">
+              <AppButton variant="primary" @click.stop="openPicker">Choose trace file</AppButton>
+            </div>
+            <small>Your files are read in this browser. Nothing is uploaded.</small>
+          </template>
+        </div>
+
+        <section v-if="demosOpen" class="demos" aria-label="Bundled demos">
+          <h2>Or start from a demo</h2>
+          <DemoList :facts="demoFacts" @open="loadDemo" />
+        </section>
       </div>
     </section>
 
@@ -531,9 +539,10 @@ main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: minmax(
 }
 
 .empty-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center; }
-/* The demos sit below the drop action: the file stays first-class, the list stays one click away. */
-.demos { width: min(560px, 100%); margin-top: var(--space-4); display: grid; gap: var(--space-2); text-align: left; }
-.demos h2 { font-size: var(--text-meta); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--dim); text-align: center; }
+/* The start panel's one control: the demos sidebar can be put away, and this brings it back. */
+.demos-toggle { position: absolute; top: var(--space-3); right: var(--space-3); z-index: 1; }
+.demos { display: grid; gap: var(--space-3); text-align: left; }
+.demos h2 { font-family: var(--font-ui); font-size: var(--text-title); font-weight: var(--weight-bold); color: var(--text); }
 .drop-zone h1 { margin-top: var(--space-3); }
 .drop-zone code { padding: 1px var(--space-2); border-radius: var(--radius-chip); background: var(--surface-2); font-family: var(--font-mono); font-size: var(--text-meta); }
 .drop-zone .problem { color: var(--danger); }

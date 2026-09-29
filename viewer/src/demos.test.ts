@@ -18,13 +18,17 @@ describe("demos", () => {
       expect(entry.file).toMatch(/\.prototrace$/);
       expect(entry.label).toBeTruthy();
       expect(entry.description).toBeTruthy();
+      expect(["run", "recipe"]).toContain(entry.group);
     }
+    // The two product runs lead the list; the recipes stay the quieter group.
+    expect(demos.filter(entry => entry.group === "run").map(entry => entry.key)).toEqual(["full", "opencsms"]);
+    expect(demos.filter(entry => entry.group === "recipe").map(entry => entry.key)).toEqual(["rest-graphql", "rest-database", "workbook"]);
   });
 
   it("formats the facts the way the run view orders them", () => {
-    expect(formatDemoFacts({ tests: 19, failed: 4, partial: 1, cancelled: 0 })).toBe("19 tests · 4 failed · 1 partial");
-    expect(formatDemoFacts({ tests: 1, failed: 0, partial: 0, cancelled: 0 })).toBe("1 test");
-    expect(formatDemoFacts({ tests: 3, failed: 0, partial: 0, cancelled: 1 })).toBe("3 tests · 1 cancelled");
+    expect(formatDemoFacts({ tests: 19, failed: 4, partial: 1, cancelled: 0, outcomes: [] })).toBe("19 tests · 4 failed · 1 partial");
+    expect(formatDemoFacts({ tests: 1, failed: 0, partial: 0, cancelled: 0, outcomes: [] })).toBe("1 test");
+    expect(formatDemoFacts({ tests: 3, failed: 0, partial: 0, cancelled: 1, outcomes: [] })).toBe("3 tests · 1 cancelled");
   });
 
   it("reads the facts from the trace instead of hardcoding them", async () => {
@@ -43,7 +47,7 @@ describe("demos", () => {
     });
 
     const facts = await summarizeDemo(buffer);
-    expect(facts).toEqual({ tests: 4, failed: 2, partial: 1, cancelled: 0 });
+    expect(facts).toEqual({ tests: 4, failed: 2, partial: 1, cancelled: 0, outcomes: ["failed", "failed", "partial", "succeeded"] });
     expect(formatDemoFacts(facts)).toBe("4 tests · 2 failed · 1 partial");
   });
 });

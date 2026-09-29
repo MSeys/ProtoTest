@@ -24,7 +24,7 @@ A dependency that goes down at the wrong moment is the failure a suite rarely se
   ]}
   before={[
     <>Point the suite at a real stack (<Link to="/learn/real-topology/published-mode">lesson 3</Link>).</>,
-    'An OpenCSMS checkout (the repository is not public yet) and a container runtime for the runs. The kept trace is on this site.',
+    'An OpenCSMS checkout and a container runtime for the runs. The kept trace is on this site.',
   ]}
   situation={
     <>

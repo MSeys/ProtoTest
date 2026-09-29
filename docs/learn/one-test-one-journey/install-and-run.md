@@ -86,11 +86,10 @@ A healthy run on a machine with Chromium ends exactly like this:
 Failed:     0, Passed:    14, Skipped:     5, Total:    19
 ```
 
-The five skips are the broker journey and the four drills. Without Chromium the browser journey skips too, and the summary reads `Passed: 13, Skipped: 6`. If your clone reports `Total: 0`, it predates the 1.1 sample; switch to that branch and run it again.
+The five skips are the broker journey and the four drills. Without Chromium the browser journey skips too, and the summary reads `Passed: 13, Skipped: 6`. If your clone reports `Total: 0`, it is behind the release; pull or clone again and run it once more.
 
 ```bash
-git fetch origin version/1.1
-git checkout version/1.1
+git pull
 ```
 
 ## Find what the run left

@@ -24,7 +24,7 @@ Level 5 leaves the Northstar sample. It runs OpenCSMS, an EV charging management
   ]}
   before={[
     <>Level 4 (<Link to="/learn/evidence/evidence-in-ci">take the evidence to CI</Link>).</>,
-    'An OpenCSMS checkout (the repository is not public yet) and a container runtime (Docker Desktop or equivalent). Reading the lesson alone also works.',
+    'An OpenCSMS checkout and a container runtime (Docker Desktop or equivalent). Reading the lesson alone also works.',
   ]}
   situation={
     <>

@@ -102,54 +102,40 @@ clock registration, attribute and skip resolution and teardown all stay under 0.
 The OpenCSMS repository's `eng/run-benchmark.ps1` runs the product itself - API, billing worker, real
 PostgreSQL and RabbitMQ from the environment - through one health-check test cycle per iteration (1,000
 iterations, 100 warmups), against a raw `WebApplicationFactory` baseline, plus a 1,000-test seeded journey
-run. Same machine and .NET 8. The local ProtoTest feed is rebuilt for each round.
+run. Same machine and .NET 8.
 
 The showpiece trace is [opencsms-showpiece.prototrace](/traces/opencsms-showpiece.prototrace): the
-`IdleFeeAfterTariffChange` journey recorded before the tariff-snapshot fix, when a reprice during an open
-session changed the session's billing. The fixed journey asserts the session's original tariff and runs in
-the OpenCSMS CI.
+`IdleFeeAfterTariffChange` journey as it failed, when a reprice during an open session changed the
+session's billing. The fixed journey asserts the session's original tariff and runs in the OpenCSMS suite.
 
-| Mode | Run | Per test | Start | Call | Complete |
-| --- | --- | --- | --- | --- | --- |
-| ProtoTest, tracing on | M7.1 published | 43.53 ms | 15.87 ms | 6.17 ms | 21.52 ms |
-| ProtoTest, tracing on | release pass, before | 42.10 ms | 15.97 ms | 5.83 ms | 20.11 ms |
-| ProtoTest, tracing on | release pass, after | 41.04 - 42.98 ms | 18.04 - 18.19 ms | 5.67 - 5.70 ms | 17.18 - 18.72 ms |
-| ProtoTest, tracing on | prepare pass, before | 44.38 ms | 17.87 ms | 5.73 ms | 20.04 ms |
-| ProtoTest, tracing on | prepare pass, after | 35.15 - 36.17 ms | 11.95 - 12.09 ms | 5.69 - 5.72 ms | 17.36 - 17.87 ms |
-| ProtoTest, tracing off | release pass, before | 45.66 ms | 15.45 ms | 5.83 ms | 24.40 ms |
-| ProtoTest, tracing off | release pass, after | 55.64 - 56.23 ms | 17.62 - 17.67 ms | 5.69 - 5.71 ms | 32.18 - 32.74 ms |
-| ProtoTest, tracing off | prepare pass, before | 52.98 ms | 17.38 ms | 5.74 ms | 29.55 ms |
-| ProtoTest, tracing off | prepare pass, after | 30.74 - 32.40 ms | 11.14 - 11.65 ms | 5.55 - 5.57 ms | 13.67 - 15.91 ms |
-| Raw `WebApplicationFactory` | every pass | 4.79 - 5.00 ms | 0.00 ms | 4.79 - 5.00 ms | - |
+| Mode | Per test | Start | Call | Complete |
+| --- | --- | --- | --- | --- |
+| ProtoTest, tracing on | 35.15 - 36.17 ms | 11.95 - 12.09 ms | 5.69 - 5.72 ms | 17.36 - 17.87 ms |
+| ProtoTest, tracing off | 30.74 - 32.40 ms | 11.14 - 11.65 ms | 5.55 - 5.57 ms | 13.67 - 15.91 ms |
+| Raw `WebApplicationFactory` | 4.79 - 5.00 ms | 0.00 ms | 4.79 - 5.00 ms | - |
 
-Suite startup through the first completed request landed between 156 and 179 ms with tracing, 154 and 176 ms without, and 73 and 83 ms raw across the passes. The 1,000-test health-check trace is 25.8 MB (about 25 KB per test); the
-1,000-journey trace is 38.8 MB, and the journey median moved from 67.9 ms before the release fix (64.4 to
-69.5 ms after) to 63.9 ms before the prepare fix and 49.3 and 54.8 ms after it.
+Suite startup through the first completed request lands between 156 and 179 ms with tracing, 154 and
+176 ms without, and 73 and 83 ms raw. The 1,000-test health-check trace is 25.8 MB (about 25 KB per
+test); the 1,000-journey trace is 38.8 MB, with a 49.3 to 54.8 ms journey median.
 
-Read the table honestly: the per-test total moves inside the run-to-run band, and the tracing-off legs are
-the most order-sensitive. They run second in the harness, after the first leg has created and deleted about
-3,300 tap queues on the shared broker; the with-tracing legs of the same runs show the changed path, and the
-controlled comparison below isolates it.
+Read the table honestly: the per-test total moves inside the run-to-run band, and the tracing-off leg
+is the most order-sensitive, because it runs second in the harness after the first leg has created and
+deleted about 3,300 tap queues on the shared broker.
 
 The run's own trace explains where the milliseconds are, and they are not the framework. Medians per
 operation over the 1,100 health-check tests of the recorded traces:
 
-| Operation | Release pass, before / after | Prepare pass, before / after | What it is |
-| --- | --- | --- | --- |
-| `client.initialize` for the messaging client | 14.86 / 17.29 ms | 17.11 / 11.09 - 11.26 ms | the test's own consumer, prepared for the suite's three tap destinations |
-| `resource.release` for that consumer | 20.99 / 16.66 ms | 18.99 / 17.00 - 17.49 ms | its tap queues and channels released |
-| `http.request` (`GET /healthz`) | 6.14 / 5.63 ms | 5.70 / 5.65 - 5.69 ms | the request itself, through the REST client |
-| Everything else | under 1 ms | under 1 ms | HTTP client init, hooks, attributes, execution and teardown scaffold, trace included |
+| Operation | Median | What it is |
+| --- | --- | --- |
+| `client.initialize` for the messaging client | 11.09 - 11.26 ms | the test's own consumer, prepared for the suite's three tap destinations |
+| `resource.release` for that consumer | 17.00 - 17.49 ms | its tap queues and channels released |
+| `http.request` (`GET /healthz`) | 5.65 - 5.69 ms | the request itself, through the REST client |
+| Everything else | under 1 ms | HTTP client init, hooks, attributes, execution and teardown scaffold, trace included |
 
-The release dropped by about 4 ms, and the preparation drifted up by about 2 ms with the broker state, so
-the health-check total stayed flat in the release pass. The prepare pass moved the preparation instead:
-17.11 ms to 11.09-11.26 ms, with the release and the request steady. The controlled A/B is the honest
-number: three tapped destinations against the same host and broker with none, several runs before and after
-each fix in one session, the no-destination host at 0.03 ms
-(`PerTestTapLifecycle_ShouldStayWithinTheSanityBound` in the RabbitMQ suite). The release fix's
-complete-phase medians were 17.25, 17.19 and 16.84 ms before and 13.04, 16.17 and 12.40 ms after; the
-prepare fix's start-phase medians were 15.91, 16.19 and 16.63 ms before and 12.41, 11.95, 10.60, 10.70 and
-10.67 ms after (the first run after a rebuild measured 18.41 ms and is left out).
+The controlled A/B is the honest number: three tapped destinations against the same host and broker
+with none, the no-destination host at 0.03 ms
+(`PerTestTapLifecycle_ShouldStayWithinTheSanityBound` in the RabbitMQ suite), and the tapped prepare
+phase at about 11-12 ms.
 
 So about 30 of the 36 ms is the suite's per-test broker isolation, about 6 ms is the request, and under
 1 ms is ProtoTest. The raw baseline never opens a broker consumer; a test that never touches messaging
@@ -162,8 +148,8 @@ still pays the tap cost, because `Tap` promises the destination is bound before 
   above shows where the 0.33 ms sits: source-location capture.
 - **Preparation is the floor.** Each tap costs five broker round trips (channel, queue declare, two
   bindings, consume), and the taps are prepared concurrently, each on its own channel, so their round trips
-  overlap: the controlled A/B above moves three taps' prepare phase from about 16 ms to about 11-12 ms.
-  Every destination is still attempted, so one that cannot be prepared fails only the await that names it.
+  overlap: three taps' prepare phase lands at about 11-12 ms. Every destination is still attempted, so one
+  that cannot be prepared fails only the await that names it.
 
 ## The viewer at 1,000+ tests
 

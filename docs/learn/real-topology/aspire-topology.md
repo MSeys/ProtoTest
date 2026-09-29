@@ -24,7 +24,7 @@ The container mode kept the product inside the test process. The topology mode h
   ]}
   before={[
     <>Run the suite on containers (<Link to="/learn/real-topology/containers">lesson 1</Link>).</>,
-    'An OpenCSMS checkout (the repository is not public yet) and a container runtime. Reading the lesson alone also works.',
+    'An OpenCSMS checkout and a container runtime. Reading the lesson alone also works.',
   ]}
   situation={
     <>

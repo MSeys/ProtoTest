@@ -23,7 +23,7 @@ The topology lesson let the AppHost own the processes. This one moves them outsi
   ]}
   before={[
     <>Let Aspire start the topology (<Link to="/learn/real-topology/aspire-topology">lesson 2</Link>).</>,
-    'An OpenCSMS checkout (the repository is not public yet) and a container runtime. Reading the lesson alone also works.',
+    'An OpenCSMS checkout and a container runtime. Reading the lesson alone also works.',
   ]}
   situation={
     <>

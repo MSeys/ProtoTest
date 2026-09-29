@@ -7,7 +7,7 @@ description: "The handful of ProtoTest.Core concepts every integration builds on
 
 # Foundation overview
 
-Everything in ProtoTest sits on a handful of concepts from `ProtoTest.Core`. Learn these once and every integration makes sense. New to integration testing? The [Learn track](/learn/) starts from why these tests get hard.
+Everything in ProtoTest sits on a handful of concepts from `ProtoTest.Core`. Learn these once and every integration makes sense. One host per process, one context per test; everything else hangs off these two. New to integration testing? The [Learn track](/learn/) starts from why these tests get hard.
 
 ```mermaid
 flowchart TB
@@ -25,21 +25,23 @@ flowchart TB
 
 ## The pieces
 
-- **[`ProtoHost`](./lifecycle.md)** is built once per test process by your runner's [assembly setup](../runners/overview.md). It owns the dependency injection container, runs suite-wide hooks and [run gates](./lifecycle.md#run-gates-and-resources), starts [infrastructure](./infrastructure.md), and starts and completes each test.
-- **[`ProtoExecutionContext`](./execution-context.md)** exists for exactly one test. It holds that test's clients, typed state, resources, findings, attachments and observations, and its own DI scope. You reach it anywhere in the test through `Proto.Context`.
-- **[Hooks](./hooks.md)** run around *every* test (`IProtoTestHook`) or around the whole run (`IProtoRunHook`). They are registered on the host.
-- **[Attributes](./attributes.md)** run around the tests they decorate. They are how you package a capability, such as "a fresh tenant" or "a logged-in administrator", and compose it onto any test.
-- **[Clients](./clients.md)** are what integrations give you: `Rest()`, `GraphQL()`, `Web()`. Under the hood each is created per test by a client initializer, which you can write yourself.
-- **[Assertions](./assertions.md)** are the surface every integration exposes: `Should` and `ShouldNot`, chainable assertion members and `Should.MatchShape`.
-- **[Attachments](./attachments.md)** are files a test produces, such as response bodies and screenshots. They are handed to your runner and bundled into the trace.
-- **[Skip conditions](./skip-conditions.md)** stop a test before its lifecycle starts when the host cannot run it, so an environment-specific test reads as skipped.
+| Piece | Job | Page |
+| --- | --- | --- |
+| `ProtoHost` | built once per test process; owns DI, run hooks, gates, infrastructure, and each test's start and completion | [Lifecycle](./lifecycle.md) |
+| `ProtoExecutionContext` | exists for exactly one test; holds its clients, state, resources, findings, attachments and observations | [Execution context](./execution-context.md) |
+| Hooks | run around every test or the whole run; registered on the host | [Hooks](./hooks.md) |
+| Attributes | run around the tests they decorate; package a capability onto any test | [Attributes](./attributes.md) |
+| Clients | what integrations give you: `Rest()`, `GraphQL()`, `Web()` | [Clients](./clients.md) |
+| Assertions | one `Should` / `ShouldNot` surface on every integration | [Assertions](./assertions.md) |
+| Attachments | files a test produces, handed to the runner and the trace | [Attachments](./attachments.md) |
+| Skip conditions | stop a test before its lifecycle starts when the host cannot run it | [Skip conditions](./skip-conditions.md) |
 
 Two things build on top and have their own sections:
 
 - **[ProtoTrace](../observability/prototrace.md)** records every operation, automatically.
 - **[Observations and coverage](../observability/coverage.md)** turn what tests did into reports.
 
-A few pieces are worth knowing even if you reach for them rarely: the context can own test-scoped [resources](./execution-context.md#resources) released at teardown and record [findings](./execution-context.md#findings) that reach the report without failing the test, and the host builder can [gate the whole run](./lifecycle.md#run-gates-and-resources) on what the reports collected.
+Two pieces matter less often. The context can own test-scoped [resources](./execution-context.md#resources) and record [findings](./execution-context.md#findings) without failing the test. The host builder can [gate the whole run](./lifecycle.md#run-gates-and-resources) on what the reports collected.
 
 [Test time](./time.md) and [Concurrency](./concurrency.md) cover two questions every suite meets: how to move a clock instead of sleeping, and what ProtoTest keeps isolated when tests run in parallel.
 

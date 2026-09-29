@@ -1,5 +1,5 @@
 ---
-sidebar_position: 7
+sidebar_position: 15
 title: Concurrency
 description: "How ProtoTest keeps parallel tests isolated, what to do when a test fans out internally, and the parallelism the project has actually exercised."
 ---
@@ -8,7 +8,7 @@ description: "How ProtoTest keeps parallel tests isolated, what to do when a tes
 
 ## What it is
 
-ProtoTest scopes the execution context to the async flow: `Proto.Context` is per test, the ambient value is flow-local, and two tests running in parallel cannot see each other's clients, resources or trace. That is why the runner's own parallelism is safe to use, and why the repository's suites run with `[Parallelizable(ParallelScope.All)]`.
+ProtoTest scopes the execution context to the async flow. `Proto.Context` is per test and flow-local. Two parallel tests do not share clients, resources or trace. That is why the runner's own parallelism is safe to use.
 
 ## Inside a test
 
@@ -21,7 +21,7 @@ One test owns one context while it is active. A nested lifecycle cannot start on
 
 ## Exercised parallelism
 
-Recorded 2026-09-24 on a 16-core developer machine with `ProtoTest.Demo` (since retired; the OpenCSMS suite is the full product demo and `samples/Northstar.ProtoTest` the Learning demo), which owned Postgres and RabbitMQ containers plus real browsers, using `NUnit.NumberOfTestWorkers`:
+Recorded 2026-09-24 on a 16-core developer machine against a suite with Postgres, RabbitMQ and real browsers, using `NUnit.NumberOfTestWorkers`. Quote these numbers only after re-running your own suite on your own hardware:
 
 | Workers | Result | Duration |
 | --- | --- | --- |
@@ -29,11 +29,9 @@ Recorded 2026-09-24 on a 16-core developer machine with `ProtoTest.Demo` (since 
 | 32 | 53 passed, 6 skipped | 8 s |
 | 64 | 1 failed, then passed on rerun | 21 s |
 
-The suite was stable up to roughly twice the core count. At four times the cores (64 workers on 16 cores) the run oversubscribed and produced one non-reproducible failure, and the demo wrote a single trace file per run, so that failure's evidence was overwritten before it could be read.
+The suite was stable up to roughly twice the core count. At four times the cores the run oversubscribed and produced one non-reproducible failure, and the single trace file per run overwrote that failure's evidence before it could be read.
 
-Beyond this range, expect resource pressure rather than a ProtoTest-specific limit: port and container exhaustion, browser memory, and contention on run-scoped infrastructure. The repository's suites run at `LevelOfParallelism(8)`.
-
-These numbers are indicative, not a contract. Re-run your own suite on your own hardware before quoting them.
+Beyond this range, expect resource pressure rather than a ProtoTest-specific limit: port and container exhaustion, browser memory, and contention on run-scoped infrastructure.
 
 ## What the trace shows
 

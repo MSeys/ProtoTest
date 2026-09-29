@@ -1,5 +1,5 @@
 ---
-sidebar_position: 5
+sidebar_position: 6
 title: Clients
 description: "Clients are what a test talks to. ProtoTest creates them per test, registers them on the context and disposes them afterwards."
 ---
@@ -8,7 +8,13 @@ description: "Clients are what a test talks to. ProtoTest creates them per test,
 
 ## What it is
 
-A client is anything a test talks to: an `HttpClient`, a browser session, a message bus connection, a fake. ProtoTest creates clients **per test**, registers them on the context, and disposes them afterwards. Most integrations use this mechanism for the systems they connect to, and you can use it for your own.
+A client is anything a test talks to, for example an `HttpClient` or a browser session. ProtoTest creates clients **per test**, registers them on the context, and disposes them afterwards. Most integrations use this mechanism for the systems they connect to, and you can use it for your own.
+
+```text
+initializer chain (registration order, first true wins)
+  -> RegisterClient -> test uses -> CompleteAsync -> dispose reversed
+ownership: Context disposes, Caller shares
+```
 
 ## How it works
 
@@ -40,9 +46,17 @@ A client that implements `IProtoClientCompletion` also gets `CompleteAsync()` af
 
 The integration accessors, `Rest(name)`, `GraphQL(name)`, `Grpc(name)` and `Devices(name)`, resolve a client name in one order:
 
-1. The name the call asked for, qualified with the selected application: `Rest("Api")` under `[Application("Csms")]` looks for `Csms:Api` first, so the ambient application wins.
-2. The requested name as given, which keeps a host- or user-registered client reachable by its own name.
-3. Across the host's registered clients of that protocol: when **exactly one** client has that unqualified name, it resolves, whichever application registered it. A test under one application can therefore reach another application's uniquely named client.
+| Step | Rule |
+| --- | --- |
+| 1. Qualified with the selected application | `Rest("Api")` under `[Application("Csms")]` looks for `Csms:Api` first, so the ambient application wins |
+| 2. The requested name as given | keeps a host- or user-registered client reachable by its own name |
+| 3. Unique across the host | when exactly one client of that protocol has that unqualified name, it resolves, whichever application registered it |
+
+```text
+name has ':'?  ->  exact, no re-qualification, no unique-name fallback
+bare name under one app, one match?  ->  resolves
+bare name, two apps, same name?  ->  ambiguous error naming both; qualify or bind
+```
 
 A name that is already qualified (`App:Client`, containing `:`) is exact: it is not re-qualified with the selected application and does not fall back to the unique-name lookup.
 
@@ -157,7 +171,7 @@ builder.ConfigureServices(services =>
     services.AddSingleton<IProtoClientInitializer>(_ => new SharedBusInitializer()));
 ```
 
-With `ProtoClientOwnership.Caller` the test registers the client as shared and does not dispose it at teardown. The trace marks the entity `client.owned = false`, and the release writes state, not a dispose. Registering through a factory delegate, as above, lets the host's service provider dispose the initializer, and with it the shared client, when the run ends. This is how the [ASP.NET Core integration](../integrations/aspnetcore.md) shares one application across tests. Remember that tests running in parallel use a shared client concurrently.
+With `ProtoClientOwnership.Caller` the test registers the client as shared and does not dispose it at teardown. The trace marks the entity `client.owned = false`, and the release writes state, not a dispose. Registering through a factory delegate, as above, lets the host's service provider dispose the initializer, and with it the shared client, when the run ends. Remember that tests running in parallel use a shared client concurrently.
 
 ## What the trace shows
 

@@ -1,12 +1,12 @@
 ---
-sidebar_position: 6
+sidebar_position: 7
 title: Assertions
 description: "One assertion surface across every integration: Should and ShouldNot, chainable members, and shape matching as the chain continuation."
 ---
 
 # Assertions
 
-Every ProtoTest subject that can be asserted, such as a REST or GraphQL response, a gRPC reply or failed call, a consumed message or a workbook cell, exposes the same surface: `Should` for the positive form and `ShouldNot` where a negated form is meaningful. Assertion members return the subject, so calls chain:
+Subjects you can assert share one surface: `Should` for the positive form and `ShouldNot` where negation makes sense. That covers REST and GraphQL responses, gRPC replies and failed calls, consumed messages and workbook cells. Assertion members return the subject, so calls chain:
 
 ```csharp
 using var response = await Proto.Context.Rest().GetAsync("/api/orders/42");
@@ -15,7 +15,7 @@ response.Should.HaveHttpStatus(HttpStatusCode.OK)          // returns the respon
     .Should.MatchShape(new { id = 42, status = "pending" });
 ```
 
-The facade owns the polarity, so one implementation covers both spellings. A negated status or sheet failure reads "Expected ... not to ...":
+One implementation covers `Should` and `ShouldNot`. A negated status or sheet failure reads "Expected ... not to ...":
 
 ```csharp
 response.ShouldNot.HaveHttpStatus(HttpStatusCode.NotFound);
@@ -25,6 +25,8 @@ sheet.Cell("A1").ShouldNot.BeBlank();
 The GraphQL error assertions are the exception: they name the opposite state directly, so `response.ShouldNot.HaveErrors()` fails with `Expected no GraphQL errors, but received 1: boom`.
 
 ## Where the surface lives
+
+Every subject below returns itself from `Should`, so assertions chain, except where noted:
 
 | Subject | Surface |
 | --- | --- |
@@ -54,7 +56,7 @@ A table row has no record type, so its shape is keyed by each column's leaf head
 
 `MatchShape(shape, exact: true)` is the exhaustive form: a field present in the response that the shape does not mention is a mismatch naming that field, so a response cannot grow a field the test never asserted. A value constraint (`JsonValue.Any()`, `JsonValue.NotNull()`) mentions its whole subtree and never fails an exact match. `PostAsync(...).ExpectAsync(shape)` is the in-call form for REST: it awaits the response and runs the same facade assertion, so the in-call and the after-the-fact spelling share one implementation. The [shape matching page](./shape-matching.md#exact-matching) has the rules.
 
-The HTTP fact assertions name the request too, and read the same on `ShouldNot`:
+The HTTP fact assertions name the request too, and read the same on `ShouldNot`. A missing header fails naming the request, the header and both values:
 
 ```csharp
 response.Should.HaveContentType("application/json");
@@ -63,13 +65,17 @@ response.Should.HaveCookie("session");
 response.Should.HaveRedirectLocation("/orders/42");
 ```
 
+```
+GET /api/orders/42 - Expected header 'X-Correlation' to have value 'abc', but it was 'xyz'.
+```
+
 ## Deliberate exceptions
 
-- **gRPC reaches `Should` through `For(...)`.** C# has no extension properties, so a reply message cannot carry a `Should` property. `ProtoGrpcAssertions.For(reply)` returns the shape facade, and `For(exception)` the status facade. The `ShouldMatchShape` and `ShouldHaveStatus` / `ShouldNotHaveStatus` extension methods remain as obsolete shims.
+- **gRPC reaches `Should` through `For(...)`.** C# has no extension properties, so a reply message cannot carry a `Should` property. `ProtoGrpcAssertions.For(reply)` returns the shape facade, and `For(exception)` the status facade.
 - **Shape has no negated form.** A negated shape match has no meaning, so there is no `response.ShouldNot.MatchShape(...)`. Shape lives on the positive facade. GraphQL's error assertions do honor `ShouldNot`: `ShouldNot.HaveErrors()` is the same check as `Should.HaveNoErrors()`.
 - **Web assertions are async.** They poll, so they return `ValueTask` and cannot return the subject; the `Async` suffix marks execution.
 
-The sheet assertions that older code spells as `Verify()` and `ShouldAll(...)` are obsolete shims. New tests use `Should.MatchModel()` and `Should.All(...)`.
+New tests use the facade forms above. The older spellings keep compiling; see [Migrating from 1.0](../getting-started/migrating-from-1-0.md#deprecated-in-11).
 
 ## What the trace shows
 

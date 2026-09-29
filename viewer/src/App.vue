@@ -23,7 +23,7 @@ import { openTraceArchive, TraceOpenError } from "./trace/archive";
 import type { TraceArchive, TraceProblem } from "./trace/archive";
 import { buildRun } from "./trace/model";
 import type { Artifact, Item, Run, Span, TestTrace } from "./trace/model";
-import { formatDuration, pad, testCodeName, testGroup, testTitle } from "./trace/format";
+import { formatDuration, failureReason, pad, testCodeName, testGroup, testTitle, tone } from "./trace/format";
 import { href, navigate, replace, route } from "./router";
 import { useSources } from "./trace/sources";
 import type { Route, TestView } from "./router";
@@ -161,6 +161,16 @@ watch(() => [route.value.name === "test" ? route.value.testId : "", view.value],
 });
 const itemSelection = computed(() => selectedItem.value ? { kind: selectedItem.value.kind, id: selectedItem.value.id } : undefined);
 const inspecting = computed(() => Boolean(selectedTest.value && (selectedSpan.value || selectedItem.value)));
+
+/*
+ * A test that stopped short without a failing operation - cancelled, or partial with nothing to blame -
+ * still answers why: the check that decided it, or the outcome in its own words when no check did.
+ */
+const unexplained = computed(() => {
+  const test = selectedTest.value;
+  if (!test || test.failure || test.outcome === "succeeded" || test.outcome === "skipped") return null;
+  return { outcome: test.outcome, ...failureReason(test) };
+});
 
 /**
  * The test a test tab opens when none is chosen yet: the first that failed, then the first that went partial
@@ -334,6 +344,7 @@ const problemTitle = computed(() => ({
                '--inspector-width': inspectorResize.width.value ? `${inspectorResize.width.value}px` : undefined,
                '--inspector-sheet-height': sheetHeight === null ? undefined : `${sheetHeight}px`
              }">
+      <a class="skip" href="#workspace-view">Skip to the view</a>
       <div class="view-bar">
         <!-- Always rendered so the tabs never shift; on the run screen the run itself is the list. -->
         <AppButton variant="icon" class="rail-toggle" :class="{ inert: !selectedTest }" :disabled="!selectedTest"
@@ -349,7 +360,7 @@ const problemTitle = computed(() => ({
       <ColumnResizer v-if="selectedTest && railOpen" class="rail-resizer" label="Resize the test list"
                      @start="railResize.start" @nudge="railResize.nudge" @reset="railResize.reset" />
 
-      <div ref="viewHost" class="view-host" id="workspace-view" role="tabpanel" :aria-labelledby="`workspace-view-tab-${view}`">
+      <div ref="viewHost" class="view-host" id="workspace-view" role="tabpanel" tabindex="-1" :aria-labelledby="`workspace-view-tab-${view}`">
         <div v-if="missingTestId" class="missing-test">
           <h2>This trace has no such test</h2>
           <p>The link names <code>{{ missingTestId }}</code>, which is not in {{ fileName }}. It may come from another run.</p>
@@ -371,6 +382,10 @@ const problemTitle = computed(() => ({
             </header>
             <FailureCard v-if="selectedTest.failure && selectedTest.outcome !== 'succeeded'" :failure="selectedTest.failure"
                          :outcome="selectedTest.outcome" @select="selectSpan" />
+            <section v-else-if="unexplained" class="unexplained" :class="tone(unexplained.outcome)" aria-label="Why this test did not pass">
+              <i class="status" :class="tone(unexplained.outcome)" />
+              <p><strong>{{ unexplained.title }}</strong><span v-if="unexplained.detail">{{ unexplained.detail }}</span></p>
+            </section>
             <StoryView v-if="view === 'story'" :test="selectedTest" :selected="selectedSpan?.id" @select="selectSpan" />
             <StateView v-else-if="view === 'state'" :test="selectedTest" :selected="itemSelection" :selected-span="selectedSpan?.id"
                        @select-item="selectItem" @select-span="selectSpan" />
@@ -425,6 +440,16 @@ main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: minmax(
 .workspace > .rail { margin-bottom: var(--space-4); }
 
 .test { display: grid; gap: var(--space-3); }
+/* Keyboard readers jump past the rail and the tab strip straight to the view. */
+.skip { position: fixed; z-index: 60; top: var(--space-2); left: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--blueprint); border-radius: var(--radius-control); background: var(--surface); font-size: var(--text-meta); transform: translateY(-300%); }
+.skip:focus-visible { transform: none; }
+/* A test that stopped short with no failing operation still says why, in the failure card's shape. */
+.unexplained { padding: var(--space-3) var(--space-4); display: flex; align-items: flex-start; gap: var(--space-3); border: 1px solid var(--border); border-left: 3px solid var(--dim); border-radius: var(--radius-control); background: var(--surface); }
+.unexplained.danger { border-left-color: var(--danger); background: var(--danger-soft); }
+.unexplained.warning { border-left-color: var(--warning); background: var(--warning-soft); }
+.unexplained .status { margin-top: var(--space-1); }
+.unexplained p { display: grid; gap: 2px; font-size: var(--text-meta); }
+.unexplained span { overflow-wrap: anywhere; font: var(--text-micro)/var(--leading) var(--font-mono); }
 .test-head { padding: var(--space-1) var(--space-1) 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: var(--space-3); }
 .test-head > b { padding-top: var(--space-1); color: var(--dim); font: var(--text-meta) var(--font-mono); }
 .test-title { min-width: 0; display: grid; gap: 2px; }

@@ -32,14 +32,15 @@ export default function VisibilityPanel(): ReactNode {
       head={
         <>
           <strong className={styles.verdict}>
-            <span className={styles.failed}>4 failed</span>, <span className={styles.partial}>1 partial</span>, 14 passed
+            <span className={styles.failed}>4 failed</span>, <span className={styles.partial}>1 partial</span>, 14
+            passed
           </strong>
           <span className={styles.meta}>19 tests in 4.06 s</span>
         </>
       }
       foot={<>The run screen of the same trace. Absent sources keep their place, drawn dashed.</>}>
       <div className={styles.body}>
-        <div className={styles.strip} role="img" aria-label="One tick per test: tests 8, 10, 12 and 15 failed, test 11 was partial">
+        <div className={styles.strip} role="img" aria-label="One tick per test: tests 8, 10, 12 and 15 failed, test 11 is partial">
           {outcomes.map((outcome, index) => (
             <i key={index} className={styles[outcome]} />
           ))}

@@ -44,25 +44,26 @@ const phases: Phase[] = [
   {
     name: 'Setup',
     marker: '--phase-setup',
-    duration: '658 ms',
+    duration: '46 ms',
     rows: [
-      {chip: 'Framework', tone: '--type-extension', title: '2 extensions', facts: 'ProtoClientInitializerHook, ProtoClientCompletionHook', duration: '349 ms', folded: true},
-      {chip: 'Extension', tone: '--type-extension', title: 'Before · NorthstarTenantAttribute', duration: '158 ms'},
-      {chip: 'Data', tone: '--type-data', title: 'Provision · ProvisionTenantRequest → TenantResponse', duration: '150 ms', depth: 1},
+      {chip: 'Framework', tone: '--type-extension', title: '2 extensions', facts: 'ProtoClientInitializerHook, ProtoClientCompletionHook', duration: '738 µs', folded: true},
+      {chip: 'Framework', tone: '--type-extension', title: '4 extensions', facts: 'NorthstarScenarioHook, ProtoHttpAuthLifecycleHook ×2, ApplicationAttribute', duration: '198 µs', folded: true},
+      {chip: 'Extension', tone: '--type-extension', title: 'Before · NorthstarTenantAttribute', duration: '45 ms'},
+      {chip: 'Data', tone: '--type-data', title: 'Provision · ProvisionTenantRequest → TenantResponse', duration: '45 ms', depth: 1},
     ],
   },
   {
     name: 'Execution',
     marker: '--phase-execution',
-    duration: '1.30 s',
+    duration: '1.11 s',
     failed: true,
     rows: [
-      {chip: 'Data', tone: '--type-data', title: 'Create · IssueInvoiceRequest', duration: '283 ms'},
+      {chip: 'Data', tone: '--type-data', title: 'Create · IssueInvoiceRequest', duration: '91 ms'},
       {
         chip: 'Call',
         tone: '--type-call',
         title: 'REST · GET /api/v1/organization',
-        duration: '6.8 ms',
+        duration: '7.6 ms',
         failed: true,
         checks: [
           {label: 'status · 200 OK', passed: true},
@@ -74,16 +75,16 @@ const phases: Phase[] = [
   {
     name: 'Teardown',
     marker: '--phase-teardown',
-    duration: '6.8 ms',
+    duration: '7.4 ms',
     rows: [
-      {chip: 'Framework', tone: '--type-extension', title: '13 framework steps', duration: '1.4 ms', folded: true},
-      {chip: 'Context', tone: '--type-context', title: 'Dispose execution context', duration: '4.5 ms'},
+      {chip: 'Framework', tone: '--type-extension', title: '13 framework steps', duration: '1.8 ms', folded: true},
+      {chip: 'Context', tone: '--type-context', title: 'Dispose execution context', duration: '4.3 ms'},
     ],
   },
 ];
 
 function tone(token: string): CSSProperties {
-  return {'--node': `var(${token})`} as CSSProperties;
+  return {'--node-color': `var(${token})`} as CSSProperties;
 }
 
 function StoryRow({row}: {row: Row}): ReactNode {
@@ -114,7 +115,7 @@ export default function StoryView(): ReactNode {
   return (
     <div className={styles.story}>
       <header className={styles.testHead}>
-        <span className={styles.testNumber}>01</span>
+        <span className={styles.testNumber}>12</span>
         <span className={styles.testName}>
           A real wait does not close the due window
           <small>Failure drills · ARealWaitDoesNotCloseTheDueWindow</small>
@@ -122,7 +123,7 @@ export default function StoryView(): ReactNode {
         <span className={styles.outcome}>
           <i className={styles.outcomeDot} />
           Failed
-          <em>1.97 s</em>
+          <em>1.16 s</em>
         </span>
       </header>
 

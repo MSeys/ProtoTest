@@ -3,10 +3,10 @@ import type {ReactNode} from 'react';
 import styles from './styles.module.css';
 
 /*
- * The viewer's Run view for the bundled demo: the outcome line, the phase bar with the four failures
- * and the partial test, the "what this run could see" panel, and the needs-attention list. Values come
- * from prototest-demo.prototrace; the test list below needs-attention is left out on purpose - the failed
- * tests are the story here.
+ * The viewer's Run view for the bundled demo: the outcome line, the phase bar with the four failures and
+ * the partial, the "what this run could see" panel, and the needs-attention list. Values come from
+ * prototest-demo.prototrace, in the viewer's start order: tests 08, 10, 12 and 15 failed, test 11 went
+ * partial. The test list below needs-attention is left out on purpose - the failed tests are the story here.
  */
 
 type Tick = 'passed' | 'failed' | 'partial';
@@ -89,6 +89,22 @@ const attention: Attention[] = [
     label: 'Failed',
   },
   {
+    number: '11',
+    title: 'A passing journey can still carry a warning',
+    kicker: 'Finished with a partial result',
+    detail: '',
+    outcome: 'partial',
+    label: 'Partial',
+  },
+  {
+    number: '11',
+    title: 'The create response carried 4 fields no assertion mentioned: createdAtUtc, environmentCount, id, slug.',
+    kicker: 'Coverage',
+    detail: '',
+    outcome: 'partial',
+    label: 'Warning finding',
+  },
+  {
     number: 'Gate',
     title: 'no error findings',
     kicker: '',
@@ -102,11 +118,10 @@ export default function RunView(): ReactNode {
   return (
     <div className={styles.run}>
       <p className={styles.outcomeLine}>
-        <b className={styles.failedText}>4 failed</b>, <b className={styles.partialText}>1 partial</b>,{' '}
-        <b className={styles.passedText}>14 passed</b>
+        <b className={styles.failedText}>4 failed</b>, <b className={styles.partialText}>1 partial</b>, 14 passed
       </p>
-      <p className={styles.meta}>19 tests in 4.06 s · 29 sep 2026, 18:37:30</p>
-      <p className={styles.meta}>.NET 8.0.31 on Microsoft Windows 10.0.26200 · ProtoTest demo trace</p>
+      <p className={styles.meta}>19 tests in 4.06 s · 29 Sep 2026, 18:37:26 UTC</p>
+      <p className={styles.meta}>.NET 8.0.31 on Microsoft Windows 10.0.26200 · prototest-demo.prototrace</p>
 
       <div className={styles.bar} aria-hidden="true">
         {outcomes.map((outcome, index) => (

@@ -26,7 +26,7 @@ import type { Artifact, Item, Run, Span, TestTrace } from "./trace/model";
 import { formatDuration, pad, testCodeName, testGroup, testTitle } from "./trace/format";
 import { href, navigate, replace, route } from "./router";
 import { useSources } from "./trace/sources";
-import type { TestView } from "./router";
+import type { Route, TestView } from "./router";
 
 const fileInput = ref<HTMLInputElement>();
 const run = ref<Run>();
@@ -188,14 +188,24 @@ const testFiles = computed<FileEntry[]>(() => [...(selectedTest.value?.artifacts
 
 const tabs = computed(() => {
   const test = selectedTest.value ?? defaultTest.value;
-  const items = [{ id: "run", label: "Run", href: href({ name: "run" }) }];
+  const items: { id: string; label: string; href: string; route: Route }[] =
+    [{ id: "run", label: "Run", href: href({ name: "run" }), route: { name: "run" } }];
   if (!test) return items;
   const current = route.value;
   const selection = selectedTest.value && current.name === "test" ? current.selection : landing(test);
   const views: [TestView, string][] = [["story", "Story"], ["state", "State"], ["spans", "Spans"], ["files", "Files"]];
-  for (const [id, label] of views) items.push({ id, label, href: href({ name: "test", testId: test.id, view: id, selection }) });
+  for (const [id, label] of views) {
+    const target: Route = { name: "test", testId: test.id, view: id, selection };
+    items.push({ id, label, href: href(target), route: target });
+  }
   return items;
 });
+
+// The strip is a tab list: clicking a tab follows its link, and the arrow keys emit the same choice.
+function selectTab(id: string) {
+  const item = tabs.value.find(entry => entry.id === id);
+  if (item) navigate(item.route);
+}
 
 function openPicker() { fileInput.value?.click(); }
 function showTest(test: TestTrace) {
@@ -324,22 +334,22 @@ const problemTitle = computed(() => ({
                '--inspector-width': inspectorResize.width.value ? `${inspectorResize.width.value}px` : undefined,
                '--inspector-sheet-height': sheetHeight === null ? undefined : `${sheetHeight}px`
              }">
-      <nav class="view-bar" aria-label="Views">
+      <div class="view-bar">
         <!-- Always rendered so the tabs never shift; on the run screen the run itself is the list. -->
         <AppButton variant="icon" class="rail-toggle" :class="{ inert: !selectedTest }" :disabled="!selectedTest"
                    :label="railOpen ? 'Hide the test list' : 'Show the test list'" @click="railOpen = !railOpen">
           <Icon name="sidebar" />
         </AppButton>
-        <Tabs :items="tabs" :active="view" variant="underline" />
-      </nav>
+        <Tabs :items="tabs" :active="view" variant="underline" label="Views" panel="workspace-view" @select="selectTab" />
+      </div>
 
       <button v-if="selectedTest && railOpen && !railFits" class="rail-scrim" type="button" aria-label="Close the test list"
               @click="railOpen = false" />
       <TestRail v-if="selectedTest && railOpen" :tests="run.tests" :selected="selectedTest" @select="showTest" />
       <ColumnResizer v-if="selectedTest && railOpen" class="rail-resizer" label="Resize the test list"
-                     @start="railResize.start" @reset="railResize.reset" />
+                     @start="railResize.start" @nudge="railResize.nudge" @reset="railResize.reset" />
 
-      <div ref="viewHost" class="view-host">
+      <div ref="viewHost" class="view-host" id="workspace-view" role="tabpanel" :aria-labelledby="`workspace-view-tab-${view}`">
         <div v-if="missingTestId" class="missing-test">
           <h2>This trace has no such test</h2>
           <p>The link names <code>{{ missingTestId }}</code>, which is not in {{ fileName }}. It may come from another run.</p>
@@ -373,7 +383,7 @@ const problemTitle = computed(() => ({
       </div>
 
       <ColumnResizer v-if="inspecting" class="inspector-resizer" label="Resize the details"
-                     @start="inspectorResize.start" @reset="inspectorResize.reset" />
+                     @start="inspectorResize.start" @nudge="inspectorResize.nudge" @reset="inspectorResize.reset" />
       <Inspector v-if="selectedTest && inspecting" :test="selectedTest" :span="selectedSpan" :item="selectedItem"
                  @select="selectSpan" @item="selectItem" @artifact="openArtifact = $event" @close="selectSpan(undefined)" />
       <button v-if="inspecting" class="inspector-handle" type="button"
@@ -404,7 +414,7 @@ main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: minmax(
   gap: var(--space-3);
   border-bottom: 1px solid var(--border);
 }
-.view-bar > nav { flex: 0 0 auto; }
+.view-bar > .tabs { flex: 0 0 auto; }
 .view-bar > button { margin-bottom: var(--space-1); }
 /* Held in place on the run screen so the tabs never move, but there is nothing for it to open there. */
 .rail-toggle.inert { visibility: hidden; }

@@ -108,10 +108,10 @@
   --hover: #eaf4f8;
 
   --text: #183f5b;
-  /* Secondary and tertiary text both read at 4.5:1 or better on the paper and on white (WCAG AA);
-     dim stays a step lighter than muted. */
+  /* Secondary and tertiary text both read at 4.5:1 or better on every light surface, hover included
+     (WCAG AA); dim stays a step lighter than muted. */
   --muted: #4d6576;
-  --dim: #5c7383;
+  --dim: #58707f;
   --border: rgba(18, 59, 88, 0.14);
   --border-strong: rgba(18, 59, 88, 0.28);
 
@@ -152,8 +152,8 @@
 
   --text: #dceaf3;
   --muted: #90aec2;
-  /* Tertiary text keeps 4.5:1 on selected and tinted rows too, not only on the bare surface. */
-  --dim: #7a9cb0;
+  /* Tertiary text keeps 4.5:1 on hover, selected and tinted rows too, not only on the bare surface. */
+  --dim: #81a3b6;
   --border: rgba(255, 255, 255, 0.11);
   --border-strong: rgba(255, 255, 255, 0.22);
 

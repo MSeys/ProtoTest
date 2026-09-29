@@ -42,6 +42,13 @@
         "files": [
           "prototest-tokens.css"
         ]
+      },
+      {
+        "src": "../static/fonts",
+        "dest": "public/fonts",
+        "files": [
+          "*.woff2"
+        ]
       }
     ],
     "output": "../../artifacts/api-reference",

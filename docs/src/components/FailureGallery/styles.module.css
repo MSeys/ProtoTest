@@ -42,6 +42,8 @@
   text-align: left;
 }
 
+.toggle > * { min-width: 0; }
+
 .toggle:hover { background: var(--hover); }
 
 .mode {

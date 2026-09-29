@@ -19,6 +19,11 @@ interface Layer {
   entries: Entry[];
 }
 
+interface BlindSpot {
+  title: string;
+  body: string;
+}
+
 /*
  * One test's trace, read layer by layer. Names, numbers and messages are the recording's own: the test
  * is FailureDrills.TheTestClockClosesTheDueWindow in samples/Northstar.ProtoTest, recorded for
@@ -26,7 +31,7 @@ interface Layer {
  * because that gap is the part a reader would otherwise misread.
  */
 
-const layers: Layer[] = [
+const defaultLayers: Layer[] = [
   {
     id: 'run',
     label: 'Run',
@@ -112,7 +117,7 @@ const layers: Layer[] = [
   },
 ];
 
-const blindSpots = [
+const blindSpots: BlindSpot[] = [
   {
     title: 'Work outside the composition',
     body: 'The environment drill used a raw HttpClient against a fixed address. Its test.execution span ran 2.05 s and recorded no operation at all; the entry holds the connection failure, and the call it never wrapped cannot appear in the trace.',
@@ -130,15 +135,31 @@ const blindSpots = [
 interface TraceAnatomyProps {
   /** The run the walk reads. The default is the clock journey's own archive. */
   source?: TraceSource;
+  /** The panel title. The default names the learn walk. */
+  title?: ReactNode;
+  /** The test the walk reads, printed under the title. */
+  test?: string;
+  /** The layers to render. The default is the clock journey's own four layers. */
+  layers?: Layer[];
+  /** The closing panel. Pass an empty array to leave it out. */
+  blindSpots?: BlindSpot[];
 }
 
-export default function TraceAnatomy({source = lessonTraces.timeFix}: TraceAnatomyProps): ReactNode {
+export default function TraceAnatomy({
+  source = lessonTraces.timeFix,
+  title = 'One test, layer by layer',
+  test = 'FailureDrills.TheTestClockClosesTheDueWindow',
+  layers: propLayers,
+  blindSpots: propBlindSpots,
+}: TraceAnatomyProps): ReactNode {
+  const layers = propLayers ?? defaultLayers;
+  const spots = propBlindSpots ?? blindSpots;
   return (
     <Frame
       head={
         <>
-          <strong>One test, layer by layer</strong>
-          <span className={styles.headMeta}>FailureDrills.TheTestClockClosesTheDueWindow</span>
+          <strong>{title}</strong>
+          <span className={styles.headMeta}>{test}</span>
         </>
       }
       foot={
@@ -173,6 +194,7 @@ export default function TraceAnatomy({source = lessonTraces.timeFix}: TraceAnato
         ))}
       </ol>
 
+      {spots.length > 0 && (
       <section className={styles.blind} aria-labelledby="trace-anatomy-blind">
         <div className={styles.blindHead}>
           <h3 id="trace-anatomy-blind">What this trace cannot see</h3>
@@ -188,7 +210,7 @@ export default function TraceAnatomy({source = lessonTraces.timeFix}: TraceAnato
           read. These are the edges of that picture.
         </p>
         <ul className={styles.blindList}>
-          {blindSpots.map((spot) => (
+          {spots.map((spot) => (
             <li key={spot.title}>
               <strong>{spot.title}</strong>
               <p>{spot.body}</p>
@@ -196,6 +218,7 @@ export default function TraceAnatomy({source = lessonTraces.timeFix}: TraceAnato
           ))}
         </ul>
       </section>
+      )}
     </Frame>
   );
 }

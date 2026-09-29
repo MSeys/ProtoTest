@@ -98,6 +98,17 @@ Playwright reports that the browser executable does not exist when it was never 
 
 Parallel tests share the application and its data. When two tests create the same customer, order number or email address, one of them fails, but only when they happen to run at the same time.
 
+```mermaid
+flowchart TB
+    Q["Fails only in a full run?"]
+    Q -->|no| F["Read the failure on its own."]
+    Q -->|yes| N{"Do two tests create\nthe same name?"}
+    N -->|yes| U["Derive it from the test id:\nProto.Context.UniqueName."]
+    N -->|no| S{"Must they run\none at a time?"}
+    S -->|yes| R["Use the runner tool:\nNonParallelizable, a collection."]
+    S -->|no| C["Check the shared client:\na Caller-owned client is concurrent."]
+```
+
 Make every value a test creates unique to that test. `Proto.Context.UniqueName("customer")` derives a deterministic name from the test id. See [Execution context](../foundation/execution-context.md#unique-names) for the rerun rule:
 
 ```csharp
@@ -115,6 +126,12 @@ Tests that genuinely cannot run side by side need the runner's own tool: `[NonPa
 ## Where is the trace?
 
 Without `ConfigureTracing`, the trace goes to `TestResults/prototest-{runId}.prototrace`. Relative paths, that one and your own, resolve against the directory the tests run in, which for `dotnet test` is the test project's output folder: `bin/Debug/net10.0/TestResults/`. Set an absolute path, or one built from an environment variable, to collect it from CI.
+
+```text
+bin/Debug/net10.0/TestResults/*.prototrace   (where dotnet test writes)
+  -- upload from the repo root misses it -->
+PROTOTEST_RESULTS (absolute; trace and sinks agree)   (where CI looks)
+```
 
 If [trace.prototest.dev](https://trace.prototest.dev) says the trace is **from an older ProtoTest**, the file was written by a version whose archive the viewer does not open: it reads spans format 2.x and state format 1.x or 2.x. Run the tests again with a current ProtoTest. The archive itself keeps its shape: manifest format 2.0, `spans.json` plus `state.json`, whose state documents are format 1.1.
 

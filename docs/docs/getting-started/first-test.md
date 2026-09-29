@@ -4,6 +4,78 @@ title: Your first test
 description: "Build a small ProtoTest suite against an ASP.NET Core API, run it, make it fail once, and read the trace."
 ---
 
+import TraceAnatomy from '@site/src/components/TraceAnatomy';
+import {lessonTraces} from '@site/src/data/traceSources';
+
+export const firstJourneyLayers = [
+  {
+    id: 'run',
+    label: 'Run',
+    when: 'before the first test',
+    lead: 'What the run composed, and where the application ran.',
+    entries: [
+      {
+        kind: 'capability',
+        name: 'REST, GraphQL, ASP.NET Core, SQL, Data, Sheets, Playwright',
+        meta: 'the capabilities the composition declared',
+      },
+      {
+        kind: 'application',
+        name: 'Northstar web on a loopback listener',
+        meta: 'readiness /health, 1 attempt, waited 89 ms',
+      },
+      {
+        kind: 'broker',
+        name: 'Messaging broker',
+        meta: 'released; no container started, so broker journeys skip',
+      },
+    ],
+  },
+  {
+    id: 'setup',
+    label: 'Setup',
+    when: '522.9 ms',
+    lead: 'Six hooks and four attributes run before the body: clients, the database connection, and the tenant the test asked for.',
+    entries: [
+      {kind: 'test.setup', name: 'Setup', meta: '6 hooks, 4 attributes'},
+      {
+        kind: 'client.initialize',
+        name: 'Rest, GraphQL, loopback web, in-process Northstar, probe, messaging',
+        meta: 'one operation per client, each with its address recorded',
+      },
+      {kind: 'sql.connection.open', name: 'Open SqliteConnection', meta: '0.05 ms'},
+      {
+        kind: 'attribute.before',
+        name: 'Application, NorthstarTenant, SignedInAs, NorthstarMember',
+        meta: 'the tenant attribute provisions a TenantResponse in 138.1 ms',
+      },
+    ],
+  },
+  {
+    id: 'execution',
+    label: 'Execution',
+    when: '161.1 ms',
+    lead: 'One request, the application event it caused, and the two checks that decided the test.',
+    entries: [
+      {kind: 'http.request', name: 'REST POST /api/v1/projects', meta: '142.2 ms, 201 Created'},
+      {kind: 'Northstar.Domain', name: 'project.create', meta: 'reported by the application itself'},
+      {kind: 'assert.http.status', name: 'Assert status 201 Created', meta: 'expected and actual agree'},
+      {kind: 'assert.json.shape', name: 'Assert response shape', meta: '5 properties matched at once'},
+    ],
+  },
+  {
+    id: 'teardown',
+    label: 'Teardown',
+    when: '30.0 ms',
+    lead: 'Attributes and hooks reverse, four attachments publish, and owned resources release in order.',
+    entries: [
+      {kind: 'attachment.publish', name: 'Request, response, expected shape, scenario summary', meta: '4 files into the archive'},
+      {kind: 'data.cleanup', name: 'Cleanup TenantResponse', meta: 'the provisioned tenant is removed'},
+      {kind: 'resource.release', name: 'Services, connection, consumer, broker, readiness, loopback', meta: 'each released in order'},
+    ],
+  },
+];
+
 # Your first test
 
 This page takes a fresh test project to a passing test. It then breaks the test and reads the trace. The steps assume an ASP.NET Core application, `Orders.Api`, beside the tests; the tip below creates one. It uses **NUnit**. The other runners differ only in the setup class, covered in [Test runners](../runners/overview.md).
@@ -11,6 +83,15 @@ This page takes a fresh test project to a passing test. It then breaks the test 
 :::tip[Rather start from a working solution?]
 `dotnet new install ProtoTest.Templates`, then `dotnet new prototest -n Orders` creates an API and a suite for it that is already composed, traced and reported. Steps 1, 2, 3 and 6 below are ready to run, and `--runner` writes the suite for xUnit v2, xUnit v3, TUnit or MSTest instead. See [Installation](./installation.md#start-from-the-template).
 :::
+
+## The six steps
+
+1. **Project.** A test project with the runner and integration packages.
+2. **Host.** One setup class that builds the host, the sink, and the application.
+3. **Test.** One passing test, one trace file under `TestResults/`.
+4. **Assert.** A shape on the body, still green.
+5. **Break it.** One wrong expectation, one failure message that names the fix.
+6. **Trace.** The `.prototrace` that recorded all of it, read layer by layer below.
 
 ## 1. Create the project
 
@@ -135,6 +216,16 @@ Run the tests, then:
 
 - drop `TestResults/orders.prototrace` onto [trace.prototest.dev](https://trace.prototest.dev) to see every step of the test, the request and the shape comparison;
 - open `report.html` for the endpoints the suite exercised. See [Reporting](../observability/reporting.md).
+
+One recorded journey reads like this. The walk below is the learning sample's project journey (`ProjectsJourney.CreatingAProjectReturnsIt`), which follows the same six steps against a real application:
+
+<TraceAnatomy
+  source={lessonTraces.firstJourney}
+  title="One journey, layer by layer"
+  test="Northstar.ProtoTest.ProjectsJourney.CreatingAProjectReturnsIt"
+  layers={firstJourneyLayers}
+  blindSpots={[]}
+/>
 
 To choose the trace path yourself, add one line to `Setup`:
 

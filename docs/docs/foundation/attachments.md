@@ -62,6 +62,23 @@ A failure publishing one attachment does not stop the others. It is recorded lik
 
 An attachment is recorded on the **record axis**, not as an operation: `Trace.Attachment` adds an `attachment-{n}` item to the record of the operation that produced it, or to the test's orphans when there is no active operation. After the test, the content is copied into the archive under `resources/{testId}/{artifact-N}/{name}`, and the item is updated with its archive path and size, so the [viewer](../observability/prototrace.md) can open it right from the step that produced it. If capturing fails, the item carries the capture error instead of a path.
 
+One journey's archive, the learning sample's project journey:
+
+```text
+l1-first-journey.prototrace
+  resources/416387000001/artifact-1..4    request, response, expected shape, scenario summary
+  resources/run/JsonReportSink, HtmlReportSink    report.json, report.html
+  sources/1..2, manifest.json, spans.json, state.json
+```
+
+Record against operation in that archive:
+
+```text
+[http.request POST /api/v1/projects] <- attachment-1 request, attachment-2 response
+[assert.json.shape]                  <- attachment-3 expected shape
+[orphans: no active operation]       <- attachment-4 scenario summary, published in teardown
+```
+
 ## Writing a runner integration
 
 Runners provide an `IProtoTestAttachmentPublisher` when they start a test:

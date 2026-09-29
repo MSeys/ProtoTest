@@ -161,7 +161,7 @@ An application hosted in process receives the same keys as host settings automat
 
 ### Run-owned schema
 
-A container database starts empty, and the schema must exist before the first test, but a test body and a test hook run inside the per-test transaction, so `EnsureCreated`/`Migrate` or raw DDL there is rolled back with the test. Create it once for the run with [run-scoped setup](../../foundation/infrastructure.md#run-scoped-setup), registered **after** the container so it reads the connection string the container published:
+A container database starts empty, and the schema must exist before the first test, but a test body and a test hook run inside the per-test transaction, so `EnsureCreated`/`Migrate` or raw DDL there is rolled back with the test. Create it once for the run with [run-scoped setup](../../foundation/infrastructure-recipes.md#run-scoped-setup), registered **after** the container so it reads the connection string the container published:
 
 ```csharp
 builder

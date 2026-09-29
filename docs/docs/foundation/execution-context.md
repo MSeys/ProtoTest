@@ -4,11 +4,77 @@ title: Execution context
 description: "ProtoExecutionContext lives for exactly one test and holds its clients, state, services, resources, attachments and observations."
 ---
 
+import AnnotatedCode from '@site/src/components/AnnotatedCode';
+
+export const contextCode = `public sealed record MemberContext(string Id, string Email) : IProtoContext;
+
+[ProtoTest]
+public async Task MemberSeesOwnInvoices()
+{
+    Proto.Context.SetContext(new MemberContext("owner", "owner@example.test"));
+
+    using var response = await Proto.Context.Rest().GetAsync("/api/invoices");
+    response.Should.HaveHttpStatus(HttpStatusCode.OK);
+
+    Proto.Context.RecordObservation("invoices", "http.response", "GET /api/invoices");
+    Proto.Context.AddAttachment("invoices.json", await response.Content.ReadAsStringAsync(), "application/json");
+    Proto.Context.AddFinding("Invoices listed without a filter; check the default page size.");
+}`;
+
+export const contextCallouts = [
+  {
+    line: 6,
+    title: 'Typed state',
+    note: 'An attribute would usually set this. Set here, any helper on the flow reads it with Resolve.',
+  },
+  {
+    line: 8,
+    title: 'Client',
+    note: 'The per-test client the initializer created in setup. No address, no lookup, no test.',
+  },
+  {
+    line: 11,
+    title: 'Observation',
+    note: 'A fact the test learned. Collectors turn it into coverage and reports.',
+  },
+  {
+    line: 12,
+    title: 'Attachment',
+    note: 'A file the test produced. Stored under the test id, handed to the runner and the archive.',
+  },
+  {
+    line: 13,
+    title: 'Finding',
+    note: 'Worth reporting, not a failure. Reaches the reports and the run gates.',
+  },
+];
+
 # Execution context
 
 ## What it is
 
 A `ProtoExecutionContext` lives for exactly one test. It is where that test's clients, state, services, resources, attachments and observations are kept.
+
+```text
+Proto.Context
+  clients ......... per-test clients the initializers created
+  typed state ..... what attributes and hooks published with SetContext
+  services ........ the test DI scope
+  resources ....... owned handles released in reverse at teardown
+  findings ........ worth reporting, not failures
+  attachments ..... files handed to the runner and the archive
+  observations .... facts collectors turn into coverage and reports
+  trace ........... the test own entries
+  identity ........ test name, method, id
+  cancellation .... the token the runner supplied
+```
+
+<AnnotatedCode
+  filename="MemberInvoices.cs"
+  code={contextCode}
+  callouts={contextCallouts}
+  foot={<>State, client, observation, attachment and finding in one test body.</>}
+/>
 
 ## Reaching it
 
@@ -23,6 +89,13 @@ Outside a test, `Proto.Context` throws. The message names the alternatives: off-
 :::tip[Parallel tests are isolated]
 The context is stored in an `AsyncLocal`, so parallel tests each see their own. You do not need to pass it around, and one test cannot accidentally read another's state.
 :::
+
+```mermaid
+flowchart LR
+    A["test A flow"] --> CA["context A"]
+    B["test B flow"] --> CB["context B"]
+    E["escaped thread"] --> T["throws: no context on this flow"]
+```
 
 ### Test identity
 
@@ -73,6 +146,12 @@ The name is `{name}-{TestId}`, or `{name}-{TestId}-{sequence}` when the optional
 
 Typed state is how attributes, hooks and tests hand information to each other without globals.
 
+```mermaid
+flowchart LR
+    S["attribute: SetContext"] --> R["test: Resolve"]
+    R --> T["teardown: TryResolve,\nearly return when setup stopped short"]
+```
+
 ```csharp
 public sealed record SampleUserContext(
     string Id, string Tenant, string Email, string Role, string AccessToken) : IProtoContext;
@@ -94,20 +173,6 @@ T? TryResolve<T>() where T : class, IProtoContext;
 - A missing resolve throws *"No context of type 'X' is registered for this test. Register it before the test body reads it ..."*. Use `TryResolve` in teardown code, where setup may not have got that far.
 - `SetContext` records the value as traced state for the context entity. `TryResolve` never traces, and `Resolve` writes a `context.resolve` event only when it fails, so the trace tells you which lookups were missing, not every read.
 
-### Services
-
-The context has its own DI scope, created at test start and disposed at test end.
-
-```csharp
-var clock = Proto.Context.Service<IClock>();          // throws if not registered
-var mailer = Proto.Context.TryService<IMailer>();     // null if not registered
-
-IServiceProvider services = Proto.Context.Services;
-IConfiguration configuration = Proto.Context.Configuration;
-```
-
-Register services with `builder.ConfigureServices(...)`. Scoped services are per test.
-
 ### Clients
 
 Integrations with a system to talk to register their clients on the context. You normally use their extension methods (`Rest()`, `GraphQL()`, `Web()`). The underlying API:
@@ -120,50 +185,6 @@ TClient? TryClient<TClient>(string name = "Default") where TClient : class;
 ```
 
 Clients are keyed by type and **case-insensitive** name. Registering the same type and name twice throws, and registering anything after release has begun throws `ObjectDisposedException`. Disposable clients are disposed when the test ends, in reverse registration order. A failing `Client<T>` lookup writes a `client.resolve` event before it throws; `TryClient` never traces. See [Clients](./clients.md) for writing your own.
-
-### Resources
-
-A test can own resources, such as temporary files, provisioned data or an enlistment, and have them released in reverse registration order during teardown, before the DI scope is disposed.
-
-```csharp
-void RegisterResource(IProtoResource resource);
-T RegisterResource<T>(T resource) where T : class, IProtoResource;
-void RegisterResource(string id, string kind, string description,
-    Func<ProtoResourceReleaseContext, ValueTask> release);
-ValueTask<bool> ReleaseResourceAsync(string id);
-
-IReadOnlyList<ProtoResourceSnapshot> Resources { get; }
-```
-
-- Registration is **test-scoped only.** A resource whose `Scope` is not `Test` throws: *"Register it with AddResource on the host builder instead."*
-- A duplicate id throws, and registration after release has begun throws `ObjectDisposedException`.
-- Each resource is released at most once, in reverse registration order, after all hooks and attributes have run. `ReleaseResourceAsync` releases one early and returns `false` for an unknown or already-released id.
-- Framework-managed clients live on the client entity and appear in the report only if their release failed.
-
-```csharp
-context.RegisterResource(
-    "mailbox:cleanup",
-    "mailbox",
-    "Delete the test's mailbox",
-    release => new ValueTask(mailbox.DeleteAsync(release.Test!.TestId, release.CancellationToken)));
-```
-
-### Findings
-
-A finding is something worth reporting that is deliberately **not** a failure: a slow response, a deprecated field, a teardown problem. Findings reach the run's reports and [run gates](./lifecycle.md#run-gates-and-resources), and are traced so they appear in ProtoTrace.
-
-```csharp
-ProtoReportItem AddFinding(
-    string message,
-    ProtoReportStatus status = ProtoReportStatus.Warning,
-    string? identifier = null,
-    string? category = null,
-    string? targetName = null,
-    IReadOnlyList<string>? tags = null,
-    IReadOnlyDictionary<string, object>? metadata = null);
-```
-
-Defaults: status `Warning`, identifier `finding-NNN` per context, category `Finding`, target `Test findings`, display group the test name. Metadata is merged with `test.id` and `test.name`. A run gate can fail the run when an `Error` finding exists.
 
 ### Attachments
 
@@ -178,25 +199,9 @@ IReadOnlyList<ProtoTestAttachment> Attachments { get; }
 
 Names without a prefix are stored as `{testId}-{name}`, and a duplicate name (case-insensitive) throws. See [Attachments](./attachments.md).
 
-### Observations
+## Beyond the basics
 
-```csharp
-void RecordObservation(string targetName, string kind, string identifier,
-    object? data = null, IReadOnlyDictionary<string, object>? metadata = null);
-void RecordObservation(ProtoObservation observation);
-
-IReadOnlyCollection<ProtoObservation> RecordedObservations { get; }
-```
-
-Recording stores the observation, dispatches it to every collector that accepts it, and traces it. See [Coverage and observations](../observability/coverage.md).
-
-### Trace
-
-```csharp
-IProtoTraceWriter Trace { get; }
-```
-
-Add your own entries to the test's trace. See [Extending ProtoTest](../advanced/extending.md#adding-to-the-trace).
+Services, owned resources, findings, observations and the trace writer live on [Execution context advanced topics](./execution-context-advanced.md).
 
 ## Limits
 

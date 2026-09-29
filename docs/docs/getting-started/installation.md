@@ -66,6 +66,22 @@ Next: [Your first test](./first-test.md) walks the same path one step at a time 
 
 ## Add ProtoTest to your own project
 
+| | Template (fastest) | Your own project (control) |
+| --- | --- | --- |
+| Start with | `dotnet new prototest -n Shop` | the `dotnet add package` lines below |
+| You get | a working API, suite, trace and report | ProtoTest inside a project you already have |
+| Pick the other when | you already have an application or a suite | you want the composed example to copy from |
+
+A suite is one runner package, `ProtoTest.Core`, and one package per integration. Infrastructure hangs off the integration it serves:
+
+```text
+your suite = runner (1 of 5) + Core + 1 package per integration
+  runner:        ProtoTest.NUnit, .Xunit, .Xunit3, .MSTest, .TUnit (pick one)
+  integrations:  Rest, GraphQL, Grpc, Data, Sql, Sheets, OpenApi, ...
+  infrastructure: Sql.Testcontainers or Messaging.RabbitMq.Testcontainers,
+                  next to the Sql or Messaging integration they serve
+```
+
 Pick one package per integration you use, plus infrastructure and extras where you need them:
 
 <TabbedCode tabs={installTabs} label="ProtoTest packages by group" />
@@ -78,18 +94,18 @@ dotnet add package NUnit --version 4.6.1
 
 ## What comes along
 
-| You add | You also get |
-| --- | --- |
-| any package | `ProtoTest.Core` |
-| `ProtoTest.Rest`, `ProtoTest.GraphQL`, `ProtoTest.Grpc` | `ProtoTest.Http`, `ProtoTest.Json` |
-| `ProtoTest.Sheets` | `ProtoTest.Json` |
-| `ProtoTest.Web.Playwright`, `ProtoTest.Web.Selenium` | `ProtoTest.Web` |
-| `ProtoTest.Messaging.RabbitMq` | `ProtoTest.Messaging` |
-| `ProtoTest.Sql.EntityFrameworkCore` | `ProtoTest.Sql` |
-| `ProtoTest.Sql.Testcontainers`, `ProtoTest.Messaging.RabbitMq.Testcontainers` | `ProtoTest.Testcontainers` |
-| `ProtoTest.OpenApi` | `ProtoTest.Rest` |
+| You add | You also get | Add it directly when you |
+| --- | --- | --- |
+| any package | `ProtoTest.Core` | your code names Core types: a hook, an attribute, a context extension |
+| `ProtoTest.Rest`, `ProtoTest.GraphQL`, `ProtoTest.Grpc` | `ProtoTest.Http`, `ProtoTest.Json` | you build on the shared HTTP layer or shape constraints without those integrations |
+| `ProtoTest.Sheets` | `ProtoTest.Json` | you use shape constraints outside Sheets |
+| `ProtoTest.Web.Playwright`, `ProtoTest.Web.Selenium` | `ProtoTest.Web` | you write a backend on the shared web layer |
+| `ProtoTest.Messaging.RabbitMq` | `ProtoTest.Messaging` | you write an adapter on the messaging layer |
+| `ProtoTest.Sql.EntityFrameworkCore` | `ProtoTest.Sql` | you use the per-test connection without EF Core |
+| `ProtoTest.Sql.Testcontainers`, `ProtoTest.Messaging.RabbitMq.Testcontainers` | `ProtoTest.Testcontainers` | you write a container of your own |
+| `ProtoTest.OpenApi` | `ProtoTest.Rest` | you call the REST layer the coverage reads |
 
-`ProtoTest.Http` is the shared HTTP client and authentication layer behind REST, GraphQL and gRPC. It is primarily an extension point for integration authors; application suites normally reference Rest, GraphQL or Grpc instead of adding it themselves.
+`ProtoTest.Http` is the shared HTTP client and authentication layer behind REST, GraphQL and gRPC. Application suites reference the integration, not the layer.
 
 ## Browsers for Playwright
 

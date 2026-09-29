@@ -4,6 +4,43 @@ title: Environment resolution
 description: "Declare what the run needs as a target with an ordered provider chain: the first provider whose condition holds serves it, and the trace records the decision."
 ---
 
+import TraceAnatomy from '@site/src/components/TraceAnatomy';
+import {lessonTraces} from '@site/src/data/traceSources';
+
+export const compositionLayers = [
+  {
+    id: 'setup',
+    label: 'Setup',
+    when: '477.7 ms',
+    lead: 'The same six hooks and four attributes as any journey. The address decision happened earlier, at chain resolution.',
+    entries: [
+      {kind: 'test.setup', name: 'Setup', meta: '6 hooks, 4 attributes'},
+      {kind: 'client.initialize', name: 'Rest, GraphQL, loopback web, in-process, probe, messaging', meta: 'each with its address recorded'},
+    ],
+  },
+  {
+    id: 'execution',
+    label: 'Execution',
+    when: '138.1 ms',
+    lead: 'The test reads the composed address. One request, two checks, both green.',
+    entries: [
+      {kind: 'http.request', name: 'REST GET /api/v1/organization', meta: '120.4 ms, 200 OK'},
+      {kind: 'assert.http.status', name: 'Assert status 200 OK', meta: 'expected and actual agree'},
+      {kind: 'assert.json.shape', name: 'Assert response shape', meta: '7.4 ms'},
+    ],
+  },
+  {
+    id: 'teardown',
+    label: 'Teardown',
+    when: '27.7 ms',
+    lead: 'Attributes and hooks reverse, three attachments publish, resources release.',
+    entries: [
+      {kind: 'attachment.publish', name: 'Response, expected shape, scenario summary', meta: '3 files into the archive'},
+      {kind: 'data.cleanup', name: 'Cleanup TenantResponse', meta: 'the provisioned tenant is removed'},
+    ],
+  },
+];
+
 # Environment resolution
 
 ## What it is
@@ -117,6 +154,24 @@ An application that declares no provider registers no chain: `AddAspNetCoreServe
 ## What the trace shows
 
 The run records one `environment.resolved` event per target with the target, its keys, the winning provider and every skipped provider with the reason, plus one `environment.provider.skipped` event per loser. A skipped provider's piece is never started, owned or released, and its run entity carries `infrastructure.state: skipped` with the reason. Read the record in a report to answer "which environment did this run actually use?" without reading the setup code.
+
+The chain figure is in [Infrastructure](./infrastructure.md#what-it-is): one target, providers in order, one winner. The two recordings below show what that decision changes for a test. The drill hardcodes its address and never touches the composition:
+
+```text
+FailureDrills.TheAddressWasHardcodedForOneMachine
+  test.execution failed in 2058.6 ms, no child operation
+  HttpRequestException: ConnectionError reaching http://127.0.0.1:5099: connection refused.
+```
+
+The trace records the failure on `test.execution`, but the call it never wrapped cannot appear in it. Teardown publishes only the scenario summary. The test that takes the address from the composition runs the same journey and passes:
+
+<TraceAnatomy
+  source={lessonTraces.environmentFix}
+  title="The address from the composition"
+  test="Northstar.ProtoTest.FailureDrills.TheAddressComesFromTheComposition"
+  layers={compositionLayers}
+  blindSpots={[]}
+/>
 
 A provider that lost to an earlier one records the earlier provider as the reason. A provider whose own condition failed records the condition: the missing keys, the unset selection key, or the requirement the probe did not meet.
 

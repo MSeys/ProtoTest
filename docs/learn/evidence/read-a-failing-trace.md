@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Read a failing trace
 
-A failed run is a story with a last page you can read. The four drills in the sample fail on purpose, each next to the test that runs the same journey the right way, so the difference is a habit and the trace shows it.
+A failed run ends with a check you can read. The four drills in the sample fail on purpose, each next to the test that runs the same journey the right way, so the difference is one practice and the trace shows it.
 
 <LearnShell
   level="Level 4, lesson 1"
@@ -29,7 +29,7 @@ A failed run is a story with a last page you can read. The four drills in the sa
   situation={
     <>
       <p>The suite in CI reports one failing check. You cannot attach a debugger to that runner, and the log holds a single line. What is left of the run is the trace, and the trace records both halves of the comparison that failed.</p>
-      <p>The four pairs below are the same failures from the Level 0 tour, this time read the way you would read a failure of your own. Set <code>ProtoTest__Sample__Drills=true</code> and both halves run and leave their traces.</p>
+      <p>The four pairs below are the same failures the [Level 0 tour](/learn/why-integration-tests-get-hard/the-trace-as-the-feedback-loop) showed, this time read the way you would read a failure of your own. Set <code>ProtoTest__Sample__Drills=true</code> and both halves run and leave their traces.</p>
     </>
   }
   checkpoint={{
@@ -87,13 +87,13 @@ The time pair is the clearest:
 | | The drill | The test that holds |
 | --- | --- | --- |
 | Before the read | an invoice is provisioned | an invoice is provisioned, then the clock moves eight days |
-| The call | `REST GET /api/v1/organization`, 98.1 ms, HTTP 200 | the same call, 66.1 ms, HTTP 200 |
+| The call | `REST GET /api/v1/organization`, 74.0 ms, HTTP 200 | the same call, 65.3 ms, HTTP 200 |
 | The check | shape failed: `$.status` expected `past_due`, read `active` | shape succeeded, then the invoice is paid |
 
 The call succeeded in both runs. The application answered quickly, with a subscription that was still `active`, because nothing had moved the clock the application reads. The drill waited a real second, and that changed nothing. The fix advanced the test clock, and the same shape check passed. One failure, four answers, and the pair writes the fix down.
 
 ## When the trace is silent
 
-The environment pair is the other direction. Its execution layer holds a single `test.execution` entry of 2.08 s and no request at all, and the failure is a connection error. Nothing wrapped the call, so nothing recorded it. That silence is the diagnosis: the work ran outside the run. The fix takes the address from the composition, and the same call turns into an ordinary request entry.
+The environment pair is the other direction. Its execution layer holds a single `test.execution` entry of 2.05 s and no request at all. The entry records the failure, a connection error, and nothing about the call: the raw client ran outside the composition, so the run never wrapped it. That missing operation is the diagnosis. The fix takes the address from the composition, and the same call turns into an ordinary request entry.
 
 </LearnShell>

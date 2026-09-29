@@ -18,10 +18,10 @@ public static class ProtoMessagingBuilderExtensions
     /// The harness resolves from the application's in-process server (<c>AddAspNetCoreServer</c>), so
     /// register <c>AddMessaging</c> after the application's server - the messaging client initializes
     /// once the server exists, exactly like the in-process topology a RabbitMQ tap binds to. The
-    /// <c>Broker</c> capability is declared only while
-    /// <c>ProtoTest:Applications:{application}:BaseUrl</c> is not configured: a published application
-    /// has no test harness in this process, so the capability is absent and
-    /// <c>[RequiresCapability(ProtoCapabilityKinds.Broker)]</c> skips instead of failing at setup.
+    /// <c>Broker</c> capability is declared only while the application runs in-process: a published,
+    /// loopback, container or AppHost application has no test harness in this process, so the
+    /// capability is absent and <c>[RequiresCapability(ProtoCapabilityKinds.Broker)]</c> skips instead
+    /// of failing at setup.
     /// </remarks>
     /// <typeparam name="TProgram">The entry point class of the in-process application under test.</typeparam>
     /// <param name="messaging">The messaging builder to attach the adapter to.</param>
@@ -37,11 +37,14 @@ public static class ProtoMessagingBuilderExtensions
         ArgumentNullException.ThrowIfNull(messaging);
         ArgumentException.ThrowIfNullOrWhiteSpace(application);
 
-        // The harness exists only while the application is hosted in-process, so the capability needs
-        // the address to be absent: a configured BaseUrl means a published process with no test harness
-        // here, and gated tests skip instead of failing at first publish or await.
-        return messaging.UseBrokerUnlessConfigured(
+        // The harness exists only while the application is hosted in-process: the application's
+        // provider chain decides, so a loopback, container or AppHost winner drops the capability and
+        // gated tests skip instead of failing at first publish or await. A host whose application
+        // declares no chain keeps the configured-address rule: a configured BaseUrl means a published
+        // process with no test harness here.
+        return messaging.UseBrokerWhenInProcess(
             _ => new MassTransitMessageBroker<TProgram>(application),
+            application,
             $"{ProtoApplication.SectionPath}:{application}:BaseUrl");
     }
 }

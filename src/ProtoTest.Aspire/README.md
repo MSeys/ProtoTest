@@ -7,7 +7,7 @@ application target, and the run releases it.
 dotnet add package ProtoTest.Aspire
 ```
 
-The package targets `net8.0`, `net9.0` and `net10.0`; the Aspire release is pinned centrally (`Directory.Packages.props` for `Aspire.Hosting.Testing`, `global.json` for the AppHost SDK).
+The package targets `net8.0`, `net9.0` and `net10.0`; the suite's AppHost leg runs on `net10.0`.
 
 ## Includes
 
@@ -40,11 +40,7 @@ The package targets `net8.0`, `net9.0` and `net10.0`; the Aspire release is pinn
 - Closed box: no per-test service substitution, no in-process assertions. White-box
   worker tests use `ProtoTest.Hosting`; topology runs use this package.
 - One AppHost instance per run; the run's state is shared between tests.
-- A chain's AppHost serves only when selected: every AppHost provider holds on
-  `ProtoTest:Aspire:Enabled` (every resource) or a resource's own
-  `ProtoTest:Aspire:Resources:{resource}:Enabled` (its targets only), so a suite that registers the
-  AppHost without setting either key never starts it and resolves through its other providers. The
-  AppHost publishes only the selected resources' keys, and a configured key is never masked.
+- Without either selection key the AppHost never starts and resolution falls through to the chain's other providers.
 - The AppHost receives the run's configuration and settings as arguments; bridging them into its
   projects (`AddConnectionString`, `WithEnvironment`) stays the AppHost project's code, because only
   it knows its graph.

@@ -108,52 +108,10 @@ jobs:
 
       # The template is packed with every run; this proves the package actually installs, generates a
       # project against the just-packed packages for every runner the template offers, and builds and
-      # tests each one.
+      # tests each one. The gate fixtures run the same script wherever the packed feed exists.
       - name: Smoke-test the starter template
         shell: pwsh
-        run: |
-          $package = Get-ChildItem artifacts/packages/ProtoTest.Templates.*.nupkg |
-            Where-Object { $_.Name -notlike '*.snupkg' } |
-            Select-Object -First 1
-          if (-not $package) { throw "The packed ProtoTest.Templates package was not found." }
-          dotnet new install $package.FullName
-          if ($LASTEXITCODE -ne 0) { throw "dotnet new install failed." }
-
-          $packages = (Resolve-Path artifacts/packages).Path
-          foreach ($runner in @("nunit", "xunit", "xunit3", "tunit", "mstest")) {
-            $starter = Join-Path $env:RUNNER_TEMP "prototest-starter-$runner"
-            if (Test-Path -LiteralPath $starter) { Remove-Item -LiteralPath $starter -Recurse -Force }
-            dotnet new prototest --no-restore -n Starter -o $starter --runner $runner
-            if ($LASTEXITCODE -ne 0) { throw "dotnet new prototest --runner $runner failed." }
-
-            # The starter resolves the packages this run just packed, and falls back to nuget.org for
-            # everything else.
-            @"
-            <?xml version="1.0" encoding="utf-8"?>
-            <configuration>
-              <packageSources>
-                <clear />
-                <add key="local" value="$packages" />
-                <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-              </packageSources>
-            </configuration>
-            "@ | Set-Content -Path (Join-Path $starter "NuGet.config")
-
-            # Run from the starter root: the Microsoft Testing Platform variants select the MTP test
-            # runner in their global.json, which the SDK resolves from the working directory.
-            Push-Location $starter
-            try {
-              dotnet restore Starter.slnx
-              if ($LASTEXITCODE -ne 0) { throw "restore failed for the $runner starter." }
-              dotnet build Starter.slnx --configuration Release --no-restore
-              if ($LASTEXITCODE -ne 0) { throw "build failed for the $runner starter." }
-              dotnet test Starter.Tests/Starter.Tests.csproj --configuration Release --no-build --no-restore
-              if ($LASTEXITCODE -ne 0) { throw "test failed for the $runner starter." }
-            }
-            finally {
-              Pop-Location
-            }
-          }
+        run: ./eng/test-template.ps1
 
       - name: Keep the validated release packages
         if: inputs.upload_packages

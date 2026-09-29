@@ -2,7 +2,7 @@
 id: evidence-loop-with-an-agent
 title: Run the evidence loop with an agent
 sidebar_label: The evidence loop with an agent
-sidebar_position: 4
+sidebar_position: 5
 description: "Read a real failing trace with the CLI, connect a coding agent to the same archive over MCP, and close the loop."
 ---
 
@@ -14,7 +14,7 @@ import Link from '@docusaurus/Link';
 The four drills leave failing traces on purpose. Level 4 read one as a human. This lesson reads the same archive with the tools a coding agent uses, and the two must tell one story.
 
 <LearnShell
-  level="Level 6, lesson 4"
+  level="Level 6, lesson 5"
   minutes="About 9 minutes"
   outcome={[
     'Run the deterministic summary on a real failing trace.',
@@ -28,7 +28,7 @@ The four drills leave failing traces on purpose. Level 4 read one as a human. Th
   situation={
     <>
       <p>The evidence loop is fail, evidence, fix, verify, report. One file carries the evidence, and every step reads that same file, so the log, the agent and the pull request cannot disagree.</p>
-      <p>The drill archive is the honest test case: a failure that was recorded once and did not change afterwards.</p>
+      <p>The drill archive is the right test case: a failure that was recorded once and did not change afterwards.</p>
     </>
   }
   checkpoint={{
@@ -75,10 +75,10 @@ prototest summary l0-time-drill.prototrace
 The command reads the archive and prints one deterministic document. Here is its output for the committed drill, with the run id and timestamps shortened:
 
 ```text
-ProtoTest trace 2.0 · run 06ed50a0... · 2026-09-28 20:04:11Z - 2026-09-28 20:04:15Z
+ProtoTest trace 2.0 · run 316f2b23... · 2026-09-29 06:18:29Z - 2026-09-29 06:18:34Z
 1 tests · 1 failed
 
-FAILED Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow (2.20 s)
+FAILED Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow (2.16 s)
   Shape mismatch failed with 1 error(s):
     • [$.status]: Values did not match. (Expected: "past_due", Actual: "active")
   at samples/Northstar.ProtoTest/FailureDrills.cs:34 (Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow)
@@ -156,6 +156,6 @@ The annotations go to stdout and the per-channel outcomes to stderr. With no tar
 - Every payload is capped, and an archive opened from a stream has no file to read, so its sources and artifact contents are absent with that reason.
 - The rules never guess. A failure whose evidence was not recorded is reported as unexplained, with a pointer to the viewer.
 
-That is the end of the track and the shape of the loop: the suite writes one archive, the human and the agent read the same document, and the fix is verified against the report that came before it.
+The suite writes one archive. The human and the agent read the same file. Verify the fix against the earlier report.
 
 </LearnShell>

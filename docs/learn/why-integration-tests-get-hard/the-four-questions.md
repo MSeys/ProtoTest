@@ -24,11 +24,11 @@ Before you can trust a test like that, it has to answer four questions.
   ]}
   before={[
     'Nothing from this track.',
-    <>The archives this level reads are on this site, so no install is needed. To run the demo as well, <code>dotnet test samples/Northstar.ProtoTest</code> needs the .NET SDK and the repository.</>,
+    <>The archives this level reads are on this site, so no install is needed. To run the sample as well, <code>dotnet test samples/Northstar.ProtoTest</code> needs the .NET SDK and the repository.</>,
   ]}
   situation={
     <>
-      <p>An integration test fails once, passes on the retry, and the failure message says nothing you can act on. That is the shape of most integration problems: something outside the code under test changed between the two runs, and the test never said what it depended on.</p>
+      <p>An integration test fails once, passes on the retry, and the failure message says nothing you can act on. Most integration failures look like this. Something outside the tested code changed, and the test never named what it depended on.</p>
       <p>The four questions name those somethings. The rest of this level answers each one with a test that fails on purpose and the test that fixes it.</p>
     </>
   }

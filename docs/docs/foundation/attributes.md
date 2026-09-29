@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 5
 title: Attributes
 description: "Turn setup into a named, reusable capability with a ProtoTest attribute, and compose it onto any test that needs it."
 ---
@@ -20,7 +20,25 @@ public sealed class BillingTests
 }
 ```
 
-The test says *what* it needs. The attribute knows *how*. Nothing is inherited from a base fixture class, and two capabilities never have to know about each other.
+The test declares what it needs. The attribute provides it. No base fixture class is needed, and capabilities stay independent of each other.
+
+## Attributes ProtoTest ships
+
+| Attribute | Kind |
+| --- | --- |
+| [`[WebSession]`](../integrations/web/index.md#several-sessions-in-one-test) | `ProtoAttribute`: declares and optionally opens a browser session |
+| [`[LoginAs<TStrategy>]`](../integrations/web/login.md) | `ProtoAttribute`: logs a browser session in |
+| [`[Auth<T>]`](../integrations/rest/authentication.md) | metadata read by the HTTP hooks, one authenticator for REST and GraphQL, narrowed with `Protocols` |
+| [`[SignedInAs]`](../integrations/rest/authentication.md#built-in-test-user) | `ProtoAttribute` plus HTTP auth metadata: declares the test user's name, roles and claims for the in-process application |
+| `[Application("Name", "Protocol:Client")]` | `ProtoAttribute`: selects the application under test and, optionally, which client each protocol uses |
+| [`[RequiresCapability(kind)]`](./skip-conditions.md) | `ProtoAttribute`: skips the test unless the host has the capability |
+| [`[RequiresWorker<TProgram>]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute`: skips unless `AddWorkerHost<TProgram>()` hosts the worker |
+| [`[RequiresServer(name)]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute`: skips unless the named `AddAspNetCoreServer` instance is composed |
+| [`[RequiresApplication(name)]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute`: skips unless `AddApplication` declared the application |
+| [`[RequiresInProcess]`](./skip-conditions.md) | `ProtoAttribute`: `[RequiresCapability("server")]` |
+| `[ProtoTest]`, `[ProtoTestFact]`, `[ProtoTestTheory]` | [runner](../runners/overview.md) entry points |
+
+Most of the capabilities in a real suite are ones you write. That is the point.
 
 ## How it works
 
@@ -51,7 +69,7 @@ Because `Order` is an `init` property, callers can override it where they apply 
 [SampleUser(SampleRoles.Member, Order = -150)]
 ```
 
-Where the attribute is declared does not affect ordering: class-level and method-level attributes are sorted together by `Order`, and class-level ones come first only on a tie. Every test hook runs before every attribute, as [Host and lifecycle](./lifecycle.md) describes.
+Where the attribute is declared does not affect ordering: class-level and method-level attributes are sorted together by `Order`, and class-level ones come first only on a tie. Every test hook runs before every attribute, as [Host and lifecycle](./lifecycle.md) describes. The [reserved `Order` bands](./hooks.md#reserved-order-bands) name the range each kind of capability belongs in.
 
 Attributes are collected from the test's class (including base classes) and from the method (including overridden base methods). Put suite-wide capabilities on the class and scenario-specific ones on the method.
 
@@ -159,7 +177,7 @@ public sealed class SampleUserAttribute : ProtoAttribute
 }
 ```
 
-The sample suite's real pair is [`NorthstarTenantAttribute` and `SignedInAsAttribute`](../../../samples/Northstar.ProtoTest/NorthstarAttributes.cs), which the demo's journeys group as [`NorthstarMemberAttribute`](../../../samples/Northstar.ProtoTest/NorthstarMember.cs).
+The sample suite's environment and user attributes are `SampleEnvironmentAttribute` and `SampleUserAttribute` (see below). The learning sample groups its pair as `NorthstarMemberAttribute` in `samples/Northstar.ProtoTest`.
 
 What makes these work well:
 
@@ -192,25 +210,7 @@ An attribute can also stop a test before the lifecycle starts. Implement `IProto
 [RequiresInProcess]
 ```
 
-Conditions run before `StartTestAsync`, so a skipped test has no context and no teardown, and the runner reports the reason. MSTest has no public dynamic-skip API: it returns an ignored result and carries the reason on the display name and log output. Conditions are **adapter-opt-in**: a runner that does not evaluate them runs the test, and evaluation happens in the order the runner resolves attributes, not in `Order`. NUnit, for example, checks class-level conditions before method-level ones in reflection order. [Skip conditions](./skip-conditions.md) covers evaluation, the per-runner behaviour and the limits.
-
-### Attributes ProtoTest ships
-
-| Attribute | Kind |
-| --- | --- |
-| [`[WebSession]`](../integrations/web/index.md#several-sessions-in-one-test) | `ProtoAttribute`: declares and optionally opens a browser session |
-| [`[LoginAs<TStrategy>]`](../integrations/web/login.md) | `ProtoAttribute`: logs a browser session in |
-| [`[Auth<T>]`](../integrations/rest/authentication.md) | metadata read by the HTTP hooks, one authenticator for REST and GraphQL, narrowed with `Protocols` |
-| [`[SignedInAs]`](../integrations/rest/authentication.md#built-in-test-user) | `ProtoAttribute` plus HTTP auth metadata: declares the test user's name, roles and claims for the in-process application |
-| `[Application("Name", "Protocol:Client")]` | `ProtoAttribute`: selects the application under test and, optionally, which client each protocol uses |
-| [`[RequiresCapability(kind)]`](./skip-conditions.md) | `ProtoAttribute`: skips the test unless the host has the capability |
-| [`[RequiresWorker<TProgram>]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute`: skips unless `AddWorkerHost<TProgram>()` hosts the worker |
-| [`[RequiresServer(name)]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute`: skips unless the named `AddAspNetCoreServer` instance is composed |
-| [`[RequiresApplication(name)]`](./skip-conditions.md#typed-conditions-for-the-host-composition) | `ProtoAttribute`: skips unless `AddApplication` declared the application |
-| [`[RequiresInProcess]`](./skip-conditions.md) | `ProtoAttribute`: `[RequiresCapability("server")]` |
-| `[ProtoTest]`, `[ProtoTestFact]`, `[ProtoTestTheory]` | [runner](../runners/overview.md) entry points |
-
-Most of the capabilities in a real suite are ones you write. That is the point.
+Conditions run before `StartTestAsync`, so a skipped test never creates a context. [Skip conditions](./skip-conditions.md) covers evaluation, the per-runner behaviour and the limits.
 
 ## What the trace shows
 

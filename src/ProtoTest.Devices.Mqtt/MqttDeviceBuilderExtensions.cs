@@ -71,8 +71,15 @@ public static class MqttDeviceBuilderExtensions
 
         // The topics ride the endpoint settings the client resolves per device; the address query
         // parameters stay the fallback for a client registered directly with AddClient.
-        return client
+        var registered = client
             .WithSetting(MqttDeviceAddress.PublishTopicParameter, publishTopic)
             .WithSetting(MqttDeviceAddress.SubscribeTopicParameter, subscribeTopic);
+
+        // An explicit address or resolver serves without configuration, so the capabilities stay
+        // unconditional; otherwise they follow MqttDeviceOptions.BrokerSetting like every address-driven
+        // integration, so an addressless client whose broker no key can provide drops them.
+        return address is null && resolveAddress is null
+            ? registered.WithAddressKeys(MqttDeviceOptions.BrokerSetting)
+            : registered;
     }
 }

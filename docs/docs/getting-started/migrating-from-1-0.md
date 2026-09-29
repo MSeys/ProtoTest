@@ -6,29 +6,30 @@ description: "What a 1.0 suite changes for 1.1: the renamed package and options 
 
 # Migrating from 1.0 to 1.1
 
-Most of 1.1 is additive. No published package was renamed, and the surface marked deprecated keeps compiling with a warning that names the replacement. The changelog's Breaking section lists the few calls that must change; the rest of a 1.0 suite runs as it is.
+| Action | What | Count |
+| --- | --- | --- |
+| MUST | [removed members](#removed-in-11) that no longer compile | 10 |
+| SHOULD | [deprecated shims](#deprecated-in-11) that keep compiling with a warning | 4 groups |
+| NOTHING | [renamed surface](#renamed-or-replaced) with a fallback, and [behavior changes](#also-changed) to verify | 3 renames, 5 behavior changes |
 
-This page covers the renames and the deprecated surface. The [changelog](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md) is the complete record, including the changes this page does not repeat.
+The changelog's Breaking section lists the calls that must change; the rest of a 1.0 suite runs as it is. This page covers the renames and the deprecated surface. The [changelog](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md) is the complete record, including the changes this page does not repeat.
 
-## Renamed or replaced
+## Removed in 1.1
 
-### The MassTransit package
+These members existed in 1.0.1 and are gone. The changelog's Breaking section carries the same list.
 
-One package changes its name, and it never shipped: `ProtoTest.MassTransit` is `ProtoTest.Messaging.MassTransit`, matching the messaging family's nesting (`ProtoTest.Messaging`, `ProtoTest.Messaging.RabbitMq`). Update the `PackageReference`; the public type names (`MassTransitEnvelope`, `UseMassTransit`) are unchanged.
-
-### The gRPC options section
-
-gRPC client options bind `ProtoTest:Grpc:Client`. The 1.0 section `ProtoTest:Grpc` still binds as a deprecated fallback, so an existing `appsettings.json` keeps working. A value under the current section wins, and list-valued options accumulate the fallback and current entries. See [Options and keys](../integrations/grpc/index.md#options-and-keys).
-
-### The OpenTelemetry bridge
-
-The `ProtoTest.OpenTelemetry` package retired. The `ProtoTest` `ActivitySource` always exists, so subscribing is one line in your own OpenTelemetry setup:
-
-```csharp
-.AddSource("ProtoTest")
-```
-
-No package replaces the bridge, because the source was always there. See [OpenTelemetry](../observability/opentelemetry.md).
+| Removed member | Replacement | Docs |
+| --- | --- | --- |
+| `ProtoExecutionContext.RegisterClient<T>(client, name, bool)` | the third argument is now `ProtoClientOwnership` (`Context` or `Caller`), so a `true` becomes `ProtoClientOwnership.Context` | [Clients](../foundation/clients.md) |
+| `ProtoDocumentSource.LoadText(source, baseUrl, httpClient)` | one `LoadText` method with optional parameters replaces the overload | [Extending](../advanced/extending.md) |
+| `ProtoHttpAuthLifecycleHook` constructor | sealed, and takes a `ProtoProtocol` instead of a string | [Hooks](../foundation/hooks.md) |
+| `ProtoHttpClientResolution` members | a positional record with `ClientEntityName`; `SourceName`, `SourceClientName` and `Deconstruct` are gone, and `ProtoHttpClientResolver.Resolve` takes the client name as an optional third argument | [Extending](../advanced/extending.md) |
+| the backend operation's `Result` on `WebOperationContext` | gone | |
+| Playwright options `Context` | configure the browser context in code with `ConfigureContext` | [Web](../integrations/web/index.md) |
+| `RequiresPlaywrightBrowser.Session` | the condition probes the configured browser or channel | [Skip conditions](../foundation/skip-conditions.md) |
+| `GrpcAttachmentOptions` HTTP members | no longer derives from the HTTP attachment options, so `SensitiveHeaders` and `SensitiveQueryParameters` are gone; gRPC metadata redaction uses the gRPC client's `SensitiveMetadataKeys` | [gRPC](../integrations/grpc/index.md) |
+| Raw `ServerStreaming` and `DuplexStreaming` helpers | moved from the gRPC client to the blocking facade: `client.Blocking.ServerStreaming(...)` | [gRPC](../integrations/grpc/index.md) |
+| the `PollInterval` on `RabbitMqOptions` | awaits are event-driven and `MessagingOptions.DefaultTimeout` bounds them | [Messaging](../integrations/messaging/index.md) |
 
 ## Deprecated in 1.1
 
@@ -68,11 +69,31 @@ builder.AddInfrastructure(
     RabbitMqOptions.ConnectionStringSetting);
 ```
 
-`UseConfigured()` is the configured-key step-aside, and `Use(provider)` takes any `IProtoTargetProvider`. See [Infrastructure](../foundation/infrastructure.md).
+`UseConfigured()` is the configured-environment provider, and `Use(provider)` takes any `IProtoTargetProvider`. See [Infrastructure](../foundation/infrastructure.md).
 
 ### The gRPC options constant
 
 `GrpcAttachmentOptions.ConfigurationSection` is an obsolete alias. Use the inherited `ConfigurationSectionName` property, or the `SectionName` constant where a name is needed without an instance.
+
+## Renamed or replaced
+
+### The MassTransit package
+
+One package changes its name: `ProtoTest.MassTransit` is `ProtoTest.Messaging.MassTransit`, matching the messaging family's nesting (`ProtoTest.Messaging`, `ProtoTest.Messaging.RabbitMq`). It was never released, so nothing you installed changes. Update the `PackageReference`; the public type names (`MassTransitEnvelope`, `UseMassTransit`) are unchanged.
+
+### The gRPC options section
+
+gRPC client options bind `ProtoTest:Grpc:Client`. The 1.0 section `ProtoTest:Grpc` still binds as a deprecated fallback, so an existing `appsettings.json` keeps working. A value under the current section wins, and list-valued options accumulate the fallback and current entries. See [Options and keys](../integrations/grpc/index.md#options-and-keys).
+
+### The OpenTelemetry bridge
+
+The `ProtoTest.OpenTelemetry` package retired. The `ProtoTest` `ActivitySource` always exists, so subscribing is one line in your own OpenTelemetry setup:
+
+```csharp
+.AddSource("ProtoTest")
+```
+
+No package replaces the bridge, because the source was always there. See [OpenTelemetry](../observability/opentelemetry.md).
 
 ## Also changed
 

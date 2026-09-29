@@ -41,7 +41,7 @@ The number is a per-test sequence, so the second request in a test is `rest-02-â
 
 ## Options
 
-`ProtoTest:Rest:Attachments` binds a `ProtoHttpAttachmentOptions`, the same base type GraphQL uses under its own key, so capture and redaction stay identical across the HTTP protocols.
+`ProtoTest:Rest:Attachments` binds a `ProtoHttpAttachmentOptions`. Rest and GraphQL share the same attachment options under their own keys, so capture and redaction match.
 
 | Option | Type | Default |
 | --- | --- | --- |
@@ -53,11 +53,10 @@ The number is a per-test sequence, so the second request in a test is `rest-02-â
 | `RedactSensitiveData` (inherited) | `bool` | `true` |
 | `MaxDiagnosticBodyLength` (inherited) | `int` | `65536` |
 | `SensitiveJsonProperties` (inherited) | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret` |
-| `ConfigurationSectionName` (get-only) | `string` | the section this instance binds from; not bindable |
 
 `RedactSensitiveData`, `MaxDiagnosticBodyLength` and `SensitiveJsonProperties` come from `JsonDiagnosticOptions`, shared with GraphQL, gRPC and messaging diagnostics.
 
-Code configuration composes rather than replaces: every `CaptureAttachments(...)` callback runs in registration order, then the known section is bound over the result, so **configuration wins over code**. Repeated calls each apply.
+Each `CaptureAttachments` callback runs in order. Configuration binds last, so it wins over code. Repeated calls each apply.
 
 ```json
 {

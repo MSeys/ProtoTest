@@ -8,7 +8,7 @@ description: "Publish a message, then await the one that matters with a predicat
 
 ## What it adds
 
-`ProtoTest.Messaging` gives each test a broker client: publish a message to a destination, then await the one that matters with a predicate and a timeout. Failing to arrive is a `TimeoutException` and a test failure, not a sleep. Without an adapter the client runs against an in-memory broker, so the API works anywhere; `ProtoTest.Messaging.RabbitMq` replaces it with RabbitMQ, `ProtoTest.Messaging.RabbitMq.Testcontainers` owns a broker for the whole run, and `ProtoTest.Messaging.MassTransit` bridges the surface to an in-process application's MassTransit test harness - or, through its `MassTransitEnvelope` helper, speaks the MassTransit wire envelope over any adapter, published applications included.
+Each test gets a broker client. Publish a message, then await the matching message with a predicate and a timeout. Failing to arrive is a `TimeoutException` and a test failure, not a sleep. Without an adapter the client runs against an in-memory broker, so the API works anywhere; `ProtoTest.Messaging.RabbitMq` replaces it with RabbitMQ, `ProtoTest.Messaging.RabbitMq.Testcontainers` owns a broker for the whole run, and `ProtoTest.Messaging.MassTransit` bridges the surface to an in-process application's MassTransit test harness - or, through its `MassTransitEnvelope` helper, speaks the MassTransit wire envelope over any adapter, published applications included.
 
 ## Install
 
@@ -33,10 +33,10 @@ builder.AddMessaging(messaging => messaging.UseMassTransit<Program>()); // the a
 IProtoHostBuilder AddMessaging(this IProtoHostBuilder builder, Action<ProtoMessagingBuilder>? configure = null);
 
 ProtoMessagingBuilder UseBroker(this ProtoMessagingBuilder messaging,
-    Func<IServiceProvider, IProtoMessageBroker> factory);
-
-ProtoMessagingBuilder UseBrokerUnlessConfigured(this ProtoMessagingBuilder messaging,
     Func<IServiceProvider, IProtoMessageBroker> factory, params string[] addressKeys);
+
+ProtoMessagingBuilder UseBrokerWhenInProcess(this ProtoMessagingBuilder messaging,
+    Func<IServiceProvider, IProtoMessageBroker> factory, string application, params string[] configuredKeys);
 
 ProtoMessagingBuilder CaptureAttachments(this ProtoMessagingBuilder messaging,
     Action<MessagingAttachmentOptions>? configure = null);
@@ -54,9 +54,9 @@ ProtoMessagingBuilder UseMassTransit<TProgram>(this ProtoMessagingBuilder messag
     string application = "Default");
 ```
 
-`UseBroker` is the adapter seam; `UseRabbitMq` and `UseMassTransit` are the built-in implementations of it. `UseBroker` declares the `Broker` capability only while at least one of its `addressKeys` can provide an address, while `UseBrokerUnlessConfigured` declares it only while none is configured. That is the in-process direction the MassTransit bridge needs, because a configured `BaseUrl` means the application runs published with no test harness here. `Tap` declares the destinations this suite awaits, in code, so an adapter can bind each test's tap during setup. See [Destinations](#destinations). `Declare` declares the destinations this suite owns, in code, so an adapter creates them during setup before any tap binds. See [Suite-owned topology](#suite-owned-topology). `AddMessaging` registers the options, the `ProtoMessageClient` initializer for every test, the run-scoped `messaging:broker` resource, and, only when an adapter is configured, the `Messaging` capability with kind `broker`.
+`UseBroker` is the adapter seam; `UseRabbitMq` and `UseMassTransit` are the built-in implementations of it. `UseBroker` declares the `Broker` capability only while at least one of its `addressKeys` can provide an address. `UseBrokerWhenInProcess` declares it only while the named application is served in-process, which is the direction the MassTransit bridge needs: the application's provider chain winner decides, so a loopback, container or AppHost application drops the capability, and a host whose application declares no chain keeps the configured-keys rule (a configured `BaseUrl` means the application runs published with no test harness here). `Tap` declares the destinations this suite awaits, in code, so an adapter can bind each test's tap during setup. See [Destinations](#destinations). `Declare` declares the destinations this suite owns, in code, so an adapter creates them during setup before any tap binds. See [Suite-owned topology](#suite-owned-topology). When an adapter is configured, `AddMessaging` also registers the `Messaging` capability with kind `broker`. It always registers the options, the per-test client initializer, and the run-scoped broker resource.
 
-A repeated `AddMessaging` is not a no-op: its `configure` callback always runs, so a later call can add an adapter to an adapter-less first call or extend attachment options. Infrastructure stays idempotent: one options object, one broker holder, one initializer, one capability and one run resource. The first adapter configured wins. A call whose `configure` throws leaves no guard behind, so a later successful call still composes.
+A repeated `AddMessaging` call runs its `configure` callback again, so a later call can add an adapter to an adapter-less first call or extend attachment options. Infrastructure stays idempotent: one options object, one broker holder, one initializer, one capability and one run resource. The first adapter configured wins.
 
 :::tip[The in-memory broker is a test double, not a broker capability]
 A configured adapter is what makes the `Broker` capability true. The in-memory default registers none, so `[RequiresCapability(ProtoCapabilityKinds.Broker)]` skips where no real broker is configured instead of passing against the double (see [skip conditions](../../foundation/skip-conditions.md)).
@@ -129,7 +129,7 @@ var ended = await messages.AwaitAsync(
 Assert.That(ended.RoutingKey, Is.EqualTo("session.ended"));
 ```
 
-`message.RoutingKey` carries what the transport delivered: the RabbitMQ adapter fills it from the delivery and the in-memory broker keeps it, so a predicate can select by it like any other message fact. `AwaitAsync(exchange, routingKey, predicate, …)` matches only that key: the RabbitMQ tap binds the key on the destination's queue, so a direct exchange delivers a publish under it, and the in-memory broker filters the history the same way; a message under another key is not consumed and stays for the await that names it. A timeout names both the destination and the routing key, and the `messaging.publish`/`messaging.await` operations record `messaging.routing_key`. Without a routing key the plain overloads behave as before, and RabbitMQ publishes under the destination itself.
+`message.RoutingKey` carries the key the transport delivered. The RabbitMQ adapter fills it from the delivery, and the in-memory broker keeps it. A predicate can filter on it. `AwaitAsync(exchange, routingKey, predicate, …)` matches only that key: the RabbitMQ tap binds the key on the destination's queue, so a direct exchange delivers a publish under it, and the in-memory broker filters the history the same way; a message under another key is not consumed and stays for the await that names it. A timeout names both the destination and the routing key, and the `messaging.publish`/`messaging.await` operations record `messaging.routing_key`. Without a routing key the plain overloads publish under the destination itself, and RabbitMQ delivers them the same way.
 
 The key is bound when the keyed await starts, so a direct exchange only delivers a message published after that; a topic exchange's `#` binding catches every key, so pre-binding the destination with `Tap` keeps the act-then-await flow reliable there. MassTransit addresses message contract types rather than broker routing, so its adapter rejects a routing key with an error naming the destination instead of dropping it.
 
@@ -192,6 +192,18 @@ An adapter's public `AwaitAsync` does whatever per-destination work it needs, de
 
 ## The tasks
 
+```mermaid
+sequenceDiagram
+    participant Test
+    participant Broker
+    participant App as System under test
+    Test->>Broker: Tap (setup, pre-bind)
+    Test->>App: act
+    App->>Broker: publish
+    Test->>Broker: AwaitAsync (predicate, timeout)
+    Broker-->>Test: match or TimeoutException
+```
+
 ```csharp
 builder.AddMessaging();
 
@@ -214,11 +226,17 @@ public async Task PayingAnInvoicePublishesAnEvent()
 
 #### RabbitMQ topology
 
-`UseRabbitMq` publishes to the exchange named like the destination and under the message's routing key, the destination itself when none is given, with `ContentType` defaulting to `application/json` and messages marked non-persistent; null headers are dropped. The delivery's routing key fills `ProtoMessage.RoutingKey`, and a keyed await binds its key on the destination's tap.
+| Fact | Rule |
+| --- | --- |
+| Publish target | the exchange named like the destination, under the message routing key or the destination itself |
+| Content | `ContentType` defaults to `application/json`, messages are non-persistent, null headers are dropped |
+| Delivery | the delivery routing key fills `ProtoMessage.RoutingKey`; a keyed await binds its key on the destination tap |
+| Connection | one connection and one publish channel for the run, created lazily; each test consumer owns one channel per destination |
+| Exchange tap | one exclusive, auto-delete queue per destination (`prototest-{guid}`), bound with the destination key and `#`: direct exchanges match the key, topic exchanges match the `#` catch-all, fanout and headers exchanges match every message; bound during setup for a tapped destination, just in time at the first await otherwise |
+| Keyed await | binds the key on the destination tap; a pre-bound tap keeps what arrived before the keyed await |
+| Queue destination | consumed as it exists, checked passively and left untouched |
 
-The broker owns one connection and one publish channel, created lazily on first use and kept for the run. Every test's consumer owns one channel per destination on that connection; channels are not thread-safe, so each side serializes its own. The destinations a test taps are prepared concurrently, so their broker round trips overlap. For an exchange destination the consumer declares one exclusive, auto-delete tap queue per destination, named `prototest-{guid}`: during setup for a declared destination, just in time at the first await otherwise. Each tap queue is bound with the destination as routing key and with `#`, which covers every exchange type: direct exchanges match the routing key, topic exchanges match the `#` catch-all, and fanout and headers exchanges ignore the routing key, so their argument-less bindings match every message. An await that names a routing key binds that key on the destination's tap as well, so a direct exchange delivers it; the tap stays one per destination, so a destination pre-bound with `Tap` still holds what was published before the keyed await. Each tap queue is deleted when the test's consumer is disposed, and an exclusive tap never competes with the application's own consumers. A queue destination is consumed as it exists, checked passively and left untouched, so disposal releases only the consumer's channel.
-
-A tap binds only to an exchange that exists; the adapter never guesses. The application declares its topology before messaging prepares. The demo declares its event exchanges at application startup and registers `AddMessaging` last on purpose, so the messaging initializer binds after the in-process application's initializer has created them:
+Each tap queue is deleted when the test consumer is disposed, and an exclusive tap never competes with the application's own consumers. A tap binds only to an exchange that exists; the adapter never guesses. The application declares its topology before messaging prepares. The demo declares its event exchanges at application startup and registers `AddMessaging` last on purpose, so the messaging initializer binds after the in-process application's initializer has created them:
 
 ```csharp
 builder
@@ -286,14 +304,11 @@ builder.AddMessaging(messaging => messaging
     .UseRabbitMq());
 ```
 
-The target's `UseContainer` provider starts the container with the host and fills every key with the
-started connection string, so the adapter and the application under test reach the same broker. The
-provider starts before any test-level skip condition is evaluated, so a machine without a container
-runtime fails the run at start. `RabbitMqBroker.Container()` creates the resource without starting it; `Start()` starts now or throws with the reason; `TryStart(configure)` reports the reason in its result instead, for a fixture that decides before registering infrastructure. The default image is `rabbitmq:3`, configurable through the builder passed to `Container`. Registering with `AddResource` only owns the release: it neither starts the container nor fills settings. With no application initializer to declare the event exchanges, the suite declares its own with `Declare` (see [Suite-owned topology](#suite-owned-topology)), with no raw broker client in the suite.
+The target's `UseContainer` provider starts the container with the host and fills every key with the started connection string, so the adapter and the application under test reach the same broker. The provider starts before any test-level skip condition is evaluated, so a machine without a container runtime fails the run at start. `RabbitMqBroker.Container()` creates the resource without starting it; `Start()` starts now or throws with the reason; `TryStart(configure)` reports the reason in its result instead, for a fixture that decides before registering infrastructure. The default image is `rabbitmq:3`, configurable through the builder passed to `Container`. Registering with `AddResource` only owns the release: it neither starts the container nor fills settings. With no application initializer to declare the event exchanges, the suite declares its own with `Declare` (see [Suite-owned topology](#suite-owned-topology)), with no raw broker client in the suite.
 
 #### MassTransit bridge
 
-An application that composes `AddMassTransitTestHarness` can be the broker itself: `ProtoTest.Messaging.MassTransit` publishes and awaits over the application's in-process `ITestHarness`, so the events the application publishes through its own `IPublishEndpoint` are the ones a test awaits. A destination names a message contract type (its full name, short name or `urn:message:` URN); `Declare` is a no-op because MassTransit owns message topology; and the `Broker` capability is declared only while the application's `BaseUrl` is not configured, so a published application skips instead of failing. For a published application - or any suite that talks to the broker itself - the package's `MassTransitEnvelope` builds and reads the MassTransit wire envelope (`application/vnd.masstransit+json`) through whichever adapter is configured, no harness needed. The [MassTransit page](./masstransit.md) has the registration, the ordering rule, the envelope interop and the limits. There is no container package for the bus: MassTransit is a bus library, not a server, so a harness-mode suite needs none, and an envelope-mode suite over RabbitMQ starts `ProtoTest.Messaging.RabbitMq.Testcontainers` (see [Owning a broker](#owning-a-broker)).
+An application that composes `AddMassTransitTestHarness` can be the broker itself: `ProtoTest.Messaging.MassTransit` publishes and awaits over the application's in-process `ITestHarness`, so the events the application publishes through its own `IPublishEndpoint` are the ones a test awaits. A destination names a message contract type (its full name, short name or `urn:message:` URN); `Declare` is a no-op because MassTransit owns message topology; and the `Broker` capability is declared while the application is hosted in-process (the `UseBrokerWhenInProcess` seam), so a published application skips instead of failing. For a published application - or any suite that talks to the broker itself - the package's `MassTransitEnvelope` builds and reads the MassTransit wire envelope (`application/vnd.masstransit+json`) through whichever adapter is configured, no harness needed. The [MassTransit page](./masstransit.md) has the registration, the ordering rule, the envelope interop and the limits.
 
 #### Attachments
 
@@ -333,7 +348,7 @@ builder.AddMessaging(messaging => messaging
 
 From the moment a tap is declared, anything the application publishes is queued for that test, so the usual act-then-await order works. Binding at await time instead would miss everything published in between, which is exactly what happens for an undeclared destination: the consumer binds just in time and can only see later messages. `Tap` is a reliability declaration: pre-bind every destination the act publishes to. The in-memory broker needs no declaration because it keeps its own history.
 
-A destination the suite itself owns, which nothing else declares, must exist before a tap binds and before the suite publishes to it. Declare it with `Declare`:
+A destination the suite itself owns, which nothing else declares, must exist before a tap binds and before the suite publishes to it. Declare it with `Declare` (see [Suite-owned topology](#suite-owned-topology)):
 
 ```csharp
 builder.AddMessaging(messaging => messaging
@@ -342,8 +357,6 @@ builder.AddMessaging(messaging => messaging
     .Tap("invoice.paid")
     .UseRabbitMq());
 ```
-
-`Declare` is idempotent: the destination is created once per run, during setup, before any tap is prepared (on RabbitMQ, as a fanout, durable, non-auto-delete exchange); a destination that already exists with the same shape is left as it is and a repeated declaration is a no-op. Like `Tap`, its values bind with `ProtoTest:Messaging:DeclaredDestinations` over the code ones. A declaration is configuration, not a runtime call: the builder is consumed when `AddMessaging` runs, so a destination cannot be declared after a test has prepared. The in-memory broker treats a declaration as a no-op because every destination already exists there.
 
 ## In the trace and coverage
 
@@ -369,6 +382,8 @@ The observations are trace evidence, not a coverage promise: `ProtoTest.Messagin
 `AddMessaging` registers the `Messaging` capability only when an adapter is configured. With `UseRabbitMq` the capability is conditional on `ProtoTest:Messaging:RabbitMq:ConnectionString`: a run with a configured key or a broker container that declares it keeps the capability, while a run with neither loses it and gated tests skip instead of failing at setup or first publish. A callback that sets `RabbitMqOptions.ConnectionString` in code provides the address without a key and keeps the capability; an adapter registered through `UseBroker` without address keys keeps the unconditional declaration.
 
 ## Limits
+
+- **Repeated `AddMessaging` composes; the first adapter wins.** A later call runs its `configure` again and can add an adapter or extend attachment options, but it never replaces the first adapter.
 
 - **The in-memory broker is a test double.** It registers no `Broker` capability; exchange destinations already exist there, so its `PrepareAsync` and `DeclareAsync` do nothing, and a queue destination is refused because it has no queues.
 - **No history on RabbitMQ.** An exchange tap holds only what arrived after it was declared; a destination declared just in time at the await sees only later messages. A queue destination reads the queue's backlog as well, but removes what it reads.

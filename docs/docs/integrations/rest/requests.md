@@ -17,16 +17,18 @@ using var response = await Proto.Context.Rest()
 
 ## Verbs
 
-```csharp
-Task<RestResponse> GetAsync(string routeTemplate, object? routeAndQueryParams = null, CancellationToken ct = default);
-Task<RestResponse> PostAsync(...);
-Task<RestResponse> PutAsync(...);
-Task<RestResponse> PatchAsync(...);
-Task<RestResponse> DeleteAsync(...);
-Task<RestResponse> HeadAsync(...);
-Task<RestResponse> OptionsAsync(...);
-Task<RestResponse> SendAsync(HttpMethod method, string routeTemplate, object? routeAndQueryParams = null, CancellationToken ct = default);
-```
+| Verb | Sends |
+| --- | --- |
+| `GetAsync(route, params?, ct?)` | `GET` |
+| `PostAsync(route, params?, ct?)` | `POST` |
+| `PutAsync(route, params?, ct?)` | `PUT` |
+| `PatchAsync(route, params?, ct?)` | `PATCH` |
+| `DeleteAsync(route, params?, ct?)` | `DELETE` |
+| `HeadAsync(route, params?, ct?)` | `HEAD` |
+| `OptionsAsync(route, params?, ct?)` | `OPTIONS` |
+| `SendAsync(method, route, params?, ct?)` | any `HttpMethod`, for verbs with no helper |
+
+Each returns `Task<RestResponse>` and takes the same route template and optional route-and-query object.
 
 `RestResponse` is `IDisposable`; use `using var` (the response body is already buffered, so disposing doesn't cut anything short).
 
@@ -42,18 +44,22 @@ await Proto.Context.Rest().GetAsync(
 // → /api/workspaces/42/releases?state=deployed&page=2
 ```
 
-The rules, precisely:
+The rules:
 
-- Placeholders match `{name}`, ASCII letters, digits and `_`, and are resolved **case-insensitively** against the object's public properties. A dictionary with string keys works too.
-- A placeholder with no matching value, or a null one, throws `ArgumentException` naming the parameter.
-- Every remaining non-null property becomes a query parameter.
-- Keys and values are escaped with `Uri.EscapeDataString`, so `"c# & .net"` is safe to pass.
-- Nulls are skipped entirely.
-- Collections expand to repeated keys: `new { tags = new[] { "csharp", "dotnet" } }` → `tags=csharp&tags=dotnet`. An empty collection emits nothing.
-- Values format with invariant culture. `bool` becomes `true`/`false`; dates and times use round-trip (`"O"`) format.
-- A `#fragment` in the template is preserved and re-appended after the query string.
-- An absolute URL as the template bypasses the client's base address. A non-HTTP(S) scheme, or a relative route with no base address, throws `InvalidOperationException`.
-- A colon in the first segment (`orders:search`) stays a relative path, as RFC 3986 requires.
+| Input | Becomes |
+| --- | --- |
+| `{placeholder}` with a matching value | a path segment, matched case-insensitively (`{workspaceId}=42` → `/workspaces/42`) |
+| `{placeholder}` with no value, or a null one | `ArgumentException` naming the parameter |
+| leftover non-null property | a query parameter (`state="deployed"` → `?state=deployed`) |
+| null property, or an empty collection | dropped (nothing emitted) |
+| collection value | a repeated key (`tags=[a,b]` → `tags=a&tags=b`) |
+| `bool`, date or time value | invariant text (`true`, round-trip `"O"` dates) |
+| `#fragment` in the template | preserved, re-appended after the query string |
+| absolute URL as the template | used as-is; the client's base address is bypassed |
+| non-HTTP(S) scheme, or a relative route with no base address | `InvalidOperationException` |
+| colon in the first segment (`orders:search`) | a relative path, as RFC 3986 requires |
+
+Keys and values are escaped with `Uri.EscapeDataString`. A dictionary with string keys works in place of the object.
 
 A per-test base-address resolver wins over the client's `HttpClient.BaseAddress` at request time.
 
@@ -74,7 +80,7 @@ The object overload serialises as `application/json`. The factory overload is in
 RestRequestBuilder Header(string name, string value);
 ```
 
-Header names are case-insensitive and the last value for a name wins. ProtoTest tries the request headers first and falls back to the content headers, throwing `InvalidOperationException` if neither accepts it. Header values are never traced; the trace records the count and each header's name.
+Header names are case-insensitive and the last value for a name wins. ProtoTest tries the request headers first and falls back to the content headers, throwing `InvalidOperationException` if neither accepts it. The trace records header names and the count, not header values.
 
 ## Authentication
 

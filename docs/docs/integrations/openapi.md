@@ -20,7 +20,7 @@ This package reports coverage. It doesn't validate requests or responses against
 dotnet add package ProtoTest.OpenApi
 ```
 
-ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `-f` is passed. The package resolves its document with `Microsoft.OpenApi.Readers` and depends on `ProtoTest.Rest`.
+ProtoTest supports .NET 8, 9 and 10. The template targets net10.0 unless you pass -f net8.0 or net9.0. The package resolves its document with `Microsoft.OpenApi` (plus `Microsoft.OpenApi.YamlReader` for YAML) and depends on `ProtoTest.Rest`.
 
 ## Compose
 
@@ -46,21 +46,13 @@ builder
 
 `ProtoTest:Applications:{application}:OpenApi:Specification` may be a local file path, the document itself as JSON or YAML, or an http(s) URL. A relative URL is resolved against the application's `ProtoTest:Applications:{application}:BaseUrl`, which is handy for pointing at `/swagger/v1/swagger.json` on a deployed API. A document that fails to parse throws with the parser's diagnostics.
 
-The application is the one the REST client belongs to: `ProtoTest:Applications:{scope}:Application` maps a client target to an application, falling back to the target name. If the key is missing or blank, the collector fails when it is constructed:
+The application is the one the REST client belongs to: a client registered inside `AddApplication("Api", …)` resolves its specification under `ProtoTest:Applications:Api`, and a host-registered client uses its own target name as the application. If the key is missing or blank, the collector fails when it is constructed:
 
 ```
 Application 'Api' has no 'OpenApi:Specification' configured. Set 'ProtoTest:Applications:Api:OpenApi:Specification'.
 ```
 
-### Constructors
-
-```csharp
-OpenApiCoverageCollector(string targetName, IConfiguration configuration, IEnumerable<ProtoApplicationTarget> applicationTargets)
-OpenApiCoverageCollector(string targetName, string openApiSpecSource)
-OpenApiCoverageCollector(string targetName, OpenApiDocument document)
-```
-
-The configuration overload receives the host's `IConfiguration` and its registered application targets from DI. Extra `AddCollector` arguments fill the remaining constructor parameters:
+The configuration overload receives the host's `IConfiguration` and its registered application targets from DI. Extra `AddCollector` arguments fill the remaining constructor parameters, so a second overload takes the specification source directly:
 
 ```csharp
 rest.AddClient("Api")
@@ -73,7 +65,6 @@ rest.AddClient("Api")
 | --- | --- | --- |
 | `ProtoTest:Applications:{application}:OpenApi:Specification` | `string` | required; blank throws when the collector is constructed |
 | `ProtoTest:Applications:{application}:BaseUrl` | `string?` | optional; used to resolve a relative specification URL only |
-| `ProtoTest:Applications:{scope}:Application` | `string?` | optional; maps a REST client target to an application, defaulting to the target name |
 
 There is no options class and no dedicated options section.
 
@@ -99,7 +90,7 @@ The request counts an endpoint and a response hit; the shape assertion is what c
 
 #### How a route matches
 
-Route matching normalizes both sides before comparing: an absolute URI is reduced to its path, the query and fragment are stripped, a leading `/` is forced and one trailing `/` is trimmed. An exact route beats parameter matches; ties break by literal-segment count, then path, case-insensitively.
+Route matching normalizes both sides. It keeps the path, strips query and fragment, forces a leading slash and trims one trailing slash. An exact route beats parameter matches; ties break by literal-segment count, then path, case-insensitively.
 
 A route parameter accepts the request value unless the contract parameter carries a constraint. These are enforced: `int`, `long`, `decimal`/`double`/`float`, `guid`, `bool`, `minlength(n)` and `maxlength(n)`. Unknown constraints are treated as matching, so `/users/abc` never counts toward `/users/{id:int}`, while a constraint the collector doesn't know cannot reject anything.
 
@@ -111,13 +102,13 @@ The exact status code is looked up first, then a case-insensitive wildcard like 
 
 #### How a property matches
 
-- Only shape assertions count. A property is covered when a `Should.MatchShape` assertion actually matched it; receiving a field in a response body is not coverage.
+- Only `Should.MatchShape` counts. Receiving a field without asserting it leaves it uncovered.
 - Array indices are normalized before comparison: `[\d+]` becomes `[]`, and matching is case-insensitive, so `$.lines[0].total` and `$.lines[3].total` both count toward `$.lines[].total`.
 - Schema extraction walks the whole document: every media type with a schema adds a `$` baseline row for the body itself; `allOf`, `oneOf` and `anyOf` are traversed at the same path; each property adds `{path}.{name}`; each array item adds `{path}[]`; `$ref`s resolve through the document's components. Recursion and diamond revisits are cut.
 
 #### What the report contains
 
-The collector walks the **entire** document, not just what was called, and reports three nested levels:
+The collector walks the whole document and reports three levels:
 
 ```
 OpenAPI              GET /api/orders/{id}      12 hits
@@ -151,7 +142,7 @@ The package has no capability descriptor and no package-specific attributes. `[R
 - **Unknown constraints are assumed to match.** Only the listed constraint names are enforced.
 - **No base-path rewriting or authentication**, and no refetch on retry. The loader reads the source once.
 - **The specification identity row is not coverage.** One aggregate item per target records `spec.source` and `spec.hash`; it carries no verdict, so no total or gate changes because of it.
-- **Spec-version support is whatever `Microsoft.OpenApi.Readers` 1.6.31 parses.**
+- **Spec-version support follows the referenced `Microsoft.OpenApi` version, JSON or YAML.**
 
 ## Links
 

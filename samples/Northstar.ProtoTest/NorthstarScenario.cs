@@ -1,5 +1,6 @@
 namespace Northstar.ProtoTest;
 
+using System.Globalization;
 using System.Text.Json;
 using global::ProtoTest.Core;
 
@@ -118,7 +119,7 @@ public sealed class NorthstarScenarioHook : IProtoTestHook
             attributes: new Dictionary<string, string?>
             {
                 ["northstar.correlation_id"] = scenario.CorrelationId,
-                ["northstar.duration_ms"] = duration.TotalMilliseconds.ToString("F1")
+                ["northstar.duration_ms"] = duration.TotalMilliseconds.ToString("F1", CultureInfo.InvariantCulture)
             });
         return Task.CompletedTask;
     }

@@ -26,7 +26,7 @@ public sealed class SheetsJourney
 
     [ProtoTest]
     [SignedInAs]
-    public async Task TheMonthlyReport_ShouldMatchItsModel()
+    public async Task TheMonthlyReportMatchesItsModel()
     {
         // Arrange: a project the report must contain.
         var project = await Proto.Context.Data()

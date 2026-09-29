@@ -17,9 +17,9 @@ public sealed record ProtoTraceFolderRuns(
 
 /// <summary>
 /// Finds the <c>.prototrace</c> archives a folder holds. One archive per run; the folder's
-/// <c>TestResults/</c> is searched first, and when nothing lives there the folder tree is walked with
-/// build and tooling directories pruned. Recency is the run's recorded start time, not a file
-/// timestamp, and an unreadable archive is skipped with its reason instead of failing the scan.
+/// <c>TestResults/</c> is searched first, and when it yields no readable run the folder tree is
+/// walked with build and tooling directories pruned. Recency is the run's recorded start time, not
+/// a file timestamp, and an unreadable archive is skipped with its reason instead of failing the scan.
 /// </summary>
 public static class ProtoTraceDiscovery
 {
@@ -43,16 +43,22 @@ public static class ProtoTraceDiscovery
 
         var runs = new List<ProtoTraceRun>();
         var skipped = new List<ProtoTraceSkippedArchive>();
-        foreach (var candidate in Candidates(root))
+        var testResults = Path.Combine(root, "TestResults");
+        if (Directory.Exists(testResults))
         {
-            if (TryOpen(candidate, out var run, out var reason))
+            Collect(EnumerateTraces(testResults, prune: false), runs, skipped);
+            if (runs.Count == 0)
             {
-                runs.Add(run);
+                // A TestResults folder that yields no readable run must not suppress the tree walk:
+                // readable runs elsewhere stay discoverable, and the tree pass re-reads TestResults.
+                runs.Clear();
+                skipped.Clear();
             }
-            else
-            {
-                skipped.Add(new ProtoTraceSkippedArchive(candidate, reason));
-            }
+        }
+
+        if (runs.Count == 0)
+        {
+            Collect(EnumerateTraces(root, prune: true), runs, skipped);
         }
 
         runs.Sort(static (left, right) =>
@@ -96,22 +102,22 @@ public static class ProtoTraceDiscovery
         }
     }
 
-    private static List<string> Candidates(string root)
+    private static void Collect(
+        IEnumerable<string> candidates,
+        List<ProtoTraceRun> runs,
+        List<ProtoTraceSkippedArchive> skipped)
     {
-        var candidates = new List<string>();
-        var testResults = Path.Combine(root, "TestResults");
-        if (Directory.Exists(testResults))
+        foreach (var candidate in candidates.OrderBy(file => file, StringComparer.Ordinal))
         {
-            candidates.AddRange(EnumerateTraces(testResults, prune: false));
+            if (TryOpen(candidate, out var run, out var reason))
+            {
+                runs.Add(run);
+            }
+            else
+            {
+                skipped.Add(new ProtoTraceSkippedArchive(candidate, reason));
+            }
         }
-
-        if (candidates.Count == 0)
-        {
-            candidates.AddRange(EnumerateTraces(root, prune: true));
-        }
-
-        candidates.Sort(StringComparer.Ordinal);
-        return candidates;
     }
 
     private static IEnumerable<string> EnumerateTraces(string start, bool prune)

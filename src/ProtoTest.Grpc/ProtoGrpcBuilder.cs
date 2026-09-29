@@ -6,9 +6,12 @@ using ProtoTest.Http;
 
 public sealed class ProtoGrpcBuilder
 {
+    /// <summary>Stable protocol key gRPC clients are registered and resolved under.</summary>
+    public const string ProtocolName = "Grpc";
+
     /// <summary>The protocol's identity: names, trace source, observation kind and coverage category.</summary>
     internal static readonly ProtoProtocol Protocol = new(
-        "Grpc", "gRPC", "ProtoTest.Grpc", "grpc.response", "gRPC");
+        ProtocolName, "gRPC", "ProtoTest.Grpc", "grpc.response", "gRPC");
 
     /// <summary>
     /// The observation kind a failed call records. It is deliberately not the response kind: a call that
@@ -28,6 +31,7 @@ public sealed class ProtoGrpcBuilder
         _application = application;
     }
 
+    /// <summary>Gets the service collection the gRPC integration registers into.</summary>
     public IServiceCollection Services { get; }
 
     /// <summary>

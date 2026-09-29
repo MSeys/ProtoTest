@@ -1,5 +1,5 @@
 ---
-sidebar_position: 9
+sidebar_position: 11
 title: Skip conditions
 description: "Skip a test before its lifecycle starts, with a reason, when the environment cannot run it, so it reads as skipped instead of failed."
 ---
@@ -10,13 +10,13 @@ description: "Skip a test before its lifecycle starts, with a reason, when the e
 
 Not every test can run in every environment. A **skip condition** stops a test before its lifecycle starts and hands the runner a reason, so an environment-specific test reads as *skipped* instead of *failed*.
 
-A condition is a `ProtoAttribute`:
-
 ```csharp
 [RequiresCapability(ProtoCapabilityKinds.Store, Reason = "The suite does not own the store.")]
 ```
 
-Conditions are evaluated with the test's other attributes, and an adapter that does not know them runs the test: the contract is opt-in.
+The test body never runs. No context is created, so no hook or attribute sees the test. Nothing is written to the trace. No teardown runs, because there is nothing to tear down. The reason reaches the runner's skip mechanism; see [what a skip means](#what-a-skip-means).
+
+A condition is a `ProtoAttribute`. Conditions are evaluated with the test's other attributes, and an adapter that does not know them runs the test: the contract is opt-in. To write your own, see [writing your own](#writing-your-own).
 
 ## How it works
 
@@ -41,20 +41,24 @@ The test runs when `ProtoHost.HasCapability(kind, CapabilityName, CapabilityInst
     Reason = "No broker is configured; set ProtoTest:Messaging:RabbitMq:ConnectionString.")]
 ```
 
-Integrations register a capability when they are configured, so the condition answers what the host *can actually do* rather than what it was asked to do. `ProtoCapabilityKinds` lists the built-in kinds: `server`, `protocol`, `browser`, `store`, `broker`, `data`, `document`. An integration may use its own. Use `CapabilityName` to require one specific capability of that kind:
+Integrations register a capability when they are configured, so the condition answers what the host *can actually do* rather than what it was asked to do. `ProtoCapabilityKinds` lists the built-in kinds: `server`, `worker`, `device`, `protocol`, `browser`, `store`, `broker`, `data`, `document`, `aspire` and `clock`. An integration may use its own. Use `CapabilityName` to require one specific capability of that kind:
 
 ```csharp
 [RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "ASP.NET Core")]
 ```
 
-An integration whose capability depends on an address can declare it conditionally: `AddCapabilityUnlessConfigured(capability, "ProtoTest:Applications:Api:BaseUrl")` drops the declaration when every listed key is already configured. The environment provides the address, so the capability stays honest and the tests that require it skip. `AddAspNetCoreServer` uses this: with `BaseUrl` configured its `ASP.NET Core` capability is absent and `[RequiresInProcess]` skips. A declaration is evaluated on its own: a descriptor drops only when *every* conditional declaration for it drops and no unconditional declaration promises it, and a capability that describes one instance (a named server or application) carries that instance in `ProtoCapabilityDescriptor.Instance`, so satisfying one instance's keys drops only that instance while another live instance keeps its capability.
+An integration whose capability depends on an address can declare it conditionally: `AddCapabilityUnlessConfigured(capability, "ProtoTest:Applications:Api:BaseUrl")` drops the declaration when every listed key is already configured. The environment provides the address, so the capability stays honest and the tests that require it skip. `AddAspNetCoreServer` uses this: with `BaseUrl` configured its `ASP.NET Core` capability is absent and `[RequiresInProcess]` skips.
 
-The pair of conditional registration kinds answers the address question in both directions:
+Each declaration is evaluated on its own. A descriptor drops only when every conditional declaration for it drops and no unconditional declaration promises it. A capability for one named instance carries that instance, so satisfying one instance's keys drops only that instance.
 
-- `AddCapabilityUnlessConfigured(capability, keys...)` drops when **every** key is configured, because the environment provides what the integration would serve (`AddAspNetCoreServer`, the in-process device transport).
-- `AddCapabilityWhenProvided(capability, keys...)` drops when **none** of the keys is provided, where *provided* means a configured value or a key a registered infrastructure piece declares, including a piece the run skips because configuration already fills its keys. It is the kind for an integration that cannot serve without an address: `UseRabbitMq` declares `broker` over `ProtoTest:Messaging:RabbitMq:ConnectionString`, so a run with neither a configured key nor a broker container skips instead of failing at setup or first publish. `AddSql` declares `store` over `SqlOptions.AddressKeys`, and `AddEntityFrameworkCore` follows the same keys for its `Entity Framework Core` capability.
+The conditional registration kinds answer the address question in both directions:
 
-A dropped declaration is recorded as a `capability.skipped` event naming the deciding keys (`capability.keys`) and the reason (`capability.reason`: `already configured`, or `no key provided`). The SQL integration goes one step further when its address keys are declared and none is provided: the connection is never opened during setup, the enlistment hook leaves the context alone, and `Proto.Context.Sql()`, `SqlConnection()`, `SqlTransaction()` and `Sql<TContext>()` throw naming the missing keys and the `[RequiresCapability(ProtoCapabilityKinds.Store)]` gate, so an ungated test fails with the fix in its message.
+| Registration | Drops when | For |
+| --- | --- | --- |
+| `AddCapabilityUnlessConfigured(capability, keys...)` | every key is configured, because the environment provides what the integration would serve | `AddAspNetCoreServer`, the in-process device transport |
+| `AddCapabilityWhenProvided(capability, keys...)` | none of the keys is provided, neither as a configured value nor as a key a registered infrastructure piece declares | an integration that cannot serve without an address: `UseRabbitMq` declares `broker` over its connection string, so a run with neither a configured key nor a broker container skips instead of failing |
+
+A dropped declaration is recorded as a `capability.skipped` event naming the deciding keys (`capability.keys`) and the reason (`capability.reason`: `already configured`, or `no key provided`).
 
 Class-level and method-level conditions accumulate like any other attribute. The first one that applies supplies the reason.
 
@@ -192,12 +196,4 @@ Because nothing starts, a skipped test has no context, no trace record and no re
 
 ## In the sample suite
 
-The Learning demo gates each environment-dependent journey with a condition:
-
-- `DomainAccessJourney` requires `ProtoCapabilityKinds.Store`, because composing the test-side domain needs a store the suite can connect to.
-- `WebJourney` requires the Playwright browser (`[RequiresPlaywrightBrowser]`), so it skips when no browser is installed. Its address comes from the loopback listener the run starts, or from the configured `ProtoTest:Applications:Northstar web:BaseUrl` in a published run.
-- `BrokerJourney` requires `ProtoCapabilityKinds.Broker`, and the broker capability only exists when a real broker adapter is configured.
-
-The broker reason is declared once in the demo's `Setup` with `AddCapabilityReason`.
-
-`[RequiresInProcess]` itself is exercised by the repository's own NUnit tests ([`tests/ProtoTest.NUnit.Tests/SkipConditionTests.cs`](../../../tests/ProtoTest.NUnit.Tests/SkipConditionTests.cs)).
+The learning sample gates each environment-dependent journey with a condition: the domain journey requires the `store` capability, the web journey requires the Playwright browser, and the broker journey requires the `broker` capability. The broker reason is declared once in the sample's `Setup` with `AddCapabilityReason`. See [Environments](../getting-started/environments.md) for how the three shapes select those capabilities.

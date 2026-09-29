@@ -8,6 +8,7 @@ dotnet add package ProtoTest.Devices
 dotnet add package ProtoTest.Devices.WebSocket              # ws:// and wss:// endpoints
 dotnet add package ProtoTest.Devices.WebSocket.AspNetCore   # in-process endpoints, no socket
 dotnet add package ProtoTest.Devices.Mqtt                   # MQTT publish/subscribe
+dotnet add package ProtoTest.Devices.Mqtt.Testcontainers  # a Mosquitto broker owned by the run
 ```
 
 ## Includes

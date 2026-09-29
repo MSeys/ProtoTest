@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// The public façade for the one internal once-only rule (<c>ProtoRegistration</c>): first registration
+/// The public facade for the one internal once-only rule (<c>ProtoRegistration</c>): first registration
 /// wins, later calls are no-ops. The guard reads through that helper for a service collection, a marker
 /// with the caller's own identity rule, and a builder that keeps its marker out of DI, so an
 /// integration's idempotency cannot drift from Core's.

@@ -32,10 +32,10 @@ The harness is MassTransit's in-memory test transport: it replaces the transport
 
 ```csharp
 builder
-    .AddAspNetCoreServer<Program>()                       // the in-process application, first
+    .AddAspNetCoreServer<Program>("Api")                  // the in-process application, first
     .AddMessaging(messaging => messaging
         .Tap("InvoicePaid")                               // snapshot the harness during setup
-        .UseMassTransit<Program>());                      // the bridge, after the server
+        .UseMassTransit<Program>("Api"));                 // the bridge, after the server
 ```
 
 ```csharp
@@ -44,6 +44,19 @@ ProtoMessagingBuilder UseMassTransit<TProgram>(this ProtoMessagingBuilder messag
 ```
 
 `TProgram` is the application's entry point class; `application` names the `AddAspNetCoreServer` registration whose harness serves (default `Default`). Register `AddMessaging` **after** the application's server: the messaging client initializes once the server exists, the same ordering the in-process RabbitMQ topology needs. The bridge is the only adapter for the run - a repeated `AddMessaging` keeps the first adapter configured, and one run has one broker.
+
+```mermaid
+flowchart LR
+    subgraph Harness["harness lane"]
+        P1[PublishAsync] --> Bus[ITestHarness bus]
+        Bus --> H1[history]
+        H1 --> A1[AwaitAsync]
+    end
+    subgraph Envelope["envelope lane"]
+        W[MassTransitEnvelope.Wrap] --> B[RabbitMQ exchange Namespace:Type]
+        B --> U[MassTransitEnvelope.Unwrap]
+    end
+```
 
 ## Destinations
 
@@ -55,7 +68,7 @@ await Proto.Context.Messaging().AwaitAsync("Billing.InvoicePaid", message => ...
 await Proto.Context.Messaging().AwaitAsync("urn:message:Billing:InvoicePaid", message => ...);
 ```
 
-The short name, the full name and the `urn:message:` URN all name the same contract; a publish, and a tap during setup, resolve the name before it becomes a bus address, so a destination that names no loaded contract - or a short name that two loaded contracts share - fails naming it (or the candidates). An await matches a published message by the name as written, so an untapped ambiguous short name matches either contract's messages and an untapped unknown one times out. The awaited `ProtoMessage.Destination` is the contract's full name.
+The short name, the full name and the `urn:message:` URN all name the same contract; a publish, and a tap during setup, resolve the name before it becomes a bus address, so a destination that names no loaded contract - or a short name that two loaded contracts share - fails naming it (or the candidates). An await matches on the name as written. An untapped ambiguous short name can match either contract. An untapped unknown name times out. The awaited `ProtoMessage.Destination` is the contract's full name.
 
 ## Publishing
 
@@ -67,7 +80,7 @@ await Proto.Context.Messaging().PublishAsync(
     """{"invoiceId":42,"amount":10.5}""");
 ```
 
-Headers passed to `PublishAsync` ride the publish context and are visible on the awaited message. A null or empty payload publishes the contract's default instance; a contract that has none fails the publish naming it, and the fix is the contract's shape or an explicit payload. The `contentType` argument is ignored: the envelope's content type is MassTransit's (`application/vnd.masstransit+json`), and the payload the bridge produces for an await is the contract instance re-serialized as JSON.
+Headers passed to `PublishAsync` ride the publish context and are visible on the awaited message. A null or empty payload publishes the contract default instance. A contract without one fails the publish naming the contract. Publish an explicit payload instead. The `contentType` argument is ignored: the envelope's content type is MassTransit's (`application/vnd.masstransit+json`), and the payload the bridge produces for an await is the contract instance re-serialized as JSON.
 
 ## Awaiting
 
@@ -134,7 +147,11 @@ MassTransitEnvelopeContent MassTransitEnvelope.Unwrap(ProtoMessage message);
 T                         MassTransitEnvelope.Unwrap<T>(ProtoMessage message);
 ```
 
-The frame is MassTransit's own envelope, not a lookalike: the package's `JsonMessageEnvelope` serialized with the package's own serializer options, so the camelCase property set, the decimal-as-string rule, the host block and every optional field are MassTransit's, not a reconstruction. It carries the content type `application/vnd.masstransit+json` and, in `messageType`, the `urn:message:` URNs of the contract - interfaces and base message types included, exactly as the bus computes them - so a MassTransit consumer's type filter matches it. No `MT-*` transport headers are involved on this path; the envelope body carries the metadata (the `MT-*` headers belong to MassTransit's raw serializer). The caller's headers ride both the broker frame and the envelope's `headers` object, as they do on a bus publish.
+The frame is MassTransit's own envelope, not a lookalike. `Wrap` serializes the package's `JsonMessageEnvelope` with the package's own serializer options.
+
+:::note[What makes it MassTransit's envelope]
+The camelCase property set, the decimal-as-string rule, the host block and every optional field are MassTransit's, not a reconstruction. It carries the content type `application/vnd.masstransit+json` and, in `messageType`, the `urn:message:` URNs of the contract - interfaces and base message types included, exactly as the bus computes them - so a MassTransit consumer's type filter matches it. No `MT-*` transport headers are involved on this path; the envelope body carries the metadata (the `MT-*` headers belong to MassTransit's raw serializer). The caller's headers ride both the broker frame and the envelope's `headers` object, as they do on a bus publish.
+:::
 
 `Unwrap<T>` reads like the consumer would: the envelope must declare `T` (or one of its message URNs) in `messageType`, and the `message` is deserialized with MassTransit's options. `Unwrap` returns the envelope metadata instead - `MessageTypes`, `MessageId`, `CorrelationId`, `ConversationId`, `SentTime` and the raw `Payload` - for a suite that asserts on the envelope itself. A frame that is not a MassTransit envelope (an empty payload, a plain JSON body, a missing `message` or `messageType`) throws `MessagingAssertionException` naming the destination and the reason, also for a typed unwrap whose envelope does not declare `T`. `Wrap` overloads take either the contract instance or the already-serialized JSON payload plus its type.
 
@@ -144,7 +161,7 @@ Both conversions are pure and need no harness, bus or server: they work with any
 
 ## Skip
 
-The harness exists only while the application is hosted in-process, so the bridge declares the `Broker` capability only while `ProtoTest:Applications:{application}:BaseUrl` is **not** configured:
+The harness exists only while the application is hosted in-process, so the bridge declares the `Broker` capability only while that application's provider chain winner runs it in-process:
 
 ```csharp
 [RequiresCapability(
@@ -152,7 +169,7 @@ The harness exists only while the application is hosted in-process, so the bridg
     Reason = "The application is not hosted in-process; the MassTransit test harness is unavailable.")]
 ```
 
-A published application (a configured `BaseUrl`) drops the capability and its tests skip instead of failing at setup. A suite that composes the bridge without an in-process server, or whose application does not register the harness, fails at first use with an error naming `AddAspNetCoreServer` or `AddMassTransitTestHarness` respectively - the composition promised something the environment cannot serve.
+An application served by a configured address, a loopback listener, a container or an AppHost drops the capability and its tests skip instead of failing at setup. A host whose application declares no chain keeps the configured-address rule: a configured `ProtoTest:Applications:{application}:BaseUrl` drops the capability. A suite that composes the bridge without an in-process server, or whose application does not register the harness, fails at first use with an error naming `AddAspNetCoreServer` or `AddMassTransitTestHarness` respectively - the composition promised something the environment cannot serve.
 
 ## Tracing
 
@@ -161,7 +178,7 @@ The bridge records the messaging vocabulary unchanged: `messaging.publish` and `
 ## Limits
 
 - **No container package for the bus.** MassTransit is a bus library, not a server, so there is nothing for Testcontainers to own: a harness-mode suite needs no container, and an envelope-mode suite over RabbitMQ starts `ProtoTest.Messaging.RabbitMq.Testcontainers` ([Owning a broker](./index.md#owning-a-broker)) and registers it like any other infrastructure. A MassTransit application's real transport is still a broker - the container belongs to that broker's package, not to this one.
-- **The harness bridge is in-process only.** `UseMassTransit<TProgram>` resolves `ITestHarness` from the application's `AddAspNetCoreServer` server. A published application (`BaseUrl` configured) drops the capability; a loopback (`AddLoopbackApplication`), container (`ApplicationContainer`) or Aspire application is a different process boundary and is not served, so gate tests that need the bridge. A published application is tested through the broker instead - [Envelope interop](#envelope-interop) with the RabbitMQ adapter - not through the harness.
+- **The harness bridge is in-process only.** `UseMassTransit<TProgram>` resolves `ITestHarness` from the application's `AddAspNetCoreServer` server. A published application (a configured `BaseUrl`), a loopback (`UseLoopback`), container (`ApplicationContainer`) or Aspire application is a different process boundary: the capability drops through the application's provider chain, so gated tests skip. A published application is tested through the broker instead - [Envelope interop](#envelope-interop) with the RabbitMQ adapter - not through the harness.
 - **The harness's transport is the application's bus in the test process.** `AddMassTransitTestHarness` replaces the real transport with the in-memory test transport; the bridge tests the application's bus behaviour, not a broker.
 - **`Wrap` writes command/event envelopes unless the caller passes the request/response fields.** Without `MassTransitEnvelopeAddresses` the source, destination and response addresses and the request id stay unset; with it, a consumer that replies through `RespondAsync` finds them, and `Unwrap` returns them on `MassTransitEnvelopeContent`. Awaiting the reply is the test's own broker await on the response address - the helper converts frames, it runs no request client. The fault, initiator and expiration fields are not exposed - add them by hand if a scenario needs them.
 - **A queue destination is refused.** A MassTransit destination is a message contract type, and the bus owns its transport's topology, so `AwaitAsync("queue:…")` fails naming the destination and the contract-type address to await instead; a queue is consumed only through a broker adapter that owns queues (the RabbitMQ adapter).

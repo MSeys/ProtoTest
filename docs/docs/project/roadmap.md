@@ -6,35 +6,47 @@ description: "What is committed next in ProtoTest, what is being explored, and w
 
 # Roadmap
 
-This page says what is coming, what is being considered, and what will not happen. It follows the project's one rule: nothing is advertised as existing before it does, and every unshipped item is described as a plan, not a feature.
+This page says what shipped, what is coming, what is being considered, and what will not happen. It follows one rule. Nothing unshipped is described as a feature.
 
-The order below is the order work happens in. It is effort-ordered, not date-ordered - ProtoTest is maintained in personal time, and a solo calendar is not a promise. The [changelog](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md) records what actually shipped.
+Shipped: 1.1. Next: nothing committed. Exploring: three ideas. Never: seven deliberate noes, each with its reason.
 
-## Next: committed, in this order
+The order below is the order work happens in. Work happens in effort order, not date order. ProtoTest is maintained in personal time. The [changelog](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md) records what actually shipped.
 
-### 1.1: the platform release
+## Shipped: 1.1
 
-The current line is in progress. Everything below is committed to 1.1, in this order; each item is finished before the next starts, and nothing here is dated.
+1.1 is released (29 Sep 2026). The 1.1 line made ProtoTest a platform proven on a real product. The sections below stay visible as user-facing capabilities; the full list is the [1.1.0 changelog](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).
 
-- **Shape and truth:** the package review (a package exists only when a consumer can reference it directly or it isolates a dependency) and the one tiny package retired into the docs.
+<details>
+<summary>What 1.1 shipped, in one list</summary>
+
+- **Shape and truth:** the package review, with the `ProtoTest.OpenTelemetry` package retired into the docs.
 - **Devices on a real product:** the reference demo's OCPP gateway and charge-point simulator, and the WebSocket device backend proven on it.
-- **Product surface:** the demo's dashboard, browser journeys, and the monthly export through Sheets.
-- **More layers testable:** per-test service substitution and fault injection, expected/exhaustive shape assertions, traffic coverage (fields that arrived as *observed but unasserted*), `Should` vocabulary parity, a built-in test user, WireMock, Aspire and MassTransit integrations, and template `--runner` variants.
-- **Topology under test:** container topology, deployed mode, fault injection, and a nightly reference run.
-- **A second device protocol:** MQTT, after OCPP proves the transport model.
-- **Agent and sharing layer:** the `ProtoTest.Mcp` tool over traces and reports, a GitHub Action that posts the failure digest and trace link, the static trace index, and the docs and skills page.
-- **Showcase:** the seeded benchmark republished on the reference demo, the trace showpiece, and the rewritten Northstar suite as the repository's Learning demo (the reference demo is the full product demo).
-- **Docs, then history:** the documentation rewrite (a five-minute path plus an extended path per topic, with interactive pieces), the history restructure, then the 1.1 tag.
+- **Product surface:** the demo's dashboard, browser journeys and the monthly export through Sheets.
+- **More layers testable:** per-test service substitution and fault injection, expected and exhaustive shape assertions, traffic coverage, `Should` vocabulary parity, a built-in test user, WireMock, Aspire and MassTransit integrations, and template `--runner` variants.
+- **Topology under test:** container topology, published mode, fault injection and the nightly reference run.
+- **A second device protocol:** MQTT, after OCPP proved the transport model.
+- **Agent and evidence layer:** `ProtoTest.Mcp`, the `prototest` CLI, `ProtoTest.Diagnosis`, `ProtoTest.Verification`, `ProtoTest.Feedback`, the feedback action, the static trace index, and the docs and skills pages.
+- **Showcase:** the benchmark republished on the reference demo and the trace showpiece.
 
-The reference demo is the proof: an independent open-source EV-charging platform (CSMS) in its own repository, with a REST API, PostgreSQL, a billing worker with retry and dead-letter semantics, browser journeys, device protocols and containers, running suites this framework did not write for itself.
+The reference demo is the proof. It is a separate open-source EV-charging platform with a REST API, PostgreSQL, a billing worker, browser journeys and containers.
+
+</details>
 
 When an item ships, it leaves this section and becomes a docs page like everything else.
 
+## Next: committed, in this order
+
+- **1.1 follow-through is done:** the tag, the packages, the public default branch, the API reference and the site are the release.
+
+Nothing else is committed. An item moves out of **Exploring** when someone needs it in a real suite.
+
 ## Exploring: genuinely considered, not committed
 
-- **Wolverine.Tracking bridge** - the same shape as the MassTransit bridge, only if users ask for it.
-- **Allure and ReportPortal sinks** - built on the existing sink contract; community-friendly once the integration template exists.
-- **Further device transports** (TCP, serial, Sigfox) and MQTT variants - after the first OCPP suite and the MQTT backend have real users.
+| Idea | What would move it |
+| --- | --- |
+| **Wolverine.Tracking bridge** - the same shape as the MassTransit bridge | Users asking for it |
+| **Allure and ReportPortal sinks** - built on the existing sink contract | The integration template existing, then community interest |
+| **Further device transports** (TCP, serial, Sigfox) and MQTT variants | Real users on the first OCPP suite and the MQTT backend |
 
 ## Not planned, with reasons
 

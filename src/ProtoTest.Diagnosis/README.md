@@ -3,6 +3,10 @@
 Reads one `.prototrace` run and states the deterministic causal summary: which tests failed and why,
 what the failing operation carried and changed, and what the report published.
 
+```bash
+dotnet add package ProtoTest.Diagnosis
+```
+
 ```csharp
 var diagnosis = ProtoDiagnosis.Read("TestResults/Shop.prototrace");
 foreach (var failure in diagnosis.Failures)
@@ -45,3 +49,8 @@ report rows the operation touched.
 
 `ProtoDiagnosisJson.ToJson` is the one JSON rendering the MCP tools and the feedback channels share,
 and `ProtoTraceSummaryText.Write` is the plain-text rendering `prototest summary` prints.
+
+## Learn more
+
+- [ProtoTrace and diagnosis](https://prototest.dev/docs/observability/prototrace)
+- [Reporting](https://prototest.dev/docs/observability/reporting)

@@ -12,11 +12,11 @@ import Link from '@docusaurus/Link';
 
 # Run the suite on containers
 
-Level 5 leaves the Northstar sample. It runs OpenCSMS, an EV charging management system in its own repository and the reference suite for ProtoTest on real infrastructure. The suite has one Setup and four modes; this level reads three of them and then the faults the suite injects on purpose.
+Your suite needs a database and a broker, and you would rather not install either. Level 5 runs OpenCSMS, an EV charging system in its own repository. Its suite has one Setup and four modes, and this level reads three of them plus the faults the suite injects on purpose.
 
 <LearnShell
   level="Level 5, lesson 1"
-  minutes="About 8 minutes"
+  minutes="About 15 minutes"
   outcome={[
     'Run the suite with PostgreSQL and RabbitMQ containers the run owns.',
     'Read the composition to see which provider serves the store and the broker.',
@@ -82,7 +82,7 @@ From the OpenCSMS repository root, with a container runtime available:
 pwsh eng/run-suite.ps1 -Mode container
 ```
 
-The script builds the dashboard first, runs `dotnet test tests/OpenCsms.Suite -c Release`, and tees the run to `artifacts/gates/opencsms-container-<timestamp>.log`. The plain command, `dotnet test tests/OpenCsms.Suite`, runs the same mode without the log file.
+The script builds the dashboard first, runs `dotnet test tests/OpenCsms.Suite -c Release`, and tees the run to `artifacts/gates/opencsms-container-<timestamp>.log`. Run the script for the count below. A plain `dotnet test tests/OpenCsms.Suite` skips the seven Chromium journeys, because the dashboard build they wait for is the script's first step, so it does not reproduce that summary.
 
 ## The chain that decides
 

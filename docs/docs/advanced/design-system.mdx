@@ -8,9 +8,7 @@ import {BrandMarks, Outcomes, Phases, Swatches, TypeFamilies, TypeScale} from '@
 
 # Design system
 
-ProtoTest has three surfaces people read: the [ProtoTrace viewer](../observability/prototrace.md), the
-[HTML report](../observability/reporting.md) and these docs. They share **one** stylesheet of design tokens,
-`design/prototest-tokens.css` at the root of the repository. There are no copies:
+Three surfaces share **one** stylesheet of design tokens, [`design/prototest-tokens.css`](https://github.com/MSeys/ProtoTest/blob/main/design/prototest-tokens.css): the [ProtoTrace viewer](../observability/prototrace.md), the [HTML report](../observability/reporting.md) and these docs. There are no copies.
 
 | Surface | How it gets the tokens |
 | --- | --- |
@@ -18,8 +16,7 @@ ProtoTest has three surfaces people read: the [ProtoTrace viewer](../observabili
 | HTML report sink | embeds the file into every report it writes |
 | Documentation | imports the file at the top of its theme |
 
-Every swatch on this page is drawn from that file, so this page is also a live check that the tokens
-render the way this page describes them.
+Every swatch on this page is drawn from that file, so this page is also a live check that the tokens render the way this page describes them.
 
 ## Two surfaces
 
@@ -32,7 +29,7 @@ Switch the theme of this site to see the blueprint values.
 
 <Swatches tokens={['--bg', '--surface', '--surface-2', '--hover', '--surface-sunken']} />
 
-Colour carries meaning and nothing else:
+Colour carries meaning only:
 
 <Swatches tokens={['--blueprint', '--success', '--warning', '--danger', '--violet', '--muted']} />
 
@@ -61,10 +58,7 @@ only separates the families.
 
 <TypeFamilies />
 
-An entry kind ProtoTrace has never seen, for example your own
-`Proto.Context.Trace.Operation("billing.webhook.deliver", …)`, is drawn as an **action**, exactly like a
-built-in call. Your integration's operations are as visible
-as ProtoTest's.
+An unknown entry kind, such as your own `billing.webhook.deliver` operation, renders as an **action**. It looks like a built-in call, so your integration's operations are as visible as ProtoTest's.
 
 ## Typography
 
@@ -80,19 +74,31 @@ Nothing is set below 10px.
 
 ## Spacing, radii and motion
 
-- **Spacing:** seven steps, `--space-1` (4px) to `--space-7` (32px). Padding, gaps and margins use these
-  steps, never raw pixels. The only exception is a hairline of 1 or 2px.
-- **Radii:** a radius names what a thing is.
-  - `--radius-chip` (4px) for chips
-  - `--radius-control` (7px) for buttons and inputs
-  - `--radius-panel` (10px) for panels
-  - `--radius-overlay` (14px) for dialogs and sheets
-  - `--radius-pill` for filter chips
-  - `--radius-hairline` for small markers and bars
-- **Elevation:** a single shadow, `--elevation-overlay`, used only by things that float. Panels have a
-  border and no shadow.
-- **Motion:** `--motion-fast` for state changes, `--motion-slow` for layout changes. Both drop to zero
-  when the reader asks the operating system to reduce motion.
+Padding, gaps and margins use the scale, never raw pixels. The only exception is a hairline of 1 or 2px.
+
+| Token | Value | Used for |
+| --- | --- | --- |
+| `--space-1` | 4px | the gap inside a chip |
+| `--space-2` | 6px | between a label and its value |
+| `--space-3` | 8px | inside a control |
+| `--space-4` | 12px | between rows in a list |
+| `--space-5` | 16px | inside a panel |
+| `--space-6` | 22px | between a panel's sections |
+| `--space-7` | 32px | between page sections |
+
+A radius names what a thing is, so pick by role:
+
+| Token | Value | Used for |
+| --- | --- | --- |
+| `--radius-hairline` | 2px | small markers and bars |
+| `--radius-chip` | 4px | chips |
+| `--radius-control` | 7px | buttons and inputs |
+| `--radius-panel` | 10px | panels |
+| `--radius-overlay` | 14px | dialogs and sheets |
+| `--radius-pill` | 999px | filter chips |
+
+- **Elevation:** a single shadow, `--elevation-overlay`, used only by things that float. Panels have a border and no shadow.
+- **Motion:** `--motion-fast` for state changes, `--motion-slow` for layout changes. Both drop to zero when the reader asks the operating system to reduce motion.
 
 ## The mark
 
@@ -107,20 +113,21 @@ their own `prefers-color-scheme` rule and follow the operating system instead.
 
 ## Using the tokens yourself
 
-If you write your own [report sink](../observability/reporting.md) or render trace data somewhere else, start from the
-same file rather than copying colours out of it:
+If you write your own [report sink](../observability/reporting.md) or render trace data somewhere else, start from the same file rather than copying colours out of it. This is a complete document:
 
 ```html
-<style>
-  /* design/prototest-tokens.css, embedded or linked */
-</style>
-<html data-theme="dark">
-  …
-  <span class="outcome" style="color: var(--outcome-failed)">Failed</span>
-  <i style="background: var(--phase-execution)"></i>
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <link rel="stylesheet" href="prototest-tokens.css" />
+  </head>
+  <body>
+    <span class="outcome" style="color: var(--outcome-failed)">Failed</span>
+    <i style="background: var(--phase-execution)"></i>
+  </body>
 </html>
 ```
 
-The viewer enforces this with a style lint that runs in its build. It rejects raw colours, spacing off the
-scale, and radii that are not tokens. The HTML report's tests check that it embeds the shared file rather
-than a palette of its own.
+Embed the file's contents instead of linking it when the output has to stand alone, which is what the HTML report sink does.
+
+The viewer enforces this with a style lint that runs in its build. It rejects raw colours, spacing off the scale, and radii that are not tokens. The HTML report's tests check that it embeds the shared file rather than a palette of its own.

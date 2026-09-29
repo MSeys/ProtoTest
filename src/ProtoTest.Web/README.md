@@ -6,9 +6,7 @@ Install `ProtoTest.Web.Playwright` or `ProtoTest.Web.Selenium` in a test project
 
 ## Why is this separate from the backends?
 
-I wanted page objects, components, tables and browser actions to work the same way without tying them to one browser library.
-
-The backend handles the browser. This package contains the API used by tests, including named sessions, reusable flows, login strategies, waits and page coverage.
+Page objects, components, tables and browser actions work the same way on either backend. The backend handles the browser; this package holds the test-facing API.
 
 ```csharp
 var page = Proto.Context.Web().Page<ProjectsPage>();

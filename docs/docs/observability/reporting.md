@@ -41,9 +41,19 @@ Items arrive sorted by target, category and identifier. Only top-level items are
 
 ### The HTML report
 
-A single self-contained page: a summary (covered, uncovered, occurrences, findings, run gates, resources, errors) and every report item, from an OpenAPI endpoint to a response to a property, from a GraphQL type to a field to an argument, or from a gRPC service to a method, with covered, partially covered and uncovered paths marked.
+The HTML report is one self-contained page. It shows a summary and every report item. Covered, partial and uncovered paths are marked.
 
-Items are different things, so the report keeps them apart in sections: **Coverage** for what the contract exercises, **Findings** for evidence tests deliberately recorded, **Run gates** for run verdicts (labelled passed, warning, failed or skipped), **Resources** for what tests owned and released, and **Run metadata** for the CI facts a run [recorded about itself](./prototrace.md#correlating-a-trace-with-the-run-that-produced-it). An integration's own kind gets a section too, titled after the kind, rather than being dropped. Searching and filtering apply across all sections, and a section that filters to nothing disappears.
+The report groups items into sections:
+
+| Section | What it holds |
+| --- | --- |
+| **Coverage** | What the contract exercised |
+| **Findings** | What tests recorded with `AddFinding`, plus what integrations reported |
+| **Run gates** | Verdicts, labelled passed, warning, failed or skipped |
+| **Resources** | What tests owned and released |
+| **Run metadata** | The CI facts a run [recorded about itself](./prototrace.md#correlating-a-trace-with-the-run-that-produced-it) |
+
+An integration's own kind gets a section too, titled after the kind. Searching and filtering apply across all sections, and a section that filters to nothing disappears.
 
 ### Occurrences
 
@@ -69,15 +79,35 @@ The same data, for tooling:
     "Gates": 1,
     "Resources": 37
   },
-  "Items": [ ... ]
+  "Items": [
+    {
+      "TargetName": "Northstar:Api",
+      "Category": "OpenAPI",
+      "Identifier": "GET /api/v1/orders",
+      "Kind": "coverage",
+      "Status": "Success",
+      "Count": 12,
+      "IsCovered": true,
+      "Value": null,
+      "Unit": null,
+      "Message": null,
+      "Tags": null,
+      "Children": [ { "TargetName": "Northstar:Api", "Category": "OpenAPI Response", "Identifier": "200", "Kind": "coverage", "Status": "Success", "Count": 12, "IsCovered": true } ],
+      "Metadata": null,
+      "DisplayName": null,
+      "DisplayGroup": null
+    }
+  ]
 }
 ```
+
+Every property of `ProtoReportItem` is written, so an unset one is present with a `null` value. The responses and properties of that endpoint are nested under `Children`; the row above is the endpoint and its `200` response, abridged to the fields the example is about.
 
 Property names match the .NET types (`ProtoReport`, `ProtoReportSummary`, `ProtoReportItem`) and enums are written as strings. `Total` counts nested items too. `TotalOccurrences` uses the per-branch rule above: coverage hit counts and observation counts, no double-counted nested breakdowns, no findings or gates. `CoveragePercentage` is rounded to two decimals and is `0` when there are no coverage items. Coverage totals count units only: an item whose `IsCovered` is `null` is an aggregate row, not a unit, so it stays out of `CoverageTotal`, `Covered`, `Uncovered` and `CoveragePercentage`. A run gate's `CoverageSummaries` leaves it out too.
 
 ## The artifact
 
-The artifact is the file a sink writes. A relative `OutputPath` resolves against the process working directory, which is usually the test project's build output. A missing `OutputPath` throws when the sink exports, naming the sink and its configuration section.
+The artifact is the file a sink writes. A relative `OutputPath` resolves against the process working directory. That is the test project's build output folder. A missing `OutputPath` throws when the sink exports, naming the sink and its configuration section.
 
 ### Configuring from files
 
@@ -145,12 +175,7 @@ Two optional interfaces make a sink a first-class citizen:
 - **`IProtoSinkArtifactSource`**: return the files you wrote from `GetArtifacts()` and they are added to the `.prototrace` archive.
 - **`IProtoConfigurableOptions`**: expose a `ConfigurationSectionName` and your sink's public properties are bound from that section after the `AddSink` callback runs.
 
-```csharp
-public static IProtoHostBuilder AddSink<TSink>(this IProtoHostBuilder builder, Action<TSink>? configure = null) where TSink : class, IProtoSink;
-public static IProtoHostBuilder AddSink<TSink>(this IProtoHostBuilder builder, TSink sink) where TSink : class, IProtoSink;
-```
-
-The first overload creates the sink through dependency injection, so it can take services. The second registers an instance as-is and **does not** apply configuration binding. The same sink type is registered once however it was added, and a repeated generic call appends its `configure` callback to that sink.
+`AddSink<TSink>()` takes an optional configure callback and creates the sink through dependency injection, so it can take services. `AddSink<TSink>(sink)` registers an instance as-is and does not apply configuration binding. The same sink type is registered once however it was added, and a repeated generic call appends its `configure` callback to that sink.
 
 ## Limits
 

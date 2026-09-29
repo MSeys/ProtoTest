@@ -3,6 +3,8 @@ import { onBeforeUnmount, ref } from "vue";
 export interface ColumnResize {
   width: ReturnType<typeof ref<number | undefined>>;
   start(event: PointerEvent): void;
+  /** Arrow-key resize: the pixels move toward the pointer side, from the width the column has right now. */
+  nudge(event: KeyboardEvent, pixels: number): void;
   reset(): void;
 }
 
@@ -46,12 +48,16 @@ export function useColumnResize(
     frame = requestAnimationFrame(() => { width.value = next; });
   }
 
+  function persist() {
+    try { if (width.value) localStorage.setItem(key, String(Math.round(width.value))); } catch { /* ignore */ }
+  }
+
   function stop() {
     removeEventListener("pointermove", move);
     removeEventListener("pointerup", stop);
     removeEventListener("pointercancel", stop);
     document.body.classList.remove("is-resizing");
-    try { if (width.value) localStorage.setItem(key, String(Math.round(width.value))); } catch { /* ignore */ }
+    persist();
   }
 
   function start(event: PointerEvent) {
@@ -65,11 +71,18 @@ export function useColumnResize(
     event.preventDefault();
   }
 
+  function nudge(event: KeyboardEvent, pixels: number) {
+    const neighbour = visibleSibling(event.currentTarget as HTMLElement, options.edge === "leading" ? "previous" : "next");
+    const current = width.value ?? neighbour?.getBoundingClientRect().width ?? options.min;
+    width.value = clamp(current + (options.edge === "leading" ? pixels : -pixels));
+    persist();
+  }
+
   function reset() {
     width.value = undefined;
     try { localStorage.removeItem(key); } catch { /* ignore */ }
   }
 
   onBeforeUnmount(() => { cancelAnimationFrame(frame); stop(); });
-  return { width, start, reset };
+  return { width, start, nudge, reset };
 }

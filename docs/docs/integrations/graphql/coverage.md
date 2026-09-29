@@ -66,7 +66,7 @@ GraphQL input type    CreateOrderInput
 └─ GraphQL input field   product
 ```
 
-Each field, argument and input-field item carries `IsCovered` and a hit count; fields add `returnType` and `deprecated` metadata, and arguments and input fields carry their declared `type`. Type rows aggregate the fields (or input fields) under them with a total hit count and no `IsCovered` verdict of their own, so the report also tells you whether you're still exercising deprecated fields.
+Each field, argument and input-field item carries `IsCovered` and a hit count; fields add `returnType` and `deprecated` metadata, and arguments and input fields carry their declared `type`. Type rows total their fields' hits and carry no verdict. Fields still show `returnType` and `deprecated`.
 
 One aggregate item records the schema identity: identifier `spec`, display `Schema`, metadata `spec.source` (the configured source) and `spec.hash` (SHA-256 of the loaded SDL). It has no covered verdict, so the type and field totals ignore it, and a cross-run comparison can tell the same schema from a changed one.
 

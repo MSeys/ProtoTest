@@ -6,7 +6,7 @@ description: "Register ProtoTest with NUnit: the SetUpFixture, the [ProtoTest] a
 
 # NUnit
 
-`ProtoTest.NUnit` starts the host from a `[SetUpFixture]` and wraps each `[ProtoTest]` method in a ProtoTest context. The wrapper sits outside NUnit's setup and teardown, so the lifecycle spans `[SetUp]`, the body and `[TearDown]`. The repository's own sample suite uses this adapter.
+`ProtoTest.NUnit` starts the host from a `[SetUpFixture]` and wraps each `[ProtoTest]` method in a ProtoTest context. The wrapper sits outside NUnit's setup and teardown, so the lifecycle spans `[SetUp]`, the body and `[TearDown]`. The `dotnet new prototest` template writes this adapter by default.
 
 ## Install
 
@@ -14,13 +14,17 @@ description: "Register ProtoTest with NUnit: the SetUpFixture, the [ProtoTest] a
 dotnet add package ProtoTest.NUnit
 ```
 
-ProtoTest targets **.NET 8, 9 and 10**, and needs **NUnit 4.6.1 or newer**; the standard `dotnet new nunit` template pins an older version, so update NUnit first. The `dotnet new prototest` template defaults to `net10.0`; pass `-f net8.0` or `-f net9.0` for an older runtime.
+ProtoTest targets **.NET 8, 9 and 10**, and needs **NUnit 4.6.1 or newer**; the standard `dotnet new nunit` template pins an older version, so update NUnit first: `dotnet add package NUnit --version 4.6.1`. The `dotnet new prototest` template defaults to `net10.0`; pass `-f net8.0` or `-f net9.0` for an older runtime.
 
 ## Register
 
 `ProtoTestAssembly` carries `[SetUpFixture]` and owns `[OneTimeSetUp]` and `[OneTimeTearDown]`. Derive from it and configure the host:
 
 ```csharp
+using NUnit.Framework;
+using ProtoTest.Core;
+using ProtoTest.NUnit;
+
 [SetUpFixture]
 public sealed class Setup : ProtoTestAssembly
 {
@@ -47,7 +51,7 @@ public class OrderTests
 ```
 
 :::warning[Namespace scoping]
-This is NUnit's own rule. A `[SetUpFixture]` outside any namespace applies to the whole assembly, while one inside a namespace applies only to that namespace and its children. If tests in another namespace cannot find the host, that is usually why.
+This is NUnit's own rule. A `[SetUpFixture]` outside any namespace applies to the whole assembly, while one inside a namespace applies only to that namespace and its children. If tests in another namespace cannot find the host, move the setup class to cover that namespace.
 :::
 
 **Low-ceremony mode.** Add `[assembly: ProtoTestAutoWrap]` and every plain `[Test]` runs through the same lifecycle. NUnit applies the nearest `IWrapSetUpTearDown` attribute (method, then fixture, then assembly), so a test that carries `[ProtoTest]` keeps its own wrapper and is never wrapped twice.

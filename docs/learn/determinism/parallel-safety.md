@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Parallel safety
 
-The sample runs its tests eight at a time. Nothing in a test coordinates with the others, and that is the point: the rules that make a test deterministic also make it safe next to another one.
+The sample runs its tests eight at a time. Tests do not coordinate with each other. The rules that make a test deterministic also keep it isolated in parallel.
 
 <LearnShell
   level="Level 3, lesson 4"
@@ -34,7 +34,7 @@ The sample runs its tests eight at a time. Nothing in a test coordinates with th
   }
   checkpoint={{
     question:
-      'The suite fixes no identifier by hand, yet every test in a parallel run creates its own tenant and project and passes. Which two mechanisms keep the tests apart?',
+      'The suite runs eight tests at once, and some journeys create fixed project names like `atlas`. Every test still passes. Which two mechanisms keep the tests apart?',
     verify: (
       <>
         Read the setup layers of <a href="pathname:///lessons/l0-state-fix.prototrace">l0-state-fix.prototrace</a> and{' '}
@@ -44,13 +44,13 @@ The sample runs its tests eight at a time. Nothing in a test coordinates with th
     ),
     reveal: (
       <>
-        The execution context is per test and flow-local, so one test cannot read another's clients, state or trace. And every durable record is named from the test id, which carries the run prefix, so two tests never produce the same name. Isolation and naming are the pair; either one alone leaves a way for tests to collide.
+        The execution context is per test and flow-local, so one test cannot read another's clients, state or trace. And every test works inside its own tenant: the tenant name carries the test id, and fixed names like `atlas` live inside it, so two tests can use the same name without meeting. Isolation and the per-test tenant are the pair; either one alone leaves a way for tests to collide.
       </>
     ),
   }}
   learned={[
     'Parallel tests each get their own execution context, on their own async flow.',
-    'Names built from the test id keep durable records apart; per-test state keeps reads apart.',
+    'The per-test tenant keeps durable records apart; per-test state keeps reads apart.',
     'The run owns what tests share; a test owns what it creates.',
   ]}
   next={[
@@ -81,15 +81,16 @@ The sample runs its tests eight at a time. Nothing in a test coordinates with th
   foot={<>From <code>samples/Northstar.ProtoTest/AssemblyInfo.cs</code>. A suite opts in when its tests isolate their own state; this one does.</>}
 />
 
-## Rule one: per-test names
+## Rule one: a tenant per test
 
-Every durable record the sample creates carries the test id:
+The tenant is what keeps durable records apart, and its name carries the test id:
 
 - The tenant comes from `context.UniqueName("northstar")`, which reads `northstar-<test id>`.
-- The project names in the journeys carry `Proto.Context.TestId`, for example `own-749428000001`.
+- Names inside the tenant can be fixed. `atlas` and `report-atlas` are the same in every test, and no two of them meet, because no two tests share the tenant. A name only has to be unique where it can be seen.
+- A record that is visible outside the tenant still carries the test id, because the run has no tenant to hide it in: the member email is built from `context.TestId`, and so is the scenario correlation id.
 - The teardown removes the tenant by the identity setup recorded, not by a search for a name.
 
-The test id carries the run prefix, so the same journey in the same second on two workers still produces two names. `TestId` is also what makes a rerun against a persistent store safe, unless a suite deliberately fixes the run prefix.
+The test id carries the run prefix, so the same journey in the same second on two workers still produces two tenants. `TestId` is also what makes a rerun against a persistent store safe, unless a suite deliberately fixes the run prefix.
 
 ## Rule two: per-test state
 
@@ -101,13 +102,13 @@ What is shared lives in one place: the run. The store, the broker, the loopback 
 
 Ask these of every test you write:
 
-- Does it create a record with a name that is not derived from the test? Replace the name with `UniqueName` or `TestId`.
+- Does it create a record outside its own tenant, or one another test can see, with a name that is not derived from the test? Replace the name with `UniqueName` or `TestId`.
 - Does it write a static or a fixture field another test could read? Move the value into the context.
 - Does it start or dispose something the run should own, or the reverse? Fix the lifetime, not the symptom.
 - Does its teardown remove everything it created? If a release is missing, the leak grows with every parallel run.
 
 ## Where the evidence is
 
-Each archive in this track is one test's trace, with its own tenant identity in the setup layer and its own cleanup in teardown. The [concurrency page](/docs/foundation/concurrency) records the parallelism the project has exercised: the demo suite at eight workers is the configuration that runs routinely.
+Each archive in this track is one test's trace, with its own tenant identity in the setup layer and its own cleanup in teardown. Open two of them side by side and the setup layers carry two different tenant names, one per test id. The [concurrency page](/docs/foundation/concurrency) covers the mechanics: what flows with the context, what loses it, and how a suite opts in.
 
 </LearnShell>

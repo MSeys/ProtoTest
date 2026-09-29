@@ -1,5 +1,5 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 title: Execution context
 description: "ProtoExecutionContext lives for exactly one test and holds its clients, state, services, resources, attachments and observations."
 ---
@@ -18,7 +18,7 @@ var context = Proto.Context;
 
 `Proto.Context` works anywhere on the test's async flow: in the test method, in helpers it awaits, in page objects, in authenticators. Hooks and attributes receive the context as a parameter instead.
 
-Outside a test, `Proto.Context` throws *"No active ProtoExecutionContext is available on this flow. ..."* and names the alternatives: off-flow telemetry uses `ProtoHost.FindTraceWriter(Activity?)` to reach the owning test's trace, and run-level code uses `ProtoHost.CurrentHost` or the host reference a hook receives. The usual cause is work started with `Task.Run` or a timer callback that escaped the test's flow, or code running in a static initializer.
+Outside a test, `Proto.Context` throws. The message names the alternatives: off-flow telemetry uses `ProtoHost.FindTraceWriter(Activity?)`, and run-level code uses `ProtoHost.CurrentHost` or the host reference a hook receives. The usual cause is work started with `Task.Run` or a timer callback that escaped the test's flow, or code running in a static initializer.
 
 :::tip[Parallel tests are isolated]
 The context is stored in an `AsyncLocal`, so parallel tests each see their own. You do not need to pass it around, and one test cannot accidentally read another's state.
@@ -26,7 +26,7 @@ The context is stored in an `AsyncLocal`, so parallel tests each see their own. 
 
 ### Test identity
 
-| Member | |
+| Member | Meaning |
 | --- | --- |
 | `TestName` | the name the runner reported |
 | `TestMethod` | the `MethodInfo` of the test |
@@ -36,7 +36,15 @@ The context is stored in an `AsyncLocal`, so parallel tests each see their own. 
 
 ### Cancellation
 
-`CancellationToken` is the token the caller supplied when the test was started:
+`CancellationToken` is the token the caller supplied when the test was started. The runner adapters pass the token their runner exposes:
+
+| Runner | Token the adapter passes | Notes |
+| --- | --- | --- |
+| NUnit | the test execution context token | cancellable with `[CancelAfter]` |
+| xUnit v2 | the runner's `CancellationTokenSource` | |
+| xUnit v3 | `TestContext.Current.CancellationToken` | |
+| TUnit | `TestContext.CancellationToken` | |
+| MSTest | `CancellationToken.None` | `ExecuteAsync(ITestMethod)` exposes no token; setup runs to the integration's own timeout |
 
 ```csharp
 await using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -44,7 +52,7 @@ var context = await host.StartTestAsync("Checkout", method, cancellation.Token);
 context.CancellationToken;   // the same token in hooks, attributes and setup I/O
 ```
 
-The runner adapters that have a cancellation token pass it in: NUnit's test context token (cancellable with `[CancelAfter]`) and the xUnit v2 runner's `CancellationTokenSource`. MSTest's `ExecuteAsync(ITestMethod)` API, xUnit v3's before/after attributes and TUnit's test executor expose no token, so those runner-driven tests see `CancellationToken.None` and setup runs to the integration's own timeout. `ProtoTest.Sql` passes the token to the connection open and transaction begin. The run-scoped [`IProtoRunHook`](./hooks.md#run-hooks) keeps taking its token as a parameter.
+`ProtoTest.Sql` passes the token to the connection open and transaction begin. The run-scoped [`IProtoRunHook`](./hooks.md#run-hooks) keeps taking its token as a parameter.
 
 ### Unique names
 
@@ -68,13 +76,9 @@ Typed state is how attributes, hooks and tests hand information to each other wi
 ```csharp
 public sealed record SampleUserContext(
     string Id, string Tenant, string Email, string Role, string AccessToken) : IProtoContext;
-```
 
-```csharp
 context.SetContext(new SampleUserContext(user.Id, user.Tenant, user.Email, user.Role, user.AccessToken));
-```
 
-```csharp
 var user = Proto.Context.Resolve<SampleUserContext>();        // throws if missing
 var maybe = Proto.Context.TryResolve<SampleUserContext>();    // null if missing
 ```
@@ -196,8 +200,7 @@ Add your own entries to the test's trace. See [Extending ProtoTest](../advanced/
 
 ## Limits
 
-- One context per async flow. Starting a second test on the same flow throws, and completing a test from a different host throws.
-- `context.DisposeAsync` is idempotent and attempts every release. Failures are aggregated.
 - `RegisterResource` refuses run-scoped resources. `AddResource` on the builder is the run-scoped counterpart.
-- A skipped test never creates a context, so hooks and attributes do not run for it.
-- `Proto.Context` cannot answer on flows that escaped the test, such as a callback on a library thread. Correlate those by trace id with `ProtoHost.FindTraceWriter`.
+- `context.DisposeAsync` is idempotent and attempts every release. Failures are aggregated.
+- A skipped test never creates a context. See [Skip conditions](./skip-conditions.md).
+- `Proto.Context` cannot answer on flows that escaped the test. See [Concurrency](./concurrency.md) for the isolation rule both pages share.

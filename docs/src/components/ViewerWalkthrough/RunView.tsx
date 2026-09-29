@@ -3,14 +3,13 @@ import type {ReactNode} from 'react';
 import styles from './styles.module.css';
 
 /*
- * The viewer's Run view for the bundled demo: the outcome line, the phase bar with the two failures and
- * two partials, the "what this run could see" panel, and the needs-attention list. Values come from
- * prototest-demo.prototrace; the test list below needs-attention is left out on purpose - the failed
+ * The viewer's Run view for the bundled demo: the outcome line, the phase bar with the four failures
+ * and the partial test, the "what this run could see" panel, and the needs-attention list. Values come
+ * from prototest-demo.prototrace; the test list below needs-attention is left out on purpose - the failed
  * tests are the story here.
  */
 
 type Tick = 'passed' | 'failed' | 'partial';
-type AttentionOutcome = Tick | 'finding';
 
 const tickClass: Record<Tick, string> = {
   passed: styles.tickPassed,
@@ -18,83 +17,81 @@ const tickClass: Record<Tick, string> = {
   partial: styles.tickPartial,
 };
 
-const attClass: Record<AttentionOutcome, string> = {
+const attClass: Record<Tick, string> = {
   failed: styles.attFailed,
   partial: styles.attPartial,
-  finding: styles.attFinding,
   passed: styles.attPassed,
 };
 
-const attLabelClass: Record<AttentionOutcome, string> = {
+const attLabelClass: Record<Tick, string> = {
   failed: styles.attLabelFailed,
   partial: styles.attLabelPartial,
-  finding: styles.attLabelFinding,
   passed: styles.attLabelPassed,
 };
 
-const outcomes: Tick[] = Array.from({length: 44}, (_, index) => {
+const outcomes: Tick[] = Array.from({length: 19}, (_, index) => {
   const test = index + 1;
-  if (test === 29 || test === 36) return 'failed';
-  if (test === 13 || test === 23) return 'partial';
+  if (test === 8 || test === 10 || test === 12 || test === 15) return 'failed';
+  if (test === 11) return 'partial';
   return 'passed';
 });
 
-const capabilities = ['Playwright', 'Data', 'Sheets', 'GraphQL', 'REST', 'gRPC', 'ASP.NET Core', 'Northstar standalone', 'SQL'];
+const capabilities = ['Playwright', 'Data', 'Sheets', 'GraphQL', 'REST', 'ASP.NET Core', 'SQL'];
 
 interface Attention {
   number: string;
   title: string;
   kicker: string;
   detail: string;
-  outcome: AttentionOutcome;
+  outcome: Tick;
   label: string;
 }
 
 const attention: Attention[] = [
   {
-    number: '29',
-    title: 'The dashboard never shows another tenants plan',
-    kicker: 'Assert · Plan should have text "Enterprise"',
-    detail: "Element 'DashboardPage.Plan' should have text \"Enterprise\" within 00:00:03. Last observed: text was \"Free\".",
+    number: '08',
+    title: 'A bare status hides what the application said',
+    kicker: 'Assert status · 201 Created',
+    detail: 'Expected HTTP status 201 (Created), but received 400 (BadRequest).',
     outcome: 'failed',
     label: 'Failed',
   },
   {
-    number: '36',
-    title: 'The organization reports its plan and project count',
-    kicker: 'Assert response shape',
-    detail: '$.projectCount: expected 99, got 0, and 1 more',
+    number: '10',
+    title: 'An unknown project ID is treated as mine',
+    kicker: 'Assert status · 200 OK',
+    detail: 'Expected HTTP status 200 (OK), but received 404 (NotFound).',
     outcome: 'failed',
     label: 'Failed',
   },
   {
-    number: '13',
-    title: 'A failed operation records its diagnostics and the run continues',
-    kicker: 'Deliver subscription webhook',
-    detail: 'The billing ledger did not acknowledge the webhook within 2 seconds.',
+    number: '11',
+    title: 'A passing journey can still carry a warning',
+    kicker: 'Coverage finding',
+    detail: 'The create response carried 4 fields no assertion mentioned: createdAtUtc, environmentCount, id, slug.',
     outcome: 'partial',
     label: 'Partial',
   },
   {
-    number: '23',
-    title: 'Shape mismatches are captured without failing the run',
+    number: '12',
+    title: 'A real wait does not close the due window',
     kicker: 'Assert response shape',
-    detail: '$.projectCount: expected 99, got 0, and 1 more',
-    outcome: 'partial',
-    label: 'Partial',
+    detail: '$.status: expected "past_due", got "active"',
+    outcome: 'failed',
+    label: 'Failed',
   },
   {
-    number: '17',
-    title: 'Deployment 1.0.0 took 1 deploy-minutes.',
-    kicker: 'Delivery, delivery-budget',
-    detail: 'Warning finding',
-    outcome: 'finding',
-    label: 'Warning finding',
+    number: '15',
+    title: 'The address was hardcoded for one machine',
+    kicker: 'Test execution',
+    detail: 'ConnectionError reaching http://127.0.0.1:5099: connection refused.',
+    outcome: 'failed',
+    label: 'Failed',
   },
   {
-    number: '',
+    number: 'Gate',
     title: 'no error findings',
-    kicker: 'Gate',
+    kicker: '',
     detail: 'No error findings were recorded.',
     outcome: 'passed',
     label: 'Passed',
@@ -105,10 +102,10 @@ export default function RunView(): ReactNode {
   return (
     <div className={styles.run}>
       <p className={styles.outcomeLine}>
-        <b className={styles.failedText}>2 failed</b>, <b className={styles.partialText}>2 partial</b>,{' '}
-        <b className={styles.passedText}>40 passed</b>
+        <b className={styles.failedText}>4 failed</b>, <b className={styles.partialText}>1 partial</b>,{' '}
+        <b className={styles.passedText}>14 passed</b>
       </p>
-      <p className={styles.meta}>44 tests in 7.40 s · 20 sep 2026, 12:32:18</p>
+      <p className={styles.meta}>19 tests in 4.06 s · 29 sep 2026, 18:37:30</p>
       <p className={styles.meta}>.NET 8.0.31 on Microsoft Windows 10.0.26200 · ProtoTest demo trace</p>
 
       <div className={styles.bar} aria-hidden="true">
@@ -153,7 +150,7 @@ export default function RunView(): ReactNode {
               <span className={styles.attNumber}>{row.number}</span>
               <span className={styles.attBody}>
                 <b className={styles.attTitle}>{row.title}</b>
-                <span className={styles.attKicker}>{row.kicker}</span>
+                {row.kicker && <span className={styles.attKicker}>{row.kicker}</span>}
                 <span className={styles.attDetail}>{row.detail}</span>
               </span>
               <span className={`${styles.attLabel} ${attLabelClass[row.outcome]}`}>{row.label}</span>

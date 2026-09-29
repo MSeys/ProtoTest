@@ -18,7 +18,7 @@ using ProtoTest.Web.Playwright;
 public sealed class InProcessBrowserJourneyTests
 {
     [ProtoTest]
-    public async Task The_browser_journeys_against_the_application_hosted_in_process()
+    public async Task TheBrowserJourneysAgainstTheApplicationHostedInProcess()
     {
         var page = Proto.Context.Web().Page<WelcomePage>();
 

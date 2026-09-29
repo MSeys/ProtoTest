@@ -2,6 +2,7 @@ namespace ProtoTest.Core;
 
 using System.Diagnostics;
 
+/// <summary>The phase of the run an entry belongs to.</summary>
 public enum ProtoTracePhase
 {
     Run,
@@ -11,6 +12,7 @@ public enum ProtoTracePhase
     Teardown
 }
 
+/// <summary>How an entry ended. The vocabulary the reports and gates read, so adapters share it.</summary>
 public enum ProtoTraceOutcome
 {
     Unknown,
@@ -21,12 +23,14 @@ public enum ProtoTraceOutcome
     Skipped
 }
 
+/// <summary>Whether an entry is a timed operation or a point-in-time event.</summary>
 public enum ProtoTraceEntryKind
 {
     Operation,
     Event
 }
 
+/// <summary>A failure recorded on a trace entry, however the runner reported it.</summary>
 public sealed record ProtoTraceError(
     string Type,
     string Message,
@@ -39,6 +43,7 @@ public sealed record ProtoTraceError(
             exception.StackTrace);
 }
 
+/// <summary>One row of the trace: a timed operation or an event, with its attributes and outcome.</summary>
 public sealed record ProtoTraceEntry(
     string Id,
     string? ParentId,
@@ -57,6 +62,7 @@ public sealed record ProtoTraceEntry(
     int Count = 1,
     IReadOnlyList<ProtoTraceSection>? Sections = null);
 
+/// <summary>A file the run captured as evidence: an attachment, or an artifact an integration wrote.</summary>
 public sealed record ProtoTraceArtifact(
     string Id,
     string Name,
@@ -84,15 +90,29 @@ public sealed record ProtoTraceEntity(
 /// <summary>The entity kinds ProtoTest itself records; an integration may define its own.</summary>
 public static class ProtoTraceEntityKinds
 {
+    /// <summary>The entity kind for test clients.</summary>
     public const string Client = "client";
+
+    /// <summary>The entity kind for contextual state a test set and resolved.</summary>
     public const string Context = "context";
+
+    /// <summary>The entity kind for the credentials a test authenticated with.</summary>
     public const string Auth = "auth";
+
+    /// <summary>The entity kind for a server the host started for the run.</summary>
     public const string Server = "server";
+
+    /// <summary>The entity kind for a capability the host declared.</summary>
     public const string Capability = "capability";
+
+    /// <summary>The entity kind for a clock: the run's, or a test's.</summary>
     public const string Clock = "clock";
+
+    /// <summary>The entity kind for a device the host attached.</summary>
     public const string Device = "device";
 }
 
+/// <summary>One test's slice of the run: its outcome, its entries and the artifacts it captured.</summary>
 public sealed record ProtoTestTrace(
     string TestId,
     string Name,
@@ -108,6 +128,10 @@ public sealed record ProtoTestTrace(
     IReadOnlyList<ProtoTraceValue>? Values = null,
     ProtoTraceRecord? Record = null);
 
+/// <summary>
+/// The whole run as a <c>.prototrace</c> reads it: every test, plus the run-level entries, entities
+/// and values. <see cref="FormatVersion"/> tells a reader how to interpret the rest.
+/// </summary>
 public sealed record ProtoTraceRun(
     string FormatVersion,
     string RunId,
@@ -125,6 +149,7 @@ public sealed record ProtoTraceRun(
 /// <summary>Provides immutable snapshots of the automatic ProtoTest execution trace.</summary>
 public interface IProtoTraceSource
 {
+    /// <summary>Takes an immutable snapshot of the run recorded so far.</summary>
     ProtoTraceRun Snapshot();
 
     /// <summary>
@@ -141,6 +166,9 @@ public interface IProtoTraceSource
 /// </summary>
 public interface IProtoTraceWriter
 {
+    /// <summary>
+    /// Starts a timed trace operation under the given parent; the returned handle carries the outcome.
+    /// </summary>
     ProtoTraceOperation StartOperation(
         string kind,
         string name,
@@ -240,12 +268,9 @@ public sealed record ProtoTestResult(
     public static ProtoTestResult Cancelled(Exception? exception = null) => new(ProtoTraceOutcome.Cancelled, exception);
 
     /// <summary>
-    /// Classifies the exception a runner reported for a test body, so every adapter applies the same
-    /// cancellation rule instead of its own: an <see cref="OperationCanceledException"/> - and the
-    /// <see cref="TaskCanceledException"/> subclass - is cancellation, anything else is a failure.
-    /// The rule is shared with runners that report only a type name through
-    /// <see cref="IsCancellation(string)"/>; NUnit cannot use either because its result carries no
-    /// exception, so its adapter classifies from NUnit's own result state instead.
+    /// Classifies the exception a runner reported for a test body: an
+    /// <see cref="OperationCanceledException"/> and its <see cref="TaskCanceledException"/> subclass are
+    /// cancellation, anything else is a failure.
     /// </summary>
     public static ProtoTestResult FromException(Exception exception)
     {

@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Move the test clock
 
-A billing period takes a month. This test closes one in about two hundred milliseconds, because the application runs on the test's clock and the test moves it by hand.
+A billing period takes a month. This test closes one in about 200 ms. The application runs on the test clock, and the test moves it.
 
 <LearnShell
   level="Level 3, lesson 1"
@@ -124,10 +124,10 @@ From the archive:
 | Entry | What it shows |
 | --- | --- |
 | `clock.advance` on `test.execution`, "Clock advanced by 30:0:00:01" | the delta, from the test side |
-| `http.request` REST `GET /api/v1/subscription`, 121.8 ms, HTTP 200 | the period the test read |
+| `http.request` REST `GET /api/v1/subscription`, 141.9 ms, HTTP 200 | the period the test read |
 | `Northstar.Domain` `invoice.issue`, reported by the application | the application closed the period |
-| `http.request` REST `GET /api/v1/invoices`, 59.1 ms, HTTP 200 | the invoice the test read |
-| `test.execution`, 201.8 ms | the whole journey |
+| `http.request` REST `GET /api/v1/invoices`, 68.4 ms, HTTP 200 | the invoice the test read |
+| `test.execution`, 233.7 ms | the whole journey |
 
 The clock advance is an event on the test execution, not a request. Nothing was sent anywhere to move time: the test holds the clock, and the application reads it.
 

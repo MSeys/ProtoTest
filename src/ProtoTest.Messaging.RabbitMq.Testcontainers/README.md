@@ -6,7 +6,7 @@ A RabbitMQ container that can be owned by a ProtoTest run.
 dotnet add package ProtoTest.Messaging.RabbitMq.Testcontainers
 ```
 
-`RabbitMqBroker.Container()` creates the resource. Register it as a target's `UseContainer(...)` provider so the messaging adapter and the application receive the same connection string; the legacy `AddInfrastructure(piece, keys)` overload keeps the all-configured skip rule for one piece.
+`RabbitMqBroker.Container()` creates the resource. Register it as a target's `UseContainer(...)` provider so the messaging adapter and the application receive the same connection string; see `ProtoTest.Testcontainers` for the shared container contract.
 
 The container starts before individual test skip conditions are evaluated. Check container availability before registration when the suite needs a fallback.
 

@@ -6,7 +6,7 @@ Most test projects get this package through a runner adapter or another ProtoTes
 
 ## Why does Core exist?
 
-I did not want every integration to manage setup, cleanup and tracing in its own way.
+Without Core, every integration would manage setup, cleanup and tracing in its own way.
 
 Core provides one host for the test run and one `ProtoExecutionContext` for each test. Integrations use that context for clients, typed contexts, resources and attachments.
 

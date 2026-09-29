@@ -7,6 +7,30 @@
 
 .archive { color: var(--blueprint); font-family: var(--font-mono); }
 
+/* The pointer above the tabs: which failed tests to open first, with buttons that jump there. */
+.pointer {
+  margin: 0;
+  padding: var(--space-3) var(--space-4) 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-meta);
+}
+
+.jump {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--blueprint);
+  font-size: var(--text-meta);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.jump:hover { border-color: var(--blueprint); }
+
 /* The tabs follow the viewer's own nav: underline, no pills. */
 .tabs {
   display: flex;
@@ -99,7 +123,6 @@
 
 .attFailed { border-left-color: var(--danger); background: var(--danger-soft); }
 .attPartial { border-left-color: var(--warning); background: var(--warning-soft); }
-.attFinding { border-left-color: var(--warning); }
 .attPassed { border-left-color: var(--success); }
 
 .attNumber { color: var(--muted); font: var(--text-micro) var(--font-mono); }
@@ -112,7 +135,6 @@
 .attLabel { align-self: start; font-size: var(--text-micro); font-weight: var(--weight-semibold); white-space: nowrap; }
 .attLabelFailed { color: var(--danger); }
 .attLabelPartial { color: var(--warning); }
-.attLabelFinding { color: var(--warning); }
 .attLabelPassed { color: var(--success); }
 
 /* Story view ---------------------------------------------------------------- */

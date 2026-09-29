@@ -16,11 +16,27 @@ dotnet add package ProtoTest.Xunit3
 
 ProtoTest targets **.NET 8, 9 and 10**, and needs **xunit.v3 4.0.0 or newer**. The `dotnet new prototest` template defaults to `net10.0`; pass `-f net8.0` or `-f net9.0` for an older runtime.
 
+**On .NET SDK 10, an xUnit v3 project runs on Microsoft.Testing.Platform.** The `dotnet new prototest` template carries the opt-in:
+
+```json title="global.json"
+{
+  "test": {
+    "runner": "Microsoft.Testing.Platform"
+  }
+}
+```
+
+With that file in the project or solution directory, run `dotnet test` from that directory, or `dotnet test --project Starter.Tests/Starter.Tests.csproj` from anywhere. Passing the solution as a path argument (`dotnet test Starter.slnx`) resolves through the old VSTest path and can report `Zero tests ran` instead of running them.
+
 ## Register
 
 Register the setup class with `[assembly: AssemblyFixture(...)]`. No collection is needed, and it applies to every test in the assembly.
 
 ```csharp
+using ProtoTest.Core;
+using ProtoTest.Xunit3;
+using Xunit;
+
 [assembly: AssemblyFixture(typeof(Setup))]
 
 public class Setup : ProtoTestAssembly
@@ -30,11 +46,18 @@ public class Setup : ProtoTestAssembly
 }
 ```
 
-Without the assembly fixture the host is never initialized, and `ProtoTestAssembly.Host` throws `InvalidOperationException` telling you to register it.
+Without the assembly fixture the host is not initialized. `ProtoTestAssembly.Host` throws an `InvalidOperationException` that names the missing registration.
 
 The test attributes are `[ProtoTestFact]` and `[ProtoTestTheory]`, and both implement xUnit v3's `IBeforeAfterTestAttribute`, so their `Before` and `After` run around every test case.
 
 ```csharp
+using System.Net;
+using ProtoTest.Core;
+using ProtoTest.Rest;
+using ProtoTest.Xunit3;
+
+namespace Orders.Tests;
+
 [Application("Api")]
 public class OrderTests
 {
@@ -49,6 +72,8 @@ public class OrderTests
 
 A `[ProtoTestTheory]` behaves the same way, and each `[InlineData]` row is a test of its own.
 
+A plain `[Fact]` keeps running unchanged next to the converted tests; it simply has no `Proto.Context`, or add `[assembly: ProtoTestAutoWrap]` to give it one. [Bring an existing xUnit suite](./bring-your-existing-suite.md) covers the incremental path for both xUnit versions.
+
 **Low-ceremony mode.** Add `[assembly: ProtoTestAutoWrap]` and every plain `[Fact]` and `[Theory]` runs through the same lifecycle. A test that carries `[ProtoTestFact]` or `[ProtoTestTheory]` keeps its own handler and is never wrapped twice.
 
 ## What the adapter changes
@@ -58,9 +83,9 @@ A `[ProtoTestTheory]` behaves the same way, and each `[InlineData]` row is a tes
 | The host | Starts once through the assembly fixture, which applies to every test in the assembly. |
 | The test attributes | `[ProtoTestFact]` and `[ProtoTestTheory]` replace `[Fact]` and `[Theory]` and carry the lifecycle themselves. Both are `AllowMultiple = false`. |
 | The lifecycle | `Before` resolves the attributes and conditions, then starts the context. `After` reads `TestContext.Current.TestState` and completes it with the mapped result. |
-| The context window | The context starts after class construction and `IAsyncLifetime.InitializeAsync`, and completes before class disposal. Class-level setup and cleanup stay outside it. |
+| The context window | The context starts after class construction and `IAsyncLifetime.InitializeAsync`, and completes before class disposal. Class-level setup and cleanup stay outside it, unlike xUnit v2, whose constructor already sees the context. |
 | Scheduling | The lifecycle handler calls the host synchronously (`GetAwaiter().GetResult()`), so xUnit v3 needs a synchronizing context. |
-| Cancellation | `IBeforeAfterTestAttribute` exposes no token, so the test starts with `CancellationToken.None`. |
+| Cancellation | `TestContext.Current.CancellationToken` is available in the before-attribute, and the lifecycle starts the context with it. |
 | Outcomes | `Passed` to `Passed`, `Skipped` and `NotRun` to `Skipped`, `Failed` to `Failed` with the exception type, message and stack. A failed `OperationCanceledException` or `TaskCanceledException` maps to `Cancelled`. Anything else is `Unknown`. |
 | Skips | A skip condition calls `Assert.Skip(reason)` before the lifecycle starts, so no trace entry is written and the reason is reported as given. A body-level `Assert.Skip` is a state on a started context and maps to `Skipped`. |
 | Attachments | `TestContext.Current.AddAttachment(name, bytes, replaceExistingValue: false, mediaType)`, so artifacts appear with the test in xUnit's output. |

@@ -4,13 +4,15 @@ title: Sheets
 description: "Open the .xlsx your application generated and assert on its sheets, cells, ranges and typed rows."
 ---
 
+import TraceExample from '@site/src/components/TraceExample';
+
 # Sheets
 
 ## What it adds
 
 `ProtoTest.Sheets` opens the `.xlsx` your application generated and lets a test assert on its sheets, cells, ranges and typed rows. It reads the file as OpenXML, the format itself, so it does not matter whether the application produced it with SpreadsheetGear, ClosedXML, EPPlus, NPOI, Aspose or raw OpenXML.
 
-Reading is eager and complete: a missing sheet, a malformed reference or a reversed range fails immediately instead of surfacing later. A reference outside the used range is an empty cell, not an error.
+Reading is eager. A missing sheet, a malformed reference, or a reversed range fails immediately. A reference outside the used range is an empty cell, not an error.
 
 ```csharp
 builder.AddSheets();
@@ -63,14 +65,22 @@ Calling it without `AddSheets` throws `InvalidOperationException` with the guida
 
 On the opened workbook:
 
-| Member | |
+| Member | Does |
 | --- | --- |
 | `Name`, `Sheets` | the workbook name and the sheets that were read (visible ones by default) |
 | `Sheet(name)` | finds a sheet; a failure lists the available names |
 | `Model<TRow>()` | binds a `[Sheet]`/`[Column]` record to the workbook |
 | `KeyValueModel<TModel>()` | binds a `[Sheet(..., Kind = ProtoSheetKind.KeyValue)]` record with `[Label]` properties to a label/value sheet |
 
-On a sheet: `Cell(reference)`, `Cell(row, column)` (1-based), `Range(reference)`, `Table(params int[] headerRows)` (defaults to row 1), plus `Name`, `Index`, `IsHidden`, `RowCount` and `ColumnCount`.
+On a sheet:
+
+| Read | Returns |
+| --- | --- |
+| `Cell(reference)`, `Cell(row, column)` (1-based) | one cell |
+| `Range(reference)` | a rectangular area |
+| `Table(params int[] headerRows)` (defaults to row 1) | a header-aware view |
+
+A sheet also carries `Name`, `Index`, `IsHidden`, `RowCount` and `ColumnCount`.
 
 ## The tasks
 
@@ -96,9 +106,9 @@ Values are typed best-effort from the OpenXML cell type and number format. A cel
 
 #### Cells
 
-Every assertion object exposes `Should` (positive) and `ShouldNot` (negated) facades whose polarity is fixed by the property, so a negative failure reads "Expected … not to …" with the same evidence.
+Each assertion object has `Should` and `ShouldNot`. The property fixes the polarity, so a negated failure reads "Expected … not to …" with the same evidence.
 
-| Cell assertion | |
+| Cell assertion | Checks |
 | --- | --- |
 | `Be(expected)` | compares text, number, boolean or date; numbers within `1e-6`, dates within a second; `null` means "holds no text"; an unsupported expected type throws `ArgumentException` |
 | `BeText()` | the cell holds text |
@@ -118,10 +128,13 @@ var table = workbook.Sheet("Sales").Table(1, 2);      // header rows 1 and 2
 var amounts = table.Column("FY26", "Amount");         // full header path
 table.Should.ContainRow("Region", "EMEA");            // one rendered value match
 var emea = table.RowWhere("Region", "EMEA");          // throws when no row matches
-string amount = emea["FY26", "Amount"].Text;          // row indexer by header path
+string region = emea["Region"].Text!;                 // text cell
+double amount = emea["FY26", "Amount"].Number!.Value; // numeric cell
 ```
 
 A column is found by its full header path; a single segment may match by suffix when it is unambiguous. Zero matches and more than one full or suffix match throw `SpreadsheetAssertionException` naming the candidate paths, so ambiguity fails instead of guessing. Header matching is ordinal (case-sensitive), and a single-segment path has no case folding. `ContainRow` compares rendered values, so a numeric or date key cell matches its printed form. A row can also be matched against a shape keyed by leaf header names, for example `table.Rows[0].Should.MatchShape(new { Region = "EMEA", Amount = "1200" })`.
+
+Read a cell without an assertion through its typed accessors. `Text` holds only a text value, so a numeric cell has `Text == null`. The other accessors hold the typed value the OpenXML cell type and number format produced: `Number` (`double?`), `Boolean` (`bool?`), `Date` (`DateTime?`), `Formula` (the formula text, with the cached result in the typed ones), and `IsEmpty` (true when none carries a value). Range and row comparisons render a cell as its text, else its typed value (invariant culture), which is why a numeric cell reads as `1200` there and not through `Text`.
 
 #### Typed models
 
@@ -154,7 +167,10 @@ sales.Row(row => row.Region == "EMEA")
 - A row is matched with the same [shapes](../../foundation/shape-matching.md) as a JSON response: `table.Rows[0].Should.MatchShape(shape)` for a table row and `row.ShouldMatchShape(shape)` for a model row (a record is a user type, so C# cannot give it a `Should` extension property). A model row serializes with its record property names; a table row is keyed by each column's leaf header name with the cell's rendered value (a table whose leaves collide fails instead of guessing). The assertion is a traced `assert.json.shape` operation on the ambient test context with the same expected/actual evidence as a response assertion, and its failure names the row's `Sheet!Range` (or the record type) and keeps the mismatch details as the inner exception.
 
 `table.Rows[0].Should.MatchShape(shape, exact: true)`, or `row.ShouldMatchShape(shape, exact: true)` for a model row, is the exhaustive form: a field present in the row that the shape does not mention is a mismatch naming that field. A value constraint mentions its whole subtree. The [shape matching page](../../foundation/shape-matching.md#exact-matching) has the rules.
-- Records are constructed through their primary constructor, so its guards and normalization run; every constructor parameter must map to a `[Column]`, or the model fails naming the parameter. A class with a parameterless constructor is constructed and its declared `[Column]` properties are set, and a class with only a mapped parameterized constructor is constructed through it. An optional empty cell binds as `null`.
+
+:::note[How records are built]
+Records are constructed through their primary constructor, so its guards and normalization run; every constructor parameter must map to a `[Column]`, or the model fails naming the parameter. A class with a parameterless constructor is constructed and its declared `[Column]` properties are set, and a class with only a mapped parameterized constructor is constructed through it. An optional empty cell binds as `null`.
+:::
 
 #### Key-value sheets
 
@@ -185,6 +201,14 @@ summary.Column(s => s.Total).ShouldNot.Be(0m);
 Hidden sheets are skipped unless `ProtoTest:Sheets:IncludeHiddenSheets` (or the option callback) turns them on. `ProtoSheet.Index` always reflects the position in the workbook including hidden sheets; when they are included, the `sheets.open` trace section marks them with `hidden`.
 
 ## In the trace and coverage
+
+This is the demo's own run:
+
+<TraceExample
+  demo="workbook"
+  title="The monthly report matches its model"
+  path="REST download → workbook model → checks"
+/>
 
 - `sheets.open` (source `ProtoTest.Sheets`) carries `sheets.name` and a Fields section listing every sheet read as `name · {rows}x{columns}[ hidden]`.
 - `sheets.model` carries `sheets.sheet` and `sheets.columns` when a table model is verified, or `sheets.labels` when a key-value model is verified; the operation records whether the sheet matched, and a negated `ShouldNot.MatchModel()` consumes a recorded violation.
@@ -221,6 +245,7 @@ The capability is name `"Sheets"`, kind `document` (`ProtoCapabilityKinds.Docume
 - **`ShouldNot.All` passes when at least one value does not match**, and typed columns read the whole declared range whether or not the test looks at every value.
 - **Coverage is read-based.** A column present in the file but never read is uncovered; hidden sheets are excluded by default. Opening a workbook records `sheets.workbook` evidence but covers nothing.
 - **Integer reads are strict.** A cell read as `int` or `long` must be finite, integral and in range: `1200.75` does not round to `1201`, and `1e20` or a `NaN` cell fails the read with a cell-naming `FormatException` instead of saturating. Read a `double` or `decimal` when a fractional value is data.
+- **A proven failure still shows.** A test that asserts a failure with `Assert.Throws`/`Assert.Catch` is green in the runner, but the failed `assert.sheets` operation it provoked leaves the test **Partial** in the trace. See [ProtoTrace outcomes](../../observability/prototrace.md#what-a-trace-contains).
 - **Header paths are ordinal.** Matching is case-sensitive, and a suffix match is only allowed when exactly one column matches.
 - **`Should.MatchHeaders()` is exact.** The sheet must declare the model's columns in declaration order with no extra column; a declared single-segment path matches the end of a layered path. Header matching reads the header rows, so coverage covers them.
 - **A key-value sheet is one label/value block.** Labels are the non-empty cells of the first column and values the second, so a sheet that uses those columns for anything else cannot be modelled as key-value; a label the model does not declare is ignored, and a duplicated label fails rather than picking a row.

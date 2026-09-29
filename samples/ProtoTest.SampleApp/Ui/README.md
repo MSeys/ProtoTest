@@ -6,7 +6,7 @@ real `/api/v1` API and `/graphql` endpoint (there is no mock layer), and the .NE
 ## Run it
 
 ```bash
-# against a running samples/ProtoTest.SampleApp (http://localhost:60546)
+# against a running samples/ProtoTest.SampleApp (see Properties/launchSettings.json for the port)
 npm install
 npm run dev          # http://localhost:5180/console/, proxies /api, /graphql (ws), /test-support, /health
 npm run build        # type-checks and writes dist/

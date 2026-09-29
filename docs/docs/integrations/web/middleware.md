@@ -6,7 +6,7 @@ description: "Register your application's notion of ready, such as spinners, in-
 
 # Waits and middleware
 
-Real applications have their own notion of "ready": a loading spinner, an in-flight XHR, an animation. Rather than sprinkling `Task.Delay` through tests, register it once.
+Real applications have their own notion of "ready": a loading spinner, an in-flight XHR, an animation. Instead of adding `Task.Delay` calls in tests, register the wait once.
 
 ## Wait conditions
 
@@ -68,7 +68,7 @@ public static IProtoHostBuilder AddWebWait<TCondition>(
 
 With no operations listed, the wait applies to `Navigate`, `Click` and `Fill`. The full list of operation kinds is `Navigate`, `Click`, `Fill`, `Check`, `SelectOption`, `Press`, `Count`, `ReadText`, `ReadValue`, `IsVisible`, `IsEnabled`, `IsChecked`, `Assert` and `Download`. A non-positive timeout or interval throws `ArgumentOutOfRangeException`.
 
-If the condition isn't ready in time, the operation fails with `WebWaitTimeoutException`, including the last observation you returned, so make those messages useful.
+If the condition is not ready in time, the operation fails with `WebWaitTimeoutException`, including the last observation you returned, so make those messages useful.
 
 ### What a condition can check
 
@@ -133,7 +133,7 @@ public sealed class SlowOperationWarning(ILogger<SlowOperationWarning> logger) :
 builder.AddWebMiddleware<SlowOperationWarning>();
 ```
 
-Middleware and wait conditions are resolved from dependency injection, so their constructors can take any registered service. `WebOperationContext` exposes `Execution` (the test's `ProtoExecutionContext`), `Kind`, `Name`, `BackendName`, `SessionName`, `CorrelationId`, `Element` and, after `next` returns, `Result`. The backend operation itself is traced as the child `web.backend.execute`, which is what links the middleware pipeline to the native driver call.
+ProtoTest resolves middleware and wait conditions from dependency injection, so their constructors can take any registered service. `WebOperationContext` exposes `Execution` (the test's `ProtoExecutionContext`), `Kind`, `Name`, `BackendName`, `SessionName`, `CorrelationId` and `Element`. The backend operation itself is traced as the child `web.backend.execute`, which is what links the middleware pipeline to the native driver call.
 
 Middleware nests like ASP.NET Core's: the **first one registered is the outermost**, and the backend call sits in the middle. All wait conditions run inside one built-in middleware, which takes its place in that order at your first `AddWebWait` call.
 

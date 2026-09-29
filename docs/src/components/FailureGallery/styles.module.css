@@ -2,6 +2,14 @@
 
 .headMeta { color: var(--dim); font: var(--text-micro) var(--font-mono); }
 
+/* The legend above the cards: how to read one record row. */
+.legend {
+  margin: 0;
+  padding: var(--space-4) var(--space-4) 0;
+  color: var(--muted);
+  font-size: var(--text-meta);
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));

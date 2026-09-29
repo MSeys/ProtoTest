@@ -115,16 +115,16 @@ From `l0-state-fix.prototrace`:
 
 | Layer | Entry | What it proves |
 | --- | --- | --- |
-| Setup | `data.create` ProvisionTenantRequest, 149.0 ms, then `data.provision`, 143.9 ms | the tenant exists before the body runs, named `northstar-749428000001` in this recording |
+| Setup | `data.create` ProvisionTenantRequest, 149.6 ms, then `data.provision`, 144.6 ms | the tenant exists before the body runs, named `northstar-553135000001` in this recording |
 | Setup | `attribute.before` SignedInAs, then its `auth.user.sign-in` event | the member acts inside that tenant |
-| Execution | `data.create` CreateProjectRequest, 119.5 ms | the project is created under the test's own tenant |
-| Execution | `http.request` REST `GET /api/v1/projects`, 105.1 ms, HTTP 200 | the read the check judged |
-| Teardown | `data.cleanup` TenantResponse, 10.6 ms, and `resource.release` of `data:TenantResponse:1` | the owned state is removed, and the release is recorded |
+| Execution | `data.create` CreateProjectRequest, 100.2 ms | the project is created under the test's own tenant |
+| Execution | `http.request` REST `GET /api/v1/projects`, 72.6 ms, HTTP 200 | the read the check judged |
+| Teardown | `data.cleanup` TenantResponse, 9.0 ms, and `resource.release` of `data:TenantResponse:1` | the owned state is removed, and the release is recorded |
 
 The value list tells the same story: the tenant item records `owned: true`, and the project is a value the test read. One cleanup covers both.
 
 ## What a leak would look like
 
-If the cleanup were missing, the teardown layer would hold no `data.cleanup` and no release for the tenant, and the record would stay in the store. The run prefix changes per run, so the next run would provision a fresh tenant under a new name; the leak would grow the store and would collide the moment a suite fixes its run prefix or points at a shared environment. The trace is where the leak is visible before that happens.
+If the cleanup were missing, the teardown layer would hold no `data.cleanup` and no release for the tenant, and the record would stay in the store. The run prefix changes per run, so the next run provisions a fresh tenant. The leak still grows the store. It collides when a suite fixes its run prefix or points at a shared environment. The trace is where the leak is visible before that happens.
 
 </LearnShell>

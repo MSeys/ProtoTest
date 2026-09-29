@@ -9,7 +9,7 @@ import VisibilityPanel from '@site/src/components/VisibilityPanel';
 
 # Coverage and observations
 
-Code coverage tells you which lines ran. It cannot tell you which **parts of your API** your tests actually checked. An endpoint can be called by a setup helper a thousand times and never have its response asserted once.
+Code coverage tells you which lines ran. It cannot tell you which **parts of your API** your tests actually checked. A setup helper can call an endpoint many times without any test asserting its response.
 
 ProtoTest measures coverage against the *contract*: your OpenAPI document, your GraphQL schema. For REST, it counts a response property as covered only when a shape assertion actually matched it, and gRPC coverage counts the services and methods your calls reached.
 
@@ -33,7 +33,7 @@ flowchart LR
 
 ### What the run could see
 
-Where the observations came from matters as much as the counts. The run screen states where the application ran, which capabilities were composed, and which value sources were present or absent. Absence keeps its place, drawn dashed.
+Where the observations came from matters as much as the counts. The run screen states where the application ran, which capabilities were composed, and which value sources were present or absent. Missing sources still appear in the list, marked as absent.
 
 <VisibilityPanel />
 
@@ -92,20 +92,22 @@ Proto.Context.RecordObservation(
 
 ### Reading the report
 
-The report nests endpoints, responses and properties. A covered item, a partially covered one and a gap read differently, and a property no assertion matched says so:
+The report nests endpoints, responses and properties. Covered items, partial items and gaps look different. A property no assertion matched is marked as unasserted:
 
 <CoverageMap />
 
 Three different gaps, three different fixes:
 
-- **An endpoint was never called**: a feature with no test at all.
-- **A response status was never reached**: the error path is untested. `403` and `404` are the usual suspects.
-- **A property was never asserted**: the test calls the endpoint but does not check that field. Add it to a `Should.MatchShape`.
+| The gap | It reads as | The fix |
+| --- | --- | --- |
+| The endpoint was never called | The whole endpoint is uncovered | Write a test for the feature |
+| A response status was never reached | `403` or `404` is uncovered | Add the error-path test |
+| A property was never asserted | `$.field` says unasserted | Add the path to a `Should.MatchShape` |
 
 The summary at the top of each report gives the total, covered and uncovered counts and a coverage percentage.
 
 :::tip[Coverage rewards shape assertions]
-Property coverage comes from the paths `Should.MatchShape` matched. A test that only checks the status code covers the endpoint and the status, but none of the fields. That is deliberate: a field nobody asserts is a field that can break silently.
+Property coverage comes from the paths `Should.MatchShape` matched. A test that only checks the status code covers the endpoint and the status, but none of the fields. That is deliberate. A field with no assertion can change without failing a test.
 :::
 
 ### Traffic coverage (observed but unasserted)
@@ -129,34 +131,35 @@ Observed fields never count as covered. That is the point. The report's coverage
 
 The rules, so the section is read correctly:
 
-- The comparison is per method, route template and status code. A field any shape mentioned for that same combination counts as asserted for the run.
-- A response no shape touched reports all of its fields. That is the gap the endpoint-level report cannot show.
-- `JsonValue.Any()` and `JsonValue.NotNull()` mention the whole value but not the fields inside it, so those fields appear here.
-- The collector reads the sanitized bodies the trace already carries. A body truncated by the diagnostic cap cannot be analyzed and contributes nothing.
-- A shape assertion made without an execution context records no structured route and cannot claim a field.
+| The rule | What it means for the section |
+| --- | --- |
+| The comparison is per method, route template and status code | A field any shape mentioned for that same combination counts as asserted for the run |
+| A response no shape touched | It reports all of its fields. That is the gap the endpoint-level report cannot show |
+| `JsonValue.Any()` and `JsonValue.NotNull()` | They mention the whole value but not the fields inside it, so those fields appear here |
+| A body truncated by the diagnostic cap | It cannot be analyzed and contributes nothing |
+| A shape assertion made without an execution context | It records no structured route and cannot claim a field |
 
 ## The artifact
 
 Coverage reaches the outside world as **report items**. The [sinks](./reporting.md) receive them once, at the end of the run, and write them into the JSON and HTML reports, which in turn travel inside the `.prototrace` archive. A coverage percentage in CI is the same item tree a run gate reads.
 
-```csharp
-public sealed record ProtoReportItem(
-    string TargetName,
-    string Category,
-    string Identifier,
-    string Kind = ProtoReportItemKinds.Observation,               // observation, coverage, finding, gate, metric, resource, run_metadata, traffic, or your own
-    ProtoReportStatus Status = ProtoReportStatus.Neutral,         // Neutral, Info, Success, Warning, Error
-    int Count = 0,
-    bool? IsCovered = null,
-    double? Value = null,
-    string? Unit = null,
-    string? Message = null,
-    IReadOnlyList<string>? Tags = null,
-    IReadOnlyList<ProtoReportItem>? Children = null,
-    IReadOnlyDictionary<string, object>? Metadata = null,
-    string? DisplayName = null,
-    string? DisplayGroup = null);
-```
+`ProtoReportItem` is one normalized row. The positional order is stable; a positional record is the whole type.
+
+| Field | What it holds | Default |
+| --- | --- | --- |
+| `TargetName` | the registered target, e.g. `Api`, or `Northstar:Api` under an application | required |
+| `Category` | what kind of surface the row is about, e.g. `OpenAPI` | required |
+| `Identifier` | the specific unit, e.g. `GET /api/v1/orders` | required |
+| `Kind` | `observation`, `coverage`, `finding`, `gate`, `metric`, `resource`, `run_metadata`, `traffic`, or your own | `observation` |
+| `Status` | `Neutral`, `Info`, `Success`, `Warning`, `Error` | `Neutral` |
+| `Count` | the hit count | `0` |
+| `IsCovered` | the covered verdict, or `null` for an aggregate row | `null` |
+| `Value`, `Unit` | a metric's value and unit | `null` |
+| `Message` | a finding's or gate's text | `null` |
+| `Tags` | the row's tags | `null` |
+| `Children` | the nested rows, such as an endpoint's responses and properties | `null` |
+| `Metadata` | anything the collector wants to carry | `null` |
+| `DisplayName`, `DisplayGroup` | how a sink should label and group the row | `null` |
 
 Items nest through `Children`. The kinds cover more than coverage: a `Metric` with a `Value` and `Unit`, or a `Finding` with a `Warning` status and a `Message`, show up in the same reports. A kind is an open string, so an integration can define its own. The built-in ones are named by `ProtoReportItemKinds`, and the HTML report keeps the kinds in their own sections (coverage, traffic, findings, run gates, resources, run metadata). An unknown kind gets its own section titled after it, so a passed gate is never read as a finding.
 

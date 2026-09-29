@@ -37,32 +37,32 @@ interface Phase {
 }
 
 const mismatches = [
-  {property: 'projectCount', expected: '99', actual: '0'},
-  {property: 'planId', expected: '"nonexistent-plan"', actual: '"free"'},
+  {property: 'status', expected: '"past_due"', actual: '"active"'},
 ];
 
 const phases: Phase[] = [
   {
     name: 'Setup',
     marker: '--phase-setup',
-    duration: '15 ms',
+    duration: '658 ms',
     rows: [
-      {chip: 'Framework', tone: '--type-extension', title: '2 extensions', facts: 'SqlConnectionHook, NorthstarTenantAttribute', duration: '644 µs', folded: true},
-      {chip: 'Extension', tone: '--type-extension', title: 'Before · NorthstarTenantAttribute', facts: 'context set', duration: '13 ms'},
-      {chip: 'Data', tone: '--type-data', title: 'Provision · ProvisionTenantRequest → TenantResponse', duration: '13 ms', depth: 1},
+      {chip: 'Framework', tone: '--type-extension', title: '2 extensions', facts: 'ProtoClientInitializerHook, ProtoClientCompletionHook', duration: '349 ms', folded: true},
+      {chip: 'Extension', tone: '--type-extension', title: 'Before · NorthstarTenantAttribute', duration: '158 ms'},
+      {chip: 'Data', tone: '--type-data', title: 'Provision · ProvisionTenantRequest → TenantResponse', duration: '150 ms', depth: 1},
     ],
   },
   {
     name: 'Execution',
     marker: '--phase-execution',
-    duration: '20 ms',
+    duration: '1.30 s',
     failed: true,
     rows: [
+      {chip: 'Data', tone: '--type-data', title: 'Create · IssueInvoiceRequest', duration: '283 ms'},
       {
         chip: 'Call',
         tone: '--type-call',
         title: 'REST · GET /api/v1/organization',
-        duration: '15 ms',
+        duration: '6.8 ms',
         failed: true,
         checks: [
           {label: 'status · 200 OK', passed: true},
@@ -74,11 +74,10 @@ const phases: Phase[] = [
   {
     name: 'Teardown',
     marker: '--phase-teardown',
-    duration: '11 ms',
+    duration: '6.8 ms',
     rows: [
-      {chip: 'Context', tone: '--type-context', title: 'Dispose execution context', duration: '7.5 ms'},
-      {chip: 'Data', tone: '--type-data', title: 'Cleanup · TenantResponse', duration: '6.8 ms', depth: 1},
-      {chip: 'Framework', tone: '--type-extension', title: '3 framework steps', duration: '25 µs', folded: true},
+      {chip: 'Framework', tone: '--type-extension', title: '13 framework steps', duration: '1.4 ms', folded: true},
+      {chip: 'Context', tone: '--type-context', title: 'Dispose execution context', duration: '4.5 ms'},
     ],
   },
 ];
@@ -115,15 +114,15 @@ export default function StoryView(): ReactNode {
   return (
     <div className={styles.story}>
       <header className={styles.testHead}>
-        <span className={styles.testNumber}>36</span>
+        <span className={styles.testNumber}>01</span>
         <span className={styles.testName}>
-          The organization reports its plan and project count
-          <small>Diagnostics showcase · TheOrganizationReportsItsPlanAndProjectCount</small>
+          A real wait does not close the due window
+          <small>Failure drills · ARealWaitDoesNotCloseTheDueWindow</small>
         </span>
         <span className={styles.outcome}>
           <i className={styles.outcomeDot} />
           Failed
-          <em>47 ms</em>
+          <em>1.97 s</em>
         </span>
       </header>
 
@@ -133,7 +132,7 @@ export default function StoryView(): ReactNode {
             Check
           </span>
           <strong>Assert response shape</strong>
-          <span className={styles.verdict}>2 mismatches</span>
+          <span className={styles.verdict}>1 mismatch</span>
           <span className={styles.on}>on REST · GET /api/v1/organization</span>
         </div>
         <div className={styles.shape}>

@@ -46,6 +46,94 @@ public sealed class MqttRegistrationTests
     }
 
     [Test]
+    public async Task AddMqttClient_WithoutABrokerAddress_ShouldDropTheDeviceCapabilities()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddDevices(devices => devices
+            .AddMqttClient("Sensors", "sensors/{deviceId}/out", "sensors/{deviceId}/in")
+                .AddDevice<PingDevice>());
+        await using var host = builder.Build();
+        await host.StartAsync();
+
+        var skipped = host.Trace.Snapshot().Entries!.Single(entry =>
+            entry.Kind == "capability.skipped"
+            && entry.Attributes["capability.kind"] == ProtoCapabilityKinds.Device
+            && entry.Attributes["capability.name"] == nameof(PingDevice));
+        await host.StopAsync();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                host.HasCapability(ProtoCapabilityKinds.Device, nameof(PingDevice)),
+                Is.False,
+                "no key can provide the broker, so [RequiresDevice] skips instead of failing at device creation");
+            Assert.That(
+                host.HasCapability(ProtoCapabilityKinds.Device, MqttDeviceTransport.TransportName),
+                Is.False,
+                "the transport capability follows the client's missing address");
+            Assert.That(skipped.Attributes["capability.keys"], Does.Contain(MqttDeviceOptions.BrokerSetting));
+            Assert.That(skipped.Attributes["capability.reason"], Is.EqualTo("no key provided"));
+        }
+    }
+
+    [Test]
+    public async Task AddMqttClient_WhenTheBrokerSettingIsConfigured_ShouldKeepTheDeviceCapabilities()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                [MqttDeviceOptions.BrokerSetting] = "mqtt://127.0.0.1:1883"
+            }));
+        builder.AddDevices(devices => devices
+            .AddMqttClient("Sensors", "sensors/{deviceId}/out", "sensors/{deviceId}/in")
+                .AddDevice<PingDevice>());
+        await using var host = builder.Build();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(host.HasCapability(ProtoCapabilityKinds.Device, nameof(PingDevice)), Is.True);
+            Assert.That(host.HasCapability(ProtoCapabilityKinds.Device, MqttDeviceTransport.TransportName), Is.True);
+        }
+    }
+
+    [Test]
+    public async Task AddMqttClient_WhenInfrastructureDeclaresTheBroker_ShouldKeepTheDeviceCapabilities()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddInfrastructure(
+            "Mqtt",
+            chain => chain
+                .UseConfigured()
+                .Use(new ProtoTargetProvider(
+                    "settings",
+                    new DeclaredSettingsInfrastructure("settings:mqtt", MqttDeviceOptions.BrokerSetting, "mqtt://127.0.0.1:1883"))),
+            MqttDeviceOptions.BrokerSetting);
+        builder.AddDevices(devices => devices
+            .AddMqttClient("Sensors", "sensors/{deviceId}/out", "sensors/{deviceId}/in")
+                .AddDevice<PingDevice>());
+        await using var host = builder.Build();
+
+        Assert.That(
+            host.HasCapability(ProtoCapabilityKinds.Device, nameof(PingDevice)),
+            Is.True,
+            "a registered piece that declares the broker key counts before it starts, like every provided capability");
+    }
+
+    [Test]
+    public void WithAddressKeys_WithoutAKey_ShouldThrow()
+    {
+        var builder = new ProtoHostBuilder();
+        var exception = Assert.Throws<ArgumentException>(() => builder.AddDevices(devices => devices
+            .AddClient("Sensors", "Memory", resolveAddress: (_, _) => "memory://devices")
+                .WithAddressKeys(" ")));
+
+        Assert.That(exception!.Message, Does.Contain("at least one configuration key"));
+    }
+
+    [Test]
     public async Task AddMqttClient_WithoutABrokerAddress_ShouldFailNamingTheSetting()
     {
         var builder = new ProtoHostBuilder();

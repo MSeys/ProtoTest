@@ -56,7 +56,7 @@ pwsh eng/release.ps1 -Configuration Release -DryRun
 ```
 
 `-Full` is the CI shape (lint, full test suite, docs) and `-Pack` validates every package against
-the baseline: `eng/pack.ps1` packs all 35 packages and checks the shared version, READMEs,
+the baseline: `eng/pack.ps1` packs all 44 packages and checks the shared version, READMEs,
 dependency edges, symbol pairs and package validation. `release.ps1 -DryRun` prints the
 dependency-ordered push plan from the packed folder without touching NuGet.
 
@@ -85,10 +85,14 @@ had no baseline now have one. After `x.y.z` is on nuget.org:
 
 1. Set `<PackageValidationBaselineVersion>` in `Directory.Build.targets` to `x.y.z`.
 2. Remove `EnablePackageValidation=false` and `PackageValidationOptOutReason` from every package
-   that now has a released baseline. Today that is `ProtoTest.Hosting`, `ProtoTest.Devices`,
+   that now has a released baseline. Today that is 17 packages: `ProtoTest.Hosting`,
+   `ProtoTest.Devices`, `ProtoTest.Devices.Mqtt`, `ProtoTest.Devices.Mqtt.Testcontainers`,
    `ProtoTest.Devices.WebSocket`, `ProtoTest.Devices.WebSocket.AspNetCore`, `ProtoTest.Web.Pages`,
-   `ProtoTest.Traces` and `ProtoTest.Cli`. `eng/pack.ps1` fails a packable project that disables
-   package validation without a reason, so the opt-outs cannot silently outlive their rollover.
+   `ProtoTest.Traces`, `ProtoTest.Cli`, `ProtoTest.Analyzers`, `ProtoTest.Aspire`,
+   `ProtoTest.Diagnosis`, `ProtoTest.Feedback`, `ProtoTest.Mcp`, `ProtoTest.Messaging.MassTransit`,
+   `ProtoTest.Verification` and `ProtoTest.WireMock`. `eng/pack.ps1` fails a packable project that
+   disables package validation without a reason, so the opt-outs cannot silently outlive their
+   rollover.
 3. Regenerate the `CompatibilitySuppressions.xml` files against the new baseline
    (`dotnet pack <project> -p:GenerateCompatibilitySuppressionFile=true`) and delete the entries the
    new baseline no longer reports; the old 1.0.1 suppressions describe removals the release already
@@ -99,9 +103,27 @@ had no baseline now have one. After `x.y.z` is on nuget.org:
 ## 6. Documentation at release
 
 The site documents the current release only: no versioned snapshot is cut, so there is no
-`docs:version` step and no `versions.json` to update. Update the announcement bar's `content` in
-`docs/docusaurus.config.ts` for the new release, run `npm run build` from `docs/`, and let the docs
-workflow publish the site. The API reference workflow builds from the same source.
+`docs:version` step and no `versions.json` to update. Deploy the site **after** the packages publish
+(step 4), because the site's release wording describes the published packages.
+
+Bring the public default branch to the released commit first, so the docs links that target `main`
+(the skills bundle, the sample journeys, the Analyzers README) resolve. Then:
+
+1. Update the announcement bar's `content` in `docs/docusaurus.config.ts` for the new release.
+2. Build the complete site from the repository root:
+
+   ```powershell
+   pwsh eng/build-docs-site.ps1
+   ```
+
+   The script runs `npm run build` in `docs/`, builds the API reference with
+   `eng/build-api-reference.ps1`, and copies it into `docs/build/api`, so the site's `/api` links
+   resolve.
+3. Upload the contents of `docs/build` (Docusaurus plus `/api`) to Cloudflare Pages.
+
+No workflow publishes the site or the API reference. `docs-quality.yml` builds the docs and runs the
+Lighthouse gate on pull requests, and `api-reference.yml` builds the reference and uploads it as a CI
+artifact; its push trigger runs on `main` only. Both are checks for a maintainer to read, not deploys.
 
 ## Checklist
 
@@ -112,5 +134,6 @@ workflow publish the site. The API reference workflow builds from the same sourc
 - [ ] `eng/verify.ps1 -Stage release-<version> -Full -Pack` is green.
 - [ ] `eng/release.ps1 -DryRun` prints the package plan without errors.
 - [ ] Tag `v<version>` pushed; `release.yml` published the packages and the GitHub Release.
+- [ ] Public default branch brought to the released commit; the `main` links resolve.
 - [ ] Baseline rollover done; opt-out reasons gone; next branch version bumped.
-- [ ] Announcement bar updated for the release; `npm run build` in `docs/` green.
+- [ ] Announcement bar updated; `eng/build-docs-site.ps1` built `docs/build` with `/api`; the folder uploaded to Cloudflare Pages.

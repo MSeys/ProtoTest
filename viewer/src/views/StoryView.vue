@@ -8,11 +8,15 @@ import StoryRow from "../ui/StoryRow.vue";
 import OutcomePill from "../ui/OutcomePill.vue";
 import EmptyState from "../ui/EmptyState.vue";
 import Panel from "../ui/Panel.vue";
+import LooseEvents from "../ui/LooseEvents.vue";
+import { looseEvents } from "../ui/looseEvents";
 
 const props = defineProps<{ test: TestTrace; selected?: string }>();
 const emit = defineEmits<{ select: [span: Span] }>();
 
 const phases = computed(() => story(props.test));
+const loose = computed(() => looseEvents(props.test));
+const hasLoose = computed(() => loose.value.length > 0);
 const open = ref(new Set<string>());
 const root = ref<HTMLElement>();
 
@@ -66,7 +70,8 @@ function toggle(id: string) {
         <p v-if="!phase.rows.length" class="quiet">Nothing ran in this phase.</p>
       </div>
     </Panel>
-    <EmptyState v-if="!phases.length" message="This test recorded no operations." />
+    <EmptyState v-if="!phases.length && !hasLoose" message="This test recorded no operations." />
+    <LooseEvents :test="test" />
   </div>
 </template>
 

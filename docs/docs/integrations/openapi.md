@@ -20,7 +20,7 @@ This package reports coverage. It doesn't validate requests or responses against
 dotnet add package ProtoTest.OpenApi
 ```
 
-ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `-f` is passed. The package resolves its document with `Microsoft.OpenApi.Readers` and depends on `ProtoTest.Rest`.
+ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `-f` is passed. The package resolves its document with `Microsoft.OpenApi` (plus `Microsoft.OpenApi.YamlReader` for YAML) and depends on `ProtoTest.Rest`.
 
 ## Compose
 
@@ -46,7 +46,7 @@ builder
 
 `ProtoTest:Applications:{application}:OpenApi:Specification` may be a local file path, the document itself as JSON or YAML, or an http(s) URL. A relative URL is resolved against the application's `ProtoTest:Applications:{application}:BaseUrl`, which is handy for pointing at `/swagger/v1/swagger.json` on a deployed API. A document that fails to parse throws with the parser's diagnostics.
 
-The application is the one the REST client belongs to: `ProtoTest:Applications:{scope}:Application` maps a client target to an application, falling back to the target name. If the key is missing or blank, the collector fails when it is constructed:
+The application is the one the REST client belongs to: a client registered inside `AddApplication("Api", …)` resolves its specification under `ProtoTest:Applications:Api`, and a host-registered client uses its own target name as the application. If the key is missing or blank, the collector fails when it is constructed:
 
 ```
 Application 'Api' has no 'OpenApi:Specification' configured. Set 'ProtoTest:Applications:Api:OpenApi:Specification'.
@@ -73,7 +73,6 @@ rest.AddClient("Api")
 | --- | --- | --- |
 | `ProtoTest:Applications:{application}:OpenApi:Specification` | `string` | required; blank throws when the collector is constructed |
 | `ProtoTest:Applications:{application}:BaseUrl` | `string?` | optional; used to resolve a relative specification URL only |
-| `ProtoTest:Applications:{scope}:Application` | `string?` | optional; maps a REST client target to an application, defaulting to the target name |
 
 There is no options class and no dedicated options section.
 
@@ -151,7 +150,7 @@ The package has no capability descriptor and no package-specific attributes. `[R
 - **Unknown constraints are assumed to match.** Only the listed constraint names are enforced.
 - **No base-path rewriting or authentication**, and no refetch on retry. The loader reads the source once.
 - **The specification identity row is not coverage.** One aggregate item per target records `spec.source` and `spec.hash`; it carries no verdict, so no total or gate changes because of it.
-- **Spec-version support is whatever `Microsoft.OpenApi.Readers` 1.6.31 parses.**
+- **Spec-version support is whatever `Microsoft.OpenApi` 3.10.2 parses, JSON or YAML.**
 
 ## Links
 

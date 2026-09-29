@@ -13,6 +13,10 @@ Most ProtoTest options can be set in code, in configuration files, or both. One 
 The host starts with an empty configuration. Add whatever sources you use:
 
 ```csharp
+// dotnet add package Microsoft.Extensions.Configuration.Json
+// dotnet add package Microsoft.Extensions.Configuration.EnvironmentVariables
+using Microsoft.Extensions.Configuration;
+
 builder.ConfigureAppConfiguration(configuration => configuration
     .AddJsonFile("appsettings.Test.json", optional: true)
     .AddEnvironmentVariables());

@@ -149,7 +149,7 @@ public sealed class ViewerTests
 
 ## In the trace and coverage
 
-Queries and mutations record a `graphql.operation` operation (`GraphQL · {type} {name}`) under the protocol-scoped client entity (`client:HttpClient:GraphQL:{target}`), with a `graphql.endpoint.resolve` child, the operation type and name, header count, response status and error count; assertions record `assert.http.status`, `assert.graphql.*` and `assert.json.shape` as children. Deserialization records `graphql.response.deserialize`. Observations: `graphql.response` for every response, `graphql.failure` when sending fails, and `graphql.contract.shape` when a shape assertion matches. Subscriptions add `graphql.subscription.start|next|complete` events.
+Queries and mutations record a `graphql.operation` operation (`GraphQL · {type} {name}`) under the protocol-scoped client entity (`client:System.Net.Http.HttpClient:GraphQL:{target}`), with a `graphql.endpoint.resolve` child, the operation type and name, header count, response status and error count; assertions record `assert.http.status`, `assert.graphql.*` and `assert.json.shape` as children. Deserialization records `graphql.response.deserialize`. Observations: `graphql.response` for every response, `graphql.failure` when sending fails, and `graphql.contract.shape` when a shape assertion matches. Subscriptions add `graphql.subscription.start|next|complete` events.
 
 `GraphQLCoverageCollector` reports operation-level hits; `GraphQLSchemaCoverageCollector` walks the SDL. See [Schema coverage](./coverage.md) and [Coverage](../../observability/coverage.md).
 
@@ -171,6 +171,7 @@ Queries and mutations record a `graphql.operation` operation (`GraphQL · {type}
 
 ## Next
 
+- [Your first GraphQL suite](./first-suite.md) - the end-to-end page, from an empty project to a subscription.
 - [Queries and mutations](./operations.md) - shape-driven operations, variables, the fluent builder and uploads.
 - [Responses](./responses.md) - errors, data and assertions.
 - [Subscriptions](./subscriptions.md) - streaming results over WebSocket or SSE.

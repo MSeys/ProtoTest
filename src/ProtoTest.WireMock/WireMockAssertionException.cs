@@ -1,7 +1,11 @@
 namespace ProtoTest.WireMock;
 
-/// <summary>Thrown when a WireMock fake assertion fails, naming the fake and the requests behind it.</summary>
-public sealed class WireMockAssertionException : Exception
+using ProtoTest.Core;
+
+/// <summary>Thrown when a WireMock fake assertion fails, naming the fake and the requests behind it.
+/// Derives from <see cref="ProtoAssertionException"/>, so a protocol assertion failure is catchable
+/// as the shared type.</summary>
+public sealed class WireMockAssertionException : ProtoAssertionException
 {
     public WireMockAssertionException(string message)
         : base(message)

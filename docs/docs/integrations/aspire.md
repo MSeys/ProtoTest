@@ -30,6 +30,8 @@ builder
 
 The order is the start order: register containers and other pieces first when the AppHost needs them, and register the readiness probe after the AppHost: probes are awaited at their registration position, so a probe registered first resolves nothing. The AppHost **serves only when selected**: `ProtoTest:Aspire:Enabled` (or a resource's own `ProtoTest:Aspire:Resources:{resource}:Enabled`) starts it, and without either key it never starts and the suite resolves its targets elsewhere. A run that configures every declared resource's `ProtoTest:Applications:{resource}:BaseUrl` satisfies all the keys the AppHost would fill, so the AppHost never starts even when selected and the same suite runs against that environment. When only some are configured, the AppHost still starts for the rest and publishes only the selected keys configuration does not already fill, so a configured address is never masked by the started AppHost.
 
+Setting the selection keys in a shell is not enough on its own: the host starts with an empty configuration, so `ProtoTest__Aspire__Enabled=true` reaches it only when the suite added `.AddEnvironmentVariables()` (or the runner supplied its own sources). A key that never arrives reads as unset and the AppHost stays off even though the shell shows it set; see [Adding configuration sources](../getting-started/configuration.md#adding-configuration-sources).
+
 `TEntryPoint` is any public type in the AppHost assembly; the testing host runs the assembly's entry point in-process. A top-level `Program` is internal, so expose an anchor:
 
 ```csharp
@@ -53,7 +55,7 @@ chain wins over it, and a target it serves needs no plain registration.
 ```csharp
 builder
     .AddAspireAppHost<OpenCsmsAppHostAnchor>(options => options
-        .MapConnectionString("postgres", "ConnectionStrings:Csms"),
+        .MapConnectionString("opencsms", "ConnectionStrings:Csms"),
         "api")
     .AddApplication("Csms", app => app
         .UseConfigured()
@@ -61,7 +63,7 @@ builder
         .UseInProcess<CsmsApi>())
     .AddInfrastructure("CsmsDatabase", piece => piece
         .UseConfigured()
-        .UseAspireResource<OpenCsmsAppHostAnchor>("postgres")
+        .UseAspireResource<OpenCsmsAppHostAnchor>("opencsms")
         .UseContainer(PostgresDatabase.Container()),
         "ConnectionStrings:Csms");
 ```
@@ -136,6 +138,8 @@ builder.AddAspireAppHost<TestAppHostAnchor>(
 | `ProtoTest:Applications:{resource}:BaseUrl` | string | unset → the AppHost publishes it | set it to point the suite at a deployed topology instead of starting the AppHost; a configured key wins over the started AppHost's address for that resource |
 
 `MapResource` publishes the resource under a different application name; `UseEndpoint` reads a non-default endpoint of the resource (the default is `http`); `MapConnectionString` publishes a resource's connection string under a target's key instead of an address; `Set` passes a setting to the AppHost as a command-line argument on top of the run's configuration and the settings earlier infrastructure published; the AppHost otherwise reads its own sources. Two resources cannot share one application name.
+
+`UseEndpoint` chooses among the endpoints the AppHost declares, and the default is the resource's `http` endpoint. A project resource with no `http` endpoint (no `WithHttpEndpoint`, and no `applicationUrl` in a launch profile) fails the start with *"Aspire resource 'api' has no 'http' endpoint"*; declare the endpoint in the AppHost, or point `UseEndpoint` at the one the resource exposes.
 
 ## Context API
 

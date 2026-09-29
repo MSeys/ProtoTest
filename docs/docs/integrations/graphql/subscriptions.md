@@ -28,25 +28,37 @@ public async Task SubscriptionStreamsShapeMatchedEvents()
         .Select(expected)
         .SubscribeAsync();
 
-    using var created = await Proto.Context.GraphQL()
-        .Mutation("createOrder", new
-        {
-            input = Gql.Variable("CreateOrderInput!", new CreateOrderRequest("live-notebook", 1, 15m))
-        })
-        .Select(new { id = Gql.Field })
-        .ExecuteAsync();
-    created.Should.HaveNoErrors();
-
-    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+    // The server acknowledges the connection, not the subscription, so trigger until the event
+    // lands; the bounded read below is what waits.
+    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+    var triggers = TriggerAsync(timeout.Token);
     using var notification = await subscription.ExpectNextAsync(expected, timeout.Token);
+    timeout.Cancel();
+    await triggers;
+
     notification.Should.HaveNoErrors();
+}
+
+private static async Task TriggerAsync(CancellationToken cancellationToken)
+{
+    while (!cancellationToken.IsCancellationRequested)
+    {
+        using var created = await Proto.Context.GraphQL()
+            .Mutation("createOrder", new
+            {
+                input = Gql.Variable("CreateOrderInput!", new CreateOrderRequest("live-notebook", 1, 15m))
+            })
+            .Select(new { id = Gql.Field })
+            .ExecuteAsync();
+        created.Should.HaveNoErrors();
+    }
 }
 ```
 
 The same `expected` object builds the subscription's selection set and asserts the event that arrives.
 
-:::tip[Give the server a moment]
-`SubscribeAsync()` returns once the server acknowledges the **connection**, not the individual subscription. If you trigger the event immediately afterwards, a fast server can publish it before it has registered the subscriber. The sample suite waits briefly (`await Task.Delay(100)`) before firing the mutation; `PlatformJourney` starts the read first and publishes until it lands.
+:::caution[Subscription registration has no acknowledgement]
+`SubscribeAsync()` returns once the server acknowledges the **connection**, not the individual subscription. If you trigger the event immediately afterwards, a fast server can publish it before it has registered the subscriber, and the event is lost. `graphql-transport-ws` has no per-subscription acknowledgement, so there is no signal to wait for, and a fixed `Task.Delay` only narrows the window. The example above triggers until the event lands: the trigger loop runs on the test's own flow, the bounded `ExpectNextAsync` is the wait, and cancelling the token ends the loop. Every trigger produces an event and the test consumes the first, so a duplicate landing after that is harmless.
 :::
 
 ## `GraphQLSubscription`

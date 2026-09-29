@@ -110,6 +110,28 @@ Task<AsyncDuplexStreamingCall<TRequest, TResponse>> OpenDuplexStreamingAsync<TRe
 
 `ServerStreaming` and `DuplexStreaming` block the calling thread while authenticators and the channel are prepared; prefer the `Open*Async` variants on a synchronizing runner. The raw helpers apply the test's `[Auth]` metadata but are untraced and uncaptured.
 
+#### Method descriptors
+
+The call helpers take a `Method<TRequest, TResponse>`; the generated client classes do not expose one per method, so keep the suite's call descriptors in one holder and use it everywhere:
+
+```csharp
+public static class OrdersMethods
+{
+    private static readonly Marshaller<GetOrderRequest> RequestMarshaller = Marshallers.Create<GetOrderRequest>(
+        (request, context) => context.Complete(request.ToByteArray()),
+        context => GetOrderRequest.Parser.ParseFrom(context.PayloadAsNewBuffer()));
+
+    private static readonly Marshaller<GetOrderReply> ReplyMarshaller = Marshallers.Create<GetOrderReply>(
+        (reply, context) => context.Complete(reply.ToByteArray()),
+        context => GetOrderReply.Parser.ParseFrom(context.PayloadAsNewBuffer()));
+
+    public static readonly Method<GetOrderRequest, GetOrderReply> GetOrder =
+        new(MethodType.Unary, "billing.Orders", "GetOrder", RequestMarshaller, ReplyMarshaller);
+}
+```
+
+The `MethodType` is `Unary`, `ServerStreaming`, `ClientStreaming` or `DuplexStreaming`, and the service name is the proto's fully qualified one (`package.Service`), so the descriptor addresses the same route the generated client uses.
+
 #### Assertions
 
 A reply is a protobuf message, and `Should.MatchShape` matches it with the same [shapes](../../foundation/shape-matching.md) as REST and GraphQL. C# has no extension properties, so a message reaches its facade through the factory; `MatchShape` returns the reply:
@@ -137,7 +159,7 @@ public static ProtoGrpcExceptionAssertions For(RpcException exception);
 ```csharp
 try
 {
-    await Proto.Context.Grpc().UnaryAsync(Orders.GetOrder, new GetOrderRequest { Id = 404 });
+    await Proto.Context.Grpc().UnaryAsync(OrdersMethods.GetOrder, new GetOrderRequest { Id = 404 });
     Assert.Fail("Expected the call to fail.");
 }
 catch (RpcException exception)
@@ -158,8 +180,9 @@ public sealed class OrderTests
     [ProtoTest]
     public async Task GetOrder()
     {
+        // OrdersMethods is the descriptor holder from "Method descriptors" above.
         var reply = await Proto.Context.Grpc().UnaryAsync(
-            Orders.GetOrder,
+            OrdersMethods.GetOrder,
             new GetOrderRequest { Id = 42 });
 
         ProtoGrpcAssertions.For(reply).Should.MatchShape(new { id = 42, status = "PENDING" });
@@ -235,6 +258,7 @@ The client is state, not history: it appears once with `client.name`, `client.pr
 
 ## Limits
 
+- **A missed deadline reports the transport's abort in-process.** A socket endpoint reports `DeadlineExceeded` (4) when a call overruns its deadline, but the in-process transport can surface the server's abort status (`Unknown` or `Internal`) when the deadline passes mid-call, because the canceled exchange reaches the client as a failed response rather than a deadline decision. Assert `Should.HaveStatus(StatusCode.DeadlineExceeded)` against socket endpoints only, or accept either status when the same suite runs against both.
 - **Streaming capture is capped.** Only the first 10 messages of a client- or server-streaming call are attached; the cap is a private constant and not configurable.
 - **Raw helpers are untraced and uncaptured.** `ServerStreaming`, `DuplexStreaming`, `OpenServerStreamingAsync` and `OpenDuplexStreamingAsync` return the call for you to drive; only `[Auth]` metadata is applied. Every call - traced or raw - resolves a fresh authenticator from the test's factory, so a stateful authenticator is never shared between calls; keep raw calls to cases the traced helpers cannot express.
 - **Address-dependent authenticators stay HTTP-only.** An authenticator that needs the request URI - `ApiKeyAuthenticator` with `ApiKeyLocation.Query` - fails when a gRPC call applies it, because metadata has no URI; use a header-location key or `GrpcClientOptions.ConfigureMetadata` for gRPC.

@@ -33,10 +33,10 @@ builder.AddMessaging(messaging => messaging.UseMassTransit<Program>()); // the a
 IProtoHostBuilder AddMessaging(this IProtoHostBuilder builder, Action<ProtoMessagingBuilder>? configure = null);
 
 ProtoMessagingBuilder UseBroker(this ProtoMessagingBuilder messaging,
-    Func<IServiceProvider, IProtoMessageBroker> factory);
-
-ProtoMessagingBuilder UseBrokerUnlessConfigured(this ProtoMessagingBuilder messaging,
     Func<IServiceProvider, IProtoMessageBroker> factory, params string[] addressKeys);
+
+ProtoMessagingBuilder UseBrokerWhenInProcess(this ProtoMessagingBuilder messaging,
+    Func<IServiceProvider, IProtoMessageBroker> factory, string application, params string[] configuredKeys);
 
 ProtoMessagingBuilder CaptureAttachments(this ProtoMessagingBuilder messaging,
     Action<MessagingAttachmentOptions>? configure = null);
@@ -54,7 +54,7 @@ ProtoMessagingBuilder UseMassTransit<TProgram>(this ProtoMessagingBuilder messag
     string application = "Default");
 ```
 
-`UseBroker` is the adapter seam; `UseRabbitMq` and `UseMassTransit` are the built-in implementations of it. `UseBroker` declares the `Broker` capability only while at least one of its `addressKeys` can provide an address, while `UseBrokerUnlessConfigured` declares it only while none is configured. That is the in-process direction the MassTransit bridge needs, because a configured `BaseUrl` means the application runs published with no test harness here. `Tap` declares the destinations this suite awaits, in code, so an adapter can bind each test's tap during setup. See [Destinations](#destinations). `Declare` declares the destinations this suite owns, in code, so an adapter creates them during setup before any tap binds. See [Suite-owned topology](#suite-owned-topology). `AddMessaging` registers the options, the `ProtoMessageClient` initializer for every test, the run-scoped `messaging:broker` resource, and, only when an adapter is configured, the `Messaging` capability with kind `broker`.
+`UseBroker` is the adapter seam; `UseRabbitMq` and `UseMassTransit` are the built-in implementations of it. `UseBroker` declares the `Broker` capability only while at least one of its `addressKeys` can provide an address. `UseBrokerWhenInProcess` declares it only while the named application is served in-process, which is the direction the MassTransit bridge needs: the application's provider chain winner decides, so a loopback, container or AppHost application drops the capability, and a host whose application declares no chain keeps the configured-keys rule (a configured `BaseUrl` means the application runs published with no test harness here). `Tap` declares the destinations this suite awaits, in code, so an adapter can bind each test's tap during setup. See [Destinations](#destinations). `Declare` declares the destinations this suite owns, in code, so an adapter creates them during setup before any tap binds. See [Suite-owned topology](#suite-owned-topology). `AddMessaging` registers the options, the `ProtoMessageClient` initializer for every test, the run-scoped `messaging:broker` resource, and, only when an adapter is configured, the `Messaging` capability with kind `broker`.
 
 A repeated `AddMessaging` is not a no-op: its `configure` callback always runs, so a later call can add an adapter to an adapter-less first call or extend attachment options. Infrastructure stays idempotent: one options object, one broker holder, one initializer, one capability and one run resource. The first adapter configured wins. A call whose `configure` throws leaves no guard behind, so a later successful call still composes.
 

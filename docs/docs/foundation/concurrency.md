@@ -29,7 +29,12 @@ Recorded 2026-09-24 on a 16-core developer machine against a suite with Postgres
 | 32 | 53 passed, 6 skipped | 8 s |
 | 64 | 1 failed, then passed on rerun | 21 s |
 
-The suite was stable up to roughly twice the core count. At four times the cores the run oversubscribed and produced one non-reproducible failure, and the single trace file per run overwrote that failure's evidence before it could be read.
+The suite was stable up to roughly twice the core count. At four times the cores the run oversubscribed and produced one failure that never reproduced. Its evidence was lost to a harness limitation: the suite writes a single trace file per run, so the passing rerun overwrote the failed run's trace before it could be read. There is no framework finding behind that row, only an unreadable artifact.
+
+Re-run 2026-09-29 on a 16-core machine (`dotnet test -- NUnit.NumberOfTestWorkers=64`):
+
+- `tests/ProtoTest.Core.Tests`: 380 passed, three runs, about 4 s each.
+- `samples/Northstar.ProtoTest` with container Postgres, container RabbitMQ and a headless Chromium journey: 15 passed, 4 skipped, two runs (6 s and 2 s).
 
 Beyond this range, expect resource pressure rather than a ProtoTest-specific limit: port and container exhaustion, browser memory, and contention on run-scoped infrastructure.
 

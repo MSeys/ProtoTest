@@ -14,6 +14,16 @@ description: "Compare what your REST tests did against your OpenAPI document, an
 This package reports coverage. It doesn't validate requests or responses against the schema.
 :::
 
+```
+OpenAPI              GET /api/orders/{id}      12 hits
+└ OpenAPI Response      200                     12 hits
+  └ OpenAPI Property     id                      12 hits
+  └ OpenAPI Property     lines › item › total     0 hits
+└ OpenAPI Response      404                      0 hits
+```
+
+One glance tells the deliverable: the uncovered rows. Receiving without asserting does not count; only `MatchShape` counts. The full annotated tree is under [What the report contains](#what-the-report-contains).
+
 ## Install
 
 ```bash
@@ -44,7 +54,13 @@ builder
 
 ### The specification source
 
-`ProtoTest:Applications:{application}:OpenApi:Specification` may be a local file path, the document itself as JSON or YAML, or an http(s) URL. A relative URL is resolved against the application's `ProtoTest:Applications:{application}:BaseUrl`, which is handy for pointing at `/swagger/v1/swagger.json` on a deployed API. A document that fails to parse throws with the parser's diagnostics.
+| Source | Value for `OpenApi:Specification` | Notes |
+| --- | --- | --- |
+| File path | `control-plane.openapi.json` | resolved as a file when it exists on disk |
+| Inline document | the JSON or YAML text itself | handy for small test specs |
+| URL | `https://api.example.test/swagger/v1/swagger.json` | a relative URL resolves against the application's `BaseUrl` |
+
+`ProtoTest:Applications:{application}:OpenApi:Specification` takes any of the three. A document that fails to parse throws with the parser's diagnostics.
 
 The application is the one the REST client belongs to: a client registered inside `AddApplication("Api", …)` resolves its specification under `ProtoTest:Applications:Api`, and a host-registered client uses its own target name as the application. If the key is missing or blank, the collector fails when it is constructed:
 
@@ -90,21 +106,45 @@ The request counts an endpoint and a response hit; the shape assertion is what c
 
 #### How a route matches
 
-Route matching normalizes both sides. It keeps the path, strips query and fragment, forces a leading slash and trims one trailing slash. An exact route beats parameter matches; ties break by literal-segment count, then path, case-insensitively.
+| Rule | Behaviour |
+| --- | --- |
+| Normalize | keep the path, strip query and fragment, force a leading slash, trim one trailing slash |
+| Prefer | an exact route beats parameter matches; ties break by literal-segment count, then path, case-insensitively |
+| Constrain | `int`, `long`, `decimal`/`double`/`float`, `guid`, `bool`, `minlength(n)`, `maxlength(n)` are enforced; unknown constraints match |
+| Miss | a route the document does not describe is ignored, as is a method the document does not declare for a matched route |
 
-A route parameter accepts the request value unless the contract parameter carries a constraint. These are enforced: `int`, `long`, `decimal`/`double`/`float`, `guid`, `bool`, `minlength(n)` and `maxlength(n)`. Unknown constraints are treated as matching, so `/users/abc` never counts toward `/users/{id:int}`, while a constraint the collector doesn't know cannot reject anything.
+```
+request path → normalize → exact route? → yes → count it
+                            → no → parameter route with all constraints satisfied?
+                                     → several → most literals wins, then path (ci)
+                                     → none → silent, not reported
+```
 
-A route the document doesn't describe is ignored, and a method the document doesn't declare for a matched route is not counted; the report only enumerates spec operations.
+A route parameter accepts the request value unless the contract parameter carries a constraint. `/users/abc` never counts toward `/users/{id:int}`, while a constraint the collector doesn't know cannot reject anything.
 
 #### How a response matches
 
-The exact status code is looked up first, then a case-insensitive wildcard like `4XX`, then a case-insensitive `default`.
+```
+status code → exact key? → yes → count it
+              → no → 4XX-style wildcard (ci)? → yes → count it
+                     → no → default (ci)? → yes → count it
+                            → no → silent, not reported
+```
 
 #### How a property matches
 
 - Only `Should.MatchShape` counts. Receiving a field without asserting it leaves it uncovered.
 - Array indices are normalized before comparison: `[\d+]` becomes `[]`, and matching is case-insensitive, so `$.lines[0].total` and `$.lines[3].total` both count toward `$.lines[].total`.
 - Schema extraction walks the whole document: every media type with a schema adds a `$` baseline row for the body itself; `allOf`, `oneOf` and `anyOf` are traversed at the same path; each property adds `{path}.{name}`; each array item adds `{path}[]`; `$ref`s resolve through the document's components. Recursion and diamond revisits are cut.
+
+#### When it throws and when it stays silent
+
+| Situation | Behaviour |
+| --- | --- |
+| No `OpenApi:Specification` key, or a blank one | throws when the collector is constructed |
+| Document fails to parse | throws with the parser's diagnostics |
+| Request route is not in the document, or the method is not declared | silent: ignored, never reported |
+| Status code matches no key, wildcard or default | silent: the response is not counted |
 
 #### What the report contains
 

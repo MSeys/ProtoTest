@@ -107,9 +107,28 @@ Without `ConnectionPayload`, `connection_init` is sent with a `null` payload.
 
 ## Protocol behaviour
 
-**WebSocket:** ProtoTest sends `connection_init` (with your payload), waits for `connection_ack` while answering server `ping`s with `pong`, echoing the ping payload when there is one, then sends `subscribe`. `next` messages become responses, `complete` ends the stream, and an `error` message is delivered as a final response with errors. `connection_error`, an unexpected message before the ack, or a non-text or oversized message throws `GraphQLProtocolException`.
+Trigger in a loop until the event lands. Time is the bug, so here it is as a picture:
 
-**SSE:** `event: next`, `event: complete` and `event: error` frames map the same way. A response that isn't `text/event-stream` is read to the end within the message limit and delivered as one response.
+```mermaid
+sequenceDiagram
+    participant Test
+    participant Server
+    Test->>Server: SubscribeAsync (waits for connection ack only)
+    loop trigger until the event lands
+        Test->>Server: createOrder mutation
+    end
+    Server-->>Test: next (event)
+    Test->>Test: ExpectNextAsync returns, cancel the loop
+    Note over Test: A fixed Task.Delay narrows the window but never closes it.
+```
+
+| Behaviour | WebSocket (`graphql-transport-ws`, the default) | SSE |
+| --- | --- | --- |
+| Handshake | `connection_init` with your payload, wait for `connection_ack`, answer server `ping` with `pong` (echoing the ping payload) | plain HTTP request, no handshake |
+| Message mapping | `next` becomes a response, `complete` ends the stream, `error` arrives as a final response with errors | `event: next`, `event: complete` and `event: error` frames map the same way |
+| Scheme | endpoint scheme is rewritten: `http` to `ws`, `https` to `wss` | endpoint scheme is used as configured |
+| Size cap | `ProtoTest:GraphQL:Responses:MaxResponseBodyBytes` (10 MiB default) | same cap, same key |
+| Failure | `connection_error`, an unexpected message before the ack, or a non-text or oversized message throws `GraphQLProtocolException` | a response that is not `text/event-stream` is read to the end within the message limit and delivered as one response |
 
 Each event is recorded: a `graphql.response` observation and a `graphql.subscription.next` event (event number, transport, error count), with response attachments named `graphql-{n:00}-event-{nn}-response`. The end of the stream records `graphql.subscription.complete` with the event count, transport and duration.
 

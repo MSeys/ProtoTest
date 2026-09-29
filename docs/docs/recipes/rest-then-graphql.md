@@ -12,7 +12,7 @@ import TraceExample from '@site/src/components/TraceExample';
 
 Many applications write through REST and read through GraphQL. Testing each API alone misses the question that matters: does a write through one show up in the other?
 
-Both clients can target the same application in one test, so the read side is proven against the write this test just made. The demo runs this journey in [PlatformJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/PlatformJourney.cs).
+Both clients can target the same application in one test. The GraphQL read checks the row the REST write just created. The demo runs this journey in [PlatformJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/PlatformJourney.cs).
 
 ## The code
 
@@ -39,7 +39,7 @@ builder.AddApplication(NorthstarTargets.Api, app =>
 });
 ```
 
-The GraphQL client is rooted at the path configured under the application's `Endpoints:GraphQL` key (`ProtoTest:Applications:Northstar:Endpoints:GraphQL` in the demo); with no path configured the transport root is used. Both clients reuse the in-process server's transport, so no socket is opened.
+The GraphQL client uses the path in the application `Endpoints:GraphQL` key. With no path set it uses the transport root. Both clients reuse the in-process server's transport, so no socket is opened.
 
 ### The test
 
@@ -54,13 +54,13 @@ public sealed class PlatformJourney
     [SignedInAs]
     public async Task RestWritesAreVisibleThroughGraphQL()
     {
-        // Arrange: write through the public REST surface.
+        // Arrange: write through the public REST surface, so the read has something to prove.
         using var created = await Proto.Context.Rest()
             .Body(new CreateProjectRequest("atlas"))
             .PostAsync("/api/v1/projects");
         created.Should.HaveHttpStatus(HttpStatusCode.Created);
 
-        // Act
+        // Act and assert: the selection is built from the shape, so the query asks for exactly the fields it checks.
         using var projects = await Proto.Context.GraphQL()
             .Query("projects", new { first = 10 })
             .ExpectAsync(new
@@ -69,7 +69,6 @@ public sealed class PlatformJourney
                 nodes = new[] { new { name = "atlas", status = ProjectStatuses.Active } }
             });
 
-        // Assert
         projects.Should.HaveNoErrors();
     }
 }
@@ -84,7 +83,7 @@ Both calls are operations of the same test against the same server, in order:
 - the REST write as `http.request` with `assert.http.status` and the `http.response` observation,
 - the GraphQL read as `graphql.operation` with its selection, `assert.json.shape` and the `graphql.response` observation.
 
-The order is the proof: a failure in the read points at the write that should have caused it, and both payloads sit in the same test's trace.
+Order matters. A read failure points to the write before it. Both payloads stay in the same test trace.
 
 The demo's own run:
 
@@ -99,11 +98,10 @@ The demo's own run:
 - **A published application.** Configure the application's `BaseUrl` and the same clients follow that address; the in-process server steps aside.
 - **Read one value.** `ReadDataAs<T>("$.order.total")` reads a single JSON path when a full shape is more than the assertion needs. See [Responses](../integrations/graphql/responses.md).
 - **Exact matching.** `MatchShape(shape, exact: true)` fails when the response carries a field the shape does not mention, so a forgotten field cannot slip past the assertion.
-- **A read-your-writes loop.** Where the read side updates asynchronously, poll with a deadline instead of adding a delay, so the wait ends as soon as the write is visible.
 
 ## What it does not prove
 
 - **Filter to what the test created.** `totalCount = 1` only holds if the query is narrowed to this test's data. The demo gets that from its provisioned tenant; a shared database needs its own filter.
 - **The two APIs name things differently.** REST and GraphQL often disagree on casing and enum values (`active` and `ACTIVE`). Assert each in its own terms; the shape matcher compares exactly.
-- **Read-your-writes is an assumption until proven.** If the read side is updated asynchronously, the first query can miss the write. Assert on that explicitly instead of adding a delay.
+- **Assume the read may lag the write until the test proves otherwise.** If the read side updates asynchronously, the first query can miss the write. Poll with a deadline instead of adding a delay, so the wait ends as soon as the write is visible.
 - **Shape-driven queries ask for what the shape names.** A field the shape omits is not fetched, and a field the server does not have fails the query.

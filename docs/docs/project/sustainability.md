@@ -14,19 +14,24 @@ ProtoTest is maintained by one person, [Matthias Seys](https://github.com/MSeys)
 
 The intent is to grow beyond that. The project is set up so other people can contribute without asking permission - the [contribution guide](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md) covers how to build it, what a feature has to ship with, and how community packages are versioned. Co-maintainers are recruited from people who use it seriously.
 
-What that means in practice: support is **best-effort**, with no response-time guarantee, and the maintainer's own standards - the tests, the docs checks, the review bar - are the ones holding the line in the meantime.
+In practice support is best-effort with no response-time guarantee. The tests, the docs checks and the review bar hold the line.
 
 ## Versioning and deprecation
 
-ProtoTest follows semantic versioning with one documented exception list, because that is what the project can honestly promise:
+ProtoTest follows semantic versioning with one documented exception list:
 
-- **Deliberate public APIs** break only in major versions. Where a replacement exists, the old member is deprecated with an `Obsolete` attribute (or an equivalent documented notice) for at least one released minor before it is removed, where that is feasible.
-- **Accidental-public plumbing and internal implementation types** - types that were never meant to be constructed or implemented outside the framework - may change in a minor release. Every such change is listed under **Breaking** in the [changelog](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md) with a migration note, and the build gates it: package validation compares each package against its previous release, so an unintentional break fails the pack step and the deliberate ones are recorded explicitly.
-- **Patch releases** do not break behavior.
+| Change kind | Rule |
+| --- | --- |
+| Deliberate public API | Breaks only in a major version. Where a replacement exists, the old member is deprecated for at least one released minor before removal, where that is feasible. |
+| Accidental-public plumbing | May change in a minor release. Each such change appears under Breaking in the changelog with a migration note. Package validation compares each package with its prior release and fails the pack on an unrecorded break. |
+| Patch release | Never breaks behavior. |
+| Older lines | Security or critical fixes, decided case by case and never promised. |
+
+A Breaking entry reads like the change it asks for: the removed REST and GraphQL client registration, with the replacement spelled out (register clients under an application and configure its base URL or endpoints, or use an `AddClient` resolver). The [changelog](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md) carries every such entry with its migration note.
 
 All ProtoTest packages share one version and are released together, so "ProtoTest 1.2" names one coherent set. Packages published outside this repository version independently and declare the ProtoTest they require.
 
-**Fixes** land on the newest released line. Older lines receive security or critical fixes when they matter, decided case by case and never promised. If you need a long support window for an old minor, pin it and budget for the upgrade.
+**Fixes** land on the newest released line. If you need a long support window for an old minor, pin it and budget for the upgrade.
 
 ## How to get help
 
@@ -43,7 +48,7 @@ This is the question in-house frameworks fail, and the project is designed aroun
 - The [extension points](../advanced/extending.md) are public, so new integrations can be written without changing the core.
 - There is no hosted service, account system or license server that could be switched off; the packages are local and the viewer is a static page.
 
-None of that is a guarantee of continued maintenance - nothing in open source is. It is the difference between a framework that can be taken over and one that merely stops: the [same argument](./compare.md#building-the-foundation-in-house) that makes adopting a public foundation safer than building your own.
+None of that guarantees continued maintenance. It is the difference between a framework that can be taken over and one that merely stops: the [same argument](./compare.md#building-the-foundation-in-house) that makes adopting a public foundation safer than building your own.
 
 ## The honest caveats
 

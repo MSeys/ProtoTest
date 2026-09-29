@@ -3,7 +3,7 @@ import Link from '@docusaurus/Link';
 
 import Frame from '@site/src/components/Frame';
 import {failureDrills, type DrillRecord} from '@site/src/data/failureDrills';
-import {drillPairs, drillRun, type TraceSource} from '@site/src/data/traceSources';
+import {drillPairs} from '@site/src/data/traceSources';
 import styles from './styles.module.css';
 
 function Records({record}: {record: DrillRecord[]}): ReactNode {
@@ -23,18 +23,13 @@ function Records({record}: {record: DrillRecord[]}): ReactNode {
   );
 }
 
-interface FailureGalleryProps {
-  /** The recording the card values come from. The default is the sample's drill run. */
-  source?: TraceSource;
-}
-
 /*
  * L0's spine: one card per failure mode, each opening the recorded slice from the drill run and the
  * test that does the same journey the right way. Each card links the drill's and the fix's own
  * archive, so a reader can open the same test and check what it recorded.
  */
-export default function FailureGallery({source = drillRun}: FailureGalleryProps): ReactNode {
-  const [open, setOpen] = useState<Set<string>>(() => new Set(['time']));
+export default function FailureGallery(): ReactNode {
+  const [open, setOpen] = useState<Set<string>>(() => new Set<string>());
 
   function toggle(id: string): void {
     setOpen((current) => {
@@ -49,18 +44,18 @@ export default function FailureGallery({source = drillRun}: FailureGalleryProps)
     <Frame
       head={
         <>
-          <strong>Four failures, four fixes</strong>
-          <span className={styles.headMeta}>samples/Northstar.ProtoTest</span>
+          <strong>What a failure looks like</strong>
         </>
       }
       foot={
         <>
-          Every line is from {source.what}
-          {source.file && <> in <code>{source.file}</code></>}. The drill failed on purpose, and the
-          paired test runs the same journey the right way. Each card links its own archive. Set{' '}
-          <code>ProtoTest__Sample__Drills=true</code> to record the drills in your own run.
+          Each card is a real recorded run. The drill failed on purpose, and the paired test runs the
+          same journey the right way. Each card links its own archive.
         </>
       }>
+      <p className={styles.legend}>
+        Each row reads kind, name, status, detail. The status marks what the check decided.
+      </p>
       <div className={styles.grid}>
         {failureDrills.map((pair) => {
           const expanded = open.has(pair.id);
@@ -84,6 +79,10 @@ export default function FailureGallery({source = drillRun}: FailureGalleryProps)
 
               {expanded && (
                 <div className={styles.panel} id={`failure-${pair.id}`}>
+                  <p className={styles.change}>
+                    <strong>What changes</strong>
+                    {pair.change}
+                  </p>
                   <div className={styles.side}>
                     <div className={styles.sideHead}>
                       <span className={styles.sideLabel}>The drill</span>
@@ -111,11 +110,6 @@ export default function FailureGallery({source = drillRun}: FailureGalleryProps)
                       </Link>
                     )}
                   </div>
-
-                  <p className={styles.change}>
-                    <strong>What changes</strong>
-                    {pair.change}
-                  </p>
                 </div>
               )}
             </article>

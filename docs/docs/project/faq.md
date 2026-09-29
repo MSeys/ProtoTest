@@ -13,7 +13,7 @@ Short answers to the questions people ask before adopting ProtoTest. Each one li
 
 Yes, deliberately. ProtoTest does not reimplement HTTP, browsers, containers, messaging or database access; every [integration](../integrations/overview.md) wraps a library that already works. What ProtoTest adds is the part those libraries deliberately leave to you: one host, one [execution context](../foundation/execution-context.md), one [lifecycle](../foundation/lifecycle.md) and one [trace](../observability/prototrace.md) shared by all of them.
 
-"The best tool per axis" is a legitimate architecture, and ProtoTest is not arguing against it. It is the answer to the glue that architecture creates. The [comparison page](./compare.md) works through this case by case.
+"The best tool per axis" is a legitimate architecture, and ProtoTest is not arguing against it. It replaces the glue code that architecture needs. The [comparison page](./compare.md) works through this case by case.
 
 ## Do I have to adopt all the integrations?
 
@@ -29,25 +29,33 @@ They are also not hidden. Clients are registered on the context and can be retri
 
 ## Why not Alba? Why not Aspire testing? Why not Playwright alone?
 
-- **Alba** is excellent at what it does - declarative HTTP scenarios with dependency-injection stubbing and deep JasperFx integration. Choose it if that is the centre of your testing. Choose ProtoTest when one test needs to cross API, database, messaging and browser in one trace. Service substitution is now shipped: `context.Override<T>()`, `[ReplaceService<T>]` and `[FailDependency<T>]` replace or fail a dependency in the application under test per test. [The full section](./compare.md#alba).
+- **Alba** is excellent at declarative HTTP scenarios with dependency-injection stubbing. Choose it if that is the centre of your testing. Choose ProtoTest when one test needs to cross API, database, messaging and browser in one trace. [The full section](./compare.md#alba).
 - **Aspire testing** is the better tool when deployment topology itself must be tested closed-box. ProtoTest's strength is the opposite - in-process speed and direct assertions - and the two are complementary: `ProtoTest.Aspire` can start an AppHost with the run and publish its resources as application targets. [The full section](./compare.md#aspire-testing).
 - **Playwright alone** is simpler when the browser is the whole problem. ProtoTest is for when the browser is one hop in a longer journey and you want the other hops in the same test and trace. [The full section](./compare.md#playwright-net-alone).
 
 ## Which test runners work?
 
-All five first-party adapters: NUnit, xUnit v2, xUnit v3, MSTest and TUnit. Each adapter is a package, the behavior is the same on all of them, and the [runner overview](../runners/overview.md) shows the setup class for each. Everything targets .NET 8, 9 and 10.
+| Runner | Package |
+| --- | --- |
+| NUnit | `ProtoTest.NUnit` |
+| xUnit v2 | `ProtoTest.Xunit` |
+| xUnit v3 | `ProtoTest.Xunit3` |
+| MSTest | `ProtoTest.MSTest` |
+| TUnit | `ProtoTest.TUnit` |
+
+Each adapter is a package, the behavior is the same on all of them, and the [runner overview](../runners/overview.md) shows the setup class for each. Everything targets .NET 8, 9 and 10.
 
 ## Is coverage a replacement for code coverage?
 
-No, it is a different metric. Code coverage tells you which lines ran. ProtoTest's [contract coverage](../observability/coverage.md) tells you which endpoints, responses and fields your suite **asserted** - an endpoint called by a thousand setup helpers counts as covered only when a test actually checked something about it. Both are useful; neither replaces the other.
+No, it is a different metric. Code coverage tells you which lines ran. [Contract coverage](../observability/coverage.md) tells you which endpoints, responses and fields your suite asserted. An endpoint counts as covered only when a test checks it. Both are useful; neither replaces the other.
 
 ## Why are my property hits zero?
 
-Because receiving a field is not covering it. Property coverage comes only from the paths a shape assertion matched: a test that checks the status code covers the endpoint and the status, but none of the fields. Add the field to a `Should.MatchShape` call and it starts counting. See [reading the coverage report](../observability/coverage.md#reading-the-report) and the [shape rules](../foundation/shape-matching.md#constraints). This is deliberate - a field nobody asserts is a field that can break silently.
+Because receiving a field is not covering it. Property coverage comes only from the paths a shape assertion matched: a test that checks the status code covers the endpoint and the status, but none of the fields. Add the field to a `Should.MatchShape` call and it starts counting. In one row: received is not covered, asserted is covered. See [reading the coverage report](../observability/coverage.md#reading-the-report) and the [shape rules](../foundation/shape-matching.md#constraints). This is deliberate - a field nobody asserts is a field that can break silently.
 
 ## What happens if the maintainer stops?
 
-The project is designed so that it can outlive its author. It is MIT licensed, the source is public, the [trace format is documented and versioned](../observability/prototrace.md), and the [extension points](../advanced/extending.md) are part of the public surface - so a fork or a successor can keep a suite running. There is no hosted service to shut down and no account system to expire. That is not a guarantee, but it is the same argument that works against building the foundation in-house.
+The project is designed so that it can outlive its author. It is MIT licensed with public source. The trace format is documented and versioned. Extension points are public. A fork can keep a suite running. There is no hosted service to shut down and no account system to expire. That is not a guarantee, but it is the same argument that works against building the foundation in-house. See [Support and sustainability](./sustainability.md).
 
 ## Is it free?
 

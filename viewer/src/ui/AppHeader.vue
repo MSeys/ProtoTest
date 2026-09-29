@@ -69,7 +69,7 @@ async function copyShare(link: string) {
 .docs { height: var(--control-height); padding: 0 var(--space-3); display: grid; place-items: center; border: 1px solid transparent; border-radius: var(--radius-control); color: var(--muted); font-size: var(--text-meta); text-decoration: none; white-space: nowrap; }
 .docs:hover { border-color: var(--border); color: var(--text); }
 .privacy { grid-column: 2; justify-self: center; color: var(--muted); font-size: var(--text-meta); white-space: nowrap; }
-.privacy span { color: var(--success); }
+.privacy span { color: var(--blueprint); }
 /* Each part owns its column, so hiding the middle one never lets the buttons drift in from the right edge.
    (A container query cannot restyle its own container, so the columns themselves never change.) */
 .actions { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: var(--space-3); }

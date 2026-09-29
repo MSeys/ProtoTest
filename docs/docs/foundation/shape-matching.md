@@ -1,5 +1,5 @@
 ---
-sidebar_position: 8
+sidebar_position: 10
 title: Shape matching
 description: "Describe the JSON you expect with an anonymous object: partial, nested, with value constraints, and every mismatch reported at once with its path."
 ---

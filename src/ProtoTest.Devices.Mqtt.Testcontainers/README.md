@@ -1,5 +1,7 @@
 # ProtoTest.Devices.Mqtt.Testcontainers
 
+> Preview: the surface can change before 1.2.
+
 A Mosquitto container that can be owned by a ProtoTest run, for suites that talk to devices over MQTT.
 
 ```bash

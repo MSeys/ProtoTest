@@ -26,10 +26,14 @@ export default function ViewerWalkthrough(): ReactNode {
   const baseId = useId();
 
   const move = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft' && event.key !== 'Home' && event.key !== 'End') return;
     event.preventDefault();
     const index = views.findIndex((item) => item.id === view);
-    const next = views[(index + (event.key === 'ArrowRight' ? 1 : views.length - 1)) % views.length];
+    const next =
+      event.key === 'ArrowRight' ? views[(index + 1) % views.length]
+      : event.key === 'ArrowLeft' ? views[(index + views.length - 1) % views.length]
+      : event.key === 'Home' ? views[0]
+      : views[views.length - 1];
     if (next) setView(next.id);
   };
 
@@ -44,13 +48,14 @@ export default function ViewerWalkthrough(): ReactNode {
       foot={
         <>
           <Link href="https://trace.prototest.dev/?demo=1">Open this exact run in the viewer →</Link>{' '}
-          Drawn from <span className={styles.archive}>prototest-demo.prototrace</span>, as the viewer shows it.
+          Copied from <span className={styles.archive}>prototest-demo.prototrace</span>, shown as the viewer
+          shows it.
         </>
       }>
       <p className={styles.pointer}>
-        4 failed. Start with test 01, then 02.
+        4 failed, 1 partial. Start with test 08, then 10.
         <button type="button" className={styles.jump} onClick={() => setView('story')}>
-          See test 01&rsquo;s story
+          See test 12&rsquo;s story
         </button>
         <button type="button" className={styles.jump} onClick={() => setView('check')}>
           See the failing check

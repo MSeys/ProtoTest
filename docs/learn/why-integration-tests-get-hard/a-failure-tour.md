@@ -3,7 +3,7 @@ id: a-failure-tour
 title: A failure tour
 sidebar_label: A failure tour
 sidebar_position: 2
-description: "Four deliberate failures from the Northstar sample, each read in its trace next to the test that does the same journey the right way."
+description: "Four deliberate failures from the Northstar.ProtoTest sample suite, each read in its trace next to the test that does the same journey the right way."
 ---
 
 import LearnShell from '@site/src/components/LearnShell';
@@ -13,7 +13,7 @@ import Link from '@docusaurus/Link';
 
 # A failure tour
 
-The Northstar sample ships four tests that fail on purpose. Each drill is paired with a test that runs the same journey and passes. The difference is one practice.
+The Northstar.ProtoTest sample suite ships four tests that fail on purpose. Each drill is paired with a test that runs the same journey and passes. The difference is one practice.
 
 <LearnShell
   level="Level 0, lesson 2"
@@ -110,7 +110,7 @@ paid
     {line: 1, title: 'Build and provision the invoice', note: 'Data() builds the request, the provisioner creates the invoice, and teardown removes it.'},
     {line: 3, title: 'Move the test clock', note: 'Advance records a clock.advance event, and the in-process application reads the same clock.'},
     {line: 4, title: 'Call through the composed client', note: 'Rest() takes the address from the run, so the same test works in-process or against a published environment.'},
-    {line: 7, title: 'Assert the property the behaviour depends on', note: 'MatchShape reports the JSON path and both values when it fails.'},
+    {line: 7, title: 'Assert the property the behavior depends on', note: 'MatchShape reports the JSON path and both values when it fails.'},
     {line: 11, title: 'Pay, then check the result', note: 'The second call reuses the same client, the same context and the same trace.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/FailureDrills.cs</code>. The drill next to it waits on real time and the due window never closes.</>}

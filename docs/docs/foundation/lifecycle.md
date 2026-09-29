@@ -1,8 +1,38 @@
 ---
-sidebar_position: 4
+sidebar_position: 5
 title: Host and lifecycle
 description: "How the ProtoTest host is built, started and stopped, and the order in which a test's hooks, attributes and clients run."
 ---
+
+import TraceAnatomy from '@site/src/components/TraceAnatomy';
+import {lessonTraces} from '@site/src/data/traceSources';
+
+export const orderLayers = [
+  {
+    id: 'setup',
+    label: 'Setup',
+    when: '500.5 ms',
+    lead: 'Hooks first in ascending Order, then attributes in ascending Order. The client hook runs before everything else.',
+    entries: [
+      {kind: 'hook.before', name: 'ProtoClientInitializerHook', meta: 'Order First: clients exist before any other hook'},
+      {kind: 'hook.before', name: 'SqlConnectionHook, NorthstarScenarioHook', meta: 'Order -1000 each'},
+      {kind: 'hook.before', name: 'ProtoHttpAuthLifecycleHook twice', meta: 'Order 100: auth applies last'},
+      {kind: 'attribute.before', name: 'Application, NorthstarTenant, SignedInAs, NorthstarMember', meta: 'Orders First, -200, -100, 0'},
+    ],
+  },
+  {
+    id: 'teardown',
+    label: 'Teardown',
+    when: '36.7 ms',
+    lead: 'The same components walk back: attributes in reverse, then hooks in reverse, then publish and release.',
+    entries: [
+      {kind: 'attribute.after', name: 'NorthstarMember, SignedInAs, NorthstarTenant, Application', meta: 'reverse of setup'},
+      {kind: 'hook.after', name: 'Auth hooks, scenario, SQL, completion, initializer', meta: 'reverse of setup'},
+      {kind: 'attachment.publish', name: 'Request, response, expected shape, scenario summary', meta: 'after every hook and attribute finished'},
+      {kind: 'resources.release', name: 'Tenant cleanup, services, connection, consumer', meta: 'reverse registration order'},
+    ],
+  },
+];
 
 # Host and lifecycle
 
@@ -11,6 +41,12 @@ description: "How the ProtoTest host is built, started and stopped, and the orde
 `ProtoHost` is built once per test process by your runner's [assembly setup](../runners/overview.md). It owns the dependency injection container, runs suite-wide hooks and [run gates](#run-gates-and-resources), starts [infrastructure](./infrastructure.md), and starts and completes each test.
 
 `ProtoExecutionContext` exists for exactly one test. It holds that test's clients, typed state, resources, attachments and observations. See [Execution context](./execution-context.md).
+
+```text
+1 hooks → 2 attributes → 3 body → 4 attributes back → 5 hooks back → 6 publish → 7 dispose
+```
+
+Hooks run before all attributes. A setup failure rolls back only what completed.
 
 ## How it works
 
@@ -103,6 +139,16 @@ FirstHook:After
 
 The test is recorded as failed, the trace shows a `Rollback` phase instead of `Teardown`, and the exception reads *"Test setup failed and completed lifecycle components were rolled back."*
 
+The same reversal in the recording, the sample suite's project journey: setup runs attributes `Application, NorthstarTenant, SignedInAs, NorthstarMember`, and teardown answers `NorthstarMember, SignedInAs, NorthstarTenant, Application`.
+
+<TraceAnatomy
+  source={lessonTraces.firstJourney}
+  title="Setup order, teardown reversal"
+  test="Northstar.ProtoTest.ProjectsJourney.CreatingAProjectReturnsIt"
+  layers={orderLayers}
+  blindSpots={[]}
+/>
+
 This is why teardown code should tolerate partial setup. The sample environment attribute uses `TryResolve` rather than `Resolve` in its `AfterTestAsync` for exactly that reason.
 
 ### One test per async flow
@@ -111,56 +157,7 @@ A context is tied to the async flow that started it. Starting a second test on t
 
 ## How to use it
 
-Runner packages call `StartTestAsync` and `CompleteTestAsync` for you. You would only call them yourself when building a runner integration, or when testing ProtoTest extensions:
-
-```csharp
-var host = new ProtoHostBuilder().AddApplication("Api", app => app
-    .AddRest(rest => rest.AddClient("Api"))).Build();
-await using var ownedHost = host;
-await host.StartAsync();
-
-var context = await host.StartTestAsync("my test", testMethod);
-// ...
-await host.CompleteTestAsync(ProtoTestResult.Passed);
-```
-
-`ProtoTestResult` has `Passed`, `Skipped`, `Unknown`, `Failed(exception)`, `Failed(error)` and `Cancelled(exception)`.
-
-The host itself:
-
-```csharp
-public sealed class ProtoHost : IAsyncDisposable
-{
-    static ProtoExecutionContext CurrentContext { get; }
-    static ProtoExecutionContext? CurrentContextOrNull { get; }
-    static ProtoHost CurrentHost { get; }
-    static IProtoTraceWriter? FindTraceWriter(ActivityTraceId traceId);
-    static IProtoTraceWriter? FindTraceWriter(Activity? activity);
-
-    IConfiguration Configuration { get; }
-    IProtoTraceSource Trace { get; }
-    bool HasCapability(string kind, string? name = null);
-
-    Task StartAsync(CancellationToken cancellationToken = default);
-    Task StopAsync(CancellationToken cancellationToken = default);
-
-    Task<ProtoExecutionContext> StartTestAsync(string testName, MethodInfo testMethod,
-        IEnumerable<ProtoAttribute>? attributes = null, IProtoTestAttachmentPublisher? attachmentPublisher = null);
-
-    Task CompleteTestAsync();                          // outcome Unknown
-    Task CompleteTestAsync(ProtoTestResult result);
-}
-```
-
-| You need | Overload |
-| --- | --- |
-| the usual start | `StartTestAsync(testName, testMethod)` |
-| an explicit test id | `StartTestAsync(testName, testId, testMethod, ...)` |
-| a token for setup I/O | `StartTestAsync(testName, testMethod, cancellationToken)` |
-| id and token | `StartTestAsync(testName, testId, testMethod, cancellationToken)` |
-| everything at once | `StartTestAsync(testName, testMethod, attributes, attachmentPublisher, cancellationToken)` |
-
-`Proto.Host` returns the host of the current test, or, outside a test, the only active host (with more than one active, it throws).
+Runner packages start and complete tests for you; the hand-driven surface lives on [Host API](./lifecycle-host-api.md).
 
 ### Test ids
 

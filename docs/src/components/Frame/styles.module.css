@@ -1,5 +1,8 @@
-/* The viewer's Panel: border only. The blueprint against the page is contrast enough. */
+/* The viewer's Panel: border only. The blueprint against the page is contrast enough.
+   The frame is also the sizing container its panels query, so they restack on the frame's own
+   width instead of the device's. */
 .frame {
+  container-type: inline-size;
   min-width: 0;
   overflow: clip;
   border: 1px solid var(--border-strong);
@@ -21,6 +24,9 @@
   gap: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--border);
 }
+
+/* A long head child, usually a mono test name, may shrink and wrap instead of pushing the frame wide. */
+.head > * { min-width: 0; }
 
 .foot {
   padding: var(--space-3) var(--space-4);

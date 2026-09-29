@@ -1,5 +1,7 @@
 # ProtoTest.Messaging.MassTransit
 
+> Preview: the surface can change before 1.2.
+
 Bridges the ProtoTest messaging surface to the application's MassTransit test harness: publish a
 command and await the events the application publishes, over the in-process `ITestHarness` the
 application composes with `AddMassTransitTestHarness`. The package also carries the MassTransit wire

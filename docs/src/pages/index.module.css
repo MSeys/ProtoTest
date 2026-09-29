@@ -63,15 +63,8 @@
   font-size: 0.92em;
 }
 
-/* The command box is the primary action; behind it sit one secondary button and one quiet route. */
-.heroLinks {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3) var(--space-5);
-}
-
-.heroLearn { font-weight: var(--weight-semibold); }
+/* The quiet route under the command box: the one path for a reader who is still learning. */
+.heroLearn { margin-top: var(--space-5); margin-bottom: 0; font-weight: var(--weight-semibold); }
 
 /* The proof strip between the hero and the paths: measured values in mono, the prose beside them. One row
    that wraps, no cards: the numbers are evidence, not decoration. */
@@ -110,8 +103,6 @@
 
 .proofLabel { max-width: 34ch; color: var(--muted); font-size: var(--text-meta); line-height: 1.45; }
 
-.proofViewer { margin-left: auto; font-weight: var(--weight-semibold); white-space: nowrap; }
-
 .heroButtons { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 
 /* The viewer's button roles, scaled for a page CTA. */
@@ -131,9 +122,6 @@
 
 .btnPrimary { background: var(--blueprint); color: var(--bg); font-weight: var(--weight-bold); }
 .btnPrimary:hover { background: color-mix(in srgb, var(--blueprint) 85%, white); color: var(--bg); }
-
-.btnSecondary { border-color: var(--border-strong); background: var(--surface-2); color: var(--text); }
-.btnSecondary:hover { border-color: var(--blueprint); color: var(--text); }
 
 .section { padding: calc(var(--space-7) * 2) 0; }
 .sectionAlt { background: var(--surface); }
@@ -217,3 +205,6 @@
   margin: 0 auto var(--space-6);
   text-align: left;
 }
+
+/* The release note inside the closing CTA: quiet, kept apart from the starter copy. */
+.ctaRelease { margin-bottom: var(--space-6); font-size: var(--text-meta); }

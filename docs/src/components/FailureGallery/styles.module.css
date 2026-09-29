@@ -42,6 +42,8 @@
   text-align: left;
 }
 
+.toggle > * { min-width: 0; }
+
 .toggle:hover { background: var(--hover); }
 
 .mode {
@@ -52,6 +54,10 @@
 }
 
 .ask { font: var(--weight-semibold) var(--text-title) var(--font-display); line-height: var(--leading-tight); }
+
+/* The verdict, visible before the card opens: what the fix changes. */
+.verdict { margin: 0; color: var(--muted); font-size: var(--text-meta); }
+.verdict strong { color: var(--blueprint); }
 
 /* Two classes so the site's inline-code chip cannot win over this rule. */
 .toggle .test {

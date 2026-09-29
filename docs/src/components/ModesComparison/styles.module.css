@@ -1,0 +1,14 @@
+.headMeta { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+
+/* Five columns never fit a phone: the table keeps its width and scrolls inside the frame,
+   the way the markdown tables do, instead of squeezing or clipping. */
+.scroll { overflow-x: auto; }
+.scroll:focus-visible { outline: 2px solid var(--blueprint); outline-offset: -2px; }
+
+.table { width: 100%; min-width: 38rem; border-collapse: collapse; font-size: var(--text-meta); }
+
+.table th,
+.table td { min-width: 0; padding: var(--space-2) var(--space-3); border-top: 1px solid var(--border); text-align: left; vertical-align: top; overflow-wrap: break-word; }
+
+.table thead th { border-top: 0; color: var(--muted); font-size: var(--text-micro); white-space: nowrap; }
+.table td strong { white-space: nowrap; }

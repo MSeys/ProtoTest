@@ -106,7 +106,16 @@ foreach (var failure in exceptions.Skip(exceptionCountBeforeTeardown))
 
 ## Break a teardown on purpose
 
-Add a file to the sample that fails after one test:
+The body passes and the run still exits 1. This is what that looks like before you write any code:
+
+```text
+TearDown failed for test fixture Northstar.ProtoTest.Setup
+TearDown : ProtoTest.Core.ProtoRunGateException : Run gate 'no error findings' failed: The run recorded error findings.
+
+Passed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1
+```
+
+The `Passed` line is the framework's view of the test. The `TearDown` lines come from the run gate when the run stops. To produce it, add a file to the sample that fails after one test:
 
 ```csharp
 namespace Northstar.ProtoTest;
@@ -126,16 +135,7 @@ Apply `[FailingTeardown]` to one journey method and run it alone:
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~ProjectsJourney.CreatingAProjectReturnsIt"
 ```
 
-The body passes and the run still exits 1:
-
-```text
-TearDown failed for test fixture Northstar.ProtoTest.Setup
-TearDown : ProtoTest.Core.ProtoRunGateException : Run gate 'no error findings' failed: The run recorded error findings.
-
-Passed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1
-```
-
-The `Passed` line is the framework's view of the test. The `TearDown` lines come from the run gate when the run stops.
+Compare the runner summary with the finding and gate rows in `TestResults/Northstar.ProtoTest/report.json`.
 
 ## The run gate reads the report
 

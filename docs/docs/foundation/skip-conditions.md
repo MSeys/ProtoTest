@@ -1,8 +1,11 @@
 ---
-sidebar_position: 11
+sidebar_position: 13
 title: Skip conditions
 description: "Skip a test before its lifecycle starts, with a reason, when the environment cannot run it, so it reads as skipped instead of failed."
 ---
+
+import TraceAnatomy from '@site/src/components/TraceAnatomy';
+import {brokerSkipLayers, brokerSkipReason, brokerSkipSource, brokerSkipTest} from '@site/src/data/brokerSkipWalk';
 
 # Skip conditions
 
@@ -15,6 +18,23 @@ Not every test can run in every environment. A **skip condition** stops a test b
 ```
 
 The test body never runs. No context is created, so no hook or attribute sees the test. Nothing is written to the trace. No teardown runs, because there is nothing to tear down. The reason reaches the runner's skip mechanism; see [what a skip means](#what-a-skip-means).
+
+One skipped test, as the runner reports it:
+
+```text
+Skipped PayingAnInvoicePublishesAnInvoicePaidEvent
+  {brokerSkipReason}
+```
+
+The archive for that run holds the run and nothing else:
+
+<TraceAnatomy
+  source={brokerSkipSource}
+  title="A skipped test, layer by layer"
+  test={brokerSkipTest}
+  layers={brokerSkipLayers}
+  blindSpots={[]}
+/>
 
 A condition is a `ProtoAttribute`. Conditions are evaluated with the test's other attributes, and an adapter that does not know them runs the test: the contract is opt-in. To write your own, see [writing your own](#writing-your-own).
 
@@ -57,6 +77,16 @@ The conditional registration kinds answer the address question in both direction
 | --- | --- | --- |
 | `AddCapabilityUnlessConfigured(capability, keys...)` | every key is configured, because the environment provides what the integration would serve | `AddAspNetCoreServer`, the in-process device transport |
 | `AddCapabilityWhenProvided(capability, keys...)` | none of the keys is provided, neither as a configured value nor as a key a registered infrastructure piece declares | an integration that cannot serve without an address: `UseRabbitMq` declares `broker` over its connection string, so a run with neither a configured key nor a broker container skips instead of failing |
+
+```mermaid
+flowchart TB
+    U["UnlessConfigured:\nevery key configured?"]
+    U -->|yes| UD["drop: the environment\nserves the target"]
+    U -->|no| UK["keep: the integration\nserves the target"]
+    W["WhenProvided:\nany key provided?"]
+    W -->|no| WD["drop: no address\nto serve"]
+    W -->|yes| WK["keep: the address exists"]
+```
 
 A dropped declaration is recorded as a `capability.skipped` event naming the deciding keys (`capability.keys`) and the reason (`capability.reason`: `already configured`, or `no key provided`).
 
@@ -196,4 +226,4 @@ Because nothing starts, a skipped test has no context, no trace record and no re
 
 ## In the sample suite
 
-The learning sample gates each environment-dependent journey with a condition: the domain journey requires the `store` capability, the web journey requires the Playwright browser, and the broker journey requires the `broker` capability. The broker reason is declared once in the sample's `Setup` with `AddCapabilityReason`. See [Environments](../getting-started/environments.md) for how the three shapes select those capabilities.
+The sample suite gates each environment-dependent journey with a condition: the domain journey requires the `store` capability, the web journey requires the Playwright browser, and the broker journey requires the `broker` capability. The broker reason is declared once in the sample's `Setup` with `AddCapabilityReason`. See [Environments](../getting-started/environments.md) for how the three shapes select those capabilities.

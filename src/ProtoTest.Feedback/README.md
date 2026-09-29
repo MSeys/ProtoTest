@@ -1,5 +1,7 @@
 # ProtoTest.Feedback
 
+> Preview: the surface can change before 1.2.
+
 Posts a failing run's digest where a pull request reads it: a comment with the trace link, check
 annotations and a webhook for a machine consumer. The digest is the `ProtoTest.Diagnosis` document,
 so the comment, the CLI and the MCP tools cannot tell different stories.

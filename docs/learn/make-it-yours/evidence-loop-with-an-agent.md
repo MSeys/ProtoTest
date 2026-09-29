@@ -72,7 +72,7 @@ dotnet tool install --global ProtoTest.Cli
 prototest summary l0-time-drill.prototrace
 ```
 
-The command reads the archive and prints one deterministic document. Here is its output for the committed drill, with the run id and timestamps shortened:
+The command reads the archive and prints one deterministic document. The shape of that document, with the drill's values and the run id shortened:
 
 ```text
 ProtoTest trace 2.0 · run 316f2b23... · 2026-09-29 06:18:29Z - 2026-09-29 06:18:34Z
@@ -131,6 +131,18 @@ The server exposes four read-only tools:
 | `get_coverage` | coverage totals and uncovered units from the report the run embedded |
 
 Ask the agent to list the runs, then for the failure in the time drill. It answers from the archive, and the failure selector is the same one the viewer and the summary use, so the names, the line and the mismatch come out identical.
+
+With `detail: context`, the same failure returns its context package beside the summary. The shape of the package, with the drill's values:
+
+```text
+context: Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow
+ancestors: test.execution > http.request REST GET /api/v1/organization > assert.json.shape
+attributes: $.status, expected past_due, actual active; clock unmoved, elapsed 1.33 s
+source: samples/Northstar.ProtoTest/FailureDrills.cs:34
+artifacts: rest-01-response, rest-01-expected-shape, scenario-summary.json
+```
+
+The five lines are the ancestor chain, the attributes, the source snippet location, the artifacts it can reach and the state it changed. The checkpoint at the top of this lesson asks what the package adds over the one-line summary, and what it can never do.
 
 ## Close the loop
 

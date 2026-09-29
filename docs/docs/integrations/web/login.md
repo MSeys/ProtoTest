@@ -1,12 +1,12 @@
 ---
-sidebar_position: 6
+sidebar_position: 7
 title: Logging in
-description: "Log in once per test the way your application does: a login page, SSO, an API token or saved storage state, as a reusable capability."
+description: "Log in once per test the way your application does: through its login page or as a user another attribute provisioned, as a reusable capability."
 ---
 
 # Logging in
 
-Almost every browser test starts by logging someone in, and almost every application does that differently: a login page, an SSO redirect, an API call plus an injected token, saved storage state. ProtoTest does not choose one. Write a **login strategy** for your application, as many as you need, and apply it with an attribute.
+Almost every browser test starts by logging someone in, and almost every application does that differently: a login page, or a user another attribute provisioned. ProtoTest does not choose one. Write a **login strategy** for your application, as many as you need, and apply it with an attribute.
 
 ```csharp
 [ProtoTest]
@@ -18,6 +18,22 @@ public async Task Billing_admin_sees_open_invoices()
     await invoices.Heading.Should.BeVisibleAsync();
 }
 ```
+
+```text
+setup order:  [SampleUser] (-100) → [WebSession] (-10) → [LoginAs] (0) → test body
+```
+
+Declare the session first with `[WebSession]`. It creates the session during setup and can open a start URL; `Application` selects the application, `Open` the address, and the attribute's fixed `Order = -10` runs it before `[LoginAs]`:
+
+```csharp
+[WebSession("Admin", Application = "ControlPlane", Open = "/back-office")]   // address from ProtoTest:Applications:ControlPlane:BaseUrl
+[WebSession("Customer")]
+[LoginAs<BackOfficeLogin>("billing.admin", Session = "Admin")]
+[LoginAs<StorefrontLogin>("customer@example.test", Session = "Customer")]
+public async Task ...
+```
+
+A relative `Open` resolves against the session's application address, `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with the named endpoint. `Session` picks which named session to log in, so one test can have two different people signed in (it defaults to `"Default"`).
 
 ## Writing a strategy
 
@@ -104,20 +120,6 @@ public sealed class LoginAsAttribute<TStrategy>(string persona, params object[] 
   ```
 
 - **`Session`** picks which [named session](./index.md#several-sessions-in-one-test) to log in, so one test can have two different people signed in (it defaults to `"Default"`).
-
-## Sessions and ordering
-
-Declare the session first with `[WebSession]`. It creates the session during setup and can open a start URL; `Application` selects the application, `Open` the address, and the attribute's fixed `Order = -10` runs it before `[LoginAs]`:
-
-```csharp
-[WebSession("Admin", Application = "ControlPlane", Open = "/back-office")]   // address from ProtoTest:Applications:ControlPlane:BaseUrl
-[WebSession("Customer")]
-[LoginAs<BackOfficeLogin>("billing.admin", Session = "Admin")]
-[LoginAs<StorefrontLogin>("customer@example.test", Session = "Customer")]
-public async Task ...
-```
-
-A relative `Open` resolves against the session's application address, `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with the named endpoint.
 
 ## Tracing
 

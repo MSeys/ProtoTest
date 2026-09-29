@@ -11,12 +11,12 @@ The **evidence loop** is fail, evidence, fix, verify, report. One file carries t
 
 ## What the reviewer sees
 
-A failing run leaves three things on the pull request. This is the comment, rendered from the committed failing fixture:
+A failing run leaves three things on the pull request. The shape of the comment, with values from the committed failing fixture:
 
 ```markdown
 ## ProtoTest run `29e344f9cf54431ca7d8bad3f87a1749`
 
-**2 tests · 1 failed · 1 passed**
+**2 tests · 1 failed · 1 succeeded**
 
 - **FAILED `orders match their shape`** (16 ms)
   - `assert.json.shape` · failed
@@ -40,7 +40,9 @@ Next to it, one check annotation per failing test at its source location, one pe
 
 ## Run it locally
 
-The same four commands, with the output each one prints. Start with a failing test:
+The same four commands in order, with the output each one prints. Start with a failing test.
+
+**1. Run the suite and summarize the trace:**
 
 ```bash
 dotnet test
@@ -59,14 +61,16 @@ FAILED Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine (2.
 
 [Diagnosis](./diagnosis.md) reads that output line by line. A coding agent reads the same story through the MCP tools ([Setup](./setup.md)), or you can read the whole run in the viewer.
 
-After the fix, run the suite again and compare the two reports:
+After the fix, run the suite again and compare the two reports.
+
+**2. Verify the fix against the baseline:**
 
 ```bash
 dotnet test
 prototest verify baseline.json TestResults/ProtoTest/report.json
 ```
 
-Post the digest without a pull request:
+**3. Post the digest without a pull request:**
 
 ```bash
 prototest feedback TestResults/ProtoTest/run.prototrace --digest digest.json
@@ -79,7 +83,7 @@ prototest feedback: github-pr-comment skipped (No GitHub token: set GITHUB_TOKEN
 prototest feedback: webhook skipped (No webhook URL: set PROTOTEST_FEEDBACK_WEBHOOK_URL.)
 ```
 
-The annotations go to stdout. The per-channel outcomes go to stderr, so a CI log keeps them out of the annotation stream. `--digest` writes the digest JSON to the path you gave it. With no target configured the network channels skip with their reason, so a local run is safe.
+The first line is stdout: the annotations GitHub renders on the pull request. The rest is stderr: one outcome per channel. `--digest` writes the digest JSON to the path you gave it. With no target configured the network channels skip with their reason, so a local run is safe.
 
 The [CLI reference](./cli.md#environment-targets) lists every target the comment and the webhook read, and the exit codes.
 

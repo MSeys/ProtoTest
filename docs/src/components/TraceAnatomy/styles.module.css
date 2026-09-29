@@ -1,4 +1,6 @@
-.headMeta { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+/* The test name under the title: a dotted path with no spaces, so it may break anywhere
+   rather than push the head past the frame on a phone. */
+.headMeta { min-width: 0; color: var(--dim); font: var(--text-micro) var(--font-mono); overflow-wrap: anywhere; }
 
 .layers {
   margin: 0;

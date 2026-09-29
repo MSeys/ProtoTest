@@ -8,6 +8,7 @@ description: "Create fixtures through a provisioner, read the provisioning chain
 
 import LearnShell from '@site/src/components/LearnShell';
 import AnnotatedCode from '@site/src/components/AnnotatedCode';
+import Checkpoint from '@site/src/components/Checkpoint';
 import Link from '@docusaurus/Link';
 
 # Provisioners and page objects
@@ -215,5 +216,11 @@ dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~WebJourney"
 The execution layer holds `web.navigate` for the open, `web.flow` for the sign-in flow and the filter flow, `web.fill` and `web.click` for the steps, and `assert.web` for the status check. Each entry carries the component path, from `ProjectsPage` down to the element the step touched, so a failure names the screen, the component and the element instead of a CSS selector.
 
 If the journey skips, the reason names Playwright and the browser it could not find. The [web integration page](/docs/integrations/web/) covers the install and the probe. The unit of work is the same either way: the page object is ordinary code, and the run records what it touched.
+
+<Checkpoint
+  question="A step in the browser journey fails on the projects screen. What three things does the trace name, and what would a raw selector name instead?"
+  verify={<>Run the WebJourney filter above and open the execution layer, or read the <code>web.*</code> entries listed in this section.</>}
+  reveal={<>The screen, the component and the element: each entry carries the component path from <code>ProjectsPage</code> down to the element the step touched. A raw selector would name only the CSS that found it, not the screen it belongs to.</>}
+/>
 
 </LearnShell>

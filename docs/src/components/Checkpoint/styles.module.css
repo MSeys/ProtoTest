@@ -37,6 +37,7 @@
 .verifyBody > :last-child { margin-bottom: 0; }
 
 .answer { display: grid; gap: var(--space-3); justify-items: start; }
+.answer > * { min-width: 0; }
 
 .reveal {
   min-height: var(--control-height);
@@ -60,6 +61,7 @@
   background: var(--surface);
   font-size: var(--text-strong);
   line-height: 1.65;
+  overflow-wrap: break-word;
 }
 
 .answerBody > :first-child { margin-top: 0; }

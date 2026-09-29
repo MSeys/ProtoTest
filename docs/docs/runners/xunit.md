@@ -14,7 +14,7 @@ description: "Register ProtoTest with xUnit v2: the collection fixture, [ProtoTe
 dotnet add package ProtoTest.Xunit
 ```
 
-ProtoTest targets **.NET 8, 9 and 10**, and needs **xunit 2.9.3 or newer**; the standard `dotnet new xunit` template already pins it. The `dotnet new prototest` template defaults to `net10.0`; pass `-f net8.0` or `-f net9.0` for an older runtime.
+ProtoTest targets **.NET 8, 9 and 10**, and needs **xunit 2.9.3 or newer**; the standard `dotnet new xunit` template already pins it. The `dotnet new prototest` template defaults to `net10.0`; pass `--framework net8.0` or `--framework net9.0` for an older runtime.
 
 ## Register
 
@@ -67,6 +67,23 @@ A `[ProtoTestTheory]` behaves the same way, and each `[InlineData]` row is a tes
 Without `[Collection(ProtoTestCollection.Name)]` the fixture never runs, so `ProtoTestAssembly.Host` throws `InvalidOperationException` from inside the test. xUnit v2 surfaces that as a test-host crash: the run aborts and the other tests' results are lost, instead of one test failing. Treat the attribute as mandatory on every class that carries a ProtoTest attribute or reads `Proto.Context`.
 :::
 
+## The context window
+
+`|` is the host bar, `[]` is the context. The constructor already sees `Proto.Context`:
+
+```text
+|[collection fixture (host)]|  [[constructor | body]]
+```
+
+xUnit v3 is the mirror image: its constructor runs before the context.
+
+```mermaid
+flowchart TD
+    miss["class without [Collection]"] --> host["fixture never runs · Host throws InvalidOperationException"]
+    host --> crash["test-host crash · run aborts · other results lost"]
+    fix["class with [Collection]"] --> ok["fixture starts the host · test gets a context and a trace"]
+```
+
 ## Bring an existing suite
 
 Adoption is per test, not per project. A plain `[Fact]` or `[Theory]` keeps running unchanged, and a class that joins the collection can mix converted and plain tests: only `[ProtoTestFact]` and `[ProtoTestTheory]` start a context. Convert a class when its tests need a host, a trace or capability skips. Add the collection attribute in the same change: the fixture starts the host. [Bring an existing xUnit suite](./bring-your-existing-suite.md) walks the order.
@@ -91,7 +108,7 @@ Adoption is per test, not per project. A plain `[Fact]` or `[Theory]` keeps runn
 
 - No native attachments. In-memory content is written under `%TEMP%\ProtoTest\attachments`, not into xUnit's output, and the path travels on the console.
 - No dynamic skip. The reason is decided before the test method is invoked, so it cannot depend on the body.
-- Every test class must join the collection. The host is never initialized otherwise, and the resulting crash aborts the whole run.
+- **Aborts the run.** Every test class must join the collection. The host is never initialized otherwise, and the resulting crash aborts the whole run.
 - The context starts before class construction, so a test class constructor already sees `Proto.Context`. The same constructor runs before the context in xUnit v3.
 - A skipped test exists only in xUnit's output. ProtoTest records nothing for it.
 - Theory rows are recorded under xUnit's display name, unlike MSTest and TUnit, which compose `MethodName[args]`.

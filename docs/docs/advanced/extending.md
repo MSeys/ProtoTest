@@ -17,7 +17,16 @@ Every built-in integration is built on public types, and a package you write use
 
 ## Where each extension point lives
 
-Start from what you need to say, then take the part of the integration it belongs to:
+Start from what you need to say, then take the part of the integration it belongs to. Where each part plugs in:
+
+```mermaid
+flowchart TD
+    tests["tests"] --> hooks["attributes for some · hooks for all"]
+    hooks --> host["host · owns start, stop and release"]
+    host --> clients["clients bring data in · typed state passes it along"]
+    host --> obs["observations"] --> collectors["collectors"] --> sinks["sinks write reports out"]
+    host --> trace["trace writer writes evidence out"] --> viewer["viewer"]
+```
 
 ```mermaid
 flowchart TD
@@ -38,7 +47,7 @@ flowchart TD
 | package setup for *some* tests | a [`ProtoAttribute`](../foundation/attributes.md) | 1 |
 | run code around *every* test or the whole run | a [hook](../foundation/hooks.md) | 1 |
 | give tests a new client | a [client initializer](../foundation/clients.md) plus an extension method | 2 |
-| publish and await over your own broker | an [`IProtoMessageBroker`](../integrations/messaging/index.md#the-adapter-contract) whose consumer derives from [`ProtoMessageConsumerBase`](../integrations/messaging/index.md#writing-an-adapter) | 2, 3 |
+| publish and await over your own broker | an [`IProtoMessageBroker`](../integrations/messaging/adapters.md#the-adapter-contract) whose consumer derives from [`ProtoMessageConsumerBase`](../integrations/messaging/adapters.md#writing-an-adapter) | 2, 3 |
 | pass data between setup and tests | [typed state](../foundation/execution-context.md#typed-state) | 3 |
 | authenticate HTTP requests | an [`IProtoHttpAuthenticator`](../integrations/rest/authentication.md#writing-your-own) | 1 |
 | log a browser in | an [`IWebLoginStrategy`](../integrations/web/login.md) | 1 |
@@ -48,6 +57,17 @@ flowchart TD
 | write reports somewhere | an [`IProtoSink`](../observability/reporting.md#writing-a-sink) | 4 |
 | show up in the trace viewer | the trace writer, below | 1 |
 | support another test runner | `ProtoHost` plus `IProtoTestAttachmentPublisher`, below | separate |
+
+## Your first integration package
+
+A minimal package is six small steps, in this order. The worked bus client below follows them, and each step runs before the next: register the package on a host, write one test through the context accessor, and read its trace before adding the collector.
+
+1. **Options.** An options type implementing `IProtoConfigurableOptions` with a section name, registered through `ProtoOptionsRegistration.Configure`, so code callbacks run in order and configuration binds over them. See [Options and configuration](#options-and-configuration).
+2. **The client and its initializer.** A client class plus an initializer that opens it per test and registers it, so tests get a fresh client with the test's cancellation token. See [part 1](#1-the-client-and-its-initializer).
+3. **A host builder extension.** An `Add...` method that registers the options and the initializer on the `IProtoHostBuilder`. See [part 2](#2-a-host-builder-extension).
+4. **A context extension.** A `Proto.Context.X()` accessor that resolves the client by name. See [part 3](#3-a-context-extension).
+5. **Trace the operations.** One `{area}.{action}` operation per act, so the package reads like a built-in in the viewer. See [Adding to the trace](#adding-to-the-trace).
+6. **Optionally, a collector.** Turn the observations the client records into a report section. See [part 4](#4-optionally-a-collector).
 
 ## A worked example: a message-bus client
 
@@ -191,7 +211,15 @@ Built-ins use `ProtoTest:<Integration>[:<Area>]`. The area names the role, such 
 
 ## Adding to the trace
 
-`context.Trace` is an `IProtoTraceWriter`.
+`context.Trace` is an `IProtoTraceWriter`. One operation your package writes reads like this in the viewer:
+
+```text
+bus.publish            BUS · Publish · orders.created     Succeeded · 12 ms
+kind                   name                               outcome
+source: Acme.ProtoTest.Bus          attributes: bus.topic = orders.created
+```
+
+Kind, name, source and attributes are the four things every call sets. The conventions below are what makes the row read like a built-in one.
 
 ### Operations
 
@@ -262,6 +290,18 @@ context.Trace.WriteEvent(
 - **Attributes** are strings. Keep them small, and never put secrets in them.
 
 Nesting is automatic. An operation started inside another becomes its child and inherits its phase. Pass `parentId` to attach elsewhere, or `phase` to set it explicitly.
+
+### Reading a trace in code
+
+The host exposes a live snapshot of the same tree, for code that needs to read a run without opening the archive:
+
+```csharp
+var run = host.Trace.Snapshot();
+var click = run.Tests.Single().Entries.Single(entry => entry.Kind == "web.click");
+Assert.That(click.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
+```
+
+`ProtoTraceDiscovery.Discover(folder)` lists the readable runs a folder holds, newest first, and names the archives it had to skip. `ProtoTest.Traces` reads one archive.
 
 ## Supporting another runner
 

@@ -10,6 +10,23 @@ description: "A database connection each test owns, optionally wrapped in a tran
 
 `ProtoTest.Sql` gives each test a database connection it owns: opened before the test, optionally wrapped in a transaction that is rolled back when the test ends, and disposed with the test. `ProtoTest.Sql.EntityFrameworkCore` builds Entity Framework Core contexts on that same connection, and `ProtoTest.Sql.Testcontainers` owns a PostgreSQL server for the run. Use it when tests write to a store they control and must leave no rows behind. When the store belongs to a deployed environment, test through the application APIs instead.
 
+Writes made through the connection ProtoTest owns disappear at teardown:
+
+| Write path | `Transaction` (default) | `None` |
+| --- | --- | --- |
+| Through the owned connection | rolled back | persists; provisioners release it |
+| Through the application's own connection | commits | commits |
+
+See [Isolation](#isolation) for the promise and its guard.
+
+## Stores other than SQL
+
+This page is relational: `ProtoTest.Sql` owns a `DbConnection` per test. When the store is MongoDB, Redis, Elasticsearch or anything else without ADO.NET, pick one of three options:
+
+1. **Test through the application APIs.** When the store belongs to a deployed environment rather than the test, drive it through the application's REST, GraphQL or gRPC surface and assert on what comes back. Nothing here is needed.
+2. **Register a raw client.** When the test must reach the store directly, register the client as an ordinary scoped service on the host builder and resolve it in the test. There is no per-test transaction or rollback; provision what the test needs and release it in teardown or with a [provisioner](../data/provisioners.md).
+3. **Write an adapter that follows the SQL rule.** When several suites need the same owned-connection shape, package it like `ProtoTest.Sql` does: a host builder extension that registers the client scoped, a test hook that opens and releases it, and the same honest capability rule. `SqlAddressRule.DeclaredKeys` and `SqlAddressRule.IsInert` carry the address decision, and `AddEntityFrameworkCore` is the canonical example to copy (see [For package authors](#for-package-authors)).
+
 ## Install
 
 ```bash
@@ -161,7 +178,7 @@ An application hosted in process receives the same keys as host settings automat
 
 ### Run-owned schema
 
-A container database starts empty, and the schema must exist before the first test, but a test body and a test hook run inside the per-test transaction, so `EnsureCreated`/`Migrate` or raw DDL there is rolled back with the test. Create it once for the run with [run-scoped setup](../../foundation/infrastructure.md#run-scoped-setup), registered **after** the container so it reads the connection string the container published:
+A container database starts empty, and the schema must exist before the first test, but a test body and a test hook run inside the per-test transaction, so `EnsureCreated`/`Migrate` or raw DDL there is rolled back with the test. Create it once for the run with [run-scoped setup](../../foundation/infrastructure-recipes.md#run-scoped-setup), registered **after** the container so it reads the connection string the container published:
 
 ```csharp
 builder
@@ -193,6 +210,13 @@ The schema then survives the rollback; the rows do not. Every test sees the tabl
 
 ## In the trace and coverage
 
+```text
+sql.connection.open · NpgsqlConnection (Setup)
+├─ sql.transaction.begin (child, sql.isolation = Transaction)
+├─ sql.enlist · OrdersDbContext (Setup, source ProtoTest.Sql.EntityFrameworkCore)
+└─ sql.transaction.rollback (release phase, inside the connection resource release)
+```
+
 - Operations follow the connection's lifecycle, all with source `ProtoTest.Sql`: `sql.connection.open` (Setup, with `sql.connection.type`), `sql.transaction.begin` (Setup, child of the open, with `sql.isolation`), `sql.transaction.rollback` (release phase, inside the connection resource's release), and `sql.enlist` (Setup, when a `DbContext` joins the transaction, with `db.context`, source `ProtoTest.Sql.EntityFrameworkCore`).
 - The connection is a **test-scoped resource**: entity kind `database`, id `database:connection`, described as the connection type and isolation, plus the names it is shared with when there are any. Its release runs in teardown before the test's clients are disposed, and is recorded as a `resource.release` entry with `resource.kind = database`.
 - The run registers `SQL` and `Entity Framework Core` as `store` capabilities. Both are declared only while the SQL address keys can provide a connection; with declared-but-unprovided keys the trace records both as `capability.skipped` and no connection is opened.
@@ -215,23 +239,25 @@ With `AddressKeys` declared and none of them provided, the `SQL` capability is a
 
 ## Limits
 
-- **The container needs a container runtime.** The container starts with the host, before any test-level skip condition, so `PostgresDatabase.Container()` fails the run at start when the runtime is missing; call `TryStart` in the suite fixture before registering it to fall back to another database, or skip the suite with the reported reason.
-- **The transaction covers one connection.** The application's own connection is not rolled back unless the application is built on ProtoTest's connection; `ShareConnectionWith` declares that fact and satisfies the run-start guard, but it does not make the application use the connection.
-- **The guard only sees registered applications.** An application hosted without `AddApplication` cannot be detected, so nothing fails the run if it writes outside the transaction.
-- **`AddSql` is once per host.** A second call is a no-op rather than layering a second connection: the first registration's factory and options win, matching [repeated registration](../../getting-started/configuration.md#repeated-registration).
-- **A rollback failure still disposes everything.** The transaction and the connection are disposed in their own `finally` blocks even when rollback throws; the release failure is aggregated like any other teardown failure.
-- **The connect timeout is provider-owned.** The connection open and transaction begin observe `ProtoExecutionContext.CancellationToken`, or the runner's own token where its adapter has one:
+| Limit | Matters when | Severity |
+| --- | --- | --- |
+| **The container needs a container runtime.** The container starts with the host, before any test-level skip condition, so `PostgresDatabase.Container()` fails the run at start when the runtime is missing; call `TryStart` in the suite fixture before registering it to fall back to another database, or skip the suite with the reported reason. | The run owns its database but no runtime is installed. | The run fails at start. |
+| **The transaction covers one connection.** The application's own connection is not rolled back unless the application is built on ProtoTest's connection; `ShareConnectionWith` declares that fact and satisfies the run-start guard, but it does not make the application use the connection. | The application opens its own connection. | Its writes commit and stay behind. |
+| **The guard only sees registered applications.** An application hosted without `AddApplication` cannot be detected, so nothing fails the run if it writes outside the transaction. | An application is hosted outside `AddApplication`. | Writes outside the transaction commit silently. |
+| **`AddSql` is once per host.** A second call is a no-op rather than layering a second connection: the first registration's factory and options win, matching [repeated registration](../../getting-started/configuration.md#repeated-registration). | `AddSql` is called twice on one host. | The second call is ignored. |
+| **A rollback failure still disposes everything.** The transaction and the connection are disposed in their own `finally` blocks even when rollback throws; the release failure is aggregated like any other teardown failure. | Rollback throws. | The failure surfaces as a teardown failure; nothing leaks. |
+| **The connect timeout is provider-owned.** The connection open and transaction begin observe `ProtoExecutionContext.CancellationToken`, or the runner's own token where its adapter has one (table below). Without a token the provider's own connect timeout ends the wait (Npgsql's default, or `Connect Timeout` in the connection string). | Opening the connection hangs. | The provider timeout ends the wait. |
+| **No automatic migration or database creation.** ProtoTest never creates or migrates a schema by itself. When the run owns the database, create the schema once with [`AddRunSetup`](#run-owned-schema): a test body or hook runs inside the rolled-back transaction, so `EnsureCreated`/`Migrate` there disappears with the test. A deployed environment keeps its own schema. | The run owns an empty database. | Tests fail on the missing schema until `AddRunSetup` creates it. |
 
-  | Runner | Cancellation source |
-  | --- | --- |
-  | NUnit | the test context token via `[CancelAfter]` |
-  | xUnit v2 | the runner's `CancellationTokenSource` |
-  | xUnit v3 | `TestContext.Current.CancellationToken` |
-  | TUnit | `TestContext.CancellationToken` |
-  | MSTest | none (4.0.2 floor exposes none) |
+The cancellation source per runner:
 
-  Without a token the provider's own connect timeout ends the wait (Npgsql's default, or `Connect Timeout` in the connection string).
-- **No automatic migration or database creation.** ProtoTest never creates or migrates a schema by itself. When the run owns the database, create the schema once with [`AddRunSetup`](#run-owned-schema): a test body or hook runs inside the rolled-back transaction, so `EnsureCreated`/`Migrate` there disappears with the test. A deployed environment keeps its own schema.
+| Runner | Cancellation source |
+| --- | --- |
+| NUnit | the test context token via `[CancelAfter]` |
+| xUnit v2 | the runner's `CancellationTokenSource` |
+| xUnit v3 | `TestContext.Current.CancellationToken` |
+| TUnit | `TestContext.CancellationToken` |
+| MSTest | none (4.0.2 floor exposes none) |
 
 ## For package authors
 
@@ -240,6 +266,6 @@ A sibling access technology that wants the same honest capability shares the rul
 ## Links
 
 - [Integrations map](../overview.md) - where the store packages sit.
-- [One suite, three environments](../../getting-started/environments.md) - the demo's SQLite and PostgreSQL switch.
+- [One suite, three environments](../../getting-started/environments.md) - the sample suite's SQLite and PostgreSQL switch.
 - [Infrastructure](../../foundation/infrastructure.md) - how `PostgresDatabase.Container()` starts and fills settings.
-- EF Core registration order and enlistment in [`tests/ProtoTest.Sql.Tests/SqlIsolationTests.cs`](https://github.com/MSeys/ProtoTest/blob/main/tests/ProtoTest.Sql.Tests/SqlIsolationTests.cs), and the demo's composition in [`samples/Northstar.ProtoTest/Setup.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs).
+- EF Core registration order and enlistment in [`tests/ProtoTest.Sql.Tests/SqlIsolationTests.cs`](https://github.com/MSeys/ProtoTest/blob/main/tests/ProtoTest.Sql.Tests/SqlIsolationTests.cs), and the sample suite's composition in [`samples/Northstar.ProtoTest/Setup.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs).

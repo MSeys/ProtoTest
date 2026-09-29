@@ -19,7 +19,10 @@
 }
 
 .jump {
+  min-height: var(--control-height);
   padding: var(--space-1) var(--space-3);
+  display: inline-flex;
+  align-items: center;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-pill);
   background: none;
@@ -34,28 +37,35 @@
 /* The tabs follow the viewer's own nav: underline, no pills. */
 .tabs {
   display: flex;
-  gap: var(--space-5);
+  align-items: center;
+  gap: 2px;
   padding: 0 var(--space-4);
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
 }
 
 .tab {
-  padding: var(--space-2) 0;
+  flex: none;
+  height: 32px;
+  padding: 0 var(--space-4);
+  display: inline-flex;
+  align-items: center;
   border: 0;
   border-bottom: 2px solid transparent;
+  border-radius: var(--radius-chip) var(--radius-chip) 0 0;
   background: none;
   color: var(--muted);
   font: var(--weight-semibold) var(--text-meta) var(--font-ui);
   cursor: pointer;
 }
 
-.tab:hover { color: var(--text); }
+.tab:hover { background: var(--hover); color: var(--text); }
 
 .tab:focus-visible { outline: 2px solid var(--blueprint); outline-offset: 2px; }
 
-.tabActive { color: var(--text); border-bottom-color: var(--blueprint); }
+.tabActive { color: var(--text); border-bottom-color: var(--blueprint); font-weight: var(--weight-bold); }
 
-.view { padding: var(--space-3) 0 0; }
+.view { padding: var(--space-3) 0 0; container-type: inline-size; }
 
 /* Run view ------------------------------------------------------------------ */
 
@@ -65,20 +75,22 @@
 
 .failedText { color: var(--danger); }
 .partialText { color: var(--warning); }
-.passedText { color: var(--success); }
 
-.meta { margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--text-meta); }
+.meta { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--text-meta); }
 
-/* The phase bar: one tick per test, passed kept quiet, the four that need attention in full colour. */
-.bar { display: flex; gap: 2px; margin: var(--space-3) 0; }
+.file { color: var(--dim); }
 
-.tick { flex: 1 1 0; height: 5px; border-radius: var(--radius-hairline); }
-.tickPassed { background: var(--success-line); }
-.tickFailed { background: var(--danger); }
-.tickPartial { background: var(--warning); }
+/* The phase bar: one tick per test, in the order they started. Passing tests are the quiet majority;
+   what did not pass stands up out of the line, in its outcome colour. */
+.bar { display: flex; align-items: flex-end; gap: 2px; height: 12px; margin: var(--space-3) 0; }
 
-.panel { margin-top: var(--space-3); overflow: clip; border: 1px solid var(--border); border-radius: var(--radius-control); }
-.panelHead { padding: var(--space-2) var(--space-3); font-weight: var(--weight-bold); }
+.tick { flex: 1 1 0; min-width: 3px; height: 5px; border-radius: var(--radius-hairline); }
+.tickPassed { background: var(--outcome-succeeded); opacity: 0.45; }
+.tickFailed { height: 12px; background: var(--outcome-failed); }
+.tickPartial { height: 12px; background: var(--outcome-partial); }
+
+.panel { margin-top: var(--space-3); overflow: clip; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.panelHead { padding: var(--space-2) var(--space-3); font-size: var(--text-strong); font-weight: var(--weight-bold); line-height: var(--leading-tight); }
 
 .panelLead { margin: 0 var(--space-3) var(--space-2); color: var(--muted); font-size: var(--text-meta); }
 
@@ -113,10 +125,16 @@
 
 .attRow {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-left: 3px solid transparent;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-left: 2px solid transparent;
+}
+
+/* Narrow frames put the outcome under the text, so the label never squeezes the title. */
+@container (max-width: 30rem) {
+  .attRow { grid-template-columns: 34px minmax(0, 1fr); }
+  .attLabel { grid-column: 2; white-space: normal; }
 }
 
 .attRow + .attRow { border-top: 1px solid var(--border); }
@@ -128,7 +146,7 @@
 .attNumber { color: var(--muted); font: var(--text-micro) var(--font-mono); }
 
 .attBody { display: grid; gap: 2px; min-width: 0; }
-.attTitle { font-size: var(--text-meta); font-weight: var(--weight-semibold); }
+.attTitle { font-size: var(--text-body); font-weight: var(--weight-semibold); }
 .attKicker { color: var(--muted); font-size: var(--text-micro); }
 .attDetail { color: var(--muted); font-size: var(--text-micro); overflow-wrap: anywhere; }
 
@@ -149,7 +167,9 @@
   flex: 1 1 auto;
   min-width: 0;
   color: var(--text);
-  font: var(--weight-semibold) var(--text-body) var(--font-ui);
+  font: var(--weight-semibold) var(--text-heading) var(--font-ui);
+  letter-spacing: var(--tracking-display);
+  overflow-wrap: anywhere;
 }
 
 /* The sentence a reader sees, with the code name it came from, as in the viewer header. */
@@ -210,6 +230,7 @@
   align-items: baseline;
   gap: var(--space-1);
   font: var(--text-micro) var(--font-mono);
+  overflow-wrap: anywhere;
 }
 
 .mismatch b { color: var(--danger); }
@@ -258,14 +279,14 @@
     linear-gradient(var(--muted), var(--muted)) center / 1px 6px no-repeat;
 }
 
-.node { justify-self: center; width: 7px; height: 7px; transform: rotate(45deg); background: var(--node); }
+.node { justify-self: center; width: 7px; height: 7px; transform: rotate(45deg); background: var(--node-color, var(--dim)); }
 
 .kind {
   justify-self: start;
   padding: 0 var(--space-2);
   border-radius: var(--radius-chip);
-  background: color-mix(in srgb, var(--node) 14%, transparent);
-  color: color-mix(in srgb, var(--node) 78%, var(--text));
+  background: color-mix(in srgb, var(--node-color) 14%, transparent);
+  color: color-mix(in srgb, var(--node-color) 78%, var(--text));
   font-size: var(--text-micro);
   font-weight: var(--weight-semibold);
   line-height: 1.8;
@@ -278,6 +299,18 @@
 .wide { grid-column: span 2; }
 .facts { min-width: 0; overflow: hidden; color: var(--muted); font-size: var(--text-micro); text-overflow: ellipsis; white-space: nowrap; }
 .duration { color: var(--muted); font-size: var(--text-micro); text-align: right; white-space: nowrap; }
+
+/* Narrow frames stack the row: marker and chip on the first line with the duration, the title
+   and facts wrap underneath, the checks keep the full width. */
+@container (max-width: 34rem) {
+  .row { grid-template-columns: 10px minmax(0, 1fr) auto; row-gap: var(--space-1); }
+  .fold, .node { grid-column: 1; grid-row: 1; margin-top: var(--space-1); }
+  .kind { grid-column: 2; grid-row: 1; }
+  .duration { grid-column: 3; grid-row: 1; }
+  .label, .wide { grid-column: 2 / -1; grid-row: 2; overflow: visible; white-space: normal; }
+  .facts { grid-column: 2 / -1; grid-row: 3; overflow: visible; white-space: normal; overflow-wrap: break-word; }
+  .checks { grid-column: 2 / -1; }
+}
 
 .checks { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: var(--space-1); }
 
@@ -302,7 +335,7 @@
 
 .checkView { padding: 0 var(--space-4) var(--space-1); display: grid; gap: var(--space-2); }
 
-.crumb { margin: 0; color: var(--muted); font-size: var(--text-meta); }
+.crumb { margin: 0; color: var(--muted); font-size: var(--text-meta); overflow-wrap: anywhere; }
 .crumbOp { color: var(--blueprint); font: var(--text-micro) var(--font-mono); }
 
 .checkHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
@@ -313,16 +346,16 @@
 
 .checkStatusOutcome { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold); }
 
-.checkOp { margin: 0; color: var(--muted); font: var(--text-micro) var(--font-mono); }
+.checkOp { margin: 0; color: var(--muted); font: var(--text-micro) var(--font-mono); overflow-wrap: anywhere; }
 
 .exception {
   padding: var(--space-3);
   display: grid;
   gap: var(--space-1);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--danger);
-  border-radius: var(--radius-control);
+  border-left: 2px solid var(--danger);
+  border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
   background: var(--danger-soft);
+  overflow-wrap: break-word;
 }
 
 .exception b { color: var(--danger); font: var(--weight-semibold) var(--text-meta) var(--font-mono); }
@@ -337,7 +370,7 @@
   margin: 0;
   padding: var(--space-2) 0;
   overflow-x: auto;
-  border-radius: var(--radius-chip);
+  border-radius: var(--radius-control);
   background: var(--surface-sunken);
   color: var(--code-text);
   font: var(--text-micro)/1.6 var(--font-mono);

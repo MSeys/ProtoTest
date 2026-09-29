@@ -75,7 +75,7 @@ prototest feedback: webhook skipped (No webhook URL: set PROTOTEST_FEEDBACK_WEBH
 
 The `::error` lines are the check annotations. The channel lines are the per-channel outcome; each one names why it skipped or failed.
 
-The same digest reaches a reviewer as a pull request comment, from the committed failing fixture:
+The same digest reaches a reviewer as a pull request comment. The shape of the comment, with values from the committed failing fixture:
 
 ```markdown
 ## ProtoTest run `29e344f9cf54431ca7d8bad3f87a1749`
@@ -138,6 +138,17 @@ jobs:
 
 Give the action both reports to gate the pull request. A nightly job runs the suite on the default branch and keeps its `report.json`. The pull request job fetches it.
 
+```mermaid
+flowchart LR
+    nightly["nightly on main · 02:30"] --> baseline["baseline report.json"]
+    pr["pull request job"] --> current["current report.json"]
+    pr --> fetch["fetch the newest nightly artifact"]
+    fetch --> baseline
+    baseline --> gate["feedback with baseline + current"]
+    current --> gate
+    gate --> verdict["pass or fail the gate"]
+```
+
 ```yaml
 # nightly.yml
 name: Nightly baseline
@@ -199,11 +210,17 @@ The other inputs are optional. `webhook-url` and `webhook-secret` post the diges
 
 [The evidence loop](../agent-workflows/loop.md#what-the-reviewer-sees) shows what the reviewer sees. The [CLI reference](../agent-workflows/cli.md#environment-targets) lists every environment target.
 
-## GitHub Actions
+## Provider configurations
 
-If you prefer to keep only the raw artifacts, this job runs the suite and uploads the results folder:
+If you prefer to keep only the raw artifacts, each provider runs the suite and uploads the results folder. The three differ in two lines: the results variable and the publish condition.
 
-```yaml
+| Provider | Results variable | Publish even on failure | Containers |
+| --- | --- | --- | --- |
+| GitHub Actions | `github.workspace` + `/TestResults/ProtoTest` | `if: always()` | Docker available on hosted Linux runners |
+| [Azure Pipelines](./azure-pipelines.md) | `$(Build.ArtifactStagingDirectory)/ProtoTest` | `succeededOrFailed()` | Microsoft-hosted Linux agents |
+| [GitLab CI](./gitlab-ci.md) | `$CI_PROJECT_DIR/TestResults/ProtoTest` | `when: always` | needs a Docker-capable runner |
+
+```yaml title=".github/workflows/integration-tests.yml"
 name: Integration tests
 
 on:
@@ -237,7 +254,7 @@ jobs:
           if-no-files-found: error
 ```
 
-`if: always()` matters here too: the trace is most useful when the test step failed. GitHub-hosted Linux runners have Docker available for Testcontainers-based infrastructure.
+`if: always()` matters: the trace is most useful when the test step failed. The [Azure](./azure-pipelines.md) and [GitLab](./gitlab-ci.md) pages carry the same shape with `succeededOrFailed()` and `when: always`. A container-backed suite on GitLab also needs a Docker-capable runner. Your runner setup decides if Docker-in-Docker is allowed and which service config it needs. ProtoTest only needs a reachable Docker endpoint.
 
 ### Playwright on Linux
 
@@ -259,57 +276,6 @@ When the suite uses the bundled Playwright browsers, build once, install the bro
 ```
 
 If `InstallBrowsers` is true, ProtoTest downloads a missing browser binary. Keep the explicit CI step on Linux. Playwright also installs the OS libraries the browser needs.
-
-## Azure Pipelines
-
-```yaml
-trigger:
-  - main
-
-pool:
-  vmImage: ubuntu-latest
-
-variables:
-  PROTOTEST_RESULTS: $(Build.ArtifactStagingDirectory)/ProtoTest
-
-steps:
-  - task: UseDotNet@2
-    inputs:
-      packageType: sdk
-      version: 10.x
-
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: test
-      arguments: --configuration Release
-
-  - task: PublishPipelineArtifact@1
-    condition: succeededOrFailed()
-    inputs:
-      targetPath: $(PROTOTEST_RESULTS)
-      artifact: prototest-results
-```
-
-Use `succeededOrFailed()` for the same reason as GitHub's `always()`: publish the evidence even when a test fails.
-
-## GitLab CI
-
-```yaml
-integration-tests:
-  image: mcr.microsoft.com/dotnet/sdk:10.0
-  variables:
-    PROTOTEST_RESULTS: "$CI_PROJECT_DIR/TestResults/ProtoTest"
-  script:
-    - dotnet restore
-    - dotnet test --configuration Release --no-restore
-  artifacts:
-    when: always
-    paths:
-      - TestResults/ProtoTest/
-    expire_in: 14 days
-```
-
-A container-backed suite also needs a Docker-capable GitLab runner. Your runner setup decides if Docker-in-Docker is allowed and which service config it needs. ProtoTest only needs a reachable Docker endpoint.
 
 ## One suite, three jobs
 
@@ -334,6 +300,12 @@ The suite is the same in all three. What changes is the composition, and the com
 | Playwright trace and screenshots | On failure, or for a short retention period | Browser-specific diagnostics carried inside `.prototrace` and by the runner |
 
 The action [above](#the-feedback-action) uploads the trace for you. Without it, upload the results folder as an artifact. Open a downloaded `.prototrace` in the [ProtoTrace viewer](https://trace.prototest.dev). The file stays in the browser. It is not uploaded.
+
+### Retention and size
+
+A trace is small until it carries diagnostics. A synthetic test records about 7 KB of trace; the OpenCSMS health-check trace holds 25.8 MB for 1,000 tests, about 25 KB each. Browser screenshots, response bodies and embedded sources grow it from there: attachment capture is opt-in per integration, and `EmbedSources` and `EmbedArtifacts` decide whether the bytes travel inside the archive. The [benchmarks](../project/benchmarks.md) page has the full numbers.
+
+Keep the same retention as other test results, and shorter for sensitive suites. On GitHub Actions the upload step takes `retention-days`; the feedback action uploads its trace artifact with the defaults, so name it with `artifact-name` and expire the raw folder yourself. On GitLab `expire_in: 14 days` on the [GitLab page](./gitlab-ci.md) is the starting point: shorten it for suites with browser diagnostics, or keep failures longer than green runs.
 
 ## Related
 

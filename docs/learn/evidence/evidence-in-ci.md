@@ -114,15 +114,25 @@ The feedback action installs the CLI, uploads the trace, posts the digest and ch
     trace: ${{ env.PROTOTEST_RESULTS }}/run.prototrace
 ```
 
-The comment carries the failing tests, the cause and the artifact link. One check annotation lands on each failing test's source location, and a missing target skips with its reason instead of failing the job. Give the action a `baseline-report` and a `current-report` as well, and the step also fails the pull request when the run is worse than the baseline.
+The comment carries the failing tests, the cause and the artifact link. One check annotation lands on each failing test's source location, and a missing target skips with its reason instead of failing the job. Give the action a `baseline-report` and a `current-report` as well, and the step also fails the pull request when the run is worse than the baseline. A digest comment reads like this:
+
+```text
+ProtoTest evidence: 1 failed, 0 passed, 0 skipped
+FAILED Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow
+  $.status: expected past_due, actual active
+Trace: run.prototrace (open it in the viewer)
+Report: report.json, report.html
+```
 
 ## Three shapes, one suite
 
 A pipeline around this suite usually splits into three jobs:
 
-- The **pull request** job runs the suite in-process and posts the digest. It is the fast one, and it runs on every change.
-- The **nightly** job runs the same suite against the container topology, where the store and the broker are real processes the run owns.
-- The **smoke** job is optional and points the suite at a deployed environment. Capability skips drop the journeys that need the test host, and the rest run against real addresses.
+| Job | What it runs | What the reviewer opens |
+| --- | --- | --- |
+| Pull request | the suite in-process, on every change | the digest comment with the failing tests and the trace artifact link |
+| Nightly | the same suite against the container topology | the same digest, with the store and the broker as real processes the run owned |
+| Smoke (optional) | the suite pointed at a deployed environment | the same digest; capability skips drop the journeys that need the test host |
 
 These are shapes a suite of this kind fits, not a fixed pipeline. The [CI page](/docs/continuous-integration/#one-suite-three-jobs) carries the same three, and its workflows are the ones to start from. The suite is the same in all three. What changes is the composition, and the composition is what decides which capabilities exist and which journeys skip.
 

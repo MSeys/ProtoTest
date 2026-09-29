@@ -4,6 +4,8 @@ title: Queries and mutations
 description: "Three ways to describe a GraphQL query or mutation: shape-driven, fluent or a raw document, all ending in the same ExecuteAsync()."
 ---
 
+import TabbedCode from '@site/src/components/TabbedCode';
+
 # Queries and mutations
 
 There are three ways to describe an operation. Pick per test; they all end in the same `ExecuteAsync()`.
@@ -13,6 +15,37 @@ There are three ways to describe an operation. Pick per test; they all end in th
 | **Shape-driven**: `Query("root", args).Select(shape)` | one root field, where the selection is also what you assert |
 | **Fluent**: `Query("Name", q => q.Field(...))` | several root fields, aliases, connections with filters and paging |
 | **Raw**: `Request("query { … }")` | fragments, directives, anything the builders don't cover |
+
+One operation in all three styles:
+
+<TabbedCode
+  label="The same query in all three styles"
+  tabs={[
+    {
+      id: 'shape',
+      label: 'Shape-driven',
+      code: `using var response = await Proto.Context.GraphQL()
+    .Query("me")
+    .Select(new { id = Gql.Field, email = Gql.Field })
+    .ExecuteAsync();`,
+    },
+    {
+      id: 'fluent',
+      label: 'Fluent',
+      code: `using var response = await Proto.Context.GraphQL()
+    .Query("Viewer", query => query
+        .Field("me", me => me.Fields("id", "email")))
+    .ExecuteAsync();`,
+    },
+    {
+      id: 'raw',
+      label: 'Raw',
+      code: `using var response = await Proto.Context.GraphQL()
+    .Request("query Viewer { me { id email } }")
+    .ExecuteAsync();`,
+    },
+  ]}
+/>
 
 ## Shape-driven operations
 
@@ -85,6 +118,12 @@ var viewer = response.ReadDataAs<ViewerSelection>();
 
 ### How a shape becomes a selection set
 
+```csharp
+new { id = Gql.Field,                        // → id
+      owner = new { email = Gql.Field } }    // → owner { email }
+new { total = JsonValue.GreaterThan(0) }     // → total (a matcher is a leaf: selected, then asserted)
+```
+
 - Every public property becomes a field, named by `[JsonPropertyName]` or else camelCase. `[JsonIgnore]` properties are skipped.
 - Recursion stops at a **leaf**: `Gql.Field`, any `JsonValue` matcher, or a value of a primitive, enum, `string`, `decimal`, `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `Guid` or `Uri` type.
 - An array or enumerable is unwrapped to its first element, so `new[] { new { id = Gql.Field } }` selects `{ id }`.
@@ -152,7 +191,7 @@ using var response = await Proto.Context.GraphQL()
 | field | `Alias(alias)`, `Argument(name, value)`, `Fields(params names)`, `Select(configure)` |
 | selection | `Field(name, configure?)`, `Fields(params names)` |
 
-`Gql.Var("tenant")` references a declared variable (`$tenant`); supply its value with `.Variables(...)`.
+`Gql.Var("tenant")` references a declared variable (`$tenant`); supply its value with `.Variables(...)`. The builder above emits one `Dashboard` query with the `me` fields and the aliased `workspaces` selection, variables included.
 
 ### Connections
 

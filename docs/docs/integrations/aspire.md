@@ -159,6 +159,12 @@ An unknown resource throws naming `AddAspireAppHost` and the resources the run c
 
 ## In the trace and coverage
 
+```text
+run entity aspire · Aspire AppHost · MyApp.AppHost
+├─ aspire.resource.api.address = https://localhost:5001 (endpoint http, AppHost published)
+└─ aspire.resource.opencsms.address_source = configuration (key already filled, AppHost never started for it)
+```
+
 The AppHost is run-scoped infrastructure: the trace records an `aspire` run entity named `Aspire AppHost · {assembly}`, the run overview lists an `aspire` capability named for the AppHost assembly, and the entity carries the published endpoints as evidence (`aspire.resource.{resource}.address`, with the endpoint name beside it; a resource whose key configuration already fills carries `aspire.resource.{resource}.address_source = configuration`, and one another provider serves carries `..._source = not selected`). A release failure follows the same path as any other run resource.
 
 ## Choosing between a worker and an AppHost

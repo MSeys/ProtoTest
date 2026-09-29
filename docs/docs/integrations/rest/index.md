@@ -140,11 +140,13 @@ Each request records an `http.request` operation (`REST · {METHOD} {route}`) un
 
 ## Limits
 
-- Shape assertions are positive-only; `Should` / `ShouldNot` expose the status, content type, header, cookie and redirect-location assertions, and `MatchShape` is the only positive-only member.
-- Response bodies are always buffered whole in memory; there is no streaming read API.
-- Route tokens are `{name}` over ASCII letters, digits and `_`.
-- Registering the same client name twice keeps the first registration; `TryAddResponseOptions` is first-wins for the keyed instance, though configuration callbacks compose.
-- No retry or resilience-policy layer.
+| Limit | Matters when | Severity |
+| --- | --- | --- |
+| Shape assertions are positive-only; `Should` / `ShouldNot` expose the status, content type, header, cookie and redirect-location assertions, and `MatchShape` is the only positive-only member. | Asserting that a field is absent or that a value differs. | The test cannot express it. |
+| Response bodies are always buffered whole in memory; there is no streaming read API. | Downloading large payloads. | Memory grows with the body size. |
+| Route tokens are `{name}` over ASCII letters, digits and `_`. | Routes use other characters. | The route does not match. |
+| Registering the same client name twice keeps the first registration; `TryAddResponseOptions` is first-wins for the keyed instance, though configuration callbacks compose. | Overlapping registrations compose the same client name. | The later registration is ignored. |
+| No retry or resilience-policy layer. | Calling a flaky endpoint. | A transient failure fails the test. |
 
 ## Next
 

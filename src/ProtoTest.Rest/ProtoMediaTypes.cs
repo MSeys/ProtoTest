@@ -1,7 +1,7 @@
-namespace ProtoTest.Http;
+namespace ProtoTest.Rest;
 
 /// <summary>
-/// The media type classification the HTTP integrations share. Bodies are only decoded as text for
+/// The media type classification the REST integration uses. Bodies are only decoded as text for
 /// text media types; anything else stays bytes so tracing never carries lossy decoded text.
 /// </summary>
 internal static class ProtoMediaTypes

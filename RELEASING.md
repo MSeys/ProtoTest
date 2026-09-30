@@ -10,7 +10,7 @@ that just bumped the version can be packed and consumed before the release.
 
 ## 1. Bump the version
 
-Set `<Version>` in `Directory.Build.props` to the release version (`1.1.0`, no pre-release suffix).
+Set `<Version>` in `Directory.Build.props` to the release version (for example `1.2.0`, no pre-release suffix).
 Branch builds use `x.y.0-alpha.<n>`; the release version must be new (see the pack guard above).
 
 ## 2. Roll the changelog
@@ -45,8 +45,7 @@ A release section uses `### Features`, `### Fixes` and - only when the release h
 (`Core`, `REST`, `GraphQL`, `Messaging`, `Web`, `Docs`). A change that needs a migration note gets at
 most one sub-bullet; everything else links the docs page. Never-public churn (alpha-only fixes,
 internal refactors, gate tooling) does not get its own entry - fold it into the public feature or fix
-that needed it. The 1.1 section is rewritten to these rules before its tag; every later release is
-written this way from the start.
+that needed it. Write every release section this way from the start.
 
 ## 3. Verify and validate
 

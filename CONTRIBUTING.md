@@ -81,6 +81,14 @@ npm ci
 npm run build
 ```
 
+## Trying the local packages
+
+`eng/pack.ps1` writes the branch packages to `artifacts/packages`. A scratch project consumes them
+through a `nuget.config` that points a local source at that folder, with package source mapping for
+`ProtoTest.*` so only ProtoTest packages resolve locally. Install the template from its package file:
+`dotnet new install artifacts/packages/ProtoTest.Templates.<version>.nupkg`. After a repack, delete
+`~/.nuget/packages/prototest.*`; the global cache wins otherwise and the old bits run.
+
 ## Integration pages
 
 Every page under `docs/docs/integrations` follows one shape, and `eng/check-docs.ps1` fails when a page that should carry it does not. The six sections, in order:

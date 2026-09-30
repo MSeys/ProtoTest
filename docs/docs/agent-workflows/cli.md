@@ -52,9 +52,11 @@ FAILED Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine (2.
   cause: runner-reported failure
 ```
 
-A run with nothing to report prints two lines and stops:
+A run with nothing to report prints the header, the counts and the words `All green.`:
 
 ```text
+ProtoTest trace 2.0 · run 761778e6dc82498a9f9965fa1e6b5a24 · 2026-09-29 06:19:01Z - 2026-09-29 06:19:05Z
+1 tests · 1 succeeded
 All green.
 ```
 
@@ -246,6 +248,7 @@ flowchart TD
 - The verbs read files. The only writes are the `index` page, the digests beside the traces and the `--digest` file.
 - No network call happens unless a target is configured. A missing target is a named skip, never a failure.
 - The verbs take no other arguments, and there is no verb that reruns a suite, writes a trace or changes an archive.
+- The CLI writes UTF-8 without a BOM and sets the console output encoding, so the `·` separator renders on a default Windows console; redirected output stays parsing-friendly.
 - The digest is built from the written archive after the run, so it reflects what the run recorded ([The evidence loop](./loop.md#limits)).
 - These four verbs are the whole `prototest` surface.
 

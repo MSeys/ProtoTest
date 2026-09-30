@@ -53,7 +53,7 @@ Every tool is read-only and returns a compact JSON document.
   on disk is modified.
 - Nothing leaves the machine by default: no telemetry, no uploads, no accounts. The stdio host reads
   local archives and logs to stderr; stdout carries the protocol only.
-- Hard caps bound every payload: 50 runs, 20 failing tests per run, 25 mismatches, 20 artifacts per
+- Hard caps bound every payload: 50 runs, 20 failing tests per run, 10 failed operations, 25 mismatches, 20 artifacts per
   test, 200 uncovered units, a 64 MB report read and a 4,000-character error message. `list_runs`
   clamps `limit` to 1-50 and `get_coverage` clamps `limit` to 1-200. `get_diagnosis` applies the
   diagnosis library's own caps (25 mismatches, 10 findings, 10 artifacts, 4 KB previews, 32 ancestors).

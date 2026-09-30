@@ -29,7 +29,11 @@ public static class ProtoExecutionContextExtensions
         _ = context.TryService<IWebBackendFactory>()
             ?? throw new InvalidOperationException(
                 "No web backend is registered. Reference ProtoTest.Web.Playwright or ProtoTest.Web.Selenium and call AddWeb().");
-        if (context.TryClient<WebSession>(resolvedName) is { } existing)
+
+        // Sessions are keyed by name and application, so the same name under two applications is two
+        // sessions. The qualification is the shared client naming, not a second registry.
+        var key = ProtoClientResolution.Qualify(resolvedName, resolvedApplication);
+        if (context.TryClient<WebSession>(key) is { } existing)
         {
             return existing;
         }
@@ -39,7 +43,7 @@ public static class ProtoExecutionContextExtensions
         // through the client registry).
         var session = new WebSession(
             context, ResolveFactory(context), resolvedName, resolvedApplication, endpoint, discoverRoutes);
-        context.RegisterClient(session, resolvedName);
+        context.RegisterClient(session, key);
         return session;
     }
 

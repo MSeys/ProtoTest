@@ -99,6 +99,27 @@ public sealed class MqttRegistrationTests
     }
 
     [Test]
+    public async Task AddMqttClient_WhenTheBrokerIsProvidedInCode_ShouldKeepTheDeviceCapabilities()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureTracing(options => options.Enabled = false);
+        builder.AddDevices(devices => devices
+            .AddMqttClient(
+                "Sensors",
+                "sensors/{deviceId}/out",
+                "sensors/{deviceId}/in",
+                configure: options => options.Broker = "mqtt://127.0.0.1:1883")
+                .AddDevice<PingDevice>());
+        await using var host = builder.Build();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(host.HasCapability(ProtoCapabilityKinds.Device, nameof(PingDevice)), Is.True);
+            Assert.That(host.HasCapability(ProtoCapabilityKinds.Device, MqttDeviceTransport.TransportName), Is.True);
+        }
+    }
+
+    [Test]
     public async Task AddMqttClient_WhenInfrastructureDeclaresTheBroker_ShouldKeepTheDeviceCapabilities()
     {
         var builder = new ProtoHostBuilder();

@@ -203,7 +203,7 @@ public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, R
             if (attachmentOptions?.CaptureRequestBodies == true)
             {
                 var mediaType = request.Content.Headers.ContentType?.MediaType;
-                if (IsTextMediaType(mediaType))
+                if (ProtoMediaTypes.IsTextMediaType(mediaType))
                 {
                     var requestBody = await request.Content.ReadAsStringAsync(ct);
                     Context.AddAttachment(
@@ -290,7 +290,7 @@ public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, R
             }
             responseFacts.Add(new("length", $"{bodyBytes.Length} B"));
             traceOperation.AddSection(new ProtoTraceSection("Response", ProtoTraceSectionKind.Fields, responseFacts));
-            if (IsTextMediaType(responseMediaType) && !string.IsNullOrWhiteSpace(diagnosticBody))
+            if (ProtoMediaTypes.IsTextMediaType(responseMediaType) && !string.IsNullOrWhiteSpace(diagnosticBody))
             {
                 traceOperation.AddSection(new ProtoTraceSection(
                     "Body",
@@ -305,7 +305,7 @@ public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, R
                 var attachmentMediaType = responseMediaType ?? "application/octet-stream";
                 var attachmentDescriptionText =
                     $"{attachmentDescription} returned {(int)responseMessage.StatusCode} ({responseMessage.StatusCode})";
-                if (IsTextMediaType(responseMediaType))
+                if (ProtoMediaTypes.IsTextMediaType(responseMediaType))
                 {
                     Context.AddAttachment(
                         attachmentName,
@@ -338,7 +338,7 @@ public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, R
                     RouteTemplate: routeTemplate,
                     StatusCode: (int)responseMessage.StatusCode,
                     // Binary bodies stay bytes in the attachment; the observation keeps no decoded text.
-                    ResponseBody: IsTextMediaType(responseMediaType) ? diagnosticBody : string.Empty,
+                    ResponseBody: ProtoMediaTypes.IsTextMediaType(responseMediaType) ? diagnosticBody : string.Empty,
                     Headers: headersDict,
                     RequestUri: ProtoHttpDiagnosticSanitizer.SanitizeUri(request.RequestUri, attachmentOptions),
                     Duration: stopwatch.Elapsed
@@ -389,19 +389,6 @@ public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, R
         }
 
         return $"rest-{state.NextRequestNumber():00}";
-    }
-
-    private static bool IsTextMediaType(string? mediaType)
-    {
-        if (mediaType is null) return false;
-        var normalized = mediaType.ToLowerInvariant();
-        return normalized.StartsWith("text/", StringComparison.Ordinal)
-            || normalized is "application/json" or "application/xml" or "application/yaml"
-                or "application/x-yaml" or "application/javascript"
-                or "application/x-www-form-urlencoded" or "application/graphql"
-            || normalized.EndsWith("+json", StringComparison.Ordinal)
-            || normalized.EndsWith("+xml", StringComparison.Ordinal)
-            || normalized.EndsWith("+yaml", StringComparison.Ordinal);
     }
 
     private void TraceConfiguredHeaders(ProtoTraceOperation operation)

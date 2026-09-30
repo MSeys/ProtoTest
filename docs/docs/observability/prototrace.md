@@ -54,13 +54,15 @@ The trace is not the same thing as [observations](./coverage.md). The trace is a
 
 The [ProtoTrace viewer](https://trace.prototest.dev) is a static web app. Trace files are read **entirely in your browser** and never uploaded. To look around before you have a trace of your own, [open the sample trace](https://trace.prototest.dev/?demo=1): a run of the sample suite, with four failing tests and one partial one.
 
-- **The run** leads one test list with shared search and outcome filters. Needs attention names the diagnosis rule: Assertion, Operation error, Runner failure or Finding, using the same precedence as `prototest summary`. The run timeline places tests and their gaps on the run clock. Run operations and tracked items open in the inspector; Run details lists the run id and every `environment.*` value.
+- **The run** leads one test list with shared search and outcome filters, and splits into views. **Overview** holds Needs attention, named with the diagnosis rule (Assertion, Operation error, Runner failure or Finding, in the precedence `prototest summary` uses), beside what the run could see. **Timeline** places tests and their gaps on the run clock. **Operations** lists the run's own work and tracked items, which open in the inspector. **Details** lists the run id and every `environment.*` value, and **Files** everything the run attached. A view with nothing in it has no tab; `#/run/<view>` links to one.
 - **A failing test** starts with a verdict bar: the diagnosis rule, the check or operation that decided it, the call it judged, and the first difference. The inspector holds the full comparison.
 - **Steps** opens on the test body. Setup and teardown fold into summary rows and open along a failure. Calls carry their checks; time with no recorded operation gets its own row.
-- **Timeline** is every operation on the test clock. Zoom to one phase, search by name, kind or attribute, filter for needs attention, and dim or hide framework work. Matching operations keep their ancestors for context.
+- **Timeline** is every operation on the test clock. Zoom to one phase, search by name, kind or attribute, and filter for needs attention. Matching operations keep their ancestors for context.
 - **State** shows tracked items with lifelines and changes on that same clock. Select a change to open its operation, shade its time and highlight the items it touched. Select an item to see its trail; its operations are highlighted in Timeline.
 - **Evidence** brings observations, files, findings and moments into time order. Each names the operation that recorded it, or states that none was above it.
 - **The inspector** shows the source, request and response, comparisons, state changes and evidence. Moments include their attributes and sections, observations their metadata, and findings their category, tags, target and metadata. A section index jumps to each part. Binary bodies recorded as text are marked instead of shown as broken glyphs.
+
+The **Framework** switch beside the view tabs shows, dims or hides the framework's own operations (hooks, extensions, clients, resources) in Steps and Timeline, and the machinery a test ran on in State. Dim is the default, the choice is remembered, and a framework operation that failed always stays.
 
 The header follows the path Run > Test > Operation. Test views use `#/test/<id>/steps|timeline|state|evidence`; old `story`, `spans` and `files` links still open the corresponding view. The URL holds the selected operation or item, including selections on the run, so a shared link keeps that place.
 
@@ -69,13 +71,6 @@ Hatched time means **no operation was recorded**, not that nothing happened. The
 These excerpts follow test 12 from the run through its four views and into the failing check:
 
 <ViewerWalkthrough />
-
-<details>
-<summary>Preview the recorded demo: run, story and check</summary>
-
-<ViewerWalkthrough />
-
-</details>
 
 ### Open your own archive
 

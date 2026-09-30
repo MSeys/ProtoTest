@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import type { Item, Phase, Span, TestTrace } from "../trace/model";
 import { untracedGaps, type UntracedGap } from "../trace/analysis";
 import { isFramework } from "../trace/story";
+import { frameworkMode as framework } from "../ui/frameworkMode";
 import { formatDuration, formatOffset, kindLabel, outcomeLabel, plural, rulerTicks, tone } from "../trace/format";
 import KindChip from "../ui/KindChip.vue";
 import FilterChip from "../ui/FilterChip.vue";
@@ -22,7 +23,6 @@ function related(span: Span) {
 
 const query = ref("");
 const attention = ref(false);
-const framework = ref<"dim" | "hide">("dim");
 const zoom = ref<Phase | "test">("test");
 const folded = ref(new Set<string>());
 watch(() => props.test.id, () => { folded.value = new Set(); attention.value = false; query.value = ""; zoom.value = "test"; });
@@ -165,11 +165,6 @@ const title = (phase: string) => phase.charAt(0).toUpperCase() + phase.slice(1);
         <FilterChip label="All" :count="test.spans.length" :active="!attention" @select="attention = false" />
         <FilterChip label="Needs attention" :count="attentionCount" :tone="attentionCount ? 'danger' : 'neutral'" :active="attention" @select="attention = true" />
       </div>
-      <div class="group" role="group" aria-label="Framework operations">
-        <span>Framework</span>
-        <FilterChip label="Dim" :active="framework === 'dim'" @select="framework = 'dim'" />
-        <FilterChip label="Hide" :active="framework === 'hide'" @select="framework = 'hide'" />
-      </div>
       <div class="group" role="group" aria-label="Zoom to">
         <span>Zoom</span>
         <FilterChip label="Whole test" :active="zoom === 'test'" @select="zoom = 'test'" />
@@ -205,7 +200,7 @@ const title = (phase: string) => phase.charAt(0).toUpperCase() + phase.slice(1);
               <button type="button" class="pick" :data-span="entry.span.id" :aria-current="entry.span.id === selected ? 'true' : undefined"
                       :title="`${entry.span.name}\n${entry.span.kind} from ${entry.span.source}, ${formatOffset(entry.span.start - test.start)} into the test`"
                       @click="emit('select', entry.span)">
-                <KindChip :type="kindLabel(entry.span.kind)" />
+                <KindChip quiet :type="kindLabel(entry.span.kind)" />
                 <span class="name">{{ entry.span.name }}</span>
                 <span v-if="marks(entry.span)" class="events">{{ marks(entry.span) }}</span>
                 <span class="visually-hidden">{{ outcomeLabel(entry.span.status) }}</span>

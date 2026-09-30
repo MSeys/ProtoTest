@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp, h, nextTick, type VNode } from "vue";
+import { frameworkMode } from "../ui/frameworkMode";
 import StateView from "./StateView.vue";
 import type { Change, Item, Span, TestTrace } from "../trace/model";
 
@@ -93,7 +94,7 @@ describe("StateView cause", () => {
 
 // A row says how much changed, so the reader sees the churn before opening the trail.
 describe("StateView change count", () => {
-  it("names the number of changes on the row", async () => {
+  it("names the number of changes in the row's hint, beside the ticks that draw them", async () => {
     const entry = item({});
     const first = change({ change: "created", item: entry, at: 1 });
     const second = change({ change: "released", item: entry, at: 5 });
@@ -101,7 +102,8 @@ describe("StateView change count", () => {
     const { host, unmount } = mount(h(StateView, { test: testTrace([entry]), onSelectItem: () => {}, onSelectSpan: () => {} }));
     await nextTick();
 
-    expect(host.querySelector(".name .changes")?.textContent).toBe("2 changes");
+    expect(host.querySelector(".name")?.getAttribute("title")).toContain("2 changes");
+    expect(host.querySelectorAll(".track .tick")).toHaveLength(2);
     unmount();
   });
 });
@@ -163,5 +165,27 @@ describe("StateView shared clock", () => {
     expect(host.textContent).toContain("This test tracked no state");
     expect(host.querySelector(".selection")).toBeNull();
     unmount();
+  });
+});
+
+// The machinery a test ran on follows the Framework switch, as its operations do.
+describe("StateView framework", () => {
+  const items = () => [item({}), item({ key: "project:p1", kind: "project", id: "p1", name: "Atlas", state: {} })];
+  const titles = (host: HTMLElement) => [...host.querySelectorAll(".panel h2")].map(entry => entry.firstChild?.textContent);
+
+  it("dims the machinery, or leaves it out when the framework is hidden", async () => {
+    frameworkMode.value = "dim";
+    const dimmed = mount(h(StateView, { test: testTrace(items()), onSelectItem: () => {}, onSelectSpan: () => {} }));
+    await nextTick();
+    expect(titles(dimmed.host)).toEqual(["Tracked by the test", "What the test ran on"]);
+    expect(dimmed.host.querySelectorAll(".panel.dim")).toHaveLength(1);
+    dimmed.unmount();
+
+    frameworkMode.value = "hide";
+    const hidden = mount(h(StateView, { test: testTrace(items()), onSelectItem: () => {}, onSelectSpan: () => {} }));
+    await nextTick();
+    expect(titles(hidden.host)).toEqual(["Tracked by the test"]);
+    frameworkMode.value = "dim";
+    hidden.unmount();
   });
 });

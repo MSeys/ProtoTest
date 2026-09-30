@@ -47,3 +47,16 @@ describe("router addresses", () => {
     expect(parse("#/test/t1/nothing")).toMatchObject({ view: "steps" });
   });
 });
+
+// The run's views live in the address too, so a shared link opens the same view; the overview keeps "#/".
+describe("run views", () => {
+  it("reads and writes a run view with its selection", () => {
+    expect(parse("#/run/timeline")).toEqual({ name: "run", view: "timeline" });
+    expect(parse("#/run/operations?span=7")).toEqual({ name: "run", view: "operations", selection: { span: "7" } });
+    expect(parse("#/?span=7")).toEqual({ name: "run", selection: { span: "7" } });
+    expect(parse("#/run/unknown")).toEqual({ name: "run" });
+    expect(href({ name: "run", view: "overview" })).toBe("#/");
+    expect(href({ name: "run", view: "files" })).toBe("#/run/files");
+    expect(href({ name: "run", view: "operations", selection: { span: "7" } })).toBe("#/run/operations?span=7");
+  });
+});

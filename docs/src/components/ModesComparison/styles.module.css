@@ -1,14 +1,25 @@
 .headMeta { color: var(--dim); font: var(--text-strong) var(--font-mono); }
 
-/* Five columns never fit a phone: the table keeps its width and scrolls inside the frame,
-   the way the markdown tables do, instead of squeezing or clipping. */
-.scroll { overflow-x: auto; }
+/* Wide frames read it as a table; narrow ones read each mode as a short card, column by column, instead of
+   scrolling a five-column table sideways. */
+.scroll { container-type: inline-size; }
 .scroll:focus-visible { outline: 2px solid var(--blueprint); outline-offset: -2px; }
 
-.table { width: 100%; min-width: 38rem; border-collapse: collapse; font-size: var(--text-title); }
+.table { width: 100%; border-collapse: collapse; font-size: var(--text-title); }
 
 .table th,
 .table td { min-width: 0; padding: var(--space-2) var(--space-3); border-top: 1px solid var(--border); text-align: left; vertical-align: top; overflow-wrap: break-word; }
 
 .table thead th { border-top: 0; color: var(--muted); font-size: var(--text-strong); white-space: nowrap; }
 .table td strong { white-space: nowrap; }
+
+@container (max-width: 38rem) {
+  .scroll .table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .scroll .table, .scroll .table tbody, .scroll .table tr, .scroll .table td { display: block; }
+  .scroll .table tr { padding: var(--space-3) var(--space-4); }
+  .scroll .table tr + tr { border-top: 1px solid var(--border); }
+  .scroll .table td { padding: 2px 0; border: 0; }
+  .scroll .table td:first-child { padding-bottom: var(--space-1); }
+  .scroll .table td[data-label] { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: var(--space-3); }
+  .scroll .table td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: var(--text-strong); }
+}

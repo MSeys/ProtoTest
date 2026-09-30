@@ -308,6 +308,21 @@ div[class*='codeBlockTitle'] {
 .markdown table tbody tr:first-child td { border-top: 0; }
 .markdown table tr { border: 0; }
 
+/* A figure in running text keeps the same distance to the next paragraph as a code block does. */
+.markdown [data-frame] { margin-bottom: var(--ifm-spacing-vertical); }
+
+/* On a phone a row reads as a short card: its first cell as the title, every other cell under its column's
+   heading (data-label, added at build time by plugins/rehype-table-labels.cjs). Wide pages keep the table. */
+@media (max-width: 700px) {
+  .markdown table:has(td[data-label]) thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .markdown table:has(td[data-label]), .markdown table:has(td[data-label]) tbody, .markdown table:has(td[data-label]) tr, .markdown table:has(td[data-label]) td { display: block; }
+  .markdown table:has(td[data-label]) tr { padding: var(--space-3) var(--space-4); }
+  .markdown table:has(td[data-label]) tr + tr { border-top: 1px solid var(--border); }
+  .markdown table:has(td[data-label]) td { padding: 2px 0; border: 0; }
+  .markdown table:has(td[data-label]) td:first-child { padding-bottom: var(--space-1); font-weight: var(--weight-semibold); }
+  .markdown table:has(td[data-label]) td:not(:first-child)[data-label]::before { content: attr(data-label); display: block; color: var(--muted); font-size: var(--text-strong); font-weight: var(--weight-regular); }
+}
+
 /* ── Admonitions: the viewer's left-edge blocks ──────────────────────────────────────────── */
 .theme-admonition {
   --admonition-color: var(--blueprint);
@@ -419,3 +434,18 @@ div[class*='codeBlockTitle'] {
 
 /* The mark already says the link leaves the site; the arrow would be a second glyph for the same job. */
 .footer__link-item[href*='github.com'] svg { display: none; }
+
+/* ── Mid-width docs ───────────────────────────────────────────────────────────────────────────
+   Between the tablet break and a wide screen the sidebar, the text and the table of contents share about
+   1000px. The sidebar gives way a little, so the text keeps a readable measure. */
+@media (min-width: 997px) and (max-width: 1199px) {
+  :root { --doc-sidebar-width: 260px; }
+}
+
+/* ── Sideways strips ──────────────────────────────────────────────────────────────────────────
+   Tabs that scroll (useStrip): no scrollbar of their own, and a fade on each side that still has more. */
+[data-strip] { overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+[data-strip]::-webkit-scrollbar { display: none; }
+[data-strip][data-more='end'] { mask-image: linear-gradient(to right, black calc(100% - var(--space-6)), transparent); }
+[data-strip][data-more='start'] { mask-image: linear-gradient(to left, black calc(100% - var(--space-6)), transparent); }
+[data-strip][data-more='both'] { mask-image: linear-gradient(to right, transparent, black var(--space-6), black calc(100% - var(--space-6)), transparent); }

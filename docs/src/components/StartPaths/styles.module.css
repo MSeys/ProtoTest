@@ -1,5 +1,5 @@
-.paths { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); margin-block: var(--space-5); }
-.path { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); color: var(--text); text-decoration: none; transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease); }
+.paths { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); margin-block: var(--space-5); }
+.path { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-4) var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); color: var(--text); text-decoration: none; transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease); }
 .path:hover { border-color: var(--blueprint-line); background: var(--surface-2); color: var(--text); text-decoration: none; }
 .path strong { font-family: var(--font-display); font-size: var(--text-title); }
 .path > span { color: var(--muted); font-size: var(--text-title); }

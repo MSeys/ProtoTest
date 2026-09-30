@@ -28,7 +28,7 @@
 .lineContent {
   flex: 1 1 auto;
   min-width: 0;
-  padding-left: 4ch;
+  padding-left: calc((var(--indent, 0) + 4) * 1ch);
   text-indent: -4ch;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

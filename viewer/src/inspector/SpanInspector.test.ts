@@ -78,7 +78,40 @@ describe("SpanInspector shape comparison", () => {
     await nextTick();
 
     expect(headings(host)).not.toContain("Expected against actual");
-    expect(host.querySelector(".shape header strong")?.textContent).toBe("Validated document");
+    expect(host.querySelector(".card header strong")?.textContent).toBe("Validated document");
+    unmount();
+  });
+
+  // Beside a comparison, the exception and the check verdicts say the same thing again: they step back.
+  it("leads with the comparison and folds what repeats it", async () => {
+    const check = span({
+      kind: "assert.json.shape", name: "Assert response shape", status: "failed",
+      error: { type: "ProtoTest.Json.JsonShapeMismatchException", message: "Shape mismatch failed with 1 error(s)" },
+      sections: [{ label: "Result", kind: "checks", language: null, content: null, items: [{ label: "shape", value: "1 mismatch", detail: null, tone: "error" }] }],
+      attributes: {
+        "shape.result": "mismatched",
+        "shape.actual": '{"code":"forbidden","message":"No."}',
+        "shape.mismatches": '[{"propertyPath":"$.message","reason":"was not expected","expected":"missing","actual":"No."}]'
+      }
+    });
+    const { host, unmount } = mount(h(SpanInspector, { span: check, test: testTrace([check]) }));
+    await nextTick();
+
+    expect(host.querySelector("section.error")).toBeNull();
+    expect(headings(host)).not.toContain("Result");
+    const folds = [...host.querySelectorAll("details.fold > summary")].map(entry => entry.textContent?.replace(/\s+/g, " ").trim());
+    expect(folds).toEqual(["The response it judged", "Exception JsonShapeMismatchException", "Attributes 3"]);
+    expect(host.querySelector<HTMLDetailsElement>("details.attributes")?.open).toBe(false);
+    unmount();
+  });
+
+  it("keeps an error with nothing to compare as the headline", async () => {
+    const call = span({ status: "failed", error: { type: "System.Net.Http.HttpRequestException", message: "Connection refused" } });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]) }));
+    await nextTick();
+
+    expect(host.querySelector("section.error h3")?.textContent).toBe("HttpRequestException");
+    expect(host.querySelector("section.error pre")?.textContent).toBe("Connection refused");
     unmount();
   });
 });
@@ -166,6 +199,35 @@ describe("SpanInspector evidence and index", () => {
     section.scrollIntoView = scroll;
     buttons[0].click();
     expect(scroll).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+});
+
+// A file the operation attached opens like every other row in the details; one it could not store says so.
+describe("SpanInspector attachments", () => {
+  const artifact = { id: "a1", name: "body.json", mediaType: "application/json", sizeBytes: 21, archivePath: "artifacts/a1", description: null, error: null };
+
+  it("opens an attached file from its row", async () => {
+    const opened = vi.fn();
+    const call = span({ evidence: [{ type: "attachment", at: 1, name: "body.json", artifact, span: null }] as Span["evidence"] });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]), onArtifact: opened }));
+    await nextTick();
+
+    const row = host.querySelector<HTMLButtonElement>("button.link-row.file");
+    expect([...row!.children].map(part => part.textContent)).toEqual(["File", "body.json", "application/json, 21 B"]);
+    row!.click();
+    expect(opened).toHaveBeenCalledWith(artifact);
+    unmount();
+  });
+
+  it("disables the row of a file that could not be stored", async () => {
+    const call = span({ evidence: [{ type: "attachment", at: 1, name: "shot.png", artifact: { ...artifact, error: "Not in the archive" }, span: null }] as Span["evidence"] });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]) }));
+    await nextTick();
+
+    const row = host.querySelector<HTMLButtonElement>("button.link-row.file");
+    expect(row?.disabled).toBe(true);
+    expect(row?.textContent).toContain("Unavailable");
     unmount();
   });
 });

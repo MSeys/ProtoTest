@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp, h, nextTick, type VNode } from "vue";
+import { testFilter } from "../ui/testFilter";
 import RunView from "./RunView.vue";
 import type { Gate, Item, Run, Span, TestTrace } from "../trace/model";
 
@@ -106,11 +107,12 @@ describe("RunView needs attention", () => {
     const tests = [testTrace(1, "failed")];
     tests[0].failure = { span: failed, check: null, mismatches: [], call: null };
     const passing = [testTrace(1, "succeeded")];
-    const failedHost = mount(h(RunView, { run: run(tests), fileName: "demo.prototrace", onSelect: () => {} }));
-    expect(failedHost.host.querySelector(".test-row .reason")?.textContent).toBe("Assert status");
+    const failedHost = mount(h(RunView, { run: run(tests), fileName: "demo.prototrace", view: "timeline", onSelect: () => {} }));
+    // The overview names the reason; on the clock it is a hover away, so the rows stay one line each.
+    expect(failedHost.host.querySelector(".test-row")?.getAttribute("title")).toBe("Test1\nAssert status");
     failedHost.unmount();
-    const passingHost = mount(h(RunView, { run: run(passing), fileName: "demo.prototrace", onSelect: () => {} }));
-    expect(passingHost.host.querySelector(".test-row .reason")).toBeNull();
+    const passingHost = mount(h(RunView, { run: run(passing), fileName: "demo.prototrace", view: "timeline", onSelect: () => {} }));
+    expect(passingHost.host.querySelector(".test-row")?.getAttribute("title")).not.toContain("\n");
     passingHost.unmount();
   });
 });
@@ -168,7 +170,7 @@ describe("RunView needs attention", () => {
   // Each row sits on the run's own clock, so the clock is labelled once above the rows.
   it("labels the test list's time axis with the run's start and length", async () => {
     const { host, unmount } = mount(h(RunView, {
-      run: run([testTrace(1, "succeeded")]), fileName: "demo.prototrace", onSelect: () => {}
+      run: run([testTrace(1, "succeeded")]), fileName: "demo.prototrace", view: "timeline", onSelect: () => {}
     }));
     await nextTick();
 
@@ -310,7 +312,7 @@ describe("RunView diagnosis and details", () => {
   });
 
   it("renders all environment keys and the run id, including custom and empty values", () => {
-    const { host, unmount } = mount(h(RunView, { run: run([], { id: "run-123", environment: { runtime: ".NET", os: "Windows", "custom.branch": "main", empty: "" } }), fileName: "demo" }));
+    const { host, unmount } = mount(h(RunView, { run: run([], { id: "run-123", environment: { runtime: ".NET", os: "Windows", "custom.branch": "main", empty: "" } }), fileName: "demo", view: "details" }));
     expect([...host.querySelectorAll(".environment dt")].map(node => node.textContent)).toEqual(["Run id", "environment.custom.branch", "environment.empty", "environment.os", "environment.runtime"]);
     expect([...host.querySelectorAll(".environment dd")].map(node => node.textContent)).toEqual(["run-123", "main", "", "Windows", ".NET"]);
     unmount();
@@ -321,7 +323,7 @@ describe("RunView diagnosis and details", () => {
     const lifecycle = span({ kind: "test.execution", phase: "execution", start: 10, end: 90, duration: 80, status: "succeeded", error: null });
     const operation = span({ start: 60, end: 90, duration: 30, parent: lifecycle, status: "succeeded", error: null });
     lifecycle.children = [operation]; test.spans = [lifecycle, operation]; test.roots = [lifecycle];
-    const { host, unmount } = mount(h(RunView, { run: run([test]), fileName: "demo" }));
+    const { host, unmount } = mount(h(RunView, { run: run([test]), fileName: "demo", view: "timeline" }));
     const gap = host.querySelector<HTMLElement>(".test-row .bar .gap");
     expect(gap?.style.left).toBe("10%");
     expect(gap?.style.width).toBe("50%");
@@ -333,15 +335,54 @@ describe("RunView diagnosis and details", () => {
     const operation = span({});
     const item: Item = { key: "broker", kind: "broker", id: "main", name: "Message bus", scope: "run", firstSeen: 0, lastSeen: 100, state: {}, changes: [], test: null };
     const selectedSpan = vi.fn(); const selectedItem = vi.fn();
-    const { host, unmount } = mount(h(RunView, { run: run([], { spans: [operation], items: [item] }), selectedSpan: operation, selectedItem: item, fileName: "demo", onSpan: selectedSpan, onItem: selectedItem }));
+    const { host, unmount } = mount(h(RunView, { run: run([], { spans: [operation], items: [item] }), selectedSpan: operation, selectedItem: item, fileName: "demo", view: "operations", onSpan: selectedSpan, onItem: selectedItem }));
     host.querySelector<HTMLButtonElement>(".operation")!.click();
     host.querySelector<HTMLButtonElement>(".run-items button")!.click();
     expect(selectedSpan).toHaveBeenCalledWith(operation);
     expect(selectedItem).toHaveBeenCalledWith(item);
     expect(host.querySelector(".operation")?.getAttribute("aria-pressed")).toBe("true");
     expect(host.querySelector(".run-items button")?.getAttribute("aria-pressed")).toBe("true");
-    host.querySelector<HTMLButtonElement>(".attention .issue.run")!.click();
+    unmount();
+
+    // The overview names the failing run operation and opens it too.
+    const overview = mount(h(RunView, { run: run([], { spans: [operation], items: [item] }), fileName: "demo", onSpan: selectedSpan }));
+    overview.host.querySelector<HTMLButtonElement>(".attention .issue.run")!.click();
     expect(selectedSpan).toHaveBeenCalledTimes(2);
+    overview.unmount();
+  });
+});
+
+// One question per view: a view with nothing in it has no tab, and a link to one falls back to the overview.
+describe("RunView views", () => {
+  it("offers only the views this run has something for", () => {
+    const { host, unmount } = mount(h(RunView, { run: run([testTrace(1, "succeeded")]), fileName: "demo", view: "operations" }));
+    const labels = [...host.querySelectorAll("[role='tab']")].map(tab => tab.textContent?.trim());
+    expect(labels).toEqual(["Overview", "Timeline", "Details"]);
+    expect(host.querySelector("[role='tab'][aria-selected='true']")?.textContent?.trim()).toBe("Overview");
+    unmount();
+  });
+
+  it("says so when nothing needs attention", () => {
+    const { host, unmount } = mount(h(RunView, { run: run([testTrace(1, "succeeded"), testTrace(2, "succeeded")]), fileName: "demo" }));
+    expect(host.querySelector(".all-clear strong")?.textContent).toBe("Nothing needs attention.");
+    expect(host.querySelector(".all-clear span")?.textContent).toContain("All 2 tests passed");
+    unmount();
+  });
+});
+
+// The rail's search and filters drive the run clock; the clock only says it is filtered, with a way back.
+describe("RunView timeline filter", () => {
+  it("names a filtered clock and shows every test again", async () => {
+    testFilter.query = "Test2";
+    const { host, unmount } = mount(h(RunView, { run: run([testTrace(1, "succeeded"), testTrace(2, "succeeded")]), fileName: "demo", view: "timeline" }));
+    await nextTick();
+    expect(host.querySelector(".filtered")?.textContent?.replace(/\s+/g, " ").trim()).toBe("1 of 2 tests Show all");
+    expect(host.querySelectorAll(".test-row")).toHaveLength(1);
+
+    host.querySelector<HTMLButtonElement>(".filtered button")!.click();
+    await nextTick();
+    expect(host.querySelector(".filtered")).toBeNull();
+    expect(host.querySelectorAll(".test-row")).toHaveLength(2);
     unmount();
   });
 });

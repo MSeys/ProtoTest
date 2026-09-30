@@ -11,13 +11,7 @@ description: "Start with the path that matches what you bring: learn integration
 
 import StartPaths from '@site/src/components/StartPaths';
 
-ProtoTest is a foundation for integration testing on .NET 8, 9 and 10. You choose the integrations a suite needs, and they share the same host, test context, lifecycle and trace.
-
-That lets one test write through REST and read through GraphQL, or combine API, browser, database, messaging and file checks when that is useful.
-
-ProtoTest packages are available on NuGet. The template targets `net10.0` by default; pass `--framework net8.0` or `net9.0` to use another supported target.
-
-## Pick your path
+ProtoTest is an integration testing foundation for .NET 8, 9 and 10. The integrations a suite needs share one host, one context per test, one lifecycle and one trace, so a single test can write through REST, read back through GraphQL and check the database on the way.
 
 <StartPaths />
 
@@ -35,21 +29,18 @@ ProtoTest packages are available on NuGet. The template targets `net10.0` by def
 | keep traces and reports in CI | [Continuous integration](./continuous-integration/index.md) |
 | add your own integration | [Extending ProtoTest](./advanced/extending.md) |
 
-## Main pieces
+## What it is made of
 
-- **Attributes** can hold reusable setup such as creating a tenant or signing in a user.
-- **Clients** such as `Proto.Context.Rest()`, `.GraphQL()`, `.Web()` and `.Data()` use the same per-test context.
-- **Shape assertions** compare the parts of a response that matter to the test and report all mismatches together.
-- **Coverage collectors** report which parts of an OpenAPI document or GraphQL schema were called and checked.
-- **ProtoTrace** records lifecycle phases, operations, checks and artifacts in a portable `.prototrace` file.
-- **Runner packages** connect the same runtime to xUnit, NUnit, MSTest and TUnit.
+- **Clients** such as `Proto.Context.Rest()`, `.GraphQL()`, `.Web()` and `.Data()`, sharing the test's context.
+- **Attributes** that hold reusable setup, such as a tenant or a signed-in user, and clean it up.
+- **Shape assertions** that compare what matters in a response and report every mismatch at once.
+- **ProtoTrace**, a portable `.prototrace` file with each test's phases, operations, checks and files, plus **coverage collectors** for OpenAPI and GraphQL.
+- **Runner packages** for xUnit, NUnit, MSTest and TUnit.
 
 ## See it in a real suite
 
-The repository contains the [Northstar sample app](https://github.com/MSeys/ProtoTest/tree/main/samples/ProtoTest.SampleApp), a multi-tenant sample application, and the [Northstar.ProtoTest](https://github.com/MSeys/ProtoTest/tree/main/samples/Northstar.ProtoTest) sample suite that tests it across API, messaging, browser, database and workbook boundaries. Examples throughout these docs come from that suite.
+Examples in these docs come from [Northstar.ProtoTest](https://github.com/MSeys/ProtoTest/tree/version/1.1/samples/Northstar.ProtoTest), which tests the multi-tenant [Northstar sample app](https://github.com/MSeys/ProtoTest/tree/version/1.1/samples/ProtoTest.SampleApp) across API, messaging, browser, database and workbook boundaries.
 
-One more suite runs outside this repository. OpenCSMS is an independent EV charging platform in its own repository and the full product demo: its suite runs in containers the run owns, through an Aspire AppHost, against a published stack and with faults injected on purpose. The [Level 5 lessons](/learn/real-topology/containers) walk containers, Aspire, published mode and fault injection.
+OpenCSMS, an independent EV charging platform, is the full product demo: its suite runs against containers, an Aspire AppHost and a published stack, with faults injected on purpose. The [Level 5 lessons](/learn/real-topology/containers) walk through it.
 
 ![The OpenCSMS stations screen listing three stations and their charge points.](/images/opencsms/dashboard.png)
-
-The full product demo's operator dashboard. Its browser journeys drive this screen.

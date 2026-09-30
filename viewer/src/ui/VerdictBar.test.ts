@@ -50,7 +50,7 @@ describe("VerdictBar", () => {
     expect(text(host, ".rule")).toBe("Assertion");
     expect(text(host, ".what")).toBe("Assert response shape");
     expect(text(host, ".call")).toBe("on REST · GET /org");
-    expect(text(host, ".where")).toBe("Execution, +100 ms into the test");
+    expect(host.querySelector(".what")?.getAttribute("title")).toBe("Execution, +100 ms into the test");
     expect(text(host, ".detail")).toBe('$.status: expected "past_due", got "active", and 1 more');
     unmount();
   });
@@ -76,7 +76,7 @@ describe("VerdictBar", () => {
 
     expect(text(host, ".rule")).toBe("Finding");
     expect(text(host, ".what")).toBe("The response carried 4 fields no assertion mentioned.");
-    expect(text(host, ".where")).toBe("Recorded +133 ms into the test");
+    expect(host.querySelector(".what")?.getAttribute("title")).toBe("Recorded +133 ms into the test");
     expect(text(host, ".detail")).toBe("Warning, Coverage");
     unmount();
   });

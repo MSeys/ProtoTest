@@ -1,74 +1,156 @@
+/* The home is the product's front: the hero carries the blueprint surface, the sections below follow the page
+   theme. Every value is a token, calc or clamp. */
 .main { font-size: 1rem; line-height: var(--leading); }
-.hero { padding: calc(var(--space-7) * 2.5) 0 calc(var(--space-7) * 2); border-bottom: 1px solid var(--border); }
-.heroGrid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: calc(var(--space-7) * 2); align-items: center; }
-.hero h1 { font-size: clamp(calc(var(--text-heading) * 2), 4.2vw, calc(var(--text-heading) * 2.8)); line-height: 1.08; max-width: 15ch; margin-bottom: var(--space-6); }
-.hero h1 span { color: var(--blueprint); }
-.eyebrow { margin: 0 0 var(--space-4); color: var(--blueprint); font: var(--weight-semibold) var(--text-strong) var(--font-mono); letter-spacing: var(--tracking-eyebrow); }
-.lead { max-width: 53ch; font-size: calc(var(--text-title) * 1.2); line-height: var(--leading); color: var(--muted); }
-.actions { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-top: var(--space-6); }
-.primary, .secondary { min-height: calc(var(--control-height) + var(--space-4)); padding: var(--space-3) var(--space-5); display: inline-flex; align-items: center; gap: var(--space-3); border-radius: var(--radius-control); font-weight: var(--weight-semibold); }
-.primary { background: var(--blueprint); color: var(--bg); border: 1px solid var(--blueprint); }
-.primary:hover { background: var(--text); border-color: var(--text); color: var(--bg); text-decoration: none; }
-.secondary { color: var(--text); border: 1px solid var(--border-strong); }
-.secondary:hover { color: var(--text); background: var(--hover); text-decoration: none; }
-.compatibility { margin: var(--space-5) 0 0; color: var(--muted); font-size: var(--text-title); }
-.foundation { min-width: 0; display: grid; padding: var(--space-6); border: 1px solid var(--border-strong); border-radius: var(--radius-panel); background: var(--surface); font-size: var(--text-title); }
-.host { display: grid; gap: var(--space-2); padding-bottom: var(--space-5); border-bottom: 2px solid var(--blueprint); }
-.host .eyebrow { margin: 0; }
-.host strong { font: var(--weight-bold) var(--text-heading) var(--font-display); }
-.host > span:last-child { color: var(--muted); }
-.contexts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); padding: var(--space-5) 0; }
-.contexts > div { position: relative; display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-2); }
-.contexts > div::before { position: absolute; content: ''; top: calc(var(--space-5) * -1); left: 50%; height: var(--space-5); width: 1px; background: var(--blueprint); }
-.contexts code { font-size: var(--text-strong); overflow-wrap: anywhere; }
-.contexts span { color: var(--muted); font-size: var(--text-strong); }
-.evidence { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--border); }
-.evidenceMark { color: var(--blueprint); font-size: var(--text-heading); }
-.evidence code { color: var(--muted); font-size: var(--text-strong); }
+
+/* ── Hero ── */
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: calc(var(--space-7) * 2.5) 0 calc(var(--space-7) * 2.25);
+  border-bottom: 1px solid var(--border-strong);
+  background:
+    radial-gradient(circle at 74% 40%, color-mix(in srgb, var(--pt-cyan) 16%, transparent), transparent 44%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
+    var(--pt-navy-deep);
+  color: var(--text);
+}
+.heroGrid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: calc(var(--space-7) * 1.5); align-items: center; }
+.heroCopy { min-width: 0; }
+.hero h1 {
+  margin-bottom: var(--space-6);
+  color: var(--pt-white);
+  font-size: clamp(calc(var(--text-heading) * 1.9), 3.8vw, calc(var(--text-heading) * 2.5));
+  line-height: 1.04;
+}
+.hero h1 span { display: block; color: var(--blueprint); }
+.lead { max-width: 50ch; margin-bottom: 0; color: var(--muted); font-size: calc(var(--text-title) * 1.2); line-height: var(--leading); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-top: var(--space-7); }
+.primary, .secondary {
+  min-height: calc(var(--control-height) + var(--space-4));
+  padding: var(--space-3) var(--space-6);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  border-radius: var(--radius-control);
+  font-weight: var(--weight-semibold);
+}
+.primary { border: 1px solid var(--blueprint); background: var(--blueprint); color: var(--bg); }
+.primary:hover { border-color: var(--pt-white); background: var(--pt-white); color: var(--pt-navy-deep); text-decoration: none; }
+.secondary { border: 1px solid var(--border-strong); color: var(--text); }
+.secondary:hover { border-color: var(--blueprint); color: var(--text); text-decoration: none; }
+.compatibility { margin: var(--space-6) 0 0; color: var(--muted); font: var(--text-strong) var(--font-mono); }
+.heroFrame { box-shadow: 0 var(--space-6) calc(var(--space-7) * 2) color-mix(in srgb, var(--pt-navy-deep) 70%, transparent); }
+
+.eyebrow {
+  margin: 0 0 var(--space-4);
+  color: var(--blueprint);
+  font: var(--weight-semibold) var(--text-meta) var(--font-mono);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.hero .eyebrow { color: var(--pt-cyan); }
+
+/* ── Journey tabs inside the hero frame ── */
+.tabs { display: flex; gap: var(--space-4); }
+.tabs button {
+  min-height: calc(var(--control-height) + var(--space-3));
+  padding: var(--space-2);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.tabs button[aria-selected='true'] { border-color: var(--blueprint); color: var(--text); font-weight: var(--weight-bold); }
+.tabs button:hover { color: var(--text); }
+.traceRows { margin: 0; padding: var(--space-3) var(--space-5); list-style: none; }
+.traceRows li { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: var(--space-3); align-items: baseline; padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+.traceRows li:last-child { border: 0; }
+.traceRows li > strong { min-width: 0; font-weight: var(--weight-semibold); overflow-wrap: anywhere; }
+.traceRows li > span:last-child { color: var(--muted); font-size: var(--text-strong); }
+.traceKind { color: color-mix(in srgb, var(--node-color) 60%, var(--text)); font: var(--text-strong) var(--font-mono); }
+
+/* ── Sections ── */
 .section { padding-top: calc(var(--space-7) * 2); padding-bottom: calc(var(--space-7) * 2); }
 .section + .section { border-top: 1px solid var(--border); }
-.sectionHead { margin-bottom: var(--space-7); max-width: 70ch; }
-.sectionHead h2, .try h2 { font-size: clamp(var(--text-display), 2.8vw, calc(var(--text-heading) * 1.7)); line-height: var(--leading-tight); }
-.sectionHead p:last-child { margin: var(--space-4) 0 0; color: var(--muted); }
+.sectionHead { max-width: 68ch; margin-bottom: var(--space-7); }
+.section h2, .origin h2 { font-size: clamp(var(--text-display), 2.8vw, calc(var(--text-heading) * 1.7)); line-height: var(--leading-tight); }
+.sectionHead > p:last-child { margin: var(--space-4) 0 0; color: var(--muted); }
+.note { margin-top: var(--space-6); color: var(--muted); font-size: var(--text-title); }
+
+/* A claim beside its proof. */
+.feature { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: calc(var(--space-7) * 1.5); align-items: center; }
+.featureReverse > :first-child { order: 2; }
+.featureCopy { min-width: 0; }
+.featureCopy > p:not(.eyebrow) { color: var(--muted); }
+.links { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); }
+.more { font-weight: var(--weight-semibold); }
+
+/* The setup score: the plumbing count on each side, then what moved where. */
+.score { min-width: 0; margin: 0; padding: var(--space-6); border: 1px solid var(--border-strong); border-radius: var(--radius-panel); background: var(--surface); }
+.scoreHead { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); }
+.scoreHead > div { display: grid; gap: var(--space-1); padding-left: var(--space-4); border-left: 3px solid var(--border-strong); }
+.scoreHead span { color: var(--muted); font-size: var(--text-strong); }
+.scoreHead strong { font: var(--weight-bold) calc(var(--text-heading) * 2.4) / 1 var(--font-display); color: var(--muted); }
+.scoreHead .scoreWith { border-left-color: var(--blueprint); }
+.scoreWith strong { color: var(--blueprint); }
+.score figcaption { margin: var(--space-3) 0 var(--space-5); color: var(--muted); font-size: var(--text-strong); }
+.moves { margin: 0; display: grid; }
+.moves > div { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: var(--space-4); padding: var(--space-3) 0; border-top: 1px solid var(--border); }
+.moves dt { font-weight: var(--weight-semibold); }
+.moves dd { margin: 0; display: grid; gap: var(--space-1); font-size: var(--text-title); }
+.moves s { color: var(--dim); text-decoration-color: color-mix(in srgb, var(--dim) 60%, transparent); }
+.moves dd span { color: var(--text); }
+.moves dd span::before { content: '→ '; color: var(--blueprint); }
+
+.checkFrame { align-self: start; }
+.frameTitle { color: var(--muted); font: var(--text-strong) var(--font-mono); }
+
+/* ── Integrations ── */
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-5); }
+.card { min-width: 0; display: flex; flex-direction: column; padding: var(--space-6); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); color: var(--text); }
+.card:hover { border-color: var(--blueprint); color: var(--text); text-decoration: none; }
+.card h3 { margin-bottom: var(--space-3); font-size: var(--text-heading); line-height: var(--leading-tight); }
+.card p { color: var(--muted); }
+.status { margin-top: auto; color: var(--muted); font: var(--text-meta) var(--font-mono); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; }
+
+/* ── How it fits ── */
+.band { border-block: 1px solid var(--border); background: var(--surface-2); }
 .steps { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-6); list-style: none; }
 .steps > li { min-width: 0; padding-top: var(--space-4); border-top: 2px solid var(--blueprint-line); }
 .steps > li > span { color: var(--muted); font: var(--text-strong) var(--font-mono); }
 .steps h3 { margin: var(--space-3) 0; font-size: var(--text-heading); }
 .steps p { color: var(--muted); }
 .steps a { font-size: var(--text-title); }
-.tabs { display: flex; gap: var(--space-4); }
-.tabs button { min-height: calc(var(--control-height) + var(--space-3)); padding: var(--space-2); border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
-.tabs button[aria-selected='true'] { color: var(--text); border-color: var(--blueprint); font-weight: var(--weight-bold); }
-.tabs button:hover { color: var(--text); }
-.traceRows { margin: 0; padding: var(--space-5); list-style: none; }
-.traceRows li { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: baseline; padding: var(--space-4) 0; border-bottom: 1px solid var(--border); }
-.traceRows li:last-child { border: 0; }
-.traceRows li > span:last-child { color: var(--muted); margin-left: auto; }
-.traceKind { color: color-mix(in srgb, var(--node-color) 55%, var(--text)); font: var(--text-strong) var(--font-mono); }
-.note { margin-top: var(--space-5); color: var(--muted); font-size: var(--text-title); line-height: var(--leading); }
-.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-5); }
-.card { min-width: 0; display: flex; flex-direction: column; padding: var(--space-6); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); color: var(--text); }
-.card:hover { border-color: var(--blueprint); color: var(--text); text-decoration: none; }
-.status { font-size: var(--text-strong); color: var(--muted); margin-bottom: var(--space-4); }
-.card h3 { font-size: var(--text-heading); line-height: var(--leading-tight); }
-.card p { color: var(--muted); }
-.cardLink { margin-top: auto; color: var(--blueprint); font-size: var(--text-title); }
-.band { background: var(--surface-2); border-block: 1px solid var(--border); }
-.fitGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: calc(var(--space-7) * 2); }
-.measurement { border-left: 2px solid var(--blueprint); padding-left: var(--space-6); }
-.measurement strong { font: var(--weight-bold) calc(var(--text-heading) * 2) var(--font-display); }
-.measurement p { color: var(--muted); }
-.measurement a { font-size: var(--text-title); }
+.fit { margin-top: calc(var(--space-7) * 1.5); display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--space-7); align-items: center; }
+.fit p { margin: 0; color: var(--muted); }
+.measurement { display: grid; gap: var(--space-1); padding-left: var(--space-6); border-left: 2px solid var(--blueprint); color: var(--muted); font-size: var(--text-title); }
+.measurement strong { color: var(--text); font: var(--weight-bold) calc(var(--text-heading) * 1.6) var(--font-display); }
+.measurement:hover { color: var(--text); text-decoration: none; }
+
+/* ── Try it, and why ── */
 .try { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: var(--space-7); align-items: start; }
 .try > div { min-width: 0; }
-.try > div > p { color: var(--muted); }
-@media (max-width: 996px) { .heroGrid { gap: var(--space-7); } .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.try > div > p:not(.eyebrow) { color: var(--muted); }
+.origin { padding-bottom: calc(var(--space-7) * 2); }
+.origin > div { max-width: 72ch; }
+.origin h2 { margin-bottom: var(--space-4); }
+.origin p { color: var(--muted); }
+
+@media (max-width: 996px) {
+  .heroGrid, .feature { grid-template-columns: minmax(0, 1fr); gap: var(--space-7); }
+  .featureReverse > :first-child { order: 0; }
+  .cards, .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fit { grid-template-columns: minmax(0, 1fr); }
+}
 @media (max-width: 700px) {
   .hero { padding: calc(var(--space-7) * 1.5) 0; }
-  .heroGrid, .fitGrid, .try { grid-template-columns: minmax(0, 1fr); }
-  .hero h1 { max-width: 17ch; }
-  .foundation { padding: var(--space-5); }
   .section { padding-top: calc(var(--space-7) * 1.5); padding-bottom: calc(var(--space-7) * 1.5); }
-  .cards, .steps { grid-template-columns: minmax(0, 1fr); }
-  .traceRows li > span:last-child { margin-left: 0; }
+  .cards, .steps, .try { grid-template-columns: minmax(0, 1fr); }
+  .score { padding: var(--space-5); }
+  .moves > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+  .traceRows li { grid-template-columns: 64px minmax(0, 1fr); }
+  .traceRows li > span:last-child { grid-column: 2; }
 }

@@ -1,6 +1,7 @@
 import {useId, useRef, useState, type KeyboardEvent, type ReactNode} from 'react';
 
 import CodeSnippet from '@site/src/components/CodeSnippet';
+import useStrip from '@site/src/hooks/useStrip';
 import CopyCode from '@site/src/components/CopyCode';
 import Frame from '@site/src/components/Frame';
 import styles from './styles.module.css';
@@ -28,6 +29,7 @@ export default function TabbedCode({tabs, label}: TabbedCodeProps): ReactNode {
   const id = useId();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const [activeId, setActiveId] = useState(tabs[0]?.id);
+  const strip = useStrip<HTMLDivElement>(activeId);
   const active = tabs.find((tab) => tab.id === activeId) ?? tabs[0];
   if (!active) return null;
 
@@ -60,7 +62,13 @@ export default function TabbedCode({tabs, label}: TabbedCodeProps): ReactNode {
           {tabs.length === 1 ? (
             <strong className={styles.title}>{active.label}</strong>
           ) : (
-            <div className={styles.tabs} role="tablist" aria-label={label ?? 'Code examples'}>
+            <div
+              ref={strip}
+              data-strip=""
+              className={styles.tabs}
+              role="tablist"
+              aria-label={label ?? 'Code examples'}
+            >
               {tabs.map((tab, index) => (
                 <button
                   key={tab.id}

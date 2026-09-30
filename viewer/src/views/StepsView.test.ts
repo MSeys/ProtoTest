@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createApp, h, nextTick, type VNode } from "vue";
 import StepsView from "./StepsView.vue";
 import type { Span, TestTrace } from "../trace/model";
+import { frameworkMode } from "../ui/frameworkMode";
 
 function span(overrides: Partial<Span>): Span {
   return {
@@ -101,6 +102,40 @@ describe("StepsView phases", () => {
     expect(phases(host)[0].open).toBe(true);
     expect(host.querySelector(".line.danger .title")?.textContent).toBeTruthy();
     expect([...host.querySelectorAll(".title")].map(entry => entry.textContent)).toContain("Provision tenant");
+    unmount();
+  });
+});
+
+// The framework's own operations step back by default, and leave on request; a failing one always stays.
+describe("StepsView framework", () => {
+  function withHooks() {
+    const execution = nest(span({ id: "exec", name: "Test execution", kind: "test.execution", duration: 80, end: 90 }), [
+      span({ id: "h1", name: "Before · Clients", kind: "hook.before" }),
+      span({ id: "h2", name: "Before · Data", kind: "hook.before" }),
+      span({ id: "call", name: "REST · GET /projects" }),
+      span({ id: "bad", name: "Initialize · Rest", kind: "client.initialize", status: "failed", error: { type: "Error", message: "No address" } })
+    ]);
+    return testTrace([execution]);
+  }
+  const titles = (host: HTMLElement) => [...host.querySelectorAll(".rows .line .title")].map(entry => entry.textContent);
+
+  it("dims the framework group and keeps a failing framework step at full strength", async () => {
+    frameworkMode.value = "dim";
+    const { host, unmount } = mount(h(StepsView, { test: withHooks(), onSelect: () => {} }));
+    await nextTick();
+
+    expect([...host.querySelectorAll(".line.dim .title")].map(entry => entry.textContent)).toEqual(["2 extensions"]);
+    expect(host.querySelector(".line.danger")?.classList.contains("dim")).toBe(false);
+    unmount();
+  });
+
+  it("leaves the framework out when hidden, but not what failed", async () => {
+    frameworkMode.value = "hide";
+    const { host, unmount } = mount(h(StepsView, { test: withHooks(), onSelect: () => {} }));
+    await nextTick();
+
+    expect(titles(host)).toEqual(["REST · GET /projects", "Initialize · Rest"]);
+    frameworkMode.value = "dim";
     unmount();
   });
 });

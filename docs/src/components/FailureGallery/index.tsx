@@ -54,7 +54,8 @@ export default function FailureGallery(): ReactNode {
         </>
       }>
       <p className={styles.legend}>
-        Each row reads kind, name, status, detail. The status marks what the check decided.
+        Four questions a failing integration test usually asks. Open one to compare the drill that fails with the
+        test that holds, as their traces recorded them.
       </p>
       <div className={styles.grid}>
         {failureDrills.map((pair) => {

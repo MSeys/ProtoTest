@@ -7,19 +7,7 @@
   background: var(--surface);
 }
 
-.head {
-  padding: var(--space-5);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-5);
-  align-items: end;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
-}
 
-.head h2 { margin: var(--space-1) 0 0; font-size: var(--text-heading); }
-.head p { margin: 0; color: var(--muted); }
-.eyebrow { color: var(--blueprint); font: var(--weight-semibold) var(--text-title) var(--font-mono); letter-spacing: var(--tracking-eyebrow); }
 
 .body { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(min(100%, 17rem), 0.75fr); }
 .body > * { min-width: 0; }
@@ -69,10 +57,11 @@
 .runnerActive { border-color: var(--blueprint-line); background: var(--blueprint-soft); color: var(--text); font-weight: var(--weight-semibold); }
 
 .result { padding: var(--space-5); border-left: 1px solid var(--border); background: var(--surface); color: var(--text); }
-.resultHead { display: flex; justify-content: space-between; gap: var(--space-2); align-items: center; }
-.resultHead span { color: var(--phase-execution); font: var(--weight-bold) var(--text-strong) var(--font-mono); letter-spacing: .12em; }
-.resultHead code { padding: 0; border: 0; background: none; color: var(--dim); font-size: var(--text-strong); }
-.result pre { margin: var(--space-4) 0; min-height: 150px; border-color: color-mix(in srgb, var(--phase-execution) 35%, transparent); background: var(--surface-sunken); }
+.resultHead { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.resultHead strong { font-size: var(--text-title); }
+.resultHead small { color: var(--muted); font-size: var(--text-strong); }
+.resultHead > :last-child { margin-left: auto; }
+.result pre { margin: var(--space-3) 0; min-height: 120px; border-color: color-mix(in srgb, var(--phase-execution) 35%, transparent); background: var(--surface-sunken); }
 .result pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .result p { margin: var(--space-3) 0 0; color: var(--dim); font-size: var(--text-title); }
 .result p code { color: var(--text); }
@@ -88,3 +77,8 @@
   .choices,
   .result { padding: var(--space-4); }
 }
+
+/* The choices follow the catalog's sections, so the list reads like the map above it. */
+.group + .group { margin-top: var(--space-4); }
+.groupLabel { display: block; margin-bottom: var(--space-2); color: var(--muted); font-size: var(--text-strong); font-weight: var(--weight-semibold); }
+.preview { margin-left: var(--space-2); color: var(--warning); font-size: var(--text-strong); font-style: normal; font-weight: var(--weight-regular); }

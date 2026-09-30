@@ -1,6 +1,7 @@
 import {useId, useRef, useState, type KeyboardEvent, type ReactNode} from 'react';
 import Link from '@docusaurus/Link';
 
+import useStrip from '@site/src/hooks/useStrip';
 import Frame from '@site/src/components/Frame';
 import CheckView from './CheckView';
 import RunView from './RunView';
@@ -25,6 +26,7 @@ const views: {id: ViewId; label: string}[] = [
 
 export default function ViewerWalkthrough(): ReactNode {
   const [view, setView] = useState<ViewId>('run');
+  const strip = useStrip<HTMLDivElement>(view);
   const baseId = useId();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -78,7 +80,14 @@ export default function ViewerWalkthrough(): ReactNode {
           See the failing check
         </button>
       </p>
-      <div className={styles.tabs} role="tablist" aria-label="Views of the demo trace" onKeyDown={move}>
+      <div
+        ref={strip}
+        data-strip=""
+        className={styles.tabs}
+        role="tablist"
+        aria-label="Views of the demo trace"
+        onKeyDown={move}
+      >
         {views.map((item, index) => (
           <button
             key={item.id}

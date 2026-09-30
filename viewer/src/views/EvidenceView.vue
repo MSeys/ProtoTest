@@ -6,6 +6,7 @@ import FilterChip from "../ui/FilterChip.vue";
 import EmptyState from "../ui/EmptyState.vue";
 import JsonView from "../inspector/JsonView.vue";
 import SectionView from "../inspector/SectionView.vue";
+import PropertyList from "../ui/PropertyList.vue";
 
 /*
  * Everything the test stated, captured, found or noted, in the order it happened, each with the operation
@@ -113,9 +114,7 @@ function entryTone(entry: Entry): string {
         <div v-if="open.has(index)" class="body">
           <pre v-if="entry.kind === 'moment' && entry.item.error" class="error">{{ entry.item.error.message }}</pre>
           <JsonView v-if="entry.kind === 'observation' && entry.item.data" :value="entry.item.data" :label="entry.item.identifier ?? entry.item.kind" :open-depth="1" />
-          <dl v-if="facts(entry).length" class="facts">
-            <template v-for="[key, value] in facts(entry)" :key="key"><dt>{{ key }}</dt><dd>{{ value }}</dd></template>
-          </dl>
+          <PropertyList v-if="facts(entry).length" :entries="facts(entry).map(([key, value]) => ({ key, value }))" mono inline />
           <template v-if="entry.kind === 'moment'">
             <SectionView v-for="section in entry.item.sections" :key="section.label" :section="section" />
           </template>
@@ -150,9 +149,6 @@ button.from:hover { border-color: var(--blueprint); color: var(--text); }
 .from.none { border-style: dashed; color: var(--dim); }
 .body { padding: 0 var(--space-4) var(--space-3) calc(64px + 92px + var(--space-4) + var(--space-3) * 2); display: grid; gap: var(--space-2); }
 .error { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--danger); font: var(--text-meta)/var(--leading) var(--font-mono); }
-.facts { margin: 0; display: grid; grid-template-columns: minmax(80px, max-content) minmax(0, 1fr); gap: 0 var(--space-3); }
-.facts dt, .facts dd { min-width: 0; margin: 0; padding: 2px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; font: var(--text-meta)/var(--leading) var(--font-mono); }
-.facts dt { color: var(--muted); }
 
 @container (max-width: 680px) {
   .line { grid-template-columns: 56px minmax(0, 1fr) auto; }

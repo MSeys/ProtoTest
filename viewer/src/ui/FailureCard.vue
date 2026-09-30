@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { Failure, Outcome, Span } from "../trace/model";
-import { jsonLiteral, kindLabel, tone } from "../trace/format";
+import type { Failure, Outcome, Span, TestTrace } from "../trace/model";
+import { formatOffset, jsonLiteral, kindLabel, tone } from "../trace/format";
 import KindChip from "./KindChip.vue";
 import ShapeResultTree from "../inspector/ShapeResultTree.vue";
 import { shapeTreeOf } from "../trace/shapes";
@@ -10,8 +10,15 @@ import { shapeTreeOf } from "../trace/shapes";
  * The answer a reader opened a failing test for, before anything else: which check failed, the values it
  * compared, and the call that produced them. Everything here is one click from the operation it names.
  */
-const props = defineProps<{ failure: Failure; outcome: Outcome }>();
+const props = defineProps<{ failure: Failure; outcome: Outcome; test: TestTrace }>();
 const emit = defineEmits<{ select: [span: Span] }>();
+
+// Where the failure sits in the test: the phase that ran it and how far into the test it started.
+const where = computed(() => {
+  const phase = props.failure.span.phase;
+  const phaseName = phase.charAt(0).toUpperCase() + phase.slice(1);
+  return `${phaseName} · ${formatOffset(props.failure.span.start - props.test.start)} into the test`;
+});
 
 // A shape check shows the document it validated, the same tree the inspector uses.
 const shapeTree = computed(() => shapeTreeOf(props.failure.span));
@@ -36,6 +43,7 @@ function value(input: unknown): string {
       <button v-if="failure.call && failure.call !== failure.span" type="button" class="call" @click="emit('select', failure.call)">
         on {{ failure.call.name }}
       </button>
+      <span class="where">{{ where }}</span>
     </header>
 
     <ShapeResultTree v-if="shapeTree" :nodes="shapeTree" />
@@ -72,6 +80,7 @@ header button { padding: 0; border: 0; background: transparent; text-align: left
 .verdict { color: var(--danger); font-size: var(--text-meta); font-weight: var(--weight-semibold); }
 .warning .verdict { color: var(--warning); }
 .call { color: var(--muted); font-size: var(--text-meta); }
+.where { margin-left: auto; color: var(--muted); font-size: var(--text-micro); white-space: nowrap; }
 
 .mismatches { width: 100%; border-collapse: collapse; font-size: var(--text-meta); }
 .mismatches th { padding: 0 var(--space-3) var(--space-1) 0; color: var(--muted); font-size: var(--text-micro); font-weight: var(--weight-semibold); text-align: left; }

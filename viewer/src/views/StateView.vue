@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import type { Change, Item, Span, TestTrace } from "../trace/model";
-import { formatOffset, itemKindLabel, itemTitle, sourceLabels, timelinePercent } from "../trace/format";
+import { formatOffset, itemKindLabel, itemTitle, plural, sourceLabels, timelinePercent } from "../trace/format";
 import EmptyState from "../ui/EmptyState.vue";
 import Panel from "../ui/Panel.vue";
 
@@ -86,6 +86,7 @@ watch(() => props.selectedSpan, () => {
           <span class="kind">{{ itemKindLabel(item).label }}</span>
           <strong>{{ itemTitle(item) }}</strong>
           <small>{{ summary(item) }}</small>
+          <small v-if="item.changes.length" class="changes">{{ item.changes.length }} {{ plural(item.changes.length, "change") }}</small>
         </button>
         <span class="track">
           <i class="life" :style="lifeline(item)" />
@@ -135,6 +136,7 @@ watch(() => props.selectedSpan, () => {
 .kind { color: var(--muted); font-size: var(--text-micro); font-weight: var(--weight-semibold); }
 .name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-meta); font-weight: var(--weight-semibold); }
 .name small { grid-column: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); font-size: var(--text-micro); }
+.name small.changes { color: var(--muted); }
 
 .track { position: relative; height: 18px; }
 .track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--border); }

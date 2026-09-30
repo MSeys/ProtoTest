@@ -33,9 +33,9 @@ function mount(view: VNode) {
   return { host, unmount: () => { app.unmount(); host.remove(); } };
 }
 
-// What the operation stated reads where it happened; the counts say what they are in words, not glyphs.
+// What the operation stated reads where it happened, so the row's count names only the files it left.
 describe("StoryRow observations", () => {
-  it("states the observation inline and labels the evidence counts", async () => {
+  it("states the observation inline and counts the files in words", async () => {
     const call = span({});
     const test = testTrace(call);
     const row = story(test)[0].rows[0];
@@ -44,12 +44,29 @@ describe("StoryRow observations", () => {
     }));
     await nextTick();
 
-    expect(host.querySelector(".observed")?.textContent).toContain("Observed row-count on projects");
-    const marks = host.querySelector(".marks")?.textContent ?? "";
-    expect(marks).toContain("1 observation");
-    expect(marks).toContain("1 attachment");
-    expect(marks).not.toContain("◎");
-    expect(marks).not.toContain("⧉");
+    expect(host.querySelector(".observed")?.textContent?.replace(/\s+/g, " ")).toContain("Observed row-count on projects");
+    expect(host.querySelector(".marks")?.textContent?.trim()).toBe("1 file");
+    unmount();
+  });
+});
+
+// Time the trace cannot account for is a row of its own, saying how long and where it ended.
+describe("StoryRow gaps", () => {
+  it("states a gap with its length and the operation that ended it", async () => {
+    const lifecycle = span({ id: "exec", name: "Test execution", kind: "test.execution", start: 0, duration: 1200, end: 1200, evidence: [] });
+    const call = span({ id: "call", parent: lifecycle, depth: 1, start: 1100, duration: 5, end: 1105, evidence: [] });
+    lifecycle.children = [call];
+    const test: TestTrace = { ...testTrace(call), duration: 1200, end: 1200, spans: [lifecycle, call], roots: [lifecycle], byId: new Map([["exec", lifecycle], ["call", call]]) };
+    const gapRow = story(test)[0].rows[0];
+    expect(gapRow.type).toBe("gap");
+    const { host, unmount } = mount(h(StoryRow, {
+      row: gapRow, test, depth: 0, open: new Set<string>(), onSelect: () => {}, onToggle: () => {}
+    }));
+    await nextTick();
+
+    const text = host.querySelector(".gap")?.textContent?.replace(/\s+/g, " ") ?? "";
+    expect(text).toContain("1.10 s with no recorded operation");
+    expect(text).toContain("Until Create project started, +1.10 s into the test");
     unmount();
   });
 });

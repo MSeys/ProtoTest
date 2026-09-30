@@ -28,7 +28,7 @@
 .lineContent {
   flex: 1 1 auto;
   min-width: 0;
-  padding-left: 4ch;
+  padding-left: calc((var(--indent, 0) + 4) * 1ch);
   text-indent: -4ch;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -89,5 +89,5 @@
 
 /* Narrow frames keep the code readable instead of tight: the frame is the query container. */
 @container (max-width: 37.5rem) {
-  .pre { padding: var(--space-4); font-size: var(--text-body); }
+  .pre { padding: var(--space-4); font-size: var(--text-strong); }
 }

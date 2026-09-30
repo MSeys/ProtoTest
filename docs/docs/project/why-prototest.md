@@ -60,7 +60,7 @@ Playwright tracing was a large inspiration, but I wanted the trace to cover more
 
 ## Stability you can adopt on
 
-ProtoTest 1.x stays additive. Released APIs change only through deprecated shims, and nothing breaks without a plan decision recorded in the changelog. Most packages are supported; a smaller preview set (the agent layer, devices, Sheets, Aspire, WireMock, MassTransit and analyzers) can still change before 1.2. Support is best effort by one maintainer in personal time; the [sustainability page](./sustainability.md) has the full story. If the foundation stops fitting, [Leaving ProtoTest](./leaving.md) removes it one test at a time.
+ProtoTest 1.x stays additive. Released APIs change only through deprecated shims, and nothing breaks without a plan decision recorded in the changelog. Most packages are supported; a smaller preview set (the agent layer, devices, Sheets, Aspire, WireMock, MassTransit and analyzers) can still change before the next minor release. Support is best effort by one maintainer in personal time; the [sustainability page](./sustainability.md) has the full story. If the foundation stops fitting, [Leaving ProtoTest](./leaving.md) removes it one test at a time.
 
 ## Nothing phones home
 

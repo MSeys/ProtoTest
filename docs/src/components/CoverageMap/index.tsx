@@ -84,7 +84,7 @@ function propertyState(property: Property): State {
 
 export default function CoverageMap(): ReactNode {
   return (
-    <Frame
+    <Frame kind="preview"
       head={
         <>
           <span className={styles.headTitle}>OpenAPI coverage</span>

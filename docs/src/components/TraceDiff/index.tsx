@@ -21,7 +21,9 @@ function Pane({
   return (
     <section className={styles.pane} aria-labelledby={id}>
       <header className={styles.paneHead}>
-        <span className={styles.role} id={id}>{role}</span>
+        <span className={styles.role} id={id}>
+          {role}
+        </span>
         <span className={`${styles.verdict} ${failed ? styles.failed : styles.passed}`}>
           {failed ? 'failed' : 'succeeded'}
         </span>
@@ -30,18 +32,21 @@ function Pane({
         <code className={styles.test}>{side.test}</code>
         <span className={styles.elapsed}>{side.elapsed}</span>
       </div>
-      <ul className={styles.records}>
-        {side.record.map((entry, index) => (
-          <li key={index} className={entry.status === 'failed' ? styles.recordFailed : undefined}>
-            <span className={styles.recordHead}>
-              <code className={styles.kind}>{entry.kind}</code>
-              <span className={styles.recordName}>{entry.name}</span>
-              {entry.status && <span className={styles[entry.status]}>{entry.status}</span>}
-            </span>
-            {entry.detail && <span className={styles.detail}>{entry.detail}</span>}
-          </li>
-        ))}
-      </ul>
+      <details className={styles.recordDetails}>
+        <summary>Recorded operations ({side.record.length})</summary>
+        <ul className={styles.records}>
+          {side.record.map((entry, index) => (
+            <li key={index} className={entry.status === 'failed' ? styles.recordFailed : undefined}>
+              <span className={styles.recordHead}>
+                <code className={styles.kind}>{entry.kind}</code>
+                <span className={styles.recordName}>{entry.name}</span>
+                {entry.status && <span className={styles[entry.status]}>{entry.status}</span>}
+              </span>
+              {entry.detail && <span className={styles.detail}>{entry.detail}</span>}
+            </li>
+          ))}
+        </ul>
+      </details>
       {archive.href && (
         <Link className={styles.archive} href={archive.href}>
           Download this run's archive
@@ -86,6 +91,7 @@ export default function TraceDiff({source = drillRun}: TraceDiffProps): ReactNod
 
   return (
     <Frame
+      kind="figure"
       head={
         <div className={styles.tabs} role="tablist" aria-label="The four drill pairs" onKeyDown={move}>
           {failureDrills.map((pair, index) => (
@@ -101,7 +107,8 @@ export default function TraceDiff({source = drillRun}: TraceDiffProps): ReactNod
               aria-controls={`${baseId}-panel`}
               tabIndex={pair.id === activeId ? 0 : -1}
               className={`${styles.tab} ${pair.id === activeId ? styles.tabActive : ''}`}
-              onClick={() => setActiveId(pair.id)}>
+              onClick={() => setActiveId(pair.id)}
+            >
               {pair.question}
             </button>
           ))}
@@ -110,15 +117,37 @@ export default function TraceDiff({source = drillRun}: TraceDiffProps): ReactNod
       foot={
         <>
           Every name, duration and message is from {source.what}
-          {source.file && <> in <code>{source.file}</code></>}. The drill failed on purpose; the test
-          beside it runs the same journey and passes. Each pane links that test's own archive.
+          {source.file && (
+            <>
+              {' '}
+              in <code>{source.file}</code>
+            </>
+          )}
+          . The drill failed on purpose; the test beside it runs the same journey and passes. Each pane links
+          that test's own archive.
         </>
-      }>
-      <div className={styles.panel} id={`${baseId}-panel`} role="tabpanel" aria-labelledby={`${baseId}-${active.id}`}>
+      }
+    >
+      <div
+        className={styles.panel}
+        id={`${baseId}-panel`}
+        role="tabpanel"
+        aria-labelledby={`${baseId}-${active.id}`}
+      >
         <p className={styles.ask}>{active.ask}</p>
         <div className={styles.panes}>
-          <Pane id={`${baseId}-drill`} role="The drill" side={active.drill} archive={drillPairs[active.id].drill} />
-          <Pane id={`${baseId}-fix`} role="The test that holds" side={active.fix} archive={drillPairs[active.id].fix} />
+          <Pane
+            id={`${baseId}-drill`}
+            role="The drill"
+            side={active.drill}
+            archive={drillPairs[active.id].drill}
+          />
+          <Pane
+            id={`${baseId}-fix`}
+            role="The test that holds"
+            side={active.fix}
+            archive={drillPairs[active.id].fix}
+          />
         </div>
         <p className={styles.change}>
           <strong>What changes</strong>

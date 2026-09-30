@@ -1,0 +1,801 @@
+{
+  "protocols": [
+    {
+      "name": "REST",
+      "does": "One HTTP client per test on IHttpClientFactory, JSON shape assertions, shared authentication, request and response capture, and endpoint coverage.",
+      "packages": [
+        "ProtoTest.Rest"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Overview",
+          "to": "/docs/integrations/rest"
+        },
+        {
+          "label": "Requests",
+          "to": "/docs/integrations/rest/requests"
+        },
+        {
+          "label": "Responses",
+          "to": "/docs/integrations/rest/responses"
+        },
+        {
+          "label": "Authentication",
+          "to": "/docs/integrations/rest/authentication"
+        },
+        {
+          "label": "Attachments",
+          "to": "/docs/integrations/rest/attachments"
+        }
+      ],
+      "builder": [
+        {
+          "id": "rest",
+          "label": "Call an API",
+          "note": "REST requests, responses and shape checks",
+          "packages": [
+            "ProtoTest.Rest"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "GraphQL",
+      "does": "Queries, mutations and subscriptions over WebSocket or SSE, file uploads, shape assertions and schema coverage.",
+      "packages": [
+        "ProtoTest.GraphQL"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Overview",
+          "to": "/docs/integrations/graphql"
+        },
+        {
+          "label": "Operations",
+          "to": "/docs/integrations/graphql/operations"
+        },
+        {
+          "label": "Responses",
+          "to": "/docs/integrations/graphql/responses"
+        },
+        {
+          "label": "Subscriptions",
+          "to": "/docs/integrations/graphql/subscriptions"
+        },
+        {
+          "label": "Coverage",
+          "to": "/docs/integrations/graphql/coverage"
+        }
+      ],
+      "builder": [
+        {
+          "id": "graphql",
+          "label": "Use GraphQL",
+          "note": "Queries, mutations and subscriptions",
+          "packages": [
+            "ProtoTest.GraphQL"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gRPC",
+      "does": "Unary and streaming calls, metadata authentication through the shared ",
+      "packages": [
+        "ProtoTest.Grpc"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Overview",
+          "to": "/docs/integrations/grpc"
+        }
+      ],
+      "builder": [
+        {
+          "id": "grpc",
+          "label": "Use gRPC",
+          "note": "Unary calls and streams",
+          "packages": [
+            "ProtoTest.Grpc"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "OpenAPI",
+      "does": "Compares REST traffic and shape assertions against your OpenAPI document and reports the endpoints, responses and properties no test has checked.",
+      "packages": [
+        "ProtoTest.OpenApi"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "OpenAPI",
+          "to": "/docs/integrations/openapi"
+        }
+      ],
+      "builder": [
+        {
+          "id": "openapi",
+          "label": "Prove the contract",
+          "note": "OpenAPI coverage of the calls and their checks",
+          "packages": [
+            "ProtoTest.OpenApi"
+          ]
+        }
+      ]
+    }
+  ],
+  "browsers": [
+    {
+      "name": "Web",
+      "does": "A driver-independent model of pages, components, elements, tables, flows and login, with page coverage and failure artifacts.",
+      "packages": [
+        "ProtoTest.Web",
+        "ProtoTest.Web.Playwright",
+        "ProtoTest.Web.Selenium"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Overview",
+          "to": "/docs/integrations/web"
+        },
+        {
+          "label": "Page objects",
+          "to": "/docs/integrations/web/page-objects"
+        },
+        {
+          "label": "Locators",
+          "to": "/docs/integrations/web/locators"
+        },
+        {
+          "label": "Interactions",
+          "to": "/docs/integrations/web/interactions"
+        },
+        {
+          "label": "Flows",
+          "to": "/docs/integrations/web/flows"
+        },
+        {
+          "label": "Login",
+          "to": "/docs/integrations/web/login"
+        },
+        {
+          "label": "Middleware",
+          "to": "/docs/integrations/web/middleware"
+        },
+        {
+          "label": "Diagnostics",
+          "to": "/docs/integrations/web/diagnostics"
+        }
+      ],
+      "builder": [
+        {
+          "id": "playwright",
+          "label": "Drive a browser with Playwright",
+          "note": "Page objects and flows on Playwright",
+          "packages": [
+            "ProtoTest.Web.Playwright"
+          ]
+        },
+        {
+          "id": "selenium",
+          "label": "Drive a browser with Selenium",
+          "note": "The same page objects on Selenium",
+          "packages": [
+            "ProtoTest.Web.Selenium"
+          ]
+        }
+      ]
+    }
+  ],
+  "messaging": [
+    {
+      "name": "Messaging",
+      "does": "Publish to a destination, then await the message that matters with a predicate and a timeout; an in-memory broker by default.",
+      "packages": [
+        "ProtoTest.Messaging"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Messaging",
+          "to": "/docs/integrations/messaging"
+        }
+      ],
+      "builder": [
+        {
+          "id": "messaging",
+          "label": "Follow an event",
+          "note": "Publish and await messages in memory",
+          "packages": [
+            "ProtoTest.Messaging"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RabbitMQ",
+      "does": "A real broker adapter, with a broker owned by the run when it should start one.",
+      "packages": [
+        "ProtoTest.Messaging.RabbitMq",
+        "ProtoTest.Messaging.RabbitMq.Testcontainers"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Messaging",
+          "to": "/docs/integrations/messaging"
+        }
+      ],
+      "builder": [
+        {
+          "id": "rabbitmq",
+          "label": "Use RabbitMQ",
+          "note": "Publish to exchanges, tap events with a per-test queue",
+          "packages": [
+            "ProtoTest.Messaging.RabbitMq"
+          ]
+        },
+        {
+          "id": "rabbitmq-container",
+          "label": "Own a RabbitMQ container",
+          "note": "A broker the run starts and releases",
+          "packages": [
+            "ProtoTest.Messaging.RabbitMq",
+            "ProtoTest.Messaging.RabbitMq.Testcontainers"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "MassTransit",
+      "does": "Bridges the messaging surface to an in-process application's MassTransit test harness, and the envelope helper speaks the wire format over any adapter.",
+      "packages": [
+        "ProtoTest.Messaging.MassTransit"
+      ],
+      "preview": true,
+      "links": [
+        {
+          "label": "MassTransit bridge",
+          "to": "/docs/integrations/messaging/masstransit"
+        }
+      ],
+      "builder": [
+        {
+          "id": "masstransit",
+          "label": "Use the MassTransit harness",
+          "note": "Publish and await over the application's test harness",
+          "packages": [
+            "ProtoTest.Messaging.MassTransit"
+          ]
+        }
+      ]
+    }
+  ],
+  "devices-preview": [
+    {
+      "name": "Devices",
+      "does": "Typed device clients, one instance per test, frame exchange and device-protocol coverage.",
+      "packages": [
+        "ProtoTest.Devices"
+      ],
+      "preview": true,
+      "links": [
+        {
+          "label": "Devices",
+          "to": "/docs/integrations/devices"
+        }
+      ]
+    },
+    {
+      "name": "WebSocket transport",
+      "does": "Ws:// and wss:// endpoints, or in-process sockets through the application's test server.",
+      "packages": [
+        "ProtoTest.Devices.WebSocket",
+        "ProtoTest.Devices.WebSocket.AspNetCore"
+      ],
+      "preview": true,
+      "links": [
+        {
+          "label": "Devices",
+          "to": "/docs/integrations/devices"
+        }
+      ],
+      "builder": [
+        {
+          "id": "devices-websocket",
+          "label": "Talk to a device over WebSocket",
+          "note": "ws:// or wss://, or in-process through the TestServer",
+          "packages": [
+            "ProtoTest.Devices.WebSocket"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "MQTT transport",
+      "does": "Publish and subscribe against a real broker, with a Mosquitto broker owned by the run.",
+      "packages": [
+        "ProtoTest.Devices.Mqtt",
+        "ProtoTest.Devices.Mqtt.Testcontainers"
+      ],
+      "preview": true,
+      "links": [
+        {
+          "label": "Devices",
+          "to": "/docs/integrations/devices"
+        }
+      ],
+      "builder": [
+        {
+          "id": "devices-mqtt",
+          "label": "Talk to a device over MQTT",
+          "note": "Publish and subscribe against a real broker",
+          "packages": [
+            "ProtoTest.Devices.Mqtt"
+          ]
+        }
+      ]
+    }
+  ],
+  "data-and-files": [
+    {
+      "name": "Test data",
+      "does": "Deterministic builders with member defaults, factories and provisioners, so a test writes only the values it is about.",
+      "packages": [
+        "ProtoTest.Data"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Overview",
+          "to": "/docs/integrations/data"
+        },
+        {
+          "label": "Defaults",
+          "to": "/docs/integrations/data/defaults"
+        },
+        {
+          "label": "Provisioners",
+          "to": "/docs/integrations/data/provisioners"
+        }
+      ],
+      "builder": [
+        {
+          "id": "data",
+          "label": "Own test data",
+          "note": "Deterministic builders and provisioners",
+          "packages": [
+            "ProtoTest.Data"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SQL",
+      "does": "A database connection each test owns, optional transaction rollback, EF Core contexts on the same connection, and a PostgreSQL server owned by the run.",
+      "packages": [
+        "ProtoTest.Sql",
+        "ProtoTest.Sql.EntityFrameworkCore",
+        "ProtoTest.Sql.Testcontainers"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "SQL",
+          "to": "/docs/integrations/sql"
+        }
+      ],
+      "builder": [
+        {
+          "id": "sql",
+          "label": "Inspect the database",
+          "note": "A per-test connection with transaction isolation",
+          "packages": [
+            "ProtoTest.Sql"
+          ]
+        },
+        {
+          "id": "sql-efcore",
+          "label": "Use an EF Core context",
+          "note": "Entity Framework Core over the per-test connection",
+          "packages": [
+            "ProtoTest.Sql.EntityFrameworkCore"
+          ]
+        },
+        {
+          "id": "sql-container",
+          "label": "Own a database container",
+          "note": "A database the run starts and releases",
+          "packages": [
+            "ProtoTest.Sql",
+            "ProtoTest.Sql.Testcontainers"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sheets",
+      "does": "Opens the .xlsx your application generated and asserts on cells, ranges, tables and typed rows, with range coverage.",
+      "packages": [
+        "ProtoTest.Sheets"
+      ],
+      "preview": true,
+      "links": [
+        {
+          "label": "Sheets",
+          "to": "/docs/integrations/sheets"
+        }
+      ],
+      "builder": [
+        {
+          "id": "sheets",
+          "label": "Check a workbook",
+          "note": "Cells, ranges and typed rows of a generated file",
+          "packages": [
+            "ProtoTest.Sheets"
+          ]
+        }
+      ]
+    }
+  ],
+  "applications-and-runs": [
+    {
+      "name": "ASP.NET Core",
+      "does": "Runs the application in-process with WebApplicationFactory and hands its HttpClient to the REST and GraphQL clients.",
+      "packages": [
+        "ProtoTest.AspNetCore"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "ASP.NET Core",
+          "to": "/docs/integrations/aspnetcore"
+        }
+      ],
+      "builder": [
+        {
+          "id": "aspnetcore",
+          "label": "Host ASP.NET Core",
+          "note": "Run the application in-process",
+          "packages": [
+            "ProtoTest.AspNetCore"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Background workers",
+      "does": "Runs a generic host with its IHostedServices inside the test process, the way ASP.NET Core runs an API.",
+      "packages": [
+        "ProtoTest.Hosting"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Background workers",
+          "to": "/docs/integrations/hosting"
+        }
+      ],
+      "builder": [
+        {
+          "id": "hosting",
+          "label": "Run background workers",
+          "note": "Workers and generic hosts in-process",
+          "packages": [
+            "ProtoTest.Hosting"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Aspire",
+      "does": "Starts an Aspire AppHost with the run and publishes each resource's endpoint as its application's address.",
+      "packages": [
+        "ProtoTest.Aspire"
+      ],
+      "preview": true,
+      "links": [
+        {
+          "label": "Aspire",
+          "to": "/docs/integrations/aspire"
+        }
+      ],
+      "builder": [
+        {
+          "id": "aspire",
+          "label": "Start an Aspire AppHost",
+          "note": "Its resources become the run's targets",
+          "packages": [
+            "ProtoTest.Aspire"
+          ]
+        }
+      ]
+    }
+  ],
+  "fakes": [
+    {
+      "name": "WireMock",
+      "does": "A fake HTTP service per test or per run, with stubs, call verification, trace evidence and stub coverage.",
+      "packages": [
+        "ProtoTest.WireMock"
+      ],
+      "preview": true,
+      "links": [
+        {
+          "label": "WireMock",
+          "to": "/docs/integrations/wiremock"
+        }
+      ],
+      "builder": [
+        {
+          "id": "wiremock",
+          "label": "Fake an HTTP dependency",
+          "note": "Per-test stubs with trace evidence and stub coverage",
+          "packages": [
+            "ProtoTest.WireMock"
+          ]
+        }
+      ]
+    }
+  ],
+  "foundation-and-support": [
+    {
+      "name": "Foundation",
+      "does": "The host, execution context, hooks, attributes, test ids, tracing and resources every integration plugs into.",
+      "packages": [
+        "ProtoTest.Core"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Overview",
+          "to": "/docs/foundation/overview"
+        }
+      ]
+    },
+    {
+      "name": "HTTP plumbing",
+      "does": "The shared client pipeline and the ",
+      "packages": [
+        "ProtoTest.Http"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Clients",
+          "to": "/docs/foundation/clients"
+        }
+      ]
+    },
+    {
+      "name": "JSON shapes",
+      "does": "Partial shape matching and JsonValue constraints; normally transitive.",
+      "packages": [
+        "ProtoTest.Json"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Shape matching",
+          "to": "/docs/foundation/shape-matching"
+        }
+      ]
+    },
+    {
+      "name": "Containers",
+      "does": "The run-scoped container base: start once, release once, with TryStart for a run that has no container runtime.",
+      "packages": [
+        "ProtoTest.Testcontainers"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Infrastructure",
+          "to": "/docs/foundation/infrastructure"
+        }
+      ]
+    },
+    {
+      "name": "Page inventory",
+      "does": "Page identities and inventory shared by the browser and ASP.NET Core integrations; normally transitive.",
+      "packages": [
+        "ProtoTest.Web.Pages"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Coverage",
+          "to": "/docs/observability/coverage"
+        },
+        {
+          "label": "Web integration",
+          "to": "/docs/integrations/web"
+        }
+      ]
+    }
+  ],
+  "runners": [
+    {
+      "name": "Test runners",
+      "does": "The same runtime in every runner, with one assertion and attachment model.",
+      "packages": [
+        "ProtoTest.NUnit",
+        "ProtoTest.Xunit",
+        "ProtoTest.Xunit3",
+        "ProtoTest.MSTest",
+        "ProtoTest.TUnit"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Overview",
+          "to": "/docs/runners/overview"
+        },
+        {
+          "label": "NUnit",
+          "to": "/docs/runners/nunit"
+        },
+        {
+          "label": "XUnit v2",
+          "to": "/docs/runners/xunit"
+        },
+        {
+          "label": "XUnit v3",
+          "to": "/docs/runners/xunit3"
+        },
+        {
+          "label": "MSTest",
+          "to": "/docs/runners/mstest"
+        },
+        {
+          "label": "TUnit",
+          "to": "/docs/runners/tunit"
+        }
+      ]
+    }
+  ],
+  "tooling-and-agent": [
+    {
+      "name": "The CLI",
+      "does": "The prototest tool: summary, index, verify and feedback over a trace, a folder of runs or two reports, with no agent in the loop.",
+      "packages": [
+        "ProtoTest.Cli"
+      ],
+      "preview": true,
+      "links": [
+        {
+          "label": "CLI reference",
+          "to": "/docs/agent-workflows/cli"
+        }
+      ]
+    },
+    {
+      "name": "Traces",
+      "does": "The .prototrace archive and the reader that opens it: the run's operations, checks and artifacts in one file.",
+      "packages": [
+        "ProtoTest.Traces"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "ProtoTrace",
+          "to": "/docs/observability/prototrace"
+        }
+      ]
+    },
+    {
+      "name": "MCP server",
+      "does": "A local stdio server that answers questions about the runs in a repository through four read-only tools.",
+      "packages": [
+        "ProtoTest.Mcp"
+      ],
+      "preview": true,
+      "links": [
+        {
+          "label": "Setup",
+          "to": "/docs/agent-workflows/setup"
+        }
+      ]
+    },
+    {
+      "name": "Diagnosis",
+      "does": "The run summary and the failing test's context package, behind the CLI and the MCP tools.",
+      "packages": [
+        "ProtoTest.Diagnosis"
+      ],
+      "preview": true,
+      "links": [
+        {
+          "label": "Diagnosis",
+          "to": "/docs/agent-workflows/diagnosis"
+        }
+      ]
+    },
+    {
+      "name": "Verification",
+      "does": "Compares two reports and records whether a fix regressed a covered unit or changed the specification.",
+      "packages": [
+        "ProtoTest.Verification"
+      ],
+      "preview": true,
+      "links": [
+        {
+          "label": "Verification",
+          "to": "/docs/agent-workflows/verification"
+        }
+      ]
+    },
+    {
+      "name": "Feedback",
+      "does": "The composite action: installs the CLI, uploads the trace, posts the digest and runs the verdict.",
+      "packages": [
+        "ProtoTest.Feedback"
+      ],
+      "preview": true,
+      "links": [
+        {
+          "label": "Continuous integration",
+          "to": "/docs/continuous-integration"
+        }
+      ]
+    },
+    {
+      "name": "Analyzers",
+      "does": "Two Roslyn warnings for test code that compiles but runs outside the lifecycle.",
+      "packages": [
+        "ProtoTest.Analyzers"
+      ],
+      "preview": true,
+      "links": [
+        {
+          "label": "Analyzers",
+          "to": "/docs/project/analyzers"
+        }
+      ],
+      "builder": [
+        {
+          "id": "analyzers",
+          "label": "Catch mistakes at build time",
+          "note": "Roslyn analyzers for ProtoTest suites",
+          "packages": [
+            "ProtoTest.Analyzers"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Templates",
+      "does": "Dotnet new prototest scaffolds an API and a suite for it, already composed.",
+      "packages": [
+        "ProtoTest.Templates"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Installation",
+          "to": "/docs/getting-started/installation"
+        }
+      ]
+    },
+    {
+      "name": "Reporting",
+      "does": "The JSON and HTML report sinks.",
+      "packages": [
+        "ProtoTest.Reporting"
+      ],
+      "preview": false,
+      "links": [
+        {
+          "label": "Reporting",
+          "to": "/docs/observability/reporting"
+        }
+      ]
+    }
+  ]
+}

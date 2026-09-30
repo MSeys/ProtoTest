@@ -4,6 +4,7 @@ import JsonNode from "./JsonNode.vue";
 import { jsonContextKey, jsonPath, parseEmbedded } from "./json";
 import { plural } from "../trace/format";
 import { useClipboard } from "../ui/useClipboard";
+import DetailCard from "../ui/DetailCard.vue";
 
 /*
  * A recorded document, read as JSON: keys, strings, numbers and literals in the code palette, every object and
@@ -63,53 +64,24 @@ async function copyDocument() {
 </script>
 
 <template>
-  <section class="json">
-    <header>
-      <strong v-if="label">{{ label }}</strong>
-      <span class="size">{{ size }}</span>
-      <span class="tools">
-        <template v-if="isDocument">
-          <button type="button" @click="setAll('all')">Expand all</button>
-          <button type="button" @click="setAll('none')">Collapse all</button>
-        </template>
-        <button type="button" @click="copyDocument">{{ copied ? "Copied" : "Copy" }}</button>
-      </span>
-    </header>
+  <DetailCard :title="label" :meta="size">
+    <template #tools>
+      <template v-if="isDocument">
+        <button type="button" title="Open every level" @click="setAll('all')">Expand</button>
+        <button type="button" title="Fold every level" @click="setAll('none')">Collapse</button>
+      </template>
+      <button type="button" @click="copyDocument">{{ copied ? "Copied" : "Copy" }}</button>
+    </template>
     <div class="body">
       <JsonNode v-if="isDocument" :value="parsed" path="$" :depth="0" last />
       <pre v-else class="text">{{ String(parsed ?? "") }}</pre>
     </div>
-  </section>
+  </DetailCard>
 </template>
 
 <style scoped>
-.json { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-control); overflow: clip; }
-header {
-  min-height: var(--row-height);
-  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
-}
-header strong { font-size: var(--text-meta); font-weight: var(--weight-bold); }
-.size { color: var(--muted); font-size: var(--text-micro); }
-.tools { margin-left: auto; display: flex; gap: var(--space-1); }
-.tools button {
-  height: 20px;
-  padding: 0 var(--space-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-chip);
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--text-micro);
-  transition: color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease);
-}
-.tools button:hover { border-color: var(--border); color: var(--text); }
 .body {
   padding: var(--space-2) var(--space-3);
-  background: var(--surface-sunken);
   color: var(--code-text);
   font: var(--text-micro)/var(--leading) var(--font-mono);
 }

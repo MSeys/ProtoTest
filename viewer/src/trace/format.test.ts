@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { testCodeName, testGroup, testMatches, testTitle } from "./format";
+import { testCodeName, testGroup, testMatches, testTitle, rulerTicks } from "./format";
 import type { TestTrace } from "./model";
 
 function testTrace(overrides: Partial<TestTrace> = {}): TestTrace {
@@ -34,5 +34,12 @@ describe("test names", () => {
     // The second call reads the cached values; the answers must not change.
     expect(testTitle(test)).toBe(testTitle(test));
     expect(testMatches(test, "graphql")).toBe(true);
+  });
+});
+
+describe("rulerTicks", () => {
+  it("marks round steps across the range", () => {
+    expect(rulerTicks(0, 1160)).toEqual([0, 200, 400, 600, 800, 1000]);
+    expect(rulerTicks(0, 7.4)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
   });
 });

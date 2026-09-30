@@ -1,4 +1,4 @@
-import type {CSSProperties, ReactNode} from 'react';
+import {useId, type CSSProperties, type ReactNode} from 'react';
 
 import styles from './styles.module.css';
 
@@ -30,6 +30,7 @@ function tone(token: string): CSSProperties {
 }
 
 export default function CheckView(): ReactNode {
+  const id = useId();
   return (
     <div className={styles.checkView}>
       <p className={styles.crumb}>
@@ -55,15 +56,19 @@ export default function CheckView(): ReactNode {
       </p>
       <p className={styles.checkOp}>assert.json.shape from ProtoTest.Rest</p>
 
-      <div className={styles.exception}>
+      <nav className={styles.detailsIndex} aria-label="Parts of this operation">
+        <a href={`#${id}-error`} onClick={() => { const error = document.getElementById(`${id}-error`); if (error instanceof HTMLDetailsElement) error.open = true; }}>Error</a><a href={`#${id}-source`}>Source</a><a href={`#${id}-comparison`}>Comparison</a>
+      </nav>
+      <details className={styles.exception} id={`${id}-error`}>
+        <summary>Exception message</summary>
         <b>JsonShapeMismatchException</b>
         <span className={styles.exceptionNote}>Shape mismatch failed with 1 error(s):</span>
         <span className={styles.exceptionNote}>
           • [$.status]: Values did not match. (Expected: &quot;past_due&quot;, Actual: &quot;active&quot;)
         </span>
-      </div>
+      </details>
 
-      <div className={styles.source}>
+      <div className={styles.source} id={`${id}-source`}>
         <div className={styles.sourceHead}>
           <b>
             {source.file}:{source.line}
@@ -79,6 +84,10 @@ export default function CheckView(): ReactNode {
           ))}
         </pre>
       </div>
+      <section className={styles.shape} id={`${id}-comparison`}>
+        <header className={styles.shapeHead}>Validated document</header>
+        <div className={styles.mismatch}><span className={styles.property}>"status"</span>: <s>"past_due"</s> <strong>"active"</strong></div>
+      </section>
     </div>
   );
 }

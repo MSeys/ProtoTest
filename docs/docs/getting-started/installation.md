@@ -43,10 +43,14 @@ export const installTabs = [
 
 # Installation
 
-One command starts a running suite. The template builds it, runs it and reports on it.
+Create a small API and a working integration test suite with the template. Run the commands in order:
+
+## Start from the template
+
+The template creates a small ASP.NET Core API and a suite for it. The default starter needs the .NET 10 SDK.
 
 ```bash
-dotnet new install ProtoTest.Templates@1.1.0
+dotnet new install ProtoTest.Templates
 dotnet new prototest -n Shop
 cd Shop
 dotnet test
@@ -55,10 +59,6 @@ dotnet test
 The run passes. The test project leaves `Shop.Tests/bin/Debug/net10.0/TestResults/prototest-{runId}.prototrace` and `Shop.html`. Each run writes its own trace, so a rerun never overwrites the previous one. Open the report for the run's verdict and the routes it covered, or drop the trace on [trace.prototest.dev](https://trace.prototest.dev).
 
 ProtoTest ships as small NuGet packages: your runner package, `ProtoTest.Core`, and one package per integration you use. The runner and integration packages target .NET 8, 9 and 10. `ProtoTest.Cli` targets .NET 8 only. `ProtoTest.Analyzers` and `ProtoTest.Templates` are netstandard2.0.
-
-## Start from the template
-
-The template creates a small ASP.NET Core API and a suite for it. The suite is ready to run, trace and report. It uses the commands above.
 
 The suite is written for NUnit. Pass `--runner xunit`, `--runner xunit3`, `--runner tunit` or `--runner mstest` to generate it for another runner, and `--framework net8.0` or `--framework net9.0` to target an older framework.
 
@@ -120,7 +120,7 @@ dotnet add package NUnit --version 4.6.1
 
 ## Preview packages
 
-The preview set works but its surface can change before 1.2: Sheets, WireMock, the devices family, Aspire, the MassTransit bridge, the agent layer (Mcp, Diagnosis, Verification, Feedback, Cli) and Analyzers. Add one per need the same way:
+The preview set works but its surface can change before the next minor release: Sheets, WireMock, the devices family, Aspire, the MassTransit bridge, the agent layer (Mcp, Diagnosis, Verification, Feedback, Cli) and Analyzers. Add one per need the same way:
 
 ```bash
 dotnet add package ProtoTest.Sheets

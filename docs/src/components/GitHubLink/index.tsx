@@ -1,5 +1,4 @@
 import type {ReactNode} from 'react';
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 import NavbarMarkLink from '@site/src/components/NavbarMarkLink';
 
@@ -10,20 +9,14 @@ interface GitHubLinkProps {
   onClick?: () => void;
 }
 
-/**
- * The GitHub mark as a navbar item. The star count is fetched at build time into `customFields`, so readers
- * never call the GitHub API; when the build could not reach it, the mark simply stands alone.
- */
+/** A quiet link to the source repository. */
 export default function GitHubLink({mobile, onClick}: GitHubLinkProps): ReactNode {
-  const {siteConfig} = useDocusaurusContext();
-  const stars = siteConfig.customFields?.githubStars;
 
   return (
     <NavbarMarkLink
       href="https://github.com/MSeys/ProtoTest"
       name="GitHub"
       title="ProtoTest on GitHub"
-      count={typeof stars === 'number' ? stars : undefined}
       mobile={mobile}
       onClick={onClick}>
       <Mark />

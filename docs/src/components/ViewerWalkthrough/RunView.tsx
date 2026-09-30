@@ -1,12 +1,11 @@
-import type {ReactNode} from 'react';
+import {useState, type ReactNode} from 'react';
 
+import useStrip from '@site/src/hooks/useStrip';
 import styles from './styles.module.css';
 
 /*
- * The viewer's Run view for the bundled demo: the outcome line, the phase bar with the four failures and
- * the partial, the "what this run could see" panel, and the needs-attention list. Values come from
- * prototest-demo.prototrace, in the viewer's start order: tests 08, 10, 12 and 15 failed, test 11 went
- * partial. The test list below needs-attention is left out on purpose - the failed tests are the story here.
+ * The demo run as the viewer opens it: the verdict and its strip, then one view at a time. Overview holds what
+ * needs attention and what the run could see; Timeline and Details are the run's clock and identity.
  */
 
 type Tick = 'passed' | 'failed' | 'partial';
@@ -54,7 +53,7 @@ const attention: Attention[] = [
     kicker: 'Assert status · 201 Created',
     detail: 'Expected HTTP status 201 (Created), but received 400 (BadRequest).',
     outcome: 'failed',
-    label: 'Failed',
+    label: 'Assertion',
   },
   {
     number: '10',
@@ -62,15 +61,7 @@ const attention: Attention[] = [
     kicker: 'Assert status · 200 OK',
     detail: 'Expected HTTP status 200 (OK), but received 404 (NotFound).',
     outcome: 'failed',
-    label: 'Failed',
-  },
-  {
-    number: '11',
-    title: 'A passing journey can still carry a warning',
-    kicker: 'Coverage finding',
-    detail: 'The create response carried 4 fields no assertion mentioned: createdAtUtc, environmentCount, id, slug.',
-    outcome: 'partial',
-    label: 'Partial',
+    label: 'Assertion',
   },
   {
     number: '12',
@@ -78,7 +69,7 @@ const attention: Attention[] = [
     kicker: 'Assert response shape',
     detail: '$.status: expected "past_due", got "active"',
     outcome: 'failed',
-    label: 'Failed',
+    label: 'Assertion',
   },
   {
     number: '15',
@@ -86,15 +77,15 @@ const attention: Attention[] = [
     kicker: 'Test execution',
     detail: 'ConnectionError reaching http://127.0.0.1:5099: connection refused.',
     outcome: 'failed',
-    label: 'Failed',
+    label: 'Runner failure',
   },
   {
     number: '11',
     title: 'A passing journey can still carry a warning',
-    kicker: 'Finished with a partial result',
-    detail: '',
+    kicker: 'The create response carried 4 fields no assertion mentioned: createdAtUtc, environmentCount, id, slug.',
+    detail: 'Warning, Coverage',
     outcome: 'partial',
-    label: 'Partial',
+    label: 'Finding',
   },
   {
     number: '11',
@@ -114,7 +105,19 @@ const attention: Attention[] = [
   },
 ];
 
+const timeline = [
+  {number: '08', title: 'A bare status hides what the application said', phases: [['setup', 1741.8, 44.1041], ['execution', 1785.929, 35.6183], ['teardown', 1821.6, 58.9866]]},
+  {number: '10', title: 'An unknown project ID is treated as mine', phases: [['setup', 1742.668, 46.3363], ['execution', 1789.032, 26.2419], ['teardown', 1815.337, 50.0184]]},
+  {number: '12', title: 'A real wait does not close the due window', phases: [['setup', 1748.087, 46.3246], ['execution', 1794.436, 1108.6688], ['teardown', 2903.184, 7.3962]], gapStart: 1886.303, gapLength: 1006.522},
+  {number: '15', title: 'The address was hardcoded for one machine', phases: [['setup', 1880.988, 37.3838], ['execution', 1918.419, 2028.7205], ['teardown', 3947.283, 10.3628]], gapStart: 1918.419, gapLength: 2028.7205},
+];
+
+type RunTab = 'overview' | 'timeline' | 'details';
+const runTabs: [RunTab, string][] = [['overview', 'Overview'], ['timeline', 'Timeline'], ['details', 'Details']];
+
 export default function RunView(): ReactNode {
+  const [tab, setTab] = useState<RunTab>('overview');
+  const strip = useStrip<HTMLDivElement>(tab);
   return (
     <div className={styles.run}>
       <p className={styles.outcomeLine}>
@@ -133,50 +136,62 @@ export default function RunView(): ReactNode {
         ))}
       </div>
 
-      <section className={styles.panel}>
-        <header className={styles.panelHead}>What this run could see</header>
-        <p className={styles.panelLead}>Where the application ran, what was composed, and how deep the trace reached.</p>
-        <div className={styles.kv}>
-          <span className={styles.kvLabel}>Application</span>
-          <b>In-process</b>
-        </div>
-        <div className={styles.kv}>
-          <span className={styles.kvLabel}>Capabilities</span>
-          <span className={styles.chips}>
-            {capabilities.map((capability) => (
-              <i key={capability} className={styles.chip}>
-                {capability}
-              </i>
-            ))}
-          </span>
-        </div>
-        <div className={styles.kv}>
-          <span className={styles.kvLabel}>Values from</span>
-          <span className={styles.chips}>
-            <i className={`${styles.chip} ${styles.chipOn}`}>Test side</i>
-            <i className={`${styles.chip} ${styles.chipOff}`}>Observed (not visible)</i>
-            <i className={`${styles.chip} ${styles.chipOn}`}>Application</i>
-          </span>
-        </div>
-      </section>
+      <div ref={strip} data-strip="" className={styles.runTabs} role="group" aria-label="Views of the run">
+        {runTabs.map(([id, label]) => (
+          <button key={id} type="button" aria-pressed={tab === id} className={`${styles.tab} ${tab === id ? styles.tabActive : ''}`} onClick={() => setTab(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
 
+      {tab === 'overview' && <>
       <section className={styles.panel}>
         <header className={styles.panelHead}>Needs attention</header>
-        <p className={styles.panelLead}>Failing and partial tests first, then what the run itself found and how its gates judged it.</p>
         <div className={styles.attention}>
           {attention.map((row) => (
             <div key={`${row.number}-${row.title}`} className={`${styles.attRow} ${attClass[row.outcome]}`}>
               <span className={styles.attNumber}>{row.number}</span>
               <span className={styles.attBody}>
                 <b className={styles.attTitle}>{row.title}</b>
-                {row.kicker && <span className={styles.attKicker}>{row.kicker}</span>}
-                <span className={styles.attDetail}>{row.detail}</span>
+                <span className={styles.attKicker}>
+                  <span className={`${styles.attLabel} ${attLabelClass[row.outcome]}`}>{row.label}</span> {row.kicker}
+                </span>
+                {row.detail && <span className={styles.attDetail}>{row.detail}</span>}
               </span>
-              <span className={`${styles.attLabel} ${attLabelClass[row.outcome]}`}>{row.label}</span>
             </div>
           ))}
         </div>
       </section>
+      <section className={styles.panel}>
+        <header className={styles.panelHead}>What this run could see</header>
+        <div className={styles.kv}><span className={styles.kvLabel}>Application</span><b>In-process</b></div>
+        <div className={styles.kv}><span className={styles.kvLabel}>Capabilities</span><span className={styles.chips}>{capabilities.map(capability => <i key={capability} className={styles.chip}>{capability}</i>)}</span></div>
+        <div className={styles.kv}><span className={styles.kvLabel}>Values from</span><span className={styles.chips}>
+          <i className={`${styles.chip} ${styles.chipOn}`}>Test side</i><i className={`${styles.chip} ${styles.chipOff}`}>Observed (not visible)</i><i className={`${styles.chip} ${styles.chipOn}`}>Application</i>
+        </span></div>
+      </section>
+      </>}
+      {tab === 'timeline' && <section className={styles.panel}>
+        <header className={styles.panelHead}>Run timeline</header>
+        <p className={styles.panelLead}>Four test rows from the full list. Hatched time has no recorded operation.</p>
+        <div className={styles.mockRuler}><span>start</span><span>4.06 s</span></div>
+        {timeline.map(test => <div key={test.number} className={styles.clockRow}>
+          <span>{test.number} {test.title}</span><span className={styles.clockTrack}>
+            {test.phases.map(([phase, start, length]) => <i key={phase} style={{left: `${Number(start) / 4059.3055 * 100}%`, width: `${Number(length) / 4059.3055 * 100}%`, background: `var(--phase-${phase})`}} />)}
+            {test.gapStart !== undefined && <i className={styles.gapBar} style={{left: `${test.gapStart / 4059.3055 * 100}%`, width: `${test.gapLength / 4059.3055 * 100}%`}} />}
+          </span>
+        </div>)}
+      </section>}
+      {tab === 'details' && <section className={styles.panel}>
+        <header className={styles.panelHead}>Run details</header>
+        <dl className={styles.runDetails}>
+          <dt>Run id</dt><dd>b8f1c1c58d984319a2c90b05aa3f2d3e</dd>
+          <dt>environment.os</dt><dd>Microsoft Windows 10.0.26200</dd>
+          <dt>environment.osArchitecture</dt><dd>X64</dd>
+          <dt>environment.processArchitecture</dt><dd>X64</dd>
+          <dt>environment.runtime</dt><dd>.NET 8.0.31</dd>
+        </dl>
+      </section>}
     </div>
   );
 }

@@ -1,23 +1,37 @@
+/* One row from the viewer's test list: outcome, name and operations, and the way in on the right. */
 .example {
-  margin: var(--space-6) 0;
-  padding: var(--space-5);
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
-  gap: var(--space-3) var(--space-5);
-  align-items: end;
+  margin: var(--space-5) 0;
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-panel);
-  background:
-    linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
-    var(--surface);
-  background-size: var(--grid-size) var(--grid-size);
+  background: var(--surface);
   color: var(--text);
+  container-type: inline-size;
 }
+.row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); }
 
-.kind { grid-column: 1 / -1; color: var(--phase-execution); font: var(--weight-bold) var(--text-micro) var(--font-mono); letter-spacing: var(--tracking-eyebrow); }
-.example div { display: grid; gap: var(--space-1); min-width: 0; overflow-wrap: break-word; }
-.example strong { font-size: var(--text-title); }
-.example code { width: fit-content; max-width: 100%; padding: 0; border: 0; background: none; color: var(--dim); overflow-wrap: anywhere; }
-/* The link keeps its own cell on wide frames and drops under the text on narrow ones. */
-.link { justify-self: start; font-weight: var(--weight-semibold); }
+.status { width: 8px; height: 8px; border-radius: 50%; background: var(--outcome-succeeded); }
+.text { min-width: 0; display: grid; gap: 2px; }
+.text strong { overflow: hidden; font-size: var(--text-title); font-weight: var(--weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
+.text code { width: fit-content; max-width: 100%; padding: 0; overflow: hidden; border: 0; background: none; color: var(--muted); font-size: var(--text-strong); text-overflow: ellipsis; white-space: nowrap; }
+
+.open {
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  color: var(--text);
+  font-size: var(--text-strong);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+.open:hover { border-color: var(--blueprint); color: var(--text); text-decoration: none; }
+
+/* A narrow frame keeps the row and moves the way in under the name. */
+@container (max-width: 30rem) {
+  .row { grid-template-columns: auto minmax(0, 1fr); }
+  .open { grid-column: 2; justify-self: start; }
+}

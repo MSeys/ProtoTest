@@ -67,7 +67,7 @@ function SliceCode({files, slices}: {files: ComparisonFile[]; slices: Comparison
       {slices.map((slice) => {
         const lines = linesOf(files, slice.file);
         return (
-          <div key={slice.file} className={styles.slice}>
+          <div key={slice.file} data-surface="blueprint" className={styles.slice}>
             <span className={styles.sliceFile}>{slice.file}</span>
             {slice.ranges.map(([from, to], index) => (
               <div key={from}>

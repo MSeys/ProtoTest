@@ -78,7 +78,40 @@ describe("SpanInspector shape comparison", () => {
     await nextTick();
 
     expect(headings(host)).not.toContain("Expected against actual");
-    expect(host.querySelector(".shape header strong")?.textContent).toBe("Validated document");
+    expect(host.querySelector(".card header strong")?.textContent).toBe("Validated document");
+    unmount();
+  });
+
+  // Beside a comparison, the exception and the check verdicts say the same thing again: they step back.
+  it("leads with the comparison and folds what repeats it", async () => {
+    const check = span({
+      kind: "assert.json.shape", name: "Assert response shape", status: "failed",
+      error: { type: "ProtoTest.Json.JsonShapeMismatchException", message: "Shape mismatch failed with 1 error(s)" },
+      sections: [{ label: "Result", kind: "checks", language: null, content: null, items: [{ label: "shape", value: "1 mismatch", detail: null, tone: "error" }] }],
+      attributes: {
+        "shape.result": "mismatched",
+        "shape.actual": '{"code":"forbidden","message":"No."}',
+        "shape.mismatches": '[{"propertyPath":"$.message","reason":"was not expected","expected":"missing","actual":"No."}]'
+      }
+    });
+    const { host, unmount } = mount(h(SpanInspector, { span: check, test: testTrace([check]) }));
+    await nextTick();
+
+    expect(host.querySelector("section.error")).toBeNull();
+    expect(headings(host)).not.toContain("Result");
+    const folds = [...host.querySelectorAll("details.fold > summary")].map(entry => entry.textContent?.replace(/\s+/g, " ").trim());
+    expect(folds).toEqual(["The response it judged", "Exception JsonShapeMismatchException", "Attributes 3"]);
+    expect(host.querySelector<HTMLDetailsElement>("details.attributes")?.open).toBe(false);
+    unmount();
+  });
+
+  it("keeps an error with nothing to compare as the headline", async () => {
+    const call = span({ status: "failed", error: { type: "System.Net.Http.HttpRequestException", message: "Connection refused" } });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]) }));
+    await nextTick();
+
+    expect(host.querySelector("section.error h3")?.textContent).toBe("HttpRequestException");
+    expect(host.querySelector("section.error pre")?.textContent).toBe("Connection refused");
     unmount();
   });
 });
@@ -108,6 +141,14 @@ describe("SpanInspector checks", () => {
 
 // A moment that went wrong reads as such; an informational one stays quiet.
 describe("SpanInspector moments", () => {
+  it("shows moment attributes, errors and sections beside their time", async () => {
+    const call = span({ moments: [{ at: 2, name: "Received", kind: "message.received", source: "Broker", outcome: "failed", error: { type: "Error", message: "Rejected" }, attributes: { queue: "invoices", missing: null }, sections: [{ label: "Payload", kind: "code", language: "text", content: "invoice", items: [] }], span: null }] });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]) }));
+    await nextTick();
+    for (const text of ["Rejected", "queue", "invoices", "missing", "null", "Payload", "invoice"]) expect(host.querySelector(".moment-detail")?.textContent).toContain(text);
+    unmount();
+  });
+
   it("marks a failed moment and leaves a quiet one alone", async () => {
     const call = span({
       moments: [
@@ -122,6 +163,71 @@ describe("SpanInspector moments", () => {
     expect(rows).toHaveLength(2);
     expect(rows[0].className).toContain("danger");
     expect(rows[1].className).not.toContain("danger");
+    unmount();
+  });
+});
+
+describe("SpanInspector evidence and index", () => {
+  it("shows observation metadata and every finding detail", () => {
+    const call = span({ evidence: [
+      { type: "observation", at: 1, target: "orders", kind: "count", identifier: null, data: null, metadata: { origin: "database", absent: null }, span: null },
+      { type: "finding", at: 2, message: "Slow export", status: "warning", category: "performance", target: "export", tags: ["slow", "review"], metadata: { elapsed: "500" }, span: null }
+    ] });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]) }));
+    for (const text of ["origin", "database", "absent", "null", "category", "performance", "target", "export", "tags", "slow, review", "elapsed", "500"]) expect(host.querySelector('[data-block="evidence"]')?.textContent).toContain(text);
+    unmount();
+  });
+
+  it("indexes sections and opens folded attributes before jumping to them", async () => {
+    const call = span({
+      sections: [{ label: "Request", kind: "code", language: "text", content: "hello", items: [] }],
+      moments: [{ at: 1, name: "Sent", kind: "http.sent", source: "REST", outcome: "succeeded", error: null, attributes: {}, sections: [], span: null }],
+      attributes: { "a.one": "1", "b.two": "2", "c.three": "3", "d.four": "4" }
+    });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]) }));
+    const buttons = [...host.querySelectorAll<HTMLButtonElement>("nav.index button")];
+    expect(buttons.map(button => button.textContent)).toEqual(["Request", "Moments", "Attributes"]);
+    const attributes = host.querySelector<HTMLDetailsElement>('details[data-block="attributes"]')!;
+    const scroll = vi.fn();
+    attributes.scrollIntoView = scroll;
+    expect(attributes.open).toBe(false);
+    buttons[2].click();
+    await nextTick();
+    expect(attributes.open).toBe(true);
+    expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "smooth" });
+    const section = host.querySelector<HTMLElement>('[data-block="section-0"]')!;
+    section.scrollIntoView = scroll;
+    buttons[0].click();
+    expect(scroll).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+});
+
+// A file the operation attached opens like every other row in the details; one it could not store says so.
+describe("SpanInspector attachments", () => {
+  const artifact = { id: "a1", name: "body.json", mediaType: "application/json", sizeBytes: 21, archivePath: "artifacts/a1", description: null, error: null };
+
+  it("opens an attached file from its row", async () => {
+    const opened = vi.fn();
+    const call = span({ evidence: [{ type: "attachment", at: 1, name: "body.json", artifact, span: null }] as Span["evidence"] });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]), onArtifact: opened }));
+    await nextTick();
+
+    const row = host.querySelector<HTMLButtonElement>("button.link-row.file");
+    expect([...row!.children].map(part => part.textContent)).toEqual(["File", "body.json", "application/json, 21 B"]);
+    row!.click();
+    expect(opened).toHaveBeenCalledWith(artifact);
+    unmount();
+  });
+
+  it("disables the row of a file that could not be stored", async () => {
+    const call = span({ evidence: [{ type: "attachment", at: 1, name: "shot.png", artifact: { ...artifact, error: "Not in the archive" }, span: null }] as Span["evidence"] });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]) }));
+    await nextTick();
+
+    const row = host.querySelector<HTMLButtonElement>("button.link-row.file");
+    expect(row?.disabled).toBe(true);
+    expect(row?.textContent).toContain("Unavailable");
     unmount();
   });
 });

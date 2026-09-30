@@ -1,5 +1,5 @@
-.headTitle { color: var(--text); font-size: var(--text-body); font-weight: var(--weight-semibold); }
-.headMeta { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+.headTitle { color: var(--text); font-size: var(--text-title); font-weight: var(--weight-semibold); }
+.headMeta { color: var(--muted); font: var(--text-strong) var(--font-mono); }
 
 .rows { padding: var(--space-2) 0 var(--space-3); container-type: inline-size; }
 
@@ -7,8 +7,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-height: 26px;
-  padding: 0 var(--space-4);
+  min-height: var(--row-height);
+  padding: var(--space-1) var(--space-4);
 }
 
 /* Children hang off a drawn guide, the same branch the report and the viewer use. */
@@ -25,21 +25,19 @@
 .label {
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   color: var(--text);
-  font: var(--text-meta)/1.4 var(--font-mono);
+  font: var(--text-strong)/var(--leading) var(--font-mono);
 }
 
-.noteText { flex: 0 0 auto; color: var(--dim); font: var(--text-micro) var(--font-mono); }
+.noteText { flex: 0 0 auto; color: var(--dim); font: var(--text-body) var(--font-mono); }
 
 /* Badges are the report's coverage chips: mono, square-cornered, tinted by what they say. */
 .badge {
   flex: 0 0 auto;
   padding: 0 var(--space-2);
   border-radius: var(--radius-chip);
-  font: var(--weight-semibold) var(--text-micro)/1.8 var(--font-mono);
+  font: var(--weight-semibold) var(--text-strong)/var(--leading) var(--font-mono);
   white-space: nowrap;
 }
 

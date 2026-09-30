@@ -31,13 +31,6 @@
   .label { display: inline; }
 }
 
-.count {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--muted);
-  font: var(--text-micro) var(--font-mono);
-}
 
 /* A tooltip for the icon-only states; the label makes it redundant once the name is visible. */
 .link::after {

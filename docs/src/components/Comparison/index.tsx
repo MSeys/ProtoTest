@@ -107,7 +107,7 @@ export default function Comparison({
   }
 
   return (
-    <Frame
+    <Frame kind="figure"
       head={
         <>
           <strong className={styles.title}>The same scenario, written twice.</strong>
@@ -160,7 +160,7 @@ export default function Comparison({
                   <span className={styles.docName}>{test.filename}</span>
                   <span className={styles.docScope}>per fixture</span>
                 </div>
-                <div className={`${styles.docBody} ${openPanes.has(group.id) ? styles.docBodyOpen : ''}`}>
+                <div data-surface="blueprint" className={`${styles.docBody} ${openPanes.has(group.id) ? styles.docBodyOpen : ''}`}>
                   <CodePane
                     code={test.code}
                     plumbingLines={test.infrastructureLines}

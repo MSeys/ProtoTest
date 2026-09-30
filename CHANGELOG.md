@@ -146,7 +146,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - Docs: the web pages make the backend choice explicit (Playwright or Selenium), and the conversion order covers NUnit, MSTest and TUnit suites. [Web](https://prototest.dev/docs/integrations/web)
 - Docs: the agent workflows document the feedback webhook payload, the configuration page lists every section's keys, and the template page shows what the scaffold creates. [CLI](https://prototest.dev/docs/agent-workflows/cli)
 - Docs: the reference pages gain the recorded trace walks, the decision figures and the triage tables; the longest pages split into child pages (web page coverage, messaging adapters, gRPC calls, the ProtoTrace archive, the CI providers). [Docs](https://prototest.dev/docs/)
-- Docs: the home leads with prototype testing: the real journey method beside the claim, the three commands, what that run recorded, one failure explained and the measured proof; the integration pages open with a shown test and keep reference detail below the tasks. [Docs](https://prototest.dev/docs/)
+- Docs: the home explains the integration testing foundation through a connected composition, test and recorded run; the starter includes the working directory and runner options; the integration pages open with a shown test and keep reference detail below the tasks. [Docs](https://prototest.dev/docs/)
 - Docs: the READMEs follow one shape per kind, from the root to the package pages. [Docs](https://prototest.dev/docs/)
 - Samples: Northstar with the Learning demo suite is the in-repo sample. [Learn](https://prototest.dev/learn)
 - Core: suites name their own sensitive values (`ConfigureRedaction`, `ProtoTest:Redaction`); state and findings redact them like the defaults. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
@@ -155,6 +155,8 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - Viewer: each screen answers its question in order: failing rows name their reason, the failure card states the phase and offset, story rows read stated observations inline, and an empty file list separates no files from no match. [Trace viewer](https://trace.prototest.dev)
 
 ### Fixes
+
+- Docs: the home, Learn lessons, integration catalog and recipes use a clearer reading hierarchy; figures follow the reader theme, product previews retain blueprint, and code controls share accessible copying. Navigation and the API reference follow the existing design tokens. [Home](https://prototest.dev/)
 
 - Core: assertion messages across GraphQL, gRPC, messaging, REST and Sheets use a plain hyphen separator. [Assertions](https://prototest.dev/docs/foundation/assertions)
 - Core: ambient-context errors name the fix (`FindTraceWriter`, `SetContext`, the runner setup). [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
@@ -269,7 +271,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - Docs: a message-to-fix table in troubleshooting, built from the errors readers hit. [Troubleshooting](https://prototest.dev/docs/getting-started/troubleshooting)
 - Docs: a where-your-evidence-goes map for the archive, the viewer, reports, OpenTelemetry, the CLI and MCP. [Observability](https://prototest.dev/docs/observability/where-evidence-goes)
 - Docs: a which-runner chooser in the runner overview. [Runners](https://prototest.dev/docs/runners/overview)
-- Docs: the navbar keeps four labels, and the API reference and the trace viewer stay in the footer. [Reference](https://prototest.dev/docs/)
+- Docs: the navbar groups the API reference, trace viewer and changelog under Resources; the footer keeps focused entry points. [Reference](https://prototest.dev/docs/)
 - Docs: the reference pages lead with a runnable example, the real output and the resolution tables, and the obsolete shims move to the migration page. [Docs](https://prototest.dev/docs/)
 - Docs: the runner chooser, the observability first screens, the CI digest and the agent quickstart show real output. [Runners](https://prototest.dev/docs/runners/overview)
 - Docs: the integration pages gain the sequence diagrams, the isolation table and the trace examples. [Integrations](https://prototest.dev/docs/integrations/overview)

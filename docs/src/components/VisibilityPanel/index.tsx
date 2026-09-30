@@ -28,7 +28,7 @@ const sources = [
 
 export default function VisibilityPanel(): ReactNode {
   return (
-    <Frame
+    <Frame kind="preview"
       head={
         <>
           <strong className={styles.verdict}>

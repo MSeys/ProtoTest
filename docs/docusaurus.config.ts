@@ -4,38 +4,13 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
-const GITHUB_REPO = 'MSeys/ProtoTest';
-
-/**
- * The star count is baked at build time so readers never call the GitHub API. A slow or failed fetch is not
- * worth failing a build over: the header simply shows the mark without a count.
- */
-async function fetchGitHubStars(): Promise<number | null> {
-  try {
-    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}`, {
-      headers: {'User-Agent': 'prototest-docs-build'},
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!response.ok) return null;
-    const data = (await response.json()) as {stargazers_count?: unknown};
-    return typeof data.stargazers_count === 'number' ? data.stargazers_count : null;
-  } catch {
-    return null;
-  }
-}
-
 export default async function createConfig(): Promise<Config> {
-  const githubStars = await fetchGitHubStars();
 
   const config: Config = {
   title: 'ProtoTest',
-  tagline: 'Test the whole journey. Trace every layer.',
+  tagline: 'An integration testing foundation for .NET.',
   // Theme-aware: the mark follows the operating system, like the viewer's and the report's.
   favicon: 'img/favicon.svg',
-
-  customFields: {
-    githubStars,
-  },
 
   future: {
     v4: true, // Improve compatibility with the upcoming Docusaurus v4
@@ -111,6 +86,7 @@ export default async function createConfig(): Promise<Config> {
         sidebarPath: './sidebars-learn.ts',
         editUrl: 'https://github.com/MSeys/ProtoTest/tree/main/docs/',
         showLastUpdateTime: true,
+        remarkPlugins: [require('./plugins/remark-learn-outline.cjs')],
       },
     ],
     [
@@ -138,12 +114,6 @@ export default async function createConfig(): Promise<Config> {
       defaultMode: 'light',
       respectPrefersColorScheme: true,
     },
-    announcementBar: {
-      id: 'release-1.1',
-      content:
-        '<span class="announcement-preview">1.1</span> ProtoTest 1.1 is released. <a target="_blank" rel="noopener noreferrer" href="https://www.nuget.org/packages?q=ProtoTest">Install from NuGet</a>',
-      isCloseable: true,
-    },
     navbar: {
       title: 'ProtoTest',
       logo: {
@@ -167,9 +137,11 @@ export default async function createConfig(): Promise<Config> {
           label: 'Docs',
         },
         {to: '/docs/recipes/overview', label: 'Recipes', position: 'left'},
-        {to: '/changelog', label: 'Changelog', position: 'left'},
-        // API reference and the trace viewer live in the footer's Reference group: the navbar keeps the four
-        // routes a reader follows, and the icons stay for the utilities (search, GitHub, NuGet).
+        {label: 'Resources', position: 'left', items: [
+          {label: 'API reference', href: 'https://prototest.dev/api/'},
+          {label: 'Trace viewer', href: 'https://trace.prototest.dev'},
+          {label: 'Changelog', to: '/changelog'},
+        ]},
         {
           type: 'custom-github',
           position: 'right',
@@ -182,13 +154,6 @@ export default async function createConfig(): Promise<Config> {
     },
     footer: {
       style: 'dark',
-      logo: {
-        alt: 'ProtoTest',
-        src: 'img/brand/prototest-mark-white.svg',
-        width: 40,
-        height: 40,
-        href: '/',
-      },
       // Four groups: learning it, looking it up, the project around it, and the community.
       links: [
         {
@@ -196,7 +161,6 @@ export default async function createConfig(): Promise<Config> {
           items: [
             {label: 'Learn', to: '/learn/'},
             {label: 'Installation', to: '/docs/getting-started/installation'},
-            {label: 'Your first test', to: '/docs/getting-started/first-test'},
             {label: 'Recipes', to: '/docs/recipes/overview'},
             {label: 'Troubleshooting', to: '/docs/getting-started/troubleshooting'},
           ],
@@ -207,25 +171,16 @@ export default async function createConfig(): Promise<Config> {
             {label: 'Foundation', to: '/docs/foundation/overview'},
             {label: 'Integrations', to: '/docs/integrations/overview'},
             {label: 'API reference', href: 'https://prototest.dev/api/'},
-            {label: 'Observability', to: '/docs/observability/prototrace'},
             {label: 'Trace viewer', href: 'https://trace.prototest.dev'},
-            {label: 'Test runners', to: '/docs/runners/overview'},
-            {label: 'Continuous integration', to: '/docs/continuous-integration/'},
-            {label: 'Extending', to: '/docs/advanced/extending'},
-            {label: 'Agent workflows', to: '/docs/agent-workflows/coding-agents'},
           ],
         },
         {
           title: 'Project',
           items: [
             {label: 'Why ProtoTest', to: '/docs/project/why-prototest'},
-            {label: 'ProtoTest compared', to: '/docs/project/compare'},
             {label: 'Benchmarks', to: '/docs/project/benchmarks'},
             {label: 'Roadmap', to: '/docs/project/roadmap'},
-            {label: 'FAQ', to: '/docs/project/faq'},
             {label: 'Sustainability', to: '/docs/project/sustainability'},
-            {label: 'AI usage', to: '/docs/project/ai-usage'},
-            {label: 'Changelog', to: '/changelog'},
           ],
         },
         {
@@ -234,9 +189,7 @@ export default async function createConfig(): Promise<Config> {
             {label: 'GitHub', href: 'https://github.com/MSeys/ProtoTest'},
             {label: 'Discussions', href: 'https://github.com/MSeys/ProtoTest/discussions'},
             {label: 'Issues', href: 'https://github.com/MSeys/ProtoTest/issues'},
-            {label: 'Contributing', href: 'https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md'},
             {label: 'Support', href: 'https://github.com/MSeys/ProtoTest/blob/main/SUPPORT.md'},
-            {label: 'NuGet', href: 'https://www.nuget.org/packages?q=ProtoTest'},
           ],
         },
       ],

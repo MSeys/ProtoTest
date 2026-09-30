@@ -9,6 +9,8 @@ description: "Start with the path that matches what you bring: learn integration
 
 # Start here
 
+import StartPaths from '@site/src/components/StartPaths';
+
 ProtoTest is a foundation for integration testing on .NET 8, 9 and 10. You choose the integrations a suite needs, and they share the same host, test context, lifecycle and trace.
 
 That lets one test write through REST and read through GraphQL, or combine API, browser, database, messaging and file checks when that is useful.
@@ -17,11 +19,7 @@ ProtoTest 1.1 packages are available on NuGet. The template targets `net10.0` by
 
 ## Pick your path
 
-**New to integration testing.** Start with [Learn integration testing](/learn/), then [Installation](./getting-started/installation.md) and [Your first test](./getting-started/first-test.md). The lessons begin with why integration tests get hard and end at a trace you can read.
-
-**Evaluating ProtoTest.** [Compare ProtoTest with the alternatives](/docs/project/compare), read [what a run costs](/docs/project/benchmarks) and the [questions teams ask before adopting it](/docs/project/faq).
-
-**Already have a suite.** [Recipes](./recipes/overview.md) show common journeys; [coverage](./observability/coverage.md), [ProtoTrace](./observability/prototrace.md) and [troubleshooting](./getting-started/troubleshooting.md) are the pages to reach for when a run needs explaining.
+<StartPaths />
 
 ## Browse by task
 

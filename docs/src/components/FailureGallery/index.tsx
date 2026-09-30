@@ -41,7 +41,7 @@ export default function FailureGallery(): ReactNode {
   }
 
   return (
-    <Frame
+    <Frame kind="figure"
       head={
         <>
           <strong>What a failure looks like</strong>

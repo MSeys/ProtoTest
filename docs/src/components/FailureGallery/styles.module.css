@@ -1,13 +1,13 @@
-/* Cards on the blueprint surface: the verdict colours are the trace's own. */
+/* Explanatory cards on the reader surface: the verdict colours are the trace's own. */
 
-.headMeta { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+.headMeta { color: var(--dim); font: var(--text-strong) var(--font-mono); }
 
 /* The legend above the cards: how to read one record row. */
 .legend {
   margin: 0;
   padding: var(--space-4) var(--space-4) 0;
   color: var(--muted);
-  font-size: var(--text-meta);
+  font-size: var(--text-title);
 }
 
 .grid {
@@ -48,7 +48,7 @@
 
 .mode {
   color: var(--blueprint);
-  font: var(--weight-semibold) var(--text-micro) var(--font-mono);
+  font: var(--weight-semibold) var(--text-strong) var(--font-mono);
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
 }
@@ -56,7 +56,7 @@
 .ask { font: var(--weight-semibold) var(--text-title) var(--font-display); line-height: var(--leading-tight); }
 
 /* The verdict, visible before the card opens: what the fix changes. */
-.verdict { margin: 0; color: var(--muted); font-size: var(--text-meta); }
+.verdict { margin: 0; color: var(--muted); font-size: var(--text-title); }
 .verdict strong { color: var(--blueprint); }
 
 /* Two classes so the site's inline-code chip cannot win over this rule. */
@@ -66,7 +66,7 @@
   padding: 0;
   background: none;
   color: var(--muted);
-  font: var(--text-micro) var(--font-mono);
+  font: var(--text-strong) var(--font-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -105,10 +105,10 @@
 
 .sideHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
 
-.sideLabel { font-size: var(--text-meta); font-weight: var(--weight-bold); }
-.elapsed { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+.sideLabel { font-size: var(--text-title); font-weight: var(--weight-bold); }
+.elapsed { color: var(--dim); font: var(--text-strong) var(--font-mono); }
 
-.what { margin: 0; color: var(--muted); font-size: var(--text-meta); line-height: var(--leading); }
+.what { margin: 0; color: var(--muted); font-size: var(--text-title); line-height: var(--leading); }
 
 .records { margin: 0; padding: 0; display: grid; gap: var(--space-2); list-style: none; }
 
@@ -130,15 +130,15 @@
   border-radius: var(--radius-chip);
   background: var(--blueprint-soft);
   color: var(--blueprint);
-  font: var(--weight-semibold) var(--text-micro) var(--font-mono);
+  font: var(--weight-semibold) var(--text-strong) var(--font-mono);
   line-height: 1.8;
 }
 
-.recordName { min-width: 0; font-size: var(--text-meta); font-weight: var(--weight-semibold); }
+.recordName { min-width: 0; font-size: var(--text-title); font-weight: var(--weight-semibold); }
 
 .succeeded, .failed {
   margin-left: auto;
-  font: var(--weight-semibold) var(--text-micro) var(--font-ui);
+  font: var(--weight-semibold) var(--text-strong) var(--font-ui);
 }
 
 .succeeded { color: var(--success); }
@@ -146,7 +146,7 @@
 
 .detail {
   color: var(--muted);
-  font: var(--text-micro)/1.55 var(--font-mono);
+  font: var(--text-strong)/1.55 var(--font-mono);
   overflow-wrap: anywhere;
 }
 
@@ -159,7 +159,7 @@
   border-radius: var(--radius-chip);
   background: var(--blueprint-soft);
   color: var(--text);
-  font-size: var(--text-meta);
+  font-size: var(--text-title);
 }
 
 .change strong { color: var(--blueprint); }
@@ -167,6 +167,6 @@
 .open {
   justify-self: start;
   color: var(--blueprint);
-  font-size: var(--text-meta);
+  font-size: var(--text-title);
   font-weight: var(--weight-semibold);
 }

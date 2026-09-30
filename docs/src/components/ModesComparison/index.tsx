@@ -38,7 +38,7 @@ const rows = [
 
 export default function ModesComparison(): ReactNode {
   return (
-    <Frame
+    <Frame kind="figure"
       head={
         <>
           <strong>Three modes, one suite</strong>

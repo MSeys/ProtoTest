@@ -14,7 +14,7 @@
   padding-block: var(--space-2);
   border-bottom: 1px solid var(--border);
   color: var(--muted);
-  font-size: var(--text-meta);
+  font-size: var(--text-title);
   font-weight: var(--weight-semibold);
 }
 
@@ -41,7 +41,7 @@
   align-items: baseline;
   gap: var(--space-2);
   color: var(--text);
-  font-size: var(--text-strong);
+  font-size: var(--text-title);
   font-weight: var(--weight-semibold);
   line-height: var(--leading-tight);
 }
@@ -53,20 +53,20 @@
 .side { display: grid; gap: var(--space-1); justify-items: start; min-width: 0; }
 
 /* Only needed once the columns stack; on a wide row the column headings say it. */
-.sideLabel { display: none; color: var(--muted); font-size: var(--text-micro); font-style: normal; font-weight: var(--weight-semibold); }
+.sideLabel { display: none; color: var(--muted); font-size: var(--text-strong); font-style: normal; font-weight: var(--weight-semibold); }
 
 /* What a side costs: a number and its unit, then what is written once, in the same face as the rest. */
-.cost { display: grid; gap: 2px; color: var(--muted); font-size: var(--text-meta); }
-.cost strong { color: var(--text); font-size: var(--text-strong); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }
+.cost { display: grid; gap: 2px; color: var(--muted); font-size: var(--text-title); }
+.cost strong { color: var(--text); font-size: var(--text-title); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }
 .cost strong.zero { color: var(--success); }
-.once { color: var(--dim); font-size: var(--text-micro); }
+.once { color: var(--dim); font-size: var(--text-strong); }
 .once code { padding: 0; border: 0; background: none; color: inherit; font-size: inherit; overflow-wrap: anywhere; }
-.absent { color: var(--dim); font-size: var(--text-meta); font-style: italic; }
+.absent { color: var(--dim); font-size: var(--text-title); font-style: italic; }
 
 /* Where the work went: a word in the blueprint colour, the one accent on the ProtoTest side. */
-.home { color: var(--blueprint); font-size: var(--text-micro); font-weight: var(--weight-bold); letter-spacing: 0.02em; }
+.home { color: var(--blueprint); font-size: var(--text-strong); font-weight: var(--weight-bold); letter-spacing: 0.02em; }
 
-.summary { color: var(--muted); font-size: var(--text-meta); line-height: var(--leading); }
+.summary { color: var(--muted); font-size: var(--text-title); line-height: var(--leading); }
 
 .code {
   display: grid;
@@ -78,13 +78,13 @@
 
 .codeSide { display: grid; gap: var(--space-3); align-content: start; min-width: 0; }
 .slice { overflow: clip; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-sunken); }
-.sliceFile { display: block; padding: var(--space-1) var(--space-3); border-bottom: 1px solid var(--border); color: var(--muted); font: var(--text-micro) var(--font-mono); overflow-wrap: anywhere; }
+.sliceFile { display: block; padding: var(--space-1) var(--space-3); border-bottom: 1px solid var(--border); color: var(--muted); font: var(--text-strong) var(--font-mono); overflow-wrap: anywhere; }
 .slice pre { margin: 0; border-radius: 0; }
 
 /* Skipped lines: a dashed rule across the code, not a fake comment in it. */
 .gap { display: block; margin: 0 var(--space-3); border-top: 1px dashed var(--border-strong); }
 
-.nothing { margin: 0; padding: var(--space-3); border: 1px dashed var(--border); border-radius: var(--radius-control); color: var(--dim); font-size: var(--text-meta); }
+.nothing { margin: 0; padding: var(--space-3); border: 1px dashed var(--border); border-radius: var(--radius-control); color: var(--dim); font-size: var(--text-title); }
 
 /* Narrow: the task leads, each side stacks under it with its own label, the code follows the same order. */
 @container (max-width: 44rem) {

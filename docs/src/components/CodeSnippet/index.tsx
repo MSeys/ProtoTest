@@ -44,6 +44,7 @@ export default function CodeSnippet({
     <Highlight theme={prototestPrism} code={code.trim()} language={language}>
       {({className, tokens, getTokenProps}) => (
         <pre
+          data-surface="blueprint"
           className={`${className} ${styles.pre} ${scroll ? styles.scroll : ''}`}
           tabIndex={regionLabel ? 0 : undefined}
           role={regionLabel ? 'region' : undefined}

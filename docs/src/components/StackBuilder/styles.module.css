@@ -4,31 +4,26 @@
   overflow: hidden;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-panel);
-  background:
-    linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
-    var(--surface);
-  background-size: 32px 32px;
-  box-shadow: var(--elevation-overlay);
+  background: var(--surface);
 }
 
 .head {
   padding: var(--space-5);
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(min(100%, 16rem), 0.8fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-5);
   align-items: end;
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  background: var(--surface-2);
 }
 
 .head h2 { margin: var(--space-1) 0 0; font-size: var(--text-heading); }
 .head p { margin: 0; color: var(--muted); }
-.eyebrow { color: var(--blueprint); font: var(--weight-bold) var(--text-micro) var(--font-mono); letter-spacing: .14em; }
+.eyebrow { color: var(--blueprint); font: var(--weight-semibold) var(--text-title) var(--font-mono); letter-spacing: var(--tracking-eyebrow); }
 
 .body { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(min(100%, 17rem), 0.75fr); }
 .body > * { min-width: 0; }
-.choices { padding: var(--space-5); background: color-mix(in srgb, var(--surface) 94%, transparent); }
+.choices { padding: var(--space-5); background: var(--surface); }
 .choices fieldset { margin: 0; padding: 0; border: 0; }
 .choices fieldset + fieldset { margin-top: var(--space-5); }
 .choices legend { margin-bottom: var(--space-2); color: var(--text); font-size: var(--text-title); font-weight: var(--weight-semibold); }
@@ -49,13 +44,13 @@
   cursor: pointer;
 }
 
-.capability:hover { border-color: var(--border-strong); }
-.capabilityActive { border-color: var(--blueprint); background: color-mix(in srgb, var(--blueprint) 8%, var(--surface)); }
+.capability:hover { border-color: var(--blueprint-line); background: var(--hover); }
+.capabilityActive { border-color: var(--blueprint-line); background: var(--blueprint-soft); }
 .capability strong,
-.capabilityActive strong { display: block; font-size: var(--text-strong); }
+.capabilityActive strong { display: block; font-size: var(--text-title); }
 .capability small,
-.capabilityActive small { display: block; margin-top: 2px; color: var(--muted); font-size: var(--text-body); line-height: var(--leading-tight); }
-.check { color: var(--blueprint); font: var(--weight-bold) var(--text-strong) var(--font-mono); }
+.capabilityActive small { display: block; margin-top: 2px; color: var(--muted); font-size: var(--text-title); line-height: var(--leading-tight); }
+.check { color: var(--blueprint); font: var(--weight-bold) var(--text-title) var(--font-mono); }
 
 .runners { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .runner,
@@ -70,17 +65,16 @@
   color: var(--muted);
   cursor: pointer;
 }
-.runnerActive { border-color: var(--blueprint); background: var(--blueprint); color: var(--surface); }
+.runner:hover { background: var(--hover); color: var(--text); }
+.runnerActive { border-color: var(--blueprint-line); background: var(--blueprint-soft); color: var(--text); font-weight: var(--weight-semibold); }
 
 .result { padding: var(--space-5); border-left: 1px solid var(--border); background: var(--surface); color: var(--text); }
 .resultHead { display: flex; justify-content: space-between; gap: var(--space-2); align-items: center; }
-.resultHead span { color: var(--phase-execution); font: var(--weight-bold) var(--text-micro) var(--font-mono); letter-spacing: .12em; }
-.resultHead code { padding: 0; border: 0; background: none; color: var(--dim); font-size: var(--text-micro); }
+.resultHead span { color: var(--phase-execution); font: var(--weight-bold) var(--text-strong) var(--font-mono); letter-spacing: .12em; }
+.resultHead code { padding: 0; border: 0; background: none; color: var(--dim); font-size: var(--text-strong); }
 .result pre { margin: var(--space-4) 0; min-height: 150px; border-color: color-mix(in srgb, var(--phase-execution) 35%, transparent); background: var(--surface-sunken); }
 .result pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
-.copy { width: 100%; min-height: var(--control-height); padding: var(--space-2) var(--space-3); border: 1px solid var(--phase-execution); border-radius: var(--radius-control); background: transparent; color: var(--phase-execution); font-weight: var(--weight-semibold); cursor: pointer; }
-.copy:hover { background: color-mix(in srgb, var(--phase-execution) 12%, transparent); }
-.result p { margin: var(--space-3) 0 0; color: var(--dim); font-size: var(--text-meta); }
+.result p { margin: var(--space-3) 0 0; color: var(--dim); font-size: var(--text-title); }
 .result p code { color: var(--text); }
 
 @container (max-width: 52.5rem) {

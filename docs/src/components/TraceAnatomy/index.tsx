@@ -53,7 +53,7 @@ const defaultLayers: Layer[] = [
         name: 'Northstar web on a loopback listener',
         meta: 'readiness /health, 1 attempt, waited 84 ms',
       },
-      { kind: 'environment', name: '.NET 8.0.31 on Windows 10.0.26200, X64' },
+      {kind: 'environment', name: '.NET 8.0.31 on Windows 10.0.26200, X64'},
     ],
   },
   {
@@ -62,19 +62,23 @@ const defaultLayers: Layer[] = [
     when: '508.4 ms',
     lead: 'Everything before the test body: hooks, attributes, clients, the database connection and the state the test asked for.',
     entries: [
-      { kind: 'test.setup', name: 'Setup', meta: '508.4 ms' },
+      {kind: 'test.setup', name: 'Setup', meta: '508.4 ms'},
       {
         kind: 'client.initialize',
         name: 'Rest, GraphQL, and the web client',
         meta: 'each client initializes once, with its address recorded',
       },
-      { kind: 'sql.connection.open', name: 'Open SqliteConnection', meta: '0.05 ms' },
+      {kind: 'sql.connection.open', name: 'Open SqliteConnection', meta: '0.05 ms'},
       {
         kind: 'attribute.before',
         name: 'Application, NorthstarTenant',
         meta: 'the tenant attribute provisions a TenantResponse in 151.7 ms',
       },
-      { kind: 'attribute.before', name: 'SignedInAs, NorthstarMember', meta: 'the sign-in is recorded as state, not as a log line' },
+      {
+        kind: 'attribute.before',
+        name: 'SignedInAs, NorthstarMember',
+        meta: 'the sign-in is recorded as state, not as a log line',
+      },
     ],
   },
   {
@@ -83,16 +87,28 @@ const defaultLayers: Layer[] = [
     when: '286.8 ms',
     lead: 'The test body. New entries nest under test.execution; the clock move is an event on it.',
     entries: [
-      { kind: 'test.execution', name: 'Test execution', meta: '286.8 ms, succeeded' },
-      { kind: 'data.create', name: 'Create · IssueInvoiceRequest', meta: '165.8 ms' },
-      { kind: 'data.provision', name: 'Provision · IssueInvoiceRequest to InvoiceResponse', meta: '164.5 ms' },
-      { kind: 'clock.advance', name: 'Clock advanced by 8:0:00:00', meta: 'event on test.execution, from the test side' },
-      { kind: 'Northstar.Domain', name: 'invoice.issue', meta: 'reported by the application itself' },
-      { kind: 'http.request', name: 'REST · GET /api/v1/organization', meta: '65.3 ms' },
-      { kind: 'assert.http.status', name: 'Assert status · 200 OK', meta: 'the check that decided the request' },
-      { kind: 'assert.json.shape', name: 'Assert response shape', meta: '7.5 ms, the property the test depended on' },
-      { kind: 'http.request', name: 'REST · POST /api/v1/invoices/{invoiceId}/pay', meta: '35.0 ms' },
-      { kind: 'assert.json.shape', name: 'Assert response shape', meta: 'the paid status' },
+      {kind: 'test.execution', name: 'Test execution', meta: '286.8 ms, succeeded'},
+      {kind: 'data.create', name: 'Create · IssueInvoiceRequest', meta: '165.8 ms'},
+      {kind: 'data.provision', name: 'Provision · IssueInvoiceRequest to InvoiceResponse', meta: '164.5 ms'},
+      {
+        kind: 'clock.advance',
+        name: 'Clock advanced by 8:0:00:00',
+        meta: 'event on test.execution, from the test side',
+      },
+      {kind: 'Northstar.Domain', name: 'invoice.issue', meta: 'reported by the application itself'},
+      {kind: 'http.request', name: 'REST · GET /api/v1/organization', meta: '65.3 ms'},
+      {
+        kind: 'assert.http.status',
+        name: 'Assert status · 200 OK',
+        meta: 'the check that decided the request',
+      },
+      {
+        kind: 'assert.json.shape',
+        name: 'Assert response shape',
+        meta: '7.5 ms, the property the test depended on',
+      },
+      {kind: 'http.request', name: 'REST · POST /api/v1/invoices/{invoiceId}/pay', meta: '35.0 ms'},
+      {kind: 'assert.json.shape', name: 'Assert response shape', meta: 'the paid status'},
     ],
   },
   {
@@ -101,13 +117,17 @@ const defaultLayers: Layer[] = [
     when: '40.6 ms',
     lead: 'What the test leaves behind, and what the run releases for it. The trace records the releases, so a leaked resource would show here.',
     entries: [
-      { kind: 'test.teardown', name: 'Teardown', meta: '40.6 ms' },
+      {kind: 'test.teardown', name: 'Teardown', meta: '40.6 ms'},
       {
         kind: 'attachment.publish',
         name: '5 REST artifacts and the scenario summary',
         meta: 'request, response and expected shape for each call',
       },
-      { kind: 'data.cleanup', name: 'Cleanup · TenantResponse', meta: '8.9 ms, the provisioned tenant is removed' },
+      {
+        kind: 'data.cleanup',
+        name: 'Cleanup · TenantResponse',
+        meta: '8.9 ms, the provisioned tenant is removed',
+      },
       {
         kind: 'resource.release',
         name: 'Application services, database connection, messaging consumer',
@@ -156,6 +176,7 @@ export default function TraceAnatomy({
   const spots = propBlindSpots ?? blindSpots;
   return (
     <Frame
+      kind="figure"
       head={
         <>
           <strong>{title}</strong>
@@ -165,11 +186,23 @@ export default function TraceAnatomy({
       foot={
         <>
           Read from {source.what}
-          {source.file && <> in <code>{source.file}</code></>}. The viewer draws the same trace from
-          that archive
-          {source.href && <> (<Link href={source.href}>download it</Link> and drop it on the viewer)</>}.
+          {source.file && (
+            <>
+              {' '}
+              in <code>{source.file}</code>
+            </>
+          )}
+          . The viewer draws the same trace from that archive
+          {source.href && (
+            <>
+              {' '}
+              (<Link href={source.href}>download it</Link> and drop it on the viewer)
+            </>
+          )}
+          .
         </>
-      }>
+      }
+    >
       <ol className={styles.layers}>
         {layers.map((layer, index) => (
           <li key={layer.id} className={styles.layer}>
@@ -180,44 +213,47 @@ export default function TraceAnatomy({
             </div>
             <div className={styles.layerBody}>
               <p className={styles.lead}>{layer.lead}</p>
-              <ul className={styles.entries}>
-                {layer.entries.map((entry, entryIndex) => (
-                  <li key={entryIndex} className={styles.entry}>
-                    <code className={styles.kind}>{entry.kind}</code>
-                    <span className={styles.name}>{entry.name}</span>
-                    {entry.meta && <span className={styles.meta}>{entry.meta}</span>}
-                  </li>
-                ))}
-              </ul>
+              <details className={styles.recordDetails}>
+                <summary>Recorded operations ({layer.entries.length})</summary>
+                <ul className={styles.entries}>
+                  {layer.entries.map((entry, entryIndex) => (
+                    <li key={entryIndex} className={styles.entry}>
+                      <code className={styles.kind}>{entry.kind}</code>
+                      <span className={styles.name}>{entry.name}</span>
+                      {entry.meta && <span className={styles.meta}>{entry.meta}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </div>
           </li>
         ))}
       </ol>
 
       {spots.length > 0 && (
-      <section className={styles.blind} aria-labelledby="trace-anatomy-blind">
-        <div className={styles.blindHead}>
-          <h3 id="trace-anatomy-blind">What this trace cannot see</h3>
-          <span className={styles.sources}>
-            <span className={styles.sourceOn}>Test side</span>
-            <span className={styles.sourceOff}>Observed</span>
-            <span className={styles.sourceOn}>Application</span>
-          </span>
-        </div>
-        <p className={styles.blindLead}>
-          The run recorded values from the test side and from the application itself. Nothing was recorded
-          as observed in a response, so the trace does not claim to have seen a value the test did not
-          read. These are the edges of that picture.
-        </p>
-        <ul className={styles.blindList}>
-          {spots.map((spot) => (
-            <li key={spot.title}>
-              <strong>{spot.title}</strong>
-              <p>{spot.body}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
+        <section className={styles.blind} aria-labelledby="trace-anatomy-blind">
+          <div className={styles.blindHead}>
+            <h3 id="trace-anatomy-blind">What this trace cannot see</h3>
+            <span className={styles.sources}>
+              <span className={styles.sourceOn}>Test side</span>
+              <span className={styles.sourceOff}>Observed</span>
+              <span className={styles.sourceOn}>Application</span>
+            </span>
+          </div>
+          <p className={styles.blindLead}>
+            The run recorded values from the test side and from the application itself. Nothing was recorded
+            as observed in a response, so the trace does not claim to have seen a value the test did not read.
+            These are the edges of that picture.
+          </p>
+          <ul className={styles.blindList}>
+            {spots.map((spot) => (
+              <li key={spot.title}>
+                <strong>{spot.title}</strong>
+                <p>{spot.body}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </Frame>
   );

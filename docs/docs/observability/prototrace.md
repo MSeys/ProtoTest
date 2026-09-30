@@ -70,6 +70,13 @@ These excerpts follow test 12 from the run through its four views and into the f
 
 <ViewerWalkthrough />
 
+<details>
+<summary>Preview the recorded demo: run, story and check</summary>
+
+<ViewerWalkthrough />
+
+</details>
+
 ### Open your own archive
 
 A run leaves its archive at `TestResults/prototest-{runId}.prototrace` under the test project's output folder, or at the path you set with `trace.OutputPath`. From there:

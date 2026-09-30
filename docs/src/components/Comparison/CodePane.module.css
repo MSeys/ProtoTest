@@ -16,7 +16,7 @@
   border-top: 1px solid var(--border);
   background: transparent;
   color: var(--muted);
-  font: var(--text-micro) var(--font-ui);
+  font: var(--text-strong) var(--font-ui);
   text-align: left;
   white-space: normal;
   cursor: pointer;
@@ -41,14 +41,14 @@
 .foldStem { transition: opacity var(--motion-fast) var(--motion-ease); }
 .foldHead[aria-expanded='true'] .foldStem { opacity: 0; }
 
-.foldSource { color: var(--text); font: var(--text-micro) var(--font-mono); }
+.foldSource { color: var(--text); font: var(--text-strong) var(--font-mono); }
 
 .foldReuse {
   padding: 0 var(--space-2);
   border-radius: var(--radius-chip);
   background: var(--blueprint-soft);
   color: var(--blueprint);
-  font: var(--weight-semibold) var(--text-micro)/1.8 var(--font-mono);
+  font: var(--weight-semibold) var(--text-strong)/1.8 var(--font-mono);
   white-space: nowrap;
 }
 
@@ -61,5 +61,5 @@
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--muted);
-  font: var(--text-micro) var(--font-mono);
+  font: var(--text-strong) var(--font-mono);
 }

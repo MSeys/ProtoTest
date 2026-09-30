@@ -46,11 +46,13 @@ Each lesson has the same shape:
 
 - **Outcome.** What you will be able to do when you finish.
 - **Before you start.** The lesson it builds on, and anything you need installed.
-- **The situation.** The real failure or question the lesson starts from, from the sample the lesson runs.
-- **The walkthrough.** Numbered steps with real code and the real trace beside them.
+- **The scenario.** The real failure or question the lesson starts from, from the sample the lesson runs.
+- **The walkthrough.** Numbered steps with real code and the real trace beside them. The page outline links to each step and the closing sections.
 - **Checkpoint.** One question, the step that proves the answer, and the answer itself when you have tried.
 - **What you learned.** The two or three lines worth keeping.
-- **Where to go next.** The next lesson, or the reference page for the details behind it.
+- **Keep exploring.** The next lesson, or the reference page for the details behind it.
+
+The previous and next lesson links at the foot of each page follow the curriculum order.
 
 ## The sample behind the lessons
 

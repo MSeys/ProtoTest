@@ -50,7 +50,7 @@ Create a small API and a working integration test suite with the template. Run t
 The template creates a small ASP.NET Core API and a suite for it. The default starter needs the .NET 10 SDK.
 
 ```bash
-dotnet new install ProtoTest.Templates@1.1.0
+dotnet new install ProtoTest.Templates
 dotnet new prototest -n Shop
 cd Shop
 dotnet test
@@ -120,7 +120,7 @@ dotnet add package NUnit --version 4.6.1
 
 ## Preview packages
 
-The preview set works but its surface can change before 1.2: Sheets, WireMock, the devices family, Aspire, the MassTransit bridge, the agent layer (Mcp, Diagnosis, Verification, Feedback, Cli) and Analyzers. Add one per need the same way:
+The preview set works but its surface can change before the next minor release: Sheets, WireMock, the devices family, Aspire, the MassTransit bridge, the agent layer (Mcp, Diagnosis, Verification, Feedback, Cli) and Analyzers. Add one per need the same way:
 
 ```bash
 dotnet add package ProtoTest.Sheets

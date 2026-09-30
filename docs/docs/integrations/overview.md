@@ -12,7 +12,7 @@ import CapabilityIndex from '@site/src/components/CapabilityIndex';
 
 Compose the capabilities your scenario needs. Every integration joins the same [host, context and lifecycle](../foundation/overview.md).
 
-**Supported** packages follow the 1.x compatibility promise. **Preview** packages work today, but their surface may change before 1.2. [Installation](../getting-started/installation.md) explains the stability tiers and framework requirements.
+**Supported** packages follow the 1.x compatibility promise. **Preview** packages work today, but their surface may change before the next minor release. [Installation](../getting-started/installation.md) explains the stability tiers and framework requirements.
 
 ## Protocols
 

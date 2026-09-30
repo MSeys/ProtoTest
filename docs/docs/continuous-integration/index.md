@@ -204,7 +204,7 @@ The step fails the pull request when the run is worse than the baseline; without
 
 ### Action inputs
 
-The action installs the ProtoTest CLI as a global tool. Set `version` to pin it (`version: 1.1.0`). Without it, the action updates the tool to the latest stable release. `dotnet-roll-forward` defaults to `LatestMajor`, so the .NET 8 tool runs on a newer runtime.
+The action installs the ProtoTest CLI as a global tool. Set `version` to pin it to the release you target. Without it, the action updates the tool to the latest stable release. `dotnet-roll-forward` defaults to `LatestMajor`, so the .NET 8 tool runs on a newer runtime.
 
 The other inputs are optional. `webhook-url` and `webhook-secret` post the digest JSON to your endpoint, with `webhook-secret-header` naming the shared-secret header (default `X-ProtoTest-Secret`). The digest leaves the runner for your endpoint, and the pull request comment is visible to the repository, so treat both like the trace. `artifact-name` names the uploaded trace (default `prototest-trace`).
 

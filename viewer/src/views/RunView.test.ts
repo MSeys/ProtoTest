@@ -101,6 +101,37 @@ describe("RunView run strip", () => {
 // Needs attention speaks in the outcome's own words, and the run's composition and gate details are stated.
 describe("RunView needs attention", () => {
   // A cancelled test is not a partial one: the list names the outcome the trace recorded.
+  it("names why a failing test failed in the test list", () => {
+    const failed = span({ id: "op", name: "Assert status", kind: "assert.http.status", status: "failed", error: null });
+    const tests = [testTrace(1, "failed")];
+    tests[0].failure = { span: failed, check: null, mismatches: [], call: null };
+    const passing = [testTrace(1, "succeeded")];
+    const failedHost = mount(h(RunView, { run: run(tests), fileName: "demo.prototrace", onSelect: () => {} }));
+    expect(failedHost.host.querySelector(".test-row .reason")?.textContent).toBe("Assert status");
+    failedHost.unmount();
+    const passingHost = mount(h(RunView, { run: run(passing), fileName: "demo.prototrace", onSelect: () => {} }));
+    expect(passingHost.host.querySelector(".test-row .reason")).toBeNull();
+    passingHost.unmount();
+  });
+});
+
+// A failing run answers what failed before it explains what it could see.
+describe("RunView order", () => {
+  it("places needs attention before what the run could see", () => {
+    const { host, unmount } = mount(h(RunView, {
+      run: run([testTrace(1, "failed")]), fileName: "demo.prototrace", onSelect: () => {}
+    }));
+
+    const html = host.innerHTML;
+    expect(html.indexOf("Needs attention")).toBeGreaterThan(-1);
+    expect(html.indexOf("What this run could see")).toBeGreaterThan(-1);
+    expect(html.indexOf("Needs attention")).toBeLessThan(html.indexOf("What this run could see"));
+    unmount();
+  });
+});
+
+// A cancelled test is not a partial one: the list names the outcome the trace recorded.
+describe("RunView needs attention", () => {
   it("names a cancelled test by its own outcome instead of calling it partial", () => {
     const { host, unmount } = mount(h(RunView, {
       run: run([testTrace(1, "succeeded"), testTrace(2, "cancelled")]), fileName: "demo.prototrace", onSelect: () => {}

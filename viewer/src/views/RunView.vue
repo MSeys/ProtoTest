@@ -102,8 +102,6 @@ function bars(test: TestTrace) {
       </div>
     </header>
 
-    <VisibilityStrip :visibility="run.visibility" :resources="resources" />
-
     <Panel v-if="attention.length || runProblems.spans.length || runProblems.moments.length || run.findings.length || run.gates.length" title="Needs attention"
            subtitle="Failing and partial tests first, then the run's own problems, what it found and how its gates judged it." pad="none">
       <div class="attention">
@@ -154,6 +152,8 @@ function bars(test: TestTrace) {
       </div>
     </Panel>
 
+    <VisibilityStrip :visibility="run.visibility" :resources="resources" />
+
     <Panel title="Tests" subtitle="In the order they started. The bar is where the test ran within the run, split by phase." pad="none">
       <template #actions>
         <div class="filters">
@@ -174,8 +174,11 @@ function bars(test: TestTrace) {
                 :title="testCodeName(test)" @click="emit('select', test)">
           <b>{{ pad(test.number) }}</b>
           <span class="test-name">
-            <span>{{ testTitle(test) }}</span>
-            <small>{{ testGroup(test) }}</small>
+            <span class="name-line">
+              <span>{{ testTitle(test) }}</span>
+              <small>{{ testGroup(test) }}</small>
+            </span>
+            <small v-if="needsAttention(test)" class="reason">{{ failureReason(test).title }}</small>
           </span>
           <span class="bar">
             <i v-for="segment in bars(test)" :key="segment.phase"
@@ -283,9 +286,15 @@ button.issue:hover { background: var(--hover); }
 .test-row b { color: var(--dim); font: var(--text-micro) var(--font-mono); }
 .test-row.danger b { color: var(--danger); }
 .test-row.warning b { color: var(--warning); }
-.test-name { min-width: 0; display: flex; align-items: baseline; gap: var(--space-2); }
-.test-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-meta); }
-.test-name small { flex: none; color: var(--dim); font-size: var(--text-micro); }
+.test-name { min-width: 0; display: grid; }
+.name-line { min-width: 0; display: flex; align-items: baseline; gap: var(--space-2); }
+.name-line span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-meta); }
+.name-line small { flex: none; color: var(--dim); font-size: var(--text-micro); }
+/* A test that did not pass says why in the list, so the reader can pick the right one without opening it. */
+.reason { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-micro); }
+.test-row.danger .reason { color: var(--danger); }
+.test-row.warning .reason { color: var(--warning); }
+.test-row.neutral .reason { color: var(--muted); }
 .bar { position: relative; height: 6px; border-radius: var(--radius-hairline); background: var(--surface-2); }
 .bar i { position: absolute; top: 0; bottom: 0; border-radius: var(--radius-hairline); }
 .duration { color: var(--muted); font-size: var(--text-micro); text-align: right; font-variant-numeric: tabular-nums; }

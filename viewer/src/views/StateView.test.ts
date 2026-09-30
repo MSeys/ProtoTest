@@ -90,3 +90,18 @@ describe("StateView cause", () => {
     unmount();
   });
 });
+
+// A row says how much changed, so the reader sees the churn before opening the trail.
+describe("StateView change count", () => {
+  it("names the number of changes on the row", async () => {
+    const entry = item({});
+    const first = change({ change: "created", item: entry, at: 1 });
+    const second = change({ change: "released", item: entry, at: 5 });
+    entry.changes = [first, second];
+    const { host, unmount } = mount(h(StateView, { test: testTrace([entry]), onSelectItem: () => {}, onSelectSpan: () => {} }));
+    await nextTick();
+
+    expect(host.querySelector(".name .changes")?.textContent).toBe("2 changes");
+    unmount();
+  });
+});

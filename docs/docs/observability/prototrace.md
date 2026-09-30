@@ -62,7 +62,7 @@ The [ProtoTrace viewer](https://trace.prototest.dev) is a static web app. Trace 
 - **Evidence** brings observations, files, findings and moments into time order. Each names the operation that recorded it, or states that none was above it.
 - **The inspector** shows the source, request and response, comparisons, state changes and evidence. Moments include their attributes and sections, observations their metadata, and findings their category, tags, target and metadata. A section index jumps to each part. Binary bodies recorded as text are marked instead of shown as broken glyphs.
 
-The **Framework** switch beside the view tabs shows, dims or hides the framework's own operations (hooks, extensions, clients, resources) in Steps and Timeline. Dim is the default, the choice is remembered, and a framework operation that failed always stays.
+The **Framework** switch beside the view tabs shows, dims or hides the framework's own operations (hooks, extensions, clients, resources) in Steps and Timeline, and the machinery a test ran on in State. Dim is the default, the choice is remembered, and a framework operation that failed always stays.
 
 The header follows the path Run > Test > Operation. Test views use `#/test/<id>/steps|timeline|state|evidence`; old `story`, `spans` and `files` links still open the corresponding view. The URL holds the selected operation or item, including selections on the run, so a shared link keeps that place.
 

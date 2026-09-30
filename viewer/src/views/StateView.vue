@@ -4,6 +4,7 @@ import type { Change, Item, Span, TestTrace } from "../trace/model";
 import { formatDuration, formatOffset, itemKindLabel, itemTitle, phaseSegments, plural, rulerTicks, sourceLabels, timelinePercent } from "../trace/format";
 import EmptyState from "../ui/EmptyState.vue";
 import Panel from "../ui/Panel.vue";
+import { frameworkMode } from "../ui/frameworkMode";
 
 /*
  * What existed while the test ran and how it changed: one row per tracked item, a lifeline across the
@@ -28,7 +29,9 @@ const groups = computed(() => {
     { id: "reported", title: "Reported by the application", note: "Values the application's own instrumentation reported while the test ran.", items: reported },
     { id: "domain", title: "Tracked by the test", note: "Values the test recorded about the system under test.", items: domain },
     { id: "machinery", title: "What the test ran on", note: "Clients, servers, contexts and connections, with who owned them and when they were released.", items: machinery }
-  ].filter(group => group.items.length);
+  ].filter(group => group.items.length)
+    // The machinery follows the Framework switch like the operations do; a selected item keeps it in view.
+    .filter(group => group.id !== "machinery" || frameworkMode.value !== "hide" || group.items.some(isSelected));
 });
 
 function position(at: number): string {
@@ -90,18 +93,19 @@ watch(() => props.selectedSpan, () => {
 
 <template>
   <div ref="root" class="state">
-    <p v-if="selectedOperation" class="selection">Selected operation: <strong>{{ selectedOperation.name }}</strong>, {{ formatOffset(selectedOperation.start - test.start) }} to {{ formatOffset(selectedOperation.end - test.start) }}. Its time is shaded; the items it touched are highlighted.</p>
-    <Panel v-for="group in groups" :key="group.id" :title="group.title" :subtitle="group.note" pad="none">
+    <p v-if="selectedOperation" class="selection" title="Its time is shaded; the items it touched are highlighted."><strong>{{ selectedOperation.name }}</strong>, {{ formatOffset(selectedOperation.start - test.start) }} to {{ formatOffset(selectedOperation.end - test.start) }}</p>
+    <Panel v-for="group in groups" :key="group.id" :title="group.title" :subtitle="group.note" pad="none"
+           :class="{ dim: group.id === 'machinery' && frameworkMode === 'dim' }">
       <div class="scale" :aria-label="`Test clock, 0 to ${formatDuration(test.duration)}`">
         <div class="ruler"><span v-for="tick in ticks" :key="tick.left" :style="{ left: tick.left }">{{ tick.label }}</span></div>
         <div class="phases"><i v-for="phase in phases" :key="phase.phase" :title="`${phase.phase}, ${formatDuration(phase.duration)}`" :style="{ left: phase.left, width: phase.width, background: `var(--phase-${phase.phase})` }" /></div>
       </div>
       <div v-for="item in group.items" :key="item.key" class="item" :class="{ active: isSelected(item), related: causes.has(item) || selectedOperation?.item === item }">
-        <button type="button" class="name" :title="item.id" :aria-pressed="isSelected(item)" @click="emit('selectItem', item)">
+        <!-- Two lines: what it is, and what it holds. The ticks on the lifeline are its changes; their count is a hover away. -->
+        <button type="button" class="name" :title="`${item.id}, ${item.changes.length} ${plural(item.changes.length, 'change')}`" :aria-pressed="isSelected(item)" @click="emit('selectItem', item)">
           <span class="kind">{{ itemKindLabel(item).label }}</span>
           <strong>{{ itemTitle(item) }}</strong>
           <small>{{ summary(item) }}</small>
-          <small v-if="item.changes.length" class="changes">{{ item.changes.length }} {{ plural(item.changes.length, "change") }}</small>
         </button>
         <span class="track">
           <i v-if="selectedTime" class="selected-time" :style="selectedTime" />
@@ -118,7 +122,6 @@ watch(() => props.selectedSpan, () => {
       <span><i class="tick testside" />Test side</span>
       <span><i class="tick observed" />Observed</span>
       <span><i class="tick applicationside" />Application</span>
-      <span class="hint">A tick is a change; select it to see the operation that made it.</span>
     </p>
   </div>
 </template>
@@ -144,6 +147,7 @@ watch(() => props.selectedSpan, () => {
   gap: var(--space-3);
 }
 .item:hover { background: var(--hover); }
+.dim .item:not(:hover, .active, .related) .name, .dim .item:not(:hover, .active, .related) .track { opacity: .6; }
 .item.active, .item.related { background: var(--blueprint-soft); box-shadow: inset 2px 0 0 var(--blueprint); }
 .name {
   min-width: 0;
@@ -160,7 +164,6 @@ watch(() => props.selectedSpan, () => {
 .kind { color: var(--muted); font-size: var(--text-micro); font-weight: var(--weight-semibold); }
 .name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-strong); font-weight: var(--weight-semibold); }
 .name small { grid-column: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); font-size: var(--text-micro); }
-.name small.changes { color: var(--muted); }
 
 .track { position: relative; height: 18px; }
 .selected-time { position: absolute; inset-block: 0; background: var(--blueprint-soft); border-inline: 1px solid var(--blueprint); }
@@ -195,7 +198,6 @@ watch(() => props.selectedSpan, () => {
 .legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); color: var(--muted); font-size: var(--text-micro); }
 .legend span { display: inline-flex; align-items: center; gap: var(--space-1); }
 .legend .tick { position: static; width: 5px; height: 10px; margin: 0; }
-.legend .hint { color: var(--dim); }
 
 @container (max-width: 560px) {
   .item { grid-template-columns: minmax(0, 1fr); gap: 0; padding-bottom: var(--space-2); }

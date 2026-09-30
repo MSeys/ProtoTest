@@ -21,7 +21,7 @@ Each test has four views:
 - **State** puts lifelines and changes on that clock. Selecting a change opens its operation and highlights what it touched; selecting an item highlights its operations in Timeline.
 - **Evidence** orders observations, files, findings and moments by time, with the operation that recorded each.
 
-The **Framework** switch beside the view tabs shows, dims or hides framework operations in Steps and Timeline, and remembers the choice.
+The **Framework** switch beside the view tabs shows, dims or hides framework operations in Steps and Timeline, and the machinery a test ran on in State, and remembers the choice.
 
 The inspector shows request and response, comparisons, state changes, metadata and moment sections. Its section index jumps to each part. Binary bodies recorded as text are marked instead of displayed as broken glyphs.
 

@@ -61,7 +61,7 @@ const explains = computed(() => props.test.outcome !== "succeeded" && props.test
 
     <div class="views">
       <Tabs :items="tabs" :active="view" variant="underline" label="Views of this test" panel="test-view" @select="emit('tab', $event)" />
-      <FrameworkToggle v-if="view === 'steps' || view === 'timeline'" class="framework" />
+      <FrameworkToggle v-if="view !== 'evidence'" class="framework" />
     </div>
     <div id="test-view" role="tabpanel" :aria-labelledby="`test-view-tab-${view}`">
       <StepsView v-if="view === 'steps'" :test="test" :selected="selectedSpan?.id" @select="emit('selectSpan', $event)" />

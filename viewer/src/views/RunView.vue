@@ -4,9 +4,7 @@ import type { Artifact, Item, Run, Span, TestTrace } from "../trace/model";
 import { diagnosisRule, diagnosisRuleLabels, testFindings, untracedGaps } from "../trace/analysis";
 import { failureReason, formatDate, formatDuration, formatOffset, needsAttention, outcomeLabel, pad, phaseSegments, testCodeName, testGroup, testMatches, testTitle, timelinePercent, tone } from "../trace/format";
 import Panel from "../ui/Panel.vue";
-import TextInput from "../ui/TextInput.vue";
 import FilterChip from "../ui/FilterChip.vue";
-import OutcomeFilters from "../ui/OutcomeFilters.vue";
 import EmptyState from "../ui/EmptyState.vue";
 import FileList from "../ui/FileList.vue";
 import type { FileEntry } from "../ui/FileList.vue";
@@ -200,28 +198,28 @@ function bars(test: TestTrace) {
     </template>
 
     <Panel v-else-if="current === 'timeline'" title="Run timeline" subtitle="Tests in start order on the run's clock. Hatched time has no recorded operation." pad="none">
+      <!-- The test list's own search and filters drive these rows; here they are only named, with a way back. -->
       <template #actions>
-        <div class="filters">
-          <OutcomeFilters :tests="run.tests" />
-          <TextInput v-model="testFilter.query" type="search" placeholder="Find a test" label="Find a test" class="find" />
+        <div class="legend" aria-hidden="true">
+          <span v-for="phase in ['setup', 'execution', 'rollback', 'teardown']" :key="phase"><i :style="{ background: `var(--phase-${phase})` }" />{{ phase }}</span>
         </div>
+        <span v-if="visible.length < run.tests.length" class="filtered">
+          {{ visible.length }} of {{ run.tests.length }} tests
+          <FilterChip label="Show all" @select="resetTestFilter()" />
+        </span>
       </template>
-      <div class="legend" aria-hidden="true">
-        <span v-for="phase in ['setup', 'execution', 'rollback', 'teardown']" :key="phase"><i :style="{ background: `var(--phase-${phase})` }" />{{ phase }}</span>
-      </div>
       <div v-if="visible.length" class="scale" aria-hidden="true">
         <span class="axis"><i>start</i><i>{{ formatOffset(run.duration) }}</i></span>
       </div>
       <div v-if="visible.length" class="tests">
         <button v-for="test in visible" :key="test.id" type="button" class="test-row" :class="tone(test.outcome)"
-                :title="testCodeName(test)" @click="emit('select', test)">
+                :title="needsAttention(test) ? `${testCodeName(test)}\n${failureReason(test).title}` : testCodeName(test)" @click="emit('select', test)">
           <b>{{ pad(test.number) }}</b>
           <span class="test-name">
             <span class="name-line">
               <span>{{ testTitle(test) }}</span>
               <small>{{ testGroup(test) }}</small>
             </span>
-            <small v-if="needsAttention(test)" class="reason">{{ failureReason(test).title }}</small>
           </span>
           <span class="bar">
             <i v-for="segment in bars(test)" :key="segment.phase"
@@ -344,9 +342,8 @@ button.issue:hover { background: var(--hover); }
 .issue.danger .issue-kind { color: var(--danger); }
 .issue.warning .issue-kind { color: var(--warning); }
 
-.filters { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
-.find { width: clamp(140px, 24cqi, 240px); }
-.legend { padding: var(--space-2) var(--space-4) 0; display: flex; flex-wrap: wrap; gap: var(--space-4); color: var(--muted); font-size: var(--text-micro); text-transform: capitalize; }
+.filtered { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--muted); font-size: var(--text-meta); }
+.legend { display: flex; flex-wrap: wrap; gap: var(--space-4); color: var(--muted); font-size: var(--text-micro); text-transform: capitalize; }
 .legend span { display: inline-flex; align-items: center; gap: var(--space-1); }
 .legend i { width: 10px; height: 4px; border-radius: var(--radius-hairline); }
 /* The bar's own clock: each row is placed on the run's axis, so the axis is labelled once above them. */

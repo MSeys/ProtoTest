@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp, h, nextTick, type VNode } from "vue";
+import { testFilter } from "../ui/testFilter";
 import RunView from "./RunView.vue";
 import type { Gate, Item, Run, Span, TestTrace } from "../trace/model";
 
@@ -107,10 +108,11 @@ describe("RunView needs attention", () => {
     tests[0].failure = { span: failed, check: null, mismatches: [], call: null };
     const passing = [testTrace(1, "succeeded")];
     const failedHost = mount(h(RunView, { run: run(tests), fileName: "demo.prototrace", view: "timeline", onSelect: () => {} }));
-    expect(failedHost.host.querySelector(".test-row .reason")?.textContent).toBe("Assert status");
+    // The overview names the reason; on the clock it is a hover away, so the rows stay one line each.
+    expect(failedHost.host.querySelector(".test-row")?.getAttribute("title")).toBe("Test1\nAssert status");
     failedHost.unmount();
     const passingHost = mount(h(RunView, { run: run(passing), fileName: "demo.prototrace", view: "timeline", onSelect: () => {} }));
-    expect(passingHost.host.querySelector(".test-row .reason")).toBeNull();
+    expect(passingHost.host.querySelector(".test-row")?.getAttribute("title")).not.toContain("\n");
     passingHost.unmount();
   });
 });
@@ -364,6 +366,23 @@ describe("RunView views", () => {
     const { host, unmount } = mount(h(RunView, { run: run([testTrace(1, "succeeded"), testTrace(2, "succeeded")]), fileName: "demo" }));
     expect(host.querySelector(".all-clear strong")?.textContent).toBe("Nothing needs attention.");
     expect(host.querySelector(".all-clear span")?.textContent).toContain("All 2 tests passed");
+    unmount();
+  });
+});
+
+// The rail's search and filters drive the run clock; the clock only says it is filtered, with a way back.
+describe("RunView timeline filter", () => {
+  it("names a filtered clock and shows every test again", async () => {
+    testFilter.query = "Test2";
+    const { host, unmount } = mount(h(RunView, { run: run([testTrace(1, "succeeded"), testTrace(2, "succeeded")]), fileName: "demo", view: "timeline" }));
+    await nextTick();
+    expect(host.querySelector(".filtered")?.textContent?.replace(/\s+/g, " ").trim()).toBe("1 of 2 tests Show all");
+    expect(host.querySelectorAll(".test-row")).toHaveLength(1);
+
+    host.querySelector<HTMLButtonElement>(".filtered button")!.click();
+    await nextTick();
+    expect(host.querySelector(".filtered")).toBeNull();
+    expect(host.querySelectorAll(".test-row")).toHaveLength(2);
     unmount();
   });
 });

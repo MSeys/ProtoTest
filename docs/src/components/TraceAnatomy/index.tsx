@@ -1,4 +1,4 @@
-import type {ReactNode} from 'react';
+import type {CSSProperties, ReactNode} from 'react';
 import Link from '@docusaurus/Link';
 
 import Frame from '@site/src/components/Frame';
@@ -165,6 +165,13 @@ interface TraceAnatomyProps {
   blindSpots?: BlindSpot[];
 }
 
+/** A layer's colour is its phase's, as in the viewer; the run itself takes the brand colour. */
+function phaseColor(id: string): string {
+  return ['setup', 'execution', 'rollback', 'teardown'].includes(id)
+    ? `var(--phase-${id})`
+    : 'var(--blueprint)';
+}
+
 export default function TraceAnatomy({
   source = lessonTraces.timeFix,
   title = 'One test, layer by layer',
@@ -180,7 +187,9 @@ export default function TraceAnatomy({
       head={
         <>
           <strong>{title}</strong>
-          <span className={styles.headMeta}>{test}</span>
+          <span className={styles.headMeta} title={test}>
+            {test}
+          </span>
         </>
       }
       foot={
@@ -204,10 +213,14 @@ export default function TraceAnatomy({
       }
     >
       <ol className={styles.layers}>
-        {layers.map((layer, index) => (
-          <li key={layer.id} className={styles.layer}>
+        {layers.map((layer) => (
+          <li
+            key={layer.id}
+            className={styles.layer}
+            style={{'--phase': phaseColor(layer.id)} as CSSProperties}
+          >
             <div className={styles.layerHead}>
-              <span className={styles.number}>{String(index + 1).padStart(2, '0')}</span>
+              <i className={styles.marker} aria-hidden="true" />
               <strong>{layer.label}</strong>
               <span className={styles.when}>{layer.when}</span>
             </div>
@@ -218,9 +231,11 @@ export default function TraceAnatomy({
                 <ul className={styles.entries}>
                   {layer.entries.map((entry, entryIndex) => (
                     <li key={entryIndex} className={styles.entry}>
-                      <code className={styles.kind}>{entry.kind}</code>
                       <span className={styles.name}>{entry.name}</span>
-                      {entry.meta && <span className={styles.meta}>{entry.meta}</span>}
+                      <span className={styles.meta}>
+                        <code className={styles.kind}>{entry.kind}</code>
+                        {entry.meta && <> · {entry.meta}</>}
+                      </span>
                     </li>
                   ))}
                 </ul>

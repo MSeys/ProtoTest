@@ -6,7 +6,7 @@ Start with the [documentation](https://prototest.dev/docs/) and [troubleshooting
 
 ## Bugs and feature ideas
 
-Use [GitHub Issues](https://github.com/MSeys/ProtoTest/issues). Include the ProtoTest package versions, .NET SDK, test runner, a minimal reproduction when possible, and the smallest relevant excerpt from the trace or error. Remove secrets and personal data before attaching artifacts.
+Use [GitHub Issues](https://github.com/MSeys/ProtoTest/issues). The bug and feature forms list exactly what to include: ProtoTest package versions, .NET SDK, test runner, a minimal reproduction when possible, and the smallest relevant excerpt from the trace or error. Remove secrets and personal data before attaching artifacts.
 
 ## Security issues
 

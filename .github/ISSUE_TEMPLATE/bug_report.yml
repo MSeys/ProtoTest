@@ -1,0 +1,62 @@
+name: Bug report
+description: Report something broken in ProtoTest
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Support is best-effort by a single maintainer, so a minimal repro is the fastest way to a fix. See SUPPORT.md for the full notes. Remove secrets and personal data before attaching anything.
+  - type: input
+    id: prototest-version
+    attributes:
+      label: ProtoTest version
+      description: The ProtoTest package version, for example 1.1.0.
+      placeholder: 1.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: runner
+    attributes:
+      label: Test runner
+      description: The runner adapter the suite uses.
+      options:
+        - NUnit
+        - xUnit
+        - xUnit v3
+        - TUnit
+        - MSTest
+    validations:
+      required: true
+  - type: input
+    id: runner-version
+    attributes:
+      label: Runner version
+      description: The runner package version, for example NUnit 4.2.2.
+      placeholder: NUnit 4.2.2
+    validations:
+      required: false
+  - type: input
+    id: framework
+    attributes:
+      label: Target framework
+      description: The target framework the tests run on, for example net8.0.
+      placeholder: net8.0
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: A minimal suite that shows the bug, or the steps to reproduce it in the Northstar sample.
+      placeholder: What did you run, and what did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: trace
+    attributes:
+      label: Trace or report excerpt
+      description: The smallest relevant excerpt from the .prototrace or the report. Redact application data first.
+      render: text
+    validations:
+      required: false

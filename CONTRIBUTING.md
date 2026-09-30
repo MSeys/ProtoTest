@@ -2,57 +2,7 @@
 
 Thanks for helping make integration tests easier to build and explain. Bug reports, focused improvements, new integrations and sharp documentation feedback are all welcome.
 
-## Before writing code
-
-- Search the [open issues](https://github.com/MSeys/ProtoTest/issues) for related work.
-- For a substantial API, package or architecture change, open an issue first. A short design conversation can prevent a large patch from heading in the wrong direction.
-- Keep a contribution focused. Unrelated cleanup is easier to review separately.
-
-## Context lookups
-
-ProtoTest has three scopes, and each has exactly one way to reach it:
-
-- **Inside a test, on the test's flow**: use `Proto.Context`. This covers test bodies,
-  test-author entries (`context.Data().For<T>()`, `row.ShouldMatchShape(...)`,
-  `ProtoGrpcAssertions.For(exception).Should.HaveStatus(...)`) and the plumbing they call. Prefer
-  passing the context down from an entry when the callee is easy to construct directly in a test; do
-  not thread it through purely for style.
-- **Run scope**: use the host, the reference a hook receives at registration, or
-  `ProtoHost.CurrentHost`. There is no ambient run context: run hooks and report building run
-  outside any test.
-- **Off the test's flow**: telemetry callbacks and library threads (a message consumer's delivery
-  callbacks, a span processor's worker) use `ProtoHost.FindTraceWriter(activity)` and correlate by
-  W3C trace id. `Proto.Context` cannot answer there, because there is no flow-local test.
-
-An object whose lifetime spans tests (a broker, a browser pool, a run-scoped resource) must not hold
-a test context; it resolves per call, and only when it acts on the test's flow. Release callbacks get
-their trace writer from `ProtoResourceReleaseContext`.
-
-## Test conventions
-
-A test's name states the behavior it pins. Two forms, by kind:
-
-- **Pure unit fixtures** use `Subject_ShouldOutcome`, with `_WhenCondition` when the condition is the
-  point (for example `RollbackFailure_ShouldStillDisposeTheTransactionAndConnection`). Name the subject
-  as the reader knows it, not the type under test.
-- **Integration journeys, samples and the `dotnet new` template** use a PascalCase sentence that reads
-  as the behavior, matching the demo and the reference suite (`CreatingAnOrderReturnsIt`,
-  `AChargingSessionBecomesAnInvoice`).
-
-Group related assertions with NUnit 4's scoped block, `using (Assert.EnterMultipleScope()) { … }`, so a
-failure reports every assertion in the scope. New tests, the samples and the template use the scoped
-form; `Assert.Multiple` remains in older tests and is not churned for style.
-
-Keep the phases visible with `// Arrange`, `// Act` and `// Assert` comments whenever the test is long
-enough that the phases are not obvious from the code; a short test needs none. One behavior per test,
-one act per test. Fixture data names its intent (`OverdueInvoice`, not `Invoice1`), and a helper used
-by more than one suite lives in `ProtoTest.TestSupport`.
-
-`using` directives go inside the file-scoped namespace, as every sample and test does. The exception is
-an assembly-attribute file whose attributes must precede the namespace (the TUnit and xUnit v3
-`Setup.cs` files); keep its usings above the namespace.
-
-## Build and test
+## Fastest green run
 
 ProtoTest requires the .NET 8, 9 and 10 SDKs. Node.js 20 or newer is needed for the documentation and trace viewer.
 
@@ -61,13 +11,44 @@ ProtoTest requires the .NET 8, 9 and 10 SDKs. Node.js 20 or newer is needed for 
 ./eng/pack.ps1 -NoBuild -NoRestore
 ```
 
-The first command restores and builds the solution and runs the test suites. The second validates the NuGet packages. Some browser and container-backed tests also require Chromium or a container runtime; the scripts report when an optional environment is unavailable.
+The first command restores, builds and tests the solution. The second validates the NuGet packages. Some browser and container-backed tests need Chromium or a container runtime; the scripts report when an optional environment is unavailable.
 
 While iterating, scope the suite with `-Include` (semicolon-separated project directories):
 
 ```powershell
 ./eng/test.ps1 -Include "tests/ProtoTest.Core.Tests;tests/ProtoTest.Rest.Tests"
 ```
+
+## Before writing code
+
+- Search the [open issues](https://github.com/MSeys/ProtoTest/issues) for related work.
+- For a substantial API, package or architecture change, open an issue first. A short design conversation can prevent a large patch from heading in the wrong direction.
+- Keep a contribution focused. Unrelated cleanup is easier to review separately.
+
+## Test conventions
+
+A test's name states the behavior it pins. Two forms, by kind:
+
+- **Pure unit fixtures** use `Subject_ShouldOutcome`, with `_WhenCondition` when the condition is the point (for example `RollbackFailure_ShouldStillDisposeTheTransactionAndConnection`). Name the subject as the reader knows it, not the type under test.
+- **Integration journeys, samples and the `dotnet new` template** use a PascalCase sentence that reads as the behavior, matching the demo and the reference suite (`CreatingAnOrderReturnsIt`, `AChargingSessionBecomesAnInvoice`).
+
+Group related assertions with NUnit 4's scoped block, `using (Assert.EnterMultipleScope()) { … }`, so a failure reports every assertion in the scope. New tests, the samples and the template use the scoped form; `Assert.Multiple` remains in older tests and is not churned for style.
+
+Keep the phases visible with `// Arrange`, `// Act` and `// Assert` comments whenever the test is long enough that the phases are not obvious from the code; a short test needs none. One behavior per test, one act per test. Fixture data names its intent (`OverdueInvoice`, not `Invoice1`), and a helper used by more than one suite lives in `ProtoTest.TestSupport`.
+
+`using` directives go inside the file-scoped namespace, as every sample and test does. The exception is an assembly-attribute file whose attributes must precede the namespace (the TUnit and xUnit v3 `Setup.cs` files); keep its usings above the namespace.
+
+## Context lookups
+
+ProtoTest has three scopes, and each has exactly one way to reach it:
+
+- **Inside a test, on the test's flow**: use `Proto.Context`. This covers test bodies, test-author entries (`context.Data().For<T>()`, `row.ShouldMatchShape(...)`, `ProtoGrpcAssertions.For(exception).Should.HaveStatus(...)`) and the plumbing they call. Prefer passing the context down from an entry when the callee is easy to construct directly in a test; do not thread it through purely for style.
+- **Run scope**: use the host, the reference a hook receives at registration, or `ProtoHost.CurrentHost`. There is no ambient run context: run hooks and report building run outside any test.
+- **Off the test's flow**: telemetry callbacks and library threads (a message consumer's delivery callbacks, a span processor's worker) use `ProtoHost.FindTraceWriter(activity)` and correlate by W3C trace id. `Proto.Context` cannot answer there, because there is no flow-local test.
+
+An object whose lifetime spans tests (a broker, a browser pool, a run-scoped resource) must not hold a test context; it resolves per call, and only when it acts on the test's flow. Release callbacks get their trace writer from `ProtoResourceReleaseContext`.
+
+## Docs and viewer
 
 For documentation changes:
 
@@ -112,17 +93,11 @@ By contributing, you agree that your contribution is licensed under the reposito
 
 ## Community packages
 
-First-party ProtoTest packages share one version and are released together. A package published outside this
-repository versions independently and declares the ProtoTest it needs: depend on the lowest compatible
-`ProtoTest.Core` (or integration) version and state it in the README. Do not take a dependency on an internal
-API marked `internal`; if an extension point is missing, open an issue so it can be added deliberately.
+First-party ProtoTest packages share one version and are released together. A package published outside this repository versions independently and declares the ProtoTest it needs: depend on the lowest compatible `ProtoTest.Core` (or integration) version and state it in the README. Do not take a dependency on an internal API marked `internal`; if an extension point is missing, open an issue so it can be added deliberately.
 
 ## AI-assisted contributions
 
-AI-assisted work is welcome and reviewed like any other contribution. Disclose it in the pull request
-(which parts, with which tool), be ready to explain the design and verify the behavior yourself, and keep the
-same evidence bar: tests for behavior changes, docs for public behavior, and no generated build output or
-credentials. A reviewer may ask for a walkthrough of any part; the contributor stays accountable for it.
+AI-assisted work is welcome and reviewed like any other contribution. Disclose it in the pull request (which parts, with which tool), be ready to explain the design and verify the behavior yourself, and keep the same evidence bar: tests for behavior changes, docs for public behavior, and no generated build output or credentials. A reviewer may ask for a walkthrough of any part; the contributor stays accountable for it.
 
 ## Conduct
 

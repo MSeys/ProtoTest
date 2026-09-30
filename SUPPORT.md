@@ -1,8 +1,10 @@
 # ProtoTest support
 
+ProtoTest is maintained as an open-source project. Support is best-effort and no response-time guarantee is implied.
+
 ## Questions and usage help
 
-Start with the [documentation](https://prototest.dev/docs/) and [troubleshooting guide](https://prototest.dev/docs/getting-started/troubleshooting). If something remains unclear, ask in the [GitHub Discussions](https://github.com/MSeys/ProtoTest/discussions) so the answer stays useful to other users.
+Start with the [documentation](https://prototest.dev/docs/) and [troubleshooting guide](https://prototest.dev/docs/getting-started/troubleshooting). If something remains unclear, ask in [GitHub Discussions](https://github.com/MSeys/ProtoTest/discussions) so the answer stays useful to other users.
 
 ## Bugs and feature ideas
 
@@ -11,5 +13,3 @@ Use [GitHub Issues](https://github.com/MSeys/ProtoTest/issues). The bug and feat
 ## Security issues
 
 Do not disclose a suspected vulnerability in a public issue. Follow [SECURITY.md](SECURITY.md) instead.
-
-ProtoTest is maintained as an open-source project. Support is best-effort and no response-time guarantee is implied.

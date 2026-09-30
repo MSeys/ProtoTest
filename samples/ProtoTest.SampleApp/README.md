@@ -1,8 +1,6 @@
 # ProtoTest.SampleApp
 
-**Northstar**: a multi-tenant release/deployment control-plane SaaS and the application under
-test in the [Learning demo suite](../Northstar.ProtoTest/README.md). It is a real runnable
-ASP.NET Core application rather than a mock server.
+**Northstar**: a multi-tenant release and deployment control-plane SaaS. It is the application under test in the [Learning demo suite](../Northstar.ProtoTest/README.md): a real runnable ASP.NET Core application, not a mock server.
 
 ```bash
 dotnet run --project samples/ProtoTest.SampleApp
@@ -23,10 +21,7 @@ Errors are `application/problem+json` with a stable `code`. `POST` requests hono
 
 ## Scenario control (`/test-support`)
 
-These routes exist only so tests can create an isolated tenant and control time. They are a development
-affordance: the surface is mapped only when `ProtoTest:TestSupport` is `1` or `true`, so a published
-deployment that does not opt in returns 404, and the testing layer then fails with a message naming the
-flag instead of a bare status assertion. `GET /test-support` answers 200 while the surface is enabled.
+These routes exist only so tests can create an isolated tenant and control time. The surface is mapped only when `ProtoTest:TestSupport` is `1` or `true`, so a published deployment that does not opt in returns 404, and the testing layer then fails with a message naming the flag instead of a bare status assertion. `GET /test-support` answers 200 while the surface is enabled.
 
 - `POST /test-support/tenants`: provision an organization with an owner and token
 - `DELETE /test-support/tenants/{slug}`: remove the organization and everything in it

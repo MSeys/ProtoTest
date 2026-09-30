@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import type { Phase, Span, TestTrace } from "../trace/model";
+import type { Item, Phase, Span, TestTrace } from "../trace/model";
 import { untracedGaps, type UntracedGap } from "../trace/analysis";
 import { isFramework } from "../trace/story";
 import { formatDuration, formatOffset, kindLabel, outcomeLabel, plural, rulerTicks, tone } from "../trace/format";
@@ -14,8 +14,11 @@ import EmptyState from "../ui/EmptyState.vue";
  * keeps everything: search answers where an operation is, the filter what needs attention, the zoom one
  * phase at a time. Framework machinery is dimmed, or hidden on request; a hit always keeps its ancestors.
  */
-const props = defineProps<{ test: TestTrace; selected?: string }>();
+const props = defineProps<{ test: TestTrace; selected?: string; selectedItem?: Item }>();
 const emit = defineEmits<{ select: [span: Span] }>();
+function related(span: Span) {
+  return Boolean(props.selectedItem && (span.item === props.selectedItem || span.changes.some(change => change.item === props.selectedItem)));
+}
 
 const query = ref("");
 const attention = ref(false);
@@ -192,7 +195,7 @@ const title = (phase: string) => phase.charAt(0).toUpperCase() + phase.slice(1);
             <span class="duration">{{ formatDuration(entry.gap.duration) }}</span>
           </div>
           <div v-else class="row" role="listitem" :style="{ '--depth': entry.depth }"
-               :class="[tone(entry.span.status), { active: entry.span.id === selected, dim: framework === 'dim' && machinery(entry.span) && !needsSpan(entry.span) }]">
+               :class="[tone(entry.span.status), { active: entry.span.id === selected, related: related(entry.span), dim: framework === 'dim' && machinery(entry.span) && !needsSpan(entry.span) && !related(entry.span) }]">
             <span class="label">
               <button v-if="entry.span.children.length && !shown" type="button" class="fold" :aria-expanded="!folded.has(entry.span.id)"
                       :aria-label="`${folded.has(entry.span.id) ? 'Unfold' : 'Fold'} ${entry.span.name}`" @click="toggle(entry.span.id)">
@@ -263,7 +266,7 @@ const title = (phase: string) => phase.charAt(0).toUpperCase() + phase.slice(1);
 }
 .row { position: relative; min-height: var(--control-height); border-radius: var(--radius-chip); }
 .row:hover { background: var(--hover); }
-.row.active { background: var(--blueprint-soft); box-shadow: inset 2px 0 0 var(--blueprint); }
+.row.active, .row.related { background: var(--blueprint-soft); box-shadow: inset 2px 0 0 var(--blueprint); }
 .row.danger .name { color: var(--danger); }
 .row.dim .label, .row.dim .duration { opacity: .6; }
 .row.dim .bar { opacity: .45; }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp, h, nextTick, type VNode } from "vue";
 import StateView from "./StateView.vue";
 import type { Change, Item, Span, TestTrace } from "../trace/model";
@@ -102,6 +102,66 @@ describe("StateView change count", () => {
     await nextTick();
 
     expect(host.querySelector(".name .changes")?.textContent).toBe("2 changes");
+    unmount();
+  });
+});
+
+describe("StateView shared clock", () => {
+  it("places the ruler, phases, lifeline and changes on the same test axis", () => {
+    const entry = item({ firstSeen: 102, lastSeen: 108 });
+    entry.changes = [change({ at: 105, item: entry })];
+    const test = { ...testTrace([entry]), start: 100, end: 110 };
+    const execution = span({ kind: "test.execution", start: 102, duration: 6, end: 108 });
+    test.spans = [execution]; test.roots = [execution];
+    const { host, unmount } = mount(h(StateView, { test }));
+    expect(host.querySelector(".scale")?.getAttribute("aria-label")).toBe("Test clock, 0 to 10 ms");
+    expect(host.querySelector<HTMLElement>(".phases i")?.style.left).toBe("20%");
+    expect(host.querySelector<HTMLElement>(".phases i")?.style.width).toBe("60%");
+    expect(host.querySelector<HTMLElement>(".life")?.style.left).toBe("20%");
+    expect(host.querySelector<HTMLElement>(".life")?.style.width).toBe("60%");
+    expect(host.querySelector<HTMLElement>("button.tick")?.style.left).toBe("50%");
+    expect(host.querySelector<HTMLButtonElement>("button.tick")?.disabled).toBe(true);
+    unmount();
+  });
+
+  it("shades the selected operation on every lifeline and highlights only the items it touched", async () => {
+    const changed = item({}); const actedOn = item({ key: "context", kind: "context", id: "ctx" }); const other = item({ key: "other", id: "other" });
+    const operation = span({ id: "op", name: "Load project", start: 2, duration: 3, end: 5, item: actedOn });
+    changed.changes = [change({ at: 3, item: changed, span: operation })];
+    const test = testTrace([changed, actedOn, other]);
+    test.spans = [operation]; test.byId.set(operation.id, operation);
+    const select = vi.fn();
+    const { host, unmount } = mount(h(StateView, { test, selectedSpan: operation.id, onSelectSpan: select }));
+    await nextTick();
+    expect(host.querySelectorAll(".selected-time")).toHaveLength(3);
+    expect(host.querySelector<HTMLElement>(".selected-time")?.style.left).toBe("20%");
+    expect(host.querySelectorAll(".item.related")).toHaveLength(2);
+    expect(host.querySelector(".selection")?.textContent).toContain("Load project, +2.0 ms to +5.0 ms");
+    host.querySelector<HTMLButtonElement>("button.tick")!.click();
+    expect(select).toHaveBeenCalledWith(operation);
+    unmount();
+  });
+
+  it("keeps item selection visible and opens its inspector", () => {
+    const entry = item({}); const select = vi.fn();
+    const { host, unmount } = mount(h(StateView, { test: testTrace([entry]), selected: { kind: entry.kind, id: entry.id }, onSelectItem: select }));
+    expect(host.querySelector(".item.active .name")?.getAttribute("aria-pressed")).toBe("true");
+    host.querySelector<HTMLButtonElement>("button.name")!.click();
+    expect(select).toHaveBeenCalledWith(entry);
+    unmount();
+  });
+
+  it("does not stretch a zero-time lifetime across the whole test", () => {
+    const { host, unmount } = mount(h(StateView, { test: testTrace([item({ firstSeen: 0, lastSeen: 0 })]) }));
+    expect(host.querySelector<HTMLElement>(".life")?.style.width).toBe("0.6%");
+    unmount();
+  });
+
+  it("explains empty state without an invented operation selection", async () => {
+    const { host, unmount } = mount(h(StateView, { test: testTrace([]), selectedSpan: "missing" }));
+    await nextTick();
+    expect(host.textContent).toContain("This test tracked no state");
+    expect(host.querySelector(".selection")).toBeNull();
     unmount();
   });
 });

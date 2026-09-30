@@ -66,7 +66,7 @@ const explains = computed(() => props.test.outcome !== "succeeded" && props.test
       <StateView v-else-if="view === 'state'" :test="test" :selected="itemSelection" :selected-span="selectedSpan?.id"
                  @select-item="emit('selectItem', $event)" @select-span="emit('selectSpan', $event)" />
       <EvidenceView v-else-if="view === 'evidence'" :test="test" @select="emit('selectSpan', $event)" @artifact="emit('artifact', $event)" />
-      <TimelineView v-else :test="test" :selected="selectedSpan?.id" @select="emit('selectSpan', $event)" />
+      <TimelineView v-else :test="test" :selected="selectedSpan?.id" :selected-item="selectedItem" @select="emit('selectSpan', $event)" />
     </div>
   </div>
 </template>

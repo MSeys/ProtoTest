@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createApp, h, nextTick, type VNode } from "vue";
 import TimelineView from "./TimelineView.vue";
-import type { Span, TestTrace } from "../trace/model";
+import type { Item, Span, TestTrace } from "../trace/model";
 
 function span(overrides: Partial<Span>): Span {
   return {
@@ -118,6 +118,15 @@ describe("TimelineView attention filter", () => {
 
 // The clock: each phase can be read on its own, framework machinery can step back, and untraced time is a row.
 describe("TimelineView clock", () => {
+  it("cross-highlights operations that acted on or changed the item selected in State", () => {
+    const item: Item = { key: "client", id: "client", kind: "client", name: "REST", scope: "test", firstSeen: 0, lastSeen: 10, state: {}, changes: [], test: null };
+    const acted = span({ id: "acted", item });
+    const changed = span({ id: "changed", changes: [{ at: 1, change: "created", item, span: null, state: {}, source: "testside", inferred: false }] });
+    const other = span({ id: "other" });
+    const { host, unmount } = mount(h(TimelineView, { test: testTrace([acted, changed, other]), selectedItem: item }));
+    expect(host.querySelectorAll(".row.related")).toHaveLength(2);
+    unmount();
+  });
   function phased(): TestTrace {
     const setup = span({ id: "setup", name: "Setup", kind: "test.setup", phase: "setup", start: 0, duration: 10, end: 10 });
     const hook = span({ id: "hook", name: "Before · Clients", kind: "hook.before", phase: "setup", start: 0, duration: 10, end: 10, parent: setup, depth: 1 });

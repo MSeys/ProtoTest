@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import type { Change, Item, Span, TestTrace } from "../trace/model";
-import { formatOffset, itemKindLabel, itemTitle, plural, sourceLabels, timelinePercent } from "../trace/format";
+import { formatDuration, formatOffset, itemKindLabel, itemTitle, phaseSegments, plural, rulerTicks, sourceLabels, timelinePercent } from "../trace/format";
 import EmptyState from "../ui/EmptyState.vue";
 import Panel from "../ui/Panel.vue";
 
@@ -37,12 +37,23 @@ function position(at: number): string {
 
 function lifeline(item: Item) {
   const start = Math.max(item.firstSeen, props.test.start);
-  const end = Math.max(start, Math.min(item.lastSeen || props.test.end, props.test.end));
+  const end = Math.max(start, Math.min(item.lastSeen, props.test.end));
   return {
     left: position(start),
     width: `${Math.max(0.6, ((end - start) / Math.max(props.test.duration, 1)) * 100)}%`
   };
 }
+
+const ticks = computed(() => rulerTicks(0, props.test.duration).map(at => ({ label: at === 0 ? "0" : formatDuration(at), left: position(props.test.start + at) })));
+const phases = computed(() => phaseSegments(props.test).map(phase => ({ ...phase, left: position(phase.start), width: `${phase.duration / Math.max(props.test.duration, 1) * 100}%` })));
+const selectedOperation = computed(() => props.selectedSpan ? props.test.byId.get(props.selectedSpan) ?? props.test.spans.find(span => span.id === props.selectedSpan) : undefined);
+const selectedTime = computed(() => {
+  const span = selectedOperation.value;
+  if (!span) return undefined;
+  const left = timelinePercent(span.start, props.test.start, props.test.duration);
+  const right = timelinePercent(span.end, props.test.start, props.test.duration);
+  return { left: `${left}%`, width: `max(2px, ${Math.max(0, right - left)}%)` };
+});
 
 /** The state a reader wants on the row: the item's own name fields first, a count of the rest. */
 function summary(item: Item): string {
@@ -79,16 +90,21 @@ watch(() => props.selectedSpan, () => {
 
 <template>
   <div ref="root" class="state">
+    <p v-if="selectedOperation" class="selection">Selected operation: <strong>{{ selectedOperation.name }}</strong>, {{ formatOffset(selectedOperation.start - test.start) }} to {{ formatOffset(selectedOperation.end - test.start) }}. Its time is shaded; the items it touched are highlighted.</p>
     <Panel v-for="group in groups" :key="group.id" :title="group.title" :subtitle="group.note" pad="none">
-      <div class="scale" aria-hidden="true"><span>start</span><span>{{ formatOffset(test.duration) }}</span></div>
-      <div v-for="item in group.items" :key="item.key" class="item" :class="{ active: isSelected(item) }">
-        <button type="button" class="name" :title="item.id" @click="emit('selectItem', item)">
+      <div class="scale" :aria-label="`Test clock, 0 to ${formatDuration(test.duration)}`">
+        <div class="ruler"><span v-for="tick in ticks" :key="tick.left" :style="{ left: tick.left }">{{ tick.label }}</span></div>
+        <div class="phases"><i v-for="phase in phases" :key="phase.phase" :title="`${phase.phase}, ${formatDuration(phase.duration)}`" :style="{ left: phase.left, width: phase.width, background: `var(--phase-${phase.phase})` }" /></div>
+      </div>
+      <div v-for="item in group.items" :key="item.key" class="item" :class="{ active: isSelected(item), related: causes.has(item) || selectedOperation?.item === item }">
+        <button type="button" class="name" :title="item.id" :aria-pressed="isSelected(item)" @click="emit('selectItem', item)">
           <span class="kind">{{ itemKindLabel(item).label }}</span>
           <strong>{{ itemTitle(item) }}</strong>
           <small>{{ summary(item) }}</small>
           <small v-if="item.changes.length" class="changes">{{ item.changes.length }} {{ plural(item.changes.length, "change") }}</small>
         </button>
         <span class="track">
+          <i v-if="selectedTime" class="selected-time" :style="selectedTime" />
           <i class="life" :style="lifeline(item)" />
           <button v-for="(change, index) in item.changes" :key="index" type="button" class="tick" :class="[change.source, { active: change.span?.id === selectedSpan, inferred: change.inferred }]"
                   :style="{ left: position(change.at) }" :title="tickTitle(change)" :aria-label="tickTitle(change)"
@@ -109,7 +125,15 @@ watch(() => props.selectedSpan, () => {
 
 <style scoped>
 .state { display: grid; gap: var(--space-4); container-type: inline-size; }
-.scale { margin-left: calc(38% + var(--space-3)); padding: var(--space-1) var(--space-4) 0 0; display: flex; justify-content: space-between; color: var(--dim); font-size: var(--text-micro); }
+.scale { margin-block: var(--space-2) var(--space-1); padding: 0 var(--space-4) 0 var(--space-2); display: grid; grid-template-columns: 38% minmax(0, 1fr); column-gap: var(--space-3); color: var(--dim); font-size: var(--text-meta); }
+.ruler { grid-column: 2; position: relative; height: 24px; border-bottom: 1px solid var(--border-strong); }
+.ruler span { position: absolute; bottom: var(--space-1); transform: translateX(-50%); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ruler span:first-child { transform: none; }
+.ruler span::after { content: ""; position: absolute; height: 4px; bottom: calc(var(--space-1) * -1); left: 50%; border-left: 1px solid var(--border-strong); }
+.phases { grid-column: 2; position: relative; height: 5px; margin-top: var(--space-1); }
+.phases i { position: absolute; height: 3px; }
+.selection { color: var(--muted); font-size: var(--text-body); overflow-wrap: anywhere; }
+.selection strong { color: var(--text); }
 
 .item {
   padding: 0 var(--space-4) 0 var(--space-2);
@@ -120,7 +144,7 @@ watch(() => props.selectedSpan, () => {
   gap: var(--space-3);
 }
 .item:hover { background: var(--hover); }
-.item.active { background: var(--blueprint-soft); box-shadow: inset 2px 0 0 var(--blueprint); }
+.item.active, .item.related { background: var(--blueprint-soft); box-shadow: inset 2px 0 0 var(--blueprint); }
 .name {
   min-width: 0;
   min-height: var(--control-height);
@@ -134,11 +158,12 @@ watch(() => props.selectedSpan, () => {
   text-align: left;
 }
 .kind { color: var(--muted); font-size: var(--text-micro); font-weight: var(--weight-semibold); }
-.name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-meta); font-weight: var(--weight-semibold); }
+.name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-strong); font-weight: var(--weight-semibold); }
 .name small { grid-column: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); font-size: var(--text-micro); }
 .name small.changes { color: var(--muted); }
 
 .track { position: relative; height: 18px; }
+.selected-time { position: absolute; inset-block: 0; background: var(--blueprint-soft); border-inline: 1px solid var(--blueprint); }
 .track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--border); }
 /* Blueprint to solid: the dashed axis is the test's time; the solid line is when the item existed. */
 .life { position: absolute; top: calc(50% - 1px); height: 2px; border-radius: var(--radius-hairline); background: var(--border-strong); }
@@ -174,7 +199,8 @@ watch(() => props.selectedSpan, () => {
 
 @container (max-width: 560px) {
   .item { grid-template-columns: minmax(0, 1fr); gap: 0; padding-bottom: var(--space-2); }
-  .scale { display: none; }
+  .scale { grid-template-columns: minmax(0, 1fr); padding-inline: var(--space-4) calc(var(--space-4) + var(--space-2)); }
+  .ruler, .phases { grid-column: 1; }
   .track { margin: 0 var(--space-2); }
   .cause { grid-column: 1; }
 }

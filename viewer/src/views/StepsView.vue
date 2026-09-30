@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import type { Span, TestTrace } from "../trace/model";
-import { fails, isFramework, pathTo, story } from "../trace/story";
+import { fails, isFramework, pathTo, story, withoutFramework } from "../trace/story";
+import { frameworkMode } from "../ui/frameworkMode";
 import type { StoryPhase, StoryRow as Row } from "../trace/story";
 import { formatDuration, phaseSummary } from "../trace/format";
 import StoryRow from "../ui/StoryRow.vue";
@@ -19,6 +20,8 @@ const props = defineProps<{ test: TestTrace; selected?: string }>();
 const emit = defineEmits<{ select: [span: Span] }>();
 
 const phases = computed(() => story(props.test));
+/** What the rows show: everything, or with the framework left out when the reader hid it. */
+const visible = (phase: StoryPhase) => frameworkMode.value === "hide" ? withoutFramework(phase.rows) : phase.rows;
 const hasLoose = computed(() => looseEvents(props.test).length > 0);
 const open = ref(new Set<string>());
 const root = ref<HTMLElement>();
@@ -89,9 +92,9 @@ function phaseTitle(phase: string): string {
         <span class="duration">{{ phase.span ? formatDuration(phase.span.duration) : "" }}</span>
       </button>
       <div v-if="open.has(phaseId(phase))" class="rows">
-        <StoryRow v-for="row in phase.rows" :key="row.type === 'step' ? row.span.id : row.id" :row="row" :test="test"
+        <StoryRow v-for="row in visible(phase)" :key="row.type === 'step' ? row.span.id : row.id" :row="row" :test="test"
                   :depth="0" :selected="selected" :open="open" @select="emit('select', $event)" @toggle="toggle" />
-        <p v-if="!phase.rows.length" class="quiet">Nothing ran in this phase.</p>
+        <p v-if="!visible(phase).length" class="quiet">{{ phase.rows.length ? "Only framework operations ran in this phase." : "Nothing ran in this phase." }}</p>
       </div>
     </section>
     <EmptyState v-if="!phases.length && !hasLoose" message="This test recorded no operations." />

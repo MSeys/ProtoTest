@@ -7,6 +7,7 @@ import StepsView from "./StepsView.vue";
 import StateView from "./StateView.vue";
 import TimelineView from "./TimelineView.vue";
 import Tabs from "../ui/Tabs.vue";
+import FrameworkToggle from "../ui/FrameworkToggle.vue";
 import VerdictBar from "../ui/VerdictBar.vue";
 import PhaseBand from "../ui/PhaseBand.vue";
 import OutcomePill from "../ui/OutcomePill.vue";
@@ -60,6 +61,7 @@ const explains = computed(() => props.test.outcome !== "succeeded" && props.test
 
     <div class="views">
       <Tabs :items="tabs" :active="view" variant="underline" label="Views of this test" panel="test-view" @select="emit('tab', $event)" />
+      <FrameworkToggle v-if="view === 'steps' || view === 'timeline'" class="framework" />
     </div>
     <div id="test-view" role="tabpanel" :aria-labelledby="`test-view-tab-${view}`">
       <StepsView v-if="view === 'steps'" :test="test" :selected="selectedSpan?.id" @select="emit('selectSpan', $event)" />
@@ -87,7 +89,9 @@ span.step { visibility: hidden; }
 .test-title code { overflow-wrap: anywhere; color: var(--dim); font-family: var(--font-mono); }
 .test-head :deep(.pill) { padding-top: var(--space-1); }
 /* The view tabs stay in reach while the view scrolls under them. */
-.views { position: sticky; top: 0; z-index: 3; border-bottom: 1px solid var(--border); background: var(--bg); }
+.views { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-4); border-bottom: 1px solid var(--border); background: var(--bg); }
+.views > :first-child { min-width: 0; flex: 1 1 auto; }
+.views .framework { margin-left: auto; }
 
 /* Narrow: the outcome keeps its own row under the title instead of squeezing it. */
 @container (max-width: 560px) {

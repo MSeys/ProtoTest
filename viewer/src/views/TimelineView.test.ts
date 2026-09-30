@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createApp, h, nextTick, type VNode } from "vue";
 import TimelineView from "./TimelineView.vue";
 import type { Item, Span, TestTrace } from "../trace/model";
+import { frameworkMode } from "../ui/frameworkMode";
 
 function span(overrides: Partial<Span>): Span {
   return {
@@ -161,14 +162,20 @@ describe("TimelineView clock", () => {
     unmount();
   });
 
-  it("dims framework machinery, or hides it on request", async () => {
+  it("dims framework machinery, shows it or hides it, as the shared choice says", async () => {
+    frameworkMode.value = "dim";
     const { host, unmount } = mount(h(TimelineView, { test: phased(), onSelect: () => {} }));
     await nextTick();
     expect([...host.querySelectorAll(".row.dim .name")].map(entry => entry.textContent)).toEqual(["Before · Clients"]);
 
-    chip(host, "Hide").click();
+    frameworkMode.value = "show";
+    await nextTick();
+    expect(host.querySelectorAll(".row.dim")).toHaveLength(0);
+
+    frameworkMode.value = "hide";
     await nextTick();
     expect(names(host)).not.toContain("Before · Clients");
+    frameworkMode.value = "dim";
     unmount();
   });
 });

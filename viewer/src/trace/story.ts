@@ -55,6 +55,16 @@ function pureFramework(span: Span): boolean {
   return isFramework(span) && span.children.every(child => isFramework(child) && pureFramework(child));
 }
 
+/** The rows with the framework left out: a step stays when scenario work or a failure happened inside it. */
+export function withoutFramework(list: StoryRow[]): StoryRow[] {
+  return list.flatMap((row): StoryRow[] => {
+    if (row.type === "group") return [];
+    if (row.type !== "step") return [row];
+    if (pureFramework(row.span) && !fails(row.span)) return [];
+    return [{ ...row, children: withoutFramework(row.children) }];
+  });
+}
+
 export function fails(span: Span): boolean {
   return span.status === "failed" || span.status === "cancelled" || Boolean(span.error) || span.children.some(fails);
 }

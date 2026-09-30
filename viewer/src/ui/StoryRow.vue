@@ -4,6 +4,8 @@ import type { Span, TestTrace } from "../trace/model";
 import type { StoryRow } from "../trace/story";
 import { formatDuration, formatOffset, itemKindLabel, kindLabel, outcomeLabel, plural, spanFacts, timelinePercent, tone } from "../trace/format";
 import KindChip from "./KindChip.vue";
+import { fails, isFramework } from "../trace/story";
+import { frameworkMode } from "./frameworkMode";
 
 const props = defineProps<{
   row: StoryRow;
@@ -18,6 +20,9 @@ const emit = defineEmits<{ select: [span: Span]; toggle: [id: string] }>();
 const id = computed(() => props.row.type === "step" ? props.row.span.id : props.row.id);
 const children = computed(() => props.row.type === "group" ? props.row.rows : props.row.type === "step" ? props.row.children : []);
 const isOpen = computed(() => props.open.has(id.value));
+/** Framework machinery steps back when the reader asked for that; a failure never does. */
+const dimmed = computed(() => frameworkMode.value === "dim"
+  && (props.row.type === "group" || (props.row.type === "step" && isFramework(props.row.span) && !fails(props.row.span))));
 
 /** Where the row ran inside the test, as a bar on the test's own clock: what took the time, without reading numbers. */
 const range = computed(() => {
@@ -100,7 +105,7 @@ function pick() {
       <span class="duration">{{ formatDuration(duration) }}</span>
     </div>
 
-    <div v-else class="line" :class="[row.type === 'step' ? tone(row.span.status) : 'group', { active: row.type === 'step' && row.span.id === selected }]">
+    <div v-else class="line" :class="[row.type === 'step' ? tone(row.span.status) : 'group', { active: row.type === 'step' && row.span.id === selected, dim: dimmed }]">
       <button v-if="children.length" type="button" class="expand" :aria-expanded="isOpen"
               :aria-label="`${isOpen ? 'Fold' : 'Unfold'} ${foldName}`" @click="emit('toggle', id)">
         <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true"><path d="M3.6 2 6.6 5 3.6 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -164,6 +169,9 @@ function pick() {
   border-radius: var(--radius-chip);
 }
 .line:hover { background: var(--hover); }
+.line.dim .pick, .line.dim .marks, .line.dim .duration { opacity: .55; }
+.line.dim .waterfall { opacity: .4; }
+.line.dim:hover .pick { opacity: 1; }
 .line.active { background: var(--blueprint-soft); box-shadow: inset 2px 0 0 var(--blueprint); }
 .line.danger { background: var(--danger-soft); box-shadow: inset 2px 0 0 var(--danger); }
 .line.danger.active { box-shadow: inset 2px 0 0 var(--blueprint), inset 0 0 0 1px var(--blueprint); }

@@ -216,6 +216,8 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - Testcontainers: a released container can be started again, and its connection string is cleared. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
 - Aspire: an AppHost for a partly configured topology publishes only the missing keys. [Aspire](https://prototest.dev/docs/integrations/aspire)
 - Aspire: a published connection string is recorded redacted, so credentials never reach the trace, while its address stays readable. [Aspire](https://prototest.dev/docs/integrations/aspire)
+- GraphQL: a fluent upload argument fails when the document is built instead of rendering as a literal. [GraphQL](https://prototest.dev/docs/integrations/graphql)
+- Docs: a repeated `AddSheets` composes its options callbacks instead of keeping the first. [Sheets](https://prototest.dev/docs/integrations/sheets)
 - WireMock: a run-scoped fake keeps its stubs and request log for the whole run; `Reset()` clears it. [WireMock](https://prototest.dev/docs/integrations/wiremock)
 - WireMock: pinning Humanizer 3.0.10 avoids a `NU1608` next to Aspire. [WireMock](https://prototest.dev/docs/integrations/wiremock)
 - WireMock: `WireMockAssertionException` derives from `ProtoAssertionException`. [WireMock](https://prototest.dev/docs/integrations/wiremock)

@@ -1,23 +1,40 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { Change, Item, Run, Span, TestTrace } from "../trace/model";
-import { formatOffset, jsonLiteral, sourceLabels } from "../trace/format";
+import { formatOffset, sourceLabels } from "../trace/format";
 import JsonView from "./JsonView.vue";
 import { isJsonLike } from "./json";
 
 /*
- * One tracked item: what it is now, how it got there, and which operations touched it. Each change reads the
- * way a shape check does - a key, the value it had crossed out, the value it got - so a trail of ten changes is
- * ten short diffs rather than ten full states.
+ * One tracked item: what it holds at the end, how it got there, and which operations touched it. The keys
+ * share a namespace ("resource."), so it is said once above them; values read as the text they are. A change
+ * shows only what it changed, one line per value, and the change that created the item folds its first values
+ * away, because the table above already holds them.
  */
 const props = defineProps<{ item: Item; test: TestTrace | Run }>();
 const emit = defineEmits<{ select: [span: Span] }>();
 
-const state = computed(() => Object.entries(props.item.state));
 const usedBy = computed(() => props.test.spans.filter(span => span.item === props.item));
+
+/** The namespace every key shares, with its dot, or nothing when the keys do not agree on one. */
+const namespace = computed(() => {
+  const keys = [...Object.keys(props.item.state), ...props.item.changes.flatMap(change => Object.keys(change.state))];
+  const first = keys[0]?.split(".")[0];
+  return first && keys.every(key => key.startsWith(`${first}.`)) ? `${first}.` : "";
+});
+const shortKey = (key: string) => namespace.value && key.startsWith(namespace.value) ? key.slice(namespace.value.length) : key;
+
+/** A value as text: no JSON quotes around a string, a unit where the key names one. */
+function display(key: string, value: string | null | undefined): string {
+  if (value === null || value === undefined) return "null";
+  return /(_ms|Ms)$/.test(key) && value !== "" && !Number.isNaN(Number(value)) ? `${value} ms` : value;
+}
+
+const state = computed(() => Object.entries(props.item.state).map(([key, value]) => ({ key, label: shortKey(key), value })));
 
 interface Difference {
   key: string;
+  label: string;
   before: string | null | undefined;
   after: string | null;
   /** First seen in this change, or changed from an earlier value. */
@@ -33,20 +50,23 @@ function differences(change: Change, index: number): Difference[] {
   for (const earlier of props.item.changes.slice(0, index)) Object.assign(known, earlier.state);
   return Object.entries(change.state)
     .filter(([key, value]) => !(key in known) || known[key] !== value)
-    .map(([key, value]) => ({ key, before: known[key], after: value, added: !(key in known) }));
+    .map(([key, value]) => ({ key, label: shortKey(key), before: known[key], after: value, added: !(key in known) }));
 }
+
+/** The first change that only set values: it reads as one line, its values folded. */
+const opening = (change: Change, index: number) => index === 0 && differences(change, index).every(difference => difference.added);
 </script>
 
 <template>
   <div class="item-inspector">
     <section class="block">
-      <h3>State at the end</h3>
+      <h3>State at the end<small v-if="namespace">{{ namespace.slice(0, -1) }}</small></h3>
       <dl v-if="state.length" class="fields">
-        <template v-for="[key, value] in state" :key="key">
-          <dt>{{ key }}</dt>
-          <dd>
-            <JsonView v-if="isJsonLike(value)" :value="value" :open-depth="0" />
-            <template v-else>{{ jsonLiteral(value ?? null) }}</template>
+        <template v-for="entry in state" :key="entry.key">
+          <dt :title="entry.key">{{ entry.label }}</dt>
+          <dd :class="{ null: entry.value === null }">
+            <JsonView v-if="isJsonLike(entry.value)" :value="entry.value" :open-depth="0" />
+            <template v-else>{{ display(entry.key, entry.value) }}</template>
           </dd>
         </template>
       </dl>
@@ -56,31 +76,38 @@ function differences(change: Change, index: number): Difference[] {
     <section class="block">
       <h3>How it changed</h3>
       <ol class="trail">
-        <li v-for="(change, index) in item.changes" :key="index">
+        <li v-for="(change, index) in item.changes" :key="index" :class="change.source">
           <span class="offset">{{ formatOffset(change.at - test.start) }}</span>
           <div class="what">
-            <p>
+            <p class="line">
               <strong>{{ change.change }}</strong>
-              <span class="source" :class="change.source">{{ sourceLabels[change.source] }}</span>
-              <em v-if="change.inferred">inferred</em>
+              <span class="by">
+                {{ sourceLabels[change.source] }}<template v-if="change.inferred">, inferred</template><template v-if="change.span">, by
+                  <button type="button" :title="change.span.name" @click="change.span && emit('select', change.span)">{{ change.span.name }}</button></template>
+              </span>
             </p>
-            <button v-if="change.span" type="button" class="by" @click="change.span && emit('select', change.span)">by {{ change.span.name }}</button>
-            <div v-if="differences(change, index).length" class="diff">
-              <div v-for="difference in differences(change, index)" :key="difference.key" class="difference" :class="{ added: difference.added }">
-                <span class="mark" :aria-label="difference.added ? 'added' : 'changed'">{{ difference.added ? "+" : "~" }}</span>
-                <span class="key">{{ difference.key }}</span>
-                <span class="values">
-                  <template v-if="isJsonLike(difference.after)">
-                    <JsonView :value="difference.after" :open-depth="0" />
-                  </template>
+            <details v-if="opening(change, index)" class="values">
+              <summary>with {{ differences(change, index).length }} {{ differences(change, index).length === 1 ? "value" : "values" }}</summary>
+              <dl class="diff">
+                <template v-for="difference in differences(change, index)" :key="difference.key">
+                  <dt :title="difference.key">{{ difference.label }}</dt>
+                  <dd><span class="after">{{ display(difference.key, difference.after) }}</span></dd>
+                </template>
+              </dl>
+            </details>
+            <dl v-else-if="differences(change, index).length" class="diff">
+              <template v-for="difference in differences(change, index)" :key="difference.key">
+                <dt :title="difference.key">{{ difference.label }}</dt>
+                <dd>
+                  <JsonView v-if="isJsonLike(difference.after)" :value="difference.after" :open-depth="0" />
                   <template v-else>
-                    <code v-if="!difference.added" class="before">{{ jsonLiteral(difference.before ?? null) }}</code>
-                    <b v-if="!difference.added" class="arrow">→</b>
-                    <code class="after">{{ jsonLiteral(difference.after ?? null) }}</code>
+                    <template v-if="!difference.added"><s class="before">{{ display(difference.key, difference.before) }}</s><span class="arrow" aria-label="became">→</span></template>
+                    <span class="after">{{ display(difference.key, difference.after) }}</span>
+                    <small v-if="difference.added" class="new">new</small>
                   </template>
-                </span>
-              </div>
-            </div>
+                </dd>
+              </template>
+            </dl>
             <p v-else class="unchanged">No value changed.</p>
           </div>
         </li>
@@ -99,43 +126,46 @@ function differences(change: Change, index: number): Difference[] {
 
 <style scoped>
 .item-inspector { min-width: 0; display: grid; gap: var(--space-5); }
-.source { padding: 0 var(--space-2); border-radius: var(--radius-chip); background: var(--surface-2); color: var(--muted); font-size: var(--text-micro); font-weight: var(--weight-semibold); }
-.source.applicationside { background: var(--blueprint-soft); color: var(--blueprint); }
-.source.observed { color: var(--pt-cyan); }
-
-h3 { font-family: var(--font-ui); font-size: var(--text-meta); font-weight: var(--weight-bold); letter-spacing: 0; }
 .block { min-width: 0; display: grid; gap: var(--space-2); }
-.fields { margin: 0; display: grid; grid-template-columns: minmax(80px, max-content) minmax(0, 1fr); gap: 0 var(--space-4); }
+h3 { display: flex; align-items: baseline; gap: var(--space-2); color: var(--muted); font-family: var(--font-ui); font-size: var(--text-meta); font-weight: var(--weight-semibold); letter-spacing: 0; }
+h3 small { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+
+/* Properties read as a two-column list: the short key, then the value as text. */
+.fields, .diff { margin: 0; display: grid; grid-template-columns: minmax(72px, max-content) minmax(0, 1fr); column-gap: var(--space-4); }
 .fields dt, .fields dd { min-width: 0; padding: var(--space-1) 0; border-top: 1px solid var(--border); }
-.fields dt { color: var(--muted); font: var(--text-micro) var(--font-mono); overflow-wrap: anywhere; }
-.fields dd { margin: 0; overflow-wrap: anywhere; font: var(--text-meta) var(--font-mono); }
-.empty, .unchanged { color: var(--dim); font-size: var(--text-micro); }
+.fields dt { color: var(--muted); font-size: var(--text-meta); overflow-wrap: anywhere; }
+.fields dd { margin: 0; overflow-wrap: anywhere; font-size: var(--text-meta); }
+.fields dd.null, .fields dd .null { color: var(--dim); }
+.empty, .unchanged { color: var(--dim); font-size: var(--text-meta); }
 
+/* The trail: one dot per change on a thin line, the time beside it, and what changed under its name. */
 .trail { margin: 0; padding: 0; list-style: none; display: grid; }
-.trail li { position: relative; min-width: 0; padding: 0 0 var(--space-4) var(--space-5); display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: var(--space-2); border-left: 1px solid var(--border); }
-.trail li::before { content: ""; position: absolute; left: -4px; top: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--border-strong); }
-.trail li:last-child { border-left-color: transparent; }
-.offset { color: var(--muted); font-size: var(--text-micro); font-variant-numeric: tabular-nums; }
+.trail li { position: relative; min-width: 0; padding: 0 0 var(--space-4) var(--space-4); display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: var(--space-2); border-left: 1px solid var(--border); }
+.trail li::before { content: ""; position: absolute; left: -4px; top: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--border-strong); }
+.trail li.applicationside::before { background: var(--blueprint); }
+.trail li:last-child { padding-bottom: 0; border-left-color: transparent; }
+.offset { padding-top: 1px; color: var(--muted); font-size: var(--text-micro); font-variant-numeric: tabular-nums; }
 .what { min-width: 0; display: grid; gap: var(--space-1); }
-.what p { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--text-meta); }
-.what em { color: var(--dim); font-size: var(--text-micro); }
-.by { justify-self: start; padding: 0; border: 0; background: transparent; color: var(--blueprint); font-size: var(--text-micro); text-align: left; }
-.by:hover { text-decoration: underline; }
+.line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-2); font-size: var(--text-meta); }
+.line strong { font-weight: var(--weight-semibold); }
+.by { min-width: 0; color: var(--dim); font-size: var(--text-micro); }
+.by button { max-width: 100%; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: var(--text-micro); text-align: left; }
+.by button:hover { color: var(--text); text-decoration: underline; }
 
-/* The shape tree's language for a change: a mark, the key, the old value crossed out, the new one. */
-.diff { min-width: 0; margin-top: var(--space-1); padding: var(--space-1) var(--space-2); display: grid; border: 1px solid var(--border); border-radius: var(--radius-chip); font: var(--text-micro)/var(--leading) var(--font-mono); }
-.difference { min-width: 0; display: grid; grid-template-columns: 12px minmax(64px, max-content) minmax(0, 1fr); align-items: baseline; gap: var(--space-2); padding: 2px 0; }
-.difference + .difference { border-top: 1px dashed var(--border); }
-.mark { color: var(--blueprint); font-weight: var(--weight-bold); text-align: center; }
-.added .mark { color: var(--success); }
-.key { color: var(--blueprint); font-weight: var(--weight-semibold); overflow-wrap: anywhere; }
-.values { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1); overflow-wrap: anywhere; }
-.values > :deep(.json) { flex: 1 1 100%; }
-.before { color: var(--muted); text-decoration: line-through; }
-.arrow { color: var(--muted); font-weight: var(--weight-regular); }
-.after { color: var(--text); font-weight: var(--weight-bold); }
+.diff dt, .diff dd { min-width: 0; padding: 1px 0; font-size: var(--text-micro); overflow-wrap: anywhere; }
+.diff dt { color: var(--muted); }
+.diff dd { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-1); }
+.diff dd > :deep(.card) { flex: 1 1 100%; }
+.before { color: var(--dim); }
+.arrow { color: var(--dim); }
+.after { color: var(--text); font-weight: var(--weight-semibold); }
+.new { color: var(--success); font-size: var(--text-micro); }
 
-.link-row { width: 100%; min-height: var(--row-height); padding: 0 var(--space-2); display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); border: 1px solid transparent; border-radius: var(--radius-chip); background: var(--surface-2); font-size: var(--text-meta); text-align: left; transition: border-color var(--motion-fast) var(--motion-ease); }
-.link-row:hover { border-color: var(--blueprint); }
+.values > summary { width: max-content; color: var(--muted); font-size: var(--text-micro); cursor: pointer; }
+.values > summary:hover { color: var(--text); }
+.values[open] > summary { margin-bottom: var(--space-1); }
+
+.link-row { width: 100%; min-height: var(--row-height); padding: 0 var(--space-2); display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); border: 0; border-radius: var(--radius-chip); background: transparent; font-size: var(--text-meta); text-align: left; transition: background var(--motion-fast) var(--motion-ease); }
+.link-row:hover { background: var(--hover); }
 .link-row small { color: var(--muted); font-size: var(--text-micro); }
 </style>

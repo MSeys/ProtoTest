@@ -120,7 +120,8 @@ const itemOrigin = computed(() => {
   background: var(--surface);
   overflow: hidden;
 }
-.head { padding: var(--space-2) var(--space-4) var(--space-3); display: grid; gap: var(--space-2); border-bottom: 1px solid var(--border); background: var(--surface); }
+/* One column that never grows past the panel: a long path or id is cut or wrapped, not pushed off the edge. */
+.head { padding: var(--space-2) var(--space-4) var(--space-3); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); border-bottom: 1px solid var(--border); background: var(--surface); }
 .top { min-height: 28px; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .actions { flex: none; display: flex; align-items: center; gap: var(--space-1); }
 .actions :deep(.close) { width: 28px; height: 28px; }

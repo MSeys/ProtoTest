@@ -67,6 +67,29 @@ public sealed class GraphQLFluentAndProtocolTests
     }
 
     [Test]
+    public async Task FluentUploadArgument_ShouldFailWithTheMultipartRoute()
+    {
+        await using var host = CreateHost(_ => Json("""{"data":{"upload":true}}"""));
+        await host.StartTestAsync("upload literal", "2", TestMethods.Placeholder);
+        try
+        {
+            var exception = Assert.ThrowsAsync<ArgumentException>(async () =>
+            {
+                using var response = await Proto.Context.GraphQL()
+                    .Mutation("UploadFile", mutation => mutation
+                        .Field("upload", field => field
+                            .Argument("file", Gql.Upload("contents"u8.ToArray(), "example.txt", "text/plain"))
+                            .Select(selection => selection.Field("ok"))))
+                    .ExecuteAsync();
+            });
+
+            // A fluent upload is never a document literal: the failure names the multipart route.
+            Assert.That(exception!.Message, Does.Contain("Variables(...)"));
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    [Test]
     public async Task Connection_ShouldRenderBackwardPagingAndDefaultPageInfo()
     {
         string? document = null;

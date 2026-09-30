@@ -180,7 +180,7 @@ Observations: `graphql.response` for every response, `graphql.failure` when send
 
 - No batching, persisted operations or incremental delivery (`@defer`).
 - WebSocket subscriptions speak only `graphql-transport-ws`; the legacy `graphql-ws` protocol is not supported.
-- A fluent `.Argument("file", Gql.Upload(...))` is **not** routed through the multipart normalizer; uploads are discovered in shape-driven arguments and in `.Variables(...)`.
+- A fluent `.Argument("file", Gql.Upload(...))` fails when the document is built; uploads travel through shape-driven arguments or `.Variables(...)`, which send them as multipart variables.
 - Shape variable type strings are parsed when you create the variable, so an invalid type fails immediately.
 - Only one `NextAsync` may be pending at a time.
 - The response must be JSON containing `data` or `errors`; anything else throws `GraphQLProtocolException`.

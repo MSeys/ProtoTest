@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { Change, Item, Span, TestTrace } from "../trace/model";
+import type { Change, Item, Run, Span, TestTrace } from "../trace/model";
 import { formatOffset, jsonLiteral, sourceLabels } from "../trace/format";
 import JsonView from "./JsonView.vue";
 import { isJsonLike } from "./json";
@@ -10,7 +10,7 @@ import { isJsonLike } from "./json";
  * way a shape check does - a key, the value it had crossed out, the value it got - so a trail of ten changes is
  * ten short diffs rather than ten full states.
  */
-const props = defineProps<{ item: Item; test: TestTrace }>();
+const props = defineProps<{ item: Item; test: TestTrace | Run }>();
 const emit = defineEmits<{ select: [span: Span] }>();
 
 const state = computed(() => Object.entries(props.item.state));

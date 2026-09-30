@@ -1,33 +1,36 @@
 import { ref } from "vue";
 
-export type TestView = "story" | "state" | "spans" | "files";
-export const testViews: TestView[] = ["story", "state", "spans", "files"];
+export type TestView = "steps" | "timeline" | "state" | "evidence";
+export const testViews: TestView[] = ["steps", "timeline", "state", "evidence"];
+
+/** Names a view had before, so a link shared then still opens the view it meant. */
+const viewAliases: Record<string, TestView> = { story: "steps", spans: "timeline", files: "evidence" };
 
 /** What the inspector shows: an operation, or a tracked item by kind and id. */
 export type Selection = { span: string } | { item: { kind: string; id: string } };
 
 export type Route =
-  | { name: "run" }
+  | { name: "run"; selection?: Selection }
   | { name: "test"; testId: string; view: TestView; selection?: Selection };
 
 export const route = ref<Route>(parse(location.hash));
 
-function parse(hash: string): Route {
+export function parse(hash: string): Route {
   const match = /^#\/test\/([^/?#]+)(?:\/([a-z]+))?(?:\?(.*))?/.exec(hash);
-  if (!match) return { name: "run" };
-  const view = (testViews as string[]).includes(match[2] ?? "") ? match[2] as TestView : "story";
   // The selection belongs in the address: a link to a failure has to survive a reload and a share.
-  const query = new URLSearchParams(match[3] ?? "");
+  const query = new URLSearchParams(match ? match[3] ?? "" : /^#\/\?(.*)$/.exec(hash)?.[1] ?? "");
   const span = query.get("span") ?? query.get("entry");
   const kind = query.get("kind");
   const id = query.get("item");
   const selection: Selection | undefined = span ? { span } : kind && id ? { item: { kind, id } } : undefined;
+  if (!match) return selection ? { name: "run", selection } : { name: "run" };
+  const named = viewAliases[match[2] ?? ""] ?? match[2] ?? "";
+  const view = (testViews as string[]).includes(named) ? named as TestView : "steps";
   return { name: "test", testId: decodeURIComponent(match[1]), view, selection };
 }
 
 export function href(next: Route): string {
-  if (next.name === "run") return "#/";
-  const base = `#/test/${encodeURIComponent(next.testId)}/${next.view}`;
+  const base = next.name === "run" ? "#/" : `#/test/${encodeURIComponent(next.testId)}/${next.view}`;
   const selection = next.selection;
   if (!selection) return base;
   const query = "span" in selection

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { Artifact, Item, Span, TestTrace } from "../trace/model";
+import type { Artifact, Item, Run, Span, TestTrace } from "../trace/model";
 import { formatDuration, formatOffset, itemKindLabel, itemTitle, kindLabel } from "../trace/format";
 import AppButton from "../ui/AppButton.vue";
 import KindChip from "../ui/KindChip.vue";
@@ -14,7 +14,8 @@ import ItemInspector from "./ItemInspector.vue";
  * detail under it scrolls. An operation and a tracked item share the head's shape, so the panel reads the
  * same whichever the reader walked to.
  */
-const props = defineProps<{ test: TestTrace; span?: Span; item?: Item }>();
+const props = defineProps<{ test: TestTrace | Run; span?: Span; item?: Item }>();
+const scope = computed(() => "number" in props.test ? "test" : "run");
 const emit = defineEmits<{ select: [span: Span]; item: [item: Item]; artifact: [artifact: Artifact]; close: [] }>();
 
 const path = computed(() => {
@@ -50,7 +51,7 @@ const itemOrigin = computed(() => {
   const parts: string[] = [];
   const title = `${itemTitle(item)} ${item.name}`.toLocaleLowerCase();
   if (!title.includes(item.id.toLocaleLowerCase())) parts.push(item.id);
-  if (item.scope && item.scope !== props.test.name) parts.push(`scope ${item.scope}`);
+  if (item.scope && (!("name" in props.test) || item.scope !== props.test.name)) parts.push(`scope ${item.scope}`);
   return parts.join(", ");
 });
 </script>
@@ -81,7 +82,7 @@ const itemOrigin = computed(() => {
         <p class="facts">
           <OutcomePill :outcome="span.status" />
           <span>{{ formatDuration(span.duration) }}</span>
-          <span>{{ formatOffset(span.start - test.start) }} into the test</span>
+          <span>{{ formatOffset(span.start - test.start) }} into the {{ scope }}</span>
           <span class="phase" :style="{ '--phase-color': `var(--phase-${span.phase})` }"><i />{{ span.phase }}</span>
           <span v-if="span.count > 1">ran {{ span.count }} times</span>
         </p>

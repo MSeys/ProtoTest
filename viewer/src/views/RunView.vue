@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import type { Artifact, Run, Span, TestTrace } from "../trace/model";
+import { computed } from "vue";
+import type { Artifact, Item, Run, Span, TestTrace } from "../trace/model";
+import { diagnosisRule, diagnosisRuleLabels, testFindings, untracedGaps } from "../trace/analysis";
 import { failureReason, formatDate, formatDuration, formatOffset, needsAttention, outcomeLabel, pad, phaseSegments, testCodeName, testGroup, testMatches, testTitle, timelinePercent, tone } from "../trace/format";
 import Panel from "../ui/Panel.vue";
 import TextInput from "../ui/TextInput.vue";
 import FilterChip from "../ui/FilterChip.vue";
+import OutcomeFilters from "../ui/OutcomeFilters.vue";
 import EmptyState from "../ui/EmptyState.vue";
 import FileList from "../ui/FileList.vue";
 import type { FileEntry } from "../ui/FileList.vue";
 import VisibilityStrip from "../ui/VisibilityStrip.vue";
+import { matchesOutcome, resetTestFilter, testFilter } from "../ui/testFilter";
 
-const props = defineProps<{ run: Run; fileName: string }>();
-const emit = defineEmits<{ select: [test: TestTrace, selection?: { span: string }]; artifact: [artifact: Artifact] }>();
+const props = defineProps<{ run: Run; fileName: string; selectedSpan?: Span; selectedItem?: Item }>();
+const emit = defineEmits<{ select: [test: TestTrace, selection?: { span: string }]; span: [span: Span]; item: [item: Item]; artifact: [artifact: Artifact] }>();
 
 // Every file the run produced, in one place: the run's own reports first, then each test's, in test order.
 // The inspector reaches an artifact through the operation that wrote it; this is the whole list.
@@ -21,10 +24,6 @@ const files = computed<FileEntry[]>(() => [
     artifact, owner: pad(test.number), detail: artifact.description ?? testTitle(test)
   })))
 ]);
-
-
-const query = ref("");
-const filter = ref<"all" | "attention">("all");
 
 const attention = computed(() => props.run.tests.filter(needsAttention)
   .sort((left, right) => (left.outcome === "failed" ? 0 : 1) - (right.outcome === "failed" ? 0 : 1) || left.number - right.number));
@@ -64,9 +63,32 @@ const verdict = computed(() => {
 });
 
 const environment = computed(() => [props.run.environment.runtime, props.run.environment.os].filter(Boolean).join(" on "));
+const environmentFacts = computed(() => Object.entries(props.run.environment).sort(([left], [right]) => left.localeCompare(right)));
+function ruleLabel(test: TestTrace) {
+  const rule = diagnosisRule(test);
+  return rule ? diagnosisRuleLabels[rule] : outcomeLabel(test.outcome);
+}
+function attentionReason(test: TestTrace) {
+  const finding = diagnosisRule(test) === "finding" ? testFindings(test)[0] : undefined;
+  return finding ? { title: finding.message, detail: [finding.status, finding.category, ...finding.tags].filter(Boolean).join(", ") } : failureReason(test);
+}
+function testSelection(test: TestTrace): { span: string } | undefined {
+  return test.failure ? { span: test.failure.span.id } : undefined;
+}
+function gaps(test: TestTrace) {
+  return untracedGaps(test).map(gap => ({
+    left: timelinePercent(gap.start, props.run.start, props.run.duration),
+    width: (gap.duration / Math.max(props.run.duration, 1)) * 100,
+    title: `${formatDuration(gap.duration)} with no recorded operation in ${gap.phase}`
+  }));
+}
+function operationBar(span: Span) {
+  return { left: `${timelinePercent(span.start, props.run.start, props.run.duration)}%`, width: `${Math.max(0.4, span.duration / Math.max(props.run.duration, 1) * 100)}%` };
+}
 
+/* The list follows the one test filter the rail shows, and keeps the run's own order: this list is a clock. */
 const visible = computed(() => props.run.tests.filter(test =>
-  (filter.value === "all" || needsAttention(test)) && testMatches(test, query.value)));
+  matchesOutcome(test, testFilter.outcome) && testMatches(test, testFilter.query)));
 
 /** Each test's phases placed on the run's own time axis, so parallel and slow tests show as such. */
 function bars(test: TestTrace) {
@@ -105,23 +127,23 @@ function bars(test: TestTrace) {
     <Panel v-if="attention.length || runProblems.spans.length || runProblems.moments.length || run.findings.length || run.gates.length" title="Needs attention"
            subtitle="Failing and partial tests first, then the run's own problems, what it found and how its gates judged it." pad="none">
       <div class="attention">
-        <button v-for="test in attention" :key="test.id" type="button" class="issue" :class="tone(test.outcome)" @click="emit('select', test)">
+        <button v-for="test in attention" :key="test.id" type="button" class="issue" :class="tone(test.outcome)" @click="emit('select', test, testSelection(test))">
           <b>{{ pad(test.number) }}</b>
           <span class="issue-main">
             <strong>{{ testTitle(test) }}</strong>
-            <span class="issue-reason">{{ failureReason(test).title }}</span>
-            <span v-if="failureReason(test).detail" class="issue-detail">{{ failureReason(test).detail }}</span>
+            <span class="issue-reason">{{ attentionReason(test).title }}</span>
+            <span v-if="attentionReason(test).detail" class="issue-detail">{{ attentionReason(test).detail }}</span>
           </span>
-          <span class="issue-kind">{{ outcomeLabel(test.outcome) }}</span>
+          <span class="issue-kind">{{ ruleLabel(test) }}</span>
         </button>
-        <div v-for="span in runProblems.spans" :key="`run-span-${span.id}`" class="issue run" :class="tone(span.status)">
+        <button v-for="span in runProblems.spans" :key="`run-span-${span.id}`" type="button" class="issue run" :class="tone(span.status)" @click="emit('span', span)">
           <b>Run</b>
           <span class="issue-main">
             <strong>{{ span.name }}</strong>
             <span class="issue-reason">{{ problemReason(span.error, outcomeLabel(span.status)) }}</span>
           </span>
           <span class="issue-kind">{{ outcomeLabel(span.status) }}</span>
-        </div>
+        </button>
         <div v-for="(moment, index) in runProblems.moments" :key="`run-moment-${index}`" class="issue run" :class="tone(moment.outcome)">
           <b>Run</b>
           <span class="issue-main">
@@ -154,13 +176,11 @@ function bars(test: TestTrace) {
 
     <VisibilityStrip :visibility="run.visibility" :resources="resources" />
 
-    <Panel title="Tests" subtitle="In the order they started. The bar is where the test ran within the run, split by phase." pad="none">
+    <Panel title="Run timeline" subtitle="Tests in start order on the run's clock. Hatched time has no recorded operation." pad="none">
       <template #actions>
         <div class="filters">
-          <FilterChip label="All" :count="run.tests.length" :active="filter === 'all'" @select="filter = 'all'" />
-          <FilterChip label="Needs attention" :count="attention.length" :tone="attention.length ? 'danger' : 'neutral'"
-                      :active="filter === 'attention'" @select="filter = 'attention'" />
-          <TextInput v-model="query" type="search" placeholder="Find a test" label="Find a test" class="find" />
+          <OutcomeFilters :tests="run.tests" />
+          <TextInput v-model="testFilter.query" type="search" placeholder="Find a test" label="Find a test" class="find" />
         </div>
       </template>
       <div class="legend" aria-hidden="true">
@@ -183,6 +203,7 @@ function bars(test: TestTrace) {
           <span class="bar">
             <i v-for="segment in bars(test)" :key="segment.phase"
                :style="{ left: `${segment.left}%`, width: `${segment.width}%`, background: `var(--phase-${segment.phase})` }" />
+            <i v-for="(gap, index) in gaps(test)" :key="`gap-${index}`" class="gap" :title="gap.title" :style="{ left: `${gap.left}%`, width: `${gap.width}%` }" />
           </span>
           <small class="duration">{{ formatDuration(test.duration) }}</small>
           <i class="status" :class="tone(test.outcome)" aria-hidden="true" />
@@ -190,8 +211,36 @@ function bars(test: TestTrace) {
         </button>
       </div>
       <EmptyState v-else message="No test matches this filter.">
-        <FilterChip label="Show all tests" @select="filter = 'all'; query = ''" />
+        <FilterChip label="Show all tests" @select="resetTestFilter()" />
       </EmptyState>
+    </Panel>
+
+    <Panel v-if="run.spans.length" title="Run operations" subtitle="Work owned by the run, on the same clock as its tests." pad="none">
+      <div class="scale" aria-hidden="true"><span class="axis"><i>start</i><i>{{ formatOffset(run.duration) }}</i></span></div>
+      <div class="tests">
+        <button v-for="span in run.spans" :key="span.id" type="button" class="test-row operation" :class="[tone(span.status), { selected: selectedSpan === span }]"
+                :aria-pressed="selectedSpan === span" @click="emit('span', span)">
+          <i class="status" :class="tone(span.status)" />
+          <span class="test-name"><strong>{{ span.name }}</strong><small>{{ span.kind }}</small></span>
+          <span class="bar"><i :style="operationBar(span)" /></span>
+          <small class="duration">{{ formatDuration(span.duration) }}</small>
+        </button>
+      </div>
+    </Panel>
+
+    <Panel v-if="run.items.length" title="Run state" subtitle="Everything owned by this run. Select an item to see its changes and operations." pad="none">
+      <div class="run-items">
+        <button v-for="item in run.items" :key="item.key" type="button" :class="{ selected: selectedItem === item }" :aria-pressed="selectedItem === item" @click="emit('item', item)">
+          <strong>{{ item.state['resource.description'] || item.name }}</strong><small>{{ item.kind }}</small>
+        </button>
+      </div>
+    </Panel>
+
+    <Panel title="Run details" subtitle="Identity and every environment value recorded in the trace.">
+      <dl class="environment">
+        <dt>Run id</dt><dd>{{ run.id }}</dd>
+        <template v-for="[key, value] in environmentFacts" :key="key"><dt>environment.{{ key }}</dt><dd>{{ value }}</dd></template>
+      </dl>
     </Panel>
 
     <Panel v-if="files.length" title="Files" subtitle="Everything the run attached: reports, captured payloads, screenshots and browser traces." pad="none">
@@ -297,13 +346,30 @@ button.issue:hover { background: var(--hover); }
 .test-row.neutral .reason { color: var(--muted); }
 .bar { position: relative; height: 6px; border-radius: var(--radius-hairline); background: var(--surface-2); }
 .bar i { position: absolute; top: 0; bottom: 0; border-radius: var(--radius-hairline); }
+.bar i.gap { background: repeating-linear-gradient(135deg, var(--muted) 0, var(--muted) 1px, transparent 1px, transparent 4px); }
+.operation .bar i { background: var(--blueprint); }
+.operation strong { overflow-wrap: anywhere; font-size: var(--text-body); }
+.selected { outline: 1px solid var(--blueprint); background: var(--blueprint-soft); }
+.run-items { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) var(--space-4); }
+.run-items button { min-width: 0; padding: var(--space-2) var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-2); text-align: left; }
+.run-items strong { overflow-wrap: anywhere; font-size: var(--text-body); }
+.run-items small { color: var(--muted); font-size: var(--text-meta); }
+.run-items button:hover { border-color: var(--blueprint); }
+.environment { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--space-1) var(--space-3); }
+.environment dt, .environment dd { margin: 0; overflow-wrap: anywhere; font: var(--text-body)/var(--leading) var(--font-mono); }
+.environment dt { color: var(--muted); }
 .duration { color: var(--muted); font-size: var(--text-micro); text-align: right; font-variant-numeric: tabular-nums; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 
 @container (max-width: 640px) {
+  .environment { grid-template-columns: minmax(0, 1fr); }
+  .environment dd { padding-bottom: var(--space-2); }
   .test-row { grid-template-columns: 22px minmax(0, 1fr) 52px 7px; }
-  .bar, .test-name small { display: none; }
-  .scale { display: none; }
+  .test-row .bar { grid-column: 2; grid-row: 2; }
+  .test-row .duration { grid-column: 3; grid-row: 1; }
+  .test-row > .status:last-of-type { grid-column: 4; grid-row: 1; }
+  .scale { grid-template-columns: 22px minmax(0, 1fr) 52px 7px; }
+  .scale .axis { grid-column: 2; }
   .issue { grid-template-columns: 30px minmax(0, 1fr); }
   .issue-kind { grid-column: 2; }
 }

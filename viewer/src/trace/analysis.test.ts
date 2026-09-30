@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { checkItems, deriveVisibility, findFailure, shapeMismatches } from "./analysis";
+import { checkItems, deriveVisibility, diagnosisRule, findFailure, shapeMismatches, untracedGaps } from "./analysis";
 import { openTraceArchive } from "./archive";
 import { buildRun } from "./model";
 import type { Change, ChangeSource, Item, SectionItem, Span, TestTrace } from "./model";
@@ -161,5 +161,53 @@ describe("findFailure over the committed demo trace", () => {
     // threw before any call was recorded.
     expect(failureOf("ARealWaitDoesNotCloseTheDueWindow")?.call?.kind).toBe("http.request");
     expect(failureOf("TheAddressWasHardcodedForOneMachine")?.call).toBeNull();
+  });
+});
+
+// Time with no operation is stated, not left as empty space: in the demo it is the cause of two failures.
+describe("untracedGaps and diagnosisRule over the committed demo trace", () => {
+  async function demoRun() {
+    const bytes = readFileSync(repositoryFile("viewer/public/demos/prototest-demo.prototrace"));
+    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    const archive = await openTraceArchive(buffer);
+    return buildRun(archive.spans, archive.state);
+  }
+  const byMethod = (tests: TestTrace[], method: string) => tests.find(test => test.method === method)!;
+
+  it("finds the real wait before the call that judged it, and the call that never ran", async () => {
+    const run = await demoRun();
+    const wait = untracedGaps(byMethod(run.tests, "ARealWaitDoesNotCloseTheDueWindow"));
+    expect(wait).toHaveLength(1);
+    expect(wait[0].phase).toBe("execution");
+    expect(Math.round(wait[0].duration)).toBe(1006);
+    expect(wait[0].before?.name).toBe("REST · GET /api/v1/organization");
+
+    const hardcoded = untracedGaps(byMethod(run.tests, "TheAddressWasHardcodedForOneMachine"));
+    expect(hardcoded).toHaveLength(1);
+    expect(Math.round(hardcoded[0].duration)).toBe(2029);
+    expect(hardcoded[0].before).toBeNull();
+  });
+
+  it("stays quiet about the ordinary cost between steps", async () => {
+    const run = await demoRun();
+    const all = run.tests.flatMap(test => untracedGaps(test));
+    expect(all).toHaveLength(3);
+  });
+
+  it("names each outcome with the rule the CLI summary uses", async () => {
+    const run = await demoRun();
+    expect(diagnosisRule(byMethod(run.tests, "ARealWaitDoesNotCloseTheDueWindow"))).toBe("assertion");
+    expect(diagnosisRule(byMethod(run.tests, "TheAddressWasHardcodedForOneMachine"))).toBe("runner-failure");
+    expect(diagnosisRule(byMethod(run.tests, "APassingJourneyCanStillCarryAWarning"))).toBe("finding");
+    expect(diagnosisRule(byMethod(run.tests, "CreatingAProjectReturnsIt"))).toBeNull();
+  });
+});
+
+describe("diagnosisRule", () => {
+  it("names a failed operation that is not a check an operation error", () => {
+    const call = span({ kind: "http.request", status: "failed", error: { type: "HttpRequestException", message: "refused" } });
+    const test = testTrace([call]);
+    test.failure = findFailure(test);
+    expect(diagnosisRule(test)).toBe("operation-error");
   });
 });

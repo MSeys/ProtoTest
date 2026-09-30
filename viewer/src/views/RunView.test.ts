@@ -287,3 +287,61 @@ describe("RunView resources", () => {
     unmount();
   });
 });
+
+describe("RunView diagnosis and details", () => {
+  it("names a finding that decided a partial test instead of blaming an unrecorded failure", () => {
+    const test = testTrace(1, "partial");
+    test.evidence = [{ type: "finding", at: 15, message: "Unexpected field", status: "warning", category: "coverage", target: null, tags: [], metadata: {}, span: null }];
+    const { host, unmount } = mount(h(RunView, { run: run([test]), fileName: "demo" }));
+    expect(host.querySelector(".attention .issue-kind")?.textContent).toBe("Finding");
+    expect(host.querySelector(".attention .issue-reason")?.textContent).toBe("Unexpected field");
+    unmount();
+  });
+  it("names the diagnosis rule and opens the exact failing operation", () => {
+    const test = testTrace(1, "failed");
+    const failed = span({ id: "assert", kind: "assert.http.status", error: null });
+    test.failure = { span: failed, check: { label: "Status", value: "404", detail: "Expected 200", tone: "error" }, call: null, mismatches: [] };
+    const select = vi.fn();
+    const { host, unmount } = mount(h(RunView, { run: run([test]), fileName: "demo", onSelect: select }));
+    expect(host.querySelector(".attention .issue-kind")?.textContent).toBe("Assertion");
+    host.querySelector<HTMLButtonElement>(".attention button.issue")!.click();
+    expect(select).toHaveBeenCalledWith(test, { span: "assert" });
+    unmount();
+  });
+
+  it("renders all environment keys and the run id, including custom and empty values", () => {
+    const { host, unmount } = mount(h(RunView, { run: run([], { id: "run-123", environment: { runtime: ".NET", os: "Windows", "custom.branch": "main", empty: "" } }), fileName: "demo" }));
+    expect([...host.querySelectorAll(".environment dt")].map(node => node.textContent)).toEqual(["Run id", "environment.custom.branch", "environment.empty", "environment.os", "environment.runtime"]);
+    expect([...host.querySelectorAll(".environment dd")].map(node => node.textContent)).toEqual(["run-123", "main", "", "Windows", ".NET"]);
+    unmount();
+  });
+
+  it("marks gaps on the run clock rather than stretching them across the test", () => {
+    const test = testTrace(1, "succeeded");
+    const lifecycle = span({ kind: "test.execution", phase: "execution", start: 10, end: 90, duration: 80, status: "succeeded", error: null });
+    const operation = span({ start: 60, end: 90, duration: 30, parent: lifecycle, status: "succeeded", error: null });
+    lifecycle.children = [operation]; test.spans = [lifecycle, operation]; test.roots = [lifecycle];
+    const { host, unmount } = mount(h(RunView, { run: run([test]), fileName: "demo" }));
+    const gap = host.querySelector<HTMLElement>(".test-row .bar .gap");
+    expect(gap?.style.left).toBe("10%");
+    expect(gap?.style.width).toBe("50%");
+    expect(gap?.title).toBe("50 ms with no recorded operation in execution");
+    unmount();
+  });
+
+  it("selects and highlights run operations and run state", () => {
+    const operation = span({});
+    const item: Item = { key: "broker", kind: "broker", id: "main", name: "Message bus", scope: "run", firstSeen: 0, lastSeen: 100, state: {}, changes: [], test: null };
+    const selectedSpan = vi.fn(); const selectedItem = vi.fn();
+    const { host, unmount } = mount(h(RunView, { run: run([], { spans: [operation], items: [item] }), selectedSpan: operation, selectedItem: item, fileName: "demo", onSpan: selectedSpan, onItem: selectedItem }));
+    host.querySelector<HTMLButtonElement>(".operation")!.click();
+    host.querySelector<HTMLButtonElement>(".run-items button")!.click();
+    expect(selectedSpan).toHaveBeenCalledWith(operation);
+    expect(selectedItem).toHaveBeenCalledWith(item);
+    expect(host.querySelector(".operation")?.getAttribute("aria-pressed")).toBe("true");
+    expect(host.querySelector(".run-items button")?.getAttribute("aria-pressed")).toBe("true");
+    host.querySelector<HTMLButtonElement>(".attention .issue.run")!.click();
+    expect(selectedSpan).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+});

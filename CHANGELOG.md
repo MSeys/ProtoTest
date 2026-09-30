@@ -5,6 +5,24 @@ All notable changes to ProtoTest are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 All ProtoTest packages share one version; breaking API changes are called out below.
 
+## [Unreleased]
+
+### Features
+
+- Viewer: State uses the same test clock and phase marks as Timeline, shades the selected operation's time across the lifelines, and highlights the items and changes it touched. The ruler stays visible on phones. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+
+- Viewer: the run names attention with the diagnosis rules, marks untraced gaps on its timeline, lists every environment value and the run id, and opens run operations and tracked items in the inspector. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+
+- Viewer: Evidence brings observations, files, findings and moments into time order with the operation that recorded each; details show their metadata and sections, a section index jumps through an operation, and binary bodies are marked instead of drawn as broken text (`#/test/<id>/files` links still open). [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+
+- Viewer: one test list on every screen, led by the run, with one filter for every list and a path from the run to the open operation; each test is a link. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+- Viewer: a test's Steps open on the test body: setup and teardown fold into one line that says what they did, time with no recorded operation gets its own row, and the verdict names the failure with the rule `prototest summary` uses (`#/test/<id>/story` links still open). [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+- Viewer: the Timeline replaces Spans: every operation on the test's clock, zoomed per phase, with framework machinery dimmed or hidden, moments and evidence marked on their bars, and untraced time drawn through the rows (`#/test/<id>/spans` links still open). [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+
+### Fixes
+
+- Viewer: the header keeps the brand, the path and the actions apart on a phone instead of drawing them over each other. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+
 ## [1.1.0] - 2026-09-30
 
 ProtoTest 1.1 adds the agent evidence layer (the MCP server, diagnosis, verification, feedback and the

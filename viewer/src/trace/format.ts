@@ -44,6 +44,18 @@ export function needsAttention(test: TestTrace): boolean {
   return test.outcome !== "succeeded" && test.outcome !== "skipped";
 }
 
+/** The run in words, what went wrong first: "4 failed, 1 partial, 14 passed". Every recorded outcome is named. */
+export function verdictParts(counts: Record<Outcome, number>): { text: string; tone: ReturnType<typeof tone> }[] {
+  const parts: { text: string; tone: ReturnType<typeof tone> }[] = [];
+  if (counts.failed) parts.push({ text: `${counts.failed} failed`, tone: "danger" });
+  if (counts.partial) parts.push({ text: `${counts.partial} partial`, tone: "warning" });
+  if (counts.cancelled) parts.push({ text: `${counts.cancelled} cancelled`, tone: "warning" });
+  if (counts.unknown) parts.push({ text: `${counts.unknown} unknown`, tone: "neutral" });
+  parts.push({ text: `${counts.succeeded} passed`, tone: "success" });
+  if (counts.skipped) parts.push({ text: `${counts.skipped} skipped`, tone: "neutral" });
+  return parts;
+}
+
 /** Why a test needs attention, in the words of the check that decided it. */
 export function failureReason(test: TestTrace): { title: string; detail: string } {
   const failure = test.failure;
@@ -248,4 +260,40 @@ export function itemKindLabel(item: Item): KindLabel {
   }
   const label = item.kind.charAt(0).toLocaleUpperCase() + item.kind.slice(1);
   return { id: families[item.kind.toLocaleLowerCase()] ?? "data", label };
+}
+
+function descendants(span: Span): Span[] {
+  return span.children.flatMap(child => [child, ...descendants(child)]);
+}
+
+/**
+ * A folded phase in one line: how many operations ran, what the framework set up or released, and the
+ * scenario work inside it with its time, so the reader knows whether to open it.
+ */
+export function phaseSummary(lifecycle: Span): string {
+  const all = descendants(lifecycle);
+  const count = (kind: string) => all.filter(span => span.kind === kind).length;
+  const parts = [`${all.length} ${plural(all.length, "operation")}`];
+  const clients = count("client.initialize");
+  const released = count("resource.release");
+  const published = count("attachment.publish");
+  if (clients) parts.push(`${clients} ${plural(clients, "client")} initialized`);
+  if (released) parts.push(`${released} ${plural(released, "resource")} released`);
+  if (published) parts.push(`${published} ${plural(published, "file")} published`);
+  const work = all.filter(span => /^data\.(create|cleanup)$/.test(span.kind) || span.kind === "http.request" || span.kind === "graphql.operation" || span.kind.startsWith("messaging."));
+  for (const span of work.slice(0, 2)) parts.push(`${span.name} (${formatDuration(span.duration)})`);
+  if (work.length > 2) parts.push(`and ${work.length - 2} more`);
+  return parts.join(", ");
+}
+
+/** Round ruler marks between two times: about `target` of them, on 1, 2 or 5 times a power of ten. */
+export function rulerTicks(from: number, to: number, target = 6): number[] {
+  const range = Math.max(to - from, 1e-3);
+  const raw = range / target;
+  const power = Math.pow(10, Math.floor(Math.log10(raw)));
+  const scaled = raw / power;
+  const step = (scaled < 1.5 ? 1 : scaled < 3.5 ? 2 : scaled < 7.5 ? 5 : 10) * power;
+  const ticks: number[] = [];
+  for (let value = Math.ceil(from / step) * step; value <= to + step * 1e-6; value += step) ticks.push(Number(value.toPrecision(12)));
+  return ticks;
 }

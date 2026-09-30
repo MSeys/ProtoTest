@@ -1,6 +1,7 @@
 import type { Phase, Span, TestTrace } from "./model";
 import { phases } from "./model";
 import { isCheck } from "./format";
+import { untracedGaps, type UntracedGap } from "./analysis";
 
 /*
  * The story of a test, built on the span tree without changing it: per phase, the operations in the order
@@ -28,7 +29,14 @@ export interface StoryGroup {
   rows: StoryRow[];
 }
 
-export type StoryRow = StoryStep | StoryGroup;
+/** Time in the phase with no operation recorded, in the place it happened. */
+export interface StoryGap {
+  type: "gap";
+  id: string;
+  gap: UntracedGap;
+}
+
+export type StoryRow = StoryStep | StoryGroup | StoryGap;
 
 export interface StoryPhase {
   phase: Phase;
@@ -87,14 +95,40 @@ function rows(spans: Span[]): StoryRow[] {
   return result;
 }
 
+function rowStart(row: StoryRow): number {
+  if (row.type === "gap") return row.gap.start;
+  return row.type === "group" ? Math.min(...row.spans.map(span => span.start)) : row.span.start;
+}
+
+function holds(row: StoryRow, span: Span): boolean {
+  return row.type === "group" ? row.spans.includes(span) : row.type === "step" && row.span === span;
+}
+
+/** Each gap goes right before the operation that ended it, or last when the phase ended with it. */
+function withGaps(list: StoryRow[], gaps: UntracedGap[]): StoryRow[] {
+  if (!gaps.length) return list;
+  const pending = [...gaps];
+  const result: StoryRow[] = [];
+  for (const row of list) {
+    while (pending.length && pending[0].before && (holds(row, pending[0].before) || rowStart(row) > pending[0].before.start)) {
+      const gap = pending.shift()!;
+      result.push({ type: "gap", id: `gap-${gap.phase}-${gap.start}`, gap });
+    }
+    result.push(row);
+  }
+  for (const gap of pending) result.push({ type: "gap", id: `gap-${gap.phase}-${gap.start}`, gap });
+  return result;
+}
+
 /** The phases of a test; each phase's lifecycle span (test.setup, ...) is the heading, its children the rows. */
 export function story(test: TestTrace): StoryPhase[] {
+  const gaps = untracedGaps(test);
   return phases
     .map(phase => {
       const roots = test.roots.filter(span => span.phase === phase);
       const lifecycle = roots.find(span => span.kind === `test.${phase}`) ?? null;
       const spans = roots.flatMap(span => span === lifecycle ? span.children : [span]);
-      return { phase, span: lifecycle, rows: rows(spans) };
+      return { phase, span: lifecycle, rows: withGaps(rows(spans), gaps.filter(gap => gap.lifecycle === lifecycle)) };
     })
     .filter(phase => phase.span || phase.rows.length);
 }
@@ -103,6 +137,7 @@ export function story(test: TestTrace): StoryPhase[] {
 export function pathTo(phasesToSearch: StoryPhase[], spanId: string): string[] {
   const search = (list: StoryRow[], trail: string[]): string[] | null => {
     for (const row of list) {
+      if (row.type === "gap") continue;
       const id = row.type === "group" ? row.id : row.span.id;
       if (row.type === "step" && (row.span.id === spanId || row.checks.some(check => check.id === spanId))) return [...trail, id];
       const inner = search(row.type === "group" ? row.rows : row.children, [...trail, id]);

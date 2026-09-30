@@ -1,4 +1,4 @@
-import type { ChangeSource, Failure, Item, SectionItem, ShapeMismatch, Span, TestTrace, Visibility } from "./model";
+import type { ChangeSource, Evidence, Failure, Item, SectionItem, ShapeMismatch, Span, TestTrace, Visibility } from "./model";
 
 /** Kinds whose span a failure belongs to, the same set the diagnosis names as call ancestors. */
 const callKinds = new Set(["http.request", "graphql.operation", "grpc.call"]);
@@ -45,6 +45,68 @@ export function shapeMismatches(span: Span): ShapeMismatch[] {
   return span.sections
     .filter(section => section.kind === "diff")
     .flatMap(section => section.items.map(item => ({ path: item.label, reason: "", expected: item.value, actual: item.detail })));
+}
+
+/** Time inside a phase with no operation recorded: a wait, or work the trace could not see. */
+export interface UntracedGap {
+  phase: Span["phase"];
+  /** The phase's own span (test.setup, test.execution, ...). */
+  lifecycle: Span;
+  start: number;
+  duration: number;
+  /** The operation that ended the gap; null when the phase ended with it. */
+  before: Span | null;
+}
+
+/**
+ * The gaps between a phase's operations that are worth stating: from 15% of the phase, at least 20 ms,
+ * and always from 250 ms. Smaller gaps are the ordinary cost of the framework between two steps.
+ */
+export function untracedGaps(test: TestTrace): UntracedGap[] {
+  const gaps: UntracedGap[] = [];
+  for (const lifecycle of test.roots.filter(span => span.kind === `test.${span.phase}`)) {
+    const threshold = Math.min(250, Math.max(20, lifecycle.duration * 0.15));
+    const children = [...lifecycle.children].sort((left, right) => left.start - right.start);
+    let cursor = lifecycle.start;
+    for (const child of children) {
+      if (child.start - cursor >= threshold) {
+        gaps.push({ phase: lifecycle.phase, lifecycle, start: cursor, duration: child.start - cursor, before: child });
+      }
+      cursor = Math.max(cursor, child.end);
+    }
+    if (lifecycle.end - cursor >= threshold) {
+      gaps.push({ phase: lifecycle.phase, lifecycle, start: cursor, duration: lifecycle.end - cursor, before: null });
+    }
+  }
+  return gaps;
+}
+
+/** The findings a test recorded, on its operations or with none above them. */
+export function testFindings(test: TestTrace): Extract<Evidence, { type: "finding" }>[] {
+  return [...test.spans.flatMap(span => span.evidence), ...test.evidence]
+    .filter((entry): entry is Extract<Evidence, { type: "finding" }> => entry.type === "finding");
+}
+
+export type DiagnosisRule = "assertion" | "operation-error" | "runner-failure" | "finding";
+
+export const diagnosisRuleLabels: Record<DiagnosisRule, string> = {
+  assertion: "Assertion",
+  "operation-error": "Operation error",
+  "runner-failure": "Runner failure",
+  finding: "Finding"
+};
+
+/**
+ * Why a test did not pass, named with the rules `prototest summary` and the MCP diagnosis use, in their
+ * order: a failed check, a failed operation, a failure the runner reported, then a finding.
+ */
+export function diagnosisRule(test: TestTrace): DiagnosisRule | null {
+  const failure = test.failure;
+  if (failure) {
+    if (failure.span.status === "failed" && failure.span.kind.startsWith("assert.") && (failure.mismatches.length || failure.check)) return "assertion";
+    if (failure.span.error) return failure.span.kind.startsWith("test.") ? "runner-failure" : "operation-error";
+  }
+  return testFindings(test).length ? "finding" : null;
 }
 
 /** What a run could see, derived from the state it recorded. */

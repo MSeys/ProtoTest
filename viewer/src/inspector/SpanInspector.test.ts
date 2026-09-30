@@ -108,6 +108,14 @@ describe("SpanInspector checks", () => {
 
 // A moment that went wrong reads as such; an informational one stays quiet.
 describe("SpanInspector moments", () => {
+  it("shows moment attributes, errors and sections beside their time", async () => {
+    const call = span({ moments: [{ at: 2, name: "Received", kind: "message.received", source: "Broker", outcome: "failed", error: { type: "Error", message: "Rejected" }, attributes: { queue: "invoices", missing: null }, sections: [{ label: "Payload", kind: "code", language: "text", content: "invoice", items: [] }], span: null }] });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]) }));
+    await nextTick();
+    for (const text of ["Rejected", "queue", "invoices", "missing", "null", "Payload", "invoice"]) expect(host.querySelector(".moment-detail")?.textContent).toContain(text);
+    unmount();
+  });
+
   it("marks a failed moment and leaves a quiet one alone", async () => {
     const call = span({
       moments: [
@@ -122,6 +130,42 @@ describe("SpanInspector moments", () => {
     expect(rows).toHaveLength(2);
     expect(rows[0].className).toContain("danger");
     expect(rows[1].className).not.toContain("danger");
+    unmount();
+  });
+});
+
+describe("SpanInspector evidence and index", () => {
+  it("shows observation metadata and every finding detail", () => {
+    const call = span({ evidence: [
+      { type: "observation", at: 1, target: "orders", kind: "count", identifier: null, data: null, metadata: { origin: "database", absent: null }, span: null },
+      { type: "finding", at: 2, message: "Slow export", status: "warning", category: "performance", target: "export", tags: ["slow", "review"], metadata: { elapsed: "500" }, span: null }
+    ] });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]) }));
+    for (const text of ["origin", "database", "absent", "null", "category", "performance", "target", "export", "tags", "slow, review", "elapsed", "500"]) expect(host.querySelector('[data-block="evidence"]')?.textContent).toContain(text);
+    unmount();
+  });
+
+  it("indexes sections and opens folded attributes before jumping to them", async () => {
+    const call = span({
+      sections: [{ label: "Request", kind: "code", language: "text", content: "hello", items: [] }],
+      moments: [{ at: 1, name: "Sent", kind: "http.sent", source: "REST", outcome: "succeeded", error: null, attributes: {}, sections: [], span: null }],
+      attributes: { "a.one": "1", "b.two": "2", "c.three": "3", "d.four": "4" }
+    });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]) }));
+    const buttons = [...host.querySelectorAll<HTMLButtonElement>("nav.index button")];
+    expect(buttons.map(button => button.textContent)).toEqual(["Request", "Moments", "Attributes"]);
+    const attributes = host.querySelector<HTMLDetailsElement>('details[data-block="attributes"]')!;
+    const scroll = vi.fn();
+    attributes.scrollIntoView = scroll;
+    expect(attributes.open).toBe(false);
+    buttons[2].click();
+    await nextTick();
+    expect(attributes.open).toBe(true);
+    expect(scroll).toHaveBeenCalledWith({ block: "start", behavior: "smooth" });
+    const section = host.querySelector<HTMLElement>('[data-block="section-0"]')!;
+    section.scrollIntoView = scroll;
+    buttons[0].click();
+    expect(scroll).toHaveBeenCalledTimes(2);
     unmount();
   });
 });

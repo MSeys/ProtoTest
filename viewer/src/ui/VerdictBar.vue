@@ -47,15 +47,14 @@ function literal(value: unknown): string {
 <template>
   <section class="verdict" :class="tone(test.outcome)" aria-label="Why this test did not pass">
     <span class="rule">{{ label }}</span>
-    <button v-if="failure" type="button" class="what" @click="emit('select', failure.span)">{{ failure.span.name }}</button>
-    <strong v-else class="what">{{ finding?.message ?? outcomeLabel(test.outcome) }}</strong>
+    <button v-if="failure" type="button" class="what" :title="where || undefined" @click="emit('select', failure.span)">{{ failure.span.name }}</button>
+    <strong v-else class="what" :title="where || undefined">{{ finding?.message ?? outcomeLabel(test.outcome) }}</strong>
     <button v-if="failure?.call && failure.call !== failure.span" type="button" class="call" @click="emit('select', failure.call)">
       on {{ failure.call.name }}
     </button>
     <button v-else-if="finding?.span" type="button" class="call" @click="finding.span && emit('select', finding.span)">
       on {{ finding.span.name }}
     </button>
-    <span v-if="where" class="where">{{ where }}</span>
     <p v-if="typeof detail === 'string' ? detail : true" class="detail">
       <template v-if="typeof detail === 'string'">{{ detail }}</template>
       <template v-else>{{ detail.path }}: expected {{ detail.expected }}, got <b>{{ detail.actual }}</b><template v-if="detail.more > 0">, and {{ detail.more }} more</template></template>
@@ -77,14 +76,14 @@ function literal(value: unknown): string {
 }
 .verdict.danger { border-left-color: var(--danger); background: var(--danger-soft); }
 .verdict.warning { border-left-color: var(--warning); background: var(--warning-soft); }
-.rule { padding: 0 var(--space-2); border: 1px solid currentColor; border-radius: var(--radius-chip); color: var(--muted); font-size: var(--text-meta); font-weight: var(--weight-bold); line-height: 1.7; white-space: nowrap; }
+/* The rule names the kind of failure in words; the bar's colour already says it failed. */
+.rule { color: var(--muted); font-size: var(--text-meta); font-weight: var(--weight-bold); white-space: nowrap; }
 .danger .rule { color: var(--danger); }
 .warning .rule { color: var(--warning); }
 button { padding: 0; border: 0; background: transparent; text-align: left; }
 .what { min-width: 0; overflow-wrap: anywhere; font-size: var(--text-title); font-weight: var(--weight-bold); }
 button.what:hover, .call:hover { text-decoration: underline; }
 .call { color: var(--muted); font-size: var(--text-body); }
-.where { margin-left: auto; color: var(--muted); font-size: var(--text-meta); white-space: nowrap; }
 .detail { flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere; font: var(--text-body)/var(--leading) var(--font-mono); }
 .danger .detail b { color: var(--danger); }
 .warning .detail b { color: var(--warning); }

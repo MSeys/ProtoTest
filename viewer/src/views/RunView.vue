@@ -125,32 +125,29 @@ function bars(test: TestTrace) {
     </header>
 
     <Panel v-if="attention.length || runProblems.spans.length || runProblems.moments.length || run.findings.length || run.gates.length" title="Needs attention"
-           subtitle="Failing and partial tests first, then the run's own problems, what it found and how its gates judged it." pad="none">
+           pad="none">
       <div class="attention">
         <button v-for="test in attention" :key="test.id" type="button" class="issue" :class="tone(test.outcome)" @click="emit('select', test, testSelection(test))">
           <b>{{ pad(test.number) }}</b>
           <span class="issue-main">
             <strong>{{ testTitle(test) }}</strong>
-            <span class="issue-reason">{{ attentionReason(test).title }}</span>
+            <span class="issue-line"><span class="issue-kind">{{ ruleLabel(test) }}</span><span class="issue-reason">{{ attentionReason(test).title }}</span></span>
             <span v-if="attentionReason(test).detail" class="issue-detail">{{ attentionReason(test).detail }}</span>
           </span>
-          <span class="issue-kind">{{ ruleLabel(test) }}</span>
         </button>
         <button v-for="span in runProblems.spans" :key="`run-span-${span.id}`" type="button" class="issue run" :class="tone(span.status)" @click="emit('span', span)">
           <b>Run</b>
           <span class="issue-main">
             <strong>{{ span.name }}</strong>
-            <span class="issue-reason">{{ problemReason(span.error, outcomeLabel(span.status)) }}</span>
+            <span class="issue-line"><span class="issue-kind">{{ outcomeLabel(span.status) }}</span><span class="issue-reason">{{ problemReason(span.error, outcomeLabel(span.status)) }}</span></span>
           </span>
-          <span class="issue-kind">{{ outcomeLabel(span.status) }}</span>
         </button>
         <div v-for="(moment, index) in runProblems.moments" :key="`run-moment-${index}`" class="issue run" :class="tone(moment.outcome)">
           <b>Run</b>
           <span class="issue-main">
             <strong>{{ moment.name }}</strong>
-            <span class="issue-reason">{{ problemReason(moment.error, outcomeLabel(moment.outcome)) }}</span>
+            <span class="issue-line"><span class="issue-kind">{{ outcomeLabel(moment.outcome) }}</span><span class="issue-reason">{{ problemReason(moment.error, outcomeLabel(moment.outcome)) }}</span></span>
           </span>
-          <span class="issue-kind">{{ outcomeLabel(moment.outcome) }}</span>
         </div>
         <component :is="item.test ? 'button' : 'div'" v-for="(item, index) in run.findings" :key="`finding-${index}`"
                    :type="item.test ? 'button' : undefined" class="issue finding" :class="item.finding.status.toLowerCase()"
@@ -158,18 +155,16 @@ function bars(test: TestTrace) {
           <b>{{ item.test ? pad(item.test.number) : "Run" }}</b>
           <span class="issue-main">
             <strong>{{ item.finding.message }}</strong>
-            <span class="issue-reason">{{ [item.finding.category, ...item.finding.tags].filter(Boolean).join(", ") }}</span>
+            <span class="issue-line"><span class="issue-kind">{{ item.finding.status }} finding</span><span class="issue-reason">{{ [item.finding.category, ...item.finding.tags].filter(Boolean).join(", ") }}</span></span>
           </span>
-          <span class="issue-kind">{{ item.finding.status }} finding</span>
         </component>
         <div v-for="gate in run.gates" :key="gate.name" class="issue gate" :class="tone(gate.outcome)">
           <b>Gate</b>
           <span class="issue-main">
             <strong>{{ gate.name }}</strong>
-            <span v-if="gate.message" class="issue-reason">{{ gate.message }}</span>
+            <span class="issue-line"><span class="issue-kind">{{ gate.status }}</span><span v-if="gate.message" class="issue-reason">{{ gate.message }}</span></span>
             <span v-if="gate.details" class="issue-detail">{{ gate.details }}</span>
           </span>
-          <span class="issue-kind">{{ gate.status }}</span>
         </div>
       </div>
     </Panel>
@@ -284,7 +279,7 @@ function bars(test: TestTrace) {
   width: 100%;
   padding: var(--space-3) var(--space-4);
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
+  grid-template-columns: 34px minmax(0, 1fr);
   align-items: start;
   gap: var(--space-3);
   border: 0;
@@ -300,9 +295,11 @@ button.issue:hover { background: var(--hover); }
 .issue b { padding-top: 1px; color: var(--dim); font: var(--text-micro) var(--font-mono); }
 .issue-main { min-width: 0; display: grid; gap: 2px; }
 .issue-main strong { font-size: var(--text-body); }
+/* The rule and the reason share one line: what kind of failure, then where. */
+.issue-line { min-width: 0; display: flex; flex-wrap: wrap; gap: 0 var(--space-2); font-size: var(--text-meta); }
 .issue-reason { color: var(--muted); font-size: var(--text-meta); }
 .issue-detail { overflow-wrap: anywhere; color: var(--text); font: var(--text-micro)/var(--leading) var(--font-mono); }
-.issue-kind { color: var(--muted); font-size: var(--text-micro); white-space: nowrap; }
+.issue-kind { color: var(--muted); font-size: var(--text-meta); font-weight: var(--weight-semibold); white-space: nowrap; }
 .issue.danger .issue-kind { color: var(--danger); }
 .issue.warning .issue-kind { color: var(--warning); }
 
@@ -371,6 +368,5 @@ button.issue:hover { background: var(--hover); }
   .scale { grid-template-columns: 22px minmax(0, 1fr) 52px 7px; }
   .scale .axis { grid-column: 2; }
   .issue { grid-template-columns: 30px minmax(0, 1fr); }
-  .issue-kind { grid-column: 2; }
 }
 </style>

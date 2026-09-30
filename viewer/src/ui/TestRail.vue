@@ -156,9 +156,8 @@ a { color: inherit; text-decoration: none; }
 .rail-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-body); }
 .rail-row small { color: var(--muted); font-size: var(--text-meta); font-variant-numeric: tabular-nums; }
 .reason { grid-column: 3 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-meta); }
-.rail-row.danger .reason { color: var(--danger); }
-.rail-row.warning .reason { color: var(--warning); }
-.rail-row.neutral .reason { color: var(--muted); }
+/* The dot and the number already say it failed; the reason reads as information, not a second alarm. */
+.rail-row .reason { color: var(--muted); }
 /* On the selected row the tint sits under the text, so the failure red deepens a step to hold its contrast. */
 html[data-theme="light"] .rail-row.active.danger .reason { color: color-mix(in srgb, var(--danger) 85%, var(--text)); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }

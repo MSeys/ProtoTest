@@ -64,7 +64,7 @@ public class OrderTests
 A `[ProtoTestTheory]` behaves the same way, and each `[InlineData]` row is a test of its own.
 
 :::warning[Forgetting `[Collection]`]
-Without `[Collection(ProtoTestCollection.Name)]` the fixture never runs, so `ProtoTestAssembly.Host` throws `InvalidOperationException` from inside the test. xUnit v2 surfaces that as a test-host crash: the run aborts and the other tests' results are lost, instead of one test failing. Treat the attribute as mandatory on every class that carries a ProtoTest attribute or reads `Proto.Context`.
+Without `[Collection(ProtoTestCollection.Name)]` the fixture never runs, so `ProtoTestAssembly.Host` throws `InvalidOperationException` from inside the test. xUnit v2 surfaces that as a test-host crash, the recorded behavior: the run aborts and the other tests' results are lost, instead of one test failing. Treat the attribute as mandatory on every class that carries a ProtoTest attribute or reads `Proto.Context`.
 :::
 
 ## The context window

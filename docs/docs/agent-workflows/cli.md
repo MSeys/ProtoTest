@@ -32,7 +32,7 @@ usage: prototest summary <file.prototrace>
 | check a run against a baseline | `verify <baseline.json> <current.json>` | nothing |
 | post the digest | `feedback <file.prototrace> [--digest <path>]` | the `--digest` file, and the posts |
 
-An unknown verb, or the wrong arguments, prints that usage to stderr and exits `1`.
+An unknown verb, or the wrong arguments, prints that usage to stderr and exits `1`. There is no `--help` verb: `prototest --help` prints the same usage to stderr and exits `1`.
 
 ### summary
 
@@ -51,6 +51,8 @@ FAILED Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine (2.
   test.execution Test execution · failed
   cause: runner-reported failure
 ```
+
+Run ids and timestamps are new on every run; compare the shape, not the values.
 
 A run with nothing to report prints the header, the counts and the words `All green.`:
 
@@ -142,7 +144,7 @@ prototest feedback: github-pr-comment skipped (No GitHub token: set GITHUB_TOKEN
 prototest feedback: webhook skipped (No webhook URL: set PROTOTEST_FEEDBACK_WEBHOOK_URL.)
 ```
 
-The stdout half is the annotation GitHub renders on the pull request, and [The evidence loop](./loop.md#run-it-locally) shows the same command with both streams.
+The stdout half is the annotation GitHub renders on the pull request, and [The evidence loop](./loop.md#run-it-locally) shows the same command with both streams. A failure with a source location renders it as properties (`::error file=path/to/OrderTests.cs,line=42::message`); without one it is the bare `::error::message` form, and run-gate annotations never carry a location.
 
 Every channel reports its outcome on stderr. A channel with no target, or nothing to post, skips. Only a channel that reached its target and failed makes the verb exit `1`. With no target configured the verb is safe to run locally.
 
@@ -205,7 +207,7 @@ The webhook posts the run's diagnosis digest: the same document `prototest summa
 }
 ```
 
-Trimmed: each failure also carries its mismatches, findings and artifacts, each gate its details, and the coverage its report artifact path. A run with no failures posts the same shape with empty `failures`, `gates` and `findings` and no stdout annotations.
+Trimmed: each failure also carries its mismatches, findings and artifacts, each gate its details, and the coverage its report artifact path. A run with no failures posts the same shape with empty `failures`, `gates` and `findings` and no stdout annotations. Run ids, file paths and timestamps differ on every run.
 
 The secret header rules:
 

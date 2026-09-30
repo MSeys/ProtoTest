@@ -4,8 +4,6 @@ title: Analyzers
 description: "ProtoTest.Analyzers: the two context-scoped warnings the framework cannot catch at runtime, and what the package deliberately does not check."
 ---
 
----
-
 import CommandBox from '@site/src/components/CommandBox';
 
 # Analyzers

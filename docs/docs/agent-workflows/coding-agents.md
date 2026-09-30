@@ -19,6 +19,8 @@ Ask for the newest failure:
 > `TheAddressWasHardcodedForOneMachine` failed with a `ConnectionError reaching
 > http://127.0.0.1:5099: connection refused` at `Program.cs:65`, in `test.execution`.
 
+The run id above stands in for any run; ids and times are new on every run.
+
 ## The workflow an agent follows
 
 ```mermaid
@@ -85,7 +87,7 @@ Nothing is uploaded by default. There is no telemetry, no account and no ProtoTe
 dotnet run --project samples/ProtoTest.Mcp.DemoEndpoint
 ```
 
-The endpoint is then at `http://127.0.0.1:5199/`. Point an HTTP-capable MCP client at it and call `list_runs`: one bundled trace, four tools, no account. The local stdio server is the surface that reads your repository; this one reads the bundled trace.
+The endpoint is then at `http://127.0.0.1:5199/`: the root path, with no `/mcp` prefix. Point an HTTP-capable MCP client at it and call `list_runs`: one bundled trace, four tools, no account. The local stdio server is the surface that reads your repository; this one reads the bundled trace.
 
 ## Check it
 

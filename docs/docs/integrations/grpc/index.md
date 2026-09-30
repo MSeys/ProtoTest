@@ -79,7 +79,7 @@ Calling `AddGrpc` twice does not throw. The shared setup runs once. Each callbac
 | `ProtoTest:Grpc:Attachments:CaptureExpectedShapes` | `ProtoHttpAttachmentOptions.CaptureExpectedShapes` | `bool` | `true` |
 | `ProtoTest:Grpc:Attachments:RedactSensitiveData` | `JsonDiagnosticOptions.RedactSensitiveData` | `bool` | `true` |
 | `ProtoTest:Grpc:Attachments:MaxDiagnosticBodyLength` | `JsonDiagnosticOptions.MaxDiagnosticBodyLength` | `int` | 65536 (64 KiB) |
-| `ProtoTest:Grpc:Attachments:SensitiveJsonProperties` | `JsonDiagnosticOptions.SensitiveJsonProperties` | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret` |
+| `ProtoTest:Grpc:Attachments:SensitiveJsonProperties` | `JsonDiagnosticOptions.SensitiveJsonProperties` | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret`, `client_secret`, `id_token` |
 
 One `ProtoTest:Grpc:Client` section serves every named client; each registration binds it over its code callback. A client's `configure` callback applies to that client only. The fallback client reads the shared section without any named callback. The older `ProtoTest:Grpc` section still binds as a fallback; see [Migrating from 1.0](../../getting-started/migrating-from-1-0.md). `GrpcAttachmentOptions` derives from the shared HTTP attachment options and binds `ProtoTest:Grpc:Attachments`, so there is one global attachment section per registration, not one per client. `GrpcClientOptions.ConfigureMetadata` is a delegate and is not bindable.
 

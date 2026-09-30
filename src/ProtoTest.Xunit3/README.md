@@ -6,7 +6,18 @@ Connects the ProtoTest lifecycle to xUnit.net v3.
 dotnet add package ProtoTest.Xunit3
 ```
 
-Register a `ProtoTestAssembly` with `[assembly: AssemblyFixture(typeof(...))]` and use `[ProtoTestFact]` or `[ProtoTestTheory]`. To skip that, add `[assembly: ProtoTestAutoWrap]` and every plain `[Fact]` and `[Theory]` runs through the same lifecycle.
+Register a `ProtoTestAssembly` with `[assembly: AssemblyFixture(typeof(...))]` and use `[ProtoTestFact]` or `[ProtoTestTheory]`:
+
+```csharp
+[assembly: AssemblyFixture(typeof(Setup))]
+
+public class Setup : ProtoTestAssembly
+{
+    protected override void Configure(IProtoHostBuilder builder) { }
+}
+```
+
+To skip that, add `[assembly: ProtoTestAutoWrap]` and every plain `[Fact]` and `[Theory]` runs through the same lifecycle.
 
 The adapter handles the test context, skip conditions, outcomes and native xUnit v3 attachments.
 

@@ -7,9 +7,22 @@ description: "Run a background worker or generic host in-process with the suite:
 
 # Background workers
 
+`ProtoTest.Hosting` runs a background worker inside the test process: it starts with the run, reads the run's settings and stops with the run.
+
+```csharp
+[ProtoTest]
+public async Task An_invoice_is_created_for_a_metered_session()
+{
+    var billing = Proto.Context.HostService<BillingWorker.Program, BillingService>("Billing");
+    // drive or inspect the running worker
+}
+```
+
+Run it with `dotnet test`. A green run prints `Passed An_invoice_is_created_for_a_metered_session`, and the trace records a `worker` run entity with the worker's name and program.
+
 ## What it adds
 
-`ProtoTest.Hosting` runs a worker application - a generic host with `IHostedService`s, the kind `dotnet new worker` creates - inside the test process, the way [ASP.NET Core](./aspnetcore.md) runs an API. The suite starts the worker's real entry point once per run, after the infrastructure registered before it, and stops it when the run ends.
+It runs a worker application - a generic host with `IHostedService`s, the kind `dotnet new worker` creates - the way [ASP.NET Core](./aspnetcore.md) runs an API. The suite starts the worker's real entry point once per run, after the infrastructure registered before it, and stops it when the run ends.
 
 ## Install
 
@@ -42,14 +55,7 @@ The suite runs the worker's own program (`Host.CreateApplicationBuilder` or `Hos
 
 ## The tasks
 
-```csharp
-[ProtoTest]
-public async Task An_invoice_is_created_for_a_metered_session()
-{
-    var billing = Proto.Context.HostService<BillingWorker.Program, BillingService>("Billing");
-    // drive or inspect the running worker
-}
-```
+The `An_invoice_is_created_for_a_metered_session` test above is the whole pattern: resolve the running worker's service, drive or inspect it.
 
 `Proto.Context.Host<TProgram>()` returns the worker's `IHost` for anything the service lookup cannot answer, and both take a name when several workers host the same program.
 

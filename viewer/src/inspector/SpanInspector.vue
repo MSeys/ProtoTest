@@ -131,9 +131,9 @@ const attributesOpen = computed(() => attributeGroups.value.length <= 3 && attri
 
     <section v-if="span.moments.length" class="block">
       <h3>What happened during it</h3>
-      <div v-for="(moment, index) in span.moments" :key="index" class="moment">
+      <div v-for="(moment, index) in span.moments" :key="index" class="moment" :class="tone(moment.outcome)">
         <span class="offset">{{ formatOffset(moment.at - test.start) }}</span>
-        <span>{{ moment.name }}</span>
+        <span class="name">{{ moment.name }}</span>
         <small>{{ moment.kind }}</small>
       </div>
     </section>
@@ -211,6 +211,9 @@ h3 { font-family: var(--font-ui); font-size: var(--text-meta); font-weight: var(
 .open:hover:not(:disabled) { border-color: var(--blueprint); }
 .moment { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: var(--space-2); font-size: var(--text-meta); }
 .moment .offset, .moment small { color: var(--muted); font-size: var(--text-micro); }
+/* A moment that went wrong reads as such; an informational one stays quiet. */
+.moment.danger .name { color: var(--danger); font-weight: var(--weight-semibold); }
+.moment.warning .name { color: var(--warning); }
 
 .attributes { padding-top: var(--space-3); border-top: 1px solid var(--border); }
 .attributes > summary { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-meta); font-weight: var(--weight-bold); cursor: pointer; }

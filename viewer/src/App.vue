@@ -456,7 +456,7 @@ const problemTitle = computed(() => ({
               <OutcomePill :outcome="selectedTest.outcome" :detail="formatDuration(selectedTest.duration)" />
             </header>
             <FailureCard v-if="selectedTest.failure && selectedTest.outcome !== 'succeeded'" :failure="selectedTest.failure"
-                         :outcome="selectedTest.outcome" @select="selectSpan" />
+                         :outcome="selectedTest.outcome" :test="selectedTest" @select="selectSpan" />
             <section v-else-if="unexplained" class="unexplained" :class="tone(unexplained.outcome)" aria-label="Why this test did not pass">
               <i class="status" :class="tone(unexplained.outcome)" />
               <p><strong>{{ unexplained.title }}</strong><span v-if="unexplained.detail">{{ unexplained.detail }}</span></p>

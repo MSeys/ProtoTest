@@ -1,4 +1,4 @@
-import type {ReactNode} from 'react';
+import type {CSSProperties, ReactNode} from 'react';
 import Link from '@docusaurus/Link';
 import Head from '@docusaurus/Head';
 import Layout from '@theme/Layout';
@@ -7,94 +7,120 @@ import Heading from '@theme/Heading';
 import CommandBox, {type CommandBoxRunner} from '@site/src/components/CommandBox';
 import CodeSnippet from '@site/src/components/CodeSnippet';
 import Frame from '@site/src/components/Frame';
-import TabbedCode, {type CodeTab} from '@site/src/components/TabbedCode';
-import ViewerWalkthrough from '@site/src/components/ViewerWalkthrough';
-import FailureGallery from '@site/src/components/FailureGallery';
 import styles from './index.module.css';
 
-const heroTabs: CodeTab[] = [
-  {
-    id: 'journey',
-    label: 'Test',
-    filename: 'PlatformJourney.cs',
-    code: `[ProtoTest]
+/*
+ * The home page leads with the prototype idea beside the test itself, then the three commands,
+ * what the run records, one failure explained, the protocols, the measured proof and the entry
+ * points. Every test line, trace row and number is quoted from the Northstar sample, the
+ * committed demo trace and the benchmarks page.
+ */
+
+/* The trace rows the page shows: a viewer row is a kind chip, a title, and the detail the run recorded. */
+interface TraceRowData {
+  /** The kind chip's label, in the viewer's vocabulary. */
+  chip: string;
+  /** The execution-vocabulary token the chip is tinted with. */
+  tone: string;
+  title: string;
+  detail?: string;
+  /** A mono body line, for a request or response payload. */
+  body?: string;
+  status?: 'failed' | 'succeeded';
+}
+
+function tone(token: string): CSSProperties {
+  return {'--node-color': `var(${token})`} as CSSProperties;
+}
+
+function TraceRows({rows}: {rows: TraceRowData[]}): ReactNode {
+  return (
+    <ul className={styles.traceRows}>
+      {rows.map((row) => (
+        <li key={row.title} className={styles.traceRow} data-status={row.status}>
+          <span className={styles.traceKind} style={tone(row.tone)}>
+            {row.chip}
+          </span>
+          <span className={styles.traceTitle}>{row.title}</span>
+          {row.detail && <span className={styles.traceDetail}>{row.detail}</span>}
+          {row.body && <code className={styles.traceBody}>{row.body}</code>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/* The real sample, samples/Northstar.ProtoTest/PlatformJourney.cs: the test method, one REST
+   write read back over GraphQL. The class carries [Application] and the suite membership; the
+   method is the journey. */
+const platformJourney = `[ProtoTest]
 [SignedInAs]
-public async Task
-    RestWritesAreVisibleThroughGraphQL()
+public async Task RestWritesAreVisibleThroughGraphQL()
 {
+    // Arrange: write through the public REST surface.
     using var created = await Proto.Context.Rest()
         .Body(new CreateProjectRequest("atlas"))
         .PostAsync("/api/v1/projects");
-
     created.Should.HaveHttpStatus(HttpStatusCode.Created);
 
+    // Act
     using var projects = await Proto.Context.GraphQL()
         .Query("projects", new { first = 10 })
         .ExpectAsync(new
         {
             totalCount = 1,
-            nodes = new[]
-            {
-                new
-                {
-                    name = "atlas",
-                    status = ProjectStatuses.Active
-                }
-            }
+            nodes = new[] { new { name = "atlas", status = ProjectStatuses.Active } }
         });
 
+    // Assert
     projects.Should.HaveNoErrors();
-}`,
-    footnote:
-      'One journey writes through REST and reads through GraphQL. ProtoTest shares the tenant, sign-in, lifecycle, cleanup and trace.',
+}`;
+
+/* What that test recorded, from test 18 of the committed demo trace. */
+const journeyRows: TraceRowData[] = [
+  {chip: 'Call', tone: '--type-call', title: 'REST · POST /api/v1/projects', detail: '201 Created'},
+  {chip: 'Call', tone: '--type-call', title: 'GraphQL · query Projects', detail: '1 node'},
+  {chip: 'Check', tone: '--type-assertion', title: 'Assert status · 201 Created', detail: 'matched'},
+  {chip: 'Check', tone: '--type-assertion', title: 'Assert GraphQL data shape', detail: '1 node'},
+  {chip: 'Cleanup', tone: '--type-ownership', title: 'Cleanup · TenantResponse', detail: 'tenant released'},
+];
+
+/* The failure drill, test 08: what was sent, what came back, the state, the cleanup and the line. */
+const failureRows: TraceRowData[] = [
+  {chip: 'Call', tone: '--type-call', title: 'POST /api/v1/projects', body: '{"name":""}'},
+  {
+    chip: 'Response',
+    tone: '--type-artifact',
+    title: '400 BadRequest · validation_failed',
+    body: `{"code":"validation_failed","message":"The value cannot be an empty string or composed entirely of whitespace. (Parameter 'name')","details":null}`,
   },
   {
-    id: 'compose',
-    label: 'Setup',
-    filename: 'Setup.cs',
-    code: `[SetUpFixture]
-public sealed class Setup : ProtoTestAssembly
-{
-    protected override void Configure(IProtoHostBuilder builder)
-    {
-        // The application: hosted in-process, reached over three protocols.
-        builder.AddApplication(NorthstarTargets.Api, app => app
-            .AddAspNetCoreServer<Program>()
-            .AddRest(rest => rest.AddClient("Api"))
-            .AddGraphQL(graphQL => graphQL.AddClient("GraphQL")));
-
-        // In front of it, behind it, and what the run leaves behind.
-        builder.AddWeb();
-        builder.AddSql(_ => new SqliteConnection("Data Source=northstar.db"));
-        // Tracing stays on its default: each run writes TestResults/prototest-{runId}.prototrace.
-        builder.AddSink<HtmlReportSink>();
-    }
-}`,
-    footnote:
-      'The short form. Each Add adds a capability. Leave one out and its client, attributes and trace output stay out too. Each package is on the installation page.',
+    chip: 'State',
+    tone: '--type-ownership',
+    title: 'data:TenantResponse:1',
+    detail: "Provisioned TenantResponse 'northstar-597539000008', created by the test.",
   },
   {
-    id: 'evidence',
-    label: 'Trace',
-    filename: 'prototest summary run.prototrace',
-    language: 'text',
-    code: `ProtoTest trace 2.0 · run 29e344f9cf54431ca7d8bad3f87a1749
-2 tests · 1 failed · 1 succeeded
-
-FAILED orders match their shape (16 ms)
-  Shape mismatch failed with 1 error(s):
-    • [$.orderId]: Values did not match. (Expected: '7', Actual: '42')
-  at artifacts/fixture-gen/Program.cs:65 (Program.<<Main)
-  assert.json.shape · failed
-  cause: assertion (1 mismatch)
-  mismatch: $.orderId: expected 7, actual 42`,
-    footnote:
-      'Shortened from a sample trace. The summary, the viewer and the agent tools read the same failure from the same archive.',
+    chip: 'Cleanup',
+    tone: '--type-ownership',
+    title: 'Cleanup · TenantResponse',
+    detail: 'northstar-597539000008 removed on teardown.',
+  },
+  {
+    chip: 'Source',
+    tone: '--type-framework',
+    title: 'FailureDrills.cs:139',
+    detail: 'response.Should.HaveHttpStatus(HttpStatusCode.Created);',
+    status: 'failed',
   },
 ];
 
 function templateCommands(runner?: string): string[] {
-  return ['dotnet new install ProtoTest.Templates', `dotnet new prototest -n Shop${runner ? ` --runner ${runner}` : ''}`];
+  return [
+    'dotnet new install ProtoTest.Templates',
+    `dotnet new prototest -n Shop${runner ? ` --runner ${runner}` : ''}`,
+    'dotnet test',
+  ];
 }
 
 // The template defaults to NUnit, so its row keeps the plain commands a reader copies without thinking.
@@ -106,270 +132,270 @@ const runnerChoices: CommandBoxRunner[] = [
   {id: 'mstest', label: 'MSTest', commands: templateCommands('mstest')},
 ];
 
-function Hero() {
+const protocols = [
+  {
+    title: 'REST, GraphQL and gRPC',
+    packages: 'ProtoTest.Rest · ProtoTest.GraphQL · ProtoTest.Grpc',
+    body: 'Fluent clients over one application, one auth model.',
+    to: '/docs/integrations/rest',
+  },
+  {
+    title: 'SQL and EF Core',
+    packages: 'ProtoTest.Sql · ProtoTest.Sql.EntityFrameworkCore',
+    body: 'A database per test, rolled back on teardown.',
+    to: '/docs/integrations/sql',
+  },
+  {
+    title: 'Browsers',
+    packages: 'ProtoTest.Web.Playwright · ProtoTest.Web.Selenium',
+    body: "Playwright or Selenium, sharing the suite's sign-in and trace.",
+    to: '/docs/integrations/web',
+  },
+  {
+    title: 'Messaging',
+    packages: 'ProtoTest.Messaging.RabbitMq · ProtoTest.Messaging.MassTransit · ProtoTest.Devices.Mqtt',
+    body: 'RabbitMQ, MassTransit and MQTT, with publish and await steps.',
+    to: '/docs/integrations/messaging',
+  },
+  {
+    title: 'Devices, Sheets and more',
+    packages: 'ProtoTest.Devices · ProtoTest.Sheets · ProtoTest.WireMock · ProtoTest.Testcontainers · ProtoTest.Aspire',
+    body: 'Chargers, spreadsheets, WireMock, Testcontainers, Aspire.',
+    to: '/docs/integrations/overview',
+  },
+];
+
+const proof = [
+  {
+    value: '35-36 ms',
+    label: 'per-test median, the 1,000-test OpenCSMS benchmark, same machine',
+    to: '/docs/project/benchmarks#opencsms-at-1000-tests',
+  },
+  {
+    value: '1.3 s',
+    label: 'viewer cold open, the 1,200-test run',
+    to: '/docs/project/benchmarks#the-viewer-at-1000-tests',
+  },
+  {
+    value: '44 packages',
+    label: 'on NuGet for .NET 8, 9 and 10',
+    to: '/docs/getting-started/installation',
+  },
+];
+
+/*
+ * First screen: the prototype claim beside the test itself. The H1 promises readability, so the
+ * frame proves it: the real journey method, no setup in sight.
+ */
+function Hero(): ReactNode {
   return (
     <header data-surface="blueprint" className={styles.hero}>
       <div className="container">
-        <div className={styles.heroInner}>
-          <div>
-            <div className={styles.eyebrow}>Composable integration testing for .NET</div>
+        <div className={styles.heroSplit}>
+          <div className={styles.heroCopy}>
+            <div className={styles.eyebrow}>Integration testing for .NET</div>
             <Heading as="h1" className={styles.heroTitle}>
-              Test the whole journey. Trace every layer.
+              Integration tests as readable as a prototype.
             </Heading>
             <p className={styles.heroLead}>
-              An integration test checks the app plus its API, database, broker and browser together.
-              ProtoTest runs it from one shared setup: REST, GraphQL, SQL, messaging, a browser or a
-              spreadsheet share one context, lifecycle, cleanup and trace.
+              ProtoTest is prototype testing for .NET: one host, one lifecycle and one trace across
+              REST, GraphQL, gRPC, SQL, browsers and brokers. The setup lives in the host; the test
+              stays the scenario.
             </p>
-            <CommandBox title="Start a project" commands={templateCommands()} runners={runnerChoices} />
-            <p className={styles.heroNext}>
-              That installs a green suite. <code>dotnet test</code> runs it and writes{' '}
-              <code>TestResults/prototest-{'{runId}'}.prototrace</code> plus <code>Shop.html</code>.
-            </p>
-            <p className={styles.heroLearn}>
-              <Link to="/learn/">New to integration testing? Start the learning track</Link>
+            <div className={styles.heroButtons}>
+              <Link className={`${styles.btn} ${styles.btnPrimary}`} to="/docs/getting-started/first-test">
+                Start in three commands
+              </Link>
+              <Link className={`${styles.btn} ${styles.btnGhost}`} href="https://trace.prototest.dev/?demo=1">
+                Open a failing trace
+              </Link>
+            </div>
+            <p className={styles.heroNote}>
+              Requires the .NET SDK only. The starter suite is green on a fresh checkout, no
+              containers or browsers needed.
             </p>
           </div>
-          <TabbedCode tabs={heroTabs} label="Three ways a ProtoTest suite looks" />
+
+          <Frame
+            className={styles.heroFrame}
+            head={
+              <>
+                <strong>PlatformJourney.cs</strong>
+                <span className={styles.frameMeta}>samples/Northstar.ProtoTest</span>
+              </>
+            }
+            foot="RestWritesAreVisibleThroughGraphQL: a REST write read back over GraphQL.">
+            <CodeSnippet code={platformJourney} language="csharp" showLineNumbers />
+          </Frame>
         </div>
       </div>
     </header>
   );
 }
 
-const proofPoints = [
-  {
-    to: '/docs/project/benchmarks#opencsms-at-1000-tests',
-    value: '35-36 ms',
-    label: 'per-test median in the 1,000-test product benchmark',
-  },
-  {
-    to: '/docs/project/benchmarks#the-viewer-at-1000-tests',
-    value: '1,200 tests',
-    label: 'viewer cold open in about 1.3 s',
-  },
-  {
-    to: '/docs/getting-started/installation',
-    value: '44 packages',
-    label: 'on NuGet, across .NET 8, 9 and 10',
-  },
-];
+function CommandsSection(): ReactNode {
+  return (
+    <section className={styles.section}>
+      <div className="container">
+        <header className={styles.sectionHead}>
+          <Heading as="h2">Three commands to a green suite.</Heading>
+        </header>
+        <div className={styles.commandsInner}>
+          <CommandBox title="Start a suite" commands={templateCommands()} runners={runnerChoices} />
+          <p className={styles.line}>
+            The template writes a suite that runs as-is; each runner row shows its commands.{' '}
+            <Link to="/docs/getting-started/installation">Installation</Link>
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 /*
- * The numbers a reader comparing frameworks asks for first, each linked to the page that measured it.
- * A quiet row, not a card row: the hero already spent the page's boldness.
+ * The same test's run: every call, check and cleanup the host recorded for it. The attributes
+ * carry identity, auth and lifecycle; the method stays the journey; the trace keeps the rest.
  */
-function ProofStrip() {
+function RecordSection(): ReactNode {
   return (
-    <section className={styles.proof} aria-label="ProtoTest measured at scale">
-      <div className={`container ${styles.proofInner}`}>
-        <span className={styles.proofLead}>Measured</span>
-        <div className={styles.proofFacts}>
-          {proofPoints.map((point) => (
-            <Link key={point.value} className={styles.proofFact} to={point.to}>
-              <span className={styles.proofValue}>{point.value}</span>
-              <span className={styles.proofLabel}>{point.label}</span>
+    <section className={styles.section}>
+      <div className="container">
+        <header className={styles.sectionHead}>
+          <Heading as="h2">The run is recorded.</Heading>
+        </header>
+        <div className={styles.failureInner}>
+          <Frame
+            head={
+              <>
+                <strong>What the run recorded</strong>
+                <span className={styles.frameMeta}>prototest-demo.prototrace</span>
+              </>
+            }
+            foot="Test 18, RestWritesAreVisibleThroughGraphQL. Rows quoted from the committed demo trace.">
+            <TraceRows rows={journeyRows} />
+          </Frame>
+        </div>
+        <p className={styles.line}>
+          Clients, state and trace are scoped to one test, and the suite stays parallel-safe.{' '}
+          <Link to="/docs/foundation/execution-context">Execution context</Link>{' '}
+          <Link to="/docs/foundation/lifecycle">Lifecycle</Link>
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function ProtocolsSection(): ReactNode {
+  return (
+    <section className={styles.section}>
+      <div className="container">
+        <header className={styles.sectionHead}>
+          <Heading as="h2">Every protocol, one suite.</Heading>
+        </header>
+        <div className={styles.cards}>
+          {protocols.map((card) => (
+            <Link key={card.title} className={styles.card} to={card.to}>
+              <strong>{card.title}</strong>
+              <code className={styles.cardPackages}>{card.packages}</code>
+              <span>{card.body}</span>
             </Link>
           ))}
         </div>
+        <p className={styles.line}>
+          NUnit, xUnit.net v2, xUnit.net v3, TUnit and MSTest stay; add <code>[ProtoTest]</code>.
+          44 packages, 29 supported and 15 preview; the integrations map marks which.{' '}
+          <Link to="/docs/runners/overview">Runners</Link>{' '}
+          <Link to="/docs/integrations/overview">Integrations map</Link>
+        </p>
       </div>
     </section>
   );
 }
 
-function PathsSection() {
-  return (
-    <section className={`${styles.section} ${styles.sectionAlt}`}>
-      <div className="container">
-        <div className={styles.sectionHead}>
-          <Heading as="h2">Start where you are</Heading>
-          <p>Three starting points. Pick the one that fits your situation.</p>
-        </div>
-        <div className={styles.paths}>
-          <div className={styles.pathCard}>
-            <Heading as="h3">New to integration testing</Heading>
-            <p>
-              Start with the Learn track. It begins with why integration tests get hard and works up to
-              tests you can trust in CI.
-            </p>
-            <Link className={styles.pathLink} to="/learn/">
-              Start learning
-            </Link>
-          </div>
-          <div className={styles.pathCard}>
-            <Heading as="h3">Evaluating ProtoTest</Heading>
-            <p>
-              Where it wins, where the alternatives win, what a run costs, and the questions teams ask
-              before adopting it.
-            </p>
-            <div className={styles.pathLinks}>
-              <Link to="/docs/project/compare">Compare alternatives</Link>
-              <Link to="/docs/project/benchmarks">Cost at scale</Link>
-              <Link to="/docs/project/faq">Adoption questions</Link>
-            </div>
-          </div>
-          <div className={styles.pathCard}>
-            <Heading as="h3">Already have a suite</Heading>
-            <p>
-              Recipes for common journeys, the conversion order for an xUnit suite you already have, and the
-              pages to reach for when a run needs explaining.
-            </p>
-            <div className={styles.pathLinks}>
-              <Link to="/docs/recipes/overview">Recipes</Link>
-              <Link to="/docs/runners/bring-your-existing-suite">Bring an existing xUnit suite</Link>
-              <Link to="/docs/getting-started/migrating-from-1-0">Migrate from 1.0</Link>
-              <Link to="/docs/getting-started/troubleshooting">Troubleshooting</Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function FailureSection() {
+function FailureSection(): ReactNode {
   return (
     <section className={styles.section}>
       <div className="container">
-        <div className={styles.sectionHead}>
-          <Heading as="h2">Learn by failure</Heading>
+        <header className={styles.sectionHead}>
+          <Heading as="h2">When it fails, the run explains itself.</Heading>
+          <p className={styles.sectionLead}>Expected 201 Created, got 400 Bad Request.</p>
+        </header>
+        <div className={styles.failureInner}>
+          <Frame
+            head={
+              <>
+                <strong>FailureDrills.ABareStatusHidesWhatTheApplicationSaid</strong>
+                <span className={styles.frameMeta}>prototest-demo.prototrace</span>
+              </>
+            }
+            foot="One column, in run order, quoted from the committed demo trace.">
+            <TraceRows rows={failureRows} />
+          </Frame>
+        </div>
+        <p className={styles.line}>
+          Setup, every call, the checks, the state it changed and the cleanup are in the .prototrace
+          file. Read it in the{' '}
+          <Link href="https://trace.prototest.dev/?demo=1">viewer</Link>, or through{' '}
+          <strong>ProtoTest.Mcp</strong>: four read-only tools over the traces in a repository, no
+          port opened, nothing uploaded.{' '}
+          <Link to="/docs/observability/prototrace#a-walk-through-one-test">Trace anatomy</Link>{' '}
+          <Link to="/docs/agent-workflows/setup">Agent setup</Link>
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function ProofSection(): ReactNode {
+  return (
+    <section className={`${styles.section} ${styles.band}`}>
+      <div className="container">
+        <header className={styles.sectionHead}>
+          <Heading as="h2">Proof, measured.</Heading>
+        </header>
+        <div className={styles.stats}>
+          {proof.map((stat) => (
+            <Link key={stat.value} className={styles.stat} to={stat.to}>
+              <strong>{stat.value}</strong>
+              <span>{stat.label}</span>
+            </Link>
+          ))}
+        </div>
+        <div className={styles.adoption}>
+          <Heading as="h3">Already have a suite?</Heading>
           <p>
-            A passing suite tells you little. A failure shows what changed, what was not ready, or
-            what cleanup hid the cause. The lessons start from those failures. The demo trace records
-            every layer of one failed test.
+            The comparison prices the plumbing per fixture: 35 lines without ProtoTest, 13 with.
+            Adoption is one setup class per project and one package per integration.{' '}
+            <Link to="/docs/project/compare">Compare</Link>{' '}
+            <Link to="/docs/getting-started/migrating-from-1-0">Migration cost</Link>
           </p>
         </div>
-        <FailureGallery />
+        <p className={styles.honesty}>
+          ProtoTest is not a runner and not a mock library. Where it does not fit, the docs say so
+          first. <Link to="/docs/project/leaving">Leaving ProtoTest</Link>
+        </p>
       </div>
     </section>
   );
 }
 
-function TraceSection() {
+function Close(): ReactNode {
   return (
-    <section className={`${styles.section} ${styles.sectionAlt}`}>
+    <section className={`${styles.section} ${styles.close}`}>
       <div className="container">
-        <div className={styles.featureRow}>
-          <div className={styles.featureCopy}>
-            <Heading as="h2">Following a failed test</Heading>
-            <p>
-              Step through the three views of the demo trace: the run, the failed test story, and
-              the check. You see the changed values, the exception, and the asserting line.
-            </p>
-            <div className={styles.featureLinks}>
-              <Link className={styles.featureLink} href="https://trace.prototest.dev/?demo=1">
-                Open the failing trace →
-              </Link>
-              <Link className={styles.featureLink} to="/docs/observability/prototrace">
-                How ProtoTrace works →
-              </Link>
-            </div>
-          </div>
-          <ViewerWalkthrough />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function AgentExchange() {
-  return (
-    <Frame
-      head={
-        <>
-          <strong>get_failure</strong>
-          <span className={styles.frameMeta}>run 29e344f9 · fixture example</span>
-        </>
-      }
-      foot={
-        <>
-          Trimmed from the committed MCP fixture trace. The tool is read-only and capped; the whole
-          document is on <Link to="/docs/agent-workflows/diagnosis">Diagnosis</Link>.
-        </>
-      }>
-      <CodeSnippet
-        language="json"
-        code={`{
-  "runId": "29e344f9cf54431ca7d8bad3f87a1749",
-  "test": {
-    "testId": "00002",
-    "name": "orders match their shape",
-    "outcome": "failed",
-    "durationMs": 16
-  },
-  "failure": {
-    "kind": "assert.json.shape",
-    "status": "failed",
-    "errorType": "ProtoTest.Json.JsonShapeMismatchException",
-    "errorMessage": "Shape mismatch failed with 1 error(s): [$.orderId]: Values did not match. (Expected: '7', Actual: '42')",
-    "sourceFile": "artifacts/fixture-gen/Program.cs",
-    "sourceLine": 65
-  }
-}`}
-      />
-    </Frame>
-  );
-}
-
-function AgentSection() {
-  return (
-    <section className={styles.section}>
-      <div className="container">
-        <div className={styles.featureRow}>
-          <div className={styles.featureCopy}>
-            <Heading as="h2">Point your agent at the trace</Heading>
-            <p>
-              <code>ProtoTest.Mcp</code> is a local server that reads the <code>.prototrace</code>{' '}
-              archives in a repository. An agent works the evidence loop through four read-only tools:{' '}
-              <code>list_runs</code>, <code>get_failure</code>, <code>get_diagnosis</code> and{' '}
-              <code>get_coverage</code>.
-            </p>
-            <p>
-              Every answer comes from the recorded trace, with size limits. The server opens no port
-              and uploads nothing. It returns the same failure the viewer shows.
-            </p>
-            <Link className={styles.featureLink} to="/docs/agent-workflows/setup">
-              Connect an agent →
-            </Link>
-          </div>
-          <AgentExchange />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function CtaSection() {
-  return (
-    <section className={styles.section}>
-      <div className="container">
-        <div className={styles.ctaBanner}>
-          <Heading as="h2">Try the starter project</Heading>
-          <p>
-            The template creates a small ASP.NET Core API and a ProtoTest suite. Run the commands
-            from the <Link to="/docs/getting-started/installation">installation page</Link>, then
-            run the suite. A green run ends like this (abridged), with the trace and the report
-            beside it:
-          </p>
-          <div className={styles.ctaSnippet}>
-            <CodeSnippet
-              language="text"
-              code={`dotnet test
-Passed! - Failed: 0, Passed: 1 - Shop.Tests.dll
-TestResults/prototest-{runId}.prototrace
-TestResults/Shop.html`}
-            />
-          </div>
-          <p className={styles.ctaRelease}>
-            1.1.0 adds readiness probes and a per-test clock.{' '}
-            <Link to="/changelog">Full list in the changelog →</Link>
-          </p>
-          <div className={styles.heroButtons}>
-            <Link className={`${styles.btn} ${styles.btnPrimary}`} to="/docs/getting-started/first-test">
-              Your first test
-            </Link>
-          </div>
-        </div>
+        <header className={styles.sectionHead}>
+          <Heading as="h2">Start where you are.</Heading>
+        </header>
+        <nav className={styles.closeNav} aria-label="Start where you are">
+          <Link to="/docs/getting-started/first-test">Your first test</Link>
+          <Link to="/learn/">Learn track</Link>
+          <Link to="/docs/recipes/overview">Recipes</Link>
+          <Link to="/docs/getting-started/troubleshooting">Troubleshooting</Link>
+          <Link to="/docs/project/faq">Adoption questions</Link>
+        </nav>
+        <p className={styles.closeLine}>
+          Three commands, a green suite, and a trace for the first time it fails.
+        </p>
       </div>
     </section>
   );
@@ -378,8 +404,8 @@ TestResults/Shop.html`}
 export default function Home(): ReactNode {
   return (
     <Layout
-      title="Test the whole journey. Trace every layer."
-      description="ProtoTest is a foundation for composing .NET integration tests around one context, lifecycle and trace.">
+      title="Integration tests as readable as a prototype."
+      description="ProtoTest is prototype testing for .NET: one host, one lifecycle and one trace across REST, GraphQL, gRPC, SQL, browsers and brokers.">
       <Head>
         <script type="application/ld+json">
           {JSON.stringify({
@@ -395,18 +421,18 @@ export default function Home(): ReactNode {
             codeRepository: 'https://github.com/MSeys/ProtoTest',
             license: 'https://github.com/MSeys/ProtoTest/blob/main/LICENSE',
             description:
-              'A foundation for composing .NET integration tests around one context, lifecycle and trace.',
+              'ProtoTest is prototype testing for .NET: one host, one lifecycle and one trace across REST, GraphQL, gRPC, SQL, browsers and brokers.',
           })}
         </script>
       </Head>
       <Hero />
       <main>
-        <ProofStrip />
+        <CommandsSection />
+        <RecordSection />
+        <ProtocolsSection />
         <FailureSection />
-        <TraceSection />
-        <AgentSection />
-        <PathsSection />
-        <CtaSection />
+        <ProofSection />
+        <Close />
       </main>
     </Layout>
   );

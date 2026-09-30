@@ -8,22 +8,28 @@ import TraceExample from '@site/src/components/TraceExample';
 
 # Sheets
 
+`ProtoTest.Sheets` opens the `.xlsx` your application generated and lets a test assert on its sheets, cells, ranges and typed rows.
+
+```csharp
+[ProtoTest]
+public async Task Monthly_report_total_matches()
+{
+    using var response = await Proto.Context.Rest().GetAsync("/api/v1/reports/monthly.xlsx");
+    var workbook = Proto.Context.Sheets().Open(response);       // the file name comes from the response
+
+    workbook.Sheet("Summary").Cell("B1").Should.Be(42.0);
+}
+```
+
+Run it with `dotnet test`. A green run prints `Passed Monthly_report_total_matches`, and the trace records a `sheets.open` operation with an `assert.sheets` operation for the check.
+
 ## What it adds
 
-`ProtoTest.Sheets` opens the `.xlsx` your application generated and lets a test assert on its sheets, cells, ranges and typed rows. It reads the file as OpenXML, the format itself, so it does not matter whether the application produced it with SpreadsheetGear, ClosedXML, EPPlus, NPOI, Aspose or raw OpenXML.
+It reads the file as OpenXML, the format itself, so it does not matter whether the application produced it with SpreadsheetGear, ClosedXML, EPPlus, NPOI, Aspose or raw OpenXML.
 
 The direction is fixed: the application writes the workbook, the suite reads it. ProtoTest never writes `.xlsx`.
 
 Reading is eager. A missing sheet, a malformed reference, or a reversed range fails immediately. A reference outside the used range is an empty cell, not an error.
-
-```csharp
-builder.AddSheets();
-
-using var response = await Proto.Context.Rest().GetAsync("/api/v1/reports/monthly.xlsx");
-var workbook = Proto.Context.Sheets().Open(response);       // the file name comes from the response
-
-workbook.Sheet("Summary").Cell("B1").Should.Be(42.0);
-```
 
 ## Install
 
@@ -36,55 +42,14 @@ ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `-
 ## Compose
 
 ```csharp
-public static IProtoHostBuilder AddSheets(
-    this IProtoHostBuilder builder,
-    Action<SheetsOptions>? configure = null);
+builder.AddSheets();
 ```
 
-`AddSheets` registers the `Sheets` capability (`ProtoCapabilityKinds.Document`), a singleton `SheetsOptions` built from the callback and then bound from `ProtoTest:Sheets`, and the `SheetsCoverageCollector`. A repeated `AddSheets` composes: every options callback runs in registration order before `ProtoTest:Sheets` binds over the result, while the collector registers once and the capability descriptor dedupes.
-
-### Options and keys
-
-| Key | Option | Type | Default |
-| --- | --- | --- | --- |
-| `ProtoTest:Sheets:IncludeHiddenSheets` | `SheetsOptions.IncludeHiddenSheets` | `bool` | `false` |
-
-When false, hidden sheets are omitted from `ProtoWorkbook.Sheets` and from every count derived from it; each sheet still carries its original position in `ProtoSheet.Index`. Configuration layers over the code callback.
-
-### Context API
-
-```csharp
-ProtoSheets sheets = Proto.Context.Sheets();
-```
-
-Calling it without `AddSheets` throws `InvalidOperationException` with the guidance to call `AddSheets` on the host builder.
-
-| Open overload | Source |
-| --- | --- |
-| `Open(string path)` | a file on disk; the workbook name is the file name |
-| `Open(Stream stream, string name = "workbook.xlsx")` | an in-memory stream |
-| `Open(IProtoBinaryContent content, string? name = null)` | anything carrying named bytes, such as a REST response or a captured attachment; the name falls back to `content.FileName`, then `workbook.xlsx` |
-
-On the opened workbook:
-
-| Member | Does |
-| --- | --- |
-| `Name`, `Sheets` | the workbook name and the sheets that were read (visible ones by default) |
-| `Sheet(name)` | finds a sheet; a failure lists the available names |
-| `Model<TRow>()` | binds a `[Sheet]`/`[Column]` record to the workbook |
-| `KeyValueModel<TModel>()` | binds a `[Sheet(..., Kind = ProtoSheetKind.KeyValue)]` record with `[Label]` properties to a label/value sheet |
-
-On a sheet:
-
-| Read | Returns |
-| --- | --- |
-| `Cell(reference)`, `Cell(row, column)` (1-based) | one cell |
-| `Range(reference)` | a rectangular area |
-| `Table(params int[] headerRows)` (defaults to row 1) | a header-aware view |
-
-A sheet also carries `Name`, `Index`, `IsHidden`, `RowCount` and `ColumnCount`.
+`AddSheets` registers the `Sheets` capability (`ProtoCapabilityKinds.Document`), a singleton `SheetsOptions` built from the callback and then bound from `ProtoTest:Sheets`, and the `SheetsCoverageCollector`. A repeated `AddSheets` composes: every options callback runs in registration order before `ProtoTest:Sheets` binds over the result, while the collector registers once and the capability descriptor dedupes. The [reference](#reference) lists the signature, the option keys and the context API.
 
 ## The tasks
+
+The `Monthly_report_total_matches` test above is the whole pattern: open the workbook, read a cell, assert.
 
 ```csharp
 var summary = Proto.Context.Sheets().Open(response).Sheet("Summary");
@@ -202,6 +167,55 @@ summary.Column(s => s.Total).ShouldNot.Be(0m);
 #### Hidden sheets
 
 Hidden sheets are skipped unless `ProtoTest:Sheets:IncludeHiddenSheets` (or the option callback) turns them on. `ProtoSheet.Index` always reflects the position in the workbook including hidden sheets; when they are included, the `sheets.open` trace section marks them with `hidden`.
+
+## Reference
+
+```csharp
+public static IProtoHostBuilder AddSheets(
+    this IProtoHostBuilder builder,
+    Action<SheetsOptions>? configure = null);
+```
+
+### Options and keys
+
+| Key | Option | Type | Default |
+| --- | --- | --- | --- |
+| `ProtoTest:Sheets:IncludeHiddenSheets` | `SheetsOptions.IncludeHiddenSheets` | `bool` | `false` |
+
+When false, hidden sheets are omitted from `ProtoWorkbook.Sheets` and from every count derived from it; each sheet still carries its original position in `ProtoSheet.Index`. Configuration layers over the code callback.
+
+### Context API
+
+```csharp
+ProtoSheets sheets = Proto.Context.Sheets();
+```
+
+Calling it without `AddSheets` throws `InvalidOperationException` with the guidance to call `AddSheets` on the host builder.
+
+| Open overload | Source |
+| --- | --- |
+| `Open(string path)` | a file on disk; the workbook name is the file name |
+| `Open(Stream stream, string name = "workbook.xlsx")` | an in-memory stream |
+| `Open(IProtoBinaryContent content, string? name = null)` | anything carrying named bytes, such as a REST response or a captured attachment; the name falls back to `content.FileName`, then `workbook.xlsx` |
+
+On the opened workbook:
+
+| Member | Does |
+| --- | --- |
+| `Name`, `Sheets` | the workbook name and the sheets that were read (visible ones by default) |
+| `Sheet(name)` | finds a sheet; a failure lists the available names |
+| `Model<TRow>()` | binds a `[Sheet]`/`[Column]` record to the workbook |
+| `KeyValueModel<TModel>()` | binds a `[Sheet(..., Kind = ProtoSheetKind.KeyValue)]` record with `[Label]` properties to a label/value sheet |
+
+On a sheet:
+
+| Read | Returns |
+| --- | --- |
+| `Cell(reference)`, `Cell(row, column)` (1-based) | one cell |
+| `Range(reference)` | a rectangular area |
+| `Table(params int[] headerRows)` (defaults to row 1) | a header-aware view |
+
+A sheet also carries `Name`, `Index`, `IsHidden`, `RowCount` and `ColumnCount`.
 
 ## In the trace and coverage
 

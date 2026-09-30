@@ -105,3 +105,23 @@ describe("SpanInspector checks", () => {
     unmount();
   });
 });
+
+// A moment that went wrong reads as such; an informational one stays quiet.
+describe("SpanInspector moments", () => {
+  it("marks a failed moment and leaves a quiet one alone", async () => {
+    const call = span({
+      moments: [
+        { at: 1, name: "Broker refused to close", kind: "resource.released", source: "ProtoTest", outcome: "failed", error: null, attributes: {}, sections: [], span: null },
+        { at: 2, name: "Server started", kind: "server.started", source: "ProtoTest", outcome: "succeeded", error: null, attributes: {}, sections: [], span: null }
+      ]
+    });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]) }));
+    await nextTick();
+
+    const rows = [...host.querySelectorAll(".moment")];
+    expect(rows).toHaveLength(2);
+    expect(rows[0].className).toContain("danger");
+    expect(rows[1].className).not.toContain("danger");
+    unmount();
+  });
+});

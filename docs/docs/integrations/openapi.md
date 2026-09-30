@@ -6,9 +6,27 @@ description: "Compare what your REST tests did against your OpenAPI document, an
 
 # OpenAPI
 
+`ProtoTest.OpenApi` compares what your REST tests did against your OpenAPI document, and reports the endpoints, responses and properties no test has touched.
+
+```csharp
+[ProtoTest]
+public async Task Order_shape_matches_the_document()
+{
+    var response = await Proto.Context.Rest("Api").GetAsync("/api/orders/42");
+    response.Should.HaveHttpStatus(HttpStatusCode.OK);
+    response.Should.MatchShape(new
+    {
+        id = 42,
+        lines = new[] { new { total = 10m } }
+    });
+}
+```
+
+Run it with `dotnet test`. A green run prints `Passed Order_shape_matches_the_document`. The request counts an endpoint and a response hit; the shape assertion is what counts the property hits.
+
 ## What it adds
 
-`ProtoTest.OpenApi` compares what your REST tests did against your OpenAPI document, and reports the endpoints, responses and properties no test has touched. It builds on [`ProtoTest.Rest`](./rest/index.md) and listens to the requests and shape assertions REST records.
+It builds on [`ProtoTest.Rest`](./rest/index.md) and listens to the requests and shape assertions REST records.
 
 :::note[Coverage, not validation]
 This package reports coverage. It doesn't validate requests or responses against the schema.
@@ -50,57 +68,11 @@ builder
             .AddCollector<OpenApiCoverageCollector>()));
 ```
 
-`AddCollector<TCollector>` passes the target name as the first constructor argument and forwards any extra arguments; everything else comes from dependency injection. Registering the same collector type for the same target twice is a no-op, so it reports once.
-
-### The specification source
-
-| Source | Value for `OpenApi:Specification` | Notes |
-| --- | --- | --- |
-| File path | `control-plane.openapi.json` | resolved as a file when it exists on disk |
-| Inline document | the JSON or YAML text itself | handy for small test specs |
-| URL | `https://api.example.test/swagger/v1/swagger.json` | a relative URL resolves against the application's `BaseUrl` |
-
-`ProtoTest:Applications:{application}:OpenApi:Specification` takes any of the three. A document that fails to parse throws with the parser's diagnostics.
-
-The application is the one the REST client belongs to: a client registered inside `AddApplication("Api", …)` resolves its specification under `ProtoTest:Applications:Api`, and a host-registered client uses its own target name as the application. If the key is missing or blank, the collector fails when it is constructed:
-
-```
-Application 'Api' has no 'OpenApi:Specification' configured. Set 'ProtoTest:Applications:Api:OpenApi:Specification'.
-```
-
-The configuration overload receives the host's `IConfiguration` and its registered application targets from DI. Extra `AddCollector` arguments fill the remaining constructor parameters, so a second overload takes the specification source directly:
-
-```csharp
-rest.AddClient("Api")
-    .AddCollector<OpenApiCoverageCollector>("https://api.example.test/swagger/v1/swagger.json");
-```
-
-### Options and keys
-
-| Key | Type | Default / required |
-| --- | --- | --- |
-| `ProtoTest:Applications:{application}:OpenApi:Specification` | `string` | required; blank throws when the collector is constructed |
-| `ProtoTest:Applications:{application}:BaseUrl` | `string?` | optional; used to resolve a relative specification URL only |
-
-There is no options class and no dedicated options section.
-
-### Context API
-
-None. The collector is attached to a REST target and needs no execution-context accessor.
+`AddCollector<TCollector>` passes the target name as the first constructor argument and forwards any extra arguments; everything else comes from dependency injection. Registering the same collector type for the same target twice is a no-op, so it reports once. The [reference](#reference) lists the specification sources, the keys and the matching rules.
 
 ## The tasks
 
-```csharp
-var response = await Proto.Context.Rest("Api").GetAsync("/api/orders/42");
-response.Should.HaveHttpStatus(HttpStatusCode.OK);
-response.Should.MatchShape(new
-{
-    id = 42,
-    lines = new[] { new { total = 10m } }
-});
-```
-
-The request counts an endpoint and a response hit; the shape assertion is what counts the property hits.
+The `Order_shape_matches_the_document` test above is the whole pattern: call the endpoint, assert the status, match the shape.
 
 ### Going further
 
@@ -193,6 +165,44 @@ OpenAPI              GET /api/orders/{id}      12 hits
 - One aggregate item records the specification identity: identifier `spec`, display `Specification`, metadata `spec.source` (the configured source, with URL credentials and known token query values removed) and `spec.hash` (SHA-256 of the loaded content). It has no covered verdict, so the coverage totals, run gates and the report percentage ignore it, and a cross-run comparison can tell the same specification from a changed one.
 
 All items are coverage items: covered ones are successful with a hit count, uncovered ones neutral. Register a [report sink](../observability/reporting.md) to see them, and read [Coverage](../observability/coverage.md) for how to use them.
+
+## Reference
+
+### The specification source
+
+| Source | Value for `OpenApi:Specification` | Notes |
+| --- | --- | --- |
+| File path | `control-plane.openapi.json` | resolved as a file when it exists on disk |
+| Inline document | the JSON or YAML text itself | handy for small test specs |
+| URL | `https://api.example.test/swagger/v1/swagger.json` | a relative URL resolves against the application's `BaseUrl` |
+
+`ProtoTest:Applications:{application}:OpenApi:Specification` takes any of the three. A document that fails to parse throws with the parser's diagnostics.
+
+The application is the one the REST client belongs to: a client registered inside `AddApplication("Api", …)` resolves its specification under `ProtoTest:Applications:Api`, and a host-registered client uses its own target name as the application. If the key is missing or blank, the collector fails when it is constructed:
+
+```
+Application 'Api' has no 'OpenApi:Specification' configured. Set 'ProtoTest:Applications:Api:OpenApi:Specification'.
+```
+
+The configuration overload receives the host's `IConfiguration` and its registered application targets from DI. Extra `AddCollector` arguments fill the remaining constructor parameters, so a second overload takes the specification source directly:
+
+```csharp
+rest.AddClient("Api")
+    .AddCollector<OpenApiCoverageCollector>("https://api.example.test/swagger/v1/swagger.json");
+```
+
+### Options and keys
+
+| Key | Type | Default / required |
+| --- | --- | --- |
+| `ProtoTest:Applications:{application}:OpenApi:Specification` | `string` | required; blank throws when the collector is constructed |
+| `ProtoTest:Applications:{application}:BaseUrl` | `string?` | optional; used to resolve a relative specification URL only |
+
+There is no options class and no dedicated options section.
+
+### Context API
+
+None. The collector is attached to a REST target and needs no execution-context accessor.
 
 ## In the trace and coverage
 

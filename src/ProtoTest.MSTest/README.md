@@ -6,7 +6,20 @@ Connects the ProtoTest lifecycle to MSTest.
 dotnet add package ProtoTest.MSTest
 ```
 
-Initialize a `ProtoTestAssembly` from `[AssemblyInitialize]`, clean it up from `[AssemblyCleanup]` and use `[ProtoTest]` instead of `[TestMethod]`.
+Initialize a `ProtoTestAssembly` from `[AssemblyInitialize]`, clean it up from `[AssemblyCleanup]` and use `[ProtoTest]` instead of `[TestMethod]`:
+
+```csharp
+[TestClass]
+public class Setup : ProtoTestAssembly
+{
+    [AssemblyInitialize]
+    public static Task AssemblyInitAsync(TestContext context)
+        => InitializeAsync(builder => { });
+
+    [AssemblyCleanup]
+    public static Task AssemblyCleanupAsync() => CleanupAsync();
+}
+```
 
 The adapter handles the test context, skip conditions, outcomes and MSTest result attachments. Each data row of a test method runs in its own ProtoTest lifecycle, like xUnit theory rows.
 

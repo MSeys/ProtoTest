@@ -7,9 +7,23 @@ description: "Talk to devices - a simulator or the real hardware - from the same
 
 # Devices
 
+`ProtoTest.Devices` talks to devices the way other integrations talk to APIs: a typed device class per kind of device, one instance per test, and every exchange in the same trace.
+
+```csharp
+[ProtoTest]
+[RequiresDevice<AcCharger>]
+public async Task A_charger_boots_and_acknowledges()
+{
+    var charger = Proto.Context.Devices("Chargers").For<AcCharger>("CP-001");
+    await charger.BootAsync();
+}
+```
+
+Run it with `dotnet test`. A green run prints `Passed A_charger_boots_and_acknowledges`, and the trace records a `device` entity with `device.command` operations for the exchange.
+
 ## What it adds
 
-`ProtoTest.Devices` talks to devices the way other integrations talk to APIs: a typed device class per kind of device, one instance per test, and every exchange in the same trace. The transport is a separate package - `ProtoTest.Devices.WebSocket` for sockets, `ProtoTest.Devices.Mqtt` for publish/subscribe - so the same suite runs against a simulator in CI and lab hardware on a bench.
+The transport is a separate package - `ProtoTest.Devices.WebSocket` for sockets, `ProtoTest.Devices.Mqtt` for publish/subscribe - so the same suite runs against a simulator in CI and lab hardware on a bench.
 
 ## Install
 
@@ -20,26 +34,6 @@ dotnet add package ProtoTest.Devices.WebSocket.AspNetCore   # in-process endpoin
 dotnet add package ProtoTest.Devices.Mqtt                   # MQTT publish/subscribe
 dotnet add package ProtoTest.Devices.Mqtt.Testcontainers    # a Mosquitto broker for the run
 ```
-
-## Defining a device
-
-Derive from `ProtoDevice` and give it the domain methods your scenario reads; the protected primitives (`ConnectAsync`, `SendAsync`, `ReceiveAsync`, `ExpectAsync`) carry the trace and coverage:
-
-```csharp
-public sealed class AcCharger : ProtoDevice
-{
-    public async ValueTask<string> BootAsync()
-    {
-        await SendTextAsync("BOOT");
-        var ack = await ExpectAsync(
-            "the charger acknowledges boot",
-            frame => frame.TryGetText(out var text) && text == "BOOT_ACK");
-        return ack.AsText();
-    }
-}
-```
-
-`ExpectAsync` is the assertion: it waits for the frame the behavior depends on, contributes device coverage, and a timeout fails with the description and the frames exchanged so far.
 
 ## Compose
 
@@ -120,17 +114,29 @@ A configured `ProtoTest:Devices:Mqtt:Broker` (the environment's broker) steps th
 
 ## The tasks
 
+The `A_charger_boots_and_acknowledges` test above is the whole pattern: resolve the device for an id, call its domain method.
+
+One instance per (client, type, id) and test, released with the test; a second `For` in the same test returns the same instance. `Devices()` without a name works when exactly one client is registered.
+
+### Defining a device
+
+Derive from `ProtoDevice` and give it the domain methods your scenario reads; the protected primitives (`ConnectAsync`, `SendAsync`, `ReceiveAsync`, `ExpectAsync`) carry the trace and coverage:
+
 ```csharp
-[ProtoTest]
-[RequiresDevice<AcCharger>]
-public async Task A_charger_boots_and_acknowledges()
+public sealed class AcCharger : ProtoDevice
 {
-    var charger = Proto.Context.Devices("Chargers").For<AcCharger>("CP-001");
-    await charger.BootAsync();
+    public async ValueTask<string> BootAsync()
+    {
+        await SendTextAsync("BOOT");
+        var ack = await ExpectAsync(
+            "the charger acknowledges boot",
+            frame => frame.TryGetText(out var text) && text == "BOOT_ACK");
+        return ack.AsText();
+    }
 }
 ```
 
-One instance per (client, type, id) and test, released with the test; a second `For` in the same test returns the same instance. `Devices()` without a name works when exactly one client is registered.
+`ExpectAsync` is the assertion: it waits for the frame the behavior depends on, contributes device coverage, and a timeout fails with the description and the frames exchanged so far.
 
 ### A conversation with a test-side peer
 

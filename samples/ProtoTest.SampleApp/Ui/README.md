@@ -1,7 +1,6 @@
 # Northstar Console
 
-A Vue 3 + TypeScript + Vite single-page console for the Northstar sample application. It talks to the
-real `/api/v1` API and `/graphql` endpoint (there is no mock layer), and the .NET build never runs Node.
+A Vue 3 + TypeScript + Vite single-page console for the Northstar sample application. It talks to the real `/api/v1` API and `/graphql` endpoint. There is no mock layer, and the .NET build never runs Node.
 
 ## Run it
 
@@ -12,27 +11,17 @@ npm run dev          # http://localhost:5180/console/, proxies /api, /graphql (w
 npm run build        # type-checks and writes dist/
 ```
 
-The dev proxy target defaults to `http://localhost:60546`; set `VITE_API_TARGET` to move it. The console
-is built with base `/console/` and is served by the sample app at `/console/` from `Ui/dist`.
+The dev proxy target defaults to `http://localhost:60546`; set `VITE_API_TARGET` to move it. The console is built with base `/console/` and is served by the sample app at `/console/` from `Ui/dist`.
 
-## Sign-in and sessions
+## Sign-in
 
-- **Browser flow**: open `/console/signin` and paste a tenant API token. It is exchanged for the same
-  HttpOnly `northstar_token` cookie the server-rendered `/login` form sets (`POST /api/auth/login`).
-  Every API and GraphQL call then carries the cookie. `POST /api/auth/logout` clears it.
-- **API-created session**: append `?token=<owner token>` to any `/console/...` URL. The token is kept in
-  `sessionStorage`, sent as `Authorization: Bearer ...`, and stripped from the address bar. This is how a
-  journey uses a token created by `POST /test-support/tenants` without driving the form.
-- A bearer session cannot authenticate a browser WebSocket, so live updates fall back to the visible
-  polling loop (below).
+- **Browser flow**: open `/console/signin` and paste a tenant API token. It is exchanged for the same HttpOnly `northstar_token` cookie the server-rendered `/login` form sets (`POST /api/auth/login`). Every API and GraphQL call then carries the cookie. `POST /api/auth/logout` clears it.
+- **API-created session**: append `?token=<owner token>` to any `/console/...` URL. The token is kept in `sessionStorage`, sent as `Authorization: Bearer ...`, and stripped from the address bar. This is how a journey uses a token created by `POST /test-support/tenants` without driving the form.
+- A bearer session cannot authenticate a browser WebSocket, so live updates fall back to polling (below).
 
-## Serving and fallback
+## Serving
 
-The sample app serves the build under `/console` from `Northstar:Ui:Path` (default `Ui/dist`, relative to
-the content root). `/` redirects to `/console/`. Unknown `/console/*` paths fall back to `index.html`;
-unknown paths elsewhere are 404, and `/api`, `/graphql`, `/test-support`, `/login` and `/projects` are
-untouched. When the folder is missing, `/console` answers with the "UI not built - run npm install && npm
-run build in Ui" page instead of failing.
+The sample app serves the build under `/console` from `Northstar:Ui:Path` (default `Ui/dist`, relative to the content root). `/` redirects to `/console/`. Unknown `/console/*` paths fall back to `index.html`; unknown paths elsewhere are 404, and `/api`, `/graphql`, `/test-support`, `/login` and `/projects` are untouched. When the folder is missing, `/console` answers with the "UI not built" page instead of failing.
 
 ## Screens and endpoints
 
@@ -46,15 +35,11 @@ run build in Ui" page instead of failing.
 | Reports | `/console/reports` | `GET /api/v1/reports/monthly.xlsx`, `GET /api/v1/reports/monthly.html` |
 | Not found | `/console/*` | none |
 
-"Promote to production" is composed client-side: it reads the preview environment's current version and
-its latest successful commit SHA, then deploys them to the production environment through the normal
-deployment endpoint. There is no server-side promote route.
+"Promote to production" is composed client-side: it reads the preview environment's current version and its latest successful commit SHA, then deploys them to the production environment through the normal deployment endpoint. There is no server-side promote route.
 
 ## Test hooks
 
-Every interactive element and every rendered fact carries a stable `data-testid`. Repeated hooks (rows)
-are scoped by their row: locate the row, then the element inside it. Attribute selectors are stable
-contracts; classes and text are not.
+Every interactive element and every rendered fact carries a stable `data-testid`. Repeated hooks (rows) are scoped by their row: locate the row, then the element inside it. Attribute selectors are stable contracts; classes and text are not.
 
 | Screen | Element | Hook |
 | --- | --- | --- |
@@ -82,29 +67,16 @@ contracts; classes and text are not.
 | Reports | HTML report document | `report-html`, `report-org`, `report-generated`, `report-table`, `report-row`, `report-project-name`, `report-project-status`, `report-project-environments` |
 | Not found | page, home link | `not-found`, `not-found-home` |
 
-Roles and labels: inputs have real `<label for>` associations (use `By.Label`); buttons are native
-`<button>` with visible names (use `By.Role`); nav links set `aria-current="page"`; the allowance meter
-is `role="meter"` with `aria-valuenow`; errors are `role="alert"`; toasts are `role="status"`/`alert`.
-The layout reserves space for errors and uses fixed-corner toasts, so controls do not move while a
-request is in flight.
+Roles and labels: inputs have real `<label for>` associations (use `By.Label`); buttons are native `<button>` with visible names (use `By.Role`); nav links set `aria-current="page"`; the allowance meter is `role="meter"` with `aria-valuenow`; errors are `role="alert"`; toasts are `role="status"`/`alert`. The layout reserves space for errors and uses fixed-corner toasts, so controls do not move while a request is in flight.
 
 ## Live updates
 
-The project screen subscribes to the app's own GraphQL subscription over WebSocket
-(`graphql-transport-ws`, `/graphql`, field `deploymentStatusChanged`). On any event for the project it
-re-reads project, environments and deployments. If the socket cannot connect (or the session is a bearer
-token), the screen shows `live-indicator[data-state="polling"]` and re-reads every 5 seconds; the
-`refresh-deployments` button is always available.
+The project screen subscribes to the app's own GraphQL subscription over WebSocket (`graphql-transport-ws`, `/graphql`, field `deploymentStatusChanged`). On any event for the project it re-reads project, environments and deployments. If the socket cannot connect (or the session is a bearer token), the screen shows `live-indicator[data-state="polling"]` and re-reads every 5 seconds; the `refresh-deployments` button is always available.
 
 ## What journeys will need that the app does not expose
 
-- **Promote** has no endpoint; the console composes it from `Deploy`. Journeys that want a server-side
-  promote must do the same.
-- **Invoice issuance** only happens at period close; use
-  `POST /test-support/tenants/{slug}/clock/advance` before asserting on billing.
-- **Environments** can be created but not renamed, paused or deleted; **projects** can be created and
-  archived, not deleted.
-- There is no **session endpoint** (`GET /api/v1/organization` is the session probe) and no token
-  introspection; a 401 sends the console to `/console/signin`.
-- The **GraphQL subscription carries only deployments and invoices**; the dashboard's "Latest releases"
-  is a plain query, not live.
+- **Promote** has no endpoint; the console composes it from `Deploy`. Journeys that want a server-side promote must do the same.
+- **Invoice issuance** only happens at period close; use `POST /test-support/tenants/{slug}/clock/advance` before asserting on billing.
+- **Environments** can be created but not renamed, paused or deleted; **projects** can be created and archived, not deleted.
+- There is no **session endpoint** (`GET /api/v1/organization` is the session probe) and no token introspection; a 401 sends the console to `/console/signin`.
+- The **GraphQL subscription carries only deployments and invoices**; the dashboard's "Latest releases" is a plain query, not live.

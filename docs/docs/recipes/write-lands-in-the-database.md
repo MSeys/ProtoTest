@@ -139,27 +139,13 @@ builder
 
 ## What the trace shows
 
-- The REST `http.request` for the write, with `assert.http.status` and the response as an `http.response` observation.
-- The `sql.connection.open` operation in setup, with the connection type, and the connection's release at teardown.
-
-The trace does not show the `SELECT`. Individual commands are not traced. The trace shows the connection lifecycle and call order. The assertion checks the row. When the row is missing, the assertion fails with the message the test wrote. The long-form reading is on [ProtoTrace](../observability/prototrace.md).
-
-In short, the trace reads in test order:
-
-```text
-01 http.request POST /api/v1/projects -> assert.http.status
-02 sql.connection.open in setup, released at teardown
-```
-
-The `SELECT` itself is not traced. The connection at `02` proves the lifecycle. The assertion proves the row.
-
-The sample suite's own run:
-
 <TraceExample
   demo="rest-database"
   title="REST write → committed row"
   path="POST /api/v1/projects · SELECT the row"
 />
+
+The trace reads in test order: the REST `http.request` for the write with `assert.http.status`, then the `sql.connection.open` operation from setup released at teardown. The `SELECT` itself is not traced. Individual commands are not traced; the connection lifecycle is, and the assertion proves the row. When the row is missing, the assertion fails with the message the test wrote. The long-form reading is on [ProtoTrace](../observability/prototrace.md).
 
 ## Variations
 

@@ -9,6 +9,25 @@ description: "A driver-independent browser-testing model for pages, components, 
 
 `ProtoTest.Web` gives each test a browser session behind page objects, with Playwright or Selenium underneath.
 
+```csharp
+[ProtoTest]
+public async Task Valid_credentials_sign_in()
+{
+    var login = Proto.Context.Web().Page<LoginPage>();
+    await login.OpenAsync("/login");
+
+    await login.Form.Flow("Sign in")
+        .Fill(form => form.Username, "matthias")
+        .Fill(form => form.Password, "correct horse")
+        .Click(form => form.Submit)
+        .RunAsync();
+
+    await login.Form.Status.Should.HaveTextAsync("Signed in");
+}
+```
+
+Run it with `dotnet test`. A green run prints `Passed Valid_credentials_sign_in`, and the trace lands at `TestResults/prototest-{runId}.prototrace` with a `web.session.initialize` operation holding every step the browser took. The page objects behind the test live under [The tasks](#the-tasks); the two backends that can run them are compared under [Which backend](#which-backend).
+
 ## What it adds
 
 `ProtoTest.Web` is a browser-testing model for pages, components, elements, tables, flows and login that doesn't depend on any particular browser driver. A backend package plugs a real driver in underneath:
@@ -17,12 +36,6 @@ description: "A driver-independent browser-testing model for pages, components, 
 - `ProtoTest.Web.Selenium` - drives any `IWebDriver` you create.
 
 Your page objects and tests stay the same for both. The backends differ underneath, most visibly in [locator translation](./locators.md#how-each-backend-translates-a-locator), but everything in this section is backend-neutral.
-
-```csharp
-var login = Proto.Context.Web().Page<LoginPage>();
-await login.OpenAsync("/login");
-await login.Form.Status.Should.HaveTextAsync("Signed in");
-```
 
 ```mermaid
 flowchart LR
@@ -307,7 +320,7 @@ await backend.Page.SetContentAsync(html);
 
 ## The tasks
 
-A page object describes the page; a test drives it. The smallest working example is below; the sample's full journey is in [WebJourney.cs](../../../../samples/Northstar.ProtoTest/WebJourney.cs):
+A page object describes the page; the sign-in test at the top of this page drives it. The smallest page objects behind that test are below; the sample's full journey is in [WebJourney.cs](../../../../samples/Northstar.ProtoTest/WebJourney.cs):
 
 ```csharp
 public sealed class LoginPage : WebPage
@@ -324,22 +337,7 @@ public sealed class LoginForm : WebComponent
 }
 ```
 
-```csharp
-[ProtoTest]
-public async Task Valid_credentials_sign_in()
-{
-    var login = Proto.Context.Web().Page<LoginPage>();
-    await login.OpenAsync("/login");
-
-    await login.Form.Flow("Sign in")
-        .Fill(form => form.Username, "matthias")
-        .Fill(form => form.Password, "correct horse")
-        .Click(form => form.Submit)
-        .RunAsync();
-
-    await login.Form.Status.Should.HaveTextAsync("Signed in");
-}
-```
+The driving test is the one at the top of this page. The flow behind it records one `web.flow` operation with a step per action, and the final read records `assert.web`.
 
 ### Going further
 

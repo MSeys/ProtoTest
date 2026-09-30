@@ -8,14 +8,7 @@ import TabbedCode from '@site/src/components/TabbedCode';
 
 # Created through the API, shown in the browser
 
-A browser needs a URL. The in-memory test host has none. This recipe starts the application listener, its container image, or a deployed instance.
-
-```text
-01 arrange over REST (POST /api/v1/projects) -> 201 Created
-02 sign in through the browser (navigate, fill, click)
-03 open the projects page and read the row (assert.web)
-04 filter the list and read the row again
-```
+Arrange over REST, check in the browser, keep one trace. A green run prints `Passed AProjectCreatedThroughTheApiAppearsOnThePage`, and the trace holds the REST create, the sign-in flow and the two page checks in that order. The test is first; the listener it needs follows under [Compose](#compose).
 
 ## The situation
 
@@ -23,47 +16,9 @@ A browser test that creates its own data through a form is slow. It can fail for
 
 The sample suite hosts the application's own listener in the test process and lets the page journey follow that address. The journey is `AProjectCreatedThroughTheApiAppearsOnThePage` in [WebJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/WebJourney.cs).
 
-## The code
+## The test
 
-### Compose
-
-The application builds without running, so a suite can start its own listener. In the sample suite that is one factory method next to `Program`:
-
-```csharp
-// Program.cs of the application under test.
-public static async Task Main(string[] args) => await CreateApp(args).RunAsync().ConfigureAwait(false);
-
-/// <summary>Builds the application without running it, so a suite can host it.</summary>
-public static WebApplication CreateApp(string[] args)
-{
-    var builder = WebApplication.CreateBuilder(args);
-    // ...the application's services, middleware and endpoints...
-    return builder.Build();
-}
-```
-
-`AddLoopbackApplication` starts that factory on `http://127.0.0.1:0` and publishes the bound address as the application's `BaseUrl`. Pass the factory's arguments to `WebApplication.CreateBuilder`: they carry the run's collected configuration, so the hand-built application reads the same addresses the tests do.
-
-```text
-[API in-process]--same store--[Loopback :0 -> BaseUrl]--browser--> [page]
-        +-- alt: ApplicationContainer --+  +-- alt: configured BaseUrl (listener steps aside)
-```
-
-```csharp
-// Setup.cs: the listener the browser can open, and the readiness probe that waits for it.
-builder.AddLoopbackApplication(NorthstarTargets.Web, NorthstarProgram.CreateApp);
-builder.AddHttpReadiness(NorthstarTargets.Web, "/health");
-
-builder.AddApplication(NorthstarTargets.Web, app => app
-    .AddRest(rest => rest
-        .CaptureAttachments()
-        .AddClient(NorthstarTargets.Web))
-    .AddWeb(options => options.Headless = true));
-```
-
-### The test
-
-The sample suite arranges through a second application, the in-process API, and the loopback instance for the page. Both read the same store, so the browser shows what the API wrote:
+The sample suite arranges through a second application, the in-process API, and the loopback instance for the page. Both read the same store, so the browser shows what the API wrote. The listener that gives the browser its URL is composed under [Compose](#compose).
 
 <TabbedCode
   label="The test and the page objects it reads"
@@ -136,6 +91,37 @@ public sealed class ProjectRow : WebComponent
 
 `Project(...)` and `Status` are page-object members, so the locators live in one place. All of it is the sample suite's own code: the page objects live in [Pages.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Pages.cs) and the sign-in screen is the application's real exchange of a tenant token for a session. See [Page objects](../integrations/web/page-objects.md) and [Logging in](../integrations/web/login.md).
 
+## Compose
+
+A browser needs a URL. The in-memory test host has none, so the suite starts its own listener. In the sample suite that is one factory method next to `Program`:
+
+```csharp
+// Program.cs of the application under test.
+public static async Task Main(string[] args) => await CreateApp(args).RunAsync().ConfigureAwait(false);
+
+/// <summary>Builds the application without running it, so a suite can host it.</summary>
+public static WebApplication CreateApp(string[] args)
+{
+    var builder = WebApplication.CreateBuilder(args);
+    // ...the application's services, middleware and endpoints...
+    return builder.Build();
+}
+```
+
+`AddLoopbackApplication` starts that factory on `http://127.0.0.1:0` and publishes the bound address as the application's `BaseUrl`. Pass the factory's arguments to `WebApplication.CreateBuilder`: they carry the run's collected configuration, so the hand-built application reads the same addresses the tests do. A container image or a deployed instance replaces the listener without touching the test: a configured `BaseUrl` wins and the listener stays stopped.
+
+```csharp
+// Setup.cs: the listener the browser can open, and the readiness probe that waits for it.
+builder.AddLoopbackApplication(NorthstarTargets.Web, NorthstarProgram.CreateApp);
+builder.AddHttpReadiness(NorthstarTargets.Web, "/health");
+
+builder.AddApplication(NorthstarTargets.Web, app => app
+    .AddRest(rest => rest
+        .CaptureAttachments()
+        .AddClient(NorthstarTargets.Web))
+    .AddWeb(options => options.Headless = true));
+```
+
 ## What the trace shows
 
 The trace reads as one story:
@@ -146,15 +132,7 @@ The trace reads as one story:
 
 Navigations record `web.page.visited`, passing page assertions record `web.page.verified`, and the page inventory records `web.page.available`. Reaching a page is not checking it. Only a verified page counts as covered. See [Web](../integrations/web/index.md#in-the-trace-and-coverage).
 
-In short, the trace reads in test order:
-
-```text
-01 http.request POST /api/v1/projects -> assert.http.status
-02 web.session.initialize -> web.navigate -> web.fill -> web.click (sign-in)
-03 web.navigate -> flow -> assert.web (the project row)
-```
-
-A failure in `03` points at the arrange step in `01` or the flow in `02`. All three stay in the same test trace.
+A failure in the page checks points at the arrange step or the sign-in flow. All three stay in the same test trace.
 
 ## Variations
 

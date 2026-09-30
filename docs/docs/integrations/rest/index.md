@@ -80,22 +80,19 @@ There is **no endpoint default**: `endpoint` names the key under `ProtoTest:Appl
 }
 ```
 
-### Options and keys
+## The tasks
 
-| Section | Key | Default |
-| --- | --- | --- |
-| `ProtoTest:Rest:Responses` | `MaxResponseBodyBytes` | `10485760` (10 MiB) |
-| | `MaxDiagnosticBodyLength` | `65536` |
-| `ProtoTest:Rest:Attachments` | `CaptureRequestBodies`, `CaptureResponses`, `CaptureExpectedShapes` | `true` |
-| | `RedactSensitiveData` | `true` |
-| | `MaxDiagnosticBodyLength` | `65536` |
-| | `SensitiveHeaders` | `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` |
-| | `SensitiveQueryParameters` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret`, `client_secret`, `id_token`, `key` |
-| | `SensitiveJsonProperties` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret`, `client_secret`, `id_token` |
+The `Creates_an_order` test above is the whole pattern: build, send with a verb, assert. The pages below cover each step.
 
-Set them in code or configuration. Configuration binds last, so it wins over code. Both option types are shared with GraphQL: each protocol owns its own keyed instance and section. When a protocol names no section of its own, the types fall back to the shared `ProtoTest:Http:Responses` and `ProtoTest:Http:Attachments` sections; every protocol here names one.
+### Going further
 
-### Context API
+- **Authentication** - `.Auth<T>(...)`, `.WithoutAuth()`, and `[Auth<T>]` on the class or method: [Authentication](./authentication.md).
+- **Attachments** - `.CaptureAttachments()` records sanitized request, response and expected-shape attachments: [Attachments and coverage](./attachments.md).
+- **Coverage** - attach `.AddCollector<RestCoverageCollector>()` to the client; [OpenAPI coverage](../openapi.md) consumes the shape assertions' matched paths, and `.AddCollector<RestTrafficCoverageCollector>()` reports the fields no shape mentioned: [Coverage](../../observability/coverage.md#traffic-coverage-observed-but-unasserted).
+- **Multiple clients** - pass `.Rest("Billing")`, or bind one for the whole test with `[Application("Api", "Rest:Billing")]`.
+- **In-process server** - `AddAspNetCoreServer<Program>()` plus a client with no URL reuses its transport automatically. A configured `BaseUrl` wins and the in-process server stays stopped.
+
+### Reference: resolution and options
 
 ```csharp
 RestRequestBuilder Rest(this ProtoExecutionContext context, string? clientName = null);
@@ -116,19 +113,27 @@ The client's base address is the application's, resolved with the shared precede
 
 A client whose address resolves is built over a test-owned handler, so its cookie jar carries only that test's session. Parallel tests never share sign-in state. If nothing resolves, the call throws `InvalidOperationException` listing the protocol's registered client names.
 
-## The tasks
+| Section | Key | Default |
+| --- | --- | --- |
+| `ProtoTest:Rest:Responses` | `MaxResponseBodyBytes` | `10485760` (10 MiB) |
+| | `MaxDiagnosticBodyLength` | `65536` |
+| `ProtoTest:Rest:Attachments` | `CaptureRequestBodies`, `CaptureResponses`, `CaptureExpectedShapes` | `true` |
+| | `RedactSensitiveData` | `true` |
+| | `MaxDiagnosticBodyLength` | `65536` |
+| | `SensitiveHeaders` | `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` |
+| | `SensitiveQueryParameters` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret`, `client_secret`, `id_token`, `key` |
+| | `SensitiveJsonProperties` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret`, `client_secret`, `id_token` |
 
-The `Creates_an_order` test above is the whole pattern: build, send with a verb, assert. The pages below cover each step.
-
-### Going further
-
-- **Authentication** - `.Auth<T>(...)`, `.WithoutAuth()`, and `[Auth<T>]` on the class or method: [Authentication](./authentication.md).
-- **Attachments** - `.CaptureAttachments()` records sanitized request, response and expected-shape attachments: [Attachments and coverage](./attachments.md).
-- **Coverage** - attach `.AddCollector<RestCoverageCollector>()` to the client; [OpenAPI coverage](../openapi.md) consumes the shape assertions' matched paths, and `.AddCollector<RestTrafficCoverageCollector>()` reports the fields no shape mentioned: [Coverage](../../observability/coverage.md#traffic-coverage-observed-but-unasserted).
-- **Multiple clients** - pass `.Rest("Billing")`, or bind one for the whole test with `[Application("Api", "Rest:Billing")]`.
-- **In-process server** - `AddAspNetCoreServer<Program>()` plus a client with no URL reuses its transport automatically. A configured `BaseUrl` wins and the in-process server stays stopped.
+Set them in code or configuration. Configuration binds last, so it wins over code. Both option types are shared with GraphQL: each protocol owns its own keyed instance and section. When a protocol names no section of its own, the types fall back to the shared `ProtoTest:Http:Responses` and `ProtoTest:Http:Attachments` sections; every protocol here names one.
 
 ## In the trace and coverage
+
+```text
+http.request REST · POST /api/orders · 201 Created
+├─ assert.http.status (expected and actual agree)
+├─ assert.json.shape (5 properties matched at once)
+└─ http.response (observation: status, sanitized body and headers, duration)
+```
 
 Each request records an `http.request` operation (`REST · {METHOD} {route}`) under the protocol-scoped client entity (`client:System.Net.Http.HttpClient:Rest:{target}`), with the method, route, sanitized URL, header count and response status. Assertions record `assert.http.status`, `assert.http.content_type`, `assert.http.header`, `assert.http.cookie`, `assert.http.redirect_location` and `assert.json.shape` as children of that request. Observations: `http.response` for every response (method, route template, status, sanitized body and headers, duration), `http.failure` when sending or URI building fails, and `http.contract.shape` when a shape assertion matches. `RestCoverageCollector` turns `http.response` observations into `REST` coverage items; `RestTrafficCoverageCollector` consumes `http.response` and `http.contract.shape` for its observed-but-unasserted section. See [ProtoTrace](../../observability/prototrace.md) and [Coverage](../../observability/coverage.md).
 

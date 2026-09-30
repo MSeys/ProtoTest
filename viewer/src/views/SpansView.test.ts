@@ -136,9 +136,31 @@ describe("SpansView attention filter", () => {
   });
 });
 
+// A span's leavings read in the model's own words: what it stated, captured or found, not one event count.
+describe("SpansView evidence marks", () => {
+  it("names observations, attachments and moments instead of lumping them as events", async () => {
+    const call = span({
+      id: "call", name: "Create project",
+      evidence: [
+        { type: "observation", at: 1, target: "projects", kind: "row-count", identifier: null, data: null, metadata: {}, span: null },
+        { type: "attachment", at: 2, name: "shot.png", artifact: null, span: null }
+      ],
+      moments: [{ at: 3, name: "Server started", kind: "server.started", source: "ProtoTest", outcome: "succeeded", error: null, attributes: {}, sections: [], span: null }]
+    });
+    const { host, unmount } = mount(h(SpansView, { test: testTrace([call]), onSelect: () => {} }));
+    await nextTick();
+
+    const marks = host.querySelector(".row .events")?.textContent;
+    expect(marks).toContain("1 observation");
+    expect(marks).toContain("1 attachment");
+    expect(marks).toContain("1 moment");
+    expect(marks).not.toContain("event");
+    unmount();
+  });
+});
+
 // The tree is long and the search is its index: pressing / lands in it from anywhere outside a field.
-describe("SpansView search shortcut", () => {
-  it("focuses the search on /", async () => {
+describe("SpansView search shortcut", () => {  it("focuses the search on /", async () => {
     const { host, unmount } = mount(h(SpansView, { test: testTrace([span({})]), onSelect: () => {} }));
     await nextTick();
 

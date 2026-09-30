@@ -6,7 +6,23 @@ Connects the ProtoTest lifecycle to NUnit.
 dotnet add package ProtoTest.NUnit
 ```
 
-Create a `[SetUpFixture]` that inherits `ProtoTestAssembly`, then use `[ProtoTest]` instead of `[Test]` on ProtoTest scenarios. To skip that, add `[assembly: ProtoTestAutoWrap]` and every plain `[Test]` runs through the same lifecycle.
+Create a `[SetUpFixture]` that inherits `ProtoTestAssembly` and compose the suite in `Configure`, then use `[ProtoTest]` instead of `[Test]`:
+
+```csharp
+[SetUpFixture]
+public class Setup : ProtoTestAssembly
+{
+    protected override void Configure(IProtoHostBuilder builder) { }
+}
+
+[ProtoTest]
+public async Task CheckoutTotalsMatch()
+{
+    // Proto.Context is ready here.
+}
+```
+
+To skip that, add `[assembly: ProtoTestAutoWrap]` and every plain `[Test]` runs through the same lifecycle.
 
 The adapter starts and completes the test context, evaluates ProtoTest skip conditions and publishes attachments through NUnit.
 

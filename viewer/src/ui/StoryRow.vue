@@ -108,7 +108,7 @@ function pick() {
       <span v-else class="leaf" aria-hidden="true" />
 
       <button type="button" class="pick" :data-span="row.type === 'step' ? row.span.id : undefined" :title="row.type === 'step' ? row.span.kind : row.spans.map(span => span.name).join('\n')" :aria-current="row.type === 'step' && row.span.id === selected ? 'true' : undefined" @click="pick">
-        <KindChip :type="row.type === 'step' ? kindLabel(row.span.kind) : { id: 'extension', label: 'Framework' }" />
+        <KindChip quiet :type="row.type === 'step' ? kindLabel(row.span.kind) : { id: 'extension', label: 'Framework' }" />
         <span class="title" :class="{ quiet: row.type === 'group' }">{{ row.type === "step" ? row.span.name : row.label }}</span>
         <span v-if="row.type === 'step' && row.span.count > 1" class="count" :title="`Ran ${row.span.count} times`">×{{ row.span.count }}</span>
         <span v-if="row.type === 'step'" class="visually-hidden">{{ outcomeLabel(row.span.status) }}</span>
@@ -219,6 +219,7 @@ function pick() {
   font-size: var(--text-meta);
   white-space: nowrap;
 }
+.check.success { border-color: transparent; background: transparent; }
 .check.success svg { color: var(--success); }
 .check.danger { border-color: var(--danger); color: var(--danger); font-weight: var(--weight-semibold); }
 .check.warning { border-color: var(--warning); color: var(--warning); }
@@ -226,8 +227,9 @@ function pick() {
 .check.active { border-color: var(--blueprint); background: var(--blueprint-soft); color: var(--text); }
 
 .marks { display: flex; justify-content: flex-end; gap: var(--space-2); color: var(--dim); font-size: var(--text-meta); white-space: nowrap; }
-.waterfall { position: relative; height: 6px; border-radius: var(--radius-hairline); background: var(--surface-2); }
-.waterfall i { position: absolute; top: 0; bottom: 0; min-width: 2px; border-radius: var(--radius-hairline); background: var(--muted); }
+/* The bar shows where the time went; with no track behind it, the list reads as rows, not as stripes. */
+.waterfall { position: relative; height: 4px; }
+.waterfall i { position: absolute; top: 0; bottom: 0; min-width: 2px; border-radius: var(--radius-hairline); background: color-mix(in srgb, var(--muted) 70%, transparent); }
 .line.danger .waterfall i { background: var(--danger); }
 .line.group .waterfall i { background: var(--border-strong); }
 .duration { color: var(--muted); font-size: var(--text-body); text-align: right; font-variant-numeric: tabular-nums; }

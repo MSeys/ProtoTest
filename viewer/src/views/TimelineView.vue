@@ -205,7 +205,7 @@ const title = (phase: string) => phase.charAt(0).toUpperCase() + phase.slice(1);
               <button type="button" class="pick" :data-span="entry.span.id" :aria-current="entry.span.id === selected ? 'true' : undefined"
                       :title="`${entry.span.name}\n${entry.span.kind} from ${entry.span.source}, ${formatOffset(entry.span.start - test.start)} into the test`"
                       @click="emit('select', entry.span)">
-                <KindChip :type="kindLabel(entry.span.kind)" />
+                <KindChip quiet :type="kindLabel(entry.span.kind)" />
                 <span class="name">{{ entry.span.name }}</span>
                 <span v-if="marks(entry.span)" class="events">{{ marks(entry.span) }}</span>
                 <span class="visually-hidden">{{ outcomeLabel(entry.span.status) }}</span>

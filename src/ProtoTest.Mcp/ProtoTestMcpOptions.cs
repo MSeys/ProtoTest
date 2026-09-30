@@ -67,7 +67,7 @@ public sealed record ProtoTestMcpOptions
             }
 
             throw new ProtoTestMcpConfigurationException(
-                $"Unknown argument '{argument}'. {Usage}");
+                $"Unknown argument '{argument}'.");
         }
 
         if (!string.IsNullOrWhiteSpace(tracePath))
@@ -98,13 +98,13 @@ public sealed record ProtoTestMcpOptions
         {
             if (index + 1 >= args.Length)
             {
-                throw new ProtoTestMcpConfigurationException($"'{name}' needs a value. {Usage}");
+                throw new ProtoTestMcpConfigurationException($"'{name}' needs a value.");
             }
 
             value = args[++index];
             if (string.IsNullOrWhiteSpace(value))
             {
-                throw new ProtoTestMcpConfigurationException($"'{name}' needs a value. {Usage}");
+                throw new ProtoTestMcpConfigurationException($"'{name}' needs a value.");
             }
 
             return true;
@@ -116,7 +116,7 @@ public sealed record ProtoTestMcpOptions
             value = argument[prefix.Length..];
             if (string.IsNullOrWhiteSpace(value))
             {
-                throw new ProtoTestMcpConfigurationException($"'{name}' needs a value. {Usage}");
+                throw new ProtoTestMcpConfigurationException($"'{name}' needs a value.");
             }
 
             return true;

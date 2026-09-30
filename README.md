@@ -57,7 +57,7 @@ ProtoTest 1.x stays additive. Released APIs change only through deprecated shims
 
 ProtoTest moves setup behind shared layers, which keeps tests clean but can hide failure causes.
 
-The built-in integrations hook into the tracing provided by Core. Every run writes a `.prototrace` file with setup, teardown, observations, state and attachments for the ProtoTrace viewer.
+The built-in integrations hook into the tracing provided by Core. Every run writes a `.prototrace` file with setup, teardown, observations, state and attachments for the ProtoTrace viewer. A reader only opens an archive from its own era; see [format compatibility](https://prototest.dev/docs/observability/prototrace-archive#format-compatibility).
 
 <p align="center">
   <img src="assets/trace-viewer.png" alt="ProtoTrace showing a failed integration test, its execution story, response mismatch and cleanup" />

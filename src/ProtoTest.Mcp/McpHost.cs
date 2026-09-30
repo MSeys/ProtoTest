@@ -30,6 +30,7 @@ public static class McpHost
         catch (ProtoTestMcpConfigurationException exception)
         {
             await error.WriteLineAsync(exception.Message).ConfigureAwait(false);
+            await error.WriteLineAsync(ProtoTestMcpOptions.Usage).ConfigureAwait(false);
             return 2;
         }
 

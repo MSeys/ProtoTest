@@ -9,7 +9,7 @@ import TraceDiff from '@site/src/components/TraceDiff';
 
 # ProtoTrace
 
-ProtoTest records each test on its own. No logging calls are needed. The trace holds hooks, requests, checks, state changes, attachments and cleanup, and the run writes it to one portable `.prototrace` file.
+ProtoTest records each test on its own. No logging calls are needed. The trace holds hooks, requests, checks, state changes, attachments and cleanup, and the run writes it to one portable `.prototrace` file. Portable has a limit: a reader only opens an archive from its own era, so check [format compatibility](./prototrace-archive.md#format-compatibility) before you archive traces long term.
 
 When a test fails in CI, download that file and open it in the [ProtoTrace viewer](https://trace.prototest.dev). You see the failing check with the request, the response and the setup around it. Without a browser, read the same story from a terminal:
 

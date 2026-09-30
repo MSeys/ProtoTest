@@ -96,7 +96,7 @@ re-reads project, environments and deployments. If the socket cannot connect (or
 token), the screen shows `live-indicator[data-state="polling"]` and re-reads every 5 seconds; the
 `refresh-deployments` button is always available.
 
-## What journeys will need that the app does not expose yet
+## What journeys will need that the app does not expose
 
 - **Promote** has no endpoint; the console composes it from `Deploy`. Journeys that want a server-side
   promote must do the same.

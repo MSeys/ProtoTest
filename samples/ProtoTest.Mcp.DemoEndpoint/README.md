@@ -16,5 +16,5 @@ Honest state:
 dotnet run --project samples/ProtoTest.Mcp.DemoEndpoint
 ```
 
-The MCP endpoint is then at `http://127.0.0.1:5199/`. Hosting this beyond a demo - an address, a
+The MCP endpoint is then at `http://127.0.0.1:5199/`. It serves at the root path `/` (the `MapMcp` default); a POST to `/mcp` returns 404. Hosting this beyond a demo - an address, a
 proxy, retention and abuse limits - is a deployment decision, not a package.

@@ -241,7 +241,7 @@ function bars(test: TestTrace) {
       <div class="scale" aria-hidden="true"><span class="axis"><i>start</i><i>{{ formatOffset(run.duration) }}</i></span></div>
       <div class="tests">
         <button v-for="span in run.spans" :key="span.id" type="button" class="test-row operation" :class="[tone(span.status), { selected: selectedSpan === span }]"
-                :aria-pressed="selectedSpan === span" @click="emit('span', span)">
+                :aria-pressed="selectedSpan === span" :title="`${span.name} (${span.kind})`" @click="emit('span', span)">
           <i class="status" :class="tone(span.status)" />
           <span class="test-name"><strong>{{ span.name }}</strong><small>{{ span.kind }}</small></span>
           <span class="bar"><i :style="operationBar(span)" /></span>
@@ -374,16 +374,15 @@ button.issue:hover { background: var(--hover); }
 .name-line { min-width: 0; display: flex; align-items: baseline; gap: var(--space-2); }
 .name-line span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-meta); }
 .name-line small { flex: none; color: var(--dim); font-size: var(--text-micro); }
-/* A test that did not pass says why in the list, so the reader can pick the right one without opening it. */
-.reason { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-micro); }
-.test-row.danger .reason { color: var(--danger); }
-.test-row.warning .reason { color: var(--warning); }
-.test-row.neutral .reason { color: var(--muted); }
 .bar { position: relative; height: 6px; border-radius: var(--radius-hairline); background: var(--surface-2); }
 .bar i { position: absolute; top: 0; bottom: 0; border-radius: var(--radius-hairline); }
 .bar i.gap { background: repeating-linear-gradient(135deg, var(--muted) 0, var(--muted) 1px, transparent 1px, transparent 4px); }
 .operation .bar i { background: var(--blueprint); }
-.operation strong { overflow-wrap: anywhere; font-size: var(--text-body); }
+/* A run operation reads like a test row: its name on one line, its kind under it, the full name a hover away. */
+.operation .status { justify-self: center; }
+.operation strong, .operation .test-name small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.operation strong { font-size: var(--text-meta); font-weight: var(--weight-semibold); }
+.operation .test-name small { color: var(--dim); font-size: var(--text-micro); }
 .selected { outline: 1px solid var(--blueprint); background: var(--blueprint-soft); }
 .run-items { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) var(--space-4); }
 .run-items button { min-width: 0; padding: var(--space-2) var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-2); text-align: left; }
@@ -403,6 +402,8 @@ button.issue:hover { background: var(--hover); }
   .test-row .bar { grid-column: 2; grid-row: 2; }
   .test-row .duration { grid-column: 3; grid-row: 1; }
   .test-row > .status:last-of-type { grid-column: 4; grid-row: 1; }
+  /* An operation's status leads its row, where a test has its number. */
+  .operation > .status:first-child { grid-column: 1; grid-row: 1; }
   .scale { grid-template-columns: 22px minmax(0, 1fr) 52px 7px; }
   .scale .axis { grid-column: 2; }
   .issue { grid-template-columns: 30px minmax(0, 1fr); }

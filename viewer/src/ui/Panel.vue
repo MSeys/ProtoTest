@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { useId } from "vue";
+import HintTip from "./HintTip.vue";
 
-/* The subtitle explains the panel once, for whoever asks: on the title's hover and to a screen reader, not as a
+/* The subtitle explains the panel once, for whoever asks: behind a small mark beside the title, not as a
    standing line under every heading. */
-const hintId = useId();
 defineProps<{
   title?: string;
   subtitle?: string;
@@ -19,8 +18,7 @@ defineProps<{
       <div class="titles">
         <slot name="lead" />
         <div class="text">
-          <h2 v-if="title" :title="subtitle" :aria-describedby="subtitle ? hintId : undefined">{{ title }}<i v-if="subtitle" class="hint-mark" aria-hidden="true">?</i></h2>
-          <p v-if="subtitle" :id="hintId" class="hint">{{ subtitle }}</p>
+          <h2 v-if="title">{{ title }}<HintTip v-if="subtitle" :text="subtitle" /></h2>
         </div>
       </div>
       <div v-if="$slots.actions" class="actions"><slot name="actions" /></div>
@@ -52,9 +50,7 @@ defineProps<{
 .text { min-width: 0; display: grid; }
 h2 { font-family: var(--font-ui); font-size: var(--text-strong); font-weight: var(--weight-bold); letter-spacing: 0; line-height: var(--leading-tight); }
 h2 { display: inline-flex; align-items: center; gap: var(--space-2); }
-.hint-mark { width: 14px; height: 14px; display: inline-grid; place-items: center; border: 1px solid var(--border-strong); border-radius: 50%; color: var(--dim); font: var(--weight-semibold) var(--text-micro) var(--font-ui); font-style: normal; line-height: 1; cursor: help; }
-h2:hover .hint-mark { border-color: var(--muted); color: var(--muted); }
-.hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
 .actions { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
 .body { min-width: 0; }
 .body.normal { padding: var(--space-4); }

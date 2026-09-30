@@ -508,6 +508,70 @@ HTTP only.
         Assert-Fixture ($text.Contains("## Limits")) "the failure must name the missing heading: $text"
     }
 
+    # Every internal link fragment must name a heading in its target file: a stale anchor fails
+    # naming file, line and target, while relative, absolute, same-page, index and changelog links
+    # with live anchors pass.
+    Invoke-Fixture "check-docs-link-fragments" {
+        if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return "skip" }
+
+        $root = Join-Path $fixtureRoot "check-docs-link-fragments"
+        New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs/guide"), (Join-Path $root "docs/learn/track"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "src") -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot "check-docs.ps1") -Destination (Join-Path $root "eng/check-docs.ps1")
+        Set-Content -LiteralPath (Join-Path $root "docs/scripts/generate-changelog.mjs") -Value "process.exit(0);" -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root "docs/configuration-keys.json") -Value '{"sections":[],"allowedKeys":[]}' -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root "src/Fixture.cs") -Value 'namespace Fixture; public sealed class Fixture { }' -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root "docs/docs/guide/index.md") -Value "# Guide Index`n`n## Guide Start`n" -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root "docs/docs/guide/target.md") -Value "# Target Page`n`n## Setup Options`n" -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root "docs/learn/track/lesson.md") -Value "# Lesson One`n`n## First Steps`n`nSee [the options](/docs/guide/target#setup-options) and [the start](#first-steps).`n" -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root "docs/docs/guide/page.md") -Value @'
+# Source Page
+
+## Local Section
+
+See [the options](./target.md#setup-options), [the same page](#local-section),
+[the absolute target](/docs/guide/target#setup-options), [the guide start](./#guide-start)
+and [the process](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#context-lookups).
+'@ -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root "CHANGELOG.md") -Value @'
+# Changelog
+
+## Unreleased
+
+- A thing. [Target](https://prototest.dev/docs/guide/target#setup-options)
+'@ -Encoding utf8
+
+        # A stale anchor fails and names the file, the line and the target.
+        Add-Content -LiteralPath (Join-Path $root "docs/docs/guide/page.md") -Value "`nSee [the gone options](./target.md#no-such-section).`n" -Encoding utf8
+        Add-Content -LiteralPath (Join-Path $root "CHANGELOG.md") -Value "- Gone. [Target](https://prototest.dev/docs/guide/target#no-such-changelog-section)`n" -Encoding utf8
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+        $text = $output -join [Environment]::NewLine
+        Assert-Fixture ($LASTEXITCODE -ne 0) "a stale link fragment must fail: $text"
+        Assert-Fixture ($text.Contains("guide/page.md") -and $text.Contains("target.md#no-such-section") -and $text.Contains("->")) "the failure must read 'file:line -> target#fragment': $text"
+        Assert-Fixture ($text.Contains("CHANGELOG.md") -and $text.Contains("#no-such-changelog-section")) "the changelog anchor failure must name its target: $text"
+
+        # The same tree with live anchors passes: relative, absolute, same-page, index, external
+        # and changelog links alike.
+        Set-Content -LiteralPath (Join-Path $root "docs/docs/guide/page.md") -Value @'
+# Source Page
+
+## Local Section
+
+See [the options](./target.md#setup-options), [the same page](#local-section),
+[the absolute target](/docs/guide/target#setup-options), [the guide start](./#guide-start)
+and [the process](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#context-lookups).
+'@ -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root "CHANGELOG.md") -Value @'
+# Changelog
+
+## Unreleased
+
+- A thing. [Target](https://prototest.dev/docs/guide/target#setup-options)
+'@ -Encoding utf8
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+        $text = $output -join [Environment]::NewLine
+        Assert-Fixture ($LASTEXITCODE -eq 0) "live anchors must pass: $text"
+    }
+
     # The workflow's template smoke step stays on the shared script, so CI and the local fixture test
     # the same five runners instead of drifting apart.
     Invoke-Fixture "template-workflow-script" {

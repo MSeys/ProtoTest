@@ -40,7 +40,7 @@ async function copyShare(link: string) {
     <div class="actions">
       <a class="docs" href="https://prototest.dev/docs/">Docs</a>
       <!-- Same order as the HTML report and the docs: the page's own action first, the theme switch last. -->
-      <AppButton v-if="share" @click="copyShare(share!)">{{ copied ? "Copied" : "Copy link" }}</AppButton>
+      <AppButton v-if="share" aria-live="polite" @click="copyShare(share!)">{{ copied ? "Copied" : "Copy link" }}</AppButton>
       <AppButton variant="primary" @click="$emit('open')">Open trace</AppButton>
       <AppButton variant="icon" :label="`Use ${theme === 'dark' ? 'light' : 'dark'} mode`" @click="toggleTheme">
         <Icon :name="theme === 'dark' ? 'sun' : 'moon'" />

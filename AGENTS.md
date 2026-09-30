@@ -96,7 +96,7 @@ When a controller session runs workers:
 | `eng/lint.ps1` | every stage |
 | `eng/check-docs.ps1` | docs, README or site changes |
 | `eng/pack.ps1` | packaging, csproj, version or new-project changes |
-| `eng/verify.ps1 -Stage <name>` | every stage; scopes to the working-tree change, or the HEAD commit on a clean tree; a docs-only stage records `docs-only`, a stage that only touched gate scripts/workflows records `tooling` and runs the gate fixtures, and a code stage whose lint/tests were skipped records `incomplete` (non-green) unless `-AllowSkippedCodeGates` names the exception; `-Pack` when public surface or packaging changed, `-Full` to force the CI shape; writes `artifacts/gates/<name>.json` |
+| `eng/verify.ps1 -Stage <name>` | every stage; scopes to the working-tree change, or the HEAD commit on a clean tree; a docs-only stage records `docs-only`, a viewer-only stage records `viewer` and runs the viewer gate (`npm ci`, `npm test`, `npm run build` in `viewer/`), a stage that only touched gate scripts/workflows records `tooling` and runs the gate fixtures, and a code stage whose lint/tests were skipped records `incomplete` (non-green) unless `-AllowSkippedCodeGates` names the exception; `-Pack` when public surface or packaging changed, `-Full` to force the CI shape; writes `artifacts/gates/<name>.json` |
 | `eng/test-gates.ps1` | the gate scripts' own fixtures; runs inside `verify.ps1` when `eng/**.ps1` or workflows changed, and in CI |
 | `npm run build` in `docs/` | docs site content or navigation changes |
 

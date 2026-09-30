@@ -103,6 +103,46 @@ public sealed class ProtoTestScopeTests
     }
 
     [Test]
+    public async Task DisposeAsync_WhenDisposedOffFlow_ShouldReleaseTheOrphanedContext()
+    {
+        // The orphaned test never completes, but its clock entry must not leak with it: the scope
+        // releases what it can before reporting the mismatch.
+        await using var host = new ProtoHostBuilder().Build();
+        await host.StartAsync();
+        var preparation = ProtoTestAdapter.Prepare(TestMethods.Placeholder, host);
+        var scope = await ProtoTestScope.StartAsync(preparation, host);
+        scope.Result = ProtoTestResult.Passed;
+        var testId = scope.Context.TestId;
+        Assert.That(host.FindClock(testId), Is.Not.Null, "the starting test registers its clock");
+
+        Exception? failure = null;
+        Task disposal;
+        using (ExecutionContext.SuppressFlow())
+        {
+            // A flow that never saw the test: no ambient context reaches the dispose call.
+            disposal = Task.Run(async () =>
+            {
+                try
+                {
+                    await scope.DisposeAsync();
+                }
+                catch (InvalidOperationException exception)
+                {
+                    failure = exception;
+                }
+            });
+        }
+
+        await disposal;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(failure, Is.Not.Null, "the off-flow mismatch is still reported");
+            Assert.That(host.FindClock(testId), Is.Null, "the orphaned clock entry is released");
+        });
+    }
+
+    [Test]
     public async Task DisposeAsync_WhenAnotherHostsContextIsActive_ShouldRecordAFindingAndFail()
     {
         // A foreign active context would complete the wrong test; the scope

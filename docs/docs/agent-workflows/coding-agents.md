@@ -87,7 +87,7 @@ Nothing is uploaded by default. There is no telemetry, no account and no ProtoTe
 dotnet run --project samples/ProtoTest.Mcp.DemoEndpoint
 ```
 
-The endpoint is then at `http://127.0.0.1:5199/`: the root path, with no `/mcp` prefix. Point an HTTP-capable MCP client at it and call `list_runs`: one bundled trace, four tools, no account. The local stdio server is the surface that reads your repository; this one reads the bundled trace.
+The endpoint is then at `http://127.0.0.1:5199/`: the root path, with no `/mcp` prefix. Point a client that speaks MCP Streamable HTTP at it (for example MCP Inspector) and call `list_runs`: one bundled trace, four tools, no account. A plain JSON-RPC POST without the Streamable HTTP headers is answered `406`. The local stdio server is the surface that reads your repository; this one reads the bundled trace.
 
 ## Check it
 

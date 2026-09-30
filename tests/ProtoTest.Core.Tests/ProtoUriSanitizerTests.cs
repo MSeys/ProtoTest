@@ -31,6 +31,14 @@ public sealed class ProtoUriSanitizerTests
             Is.EqualTo("https://example.test/callback?code=abc&access_token=%5BREDACTED%5D#done"));
 
     [Test]
+    public void Sanitize_ShouldRedactPasswordAndAuthorizationByDefault()
+        => Assert.That(
+            ProtoUriSanitizer.Sanitize(
+                new Uri("https://example.test/callback?password=hunter2&authorization=Bearer+abc&code=abc")),
+            Is.EqualTo(
+                "https://example.test/callback?password=%5BREDACTED%5D&authorization=%5BREDACTED%5D&code=abc"));
+
+    [Test]
     public void Sanitize_ShouldStripCredentialsEvenWithoutRedactionRules()
         => Assert.That(
             ProtoUriSanitizer.Sanitize(new Uri("http://user:secret@example.test/"), null),

@@ -66,7 +66,7 @@ public sealed class Setup : ProtoTestAssembly
         // In front of it, behind it, and what the run leaves behind.
         builder.AddWeb();
         builder.AddSql(_ => new SqliteConnection("Data Source=northstar.db"));
-        builder.ConfigureTracing(trace => trace.OutputPath = "northstar.prototrace");
+        // Tracing stays on its default: each run writes TestResults/prototest-{runId}.prototrace.
         builder.AddSink<HtmlReportSink>();
     }
 }`,
@@ -124,7 +124,7 @@ function Hero() {
             <CommandBox title="Start a project" commands={templateCommands()} runners={runnerChoices} />
             <p className={styles.heroNext}>
               That installs a green suite. <code>dotnet test</code> runs it and writes{' '}
-              <code>TestResults/Shop.prototrace</code> plus <code>Shop.html</code>.
+              <code>TestResults/prototest-{'{runId}'}.prototrace</code> plus <code>Shop.html</code>.
             </p>
             <p className={styles.heroLearn}>
               <Link to="/learn/">New to integration testing? Start the learning track</Link>
@@ -356,7 +356,7 @@ function CtaSection() {
               language="text"
               code={`dotnet test
 Passed! - Failed: 0, Passed: 1 - Shop.Tests.dll
-TestResults/Shop.prototrace
+TestResults/prototest-{runId}.prototrace
 TestResults/Shop.html`}
             />
           </div>

@@ -149,7 +149,7 @@ A few of the entry kinds recorded automatically:
 
 The in-process server is also a state entity with id `server:{type}:{application}` (`{type}` is the entry point's full name, as in `server:ProtoTest.SampleApp.Program:Northstar`), and those `aspnetcore.*` attributes are its state.
 
-Sensitive values stay out: form fills are recorded by length, headers and JSON properties are redacted using the [same rules as attachments](../integrations/rest/attachments.md#redaction), and sensitive query parameter values are redacted in HTTP request URLs and web navigation addresses.
+ProtoTest's own capture redacts by name: form fills are recorded by length, headers and JSON properties are redacted using the [same rules as attachments](../integrations/rest/attachments.md#redaction), and sensitive query parameter values are redacted in HTTP request URLs and web navigation addresses. Findings, observations and attachments you record yourself are redacted only where you mark them sensitive, so treat a trace like test output.
 
 A suite can name more values sensitive. `ConfigureRedaction` adds names to the defaults, and state values and finding metadata redact them:
 
@@ -187,7 +187,7 @@ builder.ConfigureTracing(trace =>
 });
 ```
 
-Turn `EmbedSources` off when a trace goes to people who should not read the suite's code.
+Turn `EmbedSources` off when a trace goes to people who should not read the suite's code. `EmbedSources` and `EmbedArtifacts` default on, so turn them both off and scope response capture (`CaptureResponses`) when the trace leaves your trust boundary.
 
 To read a run from code instead of the viewer, see [Extending ProtoTest](../advanced/extending.md#reading-a-trace-in-code). To forward operations to an observability backend, see [OpenTelemetry](./opentelemetry.md).
 

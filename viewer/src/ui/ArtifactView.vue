@@ -155,8 +155,8 @@ onBeforeUnmount(releaseArtifactUrl);
     <iframe v-else-if="artifactUrl && artifact.mediaType === 'application/pdf'" :src="artifactUrl" :title="artifact.name" class="frame" sandbox="" />
     <iframe v-else-if="artifactUrl && artifact.mediaType === 'text/html'" :src="artifactUrl" :title="artifact.name" class="frame" sandbox="allow-scripts" />
     <WorkbookPreview v-else-if="artifactBlob && isWorkbook" :blob="artifactBlob" />
-    <pre v-else-if="formattedJson" class="text json"><code>{{ formattedJson }}</code></pre>
-    <pre v-else-if="artifactText" class="text">{{ artifactText }}</pre>
+    <pre v-else-if="formattedJson" class="text json" :tabindex="fill ? 0 : undefined" :aria-label="fill ? artifact.name : undefined"><code>{{ formattedJson }}</code></pre>
+    <pre v-else-if="artifactText" class="text" :tabindex="fill ? 0 : undefined" :aria-label="fill ? artifact.name : undefined">{{ artifactText }}</pre>
     <!-- Playwright's viewer: it reads the trace in this browser, and only once you ask for it. -->
     <div v-else-if="isPlaywrightTrace" class="playwright" :class="{ embedded: embedViewer }">
       <iframe v-if="embedViewer" ref="traceFrame" :src="TRACE_VIEWER" title="Playwright trace viewer" class="frame"

@@ -55,11 +55,13 @@ function reason(test: TestTrace): string {
         <h3 v-if="group">{{ group }}</h3>
         <button v-for="test in tests" :key="test.id" type="button"
                 class="rail-row" :class="[tone(test.outcome), { active: test.id === selected?.id }]"
-                :title="testCodeName(test)" @click="emit('select', test)">
+                :title="testCodeName(test)" :aria-current="test.id === selected?.id ? 'true' : undefined"
+                @click="emit('select', test)">
           <b>{{ pad(test.number) }}</b>
           <span class="name">{{ testTitle(test) }}</span>
           <small>{{ formatDuration(test.duration) }}</small>
-          <i class="status" :class="tone(test.outcome)" />
+          <i class="status" :class="tone(test.outcome)" aria-hidden="true" />
+          <span class="visually-hidden">{{ outcomeLabel(test.outcome) }}</span>
           <span v-if="reason(test)" class="reason">{{ reason(test) }}</span>
         </button>
       </section>
@@ -116,5 +118,8 @@ function reason(test: TestTrace): string {
 .rail-row small { color: var(--muted); font-size: var(--text-micro); font-variant-numeric: tabular-nums; }
 .reason { grid-column: 2 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-micro); }
 .rail-row.danger .reason { color: var(--danger); }
+/* On the selected row the tint sits under the text, so the failure red deepens a step to hold its contrast. */
+html[data-theme="light"] .rail-row.active.danger .reason { color: color-mix(in srgb, var(--danger) 85%, var(--text)); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .rail-row.warning .reason { color: var(--warning); }
 </style>

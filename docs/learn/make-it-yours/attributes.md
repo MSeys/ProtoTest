@@ -158,7 +158,7 @@ Run it alone:
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~MyFirstJourney"
 ```
 
-Open `bin/Debug/net8.0/TestResults/Northstar.ProtoTest/northstar.prototrace` under the sample project in the [viewer](https://trace.prototest.dev). The setup phase holds a `Before · RunNoteAttribute` entry and the event you wrote, and the teardown phase holds the matching `After` entry.
+Open `bin/Debug/net8.0/TestResults/prototest-{runId}.prototrace` under the sample project in the [viewer](https://trace.prototest.dev). Each run writes its own file, named after the run id. The setup phase holds a `Before · RunNoteAttribute` entry and the event you wrote, and the teardown phase holds the matching `After` entry.
 
 ## The evidence the sample leaves
 

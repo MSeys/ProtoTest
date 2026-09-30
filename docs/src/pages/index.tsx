@@ -200,7 +200,6 @@ export default function Home(): ReactNode {
             name: 'ProtoTest',
             applicationCategory: 'DeveloperApplication',
             operatingSystem: 'Windows, Linux, macOS',
-            softwareVersion: '1.1.0',
             programmingLanguage: 'C#',
             url: 'https://prototest.dev/',
             downloadUrl: 'https://www.nuget.org/profiles/MSeys',
@@ -308,7 +307,7 @@ export default function Home(): ReactNode {
           <JourneyExample />
           <p className={styles.note}>
             Read the{' '}
-            <Link href="https://github.com/MSeys/ProtoTest/tree/version/1.1/samples/Northstar.ProtoTest">
+            <Link href="https://github.com/MSeys/ProtoTest/tree/main/samples/Northstar.ProtoTest">
               Northstar sample
             </Link>
             , or explore the recorded run in the{' '}

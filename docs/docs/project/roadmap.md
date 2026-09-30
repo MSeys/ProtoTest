@@ -8,16 +8,16 @@ description: "What is committed next in ProtoTest, what is being explored, and w
 
 This page says what shipped, what is coming, what is being considered, and what will not happen. It follows one rule. Nothing unshipped is described as a feature.
 
-Shipped: 1.1. Next: nothing committed. Exploring: three ideas. Never: seven deliberate noes, each with its reason.
+Shipped: the current release. Next: nothing committed. Exploring: three ideas. Never: seven deliberate noes, each with its reason.
 
 The order below is the order work happens in. Work happens in effort order, not date order. ProtoTest is maintained in personal time. The [changelog](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md) records what actually shipped.
 
-## Shipped: 1.1
+## Shipped
 
-1.1 is released (29 Sep 2026). The 1.1 line made ProtoTest a platform proven on a real product. The sections below stay visible as user-facing capabilities; the full list is the [1.1.0 changelog](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).
+The current release made ProtoTest a platform proven on a real product. The sections below stay visible as user-facing capabilities; the full list is the [changelog](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).
 
 <details>
-<summary>What 1.1 shipped, in one list</summary>
+<summary>What the release shipped, in one list</summary>
 
 - **Shape and truth:** the package review, with the `ProtoTest.OpenTelemetry` package retired into the docs.
 - **Devices on a real product:** the reference demo's OCPP gateway and charge-point simulator, and the WebSocket device backend proven on it.
@@ -36,7 +36,7 @@ When an item ships, it leaves this section and becomes a docs page like everythi
 
 ## Next: committed, in this order
 
-- **1.1 follow-through is done:** the tag, the packages, the public default branch, the API reference and the site are the release.
+- **Release follow-through:** the tag, the packages, the public default branch, the API reference and the site are the release.
 
 Nothing else is committed. An item moves out of **Exploring** when someone needs it in a real suite.
 

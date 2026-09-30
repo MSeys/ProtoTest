@@ -15,7 +15,7 @@ ProtoTest is a foundation for integration testing on .NET 8, 9 and 10. You choos
 
 That lets one test write through REST and read through GraphQL, or combine API, browser, database, messaging and file checks when that is useful.
 
-ProtoTest 1.1 packages are available on NuGet. The template targets `net10.0` by default; pass `--framework net8.0` or `net9.0` to use another supported target.
+ProtoTest packages are available on NuGet. The template targets `net10.0` by default; pass `--framework net8.0` or `net9.0` to use another supported target.
 
 ## Pick your path
 

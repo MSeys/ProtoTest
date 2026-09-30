@@ -29,7 +29,7 @@ ProtoTest follows semantic versioning with one documented exception list:
 
 A Breaking entry reads like the change it asks for: the removed REST and GraphQL client registration, with the replacement spelled out (register clients under an application and configure its base URL or endpoints, or use an `AddClient` resolver). The [changelog](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md) carries every such entry with its migration note.
 
-All ProtoTest packages share one version and are released together, so "ProtoTest 1.2" names one coherent set. Packages published outside this repository version independently and declare the ProtoTest they require.
+All ProtoTest packages share one version and are released together, so one minor release names one coherent set. Packages published outside this repository version independently and declare the ProtoTest they require.
 
 **Fixes** land on the newest released line. If you need a long support window for an old minor, pin it and budget for the upgrade.
 
